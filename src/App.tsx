@@ -13,6 +13,7 @@ import ModuleAllocation from "./pages/admin/ModuleAllocation";
 import PurchaseRequisition from "./pages/procurement/PurchaseRequisition";
 import PurchaseOrder from "./pages/procurement/PurchaseOrder";
 import { SupplierMaster } from "./pages/sourcing/SupplierMaster";
+import AssetManagement from "./pages/warehouse/AssetManagement";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 
@@ -73,6 +74,13 @@ const App = () => (
               <ProtectedRoute>
                 <AppLayout>
                   <SupplierMaster />
+                </AppLayout>
+              </ProtectedRoute>
+            } />
+            <Route path="/warehouse/asset-management" element={
+              <ProtectedRoute>
+                <AppLayout>
+                  <AssetManagement />
                 </AppLayout>
               </ProtectedRoute>
             } />

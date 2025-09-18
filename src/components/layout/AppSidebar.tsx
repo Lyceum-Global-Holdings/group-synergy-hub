@@ -60,6 +60,7 @@ const departments = [
       { title: "Stock Adjustment", url: "/warehouse/stock-adjustment" },
       { title: "Delivery Order", url: "/warehouse/delivery-order" },
       { title: "Inventory Valuation", url: "/warehouse/inventory-valuation" },
+      { title: "Asset Management", url: "/warehouse/asset-management" },
     ],
   },
   {
