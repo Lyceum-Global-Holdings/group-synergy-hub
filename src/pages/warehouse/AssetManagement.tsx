@@ -78,9 +78,11 @@ const mockLocations: LocationItem[] = [
   { id: "2", name: "Warehouse B", type: "location", description: "Secondary warehouse facility" },
   { id: "3", name: "Loading Dock", type: "sublocation", parentId: "1", description: "Loading area in Warehouse A" },
   { id: "4", name: "Storage Zone 1", type: "sublocation", parentId: "1", description: "Primary storage area" },
-  { id: "5", name: "Operations", type: "department", description: "Operations department" },
-  { id: "6", name: "Maintenance", type: "department", description: "Maintenance department" },
-  { id: "7", name: "Quality Control", type: "department", description: "Quality control department" },
+  { id: "5", name: "Storage Zone 2", type: "sublocation", parentId: "2", description: "Secondary storage area" },
+  { id: "6", name: "Operations", type: "department", parentId: "3", description: "Operations department in Loading Dock" },
+  { id: "7", name: "Maintenance", type: "department", parentId: "4", description: "Maintenance department in Storage Zone 1" },
+  { id: "8", name: "Quality Control", type: "department", parentId: "4", description: "Quality control department in Storage Zone 1" },
+  { id: "9", name: "Receiving", type: "department", parentId: "3", description: "Receiving department in Loading Dock" },
 ];
 
 const mockAssets = [
@@ -221,10 +223,14 @@ export default function AssetManagement() {
   );
 
   const getLocationsByType = (type: "location" | "sublocation" | "department", parentId?: string) => {
-    return locations.filter(loc => 
-      loc.type === type && 
-      (parentId ? loc.parentId === parentId : !loc.parentId || loc.type === "department")
-    );
+    if (type === "location") {
+      return locations.filter(loc => loc.type === "location");
+    } else if (type === "sublocation") {
+      return locations.filter(loc => loc.type === "sublocation" && loc.parentId === parentId);
+    } else if (type === "department") {
+      return locations.filter(loc => loc.type === "department" && loc.parentId === parentId);
+    }
+    return [];
   };
 
   const getLocationName = (id: string) => {
@@ -326,6 +332,33 @@ export default function AssetManagement() {
                     />
                   )}
 
+                  {locationForm.watch("type") === "department" && (
+                    <FormField
+                      control={locationForm.control}
+                      name="parentId"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Parent Sublocation</FormLabel>
+                          <Select onValueChange={field.onChange} defaultValue={field.value}>
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select parent sublocation" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent className="bg-background border shadow-md z-50">
+                              {getLocationsByType("sublocation").map((sublocation) => (
+                                <SelectItem key={sublocation.id} value={sublocation.id}>
+                                  {sublocation.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  )}
+
                   <FormField
                     control={locationForm.control}
                     name="description"
@@ -358,24 +391,56 @@ export default function AssetManagement() {
 
               {/* Current Locations List */}
               <div className="mt-6">
-                <h4 className="font-medium mb-3">Current Locations</h4>
-                <div className="space-y-2 max-h-40 overflow-y-auto">
-                  {locations.map((location) => (
-                    <div key={location.id} className="flex items-center justify-between p-2 border rounded">
-                      <div className="flex items-center gap-2">
-                        {location.type === "location" && <Building className="h-4 w-4" />}
-                        {location.type === "sublocation" && <MapPin className="h-4 w-4" />}
-                        {location.type === "department" && <Users className="h-4 w-4" />}
-                        <span className="font-medium">{location.name}</span>
-                        <Badge variant="outline" className="capitalize">
-                          {location.type}
-                        </Badge>
+                <h4 className="font-medium mb-3">Current Location Hierarchy</h4>
+                <div className="space-y-2 max-h-60 overflow-y-auto">
+                  {/* Show locations with their hierarchy */}
+                  {locations
+                    .filter(loc => loc.type === "location")
+                    .map((location) => (
+                    <div key={location.id} className="space-y-1">
+                      <div className="flex items-center justify-between p-2 border rounded bg-blue-50">
+                        <div className="flex items-center gap-2">
+                          <Building className="h-4 w-4 text-blue-600" />
+                          <span className="font-medium">{location.name}</span>
+                          <Badge variant="outline" className="bg-blue-100 text-blue-800">
+                            Location
+                          </Badge>
+                        </div>
                       </div>
-                      {location.parentId && (
-                        <span className="text-sm text-muted-foreground">
-                          under {getLocationName(location.parentId)}
-                        </span>
-                      )}
+                      
+                      {/* Show sublocations under this location */}
+                      {locations
+                        .filter(sub => sub.type === "sublocation" && sub.parentId === location.id)
+                        .map((sublocation) => (
+                        <div key={sublocation.id} className="ml-6 space-y-1">
+                          <div className="flex items-center justify-between p-2 border rounded bg-green-50">
+                            <div className="flex items-center gap-2">
+                              <MapPin className="h-4 w-4 text-green-600" />
+                              <span className="font-medium">{sublocation.name}</span>
+                              <Badge variant="outline" className="bg-green-100 text-green-800">
+                                Sublocation
+                              </Badge>
+                            </div>
+                          </div>
+                          
+                          {/* Show departments under this sublocation */}
+                          {locations
+                            .filter(dept => dept.type === "department" && dept.parentId === sublocation.id)
+                            .map((department) => (
+                            <div key={department.id} className="ml-6">
+                              <div className="flex items-center justify-between p-2 border rounded bg-orange-50">
+                                <div className="flex items-center gap-2">
+                                  <Users className="h-4 w-4 text-orange-600" />
+                                  <span className="font-medium">{department.name}</span>
+                                  <Badge variant="outline" className="bg-orange-100 text-orange-800">
+                                    Department
+                                  </Badge>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ))}
                     </div>
                   ))}
                 </div>
@@ -518,9 +583,17 @@ export default function AssetManagement() {
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent className="bg-background border shadow-md z-50">
-                              {getLocationsByType("department").map((department) => (
+                              {/* Show all departments available in the selected sublocation */}
+                              {locations
+                                .filter(loc => loc.type === "department")
+                                .map((department) => (
                                 <SelectItem key={department.id} value={department.name}>
                                   {department.name}
+                                  {department.parentId && (
+                                    <span className="text-xs text-muted-foreground ml-2">
+                                      ({getLocationName(department.parentId)})
+                                    </span>
+                                  )}
                                 </SelectItem>
                               ))}
                             </SelectContent>
