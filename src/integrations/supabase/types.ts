@@ -55,6 +55,107 @@ export type Database = {
           },
         ]
       }
+      asset_transfers: {
+        Row: {
+          asset_id: string
+          created_at: string
+          from_department_id: string | null
+          from_location_id: string | null
+          from_sublocation_id: string | null
+          id: string
+          notes: string | null
+          to_department_id: string | null
+          to_location_id: string | null
+          to_sublocation_id: string | null
+          transfer_date: string
+          transfer_reason: string | null
+          transferred_by: string | null
+          updated_at: string
+        }
+        Insert: {
+          asset_id: string
+          created_at?: string
+          from_department_id?: string | null
+          from_location_id?: string | null
+          from_sublocation_id?: string | null
+          id?: string
+          notes?: string | null
+          to_department_id?: string | null
+          to_location_id?: string | null
+          to_sublocation_id?: string | null
+          transfer_date?: string
+          transfer_reason?: string | null
+          transferred_by?: string | null
+          updated_at?: string
+        }
+        Update: {
+          asset_id?: string
+          created_at?: string
+          from_department_id?: string | null
+          from_location_id?: string | null
+          from_sublocation_id?: string | null
+          id?: string
+          notes?: string | null
+          to_department_id?: string | null
+          to_location_id?: string | null
+          to_sublocation_id?: string | null
+          transfer_date?: string
+          transfer_reason?: string | null
+          transferred_by?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "asset_transfers_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "warehouse_assets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "asset_transfers_from_department_id_fkey"
+            columns: ["from_department_id"]
+            isOneToOne: false
+            referencedRelation: "warehouse_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "asset_transfers_from_location_id_fkey"
+            columns: ["from_location_id"]
+            isOneToOne: false
+            referencedRelation: "warehouse_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "asset_transfers_from_sublocation_id_fkey"
+            columns: ["from_sublocation_id"]
+            isOneToOne: false
+            referencedRelation: "warehouse_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "asset_transfers_to_department_id_fkey"
+            columns: ["to_department_id"]
+            isOneToOne: false
+            referencedRelation: "warehouse_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "asset_transfers_to_location_id_fkey"
+            columns: ["to_location_id"]
+            isOneToOne: false
+            referencedRelation: "warehouse_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "asset_transfers_to_sublocation_id_fkey"
+            columns: ["to_sublocation_id"]
+            isOneToOne: false
+            referencedRelation: "warehouse_locations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       companies: {
         Row: {
           address: string | null

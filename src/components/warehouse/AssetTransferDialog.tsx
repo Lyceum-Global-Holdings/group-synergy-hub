@@ -10,7 +10,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { WarehouseAsset, WarehouseLocation } from "@/types/warehouse";
-import { useWarehouseAssets } from "@/hooks/useWarehouseAssets";
+import { useAssetTransferMutation } from "@/hooks/useAssetTransferMutation";
 import { useEffect } from "react";
 
 const transferAssetSchema = z.object({
@@ -46,7 +46,7 @@ export function AssetTransferDialog({
   getLocationsByType,
   getLocationName,
 }: AssetTransferDialogProps) {
-  const { updateAsset, isUpdating } = useWarehouseAssets();
+  const { mutate: transferAsset, isPending: isTransferring } = useAssetTransferMutation();
 
   const form = useForm<TransferAssetFormValues>({
     resolver: zodResolver(transferAssetSchema),
@@ -77,18 +77,21 @@ export function AssetTransferDialog({
   const onSubmit = (data: TransferAssetFormValues) => {
     if (!asset) return;
 
-    const updateData = {
-      location_id: data.location_id || null,
-      sublocation_id: data.sublocation_id || null,
-      department_id: data.department_id || null,
-      // Add transfer note to existing notes
-      notes: asset.notes 
-        ? `${asset.notes}\n\n--- Transfer ${data.transfer_date} ---\nReason: ${data.transfer_reason}\n${data.notes ? `Notes: ${data.notes}` : ''}`
-        : `--- Transfer ${data.transfer_date} ---\nReason: ${data.transfer_reason}\n${data.notes ? `Notes: ${data.notes}` : ''}`,
-    };
-
-    updateAsset({ id: asset.id, ...updateData });
-    onOpenChange(false);
+    transferAsset({
+      assetId: asset.id,
+      fromLocationId: asset.location_id,
+      toLocationId: data.location_id || null,
+      fromSublocationId: asset.sublocation_id,
+      toSublocationId: data.sublocation_id || null,
+      fromDepartmentId: asset.department_id,
+      toDepartmentId: data.department_id || null,
+      transferReason: data.transfer_reason,
+      notes: data.notes,
+    }, {
+      onSuccess: () => {
+        onOpenChange(false);
+      }
+    });
   };
 
   const selectedLocationId = form.watch("location_id");
@@ -286,8 +289,8 @@ export function AssetTransferDialog({
               >
                 Cancel
               </Button>
-              <Button type="submit" disabled={isUpdating}>
-                {isUpdating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              <Button type="submit" disabled={isTransferring}>
+                {isTransferring && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Transfer Asset
               </Button>
             </div>
