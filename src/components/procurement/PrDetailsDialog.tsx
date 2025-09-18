@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { format } from 'date-fns';
 import { FileText, Calendar, User, DollarSign, Package, MessageSquare, CheckCircle, XCircle, Edit } from 'lucide-react';
 import { Button } from '@/components/ui/button';
