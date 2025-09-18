@@ -262,3 +262,62 @@ export const useUpdateProfile = () => {
     },
   });
 };
+
+export const useCreateUser = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (userData: {
+      email: string;
+      password: string;
+      full_name: string;
+      department?: string;
+      roles: string[];
+      company_id?: string;
+    }) => {
+      // Create user in Supabase Auth
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: userData.email,
+        password: userData.password,
+        options: {
+          data: {
+            full_name: userData.full_name,
+          },
+        },
+      });
+
+      if (authError) throw authError;
+      if (!authData.user) throw new Error('User creation failed');
+
+      // Update profile with department if provided
+      if (userData.department) {
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .update({ department: userData.department })
+          .eq('user_id', authData.user.id);
+
+        if (profileError) throw profileError;
+      }
+
+      // Assign roles
+      if (userData.roles.length > 0) {
+        const roleAssignments = userData.roles.map(roleId => ({
+          user_id: authData.user.id,
+          role_id: roleId,
+        }));
+
+        const { error: rolesError } = await supabase
+          .from('user_roles')
+          .insert(roleAssignments);
+
+        if (rolesError) throw rolesError;
+      }
+
+      return authData.user;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+      queryClient.invalidateQueries({ queryKey: ['roles'] });
+    },
+  });
+};

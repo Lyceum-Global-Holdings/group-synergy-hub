@@ -1,14 +1,15 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogHeader,
   DialogTitle,
+  DialogFooter,
 } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 import {
   Form,
   FormControl,
@@ -25,45 +26,22 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
+import { X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useCompanies } from "@/hooks/useCompanies";
+import { useRoles, useCreateUser } from "@/hooks/useUsers";
 
-const companies = [
-  { id: "1", name: "Acme Corporation", code: "ACME" },
-  { id: "2", name: "Global Industries", code: "GLOB" },
-  { id: "3", name: "Tech Solutions Ltd", code: "TECH" },
-  { id: "4", name: "Manufacturing Co", code: "MFG" },
-];
-
-const availableRoles = [
-  "Procurement Manager",
-  "Finance Manager", 
-  "Warehouse Manager",
-  "Sourcing Manager",
-  "Operations Lead",
-  "Finance Viewer",
-  "Inventory Clerk",
-  "Purchase Officer"
-];
-
-const departments = [
-  "Finance",
-  "Warehouse", 
-  "Operations",
-  "Sourcing",
-  "Procurement",
-  "Management"
-];
-
+// Validation schema
 const userSchema = z.object({
-  firstName: z.string().min(2, "First name must be at least 2 characters"),
-  lastName: z.string().min(2, "Last name must be at least 2 characters"),
-  email: z.string().email("Invalid email address"),
-  company: z.string().min(1, "Company is required"),
-  roles: z.array(z.string()).min(1, "At least one role is required"),
-  departments: z.array(z.string()).min(1, "At least one department is required"),
+  firstName: z.string().min(1, "First name is required"),
+  lastName: z.string().min(1, "Last name is required"),
+  email: z.string().email("Please enter a valid email"),
+  password: z.string().min(6, "Password must be at least 6 characters"),
+  company: z.string().optional(),
+  roles: z.array(z.string()).min(1, "Please select at least one role"),
+  department: z.string().optional(),
 });
 
 type UserFormData = z.infer<typeof userSchema>;
@@ -71,13 +49,20 @@ type UserFormData = z.infer<typeof userSchema>;
 interface AddUserDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onUserAdded: (user: any) => void;
+  onUserAdded?: () => void;
 }
 
-export function AddUserDialog({ open, onOpenChange, onUserAdded }: AddUserDialogProps) {
-  const { toast } = useToast();
+export const AddUserDialog: React.FC<AddUserDialogProps> = ({
+  open,
+  onOpenChange,
+  onUserAdded,
+}) => {
   const [selectedRoles, setSelectedRoles] = useState<string[]>([]);
-  const [selectedDepartments, setSelectedDepartments] = useState<string[]>([]);
+  const { toast } = useToast();
+  
+  const { companies } = useCompanies();
+  const { data: roles } = useRoles();
+  const createUserMutation = useCreateUser();
 
   const form = useForm<UserFormData>({
     resolver: zodResolver(userSchema),
@@ -85,58 +70,52 @@ export function AddUserDialog({ open, onOpenChange, onUserAdded }: AddUserDialog
       firstName: "",
       lastName: "",
       email: "",
+      password: "",
       company: "",
       roles: [],
-      departments: [],
+      department: "",
     },
   });
 
-  const onSubmit = (data: UserFormData) => {
-    const selectedCompany = companies.find(c => c.id === data.company);
-    
-    const newUser = {
-      id: Date.now().toString(),
-      name: `${data.firstName} ${data.lastName}`,
-      email: data.email,
-      company: selectedCompany?.name || "",
-      roles: selectedRoles,
-      departments: selectedDepartments,
-      status: "active",
-      lastLogin: "Never",
-    };
+  const onSubmit = async (data: UserFormData) => {
+    try {
+      await createUserMutation.mutateAsync({
+        email: data.email,
+        password: data.password,
+        full_name: `${data.firstName} ${data.lastName}`,
+        department: data.department,
+        roles: selectedRoles,
+        company_id: data.company,
+      });
 
-    onUserAdded(newUser);
-    toast({
-      title: "User Created",
-      description: `${data.firstName} ${data.lastName} has been added successfully.`,
-    });
-    
-    form.reset();
-    setSelectedRoles([]);
-    setSelectedDepartments([]);
-    onOpenChange(false);
+      toast({
+        title: "User Created",
+        description: `${data.firstName} ${data.lastName} has been added successfully.`,
+      });
+
+      // Reset form
+      form.reset();
+      setSelectedRoles([]);
+      onOpenChange(false);
+      onUserAdded?.();
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to create user. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
-  const handleRoleChange = (role: string, checked: boolean) => {
+  const handleRoleChange = (roleId: string, checked: boolean) => {
     let updatedRoles;
     if (checked) {
-      updatedRoles = [...selectedRoles, role];
+      updatedRoles = [...selectedRoles, roleId];
     } else {
-      updatedRoles = selectedRoles.filter(r => r !== role);
+      updatedRoles = selectedRoles.filter((id) => id !== roleId);
     }
     setSelectedRoles(updatedRoles);
     form.setValue("roles", updatedRoles);
-  };
-
-  const handleDepartmentChange = (department: string, checked: boolean) => {
-    let updatedDepartments;
-    if (checked) {
-      updatedDepartments = [...selectedDepartments, department];
-    } else {
-      updatedDepartments = selectedDepartments.filter(d => d !== department);
-    }
-    setSelectedDepartments(updatedDepartments);
-    form.setValue("departments", updatedDepartments);
   };
 
   return (
@@ -144,9 +123,6 @@ export function AddUserDialog({ open, onOpenChange, onUserAdded }: AddUserDialog
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Add New User</DialogTitle>
-          <DialogDescription>
-            Create a new user account with company, role, and department assignments.
-          </DialogDescription>
         </DialogHeader>
 
         <Form {...form}>
@@ -159,7 +135,10 @@ export function AddUserDialog({ open, onOpenChange, onUserAdded }: AddUserDialog
                   <FormItem>
                     <FormLabel>First Name</FormLabel>
                     <FormControl>
-                      <Input placeholder="John" {...field} />
+                      <Input
+                        placeholder="Enter first name"
+                        {...field}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -173,7 +152,10 @@ export function AddUserDialog({ open, onOpenChange, onUserAdded }: AddUserDialog
                   <FormItem>
                     <FormLabel>Last Name</FormLabel>
                     <FormControl>
-                      <Input placeholder="Doe" {...field} />
+                      <Input
+                        placeholder="Enter last name"
+                        {...field}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -186,123 +168,136 @@ export function AddUserDialog({ open, onOpenChange, onUserAdded }: AddUserDialog
               name="email"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Email Address</FormLabel>
+                  <FormLabel>Email</FormLabel>
                   <FormControl>
-                    <Input placeholder="john.doe@company.com" type="email" {...field} />
+                    <Input
+                      placeholder="Enter email address"
+                      type="email"
+                      {...field}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
             />
 
+          <div className="grid grid-cols-2 gap-4">
             <FormField
               control={form.control}
-              name="company"
+              name="password"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Company</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select a company" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {companies.map((company) => (
-                        <SelectItem key={company.id} value={company.id}>
-                          {company.name} ({company.code})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <FormLabel>Password</FormLabel>
+                  <FormControl>
+                    <Input
+                      placeholder="Enter password"
+                      type="password"
+                      {...field}
+                    />
+                  </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
             />
+            <FormField
+              control={form.control}
+              name="department"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Department</FormLabel>
+                  <FormControl>
+                    <Input
+                      placeholder="Enter department"
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
 
-            <div className="space-y-3">
+          <FormField
+            control={form.control}
+            name="company"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Company (Optional)</FormLabel>
+                <FormControl>
+                  <Select value={field.value} onValueChange={field.onChange}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select company" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {companies?.map((company) => (
+                        <SelectItem key={company.id} value={company.id}>
+                          {company.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <div className="space-y-4">
+            <div>
               <FormLabel>Roles</FormLabel>
-              <div className="grid grid-cols-2 gap-3">
-                {availableRoles.map((role) => (
-                  <div key={role} className="flex items-center space-x-2">
+              <div className="mt-2 space-y-2">
+                {roles?.map((role) => (
+                  <div key={role.id} className="flex items-center space-x-2">
                     <Checkbox
-                      id={`role-${role}`}
-                      checked={selectedRoles.includes(role)}
-                      onCheckedChange={(checked) => 
-                        handleRoleChange(role, checked as boolean)
+                      id={`role-${role.id}`}
+                      checked={selectedRoles.includes(role.id)}
+                      onCheckedChange={(checked) =>
+                        handleRoleChange(role.id, !!checked)
                       }
                     />
-                    <label
-                      htmlFor={`role-${role}`}
-                      className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                    <FormLabel
+                      htmlFor={`role-${role.id}`}
+                      className="text-sm font-normal cursor-pointer"
                     >
-                      {role}
-                    </label>
+                      {role.name}
+                    </FormLabel>
                   </div>
                 ))}
               </div>
               {selectedRoles.length > 0 && (
-                <div className="flex flex-wrap gap-1 mt-2">
-                  {selectedRoles.map((role) => (
-                    <Badge key={role} variant="outline" className="text-xs">
-                      {role}
-                    </Badge>
-                  ))}
+                <div className="mt-3 flex flex-wrap gap-1">
+                  {selectedRoles.map((roleId) => {
+                    const role = roles?.find((r) => r.id === roleId);
+                    return (
+                      <Badge key={roleId} variant="secondary" className="text-xs">
+                        {role?.name}
+                        <X
+                          className="ml-1 h-3 w-3 cursor-pointer"
+                          onClick={() => handleRoleChange(roleId, false)}
+                        />
+                      </Badge>
+                    );
+                  })}
                 </div>
               )}
-              {form.formState.errors.roles && (
-                <p className="text-sm font-medium text-destructive">
-                  {form.formState.errors.roles.message}
-                </p>
-              )}
             </div>
+          </div>
 
-            <div className="space-y-3">
-              <FormLabel>Departments</FormLabel>
-              <div className="grid grid-cols-2 gap-3">
-                {departments.map((department) => (
-                  <div key={department} className="flex items-center space-x-2">
-                    <Checkbox
-                      id={`dept-${department}`}
-                      checked={selectedDepartments.includes(department)}
-                      onCheckedChange={(checked) => 
-                        handleDepartmentChange(department, checked as boolean)
-                      }
-                    />
-                    <label
-                      htmlFor={`dept-${department}`}
-                      className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                    >
-                      {department}
-                    </label>
-                  </div>
-                ))}
-              </div>
-              {selectedDepartments.length > 0 && (
-                <div className="flex flex-wrap gap-1 mt-2">
-                  {selectedDepartments.map((dept) => (
-                    <Badge key={dept} variant="secondary" className="text-xs">
-                      {dept}
-                    </Badge>
-                  ))}
-                </div>
-              )}
-              {form.formState.errors.departments && (
-                <p className="text-sm font-medium text-destructive">
-                  {form.formState.errors.departments.message}
-                </p>
-              )}
-            </div>
-
-            <div className="flex justify-end space-x-3">
-              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-                Cancel
-              </Button>
-              <Button type="submit">Create User</Button>
-            </div>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+            >
+              Cancel
+            </Button>
+            <Button type="submit" disabled={createUserMutation.isPending}>
+              {createUserMutation.isPending ? "Creating..." : "Create User"}
+            </Button>
+          </DialogFooter>
           </form>
         </Form>
       </DialogContent>
     </Dialog>
   );
-}
+};

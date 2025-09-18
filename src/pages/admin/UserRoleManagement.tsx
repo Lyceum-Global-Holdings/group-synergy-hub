@@ -17,17 +17,15 @@ export default function UserRoleManagement() {
   const [addUserOpen, setAddUserOpen] = useState(false);
   const [addRoleOpen, setAddRoleOpen] = useState(false);
   
-  const { data: users = [], isLoading: usersLoading, error: usersError } = useUsers();
+  const { data: users = [], isLoading: usersLoading, error: usersError, refetch } = useUsers();
   const { data: roles = [], isLoading: rolesLoading, error: rolesError } = useRoles();
   const assignRole = useAssignRole();
   const removeRole = useRemoveRole();
   const { toast } = useToast();
 
   const handleUserAdded = () => {
-    toast({
-      title: "User invitation sent",
-      description: "The user will receive an email invitation to join the system.",
-    });
+    // Refetch users after adding a new one
+    refetch();
   };
 
   const handleRoleAdded = () => {
