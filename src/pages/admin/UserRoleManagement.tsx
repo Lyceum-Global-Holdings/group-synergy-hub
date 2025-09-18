@@ -1,103 +1,89 @@
-import { useState } from "react";
-import { Plus, Users, Shield, Edit, Trash2, UserPlus } from "lucide-react";
-import { AddRoleDialog } from "@/components/admin/AddRoleDialog";
-import { AddUserDialog } from "@/components/admin/AddUserDialog";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-
-const users = [
-  {
-    id: "1",
-    name: "John Doe",
-    email: "john.doe@acme.com",
-    company: "Acme Corporation",
-    roles: ["Procurement Manager", "Finance Viewer"],
-    departments: ["Procurement", "Finance"],
-    status: "active",
-    lastLogin: "2024-01-15 09:30"
-  },
-  {
-    id: "2",
-    name: "Sarah Johnson",
-    email: "sarah.j@global.com",
-    company: "Global Industries",
-    roles: ["Sourcing Manager"],
-    departments: ["Sourcing"],
-    status: "active",
-    lastLogin: "2024-01-15 08:45"
-  },
-  {
-    id: "3",
-    name: "Mike Chen",
-    email: "mike.chen@tech.com",
-    company: "Tech Solutions Ltd",
-    roles: ["Warehouse Manager", "Operations Lead"],
-    departments: ["Warehouse", "Operations"],
-    status: "active",
-    lastLogin: "2024-01-14 16:22"
-  }
-];
-
-const roles = [
-  {
-    id: "1",
-    name: "Procurement Manager",
-    department: "Procurement",
-    permissions: ["Create PO", "Approve PR", "Manage Suppliers", "View Reports"],
-    userCount: 5,
-    description: "Full access to procurement operations"
-  },
-  {
-    id: "2",
-    name: "Finance Manager",
-    department: "Finance",
-    permissions: ["Manage GL", "Process Payments", "Budget Control", "Financial Reports"],
-    userCount: 3,
-    description: "Complete financial management access"
-  },
-  {
-    id: "3",
-    name: "Warehouse Manager",
-    department: "Warehouse",
-    permissions: ["Manage Inventory", "Process GRN", "Stock Adjustments", "Cycle Count"],
-    userCount: 4,
-    description: "Full warehouse operations control"
-  },
-  {
-    id: "4",
-    name: "Sourcing Manager",
-    department: "Sourcing",
-    permissions: ["Manage Suppliers", "RFQ Process", "Vendor Evaluation", "Contract Management"],
-    userCount: 2,
-    description: "Strategic sourcing and supplier management"
-  }
-];
+import React, { useState } from 'react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Users, UserPlus, Shield, Edit, Trash2, Crown, Loader2 } from 'lucide-react';
+import { AddUserDialog } from '@/components/admin/AddUserDialog';
+import { AddRoleDialog } from '@/components/admin/AddRoleDialog';
+import { useUsers, useRoles, useAssignRole, useRemoveRole } from '@/hooks/useUsers';
+import { useToast } from '@/hooks/use-toast';
+import { format } from 'date-fns';
 
 export default function UserRoleManagement() {
-  const [activeTab, setActiveTab] = useState("users");
-  const [addRoleOpen, setAddRoleOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState('users');
   const [addUserOpen, setAddUserOpen] = useState(false);
-  const [usersList, setUsersList] = useState(users);
-  const [rolesList, setRolesList] = useState(roles);
+  const [addRoleOpen, setAddRoleOpen] = useState(false);
+  
+  const { data: users = [], isLoading: usersLoading, error: usersError } = useUsers();
+  const { data: roles = [], isLoading: rolesLoading, error: rolesError } = useRoles();
+  const assignRole = useAssignRole();
+  const removeRole = useRemoveRole();
+  const { toast } = useToast();
 
-  const handleUserAdded = (newUser: any) => {
-    setUsersList([...usersList, newUser]);
+  const handleUserAdded = () => {
+    toast({
+      title: "User invitation sent",
+      description: "The user will receive an email invitation to join the system.",
+    });
   };
 
-  const handleRoleAdded = (newRole: any) => {
-    setRolesList([...rolesList, newRole]);
+  const handleRoleAdded = () => {
+    toast({
+      title: "Role created",
+      description: "The new role has been created successfully.",
+    });
   };
+
+  const handleRoleAssignment = async (userId: string, roleId: string, action: 'assign' | 'remove') => {
+    try {
+      if (action === 'assign') {
+        await assignRole.mutateAsync({ userId, roleId });
+        toast({
+          title: "Role assigned",
+          description: "The role has been assigned successfully.",
+        });
+      } else {
+        await removeRole.mutateAsync({ userId, roleId });
+        toast({
+          title: "Role removed", 
+          description: "The role has been removed successfully.",
+        });
+      }
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
+  const isLoading = usersLoading || rolesLoading;
+  const hasError = usersError || rolesError;
+
+  if (hasError) {
+    return (
+      <div className="container mx-auto p-6">
+        <Card>
+          <CardContent className="pt-6">
+            <div className="text-center text-destructive">
+              Error loading data: {usersError?.message || rolesError?.message}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  const onlineUsers = users.filter(user => {
+    const lastSignIn = user.last_sign_in_at ? new Date(user.last_sign_in_at) : null;
+    return lastSignIn && (new Date().getTime() - lastSignIn.getTime()) < 30 * 60 * 1000; // 30 minutes
+  }).length;
+
+  const activeRoles = roles.filter(role => role.user_count > 0).length;
 
   return (
     <div className="space-y-6">
@@ -113,52 +99,60 @@ export default function UserRoleManagement() {
             Add User
           </Button>
           <Button onClick={() => setAddRoleOpen(true)}>
-            <Plus className="h-4 w-4 mr-2" />
+            <Shield className="h-4 w-4 mr-2" />
             Create Role
           </Button>
         </div>
       </div>
 
-      {/* Statistics */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      {/* Statistics Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Total Users</CardTitle>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Users</CardTitle>
+            <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">120</div>
-            <p className="text-xs text-muted-foreground">Across all companies</p>
+            <div className="text-2xl font-bold">{isLoading ? '-' : users.length}</div>
+            <p className="text-xs text-muted-foreground">Registered users</p>
           </CardContent>
         </Card>
+
         <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Active Roles</CardTitle>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Active Roles</CardTitle>
+            <Shield className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">15</div>
-            <p className="text-xs text-muted-foreground">Department-based roles</p>
+            <div className="text-2xl font-bold">{isLoading ? '-' : activeRoles}</div>
+            <p className="text-xs text-muted-foreground">Roles with users</p>
           </CardContent>
         </Card>
+
         <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Online Users</CardTitle>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Online Users</CardTitle>
+            <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">24</div>
-            <p className="text-xs text-muted-foreground">Currently active</p>
+            <div className="text-2xl font-bold">{isLoading ? '-' : onlineUsers}</div>
+            <p className="text-xs text-muted-foreground">Active in last 30min</p>
           </CardContent>
         </Card>
+
         <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Pending Invites</CardTitle>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Roles</CardTitle>
+            <Crown className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">8</div>
-            <p className="text-xs text-muted-foreground">Awaiting acceptance</p>
+            <div className="text-2xl font-bold">{isLoading ? '-' : roles.length}</div>
+            <p className="text-xs text-muted-foreground">System roles</p>
           </CardContent>
         </Card>
       </div>
 
+      {/* Tabbed Interface */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList>
           <TabsTrigger value="users">Users</TabsTrigger>
@@ -168,139 +162,159 @@ export default function UserRoleManagement() {
         <TabsContent value="users" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Users className="h-5 w-5" />
-                System Users
-              </CardTitle>
+              <CardTitle>User Management</CardTitle>
+              <CardDescription>
+                Manage user accounts, roles, and permissions
+              </CardDescription>
             </CardHeader>
             <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>User</TableHead>
-                    <TableHead>Company</TableHead>
-                    <TableHead>Roles</TableHead>
-                    <TableHead>Departments</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Last Login</TableHead>
-                    <TableHead>Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {usersList.map((user) => (
-                    <TableRow key={user.id}>
-                      <TableCell>
-                        <div className="flex items-center gap-3">
-                          <Avatar className="h-8 w-8">
-                            <AvatarImage src="" />
-                            <AvatarFallback className="bg-primary text-primary-foreground text-xs">
-                              {user.name.split(" ").map(n => n[0]).join("")}
+              {isLoading ? (
+                <div className="flex items-center justify-center p-8">
+                  <Loader2 className="h-8 w-8 animate-spin" />
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>User</TableHead>
+                      <TableHead>Department</TableHead>
+                      <TableHead>Roles</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Last Login</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {users.map((user) => (
+                      <TableRow key={user.id}>
+                        <TableCell className="flex items-center space-x-3">
+                          <Avatar>
+                            <AvatarImage src={user.avatar_url || ''} />
+                            <AvatarFallback>
+                              {user.full_name?.split(' ').map(n => n[0]).join('') || 
+                               user.email.split('@')[0].substring(0, 2).toUpperCase()}
                             </AvatarFallback>
                           </Avatar>
                           <div>
-                            <div className="font-medium">{user.name}</div>
+                            <div className="font-medium">{user.full_name || 'Unknown User'}</div>
                             <div className="text-sm text-muted-foreground">{user.email}</div>
                           </div>
-                        </div>
-                      </TableCell>
-                      <TableCell>{user.company}</TableCell>
-                      <TableCell>
-                        <div className="flex flex-col gap-1">
-                          {user.roles.map((role) => (
-                            <Badge key={role} variant="outline" className="text-xs w-fit">
-                              {role}
-                            </Badge>
-                          ))}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex flex-wrap gap-1">
-                          {user.departments.map((dept) => (
-                            <Badge key={dept} variant="secondary" className="text-xs">
-                              {dept}
-                            </Badge>
-                          ))}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={user.status === "active" ? "default" : "secondary"}>
-                          {user.status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        {user.lastLogin}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <Button variant="outline" size="sm">
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button variant="outline" size="sm" className="text-destructive">
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline">
+                            {user.department || 'No Department'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex flex-wrap gap-1">
+                            {user.roles.length > 0 ? (
+                              user.roles.map((role) => (
+                                <Badge key={role.id} variant="secondary">
+                                  {role.name}
+                                </Badge>
+                              ))
+                            ) : (
+                              <Badge variant="outline">No Roles</Badge>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={user.last_sign_in_at ? 'default' : 'secondary'}>
+                            {user.last_sign_in_at ? 'Active' : 'Inactive'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          {user.last_sign_in_at ? 
+                            format(new Date(user.last_sign_in_at), 'MMM dd, yyyy HH:mm') : 
+                            'Never'}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end space-x-2">
+                            <Button variant="ghost" size="sm">
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button variant="ghost" size="sm" className="text-destructive">
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
 
         <TabsContent value="roles" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Shield className="h-5 w-5" />
-                Role Management
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid gap-4">
-                {rolesList.map((role) => (
-                  <Card key={role.id} className="p-4">
-                    <div className="flex items-start justify-between">
-                      <div className="space-y-2">
-                        <div className="flex items-center gap-2">
-                          <h3 className="font-semibold">{role.name}</h3>
-                          <Badge variant="outline">{role.department}</Badge>
-                          <Badge variant="secondary">{role.userCount} users</Badge>
-                        </div>
-                        <p className="text-sm text-muted-foreground">{role.description}</p>
-                        <div className="flex flex-wrap gap-1 mt-2">
-                          {role.permissions.map((permission) => (
-                            <Badge key={permission} variant="outline" className="text-xs">
-                              {permission}
-                            </Badge>
-                          ))}
-                        </div>
-                      </div>
+          {isLoading ? (
+            <div className="flex items-center justify-center p-8">
+              <Loader2 className="h-8 w-8 animate-spin" />
+            </div>
+          ) : (
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {roles.map((role) => (
+                <Card key={role.id}>
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-lg">{role.name}</CardTitle>
                       <div className="flex gap-2">
-                        <Button variant="outline" size="sm">
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button variant="outline" size="sm" className="text-destructive">
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                        <Badge variant="outline">{role.department || 'No Dept'}</Badge>
+                        <Badge variant="secondary">{role.app_role}</Badge>
                       </div>
                     </div>
-                  </Card>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+                    <CardDescription className="flex items-center gap-2">
+                      <Users className="h-4 w-4" />
+                      {role.user_count} users assigned
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <p className="text-sm text-muted-foreground">
+                      {role.description || 'No description available'}
+                    </p>
+                    
+                    <div className="space-y-2">
+                      <h4 className="text-sm font-medium">Permissions</h4>
+                      <div className="flex flex-wrap gap-1">
+                        {role.permissions.length > 0 ? (
+                          role.permissions.map((permission) => (
+                            <Badge key={permission.id} variant="outline" className="text-xs">
+                              {permission.name}
+                            </Badge>
+                          ))
+                        ) : (
+                          <Badge variant="outline" className="text-xs">No permissions</Badge>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex justify-between pt-4">
+                      <Button variant="ghost" size="sm">
+                        <Edit className="h-4 w-4 mr-2" />
+                        Edit
+                      </Button>
+                      <Button variant="ghost" size="sm" className="text-destructive">
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Delete
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
         </TabsContent>
       </Tabs>
 
-      <AddUserDialog 
-        open={addUserOpen} 
+      <AddUserDialog
+        open={addUserOpen}
         onOpenChange={setAddUserOpen}
         onUserAdded={handleUserAdded}
       />
       
-      <AddRoleDialog 
-        open={addRoleOpen} 
+      <AddRoleDialog
+        open={addRoleOpen}
         onOpenChange={setAddRoleOpen}
         onRoleAdded={handleRoleAdded}
       />
