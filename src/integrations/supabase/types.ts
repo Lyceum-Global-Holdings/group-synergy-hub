@@ -74,6 +74,170 @@ export type Database = {
         }
         Relationships: []
       }
+      po_items: {
+        Row: {
+          created_at: string
+          delivery_date: string | null
+          description: string | null
+          id: string
+          item_name: string
+          notes: string | null
+          po_id: string
+          pr_item_id: string | null
+          quantity_ordered: number
+          quantity_pending: number | null
+          quantity_received: number | null
+          specifications: string | null
+          total_price: number
+          unit_of_measure: string
+          unit_price: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          delivery_date?: string | null
+          description?: string | null
+          id?: string
+          item_name: string
+          notes?: string | null
+          po_id: string
+          pr_item_id?: string | null
+          quantity_ordered: number
+          quantity_pending?: number | null
+          quantity_received?: number | null
+          specifications?: string | null
+          total_price: number
+          unit_of_measure?: string
+          unit_price: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          delivery_date?: string | null
+          description?: string | null
+          id?: string
+          item_name?: string
+          notes?: string | null
+          po_id?: string
+          pr_item_id?: string | null
+          quantity_ordered?: number
+          quantity_pending?: number | null
+          quantity_received?: number | null
+          specifications?: string | null
+          total_price?: number
+          unit_of_measure?: string
+          unit_price?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "po_items_po_id_fkey"
+            columns: ["po_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "po_items_pr_item_id_fkey"
+            columns: ["pr_item_id"]
+            isOneToOne: false
+            referencedRelation: "pr_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      po_receipt_items: {
+        Row: {
+          created_at: string
+          id: string
+          notes: string | null
+          po_item_id: string
+          quality_status: string | null
+          quantity_received: number
+          receipt_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          notes?: string | null
+          po_item_id: string
+          quality_status?: string | null
+          quantity_received: number
+          receipt_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          notes?: string | null
+          po_item_id?: string
+          quality_status?: string | null
+          quantity_received?: number
+          receipt_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "po_receipt_items_po_item_id_fkey"
+            columns: ["po_item_id"]
+            isOneToOne: false
+            referencedRelation: "po_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "po_receipt_items_receipt_id_fkey"
+            columns: ["receipt_id"]
+            isOneToOne: false
+            referencedRelation: "po_receipts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      po_receipts: {
+        Row: {
+          created_at: string
+          id: string
+          notes: string | null
+          po_id: string
+          receipt_number: string
+          received_by: string
+          received_date: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          notes?: string | null
+          po_id: string
+          receipt_number: string
+          received_by: string
+          received_date?: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          notes?: string | null
+          po_id?: string
+          receipt_number?: string
+          received_by?: string
+          received_date?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "po_receipts_po_id_fkey"
+            columns: ["po_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pr_approvals: {
         Row: {
           action: Database["public"]["Enums"]["pr_status"]
@@ -197,6 +361,93 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      purchase_orders: {
+        Row: {
+          actual_delivery_date: string | null
+          approved_by: string | null
+          buyer_id: string | null
+          created_at: string
+          created_by: string
+          currency: string | null
+          delivery_terms: string | null
+          discount_amount: number | null
+          expected_delivery_date: string | null
+          final_amount: number | null
+          id: string
+          notes: string | null
+          payment_terms: string | null
+          po_date: string
+          po_number: string
+          pr_id: string | null
+          status: string
+          supplier_id: string
+          tax_amount: number | null
+          total_amount: number | null
+          updated_at: string
+        }
+        Insert: {
+          actual_delivery_date?: string | null
+          approved_by?: string | null
+          buyer_id?: string | null
+          created_at?: string
+          created_by: string
+          currency?: string | null
+          delivery_terms?: string | null
+          discount_amount?: number | null
+          expected_delivery_date?: string | null
+          final_amount?: number | null
+          id?: string
+          notes?: string | null
+          payment_terms?: string | null
+          po_date?: string
+          po_number: string
+          pr_id?: string | null
+          status?: string
+          supplier_id: string
+          tax_amount?: number | null
+          total_amount?: number | null
+          updated_at?: string
+        }
+        Update: {
+          actual_delivery_date?: string | null
+          approved_by?: string | null
+          buyer_id?: string | null
+          created_at?: string
+          created_by?: string
+          currency?: string | null
+          delivery_terms?: string | null
+          discount_amount?: number | null
+          expected_delivery_date?: string | null
+          final_amount?: number | null
+          id?: string
+          notes?: string | null
+          payment_terms?: string | null
+          po_date?: string
+          po_number?: string
+          pr_id?: string | null
+          status?: string
+          supplier_id?: string
+          tax_amount?: number | null
+          total_amount?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "purchase_orders_pr_id_fkey"
+            columns: ["pr_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_requisitions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_orders_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       purchase_requisitions: {
         Row: {
@@ -511,6 +762,10 @@ export type Database = {
           _role_ids?: string[]
         }
         Returns: Json
+      }
+      generate_po_number: {
+        Args: Record<PropertyKey, never>
+        Returns: string
       }
       generate_pr_number: {
         Args: Record<PropertyKey, never>
