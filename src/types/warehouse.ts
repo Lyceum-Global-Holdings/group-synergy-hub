@@ -27,6 +27,8 @@ export interface WarehouseAsset {
   category: string;
   category_id: string | null;
   subcategory_id: string | null;
+  brand: string | null;
+  asset_id: string | null;
   serial_number: string | null;
   asset_tag: string | null;
   location_id: string | null;
@@ -65,8 +67,7 @@ export interface CreateWarehouseAssetData {
   category: string;
   category_id?: string;
   subcategory_id?: string;
-  serial_number?: string;
-  asset_tag?: string;
+  brand?: string;
   location_id?: string;
   sublocation_id?: string;
   department_id?: string;

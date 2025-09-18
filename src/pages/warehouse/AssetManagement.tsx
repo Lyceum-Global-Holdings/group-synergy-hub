@@ -50,8 +50,7 @@ const assetFormSchema = z.object({
   category: z.string().optional(),
   category_id: z.string().min(1, "Category is required"),
   subcategory_id: z.string().optional(),
-  serial_number: z.string().optional(),
-  asset_tag: z.string().optional(),
+  brand: z.string().optional(),
   location_id: z.string().optional(),
   sublocation_id: z.string().optional(),
   department_id: z.string().optional(),
@@ -131,8 +130,7 @@ export default function AssetManagement() {
       category: "",
       category_id: "none",
       subcategory_id: "none",
-      serial_number: "",
-      asset_tag: "",
+      brand: "",
       location_id: "none",
       sublocation_id: "none",
       department_id: "none",
@@ -165,10 +163,9 @@ export default function AssetManagement() {
       category: selectedCategory?.name || "",
       category_id: data.category_id === 'none' ? undefined : data.category_id,
       subcategory_id: data.subcategory_id === 'none' ? undefined : data.subcategory_id,
+      brand: data.brand,
       condition: data.condition,
       status: data.status,
-      serial_number: data.serial_number,
-      asset_tag: data.asset_tag,
       location_id: data.location_id === 'none' ? undefined : data.location_id,
       sublocation_id: data.sublocation_id === 'none' ? undefined : data.sublocation_id,
       department_id: data.department_id === 'none' ? undefined : data.department_id,
@@ -198,8 +195,8 @@ export default function AssetManagement() {
   const filteredAssets = assets.filter((asset) =>
     asset.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     asset.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    asset.serial_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    asset.asset_tag?.toLowerCase().includes(searchTerm.toLowerCase())
+    (asset.brand && asset.brand.toLowerCase().includes(searchTerm.toLowerCase())) ||
+    (asset.asset_id && asset.asset_id.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
   const getLocationsByType = (type: "location" | "sublocation" | "department", parentId?: string) => {
@@ -541,25 +538,12 @@ export default function AssetManagement() {
                   <div className="grid grid-cols-2 gap-4">
                     <FormField
                       control={form.control}
-                      name="serial_number"
+                      name="brand"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Serial Number</FormLabel>
+                          <FormLabel>Brand</FormLabel>
                           <FormControl>
-                            <Input placeholder="Enter serial number" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="asset_tag"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Asset Tag</FormLabel>
-                          <FormControl>
-                            <Input placeholder="Enter asset tag" {...field} />
+                            <Input placeholder="Enter brand name" {...field} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -870,37 +854,33 @@ export default function AssetManagement() {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead>Asset ID</TableHead>
                 <TableHead>Asset Name</TableHead>
                 <TableHead>Category</TableHead>
-                <TableHead>Serial Number</TableHead>
+                <TableHead>Brand</TableHead>
                 <TableHead>Location</TableHead>
-                <TableHead>Sublocation</TableHead>
-                <TableHead>Department</TableHead>
                 <TableHead>Condition</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Purchase Price</TableHead>
-                <TableHead>Last Maintenance</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {assetsLoading ? (
                 <TableRow>
-                  <TableCell colSpan={10} className="text-center py-8">
+                  <TableCell colSpan={8} className="text-center py-8">
                     <Loader2 className="h-6 w-6 animate-spin mx-auto" />
                     <p className="text-muted-foreground mt-2">Loading assets...</p>
                   </TableCell>
                 </TableRow>
               ) : filteredAssets.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={10} className="text-center py-8">
+                  <TableCell colSpan={8} className="text-center py-8">
                     <p className="text-muted-foreground">No assets found</p>
                   </TableCell>
                 </TableRow>
               ) : (
                 filteredAssets.map((asset) => {
                   const locationName = asset.location_id ? getLocationName(asset.location_id) : "-";
-                  const sublocationName = asset.sublocation_id ? getLocationName(asset.sublocation_id) : "-";
-                  const departmentName = asset.department_id ? getLocationName(asset.department_id) : "-";
                   
                   const categoryName = asset.category_id ? getCategoryName(asset.category_id) : asset.category;
                   const subcategoryName = asset.subcategory_id ? getSubcategoryName(asset.subcategory_id) : "";
@@ -908,12 +888,11 @@ export default function AssetManagement() {
                   
                   return (
                     <TableRow key={asset.id}>
+                      <TableCell className="font-mono text-sm font-medium">{asset.asset_id || "-"}</TableCell>
                       <TableCell className="font-medium">{asset.name}</TableCell>
                       <TableCell>{displayCategory || asset.category}</TableCell>
-                      <TableCell className="font-mono text-sm">{asset.serial_number || "-"}</TableCell>
+                      <TableCell>{asset.brand || "-"}</TableCell>
                       <TableCell>{locationName}</TableCell>
-                      <TableCell>{sublocationName}</TableCell>
-                      <TableCell>{departmentName}</TableCell>
                       <TableCell>
                         <Badge className={getConditionBadge(asset.condition)}>
                           {asset.condition.replace('_', ' ')}
@@ -926,7 +905,6 @@ export default function AssetManagement() {
                         </div>
                       </TableCell>
                       <TableCell>{asset.purchase_price ? `$${asset.purchase_price.toLocaleString()}` : "-"}</TableCell>
-                      <TableCell>{asset.created_at ? new Date(asset.created_at).toLocaleDateString() : "-"}</TableCell>
                     </TableRow>
                   );
                 })

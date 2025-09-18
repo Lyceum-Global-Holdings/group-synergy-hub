@@ -787,7 +787,9 @@ export type Database = {
       }
       warehouse_assets: {
         Row: {
+          asset_id: string | null
           asset_tag: string | null
+          brand: string | null
           category: string
           category_id: string | null
           company_id: string | null
@@ -810,7 +812,9 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          asset_id?: string | null
           asset_tag?: string | null
+          brand?: string | null
           category: string
           category_id?: string | null
           company_id?: string | null
@@ -833,7 +837,9 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          asset_id?: string | null
           asset_tag?: string | null
+          brand?: string | null
           category?: string
           category_id?: string | null
           company_id?: string | null
@@ -955,6 +961,14 @@ export type Database = {
           _role_ids?: string[]
         }
         Returns: Json
+      }
+      generate_asset_id: {
+        Args: {
+          _brand?: string
+          _category_id: string
+          _subcategory_id?: string
+        }
+        Returns: string
       }
       generate_po_number: {
         Args: Record<PropertyKey, never>
