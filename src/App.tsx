@@ -10,6 +10,7 @@ import Dashboard from "./pages/Dashboard";
 import CompanyManagement from "./pages/admin/CompanyManagement";
 import UserRoleManagement from "./pages/admin/UserRoleManagement";
 import ModuleAllocation from "./pages/admin/ModuleAllocation";
+import PurchaseRequisition from "./pages/procurement/PurchaseRequisition";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 
@@ -49,6 +50,13 @@ const App = () => (
               <ProtectedRoute>
                 <AppLayout>
                   <ModuleAllocation />
+                </AppLayout>
+              </ProtectedRoute>
+            } />
+            <Route path="/procurement/purchase-requisition" element={
+              <ProtectedRoute>
+                <AppLayout>
+                  <PurchaseRequisition />
                 </AppLayout>
               </ProtectedRoute>
             } />
