@@ -346,11 +346,16 @@ export default function AssetManagement() {
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent className="bg-background border shadow-md z-50">
-                              {getLocationsByType("sublocation").map((sublocation) => (
-                                <SelectItem key={sublocation.id} value={sublocation.id}>
-                                  {sublocation.name}
-                                </SelectItem>
-                              ))}
+                              {locations
+                                .filter(loc => loc.type === "sublocation")
+                                .map((sublocation) => {
+                                  const parentLocation = locations.find(l => l.id === sublocation.parentId);
+                                  return (
+                                    <SelectItem key={sublocation.id} value={sublocation.id}>
+                                      {parentLocation ? `${parentLocation.name} → ${sublocation.name}` : sublocation.name}
+                                    </SelectItem>
+                                  );
+                                })}
                             </SelectContent>
                           </Select>
                           <FormMessage />
