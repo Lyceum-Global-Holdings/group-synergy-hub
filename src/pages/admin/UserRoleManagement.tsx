@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { Plus, Users, Shield, Edit, Trash2, UserPlus } from "lucide-react";
+import { AddRoleDialog } from "@/components/admin/AddRoleDialog";
+import { AddUserDialog } from "@/components/admin/AddUserDialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -84,6 +86,18 @@ const roles = [
 
 export default function UserRoleManagement() {
   const [activeTab, setActiveTab] = useState("users");
+  const [addRoleOpen, setAddRoleOpen] = useState(false);
+  const [addUserOpen, setAddUserOpen] = useState(false);
+  const [usersList, setUsersList] = useState(users);
+  const [rolesList, setRolesList] = useState(roles);
+
+  const handleUserAdded = (newUser: any) => {
+    setUsersList([...usersList, newUser]);
+  };
+
+  const handleRoleAdded = (newRole: any) => {
+    setRolesList([...rolesList, newRole]);
+  };
 
   return (
     <div className="space-y-6">
@@ -94,11 +108,11 @@ export default function UserRoleManagement() {
         </div>
         
         <div className="flex gap-2">
-          <Button variant="outline">
+          <Button variant="outline" onClick={() => setAddUserOpen(true)}>
             <UserPlus className="h-4 w-4 mr-2" />
-            Invite User
+            Add User
           </Button>
-          <Button>
+          <Button onClick={() => setAddRoleOpen(true)}>
             <Plus className="h-4 w-4 mr-2" />
             Create Role
           </Button>
@@ -173,7 +187,7 @@ export default function UserRoleManagement() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {users.map((user) => (
+                  {usersList.map((user) => (
                     <TableRow key={user.id}>
                       <TableCell>
                         <div className="flex items-center gap-3">
@@ -244,7 +258,7 @@ export default function UserRoleManagement() {
             </CardHeader>
             <CardContent>
               <div className="grid gap-4">
-                {roles.map((role) => (
+                {rolesList.map((role) => (
                   <Card key={role.id} className="p-4">
                     <div className="flex items-start justify-between">
                       <div className="space-y-2">
@@ -278,6 +292,18 @@ export default function UserRoleManagement() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      <AddUserDialog 
+        open={addUserOpen} 
+        onOpenChange={setAddUserOpen}
+        onUserAdded={handleUserAdded}
+      />
+      
+      <AddRoleDialog 
+        open={addRoleOpen} 
+        onOpenChange={setAddRoleOpen}
+        onRoleAdded={handleRoleAdded}
+      />
     </div>
   );
 }
