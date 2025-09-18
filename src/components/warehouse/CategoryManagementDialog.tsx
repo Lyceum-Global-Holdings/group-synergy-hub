@@ -13,7 +13,7 @@ export const CategoryManagementDialog = () => {
   const [editingCategory, setEditingCategory] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     name: '',
-    parent_id: '',
+    parent_id: 'none',
     description: ''
   });
 
@@ -36,7 +36,7 @@ export const CategoryManagementDialog = () => {
 
     const categoryData = {
       name: formData.name,
-      parent_id: formData.parent_id || null,
+      parent_id: formData.parent_id === 'none' ? null : formData.parent_id || null,
       description: formData.description || null
     };
 
@@ -50,14 +50,14 @@ export const CategoryManagementDialog = () => {
   };
 
   const resetForm = () => {
-    setFormData({ name: '', parent_id: '', description: '' });
+    setFormData({ name: '', parent_id: 'none', description: '' });
     setEditingCategory(null);
   };
 
   const handleEdit = (category: any) => {
     setFormData({
       name: category.name,
-      parent_id: category.parent_id || '',
+      parent_id: category.parent_id || 'none',
       description: category.description || ''
     });
     setEditingCategory(category.id);
@@ -110,14 +110,14 @@ export const CategoryManagementDialog = () => {
                   <SelectTrigger>
                     <SelectValue placeholder="Select parent category" />
                   </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="">None (Main Category)</SelectItem>
-                    {mainCategories.map((category) => (
-                      <SelectItem key={category.id} value={category.id}>
-                        {category.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
+                    <SelectContent>
+                      <SelectItem value="none">None (Main Category)</SelectItem>
+                      {mainCategories.map((category) => (
+                        <SelectItem key={category.id} value={category.id}>
+                          {category.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
                 </Select>
               </div>
 
