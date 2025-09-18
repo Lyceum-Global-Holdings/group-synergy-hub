@@ -87,7 +87,23 @@ const departments = [
 ];
 
 const unitsOfMeasure = [
-  'pcs', 'kg', 'lbs', 'tons', 'liters', 'gallons', 'meters', 'feet', 'boxes', 'sets', 'hours', 'days'
+  // Quantity
+  'pcs', 'boxes', 'sets', 'dozen', 'pack', 'roll', 'sheet', 'bundle', 'case', 'pallet',
+  
+  // Weight
+  'kg', 'lbs', 'tons', 'g', 'oz',
+  
+  // Length
+  'meters', 'feet', 'yards', 'inches', 'cm', 'mm', 'km', 'miles',
+  
+  // Volume
+  'liters', 'gallons', 'ml', 'cubic meters', 'cubic feet',
+  
+  // Area
+  'sq meters', 'sq feet', 'sq yards', 'sq inches',
+  
+  // Time
+  'hours', 'days', 'weeks', 'months'
 ];
 
 export function CreatePrDialog({ open, onOpenChange }: CreatePrDialogProps) {
