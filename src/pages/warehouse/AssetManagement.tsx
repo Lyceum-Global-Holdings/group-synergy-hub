@@ -129,13 +129,13 @@ export default function AssetManagement() {
     defaultValues: {
       name: "",
       category: "",
-      category_id: "",
-      subcategory_id: "",
+      category_id: "none",
+      subcategory_id: "none",
       serial_number: "",
       asset_tag: "",
-      location_id: "",
-      sublocation_id: "",
-      department_id: "",
+      location_id: "none",
+      sublocation_id: "none",
+      department_id: "none",
       condition: "good",
       status: "active",
       purchase_date: "",
@@ -163,15 +163,15 @@ export default function AssetManagement() {
     const assetData = {
       name: data.name,
       category: selectedCategory?.name || "",
-      category_id: data.category_id,
-      subcategory_id: data.subcategory_id,
+      category_id: data.category_id === 'none' ? undefined : data.category_id,
+      subcategory_id: data.subcategory_id === 'none' ? undefined : data.subcategory_id,
       condition: data.condition,
       status: data.status,
       serial_number: data.serial_number,
       asset_tag: data.asset_tag,
-      location_id: data.location_id,
-      sublocation_id: data.sublocation_id,
-      department_id: data.department_id,
+      location_id: data.location_id === 'none' ? undefined : data.location_id,
+      sublocation_id: data.sublocation_id === 'none' ? undefined : data.sublocation_id,
+      department_id: data.department_id === 'none' ? undefined : data.department_id,
       purchase_date: data.purchase_date,
       purchase_price: data.purchase_price ? parseFloat(data.purchase_price) : undefined,
       current_value: data.current_value ? parseFloat(data.current_value) : undefined,
@@ -492,7 +492,10 @@ export default function AssetManagement() {
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent className="bg-background border shadow-md z-50">
-                              {mainCategories.map((category) => (
+                              <SelectItem value="none">None (Required)</SelectItem>
+                              {mainCategories
+                                .filter(category => category.id && category.id.trim() !== "")
+                                .map((category) => (
                                 <SelectItem key={category.id} value={category.id}>
                                   {category.name}
                                 </SelectItem>
@@ -519,7 +522,10 @@ export default function AssetManagement() {
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent className="bg-background border shadow-md z-50">
-                              {form.watch("category_id") && getSubcategories(form.watch("category_id")).map((subcategory) => (
+                              <SelectItem value="none">None (Optional)</SelectItem>
+                              {form.watch("category_id") && form.watch("category_id") !== "none" && getSubcategories(form.watch("category_id"))
+                                .filter(subcategory => subcategory.id && subcategory.id.trim() !== "")
+                                .map((subcategory) => (
                                 <SelectItem key={subcategory.id} value={subcategory.id}>
                                   {subcategory.name}
                                 </SelectItem>
@@ -575,7 +581,10 @@ export default function AssetManagement() {
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent className="bg-background border shadow-md z-50">
-                              {getLocationsByType("location").map((location) => (
+                              <SelectItem value="none">None (Optional)</SelectItem>
+                              {getLocationsByType("location")
+                                .filter(location => location.id && location.id.trim() !== "")
+                                .map((location) => (
                                 <SelectItem key={location.id} value={location.id}>
                                   {location.name}
                                 </SelectItem>
@@ -599,8 +608,9 @@ export default function AssetManagement() {
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent className="bg-background border shadow-md z-50">
+                              <SelectItem value="none">None (Optional)</SelectItem>
                               {locations
-                                .filter(loc => loc.type === "sublocation")
+                                .filter(loc => loc.type === "sublocation" && loc.id && loc.id.trim() !== "")
                                 .map((sublocation) => {
                                   const parentLocation = locations.find(l => l.id === sublocation.parent_id);
                                   return (
@@ -628,8 +638,9 @@ export default function AssetManagement() {
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent className="bg-background border shadow-md z-50">
+                              <SelectItem value="none">None (Optional)</SelectItem>
                               {locations
-                                .filter(loc => loc.type === "department")
+                                .filter(loc => loc.type === "department" && loc.id && loc.id.trim() !== "")
                                 .map((department) => {
                                   const parentSublocation = locations.find(l => l.id === department.parent_id);
                                   const grandparentLocation = parentSublocation ? locations.find(l => l.id === parentSublocation.parent_id) : null;

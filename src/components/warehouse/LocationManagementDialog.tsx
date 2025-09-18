@@ -22,7 +22,7 @@ export const LocationManagementDialog = () => {
   }>({
     name: '',
     type: 'location',
-    parent_id: '',
+    parent_id: 'none',
     description: ''
   });
 
@@ -44,7 +44,7 @@ export const LocationManagementDialog = () => {
     const locationData = {
       name: formData.name,
       type: formData.type,
-      parent_id: formData.parent_id || undefined,
+      parent_id: formData.parent_id === 'none' ? undefined : formData.parent_id,
       description: formData.description || undefined
     };
 
@@ -58,7 +58,7 @@ export const LocationManagementDialog = () => {
   };
 
   const resetForm = () => {
-    setFormData({ name: '', type: 'location', parent_id: '', description: '' });
+    setFormData({ name: '', type: 'location', parent_id: 'none', description: '' });
     setEditingLocation(null);
   };
 
@@ -66,7 +66,7 @@ export const LocationManagementDialog = () => {
     setFormData({
       name: location.name,
       type: location.type,
-      parent_id: location.parent_id || '',
+      parent_id: location.parent_id || 'none',
       description: location.description || ''
     });
     setEditingLocation(location.id);
@@ -138,7 +138,10 @@ export const LocationManagementDialog = () => {
                       <SelectValue placeholder="Select parent location" />
                     </SelectTrigger>
                     <SelectContent>
-                      {locations.filter(loc => loc.type === 'location').map((location) => (
+                      <SelectItem value="none">None (Optional)</SelectItem>
+                      {locations
+                        .filter(loc => loc.type === 'location' && loc.id && loc.id.trim() !== "")
+                        .map((location) => (
                         <SelectItem key={location.id} value={location.id}>
                           {location.name}
                         </SelectItem>
@@ -159,7 +162,10 @@ export const LocationManagementDialog = () => {
                       <SelectValue placeholder="Select parent sublocation" />
                     </SelectTrigger>
                     <SelectContent>
-                      {locations.filter(loc => loc.type === 'sublocation').map((sublocation) => (
+                      <SelectItem value="none">None (Optional)</SelectItem>
+                      {locations
+                        .filter(loc => loc.type === 'sublocation' && loc.id && loc.id.trim() !== "")
+                        .map((sublocation) => (
                         <SelectItem key={sublocation.id} value={sublocation.id}>
                           {sublocation.name}
                         </SelectItem>
