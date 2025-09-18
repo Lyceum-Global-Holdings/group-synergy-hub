@@ -20,6 +20,7 @@ export interface PurchaseRequisition {
   created_at: string;
   updated_at: string;
   items?: PrItem[];
+  approvals?: PrApproval[];
   requested_by_profile?: {
     full_name?: string;
     email?: string;
@@ -65,5 +66,14 @@ export interface CreatePrData {
   priority: PrPriority;
   required_date: string;
   justification?: string;
-  items: Omit<PrItem, 'id' | 'pr_id' | 'created_at' | 'updated_at'>[];
+  items: {
+    item_name: string;
+    description?: string;
+    quantity: number;
+    unit_of_measure: string;
+    estimated_unit_price: number;
+    estimated_total_price: number;
+    specifications?: string;
+    notes?: string;
+  }[];
 }

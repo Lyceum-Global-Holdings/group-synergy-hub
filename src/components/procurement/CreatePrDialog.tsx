@@ -130,8 +130,22 @@ export function CreatePrDialog({ open, onOpenChange }: CreatePrDialogProps) {
 
   const onSubmit = async (data: CreatePrFormData) => {
     const createData: CreatePrData = {
-      ...data,
+      title: data.title,
+      description: data.description,
+      department: data.department,
+      priority: data.priority,
       required_date: format(data.required_date, 'yyyy-MM-dd'),
+      justification: data.justification,
+      items: data.items.map(item => ({
+        item_name: item.item_name,
+        description: item.description,
+        quantity: item.quantity,
+        unit_of_measure: item.unit_of_measure,
+        estimated_unit_price: item.estimated_unit_price,
+        estimated_total_price: item.estimated_total_price,
+        specifications: item.specifications,
+        notes: item.notes,
+      })),
     };
 
     try {

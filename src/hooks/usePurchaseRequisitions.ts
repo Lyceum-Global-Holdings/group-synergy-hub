@@ -12,14 +12,41 @@ export const usePurchaseRequisitions = () => {
         .from('purchase_requisitions')
         .select(`
           *,
-          requested_by_profile:profiles!purchase_requisitions_requested_by_fkey(full_name, email),
-          approved_by_profile:profiles!purchase_requisitions_approved_by_fkey(full_name, email),
           items:pr_items(*)
         `)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      return data || [];
+      
+      // Fetch profile data separately
+      const prs = data || [];
+      const userIds = [...new Set([
+        ...prs.map(pr => pr.requested_by),
+        ...prs.map(pr => pr.approved_by).filter(Boolean)
+      ])];
+
+      if (userIds.length > 0) {
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('user_id, full_name, email')
+          .in('user_id', userIds);
+
+        const profileMap = new Map(
+          profiles?.map(p => [p.user_id, p]) || []
+        );
+
+        return prs.map(pr => ({
+          ...pr,
+          requested_by_profile: profileMap.get(pr.requested_by),
+          approved_by_profile: pr.approved_by ? profileMap.get(pr.approved_by) : undefined,
+        }));
+      }
+
+      return prs.map(pr => ({
+        ...pr,
+        requested_by_profile: undefined,
+        approved_by_profile: undefined,
+      }));
     },
   });
 };
@@ -32,19 +59,49 @@ export const usePurchaseRequisition = (id: string) => {
         .from('purchase_requisitions')
         .select(`
           *,
-          requested_by_profile:profiles!purchase_requisitions_requested_by_fkey(full_name, email),
-          approved_by_profile:profiles!purchase_requisitions_approved_by_fkey(full_name, email),
           items:pr_items(*),
-          approvals:pr_approvals(
-            *,
-            approver_profile:profiles!pr_approvals_approver_id_fkey(full_name, email)
-          )
+          approvals:pr_approvals(*)
         `)
         .eq('id', id)
         .single();
 
       if (error) throw error;
-      return data;
+
+      // Fetch profile data separately
+      const userIds = [
+        data.requested_by,
+        data.approved_by,
+        ...(data.approvals?.map((a: any) => a.approver_id) || [])
+      ].filter(Boolean);
+
+      const uniqueUserIds = [...new Set(userIds)];
+
+      if (uniqueUserIds.length > 0) {
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('user_id, full_name, email')
+          .in('user_id', uniqueUserIds);
+
+        const profileMap = new Map(
+          profiles?.map(p => [p.user_id, p]) || []
+        );
+
+        return {
+          ...data,
+          requested_by_profile: profileMap.get(data.requested_by),
+          approved_by_profile: data.approved_by ? profileMap.get(data.approved_by) : undefined,
+          approvals: data.approvals?.map((approval: any) => ({
+            ...approval,
+            approver_profile: profileMap.get(approval.approver_id),
+          })),
+        };
+      }
+
+      return {
+        ...data,
+        requested_by_profile: undefined,
+        approved_by_profile: undefined,
+      };
     },
     enabled: !!id,
   });
