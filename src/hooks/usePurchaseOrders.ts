@@ -8,6 +8,17 @@ export function usePurchaseOrders() {
   return useQuery({
     queryKey: ['purchase-orders'],
     queryFn: async () => {
+      console.log('Fetching purchase orders...');
+      
+      // Check authentication
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      console.log('Current user:', user?.id, user?.email);
+      
+      if (authError) {
+        console.error('Auth error:', authError);
+        throw authError;
+      }
+
       const { data, error } = await supabase
         .from('purchase_orders')
         .select(`
@@ -20,7 +31,11 @@ export function usePurchaseOrders() {
         `)
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      console.log('Purchase orders query result:', { data, error });
+      if (error) {
+        console.error('Purchase orders error:', error);
+        throw error;
+      }
       return data as PurchaseOrder[];
     },
   });
