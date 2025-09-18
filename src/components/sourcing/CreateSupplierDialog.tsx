@@ -14,6 +14,7 @@ import { Separator } from '@/components/ui/separator';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useCreateSupplier } from '@/hooks/useSuppliers';
 import type { Supplier, SupplierContact, CreateSupplierData, UpdateSupplierData } from '@/types/supplier';
+import { SUPPLIER_TYPES, SUPPLIER_CATEGORIES, PAYMENT_TERMS } from '@/types/supplier';
 
 const supplierSchema = z.object({
   name: z.string().min(1, 'Supplier name is required'),
@@ -116,7 +117,14 @@ export const CreateSupplierDialog: React.FC<CreateSupplierDialogProps> = ({
       currency: data.currency,
       rating: data.rating ? parseFloat(data.rating) : undefined,
       notes: data.notes,
-      contacts: data.contacts?.filter(contact => contact.name.trim() !== ''),
+      contacts: data.contacts?.filter(contact => contact.name.trim() !== '').map(contact => ({
+        name: contact.name,
+        title: contact.title || undefined,
+        email: contact.email || undefined,
+        phone: contact.phone || undefined,
+        mobile: contact.mobile || undefined,
+        is_primary: contact.is_primary,
+      })),
     };
 
     createSupplierMutation.mutate(submitData, {

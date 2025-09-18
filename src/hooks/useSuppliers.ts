@@ -22,11 +22,7 @@ export const useSuppliers = () => {
         throw new Error(error.message);
       }
 
-      return (data || []).map(item => ({
-        ...item,
-        supplier_type: item.supplier_type as any,
-        status: item.status as any,
-      })) as Supplier[];
+      return (data || []) as Supplier[];
     },
   });
 };
@@ -53,7 +49,7 @@ export const useSupplier = (id: string) => {
         throw new Error(error.message);
       }
 
-      return data;
+      return data as Supplier;
     },
     enabled: !!id,
   });
@@ -115,7 +111,7 @@ export const useCreateSupplier = () => {
         }
       }
 
-      return supplier;
+      return supplier as Supplier;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['suppliers'] });
@@ -148,7 +144,7 @@ export const useUpdateSupplier = () => {
         throw new Error(error.message);
       }
 
-      return data;
+      return data as Supplier;
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['suppliers'] });
