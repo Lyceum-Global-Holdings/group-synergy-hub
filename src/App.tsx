@@ -11,6 +11,7 @@ import CompanyManagement from "./pages/admin/CompanyManagement";
 import UserRoleManagement from "./pages/admin/UserRoleManagement";
 import ModuleAllocation from "./pages/admin/ModuleAllocation";
 import PurchaseRequisition from "./pages/procurement/PurchaseRequisition";
+import { SupplierMaster } from "./pages/sourcing/SupplierMaster";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 
@@ -57,6 +58,13 @@ const App = () => (
               <ProtectedRoute>
                 <AppLayout>
                   <PurchaseRequisition />
+                </AppLayout>
+              </ProtectedRoute>
+            } />
+            <Route path="/sourcing/supplier-master" element={
+              <ProtectedRoute>
+                <AppLayout>
+                  <SupplierMaster />
                 </AppLayout>
               </ProtectedRoute>
             } />

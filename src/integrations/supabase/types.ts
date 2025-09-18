@@ -324,6 +324,140 @@ export type Database = {
         }
         Relationships: []
       }
+      supplier_contacts: {
+        Row: {
+          created_at: string
+          email: string | null
+          id: string
+          is_primary: boolean | null
+          mobile: string | null
+          name: string
+          phone: string | null
+          supplier_id: string
+          title: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          email?: string | null
+          id?: string
+          is_primary?: boolean | null
+          mobile?: string | null
+          name: string
+          phone?: string | null
+          supplier_id: string
+          title?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          email?: string | null
+          id?: string
+          is_primary?: boolean | null
+          mobile?: string | null
+          name?: string
+          phone?: string | null
+          supplier_id?: string
+          title?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "supplier_contacts_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      suppliers: {
+        Row: {
+          address_line1: string | null
+          address_line2: string | null
+          category: string | null
+          city: string | null
+          country: string | null
+          created_at: string
+          created_by: string | null
+          credit_limit: number | null
+          currency: string | null
+          email: string | null
+          id: string
+          legal_name: string | null
+          name: string
+          notes: string | null
+          payment_terms: string | null
+          phone: string | null
+          postal_code: string | null
+          rating: number | null
+          registration_number: string | null
+          state: string | null
+          status: string
+          supplier_code: string
+          supplier_type: string
+          tax_id: string | null
+          updated_at: string
+          website: string | null
+        }
+        Insert: {
+          address_line1?: string | null
+          address_line2?: string | null
+          category?: string | null
+          city?: string | null
+          country?: string | null
+          created_at?: string
+          created_by?: string | null
+          credit_limit?: number | null
+          currency?: string | null
+          email?: string | null
+          id?: string
+          legal_name?: string | null
+          name: string
+          notes?: string | null
+          payment_terms?: string | null
+          phone?: string | null
+          postal_code?: string | null
+          rating?: number | null
+          registration_number?: string | null
+          state?: string | null
+          status?: string
+          supplier_code: string
+          supplier_type?: string
+          tax_id?: string | null
+          updated_at?: string
+          website?: string | null
+        }
+        Update: {
+          address_line1?: string | null
+          address_line2?: string | null
+          category?: string | null
+          city?: string | null
+          country?: string | null
+          created_at?: string
+          created_by?: string | null
+          credit_limit?: number | null
+          currency?: string | null
+          email?: string | null
+          id?: string
+          legal_name?: string | null
+          name?: string
+          notes?: string | null
+          payment_terms?: string | null
+          phone?: string | null
+          postal_code?: string | null
+          rating?: number | null
+          registration_number?: string | null
+          state?: string | null
+          status?: string
+          supplier_code?: string
+          supplier_type?: string
+          tax_id?: string | null
+          updated_at?: string
+          website?: string | null
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string | null
@@ -373,6 +507,10 @@ export type Database = {
         Returns: Json
       }
       generate_pr_number: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
+      generate_supplier_code: {
         Args: Record<PropertyKey, never>
         Returns: string
       }
