@@ -25,8 +25,6 @@ export function usePurchaseOrders() {
           *,
           supplier:suppliers(name, email, phone),
           pr:purchase_requisitions(pr_number, title),
-          created_by_profile:profiles!purchase_orders_created_by_fkey(full_name, email),
-          buyer_profile:profiles!purchase_orders_buyer_id_fkey(full_name, email),
           items:po_items(*)
         `)
         .order('created_at', { ascending: false });
@@ -52,12 +50,9 @@ export function usePurchaseOrder(id: string) {
           *,
           supplier:suppliers(name, email, phone),
           pr:purchase_requisitions(pr_number, title),
-          created_by_profile:profiles!purchase_orders_created_by_fkey(full_name, email),
-          buyer_profile:profiles!purchase_orders_buyer_id_fkey(full_name, email),
           items:po_items(*),
           receipts:po_receipts(
             *,
-            received_by_profile:profiles!po_receipts_received_by_fkey(full_name, email),
             items:po_receipt_items(
               *,
               po_item:po_items(item_name, unit_of_measure)
