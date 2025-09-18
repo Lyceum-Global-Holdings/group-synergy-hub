@@ -998,8 +998,7 @@ export default function AssetManagement() {
         open={isEditDialogOpen}
         onOpenChange={setIsEditDialogOpen}
         locations={locations}
-        categories={mainCategories}
-        getSubcategories={getSubcategories}
+        categories={[...mainCategories, ...mainCategories.flatMap(cat => getSubcategories(cat.id))]}
         getLocationsByType={getLocationsByType}
       />
 
