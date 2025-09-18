@@ -42,10 +42,14 @@ import * as z from "zod";
 import { toast } from "@/hooks/use-toast";
 import { useWarehouseLocations } from "@/hooks/useWarehouseLocations";
 import { useWarehouseAssets } from "@/hooks/useWarehouseAssets";
+import { useAssetCategories } from "@/hooks/useAssetCategories";
+import { CategoryManagementDialog } from "@/components/warehouse/CategoryManagementDialog";
 
 const assetFormSchema = z.object({
   name: z.string().min(1, "Asset name is required"),
-  category: z.string().min(1, "Category is required"),
+  category: z.string().optional(),
+  category_id: z.string().min(1, "Category is required"),
+  subcategory_id: z.string().optional(),
   serial_number: z.string().optional(),
   asset_tag: z.string().optional(),
   location_id: z.string().optional(),
@@ -114,11 +118,19 @@ export default function AssetManagement() {
     isCreating: isCreatingAsset 
   } = useWarehouseAssets();
 
+  const { 
+    mainCategories, 
+    getSubcategories, 
+    isLoading: categoriesLoading 
+  } = useAssetCategories();
+
   const form = useForm<AssetFormValues>({
     resolver: zodResolver(assetFormSchema),
     defaultValues: {
       name: "",
       category: "",
+      category_id: "",
+      subcategory_id: "",
       serial_number: "",
       asset_tag: "",
       location_id: "",
@@ -145,9 +157,14 @@ export default function AssetManagement() {
   });
 
   const onSubmit = (data: AssetFormValues) => {
+    // Get category name from ID for backward compatibility
+    const selectedCategory = mainCategories.find(cat => cat.id === data.category_id);
+    
     const assetData = {
       name: data.name,
-      category: data.category,
+      category: selectedCategory?.name || "",
+      category_id: data.category_id,
+      subcategory_id: data.subcategory_id,
       condition: data.condition,
       status: data.status,
       serial_number: data.serial_number,
@@ -200,6 +217,18 @@ export default function AssetManagement() {
     return locations.find(loc => loc.id === id)?.name || "";
   };
 
+  const getCategoryName = (id: string) => {
+    return mainCategories.find(cat => cat.id === id)?.name || "";
+  };
+
+  const getSubcategoryName = (id: string) => {
+    const allCategories = [...mainCategories];
+    mainCategories.forEach(cat => {
+      allCategories.push(...getSubcategories(cat.id));
+    });
+    return allCategories.find(cat => cat.id === id)?.name || "";
+  };
+
   const totalValue = assets.reduce((sum, asset) => sum + (asset.purchase_price || 0), 0);
   const activeAssets = assets.filter(asset => asset.status === "active").length;
   const maintenanceAssets = assets.filter(asset => asset.status === "maintenance").length;
@@ -214,6 +243,7 @@ export default function AssetManagement() {
           </p>
         </div>
         <div className="flex gap-2">
+          <CategoryManagementDialog />
           <Dialog open={isLocationDialogOpen} onOpenChange={setIsLocationDialogOpen}>
             <DialogTrigger asChild>
               <Button variant="outline">
@@ -451,7 +481,7 @@ export default function AssetManagement() {
                     />
                     <FormField
                       control={form.control}
-                      name="category"
+                      name="category_id"
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>Category</FormLabel>
@@ -462,12 +492,38 @@ export default function AssetManagement() {
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent className="bg-background border shadow-md z-50">
-                              <SelectItem value="equipment">Equipment</SelectItem>
-                              <SelectItem value="machinery">Machinery</SelectItem>
-                              <SelectItem value="vehicles">Vehicles</SelectItem>
-                              <SelectItem value="tools">Tools</SelectItem>
-                              <SelectItem value="furniture">Furniture</SelectItem>
-                              <SelectItem value="technology">Technology</SelectItem>
+                              {mainCategories.map((category) => (
+                                <SelectItem key={category.id} value={category.id}>
+                                  {category.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="subcategory_id"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Subcategory (Optional)</FormLabel>
+                          <Select onValueChange={field.onChange} defaultValue={field.value}>
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select subcategory" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent className="bg-background border shadow-md z-50">
+                              {form.watch("category_id") && getSubcategories(form.watch("category_id")).map((subcategory) => (
+                                <SelectItem key={subcategory.id} value={subcategory.id}>
+                                  {subcategory.name}
+                                </SelectItem>
+                              ))}
                             </SelectContent>
                           </Select>
                           <FormMessage />
@@ -835,10 +891,14 @@ export default function AssetManagement() {
                   const sublocationName = asset.sublocation_id ? getLocationName(asset.sublocation_id) : "-";
                   const departmentName = asset.department_id ? getLocationName(asset.department_id) : "-";
                   
+                  const categoryName = asset.category_id ? getCategoryName(asset.category_id) : asset.category;
+                  const subcategoryName = asset.subcategory_id ? getSubcategoryName(asset.subcategory_id) : "";
+                  const displayCategory = subcategoryName ? `${categoryName} → ${subcategoryName}` : categoryName;
+                  
                   return (
                     <TableRow key={asset.id}>
                       <TableCell className="font-medium">{asset.name}</TableCell>
-                      <TableCell>{asset.category}</TableCell>
+                      <TableCell>{displayCategory || asset.category}</TableCell>
                       <TableCell className="font-mono text-sm">{asset.serial_number || "-"}</TableCell>
                       <TableCell>{locationName}</TableCell>
                       <TableCell>{sublocationName}</TableCell>

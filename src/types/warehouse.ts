@@ -10,10 +10,23 @@ export interface WarehouseLocation {
   created_by: string | null;
 }
 
+export interface AssetCategory {
+  id: string;
+  name: string;
+  parent_id: string | null;
+  description: string | null;
+  company_id: string | null;
+  created_at: string;
+  updated_at: string;
+  created_by: string | null;
+}
+
 export interface WarehouseAsset {
   id: string;
   name: string;
   category: string;
+  category_id: string | null;
+  subcategory_id: string | null;
   serial_number: string | null;
   asset_tag: string | null;
   location_id: string | null;
@@ -40,9 +53,18 @@ export interface CreateWarehouseLocationData {
   company_id?: string;
 }
 
+export interface CreateAssetCategoryData {
+  name: string;
+  parent_id?: string;
+  description?: string;
+  company_id?: string;
+}
+
 export interface CreateWarehouseAssetData {
   name: string;
   category: string;
+  category_id?: string;
+  subcategory_id?: string;
   serial_number?: string;
   asset_tag?: string;
   location_id?: string;

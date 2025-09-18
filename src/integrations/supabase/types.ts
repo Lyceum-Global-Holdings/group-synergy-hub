@@ -14,6 +14,47 @@ export type Database = {
   }
   public: {
     Tables: {
+      asset_categories: {
+        Row: {
+          company_id: string | null
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          name: string
+          parent_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          company_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          name: string
+          parent_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          name?: string
+          parent_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "asset_categories_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "asset_categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       companies: {
         Row: {
           address: string | null
@@ -748,6 +789,7 @@ export type Database = {
         Row: {
           asset_tag: string | null
           category: string
+          category_id: string | null
           company_id: string | null
           condition: string
           created_at: string
@@ -763,12 +805,14 @@ export type Database = {
           purchase_price: number | null
           serial_number: string | null
           status: string
+          subcategory_id: string | null
           sublocation_id: string | null
           updated_at: string
         }
         Insert: {
           asset_tag?: string | null
           category: string
+          category_id?: string | null
           company_id?: string | null
           condition?: string
           created_at?: string
@@ -784,12 +828,14 @@ export type Database = {
           purchase_price?: number | null
           serial_number?: string | null
           status?: string
+          subcategory_id?: string | null
           sublocation_id?: string | null
           updated_at?: string
         }
         Update: {
           asset_tag?: string | null
           category?: string
+          category_id?: string | null
           company_id?: string | null
           condition?: string
           created_at?: string
@@ -805,10 +851,18 @@ export type Database = {
           purchase_price?: number | null
           serial_number?: string | null
           status?: string
+          subcategory_id?: string | null
           sublocation_id?: string | null
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "warehouse_assets_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "asset_categories"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "warehouse_assets_department_id_fkey"
             columns: ["department_id"]
@@ -821,6 +875,13 @@ export type Database = {
             columns: ["location_id"]
             isOneToOne: false
             referencedRelation: "warehouse_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "warehouse_assets_subcategory_id_fkey"
+            columns: ["subcategory_id"]
+            isOneToOne: false
+            referencedRelation: "asset_categories"
             referencedColumns: ["id"]
           },
           {
