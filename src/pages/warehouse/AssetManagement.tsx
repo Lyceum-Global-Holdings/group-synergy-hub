@@ -923,14 +923,14 @@ export default function AssetManagement() {
             <TableBody>
               {assetsLoading ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center py-8">
+                  <TableCell colSpan={9} className="text-center py-8">
                     <Loader2 className="h-6 w-6 animate-spin mx-auto" />
                     <p className="text-muted-foreground mt-2">Loading assets...</p>
                   </TableCell>
                 </TableRow>
               ) : filteredAssets.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center py-8">
+                  <TableCell colSpan={9} className="text-center py-8">
                     <p className="text-muted-foreground">No assets found</p>
                   </TableCell>
                 </TableRow>
@@ -961,6 +961,49 @@ export default function AssetManagement() {
                         </div>
                       </TableCell>
                       <TableCell>{asset.purchase_price ? `$${asset.purchase_price.toLocaleString()}` : "-"}</TableCell>
+                      <TableCell>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" className="h-8 w-8 p-0">
+                              <span className="sr-only">Open menu</span>
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="bg-background border shadow-md z-50">
+                            <DropdownMenuItem onClick={() => {
+                              setSelectedAsset(asset);
+                              setIsDetailsDialogOpen(true);
+                            }}>
+                              <Eye className="mr-2 h-4 w-4" />
+                              View Details
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => {
+                              setSelectedAsset(asset);
+                              setIsEditDialogOpen(true);
+                            }}>
+                              <Edit className="mr-2 h-4 w-4" />
+                              Edit
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => {
+                              setSelectedAsset(asset);
+                              setIsTransferDialogOpen(true);
+                            }}>
+                              <ArrowRightLeft className="mr-2 h-4 w-4" />
+                              Transfer
+                            </DropdownMenuItem>
+                            <DropdownMenuItem 
+                              onClick={() => {
+                                setSelectedAsset(asset);
+                                setIsDeleteDialogOpen(true);
+                              }}
+                              className="text-destructive"
+                            >
+                              <Trash2 className="mr-2 h-4 w-4" />
+                              Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
                     </TableRow>
                   );
                 })
