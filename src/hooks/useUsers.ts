@@ -1,5 +1,34 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
+
+// Hook to bootstrap admin user (for first-time setup)
+export const useBootstrapAdmin = () => {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async (userId: string) => {
+      const { error } = await supabase.rpc('bootstrap_admin', {
+        _user_id: userId
+      });
+      
+      if (error) {
+        throw error;
+      }
+      
+      return { success: true };
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+      queryClient.invalidateQueries({ queryKey: ['roles'] });
+      toast.success('Admin privileges granted successfully');
+    },
+    onError: (error: any) => {
+      console.error('Bootstrap admin failed:', error);
+      toast.error(`Failed to grant admin privileges: ${error.message}`);
+    },
+  });
+};
 
 export interface User {
   id: string;
@@ -265,29 +294,69 @@ export const useUpdateProfile = () => {
 
 export const useCreateUser = () => {
   const queryClient = useQueryClient();
-
+  
   return useMutation({
     mutationFn: async (userData: {
       email: string;
       password: string;
-      full_name: string;
+      fullName: string;
       department?: string;
-      roles: string[];
-      company_id?: string;
+      roleIds: string[];
     }) => {
-      // Create user in Supabase Auth
+      console.log('Creating user with data:', userData);
+      
+      // First check if current user is admin or if no admins exist
+      const { data: currentUser } = await supabase.auth.getUser();
+      if (!currentUser.user) {
+        throw new Error('You must be logged in to create users');
+      }
+
+      // Check admin status or if this is bootstrap scenario
+      const { data: isAdminResult, error: adminCheckError } = await supabase
+        .rpc('is_admin', { _user_id: currentUser.user.id });
+      
+      if (adminCheckError) {
+        console.error('Admin check error:', adminCheckError);
+      }
+
+      // Check if any admin users exist
+      const { data: adminUsers, error: adminCountError } = await supabase
+        .from('user_roles')
+        .select('id, roles!inner(*)')
+        .eq('roles.app_role', 'admin');
+
+      if (adminCountError) {
+        console.error('Admin count check error:', adminCountError);
+      }
+
+      const hasAdmins = adminUsers && adminUsers.length > 0;
+      const isCurrentUserAdmin = isAdminResult === true;
+
+      if (hasAdmins && !isCurrentUserAdmin) {
+        throw new Error('Only administrators can create new users');
+      }
+      
+      // Create user via Supabase Auth
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: userData.email,
         password: userData.password,
         options: {
           data: {
-            full_name: userData.full_name,
-          },
-        },
+            full_name: userData.fullName
+          }
+        }
       });
 
-      if (authError) throw authError;
-      if (!authData.user) throw new Error('User creation failed');
+      if (authError) {
+        console.error('Auth error:', authError);
+        throw new Error(`Failed to create user account: ${authError.message}`);
+      }
+
+      if (!authData.user) {
+        throw new Error('User creation failed - no user returned');
+      }
+
+      console.log('User created successfully:', authData.user.id);
 
       // Update profile with department if provided
       if (userData.department) {
@@ -296,28 +365,48 @@ export const useCreateUser = () => {
           .update({ department: userData.department })
           .eq('user_id', authData.user.id);
 
-        if (profileError) throw profileError;
+        if (profileError) {
+          console.error('Profile update error:', profileError);
+          // Don't throw here, just log - the user was created successfully
+        }
       }
 
-      // Assign roles
-      if (userData.roles.length > 0) {
-        const roleAssignments = userData.roles.map(roleId => ({
+      // Assign roles if any provided
+      if (userData.roleIds && userData.roleIds.length > 0) {
+        const userRoleInserts = userData.roleIds.map(roleId => ({
           user_id: authData.user.id,
-          role_id: roleId,
+          role_id: roleId
         }));
 
-        const { error: rolesError } = await supabase
+        const { error: roleError } = await supabase
           .from('user_roles')
-          .insert(roleAssignments);
+          .insert(userRoleInserts);
 
-        if (rolesError) throw rolesError;
+        if (roleError) {
+          console.error('Role assignment error:', roleError);
+          throw new Error(`User created but role assignment failed: ${roleError.message}`);
+        }
       }
 
       return authData.user;
     },
     onSuccess: () => {
+      // Invalidate and refetch users
       queryClient.invalidateQueries({ queryKey: ['users'] });
       queryClient.invalidateQueries({ queryKey: ['roles'] });
+      toast.success('User created successfully');
+    },
+    onError: (error: any) => {
+      console.error('User creation failed:', error);
+      if (error.message.includes('Only administrators')) {
+        toast.error('Access denied: Administrator privileges required to create users');
+      } else if (error.message.includes('logged in')) {
+        toast.error('Please log in to create users');
+      } else if (error.message.includes('role assignment failed')) {
+        toast.error(`User created but ${error.message}`);
+      } else {
+        toast.error(`Failed to create user: ${error.message}`);
+      }
     },
   });
 };

@@ -82,10 +82,9 @@ export const AddUserDialog: React.FC<AddUserDialogProps> = ({
       await createUserMutation.mutateAsync({
         email: data.email,
         password: data.password,
-        full_name: `${data.firstName} ${data.lastName}`,
+        fullName: `${data.firstName} ${data.lastName}`,
         department: data.department,
-        roles: selectedRoles,
-        company_id: data.company,
+        roleIds: selectedRoles,
       });
 
       toast({

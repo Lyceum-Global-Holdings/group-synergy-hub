@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -8,14 +8,20 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Users, UserPlus, Shield, Edit, Trash2, Crown, Loader2 } from 'lucide-react';
 import { AddUserDialog } from '@/components/admin/AddUserDialog';
 import { AddRoleDialog } from '@/components/admin/AddRoleDialog';
+import { AdminBootstrap } from '@/components/admin/AdminBootstrap';
 import { useUsers, useRoles, useAssignRole, useRemoveRole } from '@/hooks/useUsers';
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 
 export default function UserRoleManagement() {
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState('users');
   const [addUserOpen, setAddUserOpen] = useState(false);
   const [addRoleOpen, setAddRoleOpen] = useState(false);
+  const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
+  const [hasAnyAdmins, setHasAnyAdmins] = useState<boolean | null>(null);
   
   const { data: users = [], isLoading: usersLoading, error: usersError, refetch } = useUsers();
   const { data: roles = [], isLoading: rolesLoading, error: rolesError } = useRoles();
@@ -23,8 +29,31 @@ export default function UserRoleManagement() {
   const removeRole = useRemoveRole();
   const { toast } = useToast();
 
+  // Check admin status and if any admins exist
+  useEffect(() => {
+    const checkAdminStatus = async () => {
+      if (!user?.id) return;
+
+      // Check if current user is admin
+      const { data: isAdminResult } = await supabase
+        .rpc('is_admin', { _user_id: user.id });
+      
+      setIsAdmin(isAdminResult === true);
+
+      // Check if any admin users exist
+      const { data: adminUsers } = await supabase
+        .from('user_roles')
+        .select('id, roles!inner(*)')
+        .eq('roles.app_role', 'admin');
+
+      setHasAnyAdmins(adminUsers && adminUsers.length > 0);
+    };
+
+    checkAdminStatus();
+  }, [user?.id, users]); // Re-check when users change
+
   const handleUserAdded = () => {
-    // Refetch users after adding a new one
+    // Refetch users after adding a new one and recheck admin status
     refetch();
   };
 
@@ -59,7 +88,7 @@ export default function UserRoleManagement() {
     }
   };
 
-  const isLoading = usersLoading || rolesLoading;
+  const isLoading = usersLoading || rolesLoading || isAdmin === null || hasAnyAdmins === null;
   const hasError = usersError || rolesError;
 
   if (hasError) {
@@ -70,6 +99,44 @@ export default function UserRoleManagement() {
             <div className="text-center text-destructive">
               Error loading data: {usersError?.message || rolesError?.message}
             </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Show loading while checking permissions
+  if (isLoading) {
+    return (
+      <div className="container mx-auto p-6">
+        <div className="flex items-center justify-center p-8">
+          <Loader2 className="h-8 w-8 animate-spin" />
+        </div>
+      </div>
+    );
+  }
+
+  // Show bootstrap component if no admins exist
+  if (!hasAnyAdmins) {
+    return (
+      <div className="container mx-auto py-8">
+        <AdminBootstrap />
+      </div>
+    );
+  }
+
+  // Show access denied if user is not admin
+  if (!isAdmin) {
+    return (
+      <div className="container mx-auto py-8">
+        <Card className="w-full max-w-md mx-auto">
+          <CardHeader className="text-center">
+            <CardTitle>Access Denied</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-center text-muted-foreground">
+              You need administrator privileges to access user management.
+            </p>
           </CardContent>
         </Card>
       </div>
@@ -111,7 +178,7 @@ export default function UserRoleManagement() {
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{isLoading ? '-' : users.length}</div>
+            <div className="text-2xl font-bold">{usersLoading ? '-' : users.length}</div>
             <p className="text-xs text-muted-foreground">Registered users</p>
           </CardContent>
         </Card>
@@ -122,7 +189,7 @@ export default function UserRoleManagement() {
             <Shield className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{isLoading ? '-' : activeRoles}</div>
+            <div className="text-2xl font-bold">{rolesLoading ? '-' : activeRoles}</div>
             <p className="text-xs text-muted-foreground">Roles with users</p>
           </CardContent>
         </Card>
@@ -133,7 +200,7 @@ export default function UserRoleManagement() {
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{isLoading ? '-' : onlineUsers}</div>
+            <div className="text-2xl font-bold">{usersLoading ? '-' : onlineUsers}</div>
             <p className="text-xs text-muted-foreground">Active in last 30min</p>
           </CardContent>
         </Card>
@@ -144,7 +211,7 @@ export default function UserRoleManagement() {
             <Crown className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{isLoading ? '-' : roles.length}</div>
+            <div className="text-2xl font-bold">{rolesLoading ? '-' : roles.length}</div>
             <p className="text-xs text-muted-foreground">System roles</p>
           </CardContent>
         </Card>
@@ -166,7 +233,7 @@ export default function UserRoleManagement() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {isLoading ? (
+              {rolesLoading ? (
                 <div className="flex items-center justify-center p-8">
                   <Loader2 className="h-8 w-8 animate-spin" />
                 </div>
@@ -246,7 +313,7 @@ export default function UserRoleManagement() {
         </TabsContent>
 
         <TabsContent value="roles" className="space-y-4">
-          {isLoading ? (
+              {usersLoading ? (
             <div className="flex items-center justify-center p-8">
               <Loader2 className="h-8 w-8 animate-spin" />
             </div>

@@ -210,6 +210,20 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      bootstrap_admin: {
+        Args: { _role_name?: string; _user_id: string }
+        Returns: undefined
+      }
+      create_user_with_roles: {
+        Args: {
+          _department?: string
+          _email: string
+          _full_name: string
+          _password: string
+          _role_ids?: string[]
+        }
+        Returns: Json
+      }
       has_role: {
         Args: {
           _app_role: Database["public"]["Enums"]["app_role"]
