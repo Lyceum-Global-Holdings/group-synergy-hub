@@ -25,8 +25,8 @@ const editAssetSchema = z.object({
   serial_number: z.string().optional(),
   asset_tag: z.string().optional(),
   purchase_date: z.string().optional(),
-  purchase_price: z.string().transform(val => val === "" ? undefined : Number(val)).optional(),
-  current_value: z.string().transform(val => val === "" ? undefined : Number(val)).optional(),
+  purchase_price: z.string().transform(val => val === "" ? "" : val).optional(),
+  current_value: z.string().transform(val => val === "" ? "" : val).optional(),
   description: z.string().optional(),
   notes: z.string().optional(),
 });

@@ -35,7 +35,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Plus, Search, Wrench, AlertTriangle, CheckCircle, Package, MapPin, Building, Users, Loader2 } from "lucide-react";
+import { Plus, Search, Wrench, AlertTriangle, CheckCircle, Package, MapPin, Building, Users, Loader2, MoreHorizontal, Edit, ArrowRightLeft, Trash2, Eye } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -45,6 +45,12 @@ import { useWarehouseAssets } from "@/hooks/useWarehouseAssets";
 import { useAssetCategories } from "@/hooks/useAssetCategories";
 import { CategoryManagementDialog } from "@/components/warehouse/CategoryManagementDialog";
 import { BulkAssetImportDialog } from "@/components/warehouse/BulkAssetImportDialog";
+import { AssetDetailsDialog } from "@/components/warehouse/AssetDetailsDialog";
+import { AssetEditDialog } from "@/components/warehouse/AssetEditDialog";
+import { AssetTransferDialog } from "@/components/warehouse/AssetTransferDialog";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { WarehouseAsset, WarehouseLocation, AssetCategory, CreateWarehouseAssetData, CreateWarehouseLocationData } from "@/types/warehouse";
 
 const assetFormSchema = z.object({
   name: z.string().min(1, "Asset name is required"),
@@ -102,6 +108,7 @@ const getStatusIcon = (status: string) => {
   }
 };
 
+export default function AssetManagement() {
   const [searchTerm, setSearchTerm] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isLocationDialogOpen, setIsLocationDialogOpen] = useState(false);
@@ -962,6 +969,79 @@ const getStatusIcon = (status: string) => {
           </Table>
         </CardContent>
       </Card>
+
+      {/* All Dialogs */}
+      <AssetDetailsDialog
+        asset={selectedAsset}
+        open={isDetailsDialogOpen}
+        onOpenChange={setIsDetailsDialogOpen}
+        onEdit={(asset) => {
+          setSelectedAsset(asset);
+          setIsEditDialogOpen(true);
+        }}
+        locations={locations}
+        categories={mainCategories}
+        getLocationName={(locationId) => locations.find(l => l.id === locationId)?.name || 'Unknown'}
+        getCategoryName={(categoryId) => mainCategories.find(c => c.id === categoryId)?.name || 'Unknown'}
+        getSubcategoryName={(subcategoryId) => {
+          // Find subcategory across all categories
+          for (const category of mainCategories) {
+            const subcategories = getSubcategories(category.id);
+            const found = subcategories.find(c => c.id === subcategoryId);
+            if (found) return found.name;
+          }
+          return 'Unknown';
+        }}
+      />
+
+      <AssetEditDialog
+        asset={selectedAsset}
+        open={isEditDialogOpen}
+        onOpenChange={setIsEditDialogOpen}
+        locations={locations}
+        categories={mainCategories}
+        getLocationsByType={(type, parentId) => 
+          locations.filter(l => l.type === type && (!parentId || l.parent_id === parentId))
+        }
+      />
+
+      <AssetTransferDialog
+        asset={selectedAsset}
+        open={isTransferDialogOpen}
+        onOpenChange={setIsTransferDialogOpen}
+        locations={locations}
+        getLocationsByType={(type, parentId) => 
+          locations.filter(l => l.type === type && (!parentId || l.parent_id === parentId))
+        }
+        getLocationName={(locationId) => locations.find(l => l.id === locationId)?.name || 'Unknown'}
+      />
+
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete the asset "{selectedAsset?.name}" and cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (selectedAsset) {
+                  deleteAsset(selectedAsset.id);
+                  setIsDeleteDialogOpen(false);
+                  setSelectedAsset(null);
+                }
+              }}
+              disabled={isDeleting}
+            >
+              {isDeleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
