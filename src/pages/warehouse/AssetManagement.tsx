@@ -35,23 +35,29 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Plus, Search, Wrench, AlertTriangle, CheckCircle, Package, MapPin, Building, Users } from "lucide-react";
+import { Plus, Search, Wrench, AlertTriangle, CheckCircle, Package, MapPin, Building, Users, Loader2 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { toast } from "@/hooks/use-toast";
+import { useWarehouseLocations } from "@/hooks/useWarehouseLocations";
+import { useWarehouseAssets } from "@/hooks/useWarehouseAssets";
 
 const assetFormSchema = z.object({
   name: z.string().min(1, "Asset name is required"),
   category: z.string().min(1, "Category is required"),
-  serialNumber: z.string().min(1, "Serial number is required"),
-  location: z.string().min(1, "Location is required"),
-  sublocation: z.string().optional(),
-  department: z.string().optional(),
-  condition: z.enum(["excellent", "good", "fair", "poor"]),
-  purchaseDate: z.string().min(1, "Purchase date is required"),
-  purchasePrice: z.string().min(1, "Purchase price is required"),
+  serial_number: z.string().optional(),
+  asset_tag: z.string().optional(),
+  location_id: z.string().optional(),
+  sublocation_id: z.string().optional(),
+  department_id: z.string().optional(),
+  condition: z.enum(["good", "fair", "poor", "needs_repair"]),
+  status: z.enum(["active", "inactive", "maintenance", "disposed"]),
+  purchase_date: z.string().optional(),
+  purchase_price: z.string().optional(),
+  current_value: z.string().optional(),
   description: z.string().optional(),
+  notes: z.string().optional(),
 });
 
 const locationFormSchema = z.object({
@@ -64,78 +70,12 @@ const locationFormSchema = z.object({
 type AssetFormValues = z.infer<typeof assetFormSchema>;
 type LocationFormValues = z.infer<typeof locationFormSchema>;
 
-interface LocationItem {
-  id: string;
-  name: string;
-  type: "location" | "sublocation" | "department";
-  parentId?: string;
-  description?: string;
-}
-
-// Mock data for demonstration
-const mockLocations: LocationItem[] = [
-  { id: "1", name: "Warehouse A", type: "location", description: "Main warehouse facility" },
-  { id: "2", name: "Warehouse B", type: "location", description: "Secondary warehouse facility" },
-  { id: "3", name: "Loading Dock", type: "sublocation", parentId: "1", description: "Loading area in Warehouse A" },
-  { id: "4", name: "Storage Zone 1", type: "sublocation", parentId: "1", description: "Primary storage area" },
-  { id: "5", name: "Storage Zone 2", type: "sublocation", parentId: "2", description: "Secondary storage area" },
-  { id: "6", name: "Operations", type: "department", parentId: "3", description: "Operations department in Loading Dock" },
-  { id: "7", name: "Maintenance", type: "department", parentId: "4", description: "Maintenance department in Storage Zone 1" },
-  { id: "8", name: "Quality Control", type: "department", parentId: "4", description: "Quality control department in Storage Zone 1" },
-  { id: "9", name: "Receiving", type: "department", parentId: "3", description: "Receiving department in Loading Dock" },
-];
-
-const mockAssets = [
-  {
-    id: "1",
-    name: "Forklift MF-2024",
-    category: "Equipment",
-    serialNumber: "FL-001-2024",
-    location: "Warehouse A",
-    sublocation: "Loading Dock",
-    department: "Operations",
-    condition: "excellent" as const,
-    status: "active",
-    purchaseDate: "2024-01-15",
-    purchasePrice: 45000,
-    lastMaintenance: "2024-08-15",
-  },
-  {
-    id: "2",
-    name: "Conveyor Belt System",
-    category: "Machinery",
-    serialNumber: "CB-002-2023",
-    location: "Warehouse B",
-    sublocation: "Storage Zone 1",
-    department: "Operations",
-    condition: "good" as const,
-    status: "active",
-    purchaseDate: "2023-06-10",
-    purchasePrice: 125000,
-    lastMaintenance: "2024-07-20",
-  },
-  {
-    id: "3",
-    name: "Pallet Jack PJ-150",
-    category: "Equipment",
-    serialNumber: "PJ-003-2022",
-    location: "Warehouse A",
-    sublocation: "Storage Zone 1",
-    department: "Maintenance",
-    condition: "fair" as const,
-    status: "maintenance",
-    purchaseDate: "2022-03-22",
-    purchasePrice: 2500,
-    lastMaintenance: "2024-09-01",
-  },
-];
-
 const getConditionBadge = (condition: string) => {
   const variants = {
-    excellent: "bg-green-100 text-green-800 border-green-200",
     good: "bg-blue-100 text-blue-800 border-blue-200",
     fair: "bg-yellow-100 text-yellow-800 border-yellow-200",
     poor: "bg-red-100 text-red-800 border-red-200",
+    needs_repair: "bg-orange-100 text-orange-800 border-orange-200",
   };
   return variants[condition as keyof typeof variants] || variants.good;
 };
@@ -148,6 +88,8 @@ const getStatusIcon = (status: string) => {
       return <Wrench className="h-4 w-4 text-yellow-600" />;
     case "inactive":
       return <AlertTriangle className="h-4 w-4 text-red-600" />;
+    case "disposed":
+      return <AlertTriangle className="h-4 w-4 text-gray-600" />;
     default:
       return <Package className="h-4 w-4 text-gray-600" />;
   }
@@ -157,22 +99,38 @@ export default function AssetManagement() {
   const [searchTerm, setSearchTerm] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isLocationDialogOpen, setIsLocationDialogOpen] = useState(false);
-  const [assets] = useState(mockAssets);
-  const [locations, setLocations] = useState<LocationItem[]>(mockLocations);
+  
+  const { 
+    locations, 
+    isLoading: locationsLoading, 
+    createLocation, 
+    isCreating: isCreatingLocation 
+  } = useWarehouseLocations();
+  
+  const { 
+    assets, 
+    isLoading: assetsLoading, 
+    createAsset, 
+    isCreating: isCreatingAsset 
+  } = useWarehouseAssets();
 
   const form = useForm<AssetFormValues>({
     resolver: zodResolver(assetFormSchema),
     defaultValues: {
       name: "",
       category: "",
-      serialNumber: "",
-      location: "",
-      sublocation: "",
-      department: "",
+      serial_number: "",
+      asset_tag: "",
+      location_id: "",
+      sublocation_id: "",
+      department_id: "",
       condition: "good",
-      purchaseDate: "",
-      purchasePrice: "",
+      status: "active",
+      purchase_date: "",
+      purchase_price: "",
+      current_value: "",
       description: "",
+      notes: "",
     },
   });
 
@@ -187,28 +145,35 @@ export default function AssetManagement() {
   });
 
   const onSubmit = (data: AssetFormValues) => {
-    console.log("Asset data:", data);
-    toast({
-      title: "Asset Created",
-      description: "New asset has been added successfully.",
-    });
+    const assetData = {
+      name: data.name,
+      category: data.category,
+      condition: data.condition,
+      status: data.status,
+      serial_number: data.serial_number,
+      asset_tag: data.asset_tag,
+      location_id: data.location_id,
+      sublocation_id: data.sublocation_id,
+      department_id: data.department_id,
+      purchase_date: data.purchase_date,
+      purchase_price: data.purchase_price ? parseFloat(data.purchase_price) : undefined,
+      current_value: data.current_value ? parseFloat(data.current_value) : undefined,
+      description: data.description,
+      notes: data.notes,
+    };
+    createAsset(assetData);
     setIsDialogOpen(false);
     form.reset();
   };
 
   const onLocationSubmit = (data: LocationFormValues) => {
-    const newLocation: LocationItem = {
-      id: Date.now().toString(),
+    const locationData = {
       name: data.name,
       type: data.type,
-      parentId: data.parentId,
+      parent_id: data.parentId || undefined,
       description: data.description,
     };
-    setLocations([...locations, newLocation]);
-    toast({
-      title: "Location Added",
-      description: `${data.type} "${data.name}" has been added successfully.`,
-    });
+    createLocation(locationData);
     setIsLocationDialogOpen(false);
     locationForm.reset();
   };
@@ -216,19 +181,17 @@ export default function AssetManagement() {
   const filteredAssets = assets.filter((asset) =>
     asset.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     asset.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    asset.serialNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    asset.location.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    asset.sublocation?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    asset.department?.toLowerCase().includes(searchTerm.toLowerCase())
+    asset.serial_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    asset.asset_tag?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const getLocationsByType = (type: "location" | "sublocation" | "department", parentId?: string) => {
     if (type === "location") {
       return locations.filter(loc => loc.type === "location");
     } else if (type === "sublocation") {
-      return locations.filter(loc => loc.type === "sublocation" && loc.parentId === parentId);
+      return locations.filter(loc => loc.type === "sublocation" && loc.parent_id === parentId);
     } else if (type === "department") {
-      return locations.filter(loc => loc.type === "department" && loc.parentId === parentId);
+      return locations.filter(loc => loc.type === "department" && loc.parent_id === parentId);
     }
     return [];
   };
@@ -237,7 +200,7 @@ export default function AssetManagement() {
     return locations.find(loc => loc.id === id)?.name || "";
   };
 
-  const totalValue = assets.reduce((sum, asset) => sum + asset.purchasePrice, 0);
+  const totalValue = assets.reduce((sum, asset) => sum + (asset.purchase_price || 0), 0);
   const activeAssets = assets.filter(asset => asset.status === "active").length;
   const maintenanceAssets = assets.filter(asset => asset.status === "maintenance").length;
 
@@ -349,7 +312,7 @@ export default function AssetManagement() {
                               {locations
                                 .filter(loc => loc.type === "sublocation")
                                 .map((sublocation) => {
-                                  const parentLocation = locations.find(l => l.id === sublocation.parentId);
+                                  const parentLocation = locations.find(l => l.id === sublocation.parent_id);
                                   return (
                                     <SelectItem key={sublocation.id} value={sublocation.id}>
                                       {parentLocation ? `${parentLocation.name} → ${sublocation.name}` : sublocation.name}
@@ -389,7 +352,10 @@ export default function AssetManagement() {
                     >
                       Cancel
                     </Button>
-                    <Button type="submit">Add {locationForm.watch("type")}</Button>
+                    <Button type="submit" disabled={isCreatingLocation}>
+                      {isCreatingLocation && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                      Add {locationForm.watch("type")}
+                    </Button>
                   </div>
                 </form>
               </Form>
@@ -415,7 +381,7 @@ export default function AssetManagement() {
                       
                       {/* Show sublocations under this location */}
                       {locations
-                        .filter(sub => sub.type === "sublocation" && sub.parentId === location.id)
+                        .filter(sub => sub.type === "sublocation" && sub.parent_id === location.id)
                         .map((sublocation) => (
                         <div key={sublocation.id} className="ml-6 space-y-1">
                           <div className="flex items-center justify-between p-2 border rounded bg-green-50">
@@ -430,7 +396,7 @@ export default function AssetManagement() {
                           
                           {/* Show departments under this sublocation */}
                           {locations
-                            .filter(dept => dept.type === "department" && dept.parentId === sublocation.id)
+                            .filter(dept => dept.type === "department" && dept.parent_id === sublocation.id)
                             .map((department) => (
                             <div key={department.id} className="ml-6">
                               <div className="flex items-center justify-between p-2 border rounded bg-orange-50">
@@ -513,7 +479,7 @@ export default function AssetManagement() {
                   <div className="grid grid-cols-2 gap-4">
                     <FormField
                       control={form.control}
-                      name="serialNumber"
+                      name="serial_number"
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>Serial Number</FormLabel>
@@ -526,7 +492,23 @@ export default function AssetManagement() {
                     />
                     <FormField
                       control={form.control}
-                      name="location"
+                      name="asset_tag"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Asset Tag</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Enter asset tag" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="location_id"
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>Location</FormLabel>
@@ -538,7 +520,7 @@ export default function AssetManagement() {
                             </FormControl>
                             <SelectContent className="bg-background border shadow-md z-50">
                               {getLocationsByType("location").map((location) => (
-                                <SelectItem key={location.id} value={location.name}>
+                                <SelectItem key={location.id} value={location.id}>
                                   {location.name}
                                 </SelectItem>
                               ))}
@@ -548,15 +530,12 @@ export default function AssetManagement() {
                         </FormItem>
                       )}
                     />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
                     <FormField
                       control={form.control}
-                      name="sublocation"
+                      name="sublocation_id"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Sublocation (Optional)</FormLabel>
+                          <FormLabel>Sublocation</FormLabel>
                           <Select onValueChange={field.onChange} defaultValue={field.value}>
                             <FormControl>
                               <SelectTrigger>
@@ -564,11 +543,16 @@ export default function AssetManagement() {
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent className="bg-background border shadow-md z-50">
-                              {getLocationsByType("sublocation").map((sublocation) => (
-                                <SelectItem key={sublocation.id} value={sublocation.name}>
-                                  {sublocation.name}
-                                </SelectItem>
-                              ))}
+                              {locations
+                                .filter(loc => loc.type === "sublocation")
+                                .map((sublocation) => {
+                                  const parentLocation = locations.find(l => l.id === sublocation.parent_id);
+                                  return (
+                                    <SelectItem key={sublocation.id} value={sublocation.id}>
+                                      {parentLocation ? `${parentLocation.name} → ${sublocation.name}` : sublocation.name}
+                                    </SelectItem>
+                                  );
+                                })}
                             </SelectContent>
                           </Select>
                           <FormMessage />
@@ -577,10 +561,10 @@ export default function AssetManagement() {
                     />
                     <FormField
                       control={form.control}
-                      name="department"
+                      name="department_id"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Department (Optional)</FormLabel>
+                          <FormLabel>Department</FormLabel>
                           <Select onValueChange={field.onChange} defaultValue={field.value}>
                             <FormControl>
                               <SelectTrigger>
@@ -588,19 +572,20 @@ export default function AssetManagement() {
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent className="bg-background border shadow-md z-50">
-                              {/* Show all departments available in the selected sublocation */}
                               {locations
                                 .filter(loc => loc.type === "department")
-                                .map((department) => (
-                                <SelectItem key={department.id} value={department.name}>
-                                  {department.name}
-                                  {department.parentId && (
-                                    <span className="text-xs text-muted-foreground ml-2">
-                                      ({getLocationName(department.parentId)})
-                                    </span>
-                                  )}
-                                </SelectItem>
-                              ))}
+                                .map((department) => {
+                                  const parentSublocation = locations.find(l => l.id === department.parent_id);
+                                  const grandparentLocation = parentSublocation ? locations.find(l => l.id === parentSublocation.parent_id) : null;
+                                  const fullPath = grandparentLocation && parentSublocation 
+                                    ? `${grandparentLocation.name} → ${parentSublocation.name} → ${department.name}`
+                                    : department.name;
+                                  return (
+                                    <SelectItem key={department.id} value={department.id}>
+                                      {fullPath}
+                                    </SelectItem>
+                                  );
+                                })}
                             </SelectContent>
                           </Select>
                           <FormMessage />
@@ -609,7 +594,7 @@ export default function AssetManagement() {
                     />
                   </div>
 
-                  <div className="grid grid-cols-3 gap-4">
+                  <div className="grid grid-cols-4 gap-4">
                     <FormField
                       control={form.control}
                       name="condition"
@@ -623,10 +608,10 @@ export default function AssetManagement() {
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent className="bg-background border shadow-md z-50">
-                              <SelectItem value="excellent">Excellent</SelectItem>
                               <SelectItem value="good">Good</SelectItem>
                               <SelectItem value="fair">Fair</SelectItem>
                               <SelectItem value="poor">Poor</SelectItem>
+                              <SelectItem value="needs_repair">Needs Repair</SelectItem>
                             </SelectContent>
                           </Select>
                           <FormMessage />
@@ -635,7 +620,30 @@ export default function AssetManagement() {
                     />
                     <FormField
                       control={form.control}
-                      name="purchaseDate"
+                      name="status"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Status</FormLabel>
+                          <Select onValueChange={field.onChange} defaultValue={field.value}>
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select status" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent className="bg-background border shadow-md z-50">
+                              <SelectItem value="active">Active</SelectItem>
+                              <SelectItem value="inactive">Inactive</SelectItem>
+                              <SelectItem value="maintenance">Maintenance</SelectItem>
+                              <SelectItem value="disposed">Disposed</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="purchase_date"
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>Purchase Date</FormLabel>
@@ -648,12 +656,25 @@ export default function AssetManagement() {
                     />
                     <FormField
                       control={form.control}
-                      name="purchasePrice"
+                      name="purchase_price"
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>Purchase Price</FormLabel>
                           <FormControl>
-                            <Input type="number" placeholder="0.00" {...field} />
+                            <Input type="number" placeholder="0.00" step="0.01" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="current_value"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Current Value</FormLabel>
+                          <FormControl>
+                            <Input type="number" placeholder="0.00" step="0.01" {...field} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -678,6 +699,23 @@ export default function AssetManagement() {
                     )}
                   />
 
+                  <FormField
+                    control={form.control}
+                    name="notes"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Notes</FormLabel>
+                        <FormControl>
+                          <Textarea
+                            placeholder="Enter additional notes (optional)"
+                            {...field}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
                   <div className="flex justify-end gap-3 pt-4">
                     <Button
                       type="button"
@@ -686,7 +724,10 @@ export default function AssetManagement() {
                     >
                       Cancel
                     </Button>
-                    <Button type="submit">Add Asset</Button>
+                    <Button type="submit" disabled={isCreatingAsset}>
+                      {isCreatingAsset && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                      Add Asset
+                    </Button>
                   </div>
                 </form>
               </Form>
@@ -775,29 +816,50 @@ export default function AssetManagement() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredAssets.map((asset) => (
-                <TableRow key={asset.id}>
-                  <TableCell className="font-medium">{asset.name}</TableCell>
-                  <TableCell>{asset.category}</TableCell>
-                  <TableCell className="font-mono text-sm">{asset.serialNumber}</TableCell>
-                  <TableCell>{asset.location}</TableCell>
-                  <TableCell>{asset.sublocation || "-"}</TableCell>
-                  <TableCell>{asset.department || "-"}</TableCell>
-                  <TableCell>
-                    <Badge className={getConditionBadge(asset.condition)}>
-                      {asset.condition}
-                    </Badge>
+              {assetsLoading ? (
+                <TableRow>
+                  <TableCell colSpan={10} className="text-center py-8">
+                    <Loader2 className="h-6 w-6 animate-spin mx-auto" />
+                    <p className="text-muted-foreground mt-2">Loading assets...</p>
                   </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      {getStatusIcon(asset.status)}
-                      <span className="capitalize">{asset.status}</span>
-                    </div>
-                  </TableCell>
-                  <TableCell>${asset.purchasePrice.toLocaleString()}</TableCell>
-                  <TableCell>{asset.lastMaintenance}</TableCell>
                 </TableRow>
-              ))}
+              ) : filteredAssets.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={10} className="text-center py-8">
+                    <p className="text-muted-foreground">No assets found</p>
+                  </TableCell>
+                </TableRow>
+              ) : (
+                filteredAssets.map((asset) => {
+                  const locationName = asset.location_id ? getLocationName(asset.location_id) : "-";
+                  const sublocationName = asset.sublocation_id ? getLocationName(asset.sublocation_id) : "-";
+                  const departmentName = asset.department_id ? getLocationName(asset.department_id) : "-";
+                  
+                  return (
+                    <TableRow key={asset.id}>
+                      <TableCell className="font-medium">{asset.name}</TableCell>
+                      <TableCell>{asset.category}</TableCell>
+                      <TableCell className="font-mono text-sm">{asset.serial_number || "-"}</TableCell>
+                      <TableCell>{locationName}</TableCell>
+                      <TableCell>{sublocationName}</TableCell>
+                      <TableCell>{departmentName}</TableCell>
+                      <TableCell>
+                        <Badge className={getConditionBadge(asset.condition)}>
+                          {asset.condition.replace('_', ' ')}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          {getStatusIcon(asset.status)}
+                          <span className="capitalize">{asset.status}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell>{asset.purchase_price ? `$${asset.purchase_price.toLocaleString()}` : "-"}</TableCell>
+                      <TableCell>{asset.created_at ? new Date(asset.created_at).toLocaleDateString() : "-"}</TableCell>
+                    </TableRow>
+                  );
+                })
+              )}
             </TableBody>
           </Table>
         </CardContent>

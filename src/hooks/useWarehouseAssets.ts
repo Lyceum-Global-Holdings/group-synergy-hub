@@ -1,0 +1,127 @@
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { WarehouseAsset, CreateWarehouseAssetData } from '@/types/warehouse';
+import { useToast } from '@/hooks/use-toast';
+
+export const useWarehouseAssets = () => {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  const {
+    data: assets = [],
+    isLoading,
+    error
+  } = useQuery({
+    queryKey: ['warehouse-assets'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('warehouse_assets')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      return data as WarehouseAsset[];
+    }
+  });
+
+  const createAssetMutation = useMutation({
+    mutationFn: async (assetData: CreateWarehouseAssetData) => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User not authenticated');
+
+      const { data, error } = await supabase
+        .from('warehouse_assets')
+        .insert({
+          ...assetData,
+          created_by: user.id
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['warehouse-assets'] });
+      toast({
+        title: "Success",
+        description: "Asset created successfully",
+      });
+    },
+    onError: (error) => {
+      console.error('Error creating asset:', error);
+      toast({
+        title: "Error",
+        description: "Failed to create asset",
+        variant: "destructive",
+      });
+    }
+  });
+
+  const updateAssetMutation = useMutation({
+    mutationFn: async ({ id, ...assetData }: Partial<WarehouseAsset> & { id: string }) => {
+      const { data, error } = await supabase
+        .from('warehouse_assets')
+        .update(assetData)
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['warehouse-assets'] });
+      toast({
+        title: "Success",
+        description: "Asset updated successfully",
+      });
+    },
+    onError: (error) => {
+      console.error('Error updating asset:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update asset",
+        variant: "destructive",
+      });
+    }
+  });
+
+  const deleteAssetMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from('warehouse_assets')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['warehouse-assets'] });
+      toast({
+        title: "Success",
+        description: "Asset deleted successfully",
+      });
+    },
+    onError: (error) => {
+      console.error('Error deleting asset:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete asset",
+        variant: "destructive",
+      });
+    }
+  });
+
+  return {
+    assets,
+    isLoading,
+    error,
+    createAsset: createAssetMutation.mutate,
+    updateAsset: updateAssetMutation.mutate,
+    deleteAsset: deleteAssetMutation.mutate,
+    isCreating: createAssetMutation.isPending,
+    isUpdating: updateAssetMutation.isPending,
+    isDeleting: deleteAssetMutation.isPending,
+  };
+};

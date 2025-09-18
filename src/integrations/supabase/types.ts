@@ -744,6 +744,138 @@ export type Database = {
           },
         ]
       }
+      warehouse_assets: {
+        Row: {
+          asset_tag: string | null
+          category: string
+          company_id: string | null
+          condition: string
+          created_at: string
+          created_by: string | null
+          current_value: number | null
+          department_id: string | null
+          description: string | null
+          id: string
+          location_id: string | null
+          name: string
+          notes: string | null
+          purchase_date: string | null
+          purchase_price: number | null
+          serial_number: string | null
+          status: string
+          sublocation_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          asset_tag?: string | null
+          category: string
+          company_id?: string | null
+          condition?: string
+          created_at?: string
+          created_by?: string | null
+          current_value?: number | null
+          department_id?: string | null
+          description?: string | null
+          id?: string
+          location_id?: string | null
+          name: string
+          notes?: string | null
+          purchase_date?: string | null
+          purchase_price?: number | null
+          serial_number?: string | null
+          status?: string
+          sublocation_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          asset_tag?: string | null
+          category?: string
+          company_id?: string | null
+          condition?: string
+          created_at?: string
+          created_by?: string | null
+          current_value?: number | null
+          department_id?: string | null
+          description?: string | null
+          id?: string
+          location_id?: string | null
+          name?: string
+          notes?: string | null
+          purchase_date?: string | null
+          purchase_price?: number | null
+          serial_number?: string | null
+          status?: string
+          sublocation_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "warehouse_assets_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "warehouse_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "warehouse_assets_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "warehouse_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "warehouse_assets_sublocation_id_fkey"
+            columns: ["sublocation_id"]
+            isOneToOne: false
+            referencedRelation: "warehouse_locations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      warehouse_locations: {
+        Row: {
+          company_id: string | null
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          name: string
+          parent_id: string | null
+          type: string
+          updated_at: string
+        }
+        Insert: {
+          company_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          name: string
+          parent_id?: string | null
+          type: string
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          name?: string
+          parent_id?: string | null
+          type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "warehouse_locations_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "warehouse_locations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
