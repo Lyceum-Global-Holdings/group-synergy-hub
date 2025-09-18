@@ -102,10 +102,16 @@ const getStatusIcon = (status: string) => {
   }
 };
 
-export default function AssetManagement() {
   const [searchTerm, setSearchTerm] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isLocationDialogOpen, setIsLocationDialogOpen] = useState(false);
+  const [isBulkImportOpen, setIsBulkImportOpen] = useState(false);
+  const [isCategoryManagementOpen, setIsCategoryManagementOpen] = useState(false);
+  const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isTransferDialogOpen, setIsTransferDialogOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [selectedAsset, setSelectedAsset] = useState<WarehouseAsset | null>(null);
   
   const { 
     locations, 
@@ -119,8 +125,12 @@ export default function AssetManagement() {
     isLoading: assetsLoading, 
     createAsset, 
     createBulkAssets,
+    updateAsset,
+    deleteAsset,
     isCreating: isCreatingAsset,
-    isCreatingBulk
+    isCreatingBulk,
+    isUpdating,
+    isDeleting
   } = useWarehouseAssets();
 
   const { 
@@ -896,12 +906,13 @@ export default function AssetManagement() {
                 <TableHead>Asset Name</TableHead>
                 <TableHead>Category</TableHead>
                 <TableHead>Brand</TableHead>
-                <TableHead>Location</TableHead>
-                <TableHead>Condition</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Purchase Price</TableHead>
-              </TableRow>
-            </TableHeader>
+                    <TableHead>Location</TableHead>
+                    <TableHead>Condition</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Purchase Price</TableHead>
+                    <TableHead className="w-[70px]">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
             <TableBody>
               {assetsLoading ? (
                 <TableRow>
