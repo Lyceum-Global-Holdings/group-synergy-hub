@@ -113,6 +113,41 @@ export const useWarehouseAssets = () => {
     }
   });
 
+  const createBulkAssetsMutation = useMutation({
+    mutationFn: async (assetsData: CreateWarehouseAssetData[]) => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User not authenticated');
+
+      const assetsWithUser = assetsData.map(asset => ({
+        ...asset,
+        created_by: user.id
+      }));
+
+      const { data, error } = await supabase
+        .from('warehouse_assets')
+        .insert(assetsWithUser)
+        .select();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['warehouse-assets'] });
+      toast({
+        title: "Success",
+        description: `Successfully created ${data.length} assets`,
+      });
+    },
+    onError: (error) => {
+      console.error('Error creating bulk assets:', error);
+      toast({
+        title: "Error",
+        description: "Failed to create assets in bulk",
+        variant: "destructive",
+      });
+    }
+  });
+
   return {
     assets,
     isLoading,
@@ -120,8 +155,10 @@ export const useWarehouseAssets = () => {
     createAsset: createAssetMutation.mutate,
     updateAsset: updateAssetMutation.mutate,
     deleteAsset: deleteAssetMutation.mutate,
+    createBulkAssets: createBulkAssetsMutation.mutate,
     isCreating: createAssetMutation.isPending,
     isUpdating: updateAssetMutation.isPending,
     isDeleting: deleteAssetMutation.isPending,
+    isCreatingBulk: createBulkAssetsMutation.isPending,
   };
 };

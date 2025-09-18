@@ -44,6 +44,7 @@ import { useWarehouseLocations } from "@/hooks/useWarehouseLocations";
 import { useWarehouseAssets } from "@/hooks/useWarehouseAssets";
 import { useAssetCategories } from "@/hooks/useAssetCategories";
 import { CategoryManagementDialog } from "@/components/warehouse/CategoryManagementDialog";
+import { BulkAssetImportDialog } from "@/components/warehouse/BulkAssetImportDialog";
 
 const assetFormSchema = z.object({
   name: z.string().min(1, "Asset name is required"),
@@ -240,6 +241,7 @@ export default function AssetManagement() {
           </p>
         </div>
         <div className="flex gap-2">
+          <BulkAssetImportDialog />
           <CategoryManagementDialog />
           <Dialog open={isLocationDialogOpen} onOpenChange={setIsLocationDialogOpen}>
             <DialogTrigger asChild>
