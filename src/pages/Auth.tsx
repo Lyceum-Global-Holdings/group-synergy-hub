@@ -6,8 +6,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Users } from 'lucide-react';
+import { Loader2, Users, AlertCircle, CheckCircle } from 'lucide-react';
 
 export default function Auth() {
   const [email, setEmail] = useState('');
@@ -29,6 +30,25 @@ export default function Auth() {
     }
   }, [user, navigate, location]);
 
+  const getErrorMessage = (error: any) => {
+    const message = error?.message || '';
+    
+    if (message.includes('Invalid login credentials')) {
+      return 'Invalid email or password. Please check your credentials and try again.';
+    }
+    if (message.includes('Email address') && message.includes('is invalid')) {
+      return 'This email domain may not be allowed. Please check Supabase Auth settings or use a different email.';
+    }
+    if (message.includes('User already registered')) {
+      return 'An account with this email already exists. Try signing in instead.';
+    }
+    if (message.includes('Signup is disabled')) {
+      return 'Account creation is currently disabled. Please contact your administrator.';
+    }
+    
+    return message || 'An unexpected error occurred. Please try again.';
+  };
+
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
@@ -37,9 +57,10 @@ export default function Auth() {
       const { error } = await signIn(email, password);
       
       if (error) {
+        console.error('Sign in error:', error);
         toast({
           title: "Sign in failed",
-          description: error.message,
+          description: getErrorMessage(error),
           variant: "destructive",
         });
       } else {
@@ -61,17 +82,21 @@ export default function Auth() {
       const { error } = await signUp(email, password, fullName);
       
       if (error) {
+        console.error('Sign up error:', error);
         toast({
           title: "Sign up failed",
-          description: error.message,
+          description: getErrorMessage(error),
           variant: "destructive",
         });
       } else {
         toast({
-          title: "Account created!",
-          description: "Please check your email to confirm your account.",
+          title: "Account created successfully!",
+          description: "Please check your email to confirm your account, then sign in.",
         });
         setActiveTab('signin');
+        setEmail('');
+        setPassword('');
+        setFullName('');
       }
     } finally {
       setIsLoading(false);
@@ -81,27 +106,45 @@ export default function Auth() {
   const createTestUsers = async () => {
     setIsLoading(true);
     const testUsers = [
-      { name: "Admin User", email: "admin@company.com", password: "admin123" },
-      { name: "Manager User", email: "manager@company.com", password: "manager123" },
-      { name: "Regular User", email: "user@company.com", password: "user123" }
+      { name: "Admin User", email: "admin@example.com", password: "admin123" },
+      { name: "Manager User", email: "manager@example.com", password: "manager123" },
+      { name: "Regular User", email: "user@example.com", password: "user123" }
     ];
+
+    let successCount = 0;
+    let errors: string[] = [];
 
     try {
       for (const testUser of testUsers) {
         const { error } = await signUp(testUser.email, testUser.password, testUser.name);
-        if (error && !error.message.includes('already registered')) {
-          throw error;
+        if (error) {
+          if (error.message.includes('already registered')) {
+            successCount++; // Count as success if already exists
+          } else {
+            errors.push(`${testUser.email}: ${getErrorMessage(error)}`);
+          }
+        } else {
+          successCount++;
         }
       }
       
-      toast({
-        title: "Test users created!",
-        description: "You can now sign in with admin@company.com / admin123, manager@company.com / manager123, or user@company.com / user123",
-      });
+      if (errors.length === 0) {
+        toast({
+          title: "Test users ready!",
+          description: `${successCount} test accounts available. Try: admin@example.com / admin123`,
+        });
+      } else {
+        toast({
+          title: `${successCount} users ready, ${errors.length} failed`,
+          description: `Working accounts available. Errors: ${errors.join(', ')}`,
+          variant: errors.length === testUsers.length ? "destructive" : "default",
+        });
+      }
     } catch (error: any) {
+      console.error('Test user creation error:', error);
       toast({
         title: "Error creating test users",
-        description: error.message,
+        description: getErrorMessage(error),
         variant: "destructive",
       });
     } finally {
@@ -122,7 +165,17 @@ export default function Auth() {
           </p>
         </div>
 
-        <div className="mb-4">
+        <div className="mb-4 space-y-3">
+          <Alert>
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>
+              <strong>First time setup:</strong> If you get login errors, check Supabase Auth settings:
+              <br />• Enable Email provider & new signups
+              <br />• Disable domain allowlist (or add your domain)
+              <br />• Set Site URL and Redirect URLs correctly
+            </AlertDescription>
+          </Alert>
+          
           <Button 
             onClick={createTestUsers} 
             disabled={isLoading}
@@ -133,8 +186,8 @@ export default function Auth() {
             {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Create Test Users (Dev Only)
           </Button>
-          <p className="text-xs text-muted-foreground mt-2 text-center">
-            Creates: admin@company.com, manager@company.com, user@company.com (password: role123)
+          <p className="text-xs text-muted-foreground text-center">
+            Creates: admin@example.com, manager@example.com, user@example.com (all with password: role123)
           </p>
         </div>
 
@@ -228,6 +281,15 @@ export default function Auth() {
             </Tabs>
           </CardContent>
         </Card>
+
+        <div className="text-center">
+          <Alert>
+            <CheckCircle className="h-4 w-4" />
+            <AlertDescription>
+              <strong>After signing in:</strong> First user will get admin bootstrap option to manage the system.
+            </AlertDescription>
+          </Alert>
+        </div>
       </div>
     </div>
   );
