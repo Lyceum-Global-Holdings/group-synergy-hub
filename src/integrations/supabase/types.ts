@@ -74,6 +74,94 @@ export type Database = {
         }
         Relationships: []
       }
+      pr_approvals: {
+        Row: {
+          action: Database["public"]["Enums"]["pr_status"]
+          approver_id: string
+          comments: string | null
+          created_at: string
+          id: string
+          pr_id: string
+        }
+        Insert: {
+          action: Database["public"]["Enums"]["pr_status"]
+          approver_id: string
+          comments?: string | null
+          created_at?: string
+          id?: string
+          pr_id: string
+        }
+        Update: {
+          action?: Database["public"]["Enums"]["pr_status"]
+          approver_id?: string
+          comments?: string | null
+          created_at?: string
+          id?: string
+          pr_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pr_approvals_pr_id_fkey"
+            columns: ["pr_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_requisitions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pr_items: {
+        Row: {
+          created_at: string
+          description: string | null
+          estimated_total_price: number
+          estimated_unit_price: number
+          id: string
+          item_name: string
+          notes: string | null
+          pr_id: string
+          quantity: number
+          specifications: string | null
+          unit_of_measure: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          estimated_total_price: number
+          estimated_unit_price: number
+          id?: string
+          item_name: string
+          notes?: string | null
+          pr_id: string
+          quantity: number
+          specifications?: string | null
+          unit_of_measure?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          estimated_total_price?: number
+          estimated_unit_price?: number
+          id?: string
+          item_name?: string
+          notes?: string | null
+          pr_id?: string
+          quantity?: number
+          specifications?: string | null
+          unit_of_measure?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pr_items_pr_id_fkey"
+            columns: ["pr_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_requisitions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -107,6 +195,66 @@ export type Database = {
           role?: string | null
           updated_at?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      purchase_requisitions: {
+        Row: {
+          approved_by: string | null
+          approved_date: string | null
+          created_at: string
+          department: string | null
+          description: string | null
+          id: string
+          justification: string | null
+          pr_number: string
+          priority: Database["public"]["Enums"]["pr_priority"]
+          rejection_reason: string | null
+          requested_by: string
+          requested_date: string
+          required_date: string
+          status: Database["public"]["Enums"]["pr_status"]
+          title: string
+          total_estimated_amount: number | null
+          updated_at: string
+        }
+        Insert: {
+          approved_by?: string | null
+          approved_date?: string | null
+          created_at?: string
+          department?: string | null
+          description?: string | null
+          id?: string
+          justification?: string | null
+          pr_number: string
+          priority?: Database["public"]["Enums"]["pr_priority"]
+          rejection_reason?: string | null
+          requested_by: string
+          requested_date?: string
+          required_date: string
+          status?: Database["public"]["Enums"]["pr_status"]
+          title: string
+          total_estimated_amount?: number | null
+          updated_at?: string
+        }
+        Update: {
+          approved_by?: string | null
+          approved_date?: string | null
+          created_at?: string
+          department?: string | null
+          description?: string | null
+          id?: string
+          justification?: string | null
+          pr_number?: string
+          priority?: Database["public"]["Enums"]["pr_priority"]
+          rejection_reason?: string | null
+          requested_by?: string
+          requested_date?: string
+          required_date?: string
+          status?: Database["public"]["Enums"]["pr_status"]
+          title?: string
+          total_estimated_amount?: number | null
+          updated_at?: string
         }
         Relationships: []
       }
@@ -224,6 +372,10 @@ export type Database = {
         }
         Returns: Json
       }
+      generate_pr_number: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
       has_role: {
         Args: {
           _app_role: Database["public"]["Enums"]["app_role"]
@@ -238,6 +390,14 @@ export type Database = {
     }
     Enums: {
       app_role: "super_admin" | "admin" | "manager" | "user"
+      pr_priority: "low" | "medium" | "high" | "urgent"
+      pr_status:
+        | "draft"
+        | "submitted"
+        | "pending_approval"
+        | "approved"
+        | "rejected"
+        | "cancelled"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -366,6 +526,15 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["super_admin", "admin", "manager", "user"],
+      pr_priority: ["low", "medium", "high", "urgent"],
+      pr_status: [
+        "draft",
+        "submitted",
+        "pending_approval",
+        "approved",
+        "rejected",
+        "cancelled",
+      ],
     },
   },
 } as const
