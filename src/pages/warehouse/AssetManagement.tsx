@@ -48,6 +48,9 @@ import { BulkAssetImportDialog } from "@/components/warehouse/BulkAssetImportDia
 
 const assetFormSchema = z.object({
   name: z.string().min(1, "Asset name is required"),
+  quantity: z.string().transform(val => parseInt(val)).pipe(
+    z.number().min(1, "Quantity must be at least 1").max(100, "Quantity cannot exceed 100")
+  ),
   category: z.string().optional(),
   category_id: z.string().min(1, "Category is required"),
   subcategory_id: z.string().optional(),
@@ -115,7 +118,9 @@ export default function AssetManagement() {
     assets, 
     isLoading: assetsLoading, 
     createAsset, 
-    isCreating: isCreatingAsset 
+    createBulkAssets,
+    isCreating: isCreatingAsset,
+    isCreatingBulk
   } = useWarehouseAssets();
 
   const { 
@@ -128,6 +133,7 @@ export default function AssetManagement() {
     resolver: zodResolver(assetFormSchema),
     defaultValues: {
       name: "",
+      quantity: 1,
       category: "",
       category_id: "",
       subcategory_id: "",
@@ -176,7 +182,15 @@ export default function AssetManagement() {
       description: data.description,
       notes: data.notes,
     };
-    createAsset(assetData);
+
+    if (data.quantity === 1) {
+      createAsset(assetData);
+    } else {
+      // Create array of identical assets for bulk creation
+      const bulkAssets = Array.from({ length: data.quantity }, () => ({ ...assetData }));
+      createBulkAssets(bulkAssets);
+    }
+    
     setIsDialogOpen(false);
     form.reset();
   };
@@ -464,7 +478,7 @@ export default function AssetManagement() {
               </DialogHeader>
               <Form {...form}>
                 <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-3 gap-4">
                     <FormField
                       control={form.control}
                       name="name"
@@ -475,6 +489,28 @@ export default function AssetManagement() {
                             <Input placeholder="Enter asset name" {...field} />
                           </FormControl>
                           <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="quantity"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Quantity</FormLabel>
+                          <FormControl>
+                            <Input 
+                              type="number" 
+                              min="1" 
+                              max="100"
+                              placeholder="1" 
+                              {...field} 
+                            />
+                          </FormControl>
+                          <FormMessage />
+                          <p className="text-xs text-muted-foreground">
+                            Number of identical assets to create
+                          </p>
                         </FormItem>
                       )}
                     />
@@ -777,9 +813,9 @@ export default function AssetManagement() {
                     >
                       Cancel
                     </Button>
-                    <Button type="submit" disabled={isCreatingAsset}>
-                      {isCreatingAsset && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                      Add Asset
+                    <Button type="submit" disabled={isCreatingAsset || isCreatingBulk}>
+                      {(isCreatingAsset || isCreatingBulk) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                      {form.watch("quantity") > 1 ? `Add ${form.watch("quantity")} Assets` : "Add Asset"}
                     </Button>
                   </div>
                 </form>
