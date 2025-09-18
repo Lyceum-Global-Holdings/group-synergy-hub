@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Users } from 'lucide-react';
 
 export default function Auth() {
   const [email, setEmail] = useState('');
@@ -78,6 +78,37 @@ export default function Auth() {
     }
   };
 
+  const createTestUsers = async () => {
+    setIsLoading(true);
+    const testUsers = [
+      { name: "Admin User", email: "admin@company.com", password: "admin123" },
+      { name: "Manager User", email: "manager@company.com", password: "manager123" },
+      { name: "Regular User", email: "user@company.com", password: "user123" }
+    ];
+
+    try {
+      for (const testUser of testUsers) {
+        const { error } = await signUp(testUser.email, testUser.password, testUser.name);
+        if (error && !error.message.includes('already registered')) {
+          throw error;
+        }
+      }
+      
+      toast({
+        title: "Test users created!",
+        description: "You can now sign in with admin@company.com / admin123, manager@company.com / manager123, or user@company.com / user123",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error creating test users",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <div className="w-full max-w-md space-y-6">
@@ -88,6 +119,22 @@ export default function Auth() {
           <h1 className="text-2xl font-bold text-foreground">Enterprise Management System</h1>
           <p className="text-sm text-muted-foreground text-center">
             Sign in to access your dashboard
+          </p>
+        </div>
+
+        <div className="mb-4">
+          <Button 
+            onClick={createTestUsers} 
+            disabled={isLoading}
+            variant="outline"
+            className="w-full"
+          >
+            <Users className="mr-2 h-4 w-4" />
+            {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            Create Test Users (Dev Only)
+          </Button>
+          <p className="text-xs text-muted-foreground mt-2 text-center">
+            Creates: admin@company.com, manager@company.com, user@company.com (password: role123)
           </p>
         </div>
 
