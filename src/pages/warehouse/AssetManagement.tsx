@@ -3,6 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Table,
   TableBody,
@@ -35,7 +36,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Plus, Search, Wrench, AlertTriangle, CheckCircle, Package, MapPin, Building, Users, Loader2, MoreHorizontal, Edit, ArrowRightLeft, Trash2, Eye } from "lucide-react";
+import { Plus, Search, Wrench, AlertTriangle, CheckCircle, Package, MapPin, Building, Users, Loader2, MoreHorizontal, Edit, ArrowRightLeft, Trash2, Eye, BarChart3 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -51,6 +52,7 @@ import { AssetTransferDialog } from "@/components/warehouse/AssetTransferDialog"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { WarehouseAsset, WarehouseLocation, AssetCategory, CreateWarehouseAssetData, CreateWarehouseLocationData } from "@/types/warehouse";
+import { AssetAnalytics } from "@/components/warehouse/AssetAnalytics";
 
 const assetFormSchema = z.object({
   name: z.string().min(1, "Asset name is required"),
@@ -85,10 +87,10 @@ type LocationFormValues = z.infer<typeof locationFormSchema>;
 
 const getConditionBadge = (condition: string) => {
   const variants = {
-    good: "bg-blue-100 text-blue-800 border-blue-200",
-    fair: "bg-yellow-100 text-yellow-800 border-yellow-200",
-    poor: "bg-red-100 text-red-800 border-red-200",
-    needs_repair: "bg-orange-100 text-orange-800 border-orange-200",
+    good: "bg-success/10 text-success border-success/20",
+    fair: "bg-warning/10 text-warning border-warning/20", 
+    poor: "bg-destructive/10 text-destructive border-destructive/20",
+    needs_repair: "bg-destructive/20 text-destructive border-destructive/30",
   };
   return variants[condition as keyof typeof variants] || variants.good;
 };
@@ -96,15 +98,15 @@ const getConditionBadge = (condition: string) => {
 const getStatusIcon = (status: string) => {
   switch (status) {
     case "active":
-      return <CheckCircle className="h-4 w-4 text-green-600" />;
+      return <CheckCircle className="h-4 w-4 text-success" />;
     case "maintenance":
-      return <Wrench className="h-4 w-4 text-yellow-600" />;
+      return <Wrench className="h-4 w-4 text-warning" />;
     case "inactive":
-      return <AlertTriangle className="h-4 w-4 text-red-600" />;
+      return <AlertTriangle className="h-4 w-4 text-destructive" />;
     case "disposed":
-      return <AlertTriangle className="h-4 w-4 text-gray-600" />;
+      return <AlertTriangle className="h-4 w-4 text-muted-foreground" />;
     default:
-      return <Package className="h-4 w-4 text-gray-600" />;
+      return <Package className="h-4 w-4 text-muted-foreground" />;
   }
 };
 
@@ -419,63 +421,6 @@ export default function AssetManagement() {
                   </div>
                 </form>
               </Form>
-
-              {/* Current Locations List */}
-              <div className="mt-6">
-                <h4 className="font-medium mb-3">Current Location Hierarchy</h4>
-                <div className="space-y-2 max-h-60 overflow-y-auto">
-                  {/* Show locations with their hierarchy */}
-                  {locations
-                    .filter(loc => loc.type === "location")
-                    .map((location) => (
-                    <div key={location.id} className="space-y-1">
-                      <div className="flex items-center justify-between p-2 border rounded bg-blue-50">
-                        <div className="flex items-center gap-2">
-                          <Building className="h-4 w-4 text-blue-600" />
-                          <span className="font-medium">{location.name}</span>
-                          <Badge variant="outline" className="bg-blue-100 text-blue-800">
-                            Location
-                          </Badge>
-                        </div>
-                      </div>
-                      
-                      {/* Show sublocations under this location */}
-                      {locations
-                        .filter(sub => sub.type === "sublocation" && sub.parent_id === location.id)
-                        .map((sublocation) => (
-                        <div key={sublocation.id} className="ml-6 space-y-1">
-                          <div className="flex items-center justify-between p-2 border rounded bg-green-50">
-                            <div className="flex items-center gap-2">
-                              <MapPin className="h-4 w-4 text-green-600" />
-                              <span className="font-medium">{sublocation.name}</span>
-                              <Badge variant="outline" className="bg-green-100 text-green-800">
-                                Sublocation
-                              </Badge>
-                            </div>
-                          </div>
-                          
-                          {/* Show departments under this sublocation */}
-                          {locations
-                            .filter(dept => dept.type === "department" && dept.parent_id === sublocation.id)
-                            .map((department) => (
-                            <div key={department.id} className="ml-6">
-                              <div className="flex items-center justify-between p-2 border rounded bg-orange-50">
-                                <div className="flex items-center gap-2">
-                                  <Users className="h-4 w-4 text-orange-600" />
-                                  <span className="font-medium">{department.name}</span>
-                                  <Badge variant="outline" className="bg-orange-100 text-orange-800">
-                                    Department
-                                  </Badge>
-                                </div>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      ))}
-                    </div>
-                  ))}
-                </div>
-              </div>
             </DialogContent>
           </Dialog>
 
@@ -486,11 +431,11 @@ export default function AssetManagement() {
                 Add Asset
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>Add New Asset</DialogTitle>
                 <DialogDescription>
-                  Enter asset details to add it to the warehouse inventory.
+                  Create a new warehouse asset with details and location information.
                 </DialogDescription>
               </DialogHeader>
               <Form {...form}>
@@ -560,7 +505,20 @@ export default function AssetManagement() {
                     />
                   </div>
 
-                  <div className="grid grid-cols-1 gap-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="brand"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Brand</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Enter brand" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
                     <FormField
                       control={form.control}
                       name="subcategory_id"
@@ -591,116 +549,6 @@ export default function AssetManagement() {
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
-                    <FormField
-                      control={form.control}
-                      name="brand"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Brand</FormLabel>
-                          <FormControl>
-                            <Input placeholder="Enter brand name" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-3 gap-4">
-                    <FormField
-                      control={form.control}
-                      name="location_id"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Location</FormLabel>
-                          <Select onValueChange={field.onChange} defaultValue={field.value}>
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select location" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent className="bg-background border shadow-md z-50">
-                              <SelectItem value="none">None (Optional)</SelectItem>
-                              {getLocationsByType("location")
-                                .filter(location => location.id && location.id.trim() !== "")
-                                .map((location) => (
-                                <SelectItem key={location.id} value={location.id}>
-                                  {location.name}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="sublocation_id"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Sublocation</FormLabel>
-                          <Select onValueChange={field.onChange} defaultValue={field.value}>
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select sublocation" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent className="bg-background border shadow-md z-50">
-                              <SelectItem value="none">None (Optional)</SelectItem>
-                              {locations
-                                .filter(loc => loc.type === "sublocation" && loc.id && loc.id.trim() !== "")
-                                .map((sublocation) => {
-                                  const parentLocation = locations.find(l => l.id === sublocation.parent_id);
-                                  return (
-                                    <SelectItem key={sublocation.id} value={sublocation.id}>
-                                      {parentLocation ? `${parentLocation.name} → ${sublocation.name}` : sublocation.name}
-                                    </SelectItem>
-                                  );
-                                })}
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="department_id"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Department</FormLabel>
-                          <Select onValueChange={field.onChange} defaultValue={field.value}>
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select department" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent className="bg-background border shadow-md z-50">
-                              <SelectItem value="none">None (Optional)</SelectItem>
-                              {locations
-                                .filter(loc => loc.type === "department" && loc.id && loc.id.trim() !== "")
-                                .map((department) => {
-                                  const parentSublocation = locations.find(l => l.id === department.parent_id);
-                                  const grandparentLocation = parentSublocation ? locations.find(l => l.id === parentSublocation.parent_id) : null;
-                                  const fullPath = grandparentLocation && parentSublocation 
-                                    ? `${grandparentLocation.name} → ${parentSublocation.name} → ${department.name}`
-                                    : department.name;
-                                  return (
-                                    <SelectItem key={department.id} value={department.id}>
-                                      {fullPath}
-                                    </SelectItem>
-                                  );
-                                })}
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-4 gap-4">
                     <FormField
                       control={form.control}
                       name="condition"
@@ -747,6 +595,87 @@ export default function AssetManagement() {
                         </FormItem>
                       )}
                     />
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="location_id"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Location</FormLabel>
+                          <Select onValueChange={field.onChange} defaultValue={field.value}>
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select location" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent className="bg-background border shadow-md z-50">
+                              <SelectItem value="none">None (Optional)</SelectItem>
+                              {getLocationsByType("location").map((location) => (
+                                <SelectItem key={location.id} value={location.id}>
+                                  {location.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="sublocation_id"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Sublocation</FormLabel>
+                          <Select onValueChange={field.onChange} defaultValue={field.value}>
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select sublocation" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent className="bg-background border shadow-md z-50">
+                              <SelectItem value="none">None (Optional)</SelectItem>
+                              {form.watch("location_id") && form.watch("location_id") !== "none" && getLocationsByType("sublocation", form.watch("location_id")).map((sublocation) => (
+                                <SelectItem key={sublocation.id} value={sublocation.id}>
+                                  {sublocation.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="department_id"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Department</FormLabel>
+                          <Select onValueChange={field.onChange} defaultValue={field.value}>
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select department" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent className="bg-background border shadow-md z-50">
+                              <SelectItem value="none">None (Optional)</SelectItem>
+                              {form.watch("sublocation_id") && form.watch("sublocation_id") !== "none" && getLocationsByType("department", form.watch("sublocation_id")).map((department) => (
+                                <SelectItem key={department.id} value={department.id}>
+                                  {department.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-4">
                     <FormField
                       control={form.control}
                       name="purchase_date"
@@ -767,7 +696,7 @@ export default function AssetManagement() {
                         <FormItem>
                           <FormLabel>Purchase Price</FormLabel>
                           <FormControl>
-                            <Input type="number" placeholder="0.00" step="0.01" {...field} />
+                            <Input type="number" step="0.01" placeholder="0.00" {...field} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -780,7 +709,7 @@ export default function AssetManagement() {
                         <FormItem>
                           <FormLabel>Current Value</FormLabel>
                           <FormControl>
-                            <Input type="number" placeholder="0.00" step="0.01" {...field} />
+                            <Input type="number" step="0.01" placeholder="0.00" {...field} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -796,7 +725,7 @@ export default function AssetManagement() {
                         <FormLabel>Description</FormLabel>
                         <FormControl>
                           <Textarea
-                            placeholder="Enter asset description (optional)"
+                            placeholder="Enter asset description"
                             {...field}
                           />
                         </FormControl>
@@ -813,7 +742,7 @@ export default function AssetManagement() {
                         <FormLabel>Notes</FormLabel>
                         <FormControl>
                           <Textarea
-                            placeholder="Enter additional notes (optional)"
+                            placeholder="Additional notes or comments"
                             {...field}
                           />
                         </FormControl>
@@ -832,7 +761,7 @@ export default function AssetManagement() {
                     </Button>
                     <Button type="submit" disabled={isCreatingAsset || isCreatingBulk}>
                       {(isCreatingAsset || isCreatingBulk) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                      {form.watch("quantity") > 1 ? `Add ${form.watch("quantity")} Assets` : "Add Asset"}
+                      Create Asset{form.watch("quantity") > 1 ? `s (${form.watch("quantity")})` : ""}
                     </Button>
                   </div>
                 </form>
@@ -842,178 +771,212 @@ export default function AssetManagement() {
         </div>
       </div>
 
-      {/* Overview Cards */}
-      <div className="grid gap-4 md:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Assets</CardTitle>
-            <Package className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{assets.length}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Active Assets</CardTitle>
-            <CheckCircle className="h-4 w-4 text-green-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600">{activeAssets}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Under Maintenance</CardTitle>
-            <Wrench className="h-4 w-4 text-yellow-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-yellow-600">{maintenanceAssets}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Value</CardTitle>
-            <AlertTriangle className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">${totalValue.toLocaleString()}</div>
-          </CardContent>
-        </Card>
-      </div>
+      {/* Tabs for Assets List and Analytics */}
+      <Tabs defaultValue="assets-list" className="w-full">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="assets-list" className="flex items-center gap-2">
+            <Package className="h-4 w-4" />
+            Assets List
+          </TabsTrigger>
+          <TabsTrigger value="analytics" className="flex items-center gap-2">
+            <BarChart3 className="h-4 w-4" />
+            Analytics
+          </TabsTrigger>
+        </TabsList>
 
-      {/* Assets Table */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle>Assets</CardTitle>
-              <CardDescription>
-                Manage and track all warehouse assets
-              </CardDescription>
-            </div>
-            <div className="flex items-center space-x-2">
-              <div className="relative">
-                <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search assets..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-8"
-                />
-              </div>
-            </div>
+        <TabsContent value="assets-list" className="space-y-6 mt-6">
+          {/* Asset Overview Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Total Assets</CardTitle>
+                <Package className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{assets.length}</div>
+                <p className="text-xs text-muted-foreground">
+                  All registered assets
+                </p>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Active Assets</CardTitle>
+                <CheckCircle className="h-4 w-4 text-success" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-success">{activeAssets}</div>
+                <p className="text-xs text-muted-foreground">
+                  Currently in use
+                </p>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Maintenance</CardTitle>
+                <Wrench className="h-4 w-4 text-warning" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-warning">{maintenanceAssets}</div>
+                <p className="text-xs text-muted-foreground">
+                  Under maintenance
+                </p>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Total Value</CardTitle>
+                <Package className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">${totalValue.toLocaleString()}</div>
+                <p className="text-xs text-muted-foreground">
+                  Asset portfolio value
+                </p>
+              </CardContent>
+            </Card>
           </div>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Asset ID</TableHead>
-                <TableHead>Asset Name</TableHead>
-                <TableHead>Category</TableHead>
-                <TableHead>Brand</TableHead>
-                    <TableHead>Location</TableHead>
-                    <TableHead>Condition</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Purchase Price</TableHead>
-                    <TableHead className="w-[70px]">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-            <TableBody>
-              {assetsLoading ? (
-                <TableRow>
-                  <TableCell colSpan={9} className="text-center py-8">
-                    <Loader2 className="h-6 w-6 animate-spin mx-auto" />
-                    <p className="text-muted-foreground mt-2">Loading assets...</p>
-                  </TableCell>
-                </TableRow>
-              ) : filteredAssets.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={9} className="text-center py-8">
-                    <p className="text-muted-foreground">No assets found</p>
-                  </TableCell>
-                </TableRow>
-              ) : (
-                filteredAssets.map((asset) => {
-                  const locationName = asset.location_id ? getLocationName(asset.location_id) : "-";
-                  
-                  const categoryName = asset.category_id ? getCategoryName(asset.category_id) : asset.category;
-                  const subcategoryName = asset.subcategory_id ? getSubcategoryName(asset.subcategory_id) : "";
-                  const displayCategory = subcategoryName ? `${categoryName} → ${subcategoryName}` : categoryName;
-                  
-                  return (
-                    <TableRow key={asset.id}>
-                      <TableCell className="font-mono text-sm font-medium">{asset.asset_id || "-"}</TableCell>
-                      <TableCell className="font-medium">{asset.name}</TableCell>
-                      <TableCell>{displayCategory || asset.category}</TableCell>
-                      <TableCell>{asset.brand || "-"}</TableCell>
-                      <TableCell>{locationName}</TableCell>
-                      <TableCell>
-                        <Badge className={getConditionBadge(asset.condition)}>
-                          {asset.condition.replace('_', ' ')}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          {getStatusIcon(asset.status)}
-                          <span className="capitalize">{asset.status}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell>{asset.purchase_price ? `$${asset.purchase_price.toLocaleString()}` : "-"}</TableCell>
-                      <TableCell>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" className="h-8 w-8 p-0">
-                              <span className="sr-only">Open menu</span>
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="bg-background border shadow-md z-50">
-                            <DropdownMenuItem onClick={() => {
-                              setSelectedAsset(asset);
-                              setIsDetailsDialogOpen(true);
-                            }}>
-                              <Eye className="mr-2 h-4 w-4" />
-                              View Details
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => {
-                              setSelectedAsset(asset);
-                              setIsEditDialogOpen(true);
-                            }}>
-                              <Edit className="mr-2 h-4 w-4" />
-                              Edit
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => {
-                              setSelectedAsset(asset);
-                              setIsTransferDialogOpen(true);
-                            }}>
-                              <ArrowRightLeft className="mr-2 h-4 w-4" />
-                              Transfer
-                            </DropdownMenuItem>
-                            <DropdownMenuItem 
-                              onClick={() => {
-                                setSelectedAsset(asset);
-                                setIsDeleteDialogOpen(true);
-                              }}
-                              className="text-destructive"
-                            >
-                              <Trash2 className="mr-2 h-4 w-4" />
-                              Delete
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
 
-      {/* All Dialogs */}
+          {/* Search and Filter */}
+          <div className="flex items-center space-x-2">
+            <Search className="h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search assets by name, category, brand, or asset ID..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="max-w-sm"
+            />
+          </div>
+
+          {/* Assets Table */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Asset Inventory</CardTitle>
+              <CardDescription>
+                Manage all warehouse assets and their details
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Asset ID</TableHead>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Category</TableHead>
+                      <TableHead>Brand</TableHead>
+                      <TableHead>Location</TableHead>
+                      <TableHead>Condition</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Value</TableHead>
+                      <TableHead>Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {assetsLoading ? (
+                      <TableRow>
+                        <TableCell colSpan={9} className="text-center">
+                          <Loader2 className="h-4 w-4 animate-spin inline mr-2" />
+                          Loading assets...
+                        </TableCell>
+                      </TableRow>
+                    ) : filteredAssets.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={9} className="text-center text-muted-foreground">
+                          No assets found
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      filteredAssets.map((asset) => (
+                        <TableRow key={asset.id}>
+                          <TableCell className="font-mono text-sm">
+                            {asset.asset_id || "Auto-generated"}
+                          </TableCell>
+                          <TableCell className="font-medium">{asset.name}</TableCell>
+                          <TableCell>{asset.category}</TableCell>
+                          <TableCell>{asset.brand || "—"}</TableCell>
+                          <TableCell>
+                            {asset.location_id ? getLocationName(asset.location_id) : "—"}
+                          </TableCell>
+                          <TableCell>
+                            <Badge className={getConditionBadge(asset.condition)} variant="outline">
+                              {asset.condition.replace("_", " ")}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              {getStatusIcon(asset.status)}
+                              <span className="capitalize">{asset.status}</span>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            ${(asset.current_value || asset.purchase_price || 0).toLocaleString()}
+                          </TableCell>
+                          <TableCell>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" className="h-8 w-8 p-0">
+                                  <MoreHorizontal className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={() => {
+                                  setSelectedAsset(asset);
+                                  setIsDetailsDialogOpen(true);
+                                }}>
+                                  <Eye className="mr-2 h-4 w-4" />
+                                  View Details
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => {
+                                  setSelectedAsset(asset);
+                                  setIsEditDialogOpen(true);
+                                }}>
+                                  <Edit className="mr-2 h-4 w-4" />
+                                  Edit
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => {
+                                  setSelectedAsset(asset);
+                                  setIsTransferDialogOpen(true);
+                                }}>
+                                  <ArrowRightLeft className="mr-2 h-4 w-4" />
+                                  Transfer
+                                </DropdownMenuItem>
+                                <DropdownMenuItem 
+                                  className="text-destructive"
+                                  onClick={() => {
+                                    setSelectedAsset(asset);
+                                    setIsDeleteDialogOpen(true);
+                                  }}
+                                >
+                                  <Trash2 className="mr-2 h-4 w-4" />
+                                  Delete
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="analytics" className="mt-6">
+          <AssetAnalytics 
+            assets={assets}
+            locations={locations}
+            categories={[...mainCategories, ...mainCategories.flatMap(cat => getSubcategories(cat.id))]}
+          />
+        </TabsContent>
+      </Tabs>
+
+      {/* Dialogs */}
       <AssetDetailsDialog
         asset={selectedAsset}
         open={isDetailsDialogOpen}
@@ -1021,20 +984,13 @@ export default function AssetManagement() {
         onEdit={(asset) => {
           setSelectedAsset(asset);
           setIsEditDialogOpen(true);
+          setIsDetailsDialogOpen(false);
         }}
         locations={locations}
-        categories={mainCategories}
-        getLocationName={(locationId) => locations.find(l => l.id === locationId)?.name || 'Unknown'}
-        getCategoryName={(categoryId) => mainCategories.find(c => c.id === categoryId)?.name || 'Unknown'}
-        getSubcategoryName={(subcategoryId) => {
-          // Find subcategory across all categories
-          for (const category of mainCategories) {
-            const subcategories = getSubcategories(category.id);
-            const found = subcategories.find(c => c.id === subcategoryId);
-            if (found) return found.name;
-          }
-          return 'Unknown';
-        }}
+        categories={[...mainCategories, ...mainCategories.flatMap(cat => getSubcategories(cat.id))]}
+        getLocationName={getLocationName}
+        getCategoryName={getCategoryName}
+        getSubcategoryName={getSubcategoryName}
       />
 
       <AssetEditDialog
@@ -1043,9 +999,8 @@ export default function AssetManagement() {
         onOpenChange={setIsEditDialogOpen}
         locations={locations}
         categories={mainCategories}
-        getLocationsByType={(type, parentId) => 
-          locations.filter(l => l.type === type && (!parentId || l.parent_id === parentId))
-        }
+        getSubcategories={getSubcategories}
+        getLocationsByType={getLocationsByType}
       />
 
       <AssetTransferDialog
@@ -1053,10 +1008,8 @@ export default function AssetManagement() {
         open={isTransferDialogOpen}
         onOpenChange={setIsTransferDialogOpen}
         locations={locations}
-        getLocationsByType={(type, parentId) => 
-          locations.filter(l => l.type === type && (!parentId || l.parent_id === parentId))
-        }
-        getLocationName={(locationId) => locations.find(l => l.id === locationId)?.name || 'Unknown'}
+        getLocationsByType={getLocationsByType}
+        getLocationName={getLocationName}
       />
 
       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
