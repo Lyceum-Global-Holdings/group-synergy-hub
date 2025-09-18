@@ -385,6 +385,8 @@ export type Database = {
           email: string | null
           id: string
           legal_name: string | null
+          material_type: string | null
+          measurement_type: string | null
           name: string
           notes: string | null
           payment_terms: string | null
@@ -413,6 +415,8 @@ export type Database = {
           email?: string | null
           id?: string
           legal_name?: string | null
+          material_type?: string | null
+          measurement_type?: string | null
           name: string
           notes?: string | null
           payment_terms?: string | null
@@ -441,6 +445,8 @@ export type Database = {
           email?: string | null
           id?: string
           legal_name?: string | null
+          material_type?: string | null
+          measurement_type?: string | null
           name?: string
           notes?: string | null
           payment_terms?: string | null

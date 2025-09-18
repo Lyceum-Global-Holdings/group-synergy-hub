@@ -14,13 +14,15 @@ import { Separator } from '@/components/ui/separator';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useCreateSupplier } from '@/hooks/useSuppliers';
 import type { Supplier, SupplierContact, CreateSupplierData, UpdateSupplierData } from '@/types/supplier';
-import { SUPPLIER_TYPES, SUPPLIER_CATEGORIES, PAYMENT_TERMS } from '@/types/supplier';
+import { SUPPLIER_TYPES, SUPPLIER_CATEGORIES, PAYMENT_TERMS, MATERIAL_TYPES, MEASUREMENT_TYPES } from '@/types/supplier';
 
 const supplierSchema = z.object({
   name: z.string().min(1, 'Supplier name is required'),
   legal_name: z.string().optional(),
   supplier_type: z.enum(['vendor', 'service_provider', 'contractor', 'manufacturer']),
   category: z.string().optional(),
+  material_type: z.string().optional(),
+  measurement_type: z.string().optional(),
   email: z.string().email('Invalid email address').optional().or(z.literal('')),
   phone: z.string().optional(),
   website: z.string().url('Invalid website URL').optional().or(z.literal('')),
@@ -70,6 +72,8 @@ export const CreateSupplierDialog: React.FC<CreateSupplierDialogProps> = ({
       legal_name: '',
       supplier_type: 'vendor',
       category: '',
+      material_type: '',
+      measurement_type: '',
       email: '',
       phone: '',
       website: '',
@@ -101,6 +105,8 @@ export const CreateSupplierDialog: React.FC<CreateSupplierDialogProps> = ({
       legal_name: data.legal_name,
       supplier_type: data.supplier_type,
       category: data.category,
+      material_type: data.material_type,
+      measurement_type: data.measurement_type,
       email: data.email,
       phone: data.phone,
       website: data.website,
@@ -241,6 +247,56 @@ export const CreateSupplierDialog: React.FC<CreateSupplierDialogProps> = ({
                             {SUPPLIER_CATEGORIES.map((category) => (
                               <SelectItem key={category.value} value={category.value}>
                                 {category.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="material_type"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Material Type</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select material type" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {MATERIAL_TYPES.map((material) => (
+                              <SelectItem key={material.value} value={material.value}>
+                                {material.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="measurement_type"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Measurement Type</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select measurement type" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {MEASUREMENT_TYPES.map((measurement) => (
+                              <SelectItem key={measurement.value} value={measurement.value}>
+                                {measurement.label}
                               </SelectItem>
                             ))}
                           </SelectContent>
