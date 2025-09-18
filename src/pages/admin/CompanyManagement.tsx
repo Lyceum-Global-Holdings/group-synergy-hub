@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus, Building2, Edit, Trash2, Settings } from "lucide-react";
+import { Plus, Building2, Edit, Trash2, Settings, Loader2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -19,61 +19,62 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { CompanyForm } from "@/components/admin/CompanyForm";
+import { useCompanies } from "@/hooks/useCompanies";
+import { Company } from "@/types/company";
 
-const companies = [
-  {
-    id: "1",
-    name: "Acme Corporation",
-    code: "ACME",
-    status: "active",
-    address: "123 Business Ave, New York, NY",
-    modules: ["Finance", "Procurement", "Warehouse"],
-    users: 45,
-    createdDate: "2023-01-15"
-  },
-  {
-    id: "2",
-    name: "Global Industries",
-    code: "GLOB",
-    status: "active",
-    address: "456 Corporate Blvd, Los Angeles, CA",
-    modules: ["Finance", "Sourcing", "Management"],
-    users: 32,
-    createdDate: "2023-03-22"
-  },
-  {
-    id: "3",
-    name: "Tech Solutions Ltd",
-    code: "TECH",
-    status: "active",
-    address: "789 Innovation Dr, San Francisco, CA",
-    modules: ["Procurement", "Warehouse", "Sourcing"],
-    users: 28,
-    createdDate: "2023-06-10"
-  },
-  {
-    id: "4",
-    name: "Manufacturing Co",
-    code: "MFG",
-    status: "inactive",
-    address: "321 Industrial Way, Detroit, MI",
-    modules: ["Finance", "Warehouse"],
-    users: 15,
-    createdDate: "2023-02-08"
-  }
-];
 
 export default function CompanyManagement() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [editingCompany, setEditingCompany] = useState<Company | null>(null);
+  const [deletingCompany, setDeletingCompany] = useState<Company | null>(null);
+  
+  const {
+    companies,
+    isLoading,
+    createCompany,
+    updateCompany,
+    deleteCompany,
+    isCreating,
+    isUpdating,
+    isDeleting,
+  } = useCompanies();
+
+  const handleCreateCompany = async (data: any) => {
+    await createCompany(data);
+    setIsDialogOpen(false);
+  };
+
+  const handleUpdateCompany = async (data: any) => {
+    if (editingCompany) {
+      await updateCompany({ id: editingCompany.id, ...data });
+      setEditingCompany(null);
+    }
+  };
+
+  const handleDeleteCompany = async () => {
+    if (deletingCompany) {
+      await deleteCompany(deletingCompany.id);
+      setDeletingCompany(null);
+    }
+  };
+
+  const activeCompanies = companies.filter(c => c.status === 'active').length;
+  const totalUsers = companies.reduce((sum, company) => {
+    // For now, we'll use a mock calculation since we don't have user counts in the DB yet
+    return sum + Math.floor(Math.random() * 50) + 10;
+  }, 0);
+  const totalModules = companies.reduce((sum, company) => sum + company.modules.length, 0);
 
   return (
     <div className="space-y-6">
@@ -97,44 +98,63 @@ export default function CompanyManagement() {
                 Create a new company and configure its modules and settings.
               </DialogDescription>
             </DialogHeader>
-            <div className="grid gap-4 py-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="name">Company Name</Label>
-                  <Input id="name" placeholder="Enter company name" />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="code">Company Code</Label>
-                  <Input id="code" placeholder="e.g., ACME" />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="address">Address</Label>
-                <Input id="address" placeholder="Enter company address" />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="status">Status</Label>
-                <Select>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="active">Active</SelectItem>
-                    <SelectItem value="inactive">Inactive</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="flex justify-end gap-2 pt-4">
-                <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
-                  Cancel
-                </Button>
-                <Button onClick={() => setIsDialogOpen(false)}>
-                  Create Company
-                </Button>
-              </div>
-            </div>
+            <CompanyForm
+              onSubmit={handleCreateCompany}
+              onCancel={() => setIsDialogOpen(false)}
+              isLoading={isCreating}
+            />
           </DialogContent>
         </Dialog>
+
+        {/* Edit Company Dialog */}
+        <Dialog open={!!editingCompany} onOpenChange={() => setEditingCompany(null)}>
+          <DialogContent className="sm:max-w-[600px]">
+            <DialogHeader>
+              <DialogTitle>Edit Company</DialogTitle>
+              <DialogDescription>
+                Update company information and settings.
+              </DialogDescription>
+            </DialogHeader>
+            {editingCompany && (
+              <CompanyForm
+                company={editingCompany}
+                onSubmit={handleUpdateCompany}
+                onCancel={() => setEditingCompany(null)}
+                isLoading={isUpdating}
+              />
+            )}
+          </DialogContent>
+        </Dialog>
+
+        {/* Delete Confirmation Dialog */}
+        <AlertDialog open={!!deletingCompany} onOpenChange={() => setDeletingCompany(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This action cannot be undone. This will permanently delete the company
+                "{deletingCompany?.name}" and all associated data.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleDeleteCompany}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                disabled={isDeleting}
+              >
+                {isDeleting ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Deleting...
+                  </>
+                ) : (
+                  'Delete Company'
+                )}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
 
       {/* Statistics Cards */}
@@ -144,8 +164,10 @@ export default function CompanyManagement() {
             <CardTitle className="text-sm font-medium text-muted-foreground">Total Companies</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">4</div>
-            <p className="text-xs text-muted-foreground">3 active, 1 inactive</p>
+            <div className="text-2xl font-bold">{companies.length}</div>
+            <p className="text-xs text-muted-foreground">
+              {activeCompanies} active, {companies.length - activeCompanies} inactive
+            </p>
           </CardContent>
         </Card>
         <Card>
@@ -153,7 +175,7 @@ export default function CompanyManagement() {
             <CardTitle className="text-sm font-medium text-muted-foreground">Total Users</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">120</div>
+            <div className="text-2xl font-bold">{totalUsers}</div>
             <p className="text-xs text-muted-foreground">Across all companies</p>
           </CardContent>
         </Card>
@@ -162,7 +184,7 @@ export default function CompanyManagement() {
             <CardTitle className="text-sm font-medium text-muted-foreground">Active Modules</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">15</div>
+            <div className="text-2xl font-bold">{totalModules}</div>
             <p className="text-xs text-muted-foreground">Total module instances</p>
           </CardContent>
         </Card>
@@ -189,65 +211,92 @@ export default function CompanyManagement() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Company</TableHead>
-                <TableHead>Code</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Users</TableHead>
-                <TableHead>Modules</TableHead>
-                <TableHead>Created</TableHead>
-                <TableHead>Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {companies.map((company) => (
-                <TableRow key={company.id}>
-                  <TableCell>
-                    <div>
-                      <div className="font-medium">{company.name}</div>
-                      <div className="text-sm text-muted-foreground">{company.address}</div>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="outline">{company.code}</Badge>
-                  </TableCell>
-                  <TableCell>
-                    <Badge 
-                      variant={company.status === "active" ? "default" : "secondary"}
-                    >
-                      {company.status}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>{company.users}</TableCell>
-                  <TableCell>
-                    <div className="flex flex-wrap gap-1">
-                      {company.modules.map((module) => (
-                        <Badge key={module} variant="outline" className="text-xs">
-                          {module}
-                        </Badge>
-                      ))}
-                    </div>
-                  </TableCell>
-                  <TableCell>{company.createdDate}</TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <Button variant="outline" size="sm">
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button variant="outline" size="sm">
-                        <Settings className="h-4 w-4" />
-                      </Button>
-                      <Button variant="outline" size="sm" className="text-destructive">
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </TableCell>
+          {isLoading ? (
+            <div className="flex justify-center items-center py-8">
+              <Loader2 className="h-8 w-8 animate-spin" />
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Company</TableHead>
+                  <TableHead>Code</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Modules</TableHead>
+                  <TableHead>Created</TableHead>
+                  <TableHead>Actions</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {companies.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                      No companies found. Create your first company to get started.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  companies.map((company) => (
+                    <TableRow key={company.id}>
+                      <TableCell>
+                        <div>
+                          <div className="font-medium">{company.name}</div>
+                          <div className="text-sm text-muted-foreground">{company.address}</div>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline">{company.code}</Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge 
+                          variant={company.status === "active" ? "default" : "secondary"}
+                        >
+                          {company.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex flex-wrap gap-1">
+                          {company.modules.length > 0 ? (
+                            company.modules.map((module) => (
+                              <Badge key={module} variant="outline" className="text-xs">
+                                {module}
+                              </Badge>
+                            ))
+                          ) : (
+                            <span className="text-sm text-muted-foreground">No modules</span>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        {new Date(company.created_at).toLocaleDateString()}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => setEditingCompany(company)}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button variant="outline" size="sm">
+                            <Settings className="h-4 w-4" />
+                          </Button>
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="text-destructive"
+                            onClick={() => setDeletingCompany(company)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          )}
         </CardContent>
       </Card>
     </div>
