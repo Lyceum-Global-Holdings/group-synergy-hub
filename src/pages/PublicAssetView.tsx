@@ -4,7 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { Loader2, Package, MapPin, Calendar, DollarSign, Info, Tag } from 'lucide-react';
+import { Loader2, Package, MapPin, Calendar, Info, Tag } from 'lucide-react';
 import { format } from 'date-fns';
 
 interface PublicAssetData {
@@ -18,15 +18,8 @@ interface PublicAssetData {
   condition: string;
   status: string;
   purchase_date: string | null;
-  purchase_price: number | null;
-  current_value: number | null;
   description: string | null;
   notes: string | null;
-  location_id: string | null;
-  sublocation_id: string | null;
-  department_id: string | null;
-  category_id: string | null;
-  subcategory_id: string | null;
 }
 
 const getConditionBadge = (condition: string) => {
@@ -222,35 +215,21 @@ export default function PublicAssetView() {
 
               <Separator />
 
-              {/* Financial Information */}
-              {(asset.purchase_price || asset.current_value || asset.purchase_date) && (
+              {/* Purchase Date Only (no financial info) */}
+              {asset.purchase_date && (
                 <>
                   <div className="space-y-4">
                     <div className="flex items-center gap-2">
-                      <DollarSign className="h-4 w-4 text-muted-foreground" />
-                      <span className="font-medium">Financial Information</span>
+                      <Calendar className="h-4 w-4 text-muted-foreground" />
+                      <span className="font-medium">Purchase Information</span>
                     </div>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-                      {asset.purchase_price && (
-                        <div>
-                          <span className="text-muted-foreground block">Purchase Price</span>
-                          <span className="text-lg font-semibold">${asset.purchase_price.toLocaleString()}</span>
-                        </div>
-                      )}
-                      {asset.current_value && (
-                        <div>
-                          <span className="text-muted-foreground block">Current Value</span>
-                          <span className="text-lg font-semibold">${asset.current_value.toLocaleString()}</span>
-                        </div>
-                      )}
-                      {asset.purchase_date && (
-                        <div>
-                          <span className="text-muted-foreground block">Purchase Date</span>
-                          <span className="text-lg font-semibold">
-                            {format(new Date(asset.purchase_date), 'MMM dd, yyyy')}
-                          </span>
-                        </div>
-                      )}
+                    <div className="grid grid-cols-1 gap-4 text-sm">
+                      <div>
+                        <span className="text-muted-foreground block">Purchase Date</span>
+                        <span className="text-lg font-semibold">
+                          {format(new Date(asset.purchase_date), 'MMM dd, yyyy')}
+                        </span>
+                      </div>
                     </div>
                   </div>
                   <Separator />
