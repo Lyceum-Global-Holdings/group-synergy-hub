@@ -13,6 +13,7 @@ interface AssetQRCodeProps {
 export default function AssetQRCode({ assetId, assetName }: AssetQRCodeProps) {
   const [qrCodeUrl, setQrCodeUrl] = useState<string>('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isGenerated, setIsGenerated] = useState(false);
   const [copied, setCopied] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -25,19 +26,11 @@ export default function AssetQRCode({ assetId, assetName }: AssetQRCodeProps) {
     }
 
     setIsLoading(true);
+    setIsGenerated(false);
+    
     try {
-      const canvas = canvasRef.current;
-      if (!canvas) {
-        throw new Error('Canvas element not found');
-      }
-
-      // Clear any existing content
-      const ctx = canvas.getContext('2d');
-      if (ctx) {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-      }
-
-      await QRCode.toCanvas(canvas, publicUrl, {
+      // Generate QR code as data URL first (no canvas dependency)
+      const dataUrl = await QRCode.toDataURL(publicUrl, {
         width: 256,
         margin: 2,
         color: {
@@ -47,13 +40,30 @@ export default function AssetQRCode({ assetId, assetName }: AssetQRCodeProps) {
         errorCorrectionLevel: 'M'
       });
       
-      const dataUrl = canvas.toDataURL('image/png');
       setQrCodeUrl(dataUrl);
+      setIsGenerated(true);
+      
+      // Also update canvas for consistency (if available)
+      const canvas = canvasRef.current;
+      if (canvas) {
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          const img = new Image();
+          img.onload = () => {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            canvas.width = 256;
+            canvas.height = 256;
+            ctx.drawImage(img, 0, 0);
+          };
+          img.src = dataUrl;
+        }
+      }
       
       console.log('QR code generated successfully for:', publicUrl);
     } catch (error) {
       console.error('Error generating QR code:', error);
       toast.error(`Failed to generate QR code: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      setIsGenerated(false);
     } finally {
       setIsLoading(false);
     }
@@ -82,7 +92,7 @@ export default function AssetQRCode({ assetId, assetName }: AssetQRCodeProps) {
 
   return (
     <Dialog onOpenChange={(open) => {
-      if (open && !qrCodeUrl) {
+      if (open && !isGenerated) {
         generateQRCode();
       }
     }}>
@@ -102,26 +112,31 @@ export default function AssetQRCode({ assetId, assetName }: AssetQRCodeProps) {
               Scan this QR code to view asset details without login
             </p>
             <div className="flex justify-center">
-              {isLoading ? (
-                <div className="w-64 h-64 flex items-center justify-center bg-muted rounded-lg border">
+              <div className="w-64 h-64 flex items-center justify-center bg-muted rounded-lg border">
+                {isLoading ? (
                   <div className="flex flex-col items-center gap-2">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
                     <p className="text-sm text-muted-foreground">Generating QR code...</p>
                   </div>
-                </div>
-              ) : qrCodeUrl ? (
-                <div className="border rounded-lg p-2 bg-background">
-                  <canvas
-                    ref={canvasRef}
-                    className="rounded"
-                    style={{ maxWidth: '256px', maxHeight: '256px' }}
-                  />
-                </div>
-              ) : (
-                <div className="w-64 h-64 flex items-center justify-center bg-muted rounded-lg border">
+                ) : isGenerated && qrCodeUrl ? (
+                  <div className="border rounded-lg p-2 bg-background">
+                    <img 
+                      src={qrCodeUrl} 
+                      alt={`QR Code for ${assetName}`}
+                      className="rounded w-64 h-64 object-contain"
+                    />
+                  </div>
+                ) : (
                   <p className="text-sm text-muted-foreground">Click to generate QR code</p>
-                </div>
-              )}
+                )}
+                {/* Hidden canvas for download functionality */}
+                <canvas
+                  ref={canvasRef}
+                  className="hidden"
+                  width={256}
+                  height={256}
+                />
+              </div>
             </div>
           </div>
           
