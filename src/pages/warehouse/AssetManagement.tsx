@@ -44,6 +44,7 @@ import { toast } from "@/hooks/use-toast";
 import { useWarehouseLocations } from "@/hooks/useWarehouseLocations";
 import { useWarehouseAssets } from "@/hooks/useWarehouseAssets";
 import { useAssetCategories } from "@/hooks/useAssetCategories";
+import { useCompanies } from "@/hooks/useCompanies";
 import { CategoryManagementDialog } from "@/components/warehouse/CategoryManagementDialog";
 import { BulkAssetImportDialog } from "@/components/warehouse/BulkAssetImportDialog";
 import { AssetDetailsDialog } from "@/components/warehouse/AssetDetailsDialog";
@@ -59,6 +60,7 @@ const assetFormSchema = z.object({
   quantity: z.string().transform(val => parseInt(val)).pipe(
     z.number().min(1, "Quantity must be at least 1").max(100, "Quantity cannot exceed 100")
   ),
+  company_id: z.string().min(1, "Company is required"),
   category: z.string().optional(),
   category_id: z.string().min(1, "Category is required"),
   subcategory_id: z.string().optional(),
@@ -148,11 +150,17 @@ export default function AssetManagement() {
     isLoading: categoriesLoading 
   } = useAssetCategories();
 
+  const { 
+    companies, 
+    isLoading: companiesLoading 
+  } = useCompanies();
+
   const form = useForm<AssetFormValues>({
     resolver: zodResolver(assetFormSchema),
     defaultValues: {
       name: "",
       quantity: 1,
+      company_id: "",
       category: "",
       category_id: "",
       subcategory_id: "",
@@ -440,7 +448,7 @@ export default function AssetManagement() {
               </DialogHeader>
               <Form {...form}>
                 <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                  <div className="grid grid-cols-3 gap-4">
+                  <div className="grid grid-cols-4 gap-4">
                     <FormField
                       control={form.control}
                       name="name"
@@ -473,6 +481,30 @@ export default function AssetManagement() {
                           <p className="text-xs text-muted-foreground">
                             Number of identical assets to create
                           </p>
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="company_id"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Company</FormLabel>
+                          <Select onValueChange={field.onChange} defaultValue={field.value}>
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select company" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent className="bg-background border shadow-md z-50">
+                              {companies?.map((company) => (
+                                <SelectItem key={company.id} value={company.id}>
+                                  {company.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
                         </FormItem>
                       )}
                     />
