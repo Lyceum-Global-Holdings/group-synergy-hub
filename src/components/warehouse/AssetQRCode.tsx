@@ -19,25 +19,41 @@ export default function AssetQRCode({ assetId, assetName }: AssetQRCodeProps) {
   const publicUrl = `${window.location.origin}/asset/${assetId}`;
 
   const generateQRCode = async () => {
+    if (!publicUrl || !assetId) {
+      toast.error('Invalid asset information');
+      return;
+    }
+
     setIsLoading(true);
     try {
       const canvas = canvasRef.current;
-      if (canvas) {
-        await QRCode.toCanvas(canvas, publicUrl, {
-          width: 256,
-          margin: 2,
-          color: {
-            dark: '#000000',
-            light: '#FFFFFF'
-          }
-        });
-        
-        const dataUrl = canvas.toDataURL('image/png');
-        setQrCodeUrl(dataUrl);
+      if (!canvas) {
+        throw new Error('Canvas element not found');
       }
+
+      // Clear any existing content
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+      }
+
+      await QRCode.toCanvas(canvas, publicUrl, {
+        width: 256,
+        margin: 2,
+        color: {
+          dark: '#000000',
+          light: '#FFFFFF'
+        },
+        errorCorrectionLevel: 'M'
+      });
+      
+      const dataUrl = canvas.toDataURL('image/png');
+      setQrCodeUrl(dataUrl);
+      
+      console.log('QR code generated successfully for:', publicUrl);
     } catch (error) {
       console.error('Error generating QR code:', error);
-      toast.error('Failed to generate QR code');
+      toast.error(`Failed to generate QR code: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setIsLoading(false);
     }
@@ -87,15 +103,24 @@ export default function AssetQRCode({ assetId, assetName }: AssetQRCodeProps) {
             </p>
             <div className="flex justify-center">
               {isLoading ? (
-                <div className="w-64 h-64 flex items-center justify-center bg-gray-100 rounded-lg">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                <div className="w-64 h-64 flex items-center justify-center bg-muted rounded-lg border">
+                  <div className="flex flex-col items-center gap-2">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                    <p className="text-sm text-muted-foreground">Generating QR code...</p>
+                  </div>
+                </div>
+              ) : qrCodeUrl ? (
+                <div className="border rounded-lg p-2 bg-background">
+                  <canvas
+                    ref={canvasRef}
+                    className="rounded"
+                    style={{ maxWidth: '256px', maxHeight: '256px' }}
+                  />
                 </div>
               ) : (
-                <canvas
-                  ref={canvasRef}
-                  className="border rounded-lg"
-                  style={{ maxWidth: '256px', maxHeight: '256px' }}
-                />
+                <div className="w-64 h-64 flex items-center justify-center bg-muted rounded-lg border">
+                  <p className="text-sm text-muted-foreground">Click to generate QR code</p>
+                </div>
               )}
             </div>
           </div>

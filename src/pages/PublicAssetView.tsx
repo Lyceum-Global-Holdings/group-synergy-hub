@@ -55,34 +55,86 @@ export default function PublicAssetView() {
   const { data: asset, isLoading, error } = useQuery({
     queryKey: ['public-asset', assetId],
     queryFn: async () => {
-      if (!assetId) throw new Error('Asset ID is required');
+      if (!assetId) return null;
 
       const { data, error } = await supabase
         .from('warehouse_assets')
-        .select('*')
+        .select(`
+          id,
+          name,
+          category,
+          brand,
+          asset_id,
+          serial_number,
+          asset_tag,
+          condition,
+          status,
+          purchase_date,
+          purchase_price,
+          current_value,
+          description,
+          notes
+        `)
         .eq('id', assetId)
-        .single();
+        .maybeSingle();
 
-      if (error) throw error;
-      return data as PublicAssetData;
+      if (error) {
+        console.error('Error fetching public asset:', error);
+        throw error;
+      }
+      return data as PublicAssetData | null;
     },
     enabled: !!assetId,
   });
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="flex flex-col items-center space-y-4">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          <p className="text-sm text-muted-foreground">Loading asset details...</p>
-        </div>
+      <div className="min-h-screen flex items-center justify-center bg-background p-4">
+        <Card className="w-full max-w-md">
+          <CardContent className="pt-6">
+            <div className="text-center space-y-4">
+              <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto" />
+              <div>
+                <h3 className="text-lg font-semibold">Loading Asset</h3>
+                <p className="text-sm text-muted-foreground">
+                  Please wait while we fetch the asset information...
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     );
   }
 
-  if (error || !asset) {
+  if (error) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
+      <div className="min-h-screen flex items-center justify-center bg-background p-4">
+        <Card className="w-full max-w-md">
+          <CardContent className="pt-6">
+            <div className="text-center space-y-4">
+              <div className="h-12 w-12 rounded-full bg-destructive/10 flex items-center justify-center mx-auto">
+                <Package className="h-6 w-6 text-destructive" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-destructive">Error Loading Asset</h3>
+                <p className="text-sm text-muted-foreground mb-2">
+                  There was a problem loading the asset information.
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Error: {error.message}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (!asset) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background p-4">
         <Card className="w-full max-w-md">
           <CardContent className="pt-6">
             <div className="text-center space-y-4">
@@ -90,7 +142,7 @@ export default function PublicAssetView() {
               <div>
                 <h3 className="text-lg font-semibold">Asset Not Found</h3>
                 <p className="text-sm text-muted-foreground">
-                  The requested asset could not be found or may have been removed.
+                  The requested asset could not be found. Please check the QR code or link and try again.
                 </p>
               </div>
             </div>
