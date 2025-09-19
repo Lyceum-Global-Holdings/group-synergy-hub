@@ -74,12 +74,12 @@ export default function AssetQRCode({ assetId, assetName, assetIdentifier }: Ass
     if (qrCodeUrl) {
       const link = document.createElement('a');
       const fileName = assetIdentifier 
-        ? `asset-qr-${assetIdentifier.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.png`
-        : `asset-qr-${assetName.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.png`;
+        ? `qr-${assetIdentifier.replace(/[^a-z0-9\-]/gi, '_')}.png`
+        : `qr-${assetName.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.png`;
       link.download = fileName;
       link.href = qrCodeUrl;
       link.click();
-      toast.success('QR code downloaded');
+      toast.success(`QR code downloaded as ${fileName}`);
     }
   };
 
