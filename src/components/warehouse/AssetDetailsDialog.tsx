@@ -14,6 +14,7 @@ import {
 import { WarehouseAsset, WarehouseLocation, AssetCategory } from "@/types/warehouse";
 import { useAssetTransfers } from "@/hooks/useAssetTransfers";
 import { format, differenceInDays, differenceInCalendarDays } from "date-fns";
+import AssetQRCode from "./AssetQRCode";
 
 interface AssetDetailsDialogProps {
   asset: WarehouseAsset | null;
@@ -119,17 +120,20 @@ export function AssetDetailsDialog({
                 {asset.asset_id || 'Auto-generated'}
               </Badge>
             </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                onEdit(asset);
-                onOpenChange(false);
-              }}
-            >
-              <Edit className="h-4 w-4 mr-2" />
-              Edit Asset
-            </Button>
+            <div className="flex items-center gap-2">
+              <AssetQRCode assetId={asset.id} assetName={asset.name} />
+              <Button
+                variant="outline"  
+                size="sm"
+                onClick={() => {
+                  onEdit(asset);
+                  onOpenChange(false);
+                }}
+              >
+                <Edit className="h-4 w-4 mr-2" />
+                Edit Asset
+              </Button>
+            </div>
           </DialogTitle>
         </DialogHeader>
 

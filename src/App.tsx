@@ -14,6 +14,7 @@ import PurchaseRequisition from "./pages/procurement/PurchaseRequisition";
 import PurchaseOrder from "./pages/procurement/PurchaseOrder";
 import { SupplierMaster } from "./pages/sourcing/SupplierMaster";
 import AssetManagement from "./pages/warehouse/AssetManagement";
+import PublicAssetView from "./pages/PublicAssetView";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 
@@ -28,6 +29,7 @@ const App = () => (
         <BrowserRouter>
           <Routes>
             <Route path="/auth" element={<Auth />} />
+            <Route path="/asset/:assetId" element={<PublicAssetView />} />
             <Route path="/" element={
               <ProtectedRoute>
                 <AppLayout>
