@@ -48,7 +48,8 @@ export default function AssetQRCode({ assetId, assetName, assetIdentifier }: Ass
         if (ctx) {
           // Set canvas size to accommodate QR code + text
           const qrSize = 256;
-          const textHeight = assetIdentifier ? 50 : 0;
+          const label = assetIdentifier || assetId;
+          const textHeight = label ? 50 : 0;
           const padding = 20;
           const totalHeight = qrSize + textHeight + padding;
           
@@ -65,7 +66,7 @@ export default function AssetQRCode({ assetId, assetName, assetIdentifier }: Ass
             ctx.drawImage(qrImg, padding, padding, qrSize, qrSize);
             
             // Add asset ID text below QR code if available
-            if (assetIdentifier) {
+            if (label) {
               ctx.fillStyle = '#000000';
               ctx.font = 'bold 24px monospace';
               ctx.textAlign = 'center';
@@ -75,7 +76,7 @@ export default function AssetQRCode({ assetId, assetName, assetIdentifier }: Ass
               const textY = padding + qrSize + (textHeight / 2);
               
               // Add white background rectangle for text
-              const textMetrics = ctx.measureText(assetIdentifier);
+              const textMetrics = ctx.measureText(label);
               const textWidth = textMetrics.width + 20;
               const textBgHeight = 35;
               
@@ -87,7 +88,7 @@ export default function AssetQRCode({ assetId, assetName, assetIdentifier }: Ass
               
               // Draw text
               ctx.fillStyle = '#000000';
-              ctx.fillText(assetIdentifier, textX, textY);
+              ctx.fillText(label, textX, textY);
             }
             
             // Convert canvas to data URL
@@ -116,9 +117,9 @@ export default function AssetQRCode({ assetId, assetName, assetIdentifier }: Ass
   const downloadQRCode = () => {
     if (qrCodeUrl) {
       const link = document.createElement('a');
-      const fileName = assetIdentifier 
-        ? `qr-${assetIdentifier.replace(/[^a-z0-9\-]/gi, '_')}.png`
-        : `qr-${assetName.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.png`;
+      const label = assetIdentifier || assetId;
+      const sanitized = label.replace(/[^a-z0-9\-]/gi, '_');
+      const fileName = `qr-${sanitized}.png`;
       link.download = fileName;
       link.href = qrCodeUrl;
       link.click();
