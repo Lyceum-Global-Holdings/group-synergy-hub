@@ -57,32 +57,24 @@ export default function PublicAssetView() {
     queryFn: async () => {
       if (!assetId) return null;
 
-      const { data, error } = await supabase
-        .from('warehouse_assets')
-        .select(`
-          id,
-          name,
-          category,
-          brand,
-          asset_id,
-          serial_number,
-          asset_tag,
-          condition,
-          status,
-          purchase_date,
-          purchase_price,
-          current_value,
-          description,
-          notes
-        `)
-        .eq('id', assetId)
-        .maybeSingle();
+      console.log('Fetching public asset data for ID:', assetId);
+      
+      const { data, error } = await supabase.rpc('get_public_asset', {
+        p_id: assetId
+      });
 
       if (error) {
         console.error('Error fetching public asset:', error);
         throw error;
       }
-      return data as PublicAssetData | null;
+      
+      console.log('Public asset data received:', data);
+      
+      // RPC returns null if no asset found
+      if (!data) return null;
+      
+      // The RPC function returns a JSON object, so we need to type it properly
+      return data as unknown as PublicAssetData;
     },
     enabled: !!assetId,
   });

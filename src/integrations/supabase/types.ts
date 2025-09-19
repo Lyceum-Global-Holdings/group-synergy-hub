@@ -1083,6 +1083,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: string
       }
+      get_public_asset: {
+        Args: { p_id: string }
+        Returns: Json
+      }
       has_role: {
         Args: {
           _app_role: Database["public"]["Enums"]["app_role"]
