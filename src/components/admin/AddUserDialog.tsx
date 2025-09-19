@@ -39,7 +39,7 @@ const userSchema = z.object({
   lastName: z.string().min(1, "Last name is required"),
   email: z.string().email("Please enter a valid email"),
   password: z.string().min(6, "Password must be at least 6 characters"),
-  company: z.string().optional(),
+  company: z.string().min(1, "Company is required"),
   roles: z.array(z.string()).min(1, "Please select at least one role"),
   department: z.string().optional(),
 });
@@ -84,6 +84,7 @@ export const AddUserDialog: React.FC<AddUserDialogProps> = ({
         password: data.password,
         fullName: `${data.firstName} ${data.lastName}`,
         department: data.department,
+        companyId: data.company,
         roleIds: selectedRoles,
       });
 
@@ -221,13 +222,13 @@ export const AddUserDialog: React.FC<AddUserDialogProps> = ({
             name="company"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Company (Optional)</FormLabel>
+                <FormLabel>Company</FormLabel>
                 <FormControl>
                   <Select value={field.value} onValueChange={field.onChange}>
                     <SelectTrigger>
                       <SelectValue placeholder="Select company" />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent className="bg-background border shadow-md z-50">
                       {companies?.map((company) => (
                         <SelectItem key={company.id} value={company.id}>
                           {company.name}

@@ -471,6 +471,7 @@ export type Database = {
       profiles: {
         Row: {
           avatar_url: string | null
+          company_id: string | null
           created_at: string
           department: string | null
           email: string | null
@@ -482,6 +483,7 @@ export type Database = {
         }
         Insert: {
           avatar_url?: string | null
+          company_id?: string | null
           created_at?: string
           department?: string | null
           email?: string | null
@@ -493,6 +495,7 @@ export type Database = {
         }
         Update: {
           avatar_url?: string | null
+          company_id?: string | null
           created_at?: string
           department?: string | null
           email?: string | null
@@ -502,7 +505,15 @@ export type Database = {
           updated_at?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "profiles_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       purchase_orders: {
         Row: {
@@ -1095,6 +1106,10 @@ export type Database = {
         Returns: boolean
       }
       is_admin: {
+        Args: { _user_id: string }
+        Returns: boolean
+      }
+      is_super_admin: {
         Args: { _user_id: string }
         Returns: boolean
       }

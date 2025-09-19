@@ -10,6 +10,8 @@ import { AddUserDialog } from '@/components/admin/AddUserDialog';
 import { AddRoleDialog } from '@/components/admin/AddRoleDialog';
 import { AdminBootstrap } from '@/components/admin/AdminBootstrap';
 import { useUsers, useRoles, useAssignRole, useRemoveRole } from '@/hooks/useUsers';
+import { useSuperAdmin, useIsAdmin } from '@/hooks/useSuperAdmin';
+import { useCompanies } from '@/hooks/useCompanies';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -25,6 +27,9 @@ export default function UserRoleManagement() {
   
   const { data: users = [], isLoading: usersLoading, error: usersError, refetch } = useUsers();
   const { data: roles = [], isLoading: rolesLoading, error: rolesError } = useRoles();
+  const { data: isSuperAdmin } = useSuperAdmin();
+  const { data: isAdminCheck } = useIsAdmin();
+  const { companies } = useCompanies();
   const assignRole = useAssignRole();
   const removeRole = useRemoveRole();
   const { toast } = useToast();
@@ -238,73 +243,87 @@ export default function UserRoleManagement() {
                   <Loader2 className="h-8 w-8 animate-spin" />
                 </div>
               ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>User</TableHead>
-                      <TableHead>Department</TableHead>
-                      <TableHead>Roles</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Last Login</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {users.map((user) => (
-                      <TableRow key={user.id}>
-                        <TableCell className="flex items-center space-x-3">
-                          <Avatar>
-                            <AvatarImage src={user.avatar_url || ''} />
-                            <AvatarFallback>
-                              {user.full_name?.split(' ').map(n => n[0]).join('') || 
-                               user.email.split('@')[0].substring(0, 2).toUpperCase()}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div>
-                            <div className="font-medium">{user.full_name || 'Unknown User'}</div>
-                            <div className="text-sm text-muted-foreground">{user.email}</div>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="outline">
-                            {user.department || 'No Department'}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex flex-wrap gap-1">
-                            {user.roles.length > 0 ? (
-                              user.roles.map((role) => (
-                                <Badge key={role.id} variant="secondary">
-                                  {role.name}
-                                </Badge>
-                              ))
-                            ) : (
-                              <Badge variant="outline">No Roles</Badge>
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={user.last_sign_in_at ? 'default' : 'secondary'}>
-                            {user.last_sign_in_at ? 'Active' : 'Inactive'}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          {user.last_sign_in_at ? 
-                            format(new Date(user.last_sign_in_at), 'MMM dd, yyyy HH:mm') : 
-                            'Never'}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex justify-end space-x-2">
-                            <Button variant="ghost" size="sm">
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                            <Button variant="ghost" size="sm" className="text-destructive">
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>User</TableHead>
+                        <TableHead>Company</TableHead>
+                        <TableHead>Department</TableHead>
+                        <TableHead>Roles</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Last Login</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
                       </TableRow>
-                    ))}
+                    </TableHeader>
+                    <TableBody>
+                      {users.map((user) => {
+                        // Find the user's company
+                        const userCompany = companies?.find(c => c.id === (user as any).company_id);
+                        
+                        return (
+                          <TableRow key={user.id}>
+                            <TableCell className="flex items-center space-x-3">
+                              <Avatar>
+                                <AvatarImage src={user.avatar_url || ''} />
+                                <AvatarFallback>
+                                  {user.full_name?.split(' ').map(n => n[0]).join('') || 
+                                   user.email.split('@')[0].substring(0, 2).toUpperCase()}
+                                </AvatarFallback>
+                              </Avatar>
+                              <div>
+                                <div className="font-medium">{user.full_name || 'Unknown User'}</div>
+                                <div className="text-sm text-muted-foreground">{user.email}</div>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant="outline">
+                                {userCompany ? userCompany.name : 'No Company'}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant="outline">
+                                {user.department || 'No Department'}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex flex-wrap gap-1">
+                                {user.roles.length > 0 ? (
+                                  user.roles.map((role) => (
+                                    <Badge key={role.id} variant="secondary">
+                                      {role.name}
+                                      {role.app_role === 'super_admin' && (
+                                        <Crown className="ml-1 h-3 w-3" />
+                                      )}
+                                    </Badge>
+                                  ))
+                                ) : (
+                                  <Badge variant="outline">No roles assigned</Badge>
+                                )}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant={user.last_sign_in_at ? 'default' : 'secondary'}>
+                                {user.last_sign_in_at ? 'Active' : 'Inactive'}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              {user.last_sign_in_at ? 
+                                format(new Date(user.last_sign_in_at), 'MMM dd, yyyy HH:mm') : 
+                                'Never'}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <div className="flex justify-end space-x-2">
+                                <Button variant="ghost" size="sm">
+                                  <Edit className="h-4 w-4" />
+                                </Button>
+                                <Button variant="ghost" size="sm" className="text-destructive">
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
                   </TableBody>
                 </Table>
               )}

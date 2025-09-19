@@ -36,6 +36,7 @@ export interface User {
   full_name: string | null;
   avatar_url: string | null;
   department: string | null;
+  company_id: string | null;
   created_at: string;
   updated_at: string;
   roles: Array<{
@@ -101,6 +102,7 @@ export const useUsers = () => {
           full_name: profile.full_name,
           avatar_url: profile.avatar_url,
           department: profile.department,
+          company_id: profile.company_id,
           created_at: profile.created_at,
           updated_at: profile.updated_at,
           roles: roles,
@@ -301,6 +303,7 @@ export const useCreateUser = () => {
       password: string;
       fullName: string;
       department?: string;
+      companyId?: string;
       roleIds: string[];
     }) => {
       console.log('Creating user with data:', userData);
@@ -358,11 +361,19 @@ export const useCreateUser = () => {
 
       console.log('User created successfully:', authData.user.id);
 
-      // Update profile with department if provided
+      // Update profile with department and company if provided
+      const profileUpdate: { department?: string; company_id?: string } = {};
       if (userData.department) {
+        profileUpdate.department = userData.department;
+      }
+      if (userData.companyId) {
+        profileUpdate.company_id = userData.companyId;
+      }
+      
+      if (Object.keys(profileUpdate).length > 0) {
         const { error: profileError } = await supabase
           .from('profiles')
-          .update({ department: userData.department })
+          .update(profileUpdate)
           .eq('user_id', authData.user.id);
 
         if (profileError) {
