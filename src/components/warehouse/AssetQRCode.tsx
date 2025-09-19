@@ -106,28 +106,30 @@ export default function AssetQRCode({ assetId, assetName }: AssetQRCodeProps) {
         <DialogHeader>
           <DialogTitle>Asset QR Code</DialogTitle>
         </DialogHeader>
-        <div className="space-y-4">
-          <div className="text-center">
-            <p className="text-sm text-muted-foreground mb-4">
+        <div className="space-y-6">
+          <div className="text-center space-y-4">
+            <p className="text-sm text-muted-foreground">
               Scan this QR code to view asset details without login
             </p>
+            
+            {/* QR Code Container */}
             <div className="flex justify-center">
-              <div className="w-64 h-64 flex items-center justify-center bg-muted rounded-lg border">
+              <div className="w-full max-w-64 aspect-square flex items-center justify-center bg-muted rounded-lg border">
                 {isLoading ? (
-                  <div className="flex flex-col items-center gap-2">
+                  <div className="flex flex-col items-center gap-3">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
                     <p className="text-sm text-muted-foreground">Generating QR code...</p>
                   </div>
                 ) : isGenerated && qrCodeUrl ? (
-                  <div className="border rounded-lg p-2 bg-background">
+                  <div className="p-3 bg-background rounded-lg border">
                     <img 
                       src={qrCodeUrl} 
                       alt={`QR Code for ${assetName}`}
-                      className="rounded w-64 h-64 object-contain"
+                      className="w-full h-auto max-w-56 rounded"
                     />
                   </div>
                 ) : (
-                  <p className="text-sm text-muted-foreground">Click to generate QR code</p>
+                  <p className="text-sm text-muted-foreground px-4">Click to generate QR code</p>
                 )}
                 {/* Hidden canvas for download functionality */}
                 <canvas
@@ -140,17 +142,19 @@ export default function AssetQRCode({ assetId, assetName }: AssetQRCodeProps) {
             </div>
           </div>
           
-          <div className="space-y-2">
+          {/* Public URL Section */}
+          <div className="space-y-3">
             <p className="text-sm font-medium">Public URL:</p>
-            <div className="flex items-center gap-2">
-              <code className="flex-1 p-2 bg-muted rounded text-xs truncate">
+            <div className="flex items-stretch gap-2">
+              <code className="flex-1 p-3 bg-muted rounded-md text-xs break-all leading-relaxed">
                 {publicUrl}
               </code>
               <Button
                 variant="outline"
                 size="sm"
                 onClick={copyUrl}
-                className="shrink-0"
+                className="shrink-0 h-auto px-3"
+                title="Copy URL"
               >
                 {copied ? (
                   <Check className="h-4 w-4" />
@@ -161,11 +165,13 @@ export default function AssetQRCode({ assetId, assetName }: AssetQRCodeProps) {
             </div>
           </div>
 
-          <div className="flex gap-2 justify-center">
+          {/* Download Button */}
+          <div className="flex justify-center">
             <Button
               onClick={downloadQRCode}
               disabled={!qrCodeUrl}
-              className="flex-1"
+              className="w-full max-w-xs"
+              size="default"
             >
               <Download className="h-4 w-4 mr-2" />
               Download QR Code
