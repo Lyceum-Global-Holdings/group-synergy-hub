@@ -121,7 +121,7 @@ export function AssetDetailsDialog({
               </Badge>
             </div>
             <div className="flex items-center gap-2">
-              <AssetQRCode assetId={asset.id} assetName={asset.name} />
+              <AssetQRCode assetId={asset.id} assetName={asset.name} assetIdentifier={asset.asset_id} />
               <Button
                 variant="outline"  
                 size="sm"

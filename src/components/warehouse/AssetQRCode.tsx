@@ -8,9 +8,10 @@ import QRCode from 'qrcode';
 interface AssetQRCodeProps {
   assetId: string;
   assetName: string;
+  assetIdentifier?: string;
 }
 
-export default function AssetQRCode({ assetId, assetName }: AssetQRCodeProps) {
+export default function AssetQRCode({ assetId, assetName, assetIdentifier }: AssetQRCodeProps) {
   const [qrCodeUrl, setQrCodeUrl] = useState<string>('');
   const [isLoading, setIsLoading] = useState(false);
   const [isGenerated, setIsGenerated] = useState(false);
@@ -72,7 +73,10 @@ export default function AssetQRCode({ assetId, assetName }: AssetQRCodeProps) {
   const downloadQRCode = () => {
     if (qrCodeUrl) {
       const link = document.createElement('a');
-      link.download = `asset-qr-${assetName.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.png`;
+      const fileName = assetIdentifier 
+        ? `asset-qr-${assetIdentifier.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.png`
+        : `asset-qr-${assetName.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.png`;
+      link.download = fileName;
       link.href = qrCodeUrl;
       link.click();
       toast.success('QR code downloaded');
@@ -121,12 +125,19 @@ export default function AssetQRCode({ assetId, assetName }: AssetQRCodeProps) {
                     <p className="text-sm text-muted-foreground">Generating QR code...</p>
                   </div>
                 ) : isGenerated && qrCodeUrl ? (
-                  <div className="p-3 bg-background rounded-lg border">
+                  <div className="p-3 bg-background rounded-lg border space-y-3">
                     <img 
                       src={qrCodeUrl} 
                       alt={`QR Code for ${assetName}`}
                       className="w-full h-auto max-w-56 rounded"
                     />
+                    {assetIdentifier && (
+                      <div className="text-center py-2 px-3 bg-muted/50 rounded-md border">
+                        <span className="text-sm font-mono font-semibold tracking-wide">
+                          {assetIdentifier}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <p className="text-sm text-muted-foreground px-4">Click to generate QR code</p>
