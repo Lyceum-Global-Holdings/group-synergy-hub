@@ -133,6 +133,7 @@ export const useCreatePurchaseRequisition = () => {
           priority: data.priority,
           required_date: data.required_date,
           justification: data.justification,
+          company_id: data.company_id,
         })
         .select()
         .single();

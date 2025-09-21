@@ -40,6 +40,7 @@ import {
 } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useCreatePurchaseRequisition } from '@/hooks/usePurchaseRequisitions';
+import { useCompanyContext } from '@/contexts/CompanyContext';
 import { cn } from '@/lib/utils';
 import type { CreatePrData, PrPriority } from '@/types/procurement';
 
@@ -108,6 +109,7 @@ const unitsOfMeasure = [
 
 export function CreatePrDialog({ open, onOpenChange }: CreatePrDialogProps) {
   const createPrMutation = useCreatePurchaseRequisition();
+  const { selectedCompany } = useCompanyContext();
   
   const form = useForm<CreatePrFormData>({
     resolver: zodResolver(createPrSchema),
@@ -152,6 +154,7 @@ export function CreatePrDialog({ open, onOpenChange }: CreatePrDialogProps) {
       priority: data.priority,
       required_date: format(data.required_date, 'yyyy-MM-dd'),
       justification: data.justification,
+      company_id: selectedCompany?.id,
       items: data.items.map(item => ({
         item_name: item.item_name,
         description: item.description,

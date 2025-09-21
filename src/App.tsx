@@ -12,6 +12,7 @@ import UserRoleManagement from "./pages/admin/UserRoleManagement";
 import ModuleAllocation from "./pages/admin/ModuleAllocation";
 import PurchaseRequisition from "./pages/procurement/PurchaseRequisition";
 import PurchaseOrder from "./pages/procurement/PurchaseOrder";
+import BillOfMaterialsPage from "@/pages/procurement/BillOfMaterials";
 import { SupplierMaster } from "./pages/sourcing/SupplierMaster";
 import AssetManagement from "./pages/warehouse/AssetManagement";
 import ItemBinMaster from "./pages/warehouse/ItemBinMaster";
@@ -70,6 +71,13 @@ const App = () => (
               <ProtectedRoute>
                 <AppLayout>
                   <PurchaseOrder />
+                </AppLayout>
+              </ProtectedRoute>
+            } />
+            <Route path="/procurement/bom" element={
+              <ProtectedRoute>
+                <AppLayout>
+                  <BillOfMaterialsPage />
                 </AppLayout>
               </ProtectedRoute>
             } />

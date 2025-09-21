@@ -16,6 +16,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useCreatePurchaseOrder } from "@/hooks/usePurchaseOrders";
 import { usePurchaseRequisitions } from "@/hooks/usePurchaseRequisitions";
 import { useSuppliers } from "@/hooks/useSuppliers";
+import { useCompanyContext } from "@/contexts/CompanyContext";
 import { CreatePoData } from "@/types/purchaseOrder";
 import { cn } from "@/lib/utils";
 
@@ -78,6 +79,7 @@ export function CreatePoDialog({ open, onOpenChange, prId }: CreatePoDialogProps
   const { data: suppliers = [] } = useSuppliers();
   const { data: purchaseRequisitions = [] } = usePurchaseRequisitions();
   const createPoMutation = useCreatePurchaseOrder();
+  const { selectedCompany } = useCompanyContext();
 
   // Filter approved PRs
   const approvedPRs = purchaseRequisitions.filter(pr => pr.status === 'approved');
@@ -145,7 +147,11 @@ export function CreatePoDialog({ open, onOpenChange, prId }: CreatePoDialogProps
 
   const onSubmit = async (data: CreatePoFormData) => {
     try {
-      await createPoMutation.mutateAsync(data as CreatePoData);
+      const poData = {
+        ...data,
+        company_id: selectedCompany?.id
+      };
+      await createPoMutation.mutateAsync(poData as CreatePoData);
       form.reset();
       onOpenChange(false);
     } catch (error) {

@@ -156,6 +156,63 @@ export type Database = {
           },
         ]
       }
+      bill_of_materials: {
+        Row: {
+          bom_number: string
+          company_id: string | null
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          po_id: string | null
+          product_name: string
+          status: string
+          updated_at: string
+          version: string | null
+        }
+        Insert: {
+          bom_number: string
+          company_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          po_id?: string | null
+          product_name: string
+          status?: string
+          updated_at?: string
+          version?: string | null
+        }
+        Update: {
+          bom_number?: string
+          company_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          po_id?: string | null
+          product_name?: string
+          status?: string
+          updated_at?: string
+          version?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bill_of_materials_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bill_of_materials_po_id_fkey"
+            columns: ["po_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       bin_types: {
         Row: {
           company_id: string | null
@@ -185,6 +242,72 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      bom_items: {
+        Row: {
+          bom_id: string
+          created_at: string
+          description: string | null
+          id: string
+          item_name: string
+          manufacturer_part_number: string | null
+          notes: string | null
+          po_item_id: string | null
+          quantity: number
+          supplier_part_number: string | null
+          total_cost: number | null
+          unit_cost: number | null
+          unit_of_measure: string
+          updated_at: string
+        }
+        Insert: {
+          bom_id: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          item_name: string
+          manufacturer_part_number?: string | null
+          notes?: string | null
+          po_item_id?: string | null
+          quantity: number
+          supplier_part_number?: string | null
+          total_cost?: number | null
+          unit_cost?: number | null
+          unit_of_measure?: string
+          updated_at?: string
+        }
+        Update: {
+          bom_id?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          item_name?: string
+          manufacturer_part_number?: string | null
+          notes?: string | null
+          po_item_id?: string | null
+          quantity?: number
+          supplier_part_number?: string | null
+          total_cost?: number | null
+          unit_cost?: number | null
+          unit_of_measure?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bom_items_bom_id_fkey"
+            columns: ["bom_id"]
+            isOneToOne: false
+            referencedRelation: "bill_of_materials"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bom_items_po_item_id_fkey"
+            columns: ["po_item_id"]
+            isOneToOne: false
+            referencedRelation: "po_items"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       companies: {
         Row: {
@@ -627,6 +750,7 @@ export type Database = {
           actual_delivery_date: string | null
           approved_by: string | null
           buyer_id: string | null
+          company_id: string | null
           created_at: string
           created_by: string
           currency: string | null
@@ -650,6 +774,7 @@ export type Database = {
           actual_delivery_date?: string | null
           approved_by?: string | null
           buyer_id?: string | null
+          company_id?: string | null
           created_at?: string
           created_by: string
           currency?: string | null
@@ -673,6 +798,7 @@ export type Database = {
           actual_delivery_date?: string | null
           approved_by?: string | null
           buyer_id?: string | null
+          company_id?: string | null
           created_at?: string
           created_by?: string
           currency?: string | null
@@ -694,6 +820,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "purchase_orders_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "purchase_orders_pr_id_fkey"
             columns: ["pr_id"]
             isOneToOne: false
@@ -713,6 +846,7 @@ export type Database = {
         Row: {
           approved_by: string | null
           approved_date: string | null
+          company_id: string | null
           created_at: string
           department: string | null
           description: string | null
@@ -732,6 +866,7 @@ export type Database = {
         Insert: {
           approved_by?: string | null
           approved_date?: string | null
+          company_id?: string | null
           created_at?: string
           department?: string | null
           description?: string | null
@@ -751,6 +886,7 @@ export type Database = {
         Update: {
           approved_by?: string | null
           approved_date?: string | null
+          company_id?: string | null
           created_at?: string
           department?: string | null
           description?: string | null
@@ -767,7 +903,15 @@ export type Database = {
           total_estimated_amount?: number | null
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "purchase_requisitions_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       role_permissions: {
         Row: {
@@ -1359,6 +1503,10 @@ export type Database = {
           _category_id: string
           _subcategory_id?: string
         }
+        Returns: string
+      }
+      generate_bom_number: {
+        Args: Record<PropertyKey, never>
         Returns: string
       }
       generate_po_number: {

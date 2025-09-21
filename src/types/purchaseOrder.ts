@@ -105,6 +105,7 @@ export interface CreatePoData {
   currency?: string;
   buyer_id?: string;
   notes?: string;
+  company_id?: string;
   items: {
     pr_item_id?: string;
     item_name: string;
