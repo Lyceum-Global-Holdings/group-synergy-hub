@@ -33,6 +33,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useBillOfMaterials } from '@/hooks/useBillOfMaterials';
 import { useCompany } from '@/contexts/CompanyContext';
 import { BOM_CATEGORIES, BomCategoryKey } from '@/constants/bomCategories';
+import { STANDARD_SIZES, SIZE_CATEGORIES, getSizesByCategory } from '@/constants/standardSizes';
 import { CreateBomItemData } from '@/types/bom';
 
 const bomSchema = z.object({
@@ -224,12 +225,28 @@ export function CreateBomDialog({ children }: CreateBomDialogProps) {
                         />
                       </td>
                       <td className="p-2">
-                        <Input
+                        <Select
                           value={item.size || ''}
-                          onChange={(e) => updateItem(category, index, 'size', e.target.value)}
-                          placeholder="Size"
-                          className="h-8"
-                        />
+                          onValueChange={(value) => updateItem(category, index, 'size', value)}
+                        >
+                          <SelectTrigger className="h-8 w-24">
+                            <SelectValue placeholder="Size" />
+                          </SelectTrigger>
+                          <SelectContent className="bg-background border z-50 max-h-60">
+                            {SIZE_CATEGORIES.map((cat) => (
+                              <div key={cat}>
+                                <div className="px-2 py-1 text-xs font-medium text-muted-foreground border-b">
+                                  {cat}
+                                </div>
+                                {getSizesByCategory(cat).map((size) => (
+                                  <SelectItem key={size.value} value={size.value}>
+                                    {size.label}
+                                  </SelectItem>
+                                ))}
+                              </div>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </td>
                       <td className="p-2">
                         <Input
