@@ -25,6 +25,11 @@ export interface BomItem {
   manufacturer_part_number?: string;
   po_item_id?: string;
   notes?: string;
+  item_code?: string;
+  colour?: string;
+  size?: string;
+  consumption?: number;
+  category?: string;
   created_at: string;
   updated_at: string;
 }
@@ -49,6 +54,11 @@ export interface CreateBomItemData {
   manufacturer_part_number?: string;
   po_item_id?: string;
   notes?: string;
+  item_code?: string;
+  colour?: string;
+  size?: string;
+  consumption?: number;
+  category?: string;
 }
 
 export interface UpdateBomData extends Partial<CreateBomData> {

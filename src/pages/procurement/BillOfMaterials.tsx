@@ -22,6 +22,7 @@ import {
 import { useBillOfMaterials } from "@/hooks/useBillOfMaterials";
 import { useCompany } from "@/contexts/CompanyContext";
 import { BillOfMaterials } from "@/types/bom";
+import { CreateBomDialog } from "@/components/procurement/CreateBomDialog";
 
 const statusColors = {
   active: "bg-success text-success-foreground",
@@ -75,10 +76,12 @@ export default function BillOfMaterialsPage() {
             Manage BOMs for {selectedCompany?.name || 'your company'}
           </p>
         </div>
-        <Button>
-          <Plus className="h-4 w-4 mr-2" />
-          Create BOM
-        </Button>
+        <CreateBomDialog>
+          <Button>
+            <Plus className="h-4 w-4 mr-2" />
+            Create BOM
+          </Button>
+        </CreateBomDialog>
       </div>
 
       {/* Summary Cards */}

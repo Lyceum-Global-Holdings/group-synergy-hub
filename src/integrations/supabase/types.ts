@@ -246,14 +246,19 @@ export type Database = {
       bom_items: {
         Row: {
           bom_id: string
+          category: string | null
+          colour: string | null
+          consumption: number | null
           created_at: string
           description: string | null
           id: string
+          item_code: string | null
           item_name: string
           manufacturer_part_number: string | null
           notes: string | null
           po_item_id: string | null
           quantity: number
+          size: string | null
           supplier_part_number: string | null
           total_cost: number | null
           unit_cost: number | null
@@ -262,14 +267,19 @@ export type Database = {
         }
         Insert: {
           bom_id: string
+          category?: string | null
+          colour?: string | null
+          consumption?: number | null
           created_at?: string
           description?: string | null
           id?: string
+          item_code?: string | null
           item_name: string
           manufacturer_part_number?: string | null
           notes?: string | null
           po_item_id?: string | null
           quantity: number
+          size?: string | null
           supplier_part_number?: string | null
           total_cost?: number | null
           unit_cost?: number | null
@@ -278,14 +288,19 @@ export type Database = {
         }
         Update: {
           bom_id?: string
+          category?: string | null
+          colour?: string | null
+          consumption?: number | null
           created_at?: string
           description?: string | null
           id?: string
+          item_code?: string | null
           item_name?: string
           manufacturer_part_number?: string | null
           notes?: string | null
           po_item_id?: string | null
           quantity?: number
+          size?: string | null
           supplier_part_number?: string | null
           total_cost?: number | null
           unit_cost?: number | null
