@@ -66,6 +66,7 @@ export interface CreatePrData {
   priority: PrPriority;
   required_date: string;
   justification?: string;
+  company_id?: string;
   items: {
     item_name: string;
     description?: string;
