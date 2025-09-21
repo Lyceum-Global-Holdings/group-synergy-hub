@@ -95,7 +95,6 @@ export function useCreatePurchaseOrder() {
           currency: data.currency || 'USD',
           buyer_id: data.buyer_id,
           notes: data.notes,
-          company_id: data.company_id,
           created_by: (await supabase.auth.getUser()).data.user?.id!,
         })
         .select()

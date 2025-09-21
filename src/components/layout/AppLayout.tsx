@@ -1,15 +1,13 @@
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
-import { CompanySidebar } from "@/components/layout/CompanySidebar";
+import { AppSidebar } from "@/components/layout/AppSidebar";
 import { CompanySelector } from "@/components/common/CompanySelector";
 import { UserProfile } from "@/components/common/UserProfile";
-import { CompanyProvider } from "@/contexts/CompanyContext";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
-    <CompanyProvider>
-      <SidebarProvider>
-        <div className="min-h-screen flex w-full bg-background">
-          <CompanySidebar />
+    <SidebarProvider>
+      <div className="min-h-screen flex w-full bg-background">
+        <AppSidebar />
         
         <div className="flex-1 flex flex-col">
           {/* Header */}
@@ -36,9 +34,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           <main className="flex-1 p-6">
             {children}
           </main>
-          </div>
         </div>
-      </SidebarProvider>
-    </CompanyProvider>
+      </div>
+    </SidebarProvider>
   );
 }
