@@ -25,7 +25,7 @@ export function CreateCategoryDialog({ open, onOpenChange, editingCategory }: Cr
     name: '',
     code: '',
     description: '',
-    parent_id: ''
+    parent_id: 'none'
   });
 
   const { categories, createCategory, isCreating } = useItemCategories();
@@ -36,14 +36,14 @@ export function CreateCategoryDialog({ open, onOpenChange, editingCategory }: Cr
         name: editingCategory.name,
         code: editingCategory.code || '',
         description: editingCategory.description || '',
-        parent_id: editingCategory.parent_id || ''
+        parent_id: editingCategory.parent_id || 'none'
       });
     } else {
       setFormData({
         name: '',
         code: '',
         description: '',
-        parent_id: ''
+        parent_id: 'none'
       });
     }
   }, [editingCategory, open]);
@@ -55,7 +55,7 @@ export function CreateCategoryDialog({ open, onOpenChange, editingCategory }: Cr
       name: formData.name,
       code: formData.code || null,
       description: formData.description || null,
-      parent_id: formData.parent_id || null
+      parent_id: formData.parent_id === "none" ? null : formData.parent_id || null
     };
 
     createCategory(categoryData);
@@ -111,7 +111,7 @@ export function CreateCategoryDialog({ open, onOpenChange, editingCategory }: Cr
                 <SelectValue placeholder="Select parent category (optional)" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">None (Top Level)</SelectItem>
+                <SelectItem value="none">None (Top Level)</SelectItem>
                 {availableParentCategories.map((category) => (
                   <SelectItem key={category.id} value={category.id}>
                     {category.name}
