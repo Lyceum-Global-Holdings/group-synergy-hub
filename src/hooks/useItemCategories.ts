@@ -127,6 +127,32 @@ export const useItemCategories = () => {
     }
   });
 
+  const deleteCategoryMutation = useMutation({
+    mutationFn: async (categoryId: string) => {
+      const { error } = await supabase
+        .from('item_categories')
+        .delete()
+        .eq('id', categoryId);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['item-categories'] });
+      toast({
+        title: "Success",
+        description: "Category deleted successfully.",
+      });
+    },
+    onError: (error) => {
+      console.error('Error deleting category:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete category. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
   return {
     categories,
     isLoading,
@@ -135,5 +161,7 @@ export const useItemCategories = () => {
     isCreating: createCategoryMutation.isPending,
     bulkImportCategories: bulkImportCategoriesMutation.mutate,
     isImporting: bulkImportCategoriesMutation.isPending,
+    deleteCategory: deleteCategoryMutation.mutate,
+    isDeleting: deleteCategoryMutation.isPending,
   };
 };
