@@ -21,6 +21,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { useWarehouseItems } from '@/hooks/useWarehouseItems';
 import { useItemCategories } from '@/hooks/useItemCategories';
 import { useSuppliers } from '@/hooks/useSuppliers';
+import { useItemUnits } from '@/hooks/useItemUnits';
 import { WarehouseItem } from '@/types/itemBin';
 
 interface CreateItemDialogProps {
@@ -35,6 +36,7 @@ export function CreateItemDialog({ open, onOpenChange, editingItem }: CreateItem
     name: '',
     description: '',
     category_id: '',
+    unit_id: '',
     brand: '',
     manufacturer: '',
     supplier_id: '',
@@ -54,6 +56,7 @@ export function CreateItemDialog({ open, onOpenChange, editingItem }: CreateItem
   const { createItem, updateItem, isCreating, isUpdating } = useWarehouseItems();
   const { categories } = useItemCategories();
   const { data: suppliers = [] } = useSuppliers();
+  const { units } = useItemUnits();
 
   useEffect(() => {
     if (editingItem) {
@@ -62,6 +65,7 @@ export function CreateItemDialog({ open, onOpenChange, editingItem }: CreateItem
         name: editingItem.name,
         description: editingItem.description || '',
         category_id: editingItem.category_id || '',
+        unit_id: editingItem.unit_id || '',
         brand: editingItem.brand || '',
         manufacturer: editingItem.manufacturer || '',
         supplier_id: editingItem.supplier_id || '',
@@ -83,6 +87,7 @@ export function CreateItemDialog({ open, onOpenChange, editingItem }: CreateItem
         name: '',
         description: '',
         category_id: '',
+        unit_id: '',
         brand: '',
         manufacturer: '',
         supplier_id: '',
@@ -112,6 +117,7 @@ export function CreateItemDialog({ open, onOpenChange, editingItem }: CreateItem
       min_stock_level: formData.min_stock_level ? parseFloat(formData.min_stock_level) : undefined,
       max_stock_level: formData.max_stock_level ? parseFloat(formData.max_stock_level) : undefined,
       category_id: formData.category_id || undefined,
+      unit_id: formData.unit_id || undefined,
       supplier_id: formData.supplier_id || undefined,
     };
 
@@ -168,17 +174,32 @@ export function CreateItemDialog({ open, onOpenChange, editingItem }: CreateItem
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-3 gap-4">
             <div className="space-y-2">
               <Label htmlFor="category_id">Category</Label>
               <Select value={formData.category_id} onValueChange={(value) => setFormData({ ...formData, category_id: value })}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select category" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="bg-background border z-50">
                   {categories.map((category) => (
                     <SelectItem key={category.id} value={category.id}>
                       {category.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="unit_id">Unit of Measure</Label>
+              <Select value={formData.unit_id} onValueChange={(value) => setFormData({ ...formData, unit_id: value })}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select unit" />
+                </SelectTrigger>
+                <SelectContent className="bg-background border z-50">
+                  {units.map((unit) => (
+                    <SelectItem key={unit.id} value={unit.id}>
+                      {unit.name} ({unit.abbreviation})
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -190,7 +211,7 @@ export function CreateItemDialog({ open, onOpenChange, editingItem }: CreateItem
                 <SelectTrigger>
                   <SelectValue placeholder="Select supplier" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="bg-background border z-50">
                   {suppliers.map((supplier) => (
                     <SelectItem key={supplier.id} value={supplier.id}>
                       {supplier.name}

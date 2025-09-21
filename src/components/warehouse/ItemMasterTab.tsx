@@ -12,6 +12,8 @@ import {
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { useWarehouseItems } from '@/hooks/useWarehouseItems';
+import { useItemCategories } from '@/hooks/useItemCategories';
+import { useItemUnits } from '@/hooks/useItemUnits';
 import { CreateItemDialog } from '@/components/warehouse/CreateItemDialog';
 import { WarehouseItem } from '@/types/itemBin';
 
@@ -21,6 +23,8 @@ export function ItemMasterTab() {
   const [editingItem, setEditingItem] = useState<WarehouseItem | null>(null);
   
   const { items, isLoading, deleteItem, isDeleting } = useWarehouseItems();
+  const { categories } = useItemCategories();
+  const { units } = useItemUnits();
 
   const filteredItems = items.filter(item =>
     item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -64,6 +68,7 @@ export function ItemMasterTab() {
               <TableHead>Item Code</TableHead>
               <TableHead>Name</TableHead>
               <TableHead>Category</TableHead>
+              <TableHead>Unit</TableHead>
               <TableHead>Brand</TableHead>
               <TableHead>Current Stock</TableHead>
               <TableHead>Unit Cost</TableHead>
@@ -74,13 +79,13 @@ export function ItemMasterTab() {
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={8} className="text-center py-8">
+                <TableCell colSpan={9} className="text-center py-8">
                   Loading items...
                 </TableCell>
               </TableRow>
             ) : filteredItems.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
                   No items found. Create your first item to get started.
                 </TableCell>
               </TableRow>
@@ -89,7 +94,18 @@ export function ItemMasterTab() {
                 <TableRow key={item.id}>
                   <TableCell className="font-medium">{item.item_code}</TableCell>
                   <TableCell>{item.name}</TableCell>
-                  <TableCell>-</TableCell>
+                  <TableCell>
+                    {item.category_id 
+                      ? categories.find(c => c.id === item.category_id)?.name || '-'
+                      : '-'
+                    }
+                  </TableCell>
+                  <TableCell>
+                    {item.unit_id 
+                      ? units.find(u => u.id === item.unit_id)?.abbreviation || '-'
+                      : '-'
+                    }
+                  </TableCell>
                   <TableCell>{item.brand || '-'}</TableCell>
                   <TableCell>{item.current_stock}</TableCell>
                   <TableCell>{item.unit_cost ? `$${item.unit_cost}` : '-'}</TableCell>
