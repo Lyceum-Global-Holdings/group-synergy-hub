@@ -84,7 +84,6 @@ export function CreateBomDialog({ children }: CreateBomDialogProps) {
         category,
         item_code: '',
         colour: '',
-        size: '',
       }));
       setItems(prev => ({ ...prev, [category]: categoryItems }));
     }
@@ -101,7 +100,6 @@ export function CreateBomDialog({ children }: CreateBomDialogProps) {
       category,
       item_code: '',
       colour: '',
-      size: '',
     };
     setItems(prev => ({
       ...prev,
@@ -190,7 +188,6 @@ export function CreateBomDialog({ children }: CreateBomDialogProps) {
                     <th className="p-2 text-left font-medium">Item Code</th>
                     <th className="p-2 text-left font-medium">Description</th>
                     <th className="p-2 text-left font-medium">Colour</th>
-                    <th className="p-2 text-left font-medium">Size</th>
                     <th className="p-2 text-left font-medium">Consumption</th>
                     <th className="p-2 text-left font-medium">UOM</th>
                     <th className="p-2 text-left font-medium">Qty</th>
@@ -225,30 +222,6 @@ export function CreateBomDialog({ children }: CreateBomDialogProps) {
                           placeholder="Colour"
                           className="h-8"
                         />
-                      </td>
-                      <td className="p-2">
-                        <Select
-                          value={item.size || ''}
-                          onValueChange={(value) => updateItem(category, index, 'size', value)}
-                        >
-                          <SelectTrigger className="h-8 w-24">
-                            <SelectValue placeholder="Size" />
-                          </SelectTrigger>
-                          <SelectContent className="bg-background border z-50 max-h-60">
-                            {SIZE_CATEGORIES.map((cat) => (
-                              <div key={cat}>
-                                <div className="px-2 py-1 text-xs font-medium text-muted-foreground border-b">
-                                  {cat}
-                                </div>
-                                {getSizesByCategory(cat).map((size) => (
-                                  <SelectItem key={size.value} value={size.value}>
-                                    {size.label}
-                                  </SelectItem>
-                                ))}
-                              </div>
-                            ))}
-                          </SelectContent>
-                        </Select>
                       </td>
                       <td className="p-2">
                         <Input

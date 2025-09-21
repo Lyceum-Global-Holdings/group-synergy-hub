@@ -27,7 +27,6 @@ export interface BomItem {
   notes?: string;
   item_code?: string;
   colour?: string;
-  size?: string;
   consumption?: number;
   category?: string;
   created_at: string;
@@ -56,7 +55,6 @@ export interface CreateBomItemData {
   notes?: string;
   item_code?: string;
   colour?: string;
-  size?: string;
   consumption?: number;
   category?: string;
 }

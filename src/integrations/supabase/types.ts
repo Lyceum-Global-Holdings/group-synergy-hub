@@ -258,7 +258,6 @@ export type Database = {
           notes: string | null
           po_item_id: string | null
           quantity: number
-          size: string | null
           supplier_part_number: string | null
           total_cost: number | null
           unit_cost: number | null
@@ -279,7 +278,6 @@ export type Database = {
           notes?: string | null
           po_item_id?: string | null
           quantity: number
-          size?: string | null
           supplier_part_number?: string | null
           total_cost?: number | null
           unit_cost?: number | null
@@ -300,7 +298,6 @@ export type Database = {
           notes?: string | null
           po_item_id?: string | null
           quantity?: number
-          size?: string | null
           supplier_part_number?: string | null
           total_cost?: number | null
           unit_cost?: number | null
