@@ -263,12 +263,12 @@ export function CreateItemDialog({ open, onOpenChange, editingItem }: CreateItem
 
           <div className="space-y-2">
             <Label htmlFor="company_id">Company Allocation</Label>
-            <Select value={formData.company_id} onValueChange={(value) => setFormData({ ...formData, company_id: value })}>
+            <Select value={formData.company_id || "all"} onValueChange={(value) => setFormData({ ...formData, company_id: value === "all" ? "" : value })}>
               <SelectTrigger>
                 <SelectValue placeholder="Select company allocation" />
               </SelectTrigger>
               <SelectContent className="bg-background border z-50">
-                <SelectItem value="">All Companies</SelectItem>
+                <SelectItem value="all">All Companies</SelectItem>
                 {companies.map((company) => (
                   <SelectItem key={company.id} value={company.id}>
                     {company.name}
