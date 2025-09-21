@@ -14,6 +14,7 @@ import { Badge } from '@/components/ui/badge';
 import { useWarehouseItems } from '@/hooks/useWarehouseItems';
 import { useItemCategories } from '@/hooks/useItemCategories';
 import { useItemUnits } from '@/hooks/useItemUnits';
+import { useCompany } from '@/contexts/CompanyContext';
 import { CreateItemDialog } from '@/components/warehouse/CreateItemDialog';
 import { StockMovementDialog } from '@/components/warehouse/StockMovementDialog';
 import { StockAdjustmentDialog } from '@/components/warehouse/StockAdjustmentDialog';
@@ -29,6 +30,7 @@ export function ItemMasterTab() {
   const { items, isLoading, deleteItem, isDeleting } = useWarehouseItems();
   const { categories } = useItemCategories();
   const { units } = useItemUnits();
+  const { companies } = useCompany();
 
   const filteredItems = items.filter(item =>
     item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -74,6 +76,7 @@ export function ItemMasterTab() {
               <TableHead>Category</TableHead>
               <TableHead>Unit</TableHead>
               <TableHead>Brand</TableHead>
+              <TableHead>Company</TableHead>
               <TableHead className="text-right">Current Stock</TableHead>
               <TableHead>Unit Cost</TableHead>
               <TableHead>Status</TableHead>
@@ -83,13 +86,13 @@ export function ItemMasterTab() {
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={8} className="text-center py-8">
+                <TableCell colSpan={10} className="text-center py-8">
                   Loading items...
                 </TableCell>
               </TableRow>
             ) : filteredItems.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
                   No items found. Create your first item to get started.
                 </TableCell>
               </TableRow>
@@ -111,6 +114,12 @@ export function ItemMasterTab() {
                     }
                   </TableCell>
                   <TableCell>{item.brand || '-'}</TableCell>
+                  <TableCell>
+                    {item.company_id 
+                      ? companies.find(c => c.id === item.company_id)?.name || '-'
+                      : 'All Companies'
+                    }
+                  </TableCell>
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-1">
                       <span className={`font-medium ${

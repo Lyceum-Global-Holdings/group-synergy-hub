@@ -23,6 +23,7 @@ import { useItemCategories } from '@/hooks/useItemCategories';
 import { useSuppliers } from '@/hooks/useSuppliers';
 import { useItemUnits } from '@/hooks/useItemUnits';
 import { useStockTransactions } from '@/hooks/useStockTransactions';
+import { useCompany } from '@/contexts/CompanyContext';
 import { WarehouseItem } from '@/types/itemBin';
 
 interface CreateItemDialogProps {
@@ -41,6 +42,7 @@ export function CreateItemDialog({ open, onOpenChange, editingItem }: CreateItem
     brand: '',
     manufacturer: '',
     supplier_id: '',
+    company_id: '',
     unit_cost: '',
     selling_price: '',
     reorder_level: '',
@@ -60,6 +62,7 @@ export function CreateItemDialog({ open, onOpenChange, editingItem }: CreateItem
   const { data: suppliers = [] } = useSuppliers();
   const { units } = useItemUnits();
   const { createTransaction } = useStockTransactions();
+  const { companies, selectedCompany } = useCompany();
 
   useEffect(() => {
     if (editingItem) {
@@ -72,6 +75,7 @@ export function CreateItemDialog({ open, onOpenChange, editingItem }: CreateItem
         brand: editingItem.brand || '',
         manufacturer: editingItem.manufacturer || '',
         supplier_id: editingItem.supplier_id || '',
+        company_id: editingItem.company_id || '',
         unit_cost: editingItem.unit_cost?.toString() || '',
         selling_price: editingItem.selling_price?.toString() || '',
         reorder_level: editingItem.reorder_level?.toString() || '',
@@ -95,6 +99,7 @@ export function CreateItemDialog({ open, onOpenChange, editingItem }: CreateItem
         brand: '',
         manufacturer: '',
         supplier_id: '',
+        company_id: selectedCompany?.id || '',
         unit_cost: '',
         selling_price: '',
         reorder_level: '',
@@ -124,6 +129,7 @@ export function CreateItemDialog({ open, onOpenChange, editingItem }: CreateItem
       category_id: formData.category_id || undefined,
       unit_id: formData.unit_id || undefined,
       supplier_id: formData.supplier_id || undefined,
+      company_id: formData.company_id || undefined,
       current_stock: 0, // Will be updated by stock transaction
     };
 
@@ -253,6 +259,23 @@ export function CreateItemDialog({ open, onOpenChange, editingItem }: CreateItem
                 </SelectContent>
               </Select>
             </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="company_id">Company Allocation</Label>
+            <Select value={formData.company_id} onValueChange={(value) => setFormData({ ...formData, company_id: value })}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select company allocation" />
+              </SelectTrigger>
+              <SelectContent className="bg-background border z-50">
+                <SelectItem value="">All Companies</SelectItem>
+                {companies.map((company) => (
+                  <SelectItem key={company.id} value={company.id}>
+                    {company.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
