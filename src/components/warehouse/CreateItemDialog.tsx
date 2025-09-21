@@ -1,0 +1,350 @@
+import { useState, useEffect } from 'react';
+import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
+import { useWarehouseItems } from '@/hooks/useWarehouseItems';
+import { useItemCategories } from '@/hooks/useItemCategories';
+import { useSuppliers } from '@/hooks/useSuppliers';
+import { WarehouseItem } from '@/types/itemBin';
+
+interface CreateItemDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  editingItem?: WarehouseItem | null;
+}
+
+export function CreateItemDialog({ open, onOpenChange, editingItem }: CreateItemDialogProps) {
+  const [formData, setFormData] = useState({
+    item_code: '',
+    name: '',
+    description: '',
+    category_id: '',
+    brand: '',
+    manufacturer: '',
+    supplier_id: '',
+    unit_cost: '',
+    selling_price: '',
+    reorder_level: '',
+    min_stock_level: '',
+    max_stock_level: '',
+    barcode: '',
+    sku: '',
+    status: 'active' as 'active' | 'inactive' | 'discontinued',
+    is_serialized: false,
+    is_batch_tracked: false,
+    notes: '',
+  });
+
+  const { createItem, updateItem, isCreating, isUpdating } = useWarehouseItems();
+  const { categories } = useItemCategories();
+  const { data: suppliers = [] } = useSuppliers();
+
+  useEffect(() => {
+    if (editingItem) {
+      setFormData({
+        item_code: editingItem.item_code,
+        name: editingItem.name,
+        description: editingItem.description || '',
+        category_id: editingItem.category_id || '',
+        brand: editingItem.brand || '',
+        manufacturer: editingItem.manufacturer || '',
+        supplier_id: editingItem.supplier_id || '',
+        unit_cost: editingItem.unit_cost?.toString() || '',
+        selling_price: editingItem.selling_price?.toString() || '',
+        reorder_level: editingItem.reorder_level?.toString() || '',
+        min_stock_level: editingItem.min_stock_level?.toString() || '',
+        max_stock_level: editingItem.max_stock_level?.toString() || '',
+        barcode: editingItem.barcode || '',
+        sku: editingItem.sku || '',
+        status: editingItem.status,
+        is_serialized: editingItem.is_serialized,
+        is_batch_tracked: editingItem.is_batch_tracked,
+        notes: editingItem.notes || '',
+      });
+    } else {
+      setFormData({
+        item_code: '',
+        name: '',
+        description: '',
+        category_id: '',
+        brand: '',
+        manufacturer: '',
+        supplier_id: '',
+        unit_cost: '',
+        selling_price: '',
+        reorder_level: '',
+        min_stock_level: '',
+        max_stock_level: '',
+        barcode: '',
+        sku: '',
+        status: 'active',
+        is_serialized: false,
+        is_batch_tracked: false,
+        notes: '',
+      });
+    }
+  }, [editingItem, open]);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    const data = {
+      ...formData,
+      unit_cost: formData.unit_cost ? parseFloat(formData.unit_cost) : undefined,
+      selling_price: formData.selling_price ? parseFloat(formData.selling_price) : undefined,
+      reorder_level: formData.reorder_level ? parseFloat(formData.reorder_level) : undefined,
+      min_stock_level: formData.min_stock_level ? parseFloat(formData.min_stock_level) : undefined,
+      max_stock_level: formData.max_stock_level ? parseFloat(formData.max_stock_level) : undefined,
+      category_id: formData.category_id || undefined,
+      supplier_id: formData.supplier_id || undefined,
+    };
+
+    if (editingItem) {
+      updateItem({ id: editingItem.id, ...data });
+    } else {
+      createItem(data);
+    }
+    
+    onOpenChange(false);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>
+            {editingItem ? 'Edit Item' : 'Create New Item'}
+          </DialogTitle>
+          <DialogDescription>
+            {editingItem ? 'Update the item details below.' : 'Add a new item to your inventory.'}
+          </DialogDescription>
+        </DialogHeader>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="item_code">Item Code *</Label>
+              <Input
+                id="item_code"
+                value={formData.item_code}
+                onChange={(e) => setFormData({ ...formData, item_code: e.target.value })}
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="name">Item Name *</Label>
+              <Input
+                id="name"
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                required
+              />
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="description">Description</Label>
+            <Textarea
+              id="description"
+              value={formData.description}
+              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              rows={2}
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="category_id">Category</Label>
+              <Select value={formData.category_id} onValueChange={(value) => setFormData({ ...formData, category_id: value })}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select category" />
+                </SelectTrigger>
+                <SelectContent>
+                  {categories.map((category) => (
+                    <SelectItem key={category.id} value={category.id}>
+                      {category.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="supplier_id">Supplier</Label>
+              <Select value={formData.supplier_id} onValueChange={(value) => setFormData({ ...formData, supplier_id: value })}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select supplier" />
+                </SelectTrigger>
+                <SelectContent>
+                  {suppliers.map((supplier) => (
+                    <SelectItem key={supplier.id} value={supplier.id}>
+                      {supplier.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="brand">Brand</Label>
+              <Input
+                id="brand"
+                value={formData.brand}
+                onChange={(e) => setFormData({ ...formData, brand: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="manufacturer">Manufacturer</Label>
+              <Input
+                id="manufacturer"
+                value={formData.manufacturer}
+                onChange={(e) => setFormData({ ...formData, manufacturer: e.target.value })}
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="unit_cost">Unit Cost</Label>
+              <Input
+                id="unit_cost"
+                type="number"
+                step="0.01"
+                value={formData.unit_cost}
+                onChange={(e) => setFormData({ ...formData, unit_cost: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="selling_price">Selling Price</Label>
+              <Input
+                id="selling_price"
+                type="number"
+                step="0.01"
+                value={formData.selling_price}
+                onChange={(e) => setFormData({ ...formData, selling_price: e.target.value })}
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-3 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="reorder_level">Reorder Level</Label>
+              <Input
+                id="reorder_level"
+                type="number"
+                value={formData.reorder_level}
+                onChange={(e) => setFormData({ ...formData, reorder_level: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="min_stock_level">Min Stock</Label>
+              <Input
+                id="min_stock_level"
+                type="number"
+                value={formData.min_stock_level}
+                onChange={(e) => setFormData({ ...formData, min_stock_level: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="max_stock_level">Max Stock</Label>
+              <Input
+                id="max_stock_level"
+                type="number"
+                value={formData.max_stock_level}
+                onChange={(e) => setFormData({ ...formData, max_stock_level: e.target.value })}
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="barcode">Barcode</Label>
+              <Input
+                id="barcode"
+                value={formData.barcode}
+                onChange={(e) => setFormData({ ...formData, barcode: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="sku">SKU</Label>
+              <Input
+                id="sku"
+                value={formData.sku}
+                onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
+              />
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="status">Status</Label>
+            <Select value={formData.status} onValueChange={(value: any) => setFormData({ ...formData, status: value })}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="active">Active</SelectItem>
+                <SelectItem value="inactive">Inactive</SelectItem>
+                <SelectItem value="discontinued">Discontinued</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="flex items-center space-x-6">
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="is_serialized"
+                checked={formData.is_serialized}
+                onCheckedChange={(checked) => setFormData({ ...formData, is_serialized: !!checked })}
+              />
+              <Label htmlFor="is_serialized">Serialized Item</Label>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="is_batch_tracked"
+                checked={formData.is_batch_tracked}
+                onCheckedChange={(checked) => setFormData({ ...formData, is_batch_tracked: !!checked })}
+              />
+              <Label htmlFor="is_batch_tracked">Batch Tracked</Label>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="notes">Notes</Label>
+            <Textarea
+              id="notes"
+              value={formData.notes}
+              onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+              rows={3}
+            />
+          </div>
+
+          <div className="flex justify-end space-x-2 pt-4">
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={isCreating || isUpdating}>
+              {editingItem ? 'Update Item' : 'Create Item'}
+            </Button>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
