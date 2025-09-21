@@ -25,28 +25,35 @@ export const useWarehouseItems = () => {
   });
 
   const createItemMutation = useMutation({
-    mutationFn: async (itemData: CreateWarehouseItemData) => {
+    mutationFn: async (itemData: CreateWarehouseItemData & { initialStock?: number; initialUnitCost?: number }) => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User not authenticated');
+
+      const { initialStock, initialUnitCost, ...itemDataWithoutStock } = itemData;
 
       const { data, error } = await supabase
         .from('warehouse_items')
         .insert({
-          ...itemData,
+          ...itemDataWithoutStock,
           created_by: user.id
         })
         .select()
         .single();
 
       if (error) throw error;
-      return data;
+      return { item: data, initialStock, initialUnitCost };
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ['warehouse-items'] });
       toast({
-        title: "Success",
+        title: "Success", 
         description: "Item created successfully",
       });
+      
+      // Create initial stock transaction if provided
+      if (result.initialStock && result.initialStock > 0) {
+        // We'll handle this in the component using the returned data
+      }
     },
     onError: (error) => {
       console.error('Error creating item:', error);
@@ -118,6 +125,7 @@ export const useWarehouseItems = () => {
     isLoading,
     error,
     createItem: createItemMutation.mutate,
+    createItemAsync: createItemMutation.mutateAsync,
     updateItem: updateItemMutation.mutate,
     deleteItem: deleteItemMutation.mutate,
     isCreating: createItemMutation.isPending,

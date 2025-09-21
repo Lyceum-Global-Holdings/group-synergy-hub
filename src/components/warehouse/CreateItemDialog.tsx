@@ -55,7 +55,7 @@ export function CreateItemDialog({ open, onOpenChange, editingItem }: CreateItem
   });
   const [initialStock, setInitialStock] = useState('');
 
-  const { createItem, updateItem, isCreating, isUpdating } = useWarehouseItems();
+  const { createItem, createItemAsync, updateItem, isCreating, isUpdating } = useWarehouseItems();
   const { categories } = useItemCategories();
   const { data: suppliers = [] } = useSuppliers();
   const { units } = useItemUnits();
@@ -111,7 +111,7 @@ export function CreateItemDialog({ open, onOpenChange, editingItem }: CreateItem
     }
   }, [editingItem, open]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     const data = {
@@ -129,23 +129,38 @@ export function CreateItemDialog({ open, onOpenChange, editingItem }: CreateItem
 
     if (editingItem) {
       updateItem({ id: editingItem.id, ...data });
+      onOpenChange(false);
     } else {
-      createItem(data);
-      
-      // If initial stock is provided, we'll need to create a stock transaction
-      // Note: This would ideally be handled after successful item creation
-      if (initialStock && parseFloat(initialStock) > 0) {
-        setTimeout(() => {
-          // This is a simplified approach - in a real app, you'd get the item ID from the response
-          console.log('Would create opening stock transaction:', {
-            quantity: parseFloat(initialStock),
-            unit_cost: formData.unit_cost ? parseFloat(formData.unit_cost) : 0
+      try {
+        const result = await createItemAsync({
+          ...data,
+          initialStock: initialStock ? parseFloat(initialStock) : undefined,
+          initialUnitCost: formData.unit_cost ? parseFloat(formData.unit_cost) : undefined,
+        });
+
+        // Create opening stock transaction if initial stock provided
+        if (initialStock && parseFloat(initialStock) > 0) {
+          const stockQuantity = parseFloat(initialStock);
+          const unitCostValue = formData.unit_cost ? parseFloat(formData.unit_cost) : 0;
+          
+          createTransaction({
+            item_id: result.item.id,
+            transaction_type: 'opening_stock',
+            reference_type: 'manual',
+            quantity_change: stockQuantity,
+            quantity_before: 0,
+            quantity_after: stockQuantity,
+            unit_cost: unitCostValue > 0 ? unitCostValue : undefined,
+            total_value: unitCostValue > 0 ? unitCostValue * stockQuantity : undefined,
+            notes: 'Opening stock balance',
           });
-        }, 100);
+        }
+        
+        onOpenChange(false);
+      } catch (error) {
+        console.error('Error creating item:', error);
       }
     }
-    
-    onOpenChange(false);
   };
 
   return (

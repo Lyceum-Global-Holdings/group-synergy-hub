@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Button } from '@/components/ui/button';
 import {
   Dialog,
   DialogContent,
@@ -16,13 +17,15 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
 import { useStockTransactions } from '@/hooks/useStockTransactions';
-import { Loader2 } from 'lucide-react';
+import { StockAdjustmentDialog } from './StockAdjustmentDialog';
+import { Loader2, Plus } from 'lucide-react';
 
 interface StockMovementDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   itemId: string;
   itemName: string;
+  currentStock?: number;
 }
 
 const transactionTypeLabels = {
@@ -53,14 +56,25 @@ const getTransactionTypeColor = (type: string) => {
   }
 };
 
-export function StockMovementDialog({ open, onOpenChange, itemId, itemName }: StockMovementDialogProps) {
+export function StockMovementDialog({ open, onOpenChange, itemId, itemName, currentStock }: StockMovementDialogProps) {
   const { transactions, isLoading } = useStockTransactions(itemId);
+  const [isAdjustmentDialogOpen, setIsAdjustmentDialogOpen] = useState(false);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl max-h-[80vh] overflow-hidden flex flex-col">
         <DialogHeader>
-          <DialogTitle>Stock Movement History - {itemName}</DialogTitle>
+          <DialogTitle className="flex items-center justify-between">
+            Stock Movement History - {itemName}
+            <Button
+              onClick={() => setIsAdjustmentDialogOpen(true)}
+              size="sm"
+              className="ml-4"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              New Adjustment
+            </Button>
+          </DialogTitle>
         </DialogHeader>
 
         <div className="flex-1 overflow-auto">
@@ -131,6 +145,14 @@ export function StockMovementDialog({ open, onOpenChange, itemId, itemName }: St
             </Table>
           )}
         </div>
+
+        <StockAdjustmentDialog
+          open={isAdjustmentDialogOpen}
+          onOpenChange={setIsAdjustmentDialogOpen}
+          itemId={itemId}
+          itemName={itemName}
+          currentStock={currentStock || transactions[0]?.quantity_after || 0}
+        />
       </DialogContent>
     </Dialog>
   );

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Plus, Search, Edit, Trash2, History } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, History, Settings } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -16,6 +16,7 @@ import { useItemCategories } from '@/hooks/useItemCategories';
 import { useItemUnits } from '@/hooks/useItemUnits';
 import { CreateItemDialog } from '@/components/warehouse/CreateItemDialog';
 import { StockMovementDialog } from '@/components/warehouse/StockMovementDialog';
+import { StockAdjustmentDialog } from '@/components/warehouse/StockAdjustmentDialog';
 import { WarehouseItem } from '@/types/itemBin';
 
 export function ItemMasterTab() {
@@ -23,6 +24,7 @@ export function ItemMasterTab() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<WarehouseItem | null>(null);
   const [stockMovementItem, setStockMovementItem] = useState<WarehouseItem | null>(null);
+  const [stockAdjustmentItem, setStockAdjustmentItem] = useState<WarehouseItem | null>(null);
   
   const { items, isLoading, deleteItem, isDeleting } = useWarehouseItems();
   const { categories } = useItemCategories();
@@ -121,8 +123,18 @@ export function ItemMasterTab() {
                       <Button
                         variant="ghost"
                         size="sm"
+                        onClick={() => setStockAdjustmentItem(item)}
+                        className="p-1 h-6 w-6"
+                        title="Adjust Stock"
+                      >
+                        <Settings className="h-3 w-3" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
                         onClick={() => setStockMovementItem(item)}
                         className="p-1 h-6 w-6"
+                        title="View History"
                       >
                         <History className="h-3 w-3" />
                       </Button>
@@ -177,6 +189,19 @@ export function ItemMasterTab() {
           }}
           itemId={stockMovementItem.id}
           itemName={stockMovementItem.name}
+          currentStock={stockMovementItem.current_stock || 0}
+        />
+      )}
+
+      {stockAdjustmentItem && (
+        <StockAdjustmentDialog
+          open={!!stockAdjustmentItem}
+          onOpenChange={(open) => {
+            if (!open) setStockAdjustmentItem(null);
+          }}
+          itemId={stockAdjustmentItem.id}
+          itemName={stockAdjustmentItem.name}
+          currentStock={stockAdjustmentItem.current_stock || 0}
         />
       )}
     </div>
