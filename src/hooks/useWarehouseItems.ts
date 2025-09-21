@@ -67,6 +67,9 @@ export const useWarehouseItems = () => {
 
   const updateItemMutation = useMutation({
     mutationFn: async ({ id, ...itemData }: Partial<WarehouseItem> & { id: string }) => {
+      console.log('Updating item with ID:', id);
+      console.log('Update payload:', itemData);
+      
       const { data, error } = await supabase
         .from('warehouse_items')
         .update(itemData)
@@ -74,7 +77,11 @@ export const useWarehouseItems = () => {
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase update error:', error);
+        throw error;
+      }
+      console.log('Update successful, returned data:', data);
       return data;
     },
     onSuccess: () => {

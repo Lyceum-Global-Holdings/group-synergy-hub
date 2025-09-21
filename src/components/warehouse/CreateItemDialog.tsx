@@ -114,12 +114,15 @@ export function CreateItemDialog({ open, onOpenChange, editingItem }: CreateItem
       });
       setInitialStock('');
     }
-  }, [editingItem, open]);
+  }, [editingItem, open, selectedCompany?.id]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    const data = {
+    console.log('Form submission - editingItem:', editingItem);
+    console.log('Form data before processing:', formData);
+    
+    const baseData = {
       ...formData,
       unit_cost: formData.unit_cost ? parseFloat(formData.unit_cost) : undefined,
       selling_price: formData.selling_price ? parseFloat(formData.selling_price) : undefined,
@@ -129,17 +132,24 @@ export function CreateItemDialog({ open, onOpenChange, editingItem }: CreateItem
       category_id: formData.category_id || undefined,
       unit_id: formData.unit_id || undefined,
       supplier_id: formData.supplier_id || undefined,
-      company_id: formData.company_id || undefined,
-      current_stock: 0, // Will be updated by stock transaction
+      company_id: formData.company_id || null, // Convert empty string to null for proper database storage
     };
 
     if (editingItem) {
-      updateItem({ id: editingItem.id, ...data });
+      // For updates, don't include current_stock to prevent overwriting it
+      console.log('Update data being sent:', { id: editingItem.id, ...baseData });
+      updateItem({ id: editingItem.id, ...baseData });
       onOpenChange(false);
     } else {
+      // For new items, include initial stock
+      const createData = {
+        ...baseData,
+        current_stock: 0, // Will be updated by stock transaction
+      };
+      console.log('Create data being sent:', createData);
       try {
         const result = await createItemAsync({
-          ...data,
+          ...createData,
           initialStock: initialStock ? parseFloat(initialStock) : undefined,
           initialUnitCost: formData.unit_cost ? parseFloat(formData.unit_cost) : undefined,
         });
@@ -263,7 +273,13 @@ export function CreateItemDialog({ open, onOpenChange, editingItem }: CreateItem
 
           <div className="space-y-2">
             <Label htmlFor="company_id">Company Allocation</Label>
-            <Select value={formData.company_id || "all"} onValueChange={(value) => setFormData({ ...formData, company_id: value === "all" ? "" : value })}>
+            <Select 
+              value={formData.company_id || "all"} 
+              onValueChange={(value) => {
+                console.log('Company selection changed to:', value);
+                setFormData({ ...formData, company_id: value === "all" ? "" : value });
+              }}
+            >
               <SelectTrigger>
                 <SelectValue placeholder="Select company allocation" />
               </SelectTrigger>
