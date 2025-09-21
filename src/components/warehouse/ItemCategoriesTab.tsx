@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Plus, Search, Edit, Trash2 } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, Download } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -12,11 +12,13 @@ import {
 } from '@/components/ui/table';
 import { useItemCategories } from '@/hooks/useItemCategories';
 import { CreateCategoryDialog } from '@/components/warehouse/CreateCategoryDialog';
+import { ImportCategoriesDialog } from '@/components/warehouse/ImportCategoriesDialog';
 import { ItemCategory } from '@/types/itemBin';
 
 export function ItemCategoriesTab() {
   const [searchTerm, setSearchTerm] = useState('');
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<ItemCategory | null>(null);
   
   const { categories, isLoading } = useItemCategories();
@@ -40,10 +42,16 @@ export function ItemCategoriesTab() {
             />
           </div>
         </div>
-        <Button onClick={() => setIsCreateDialogOpen(true)}>
-          <Plus className="mr-2 h-4 w-4" />
-          Add Category
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => setIsImportDialogOpen(true)}>
+            <Download className="mr-2 h-4 w-4" />
+            Import Standard Categories
+          </Button>
+          <Button onClick={() => setIsCreateDialogOpen(true)}>
+            <Plus className="mr-2 h-4 w-4" />
+            Add Category
+          </Button>
+        </div>
       </div>
 
       <div className="border rounded-lg">
@@ -114,6 +122,11 @@ export function ItemCategoriesTab() {
           if (!open) setEditingCategory(null);
         }}
         editingCategory={editingCategory}
+      />
+
+      <ImportCategoriesDialog
+        open={isImportDialogOpen}
+        onOpenChange={setIsImportDialogOpen}
       />
     </div>
   );

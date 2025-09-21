@@ -58,11 +58,52 @@ export const useItemCategories = () => {
     }
   });
 
+  const bulkImportCategoriesMutation = useMutation({
+    mutationFn: async (categoriesData: CreateItemCategoryData[]) => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User not authenticated');
+
+      // Import categories in order (parents first, then children)
+      const results = [];
+      for (const categoryData of categoriesData) {
+        const { data, error } = await supabase
+          .from('item_categories')
+          .insert({
+            ...categoryData,
+            created_by: user.id
+          })
+          .select()
+          .single();
+
+        if (error) throw error;
+        results.push(data);
+      }
+      return results;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['item-categories'] });
+      toast({
+        title: "Success",
+        description: `${data.length} categories imported successfully`,
+      });
+    },
+    onError: (error) => {
+      console.error('Error importing categories:', error);
+      toast({
+        title: "Error",
+        description: "Failed to import categories",
+        variant: "destructive",
+      });
+    }
+  });
+
   return {
     categories,
     isLoading,
     error,
     createCategory: createCategoryMutation.mutate,
     isCreating: createCategoryMutation.isPending,
+    bulkImportCategories: bulkImportCategoriesMutation.mutate,
+    isImporting: bulkImportCategoriesMutation.isPending,
   };
 };
