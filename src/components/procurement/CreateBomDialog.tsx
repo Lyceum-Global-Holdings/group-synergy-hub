@@ -39,6 +39,7 @@ import { CreateBomItemData } from '@/types/bom';
 const bomSchema = z.object({
   product_name: z.string().min(1, 'Product name is required'),
   version: z.string().optional(),
+  size: z.string().optional(),
   description: z.string().optional(),
   status: z.enum(['active', 'inactive', 'draft']).default('draft'),
 });
@@ -66,6 +67,7 @@ export function CreateBomDialog({ children }: CreateBomDialogProps) {
     defaultValues: {
       product_name: '',
       version: '1.0',
+      size: '',
       description: '',
       status: 'draft',
     },
@@ -360,6 +362,38 @@ export function CreateBomDialog({ children }: CreateBomDialogProps) {
                       <FormControl>
                         <Input {...field} placeholder="1.0" />
                       </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="size"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Size</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select size" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent className="bg-background border z-50 max-h-60">
+                          {SIZE_CATEGORIES.map((cat) => (
+                            <div key={cat}>
+                              <div className="px-2 py-1 text-xs font-medium text-muted-foreground border-b">
+                                {cat}
+                              </div>
+                              {getSizesByCategory(cat).map((size) => (
+                                <SelectItem key={size.value} value={size.value}>
+                                  {size.label}
+                                </SelectItem>
+                              ))}
+                            </div>
+                          ))}
+                        </SelectContent>
+                      </Select>
                       <FormMessage />
                     </FormItem>
                   )}
