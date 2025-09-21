@@ -135,6 +135,15 @@ export function CompanySidebar() {
     .map(moduleKey => moduleConfig[moduleKey as keyof typeof moduleConfig])
     .filter(Boolean);
 
+  // Debug logging
+  console.log('CompanySidebar Debug:', {
+    selectedCompany: selectedCompany?.name,
+    companyModules: selectedCompany?.modules,
+    availableModules,
+    departments: departments.map(d => d.title),
+    moduleConfigKeys: Object.keys(moduleConfig)
+  });
+
   return (
     <Sidebar className="border-r">
       <SidebarContent>
