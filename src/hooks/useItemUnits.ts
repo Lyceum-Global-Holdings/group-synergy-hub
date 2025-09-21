@@ -113,6 +113,42 @@ export const useItemUnits = () => {
     }
   });
 
+  const bulkImportUnitsMutation = useMutation({
+    mutationFn: async (unitsData: CreateItemUnitData[]) => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User not authenticated');
+
+      // Add created_by to each unit
+      const unitsWithCreator = unitsData.map(unit => ({
+        ...unit,
+        created_by: user.id
+      }));
+
+      const { data, error } = await supabase
+        .from('item_units')
+        .insert(unitsWithCreator)
+        .select();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['item-units'] });
+      toast({
+        title: "Success",
+        description: `${data.length} units imported successfully`,
+      });
+    },
+    onError: (error) => {
+      console.error('Error importing units:', error);
+      toast({
+        title: "Error",
+        description: "Failed to import units",
+        variant: "destructive",
+      });
+    }
+  });
+
   return {
     units,
     isLoading,
@@ -120,8 +156,10 @@ export const useItemUnits = () => {
     createUnit: createUnitMutation.mutate,
     updateUnit: updateUnitMutation.mutate,
     deleteUnit: deleteUnitMutation.mutate,
+    bulkImportUnits: bulkImportUnitsMutation.mutate,
     isCreating: createUnitMutation.isPending,
     isUpdating: updateUnitMutation.isPending,
     isDeleting: deleteUnitMutation.isPending,
+    isImporting: bulkImportUnitsMutation.isPending,
   };
 };

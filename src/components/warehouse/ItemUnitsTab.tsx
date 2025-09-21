@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Plus, Search, Edit, Trash2 } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, Download } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -12,11 +12,13 @@ import {
 } from '@/components/ui/table';
 import { useItemUnits } from '@/hooks/useItemUnits';
 import { CreateUnitDialog } from '@/components/warehouse/CreateUnitDialog';
+import { ImportStandardUnitsDialog } from '@/components/warehouse/ImportStandardUnitsDialog';
 import { ItemUnit } from '@/types/itemBin';
 
 export function ItemUnitsTab() {
   const [searchTerm, setSearchTerm] = useState('');
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
   const [editingUnit, setEditingUnit] = useState<ItemUnit | null>(null);
   
   const { units, isLoading, deleteUnit, isDeleting } = useItemUnits();
@@ -40,10 +42,16 @@ export function ItemUnitsTab() {
             />
           </div>
         </div>
-        <Button onClick={() => setIsCreateDialogOpen(true)}>
-          <Plus className="mr-2 h-4 w-4" />
-          Add Unit
-        </Button>
+        <div className="flex items-center space-x-2">
+          <Button variant="outline" onClick={() => setIsImportDialogOpen(true)}>
+            <Download className="mr-2 h-4 w-4" />
+            Import Standards
+          </Button>
+          <Button onClick={() => setIsCreateDialogOpen(true)}>
+            <Plus className="mr-2 h-4 w-4" />
+            Add Unit
+          </Button>
+        </div>
       </div>
 
       <div className="border rounded-lg">
@@ -108,6 +116,11 @@ export function ItemUnitsTab() {
           if (!open) setEditingUnit(null);
         }}
         editingUnit={editingUnit}
+      />
+
+      <ImportStandardUnitsDialog
+        open={isImportDialogOpen}
+        onOpenChange={setIsImportDialogOpen}
       />
     </div>
   );
