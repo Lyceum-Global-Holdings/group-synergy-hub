@@ -14,6 +14,7 @@ import PurchaseRequisition from "./pages/procurement/PurchaseRequisition";
 import PurchaseOrder from "./pages/procurement/PurchaseOrder";
 import { SupplierMaster } from "./pages/sourcing/SupplierMaster";
 import AssetManagement from "./pages/warehouse/AssetManagement";
+import ItemBinMaster from "./pages/warehouse/ItemBinMaster";
 import PublicAssetView from "./pages/PublicAssetView";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
@@ -83,6 +84,13 @@ const App = () => (
               <ProtectedRoute>
                 <AppLayout>
                   <AssetManagement />
+                </AppLayout>
+              </ProtectedRoute>
+            } />
+            <Route path="/warehouse/item-bin-master" element={
+              <ProtectedRoute>
+                <AppLayout>
+                  <ItemBinMaster />
                 </AppLayout>
               </ProtectedRoute>
             } />

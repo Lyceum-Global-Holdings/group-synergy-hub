@@ -156,6 +156,36 @@ export type Database = {
           },
         ]
       }
+      bin_types: {
+        Row: {
+          company_id: string | null
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          company_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       companies: {
         Row: {
           address: string | null
@@ -185,6 +215,83 @@ export type Database = {
           modules?: string[] | null
           name?: string
           status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      item_categories: {
+        Row: {
+          code: string | null
+          company_id: string | null
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          name: string
+          parent_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          code?: string | null
+          company_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          name: string
+          parent_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          code?: string | null
+          company_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          name?: string
+          parent_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "item_categories_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "item_categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      item_units: {
+        Row: {
+          abbreviation: string
+          company_id: string | null
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          abbreviation: string
+          company_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          abbreviation?: string
+          company_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          name?: string
           updated_at?: string
         }
         Relationships: []
@@ -1007,6 +1114,178 @@ export type Database = {
             columns: ["sublocation_id"]
             isOneToOne: false
             referencedRelation: "warehouse_locations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      warehouse_bins: {
+        Row: {
+          bin_code: string
+          bin_type_id: string | null
+          capacity: number | null
+          company_id: string | null
+          created_at: string
+          created_by: string | null
+          current_quantity: number | null
+          description: string | null
+          id: string
+          location_id: string | null
+          name: string
+          notes: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          bin_code: string
+          bin_type_id?: string | null
+          capacity?: number | null
+          company_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          current_quantity?: number | null
+          description?: string | null
+          id?: string
+          location_id?: string | null
+          name: string
+          notes?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          bin_code?: string
+          bin_type_id?: string | null
+          capacity?: number | null
+          company_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          current_quantity?: number | null
+          description?: string | null
+          id?: string
+          location_id?: string | null
+          name?: string
+          notes?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "warehouse_bins_bin_type_id_fkey"
+            columns: ["bin_type_id"]
+            isOneToOne: false
+            referencedRelation: "bin_types"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "warehouse_bins_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "warehouse_locations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      warehouse_items: {
+        Row: {
+          barcode: string | null
+          brand: string | null
+          category_id: string | null
+          company_id: string | null
+          created_at: string
+          created_by: string | null
+          current_stock: number | null
+          description: string | null
+          id: string
+          is_batch_tracked: boolean | null
+          is_serialized: boolean | null
+          item_code: string
+          manufacturer: string | null
+          max_stock_level: number | null
+          min_stock_level: number | null
+          name: string
+          notes: string | null
+          reorder_level: number | null
+          selling_price: number | null
+          sku: string | null
+          status: string
+          supplier_id: string | null
+          unit_cost: number | null
+          unit_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          barcode?: string | null
+          brand?: string | null
+          category_id?: string | null
+          company_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          current_stock?: number | null
+          description?: string | null
+          id?: string
+          is_batch_tracked?: boolean | null
+          is_serialized?: boolean | null
+          item_code: string
+          manufacturer?: string | null
+          max_stock_level?: number | null
+          min_stock_level?: number | null
+          name: string
+          notes?: string | null
+          reorder_level?: number | null
+          selling_price?: number | null
+          sku?: string | null
+          status?: string
+          supplier_id?: string | null
+          unit_cost?: number | null
+          unit_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          barcode?: string | null
+          brand?: string | null
+          category_id?: string | null
+          company_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          current_stock?: number | null
+          description?: string | null
+          id?: string
+          is_batch_tracked?: boolean | null
+          is_serialized?: boolean | null
+          item_code?: string
+          manufacturer?: string | null
+          max_stock_level?: number | null
+          min_stock_level?: number | null
+          name?: string
+          notes?: string | null
+          reorder_level?: number | null
+          selling_price?: number | null
+          sku?: string | null
+          status?: string
+          supplier_id?: string | null
+          unit_cost?: number | null
+          unit_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "warehouse_items_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "item_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "warehouse_items_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "warehouse_items_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "item_units"
             referencedColumns: ["id"]
           },
         ]
