@@ -991,6 +991,60 @@ export type Database = {
         }
         Relationships: []
       }
+      stock_transactions: {
+        Row: {
+          company_id: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          item_id: string
+          notes: string | null
+          quantity_after: number
+          quantity_before: number
+          quantity_change: number
+          reference_id: string | null
+          reference_type: Database["public"]["Enums"]["stock_reference_type"]
+          total_value: number | null
+          transaction_type: Database["public"]["Enums"]["stock_transaction_type"]
+          unit_cost: number | null
+          updated_at: string
+        }
+        Insert: {
+          company_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          item_id: string
+          notes?: string | null
+          quantity_after?: number
+          quantity_before?: number
+          quantity_change: number
+          reference_id?: string | null
+          reference_type: Database["public"]["Enums"]["stock_reference_type"]
+          total_value?: number | null
+          transaction_type: Database["public"]["Enums"]["stock_transaction_type"]
+          unit_cost?: number | null
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          item_id?: string
+          notes?: string | null
+          quantity_after?: number
+          quantity_before?: number
+          quantity_change?: number
+          reference_id?: string | null
+          reference_type?: Database["public"]["Enums"]["stock_reference_type"]
+          total_value?: number | null
+          transaction_type?: Database["public"]["Enums"]["stock_transaction_type"]
+          unit_cost?: number | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       supplier_contacts: {
         Row: {
           created_at: string
@@ -1563,6 +1617,15 @@ export type Database = {
         | "approved"
         | "rejected"
         | "cancelled"
+      stock_reference_type: "manual" | "grn" | "mrn" | "adjustment" | "transfer"
+      stock_transaction_type:
+        | "opening_stock"
+        | "goods_receipt"
+        | "material_issue"
+        | "material_return"
+        | "adjustment"
+        | "transfer_in"
+        | "transfer_out"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1699,6 +1762,16 @@ export const Constants = {
         "approved",
         "rejected",
         "cancelled",
+      ],
+      stock_reference_type: ["manual", "grn", "mrn", "adjustment", "transfer"],
+      stock_transaction_type: [
+        "opening_stock",
+        "goods_receipt",
+        "material_issue",
+        "material_return",
+        "adjustment",
+        "transfer_in",
+        "transfer_out",
       ],
     },
   },
