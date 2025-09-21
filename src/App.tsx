@@ -17,6 +17,7 @@ import BillOfMaterials from "./pages/procurement/BillOfMaterials";
 import { SupplierMaster } from "./pages/sourcing/SupplierMaster";
 import AssetManagement from "./pages/warehouse/AssetManagement";
 import ItemBinMaster from "./pages/warehouse/ItemBinMaster";
+import MaterialIssueReturn from "./pages/warehouse/MaterialIssueReturn";
 import PublicAssetView from "./pages/PublicAssetView";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
@@ -101,6 +102,13 @@ const App = () => (
                 <ProtectedRoute>
                   <AppLayout>
                     <ItemBinMaster />
+                  </AppLayout>
+                </ProtectedRoute>
+              } />
+              <Route path="/warehouse/material-issue" element={
+                <ProtectedRoute>
+                  <AppLayout>
+                    <MaterialIssueReturn />
                   </AppLayout>
                 </ProtectedRoute>
               } />

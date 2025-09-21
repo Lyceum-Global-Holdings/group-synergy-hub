@@ -431,6 +431,225 @@ export type Database = {
         }
         Relationships: []
       }
+      material_issue_items: {
+        Row: {
+          created_at: string
+          id: string
+          item_id: string
+          min_id: string
+          notes: string | null
+          quantity_issued: number
+          total_cost: number | null
+          unit_cost: number | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          item_id: string
+          min_id: string
+          notes?: string | null
+          quantity_issued: number
+          total_cost?: number | null
+          unit_cost?: number | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          item_id?: string
+          min_id?: string
+          notes?: string | null
+          quantity_issued?: number
+          total_cost?: number | null
+          unit_cost?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "material_issue_items_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "warehouse_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "material_issue_items_min_id_fkey"
+            columns: ["min_id"]
+            isOneToOne: false
+            referencedRelation: "material_issue_notes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      material_issue_notes: {
+        Row: {
+          approved_by: string | null
+          approved_date: string | null
+          company_id: string | null
+          created_at: string
+          created_by: string | null
+          department: string | null
+          id: string
+          issue_date: string
+          issued_to: string
+          min_number: string
+          notes: string | null
+          purpose: string | null
+          status: string
+          total_value: number | null
+          updated_at: string
+        }
+        Insert: {
+          approved_by?: string | null
+          approved_date?: string | null
+          company_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          department?: string | null
+          id?: string
+          issue_date?: string
+          issued_to: string
+          min_number: string
+          notes?: string | null
+          purpose?: string | null
+          status?: string
+          total_value?: number | null
+          updated_at?: string
+        }
+        Update: {
+          approved_by?: string | null
+          approved_date?: string | null
+          company_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          department?: string | null
+          id?: string
+          issue_date?: string
+          issued_to?: string
+          min_number?: string
+          notes?: string | null
+          purpose?: string | null
+          status?: string
+          total_value?: number | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      material_return_items: {
+        Row: {
+          condition: string | null
+          created_at: string
+          id: string
+          item_id: string
+          mrn_id: string
+          notes: string | null
+          quantity_returned: number
+          total_cost: number | null
+          unit_cost: number | null
+          updated_at: string
+        }
+        Insert: {
+          condition?: string | null
+          created_at?: string
+          id?: string
+          item_id: string
+          mrn_id: string
+          notes?: string | null
+          quantity_returned: number
+          total_cost?: number | null
+          unit_cost?: number | null
+          updated_at?: string
+        }
+        Update: {
+          condition?: string | null
+          created_at?: string
+          id?: string
+          item_id?: string
+          mrn_id?: string
+          notes?: string | null
+          quantity_returned?: number
+          total_cost?: number | null
+          unit_cost?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "material_return_items_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "warehouse_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "material_return_items_mrn_id_fkey"
+            columns: ["mrn_id"]
+            isOneToOne: false
+            referencedRelation: "material_return_notes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      material_return_notes: {
+        Row: {
+          approved_by: string | null
+          approved_date: string | null
+          company_id: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          mrn_number: string
+          notes: string | null
+          reason: string
+          reference_id: string | null
+          reference_type: string | null
+          return_date: string
+          return_type: string
+          returned_by: string
+          status: string
+          total_value: number | null
+          updated_at: string
+        }
+        Insert: {
+          approved_by?: string | null
+          approved_date?: string | null
+          company_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          mrn_number: string
+          notes?: string | null
+          reason: string
+          reference_id?: string | null
+          reference_type?: string | null
+          return_date?: string
+          return_type?: string
+          returned_by: string
+          status?: string
+          total_value?: number | null
+          updated_at?: string
+        }
+        Update: {
+          approved_by?: string | null
+          approved_date?: string | null
+          company_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          mrn_number?: string
+          notes?: string | null
+          reason?: string
+          reference_id?: string | null
+          reference_type?: string | null
+          return_date?: string
+          return_type?: string
+          returned_by?: string
+          status?: string
+          total_value?: number | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       permissions: {
         Row: {
           category: string
@@ -1572,6 +1791,14 @@ export type Database = {
         Returns: string
       }
       generate_bom_number: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
+      generate_min_number: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
+      generate_mrn_number: {
         Args: Record<PropertyKey, never>
         Returns: string
       }
