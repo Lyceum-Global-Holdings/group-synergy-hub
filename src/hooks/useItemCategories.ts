@@ -59,25 +59,55 @@ export const useItemCategories = () => {
   });
 
   const bulkImportCategoriesMutation = useMutation({
-    mutationFn: async (categoriesData: CreateItemCategoryData[]) => {
+    mutationFn: async (categoriesData: Array<CreateItemCategoryData & { level: number; parentName?: string }>) => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User not authenticated');
 
-      // Import categories in order (parents first, then children)
-      const results = [];
-      for (const categoryData of categoriesData) {
-        const { data, error } = await supabase
-          .from('item_categories')
-          .insert({
-            ...categoryData,
-            created_by: user.id
-          })
-          .select()
-          .single();
+      // Group categories by level for hierarchical processing
+      const categoriesByLevel = categoriesData.reduce((acc, category) => {
+        const level = category.level || 0;
+        if (!acc[level]) acc[level] = [];
+        acc[level].push(category);
+        return acc;
+      }, {} as Record<number, Array<CreateItemCategoryData & { level: number; parentName?: string }>>);
 
-        if (error) throw error;
-        results.push(data);
+      // Map to store created category names to their database IDs
+      const nameToIdMap = new Map<string, string>();
+      const results = [];
+
+      // Process categories level by level (parents first)
+      const levels = Object.keys(categoriesByLevel).map(Number).sort();
+      
+      for (const level of levels) {
+        const levelCategories = categoriesByLevel[level];
+        
+        for (const categoryData of levelCategories) {
+          // Find parent ID if this is a subcategory
+          let parent_id: string | undefined;
+          if (categoryData.parentName && nameToIdMap.has(categoryData.parentName)) {
+            parent_id = nameToIdMap.get(categoryData.parentName);
+          }
+
+          const { data, error } = await supabase
+            .from('item_categories')
+            .insert({
+              name: categoryData.name,
+              code: categoryData.code,
+              description: categoryData.description,
+              parent_id,
+              created_by: user.id
+            })
+            .select()
+            .single();
+
+          if (error) throw error;
+          
+          // Store the mapping for child categories
+          nameToIdMap.set(categoryData.name, data.id);
+          results.push(data);
+        }
       }
+      
       return results;
     },
     onSuccess: (data) => {

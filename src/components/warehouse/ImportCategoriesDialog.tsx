@@ -87,35 +87,17 @@ export function ImportCategoriesDialog({ open, onOpenChange }: ImportCategoriesD
   const handleImport = () => {
     if (selectedCategories.size === 0) return;
 
-    // Create a map for parent categories
-    const parentMap = new Map<string, string>();
-    const categoriesToImport: CreateItemCategoryData[] = [];
-    
-    // Process selected categories in order (parents first)
-    const sortedCategories = availableCategories
+    // Process selected categories with their metadata
+    const categoriesToImport = availableCategories
       .filter(cat => selectedCategories.has(cat.uniqueKey))
-      .sort((a, b) => a.level - b.level);
-
-    sortedCategories.forEach(category => {
-      let parent_id: string | undefined;
-      
-      // Find parent ID if this is a subcategory
-      if (category.parentName) {
-        parent_id = parentMap.get(category.parentName);
-      }
-
-      const categoryData: CreateItemCategoryData = {
+      .sort((a, b) => a.level - b.level)
+      .map(category => ({
         name: category.name,
         code: category.code,
         description: category.description,
-        parent_id
-      };
-
-      categoriesToImport.push(categoryData);
-      
-      // Store this category for future children
-      parentMap.set(category.name, 'pending'); // Will be replaced with actual ID after creation
-    });
+        level: category.level,
+        parentName: category.parentName
+      }));
 
     bulkImportCategories(categoriesToImport);
     onOpenChange(false);
