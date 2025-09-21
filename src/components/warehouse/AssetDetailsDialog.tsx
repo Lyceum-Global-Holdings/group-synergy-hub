@@ -170,7 +170,7 @@ export function AssetDetailsDialog({
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">
-                    {asset.current_value ? `$${Number(asset.current_value).toLocaleString()}` : 'N/A'}
+                    {asset.current_value ? `Rs. ${Number(asset.current_value).toLocaleString()}` : 'N/A'}
                   </div>
                   <p className="text-xs text-muted-foreground">
                     {residualValuePercentage !== null 
@@ -432,7 +432,7 @@ export function AssetDetailsDialog({
                     <label className="text-sm font-medium text-muted-foreground">Purchase Price</label>
                     <p className="text-2xl font-bold">
                       {asset.purchase_price 
-                        ? `$${Number(asset.purchase_price).toLocaleString()}`
+                        ? `Rs. ${Number(asset.purchase_price).toLocaleString()}`
                         : 'Not specified'
                       }
                     </p>
@@ -460,7 +460,7 @@ export function AssetDetailsDialog({
                     <div>
                       <label className="text-sm font-medium text-muted-foreground">Total Depreciation</label>
                       <p className="text-lg font-semibold text-red-600">
-                        -${depreciationAmount.toLocaleString()}
+                        -Rs. {depreciationAmount.toLocaleString()}
                       </p>
                     </div>
                   )}
@@ -469,7 +469,7 @@ export function AssetDetailsDialog({
                     <div>
                       <label className="text-sm font-medium text-muted-foreground">Current Value</label>
                       <p className="text-2xl font-bold">
-                        ${Number(asset.current_value).toLocaleString()}
+                        Rs. {Number(asset.current_value).toLocaleString()}
                       </p>
                       {residualValuePercentage && (
                         <p className="text-sm text-muted-foreground">

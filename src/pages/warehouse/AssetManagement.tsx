@@ -864,7 +864,7 @@ export default function AssetManagement() {
                 <Package className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">${totalValue.toLocaleString()}</div>
+                <div className="text-2xl font-bold">Rs. {totalValue.toLocaleString()}</div>
                 <p className="text-xs text-muted-foreground">
                   Asset portfolio value
                 </p>
@@ -945,7 +945,7 @@ export default function AssetManagement() {
                             </div>
                           </TableCell>
                           <TableCell>
-                            ${(asset.current_value || asset.purchase_price || 0).toLocaleString()}
+                            Rs. {(asset.current_value || asset.purchase_price || 0).toLocaleString()}
                           </TableCell>
                           <TableCell>
                             <DropdownMenu>

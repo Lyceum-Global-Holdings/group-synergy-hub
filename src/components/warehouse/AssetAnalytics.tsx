@@ -124,7 +124,7 @@ export function AssetAnalytics({ assets, locations, categories }: AssetAnalytics
           <p className="font-medium">{label}</p>
           {payload.map((entry: any, index: number) => (
             <p key={index} style={{ color: entry.color }}>
-              {`${entry.dataKey}: ${entry.dataKey === 'value' ? `$${entry.value.toLocaleString()}` : entry.value}`}
+              {`${entry.dataKey}: ${entry.dataKey === 'value' ? `Rs. ${entry.value.toLocaleString()}` : entry.value}`}
             </p>
           ))}
         </div>
@@ -169,7 +169,7 @@ export function AssetAnalytics({ assets, locations, categories }: AssetAnalytics
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">${analyticsData.financial.totalCurrentValue.toLocaleString()}</div>
+            <div className="text-2xl font-bold">Rs. {analyticsData.financial.totalCurrentValue.toLocaleString()}</div>
             <p className="text-xs text-muted-foreground">
               Current asset value
             </p>
@@ -182,7 +182,7 @@ export function AssetAnalytics({ assets, locations, categories }: AssetAnalytics
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">${analyticsData.kpis.avgAssetValue.toLocaleString()}</div>
+            <div className="text-2xl font-bold">Rs. {analyticsData.kpis.avgAssetValue.toLocaleString()}</div>
             <p className="text-xs text-muted-foreground">
               Per asset average
             </p>
@@ -348,7 +348,7 @@ export function AssetAnalytics({ assets, locations, categories }: AssetAnalytics
                           <p className="font-medium">{label}</p>
                           <p className="text-sm">Assets: {payload[0]?.payload?.count}</p>
                           <p className="text-sm">Reliability: {typeof payload[1]?.value === 'number' ? payload[1]?.value?.toFixed(1) : payload[1]?.value}%</p>
-                          <p className="text-sm">Value: ${payload[0]?.payload?.value?.toLocaleString()}</p>
+                          <p className="text-sm">Value: Rs. {payload[0]?.payload?.value?.toLocaleString()}</p>
                         </div>
                       );
                     }
@@ -379,21 +379,21 @@ export function AssetAnalytics({ assets, locations, categories }: AssetAnalytics
               <div className="flex justify-between items-center p-3 border rounded">
                 <span className="text-sm font-medium">Original Purchase Value</span>
                 <span className="text-lg font-bold text-success">
-                  ${analyticsData.financial.totalPurchaseValue.toLocaleString()}
+                  Rs. {analyticsData.financial.totalPurchaseValue.toLocaleString()}
                 </span>
               </div>
               
               <div className="flex justify-between items-center p-3 border rounded">
                 <span className="text-sm font-medium">Current Asset Value</span>
                 <span className="text-lg font-bold">
-                  ${analyticsData.financial.totalCurrentValue.toLocaleString()}
+                  Rs. {analyticsData.financial.totalCurrentValue.toLocaleString()}
                 </span>
               </div>
               
               <div className="flex justify-between items-center p-3 border rounded">
                 <span className="text-sm font-medium">Total Depreciation</span>
                 <span className="text-lg font-bold text-destructive">
-                  -${analyticsData.financial.depreciation.toLocaleString()}
+                  -Rs. {analyticsData.financial.depreciation.toLocaleString()}
                 </span>
               </div>
               

@@ -41,7 +41,7 @@ const kpiData = [
   },
   {
     title: "Monthly Spend",
-    value: "$2.4M",
+    value: "Rs. 2.4M",
     change: "+8.1%",
     trend: "up",
     icon: DollarSign,

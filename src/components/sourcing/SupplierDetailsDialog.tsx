@@ -74,7 +74,7 @@ export const SupplierDetailsDialog: React.FC<SupplierDetailsDialogProps> = ({
     }
   };
 
-  const formatCurrency = (amount?: number, currency = 'USD') => {
+  const formatCurrency = (amount?: number, currency = 'LKR') => {
     if (!amount) return '-';
     return new Intl.NumberFormat('en-US', {
       style: 'currency',

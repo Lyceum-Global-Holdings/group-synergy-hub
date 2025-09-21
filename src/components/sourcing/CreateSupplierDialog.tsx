@@ -87,7 +87,7 @@ export const CreateSupplierDialog: React.FC<CreateSupplierDialogProps> = ({
       country: '',
       payment_terms: '',
       credit_limit: '',
-      currency: 'USD',
+      currency: 'LKR',
       rating: '',
       notes: '',
       contacts: [],
@@ -539,7 +539,7 @@ export const CreateSupplierDialog: React.FC<CreateSupplierDialogProps> = ({
                       <FormItem>
                         <FormLabel>Currency</FormLabel>
                         <FormControl>
-                          <Input placeholder="USD" {...field} />
+                          <Input placeholder="LKR" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>

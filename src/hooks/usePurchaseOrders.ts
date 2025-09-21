@@ -92,7 +92,7 @@ export function useCreatePurchaseOrder() {
           expected_delivery_date: data.expected_delivery_date,
           payment_terms: data.payment_terms,
           delivery_terms: data.delivery_terms,
-          currency: data.currency || 'USD',
+          currency: data.currency || 'LKR',
           buyer_id: data.buyer_id,
           notes: data.notes,
           created_by: (await supabase.auth.getUser()).data.user?.id!,

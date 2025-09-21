@@ -25,7 +25,7 @@ const createPoSchema = z.object({
   expected_delivery_date: z.string().optional(),
   payment_terms: z.string().optional(),
   delivery_terms: z.string().optional(),
-  currency: z.string().default("USD"),
+  currency: z.string().default("LKR"),
   buyer_id: z.string().optional(),
   notes: z.string().optional(),
   items: z.array(z.object({
@@ -50,7 +50,7 @@ interface CreatePoDialogProps {
   prId?: string;
 }
 
-const currencies = ['USD', 'EUR', 'GBP', 'JPY', 'AUD', 'CAD'];
+const currencies = ['LKR', 'USD', 'EUR', 'GBP', 'JPY', 'AUD', 'CAD'];
 
 const unitsOfMeasure = [
   // Quantity
@@ -88,7 +88,7 @@ export function CreatePoDialog({ open, onOpenChange, prId }: CreatePoDialogProps
     defaultValues: {
       pr_id: prId,
       supplier_id: "",
-      currency: "USD",
+      currency: "LKR",
       items: [
         {
           item_name: "",

@@ -130,7 +130,7 @@ export default function PurchaseOrderPage() {
               <CardTitle className="text-sm font-medium">Total Value</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">${summaryStats.total_value.toLocaleString()}</div>
+              <div className="text-2xl font-bold">Rs. {summaryStats.total_value.toLocaleString()}</div>
             </CardContent>
           </Card>
         </div>
@@ -209,7 +209,7 @@ export default function PurchaseOrderPage() {
                         : '-'
                       }
                     </TableCell>
-                    <TableCell>${po.final_amount.toLocaleString()}</TableCell>
+                    <TableCell>Rs. {po.final_amount.toLocaleString()}</TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <Button

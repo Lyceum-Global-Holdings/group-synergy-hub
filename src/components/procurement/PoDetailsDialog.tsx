@@ -163,19 +163,19 @@ export function PoDetailsDialog({ open, onOpenChange, purchaseOrder }: PoDetails
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">Subtotal</p>
-                  <p className="text-lg font-semibold">${purchaseOrder.total_amount.toLocaleString()}</p>
+                  <p className="text-lg font-semibold">Rs. {purchaseOrder.total_amount.toLocaleString()}</p>
                 </div>
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">Tax</p>
-                  <p className="text-lg font-semibold">${purchaseOrder.tax_amount.toLocaleString()}</p>
+                  <p className="text-lg font-semibold">Rs. {purchaseOrder.tax_amount.toLocaleString()}</p>
                 </div>
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">Discount</p>
-                  <p className="text-lg font-semibold">-${purchaseOrder.discount_amount.toLocaleString()}</p>
+                  <p className="text-lg font-semibold">-Rs. {purchaseOrder.discount_amount.toLocaleString()}</p>
                 </div>
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">Total</p>
-                  <p className="text-xl font-bold">${purchaseOrder.final_amount.toLocaleString()}</p>
+                  <p className="text-xl font-bold">Rs. {purchaseOrder.final_amount.toLocaleString()}</p>
                 </div>
               </div>
             </CardContent>
@@ -208,8 +208,8 @@ export function PoDetailsDialog({ open, onOpenChange, purchaseOrder }: PoDetails
                       <TableCell>{item.quantity_ordered}</TableCell>
                       <TableCell>{item.quantity_received}</TableCell>
                       <TableCell>{item.quantity_pending}</TableCell>
-                      <TableCell>${item.unit_price.toLocaleString()}</TableCell>
-                      <TableCell>${item.total_price.toLocaleString()}</TableCell>
+                      <TableCell>Rs. {item.unit_price.toLocaleString()}</TableCell>
+                      <TableCell>Rs. {item.total_price.toLocaleString()}</TableCell>
                       <TableCell>{item.unit_of_measure}</TableCell>
                     </TableRow>
                   ))}
