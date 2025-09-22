@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -18,8 +19,20 @@ const availableModules = [
 
 export default function ModuleAllocation() {
   const { companies, updateCompany, isUpdating } = useCompanies();
+  const [searchParams] = useSearchParams();
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
   const [moduleChanges, setModuleChanges] = useState<string[]>([]);
+
+  // Auto-select company from URL parameter
+  useEffect(() => {
+    const companyId = searchParams.get('company');
+    if (companyId && companies.length > 0) {
+      const company = companies.find(c => c.id === companyId);
+      if (company) {
+        handleCompanySelect(company);
+      }
+    }
+  }, [searchParams, companies]);
 
   const handleCompanySelect = (company: Company) => {
     setSelectedCompany(company);

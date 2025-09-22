@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Plus, Building2, Edit, Trash2, Settings, Loader2 } from "lucide-react";
+import { Plus, Building2, Edit, Trash2, Settings, Loader2, MoreHorizontal, Package } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -29,12 +30,20 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { CompanyForm } from "@/components/admin/CompanyForm";
 import { useCompanies } from "@/hooks/useCompanies";
 import { Company } from "@/types/company";
 
 
 export default function CompanyManagement() {
+  const navigate = useNavigate();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingCompany, setEditingCompany] = useState<Company | null>(null);
   const [deletingCompany, setDeletingCompany] = useState<Company | null>(null);
@@ -270,26 +279,45 @@ export default function CompanyManagement() {
                         {new Date(company.created_at).toLocaleDateString()}
                       </TableCell>
                       <TableCell>
-                        <div className="flex items-center gap-2">
-                          <Button 
-                            variant="outline" 
-                            size="sm"
-                            onClick={() => setEditingCompany(company)}
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button variant="outline" size="sm">
-                            <Settings className="h-4 w-4" />
-                          </Button>
-                          <Button 
-                            variant="outline" 
-                            size="sm" 
-                            className="text-destructive"
-                            onClick={() => setDeletingCompany(company)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="outline" size="sm">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-48">
+                            <DropdownMenuItem
+                              onClick={() => setEditingCompany(company)}
+                              className="cursor-pointer"
+                            >
+                              <Edit className="h-4 w-4 mr-2" />
+                              Edit Company
+                            </DropdownMenuItem>
+                            
+                            <DropdownMenuItem
+                              onClick={() => navigate(`/admin/modules?company=${company.id}`)}
+                              className="cursor-pointer"
+                            >
+                              <Package className="h-4 w-4 mr-2" />
+                              Manage Modules
+                            </DropdownMenuItem>
+                            
+                            <DropdownMenuItem className="cursor-pointer">
+                              <Settings className="h-4 w-4 mr-2" />
+                              Company Settings
+                            </DropdownMenuItem>
+                            
+                            <DropdownMenuSeparator />
+                            
+                            <DropdownMenuItem
+                              onClick={() => setDeletingCompany(company)}
+                              className="cursor-pointer text-destructive focus:text-destructive"
+                            >
+                              <Trash2 className="h-4 w-4 mr-2" />
+                              Delete Company
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </TableCell>
                     </TableRow>
                   ))
