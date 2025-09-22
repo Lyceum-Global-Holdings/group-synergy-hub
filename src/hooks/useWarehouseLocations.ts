@@ -14,12 +14,19 @@ export const useWarehouseLocations = () => {
   } = useQuery({
     queryKey: ['warehouse-locations'],
     queryFn: async () => {
+      console.log('Fetching warehouse locations...');
+      
       const { data, error } = await supabase
         .from('warehouse_locations')
         .select('*')
         .order('created_at', { ascending: true });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching locations:', error);
+        throw error;
+      }
+      
+      console.log('Fetched locations:', data);
       return data as WarehouseLocation[];
     }
   });

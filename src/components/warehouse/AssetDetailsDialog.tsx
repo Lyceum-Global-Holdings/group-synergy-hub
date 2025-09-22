@@ -370,35 +370,72 @@ export function AssetDetailsDialog({
                     <p>No transfers recorded</p>
                     <p className="text-sm">This asset has remained at its original location</p>
                   </div>
-                ) : (
+                 ) : (
                   <div className="space-y-4">
-                    {transfers.map((transfer, index) => (
-                      <div key={transfer.id} className="flex items-start gap-3 p-3 border rounded-lg">
-                        <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                          <ArrowRightLeft className="h-4 w-4 text-primary" />
-                        </div>
-                        <div className="flex-grow space-y-1">
-                          <div className="flex items-center justify-between">
-                            <p className="font-medium">
-                              {getLocationName(transfer.from_location_id) || 'Unknown'} → {getLocationName(transfer.to_location_id) || 'Unknown'}
-                            </p>
-                            <span className="text-sm text-muted-foreground">
-                              {format(new Date(transfer.transfer_date), 'MMM dd, yyyy')}
-                            </span>
+                    {transfers.map((transfer, index) => {
+                      // Build complete location paths
+                      const fromLocationPath = [
+                        getLocationName(transfer.from_location_id),
+                        getLocationName(transfer.from_sublocation_id),
+                        getLocationName(transfer.from_department_id)
+                      ].filter(Boolean).join(' → ');
+                      
+                      const toLocationPath = [
+                        getLocationName(transfer.to_location_id),
+                        getLocationName(transfer.to_sublocation_id),
+                        getLocationName(transfer.to_department_id)
+                      ].filter(Boolean).join(' → ');
+
+                      return (
+                        <div key={transfer.id} className="flex items-start gap-3 p-4 border rounded-lg bg-muted/30">
+                          <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                            <ArrowRightLeft className="h-4 w-4 text-primary" />
                           </div>
-                          {transfer.transfer_reason && (
-                            <p className="text-sm text-muted-foreground">
-                              <strong>Reason:</strong> {transfer.transfer_reason}
-                            </p>
-                          )}
-                          {transfer.notes && (
-                            <p className="text-sm text-muted-foreground">
-                              <strong>Notes:</strong> {transfer.notes}
-                            </p>
-                          )}
+                          <div className="flex-grow space-y-2">
+                            <div className="flex items-center justify-between">
+                              <div className="space-y-1">
+                                <p className="font-medium text-sm">
+                                  <span className="text-muted-foreground">From:</span> {fromLocationPath || 'Unknown Location'}
+                                </p>
+                                <p className="font-medium text-sm">
+                                  <span className="text-muted-foreground">To:</span> {toLocationPath || 'Unknown Location'}
+                                </p>
+                              </div>
+                              <div className="text-right">
+                                <span className="text-sm font-medium">
+                                  {format(new Date(transfer.transfer_date), 'MMM dd, yyyy')}
+                                </span>
+                                <p className="text-xs text-muted-foreground">
+                                  {format(new Date(transfer.transfer_date), 'h:mm a')}
+                                </p>
+                              </div>
+                            </div>
+                            
+                            {transfer.transfer_reason && (
+                              <div className="bg-background/50 p-2 rounded text-sm">
+                                <span className="font-medium text-muted-foreground">Reason:</span> {transfer.transfer_reason}
+                              </div>
+                            )}
+                            
+                            {transfer.notes && (
+                              <div className="bg-background/50 p-2 rounded text-sm">
+                                <span className="font-medium text-muted-foreground">Notes:</span> {transfer.notes}
+                              </div>
+                            )}
+                            
+                            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                              <span>Transfer #{index + 1}</span>
+                              {transfer.transferred_by && (
+                                <>
+                                  <span>•</span>
+                                  <span>By: User {transfer.transferred_by.slice(0, 8)}</span>
+                                </>
+                              )}
+                            </div>
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </CardContent>

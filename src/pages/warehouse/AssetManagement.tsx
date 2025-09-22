@@ -642,14 +642,20 @@ export default function AssetManagement() {
                                 <SelectValue placeholder="Select location" />
                               </SelectTrigger>
                             </FormControl>
-                            <SelectContent className="bg-background border shadow-md z-50">
-                              <SelectItem value="none">None (Optional)</SelectItem>
-                              {getLocationsByType("location").map((location) => (
-                                <SelectItem key={location.id} value={location.id}>
-                                  {location.name}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
+                             <SelectContent className="bg-background border shadow-md z-50">
+                               <SelectItem value="none">None (Optional)</SelectItem>
+                               {locationsLoading ? (
+                                 <SelectItem value="" disabled>Loading locations...</SelectItem>
+                               ) : locations.length === 0 ? (
+                                 <SelectItem value="" disabled>No locations available</SelectItem>
+                               ) : (
+                                 getLocationsByType("location").map((location) => (
+                                   <SelectItem key={location.id} value={location.id}>
+                                     {location.name}
+                                   </SelectItem>
+                                 ))
+                               )}
+                             </SelectContent>
                           </Select>
                           <FormMessage />
                         </FormItem>
