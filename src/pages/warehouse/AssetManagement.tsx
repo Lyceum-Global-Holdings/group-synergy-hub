@@ -47,6 +47,7 @@ import { useAssetCategories } from "@/hooks/useAssetCategories";
 import { useCompanies } from "@/hooks/useCompanies";
 import { CategoryManagementDialog } from "@/components/warehouse/CategoryManagementDialog";
 import { BulkAssetImportDialog } from "@/components/warehouse/BulkAssetImportDialog";
+import { LocationManagementDialog } from "@/components/warehouse/LocationManagementDialog";
 import { AssetDetailsDialog } from "@/components/warehouse/AssetDetailsDialog";
 import { AssetEditDialog } from "@/components/warehouse/AssetEditDialog";
 import { AssetTransferDialog } from "@/components/warehouse/AssetTransferDialog";
@@ -77,15 +78,7 @@ const assetFormSchema = z.object({
   notes: z.string().optional(),
 });
 
-const locationFormSchema = z.object({
-  name: z.string().min(1, "Location name is required"),
-  type: z.enum(["location", "sublocation", "department"]),
-  parentId: z.string().optional(),
-  description: z.string().optional(),
-});
-
 type AssetFormValues = z.infer<typeof assetFormSchema>;
-type LocationFormValues = z.infer<typeof locationFormSchema>;
 
 const getConditionBadge = (condition: string) => {
   const variants = {
@@ -115,7 +108,7 @@ const getStatusIcon = (status: string) => {
 export default function AssetManagement() {
   const [searchTerm, setSearchTerm] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [isLocationDialogOpen, setIsLocationDialogOpen] = useState(false);
+  
   const [isBulkImportOpen, setIsBulkImportOpen] = useState(false);
   const [isCategoryManagementOpen, setIsCategoryManagementOpen] = useState(false);
   const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false);
@@ -125,10 +118,9 @@ export default function AssetManagement() {
   const [selectedAsset, setSelectedAsset] = useState<WarehouseAsset | null>(null);
   
   const { 
-    locations, 
-    isLoading: locationsLoading, 
-    createLocation, 
-    isCreating: isCreatingLocation 
+    locations,
+    isLoading: isLoadingLocations,
+    error: locationsError
   } = useWarehouseLocations();
   
   const { 
@@ -178,15 +170,6 @@ export default function AssetManagement() {
     },
   });
 
-  const locationForm = useForm<LocationFormValues>({
-    resolver: zodResolver(locationFormSchema),
-    defaultValues: {
-      name: "",
-      type: "location",
-      parentId: "",
-      description: "",
-    },
-  });
 
   const onSubmit = (data: AssetFormValues) => {
     // Get category name from ID for backward compatibility
@@ -222,17 +205,6 @@ export default function AssetManagement() {
     form.reset();
   };
 
-  const onLocationSubmit = (data: LocationFormValues) => {
-    const locationData = {
-      name: data.name,
-      type: data.type,
-      parent_id: data.parentId || undefined,
-      description: data.description,
-    };
-    createLocation(locationData);
-    setIsLocationDialogOpen(false);
-    locationForm.reset();
-  };
 
   const filteredAssets = assets.filter((asset) =>
     asset.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -284,153 +256,7 @@ export default function AssetManagement() {
         <div className="flex gap-2">
           <BulkAssetImportDialog />
           <CategoryManagementDialog />
-          <Dialog open={isLocationDialogOpen} onOpenChange={setIsLocationDialogOpen}>
-            <DialogTrigger asChild>
-              <Button variant="outline">
-                <MapPin className="mr-2 h-4 w-4" />
-                Manage Locations
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-2xl">
-              <DialogHeader>
-                <DialogTitle>Add Location/Department</DialogTitle>
-                <DialogDescription>
-                  Create new locations, sublocations, or departments for asset management.
-                </DialogDescription>
-              </DialogHeader>
-              <Form {...locationForm}>
-                <form onSubmit={locationForm.handleSubmit(onLocationSubmit)} className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <FormField
-                      control={locationForm.control}
-                      name="name"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Name</FormLabel>
-                          <FormControl>
-                            <Input placeholder="Enter name" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={locationForm.control}
-                      name="type"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Type</FormLabel>
-                          <Select onValueChange={field.onChange} defaultValue={field.value}>
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select type" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent className="bg-background border shadow-md z-50">
-                              <SelectItem value="location">Location</SelectItem>
-                              <SelectItem value="sublocation">Sublocation</SelectItem>
-                              <SelectItem value="department">Department</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-
-                  {locationForm.watch("type") === "sublocation" && (
-                    <FormField
-                      control={locationForm.control}
-                      name="parentId"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Parent Location</FormLabel>
-                          <Select onValueChange={field.onChange} defaultValue={field.value}>
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select parent location" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent className="bg-background border shadow-md z-50">
-                              {getLocationsByType("location").map((location) => (
-                                <SelectItem key={location.id} value={location.id}>
-                                  {location.name}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  )}
-
-                  {locationForm.watch("type") === "department" && (
-                    <FormField
-                      control={locationForm.control}
-                      name="parentId"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Parent Sublocation</FormLabel>
-                          <Select onValueChange={field.onChange} defaultValue={field.value}>
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select parent sublocation" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent className="bg-background border shadow-md z-50">
-                              {locations
-                                .filter(loc => loc.type === "sublocation")
-                                .map((sublocation) => {
-                                  const parentLocation = locations.find(l => l.id === sublocation.parent_id);
-                                  return (
-                                    <SelectItem key={sublocation.id} value={sublocation.id}>
-                                      {parentLocation ? `${parentLocation.name} → ${sublocation.name}` : sublocation.name}
-                                    </SelectItem>
-                                  );
-                                })}
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  )}
-
-                  <FormField
-                    control={locationForm.control}
-                    name="description"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Description</FormLabel>
-                        <FormControl>
-                          <Textarea
-                            placeholder="Enter description (optional)"
-                            {...field}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <div className="flex justify-end gap-3 pt-4">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => setIsLocationDialogOpen(false)}
-                    >
-                      Cancel
-                    </Button>
-                    <Button type="submit" disabled={isCreatingLocation}>
-                      {isCreatingLocation && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                      Add {locationForm.watch("type")}
-                    </Button>
-                  </div>
-                </form>
-              </Form>
-            </DialogContent>
-          </Dialog>
+          <LocationManagementDialog />
 
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
@@ -644,7 +470,7 @@ export default function AssetManagement() {
                             </FormControl>
                              <SelectContent className="bg-background border shadow-md z-50">
                                <SelectItem value="none">None (Optional)</SelectItem>
-                               {locationsLoading ? (
+                               {isLoadingLocations ? (
                                  <SelectItem value="" disabled>Loading locations...</SelectItem>
                                ) : locations.length === 0 ? (
                                  <SelectItem value="" disabled>No locations available</SelectItem>
