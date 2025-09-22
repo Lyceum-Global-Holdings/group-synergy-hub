@@ -31,6 +31,14 @@ import {
 } from "@/components/ui/collapsible";
 import { useCompany } from "@/contexts/CompanyContext";
 import { Badge } from "@/components/ui/badge";
+import { Company } from "@/types/company";
+
+type ModuleWithCompanies = {
+  title: string;
+  icon: any;
+  items: { title: string; url: string }[];
+  companiesUsing?: Company[];
+};
 
 const moduleConfig = {
   finance: {
@@ -122,22 +130,55 @@ const adminItems = [
 export function CompanySidebar() {
   const { state } = useSidebar();
   const location = useLocation();
-  const { selectedCompany } = useCompany();
+  const { selectedCompany, companies, isViewingAllCompanies } = useCompany();
   const currentPath = location.pathname;
 
   const isActive = (path: string) => currentPath === path;
   const isGroupActive = (items: { url: string }[]) =>
     items.some((item) => currentPath.startsWith(item.url));
 
-  // Filter modules based on selected company
-  const availableModules = selectedCompany?.modules || [];
-  const departments = availableModules
-    .map(moduleKey => moduleConfig[moduleKey as keyof typeof moduleConfig])
-    .filter(Boolean);
+  // Get all unique modules when viewing all companies
+  const getAllUniqueModules = () => {
+    const allModules = new Set<string>();
+    companies.forEach(company => {
+      company.modules?.forEach(module => allModules.add(module));
+    });
+    return Array.from(allModules);
+  };
+
+  // Get companies that use a specific module
+  const getCompaniesUsingModule = (moduleKey: string) => {
+    return companies.filter(company => 
+      company.modules?.includes(moduleKey)
+    );
+  };
+
+  // Filter modules based on selected company or show all when viewing all companies
+  const availableModules = isViewingAllCompanies 
+    ? getAllUniqueModules()
+    : (selectedCompany?.modules || []);
+    
+  const departments: ModuleWithCompanies[] = availableModules
+    .map(moduleKey => {
+      const module = moduleConfig[moduleKey as keyof typeof moduleConfig];
+      if (!module) return null;
+      
+      // Add companies using this module when viewing all companies
+      if (isViewingAllCompanies) {
+        return {
+          ...module,
+          companiesUsing: getCompaniesUsingModule(moduleKey)
+        };
+      }
+      
+      return module;
+    })
+    .filter(Boolean) as ModuleWithCompanies[];
 
   // Debug logging
   console.log('CompanySidebar Debug:', {
     selectedCompany: selectedCompany?.name,
+    isViewingAllCompanies,
     companyModules: selectedCompany?.modules,
     availableModules,
     departments: departments.map(d => d.title),
@@ -148,26 +189,27 @@ export function CompanySidebar() {
     <Sidebar className="border-r">
       <SidebarContent>
         {/* Company Header */}
-        {selectedCompany && (
-          <SidebarGroup className="pb-2">
-            <div className="px-3 py-2 bg-muted/50 rounded-lg mx-2 mb-2">
-              <div className="flex items-center gap-2">
-                <Building2 className="h-4 w-4 text-primary" />
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-medium truncate">
-                    {selectedCompany.name}
-                  </div>
-                  <div className="text-xs text-muted-foreground">
-                    {selectedCompany.code}
-                  </div>
+        <SidebarGroup className="pb-2">
+          <div className="px-3 py-2 bg-muted/50 rounded-lg mx-2 mb-2">
+            <div className="flex items-center gap-2">
+              <Building2 className="h-4 w-4 text-primary" />
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-medium truncate">
+                  {isViewingAllCompanies ? "All Companies" : selectedCompany?.name}
                 </div>
-                <Badge variant="secondary" className="text-xs">
-                  {availableModules.length}
-                </Badge>
+                <div className="text-xs text-muted-foreground">
+                  {isViewingAllCompanies 
+                    ? `${companies.length} companies` 
+                    : selectedCompany?.code
+                  }
+                </div>
               </div>
+              <Badge variant="secondary" className="text-xs">
+                {availableModules.length}
+              </Badge>
             </div>
-          </SidebarGroup>
-        )}
+          </div>
+        </SidebarGroup>
 
         {/* Main Navigation */}
         <SidebarGroup>
@@ -190,7 +232,7 @@ export function CompanySidebar() {
         {departments.length > 0 && (
           <SidebarGroup>
             <SidebarGroupLabel>
-              {selectedCompany?.name} Modules
+              {isViewingAllCompanies ? "All Available Modules" : `${selectedCompany?.name} Modules`}
             </SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
@@ -207,7 +249,14 @@ export function CompanySidebar() {
                           className="w-full"
                         >
                           <dept.icon className="h-4 w-4" />
-                          <span>{dept.title}</span>
+                          <div className="flex-1 flex items-center justify-between">
+                            <span>{dept.title}</span>
+                            {isViewingAllCompanies && dept.companiesUsing && (
+                              <Badge variant="outline" className="text-xs ml-2">
+                                {dept.companiesUsing.length}
+                              </Badge>
+                            )}
+                          </div>
                           <ChevronDown className="ml-auto h-4 w-4 transition-transform group-data-[state=open]/collapsible:rotate-180" />
                         </SidebarMenuButton>
                       </CollapsibleTrigger>
@@ -223,6 +272,20 @@ export function CompanySidebar() {
                               </SidebarMenuSubButton>
                             </SidebarMenuSubItem>
                           ))}
+                          {isViewingAllCompanies && dept.companiesUsing && dept.companiesUsing.length > 0 && (
+                            <SidebarMenuSubItem>
+                              <div className="px-3 py-1">
+                                <div className="text-xs text-muted-foreground mb-1">Used by:</div>
+                                <div className="flex flex-wrap gap-1">
+                                  {dept.companiesUsing.map((company) => (
+                                    <Badge key={company.id} variant="secondary" className="text-xs">
+                                      {company.code}
+                                    </Badge>
+                                  ))}
+                                </div>
+                              </div>
+                            </SidebarMenuSubItem>
+                          )}
                         </SidebarMenuSub>
                       </CollapsibleContent>
                     </SidebarMenuItem>
