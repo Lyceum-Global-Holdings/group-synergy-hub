@@ -228,6 +228,30 @@ export default function AssetManagement() {
     return locations.find(loc => loc.id === id)?.name || "";
   };
 
+  const getFullLocationPath = (asset: WarehouseAsset) => {
+    const parts = [];
+    
+    // Add main location
+    if (asset.location_id) {
+      const location = locations?.find(loc => loc.id === asset.location_id);
+      if (location) parts.push(location.name);
+    }
+    
+    // Add sublocation
+    if (asset.sublocation_id) {
+      const sublocation = locations?.find(loc => loc.id === asset.sublocation_id);
+      if (sublocation) parts.push(sublocation.name);
+    }
+    
+    // Add department
+    if (asset.department_id) {
+      const department = locations?.find(loc => loc.id === asset.department_id);
+      if (department) parts.push(department.name);
+    }
+    
+    return parts.length > 0 ? parts.join(" → ") : "—";
+  };
+
   const getCategoryName = (id: string) => {
     return mainCategories.find(cat => cat.id === id)?.name || "";
   };
@@ -763,7 +787,7 @@ export default function AssetManagement() {
                           <TableCell>{asset.category}</TableCell>
                           <TableCell>{asset.brand || "—"}</TableCell>
                           <TableCell>
-                            {asset.location_id ? getLocationName(asset.location_id) : "—"}
+                            {getFullLocationPath(asset)}
                           </TableCell>
                           <TableCell>
                             <Badge className={getConditionBadge(asset.condition)} variant="outline">
