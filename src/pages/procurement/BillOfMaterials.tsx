@@ -37,8 +37,8 @@ const statusLabels = {
 };
 
 export default function BillOfMaterialsPage() {
-  const { selectedCompany } = useCompany();
-  const { boms, isLoading, deleteBom, isDeleting } = useBillOfMaterials(selectedCompany?.id);
+  const { selectedCompany, isViewingAllCompanies } = useCompany();
+  const { boms, isLoading, deleteBom, isDeleting } = useBillOfMaterials(isViewingAllCompanies ? undefined : selectedCompany?.id);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [selectedBom, setSelectedBom] = useState<BillOfMaterials | null>(null);
@@ -73,7 +73,7 @@ export default function BillOfMaterialsPage() {
         <div>
           <h1 className="text-3xl font-bold text-foreground">Bill of Materials</h1>
           <p className="text-muted-foreground">
-            Manage BOMs for {selectedCompany?.name || 'your company'}
+            Manage BOMs for {isViewingAllCompanies ? 'All Companies' : (selectedCompany?.name || 'your company')}
           </p>
         </div>
         <CreateBomDialog>
@@ -122,7 +122,9 @@ export default function BillOfMaterialsPage() {
             <CardTitle className="text-sm font-medium">Company</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-lg font-semibold">{selectedCompany?.code}</div>
+            <div className="text-lg font-semibold">
+              {isViewingAllCompanies ? 'All' : selectedCompany?.code}
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -177,6 +179,7 @@ export default function BillOfMaterialsPage() {
                 <TableHead>Product Name</TableHead>
                 <TableHead>Version</TableHead>
                 <TableHead>Status</TableHead>
+                {isViewingAllCompanies && <TableHead>Company</TableHead>}
                 <TableHead>Created Date</TableHead>
                 <TableHead>Actions</TableHead>
               </TableRow>
@@ -188,6 +191,13 @@ export default function BillOfMaterialsPage() {
                   <TableCell>{bom.product_name}</TableCell>
                   <TableCell>{bom.version}</TableCell>
                   <TableCell>{getStatusBadge(bom.status)}</TableCell>
+                  {isViewingAllCompanies && (
+                    <TableCell>
+                      <Badge variant="outline">
+                        {bom.company_id ? 'Company' : 'N/A'}
+                      </Badge>
+                    </TableCell>
+                  )}
                   <TableCell>
                     {new Date(bom.created_at).toLocaleDateString()}
                   </TableCell>

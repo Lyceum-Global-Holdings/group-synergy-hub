@@ -7,6 +7,7 @@ interface CompanyContextType {
   setSelectedCompany: (company: Company | null) => void;
   companies: Company[];
   isLoading: boolean;
+  isViewingAllCompanies: boolean;
 }
 
 const CompanyContext = createContext<CompanyContextType | undefined>(undefined);
@@ -14,22 +15,34 @@ const CompanyContext = createContext<CompanyContextType | undefined>(undefined);
 export function CompanyProvider({ children }: { children: ReactNode }) {
   const { companies, isLoading } = useCompanies();
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
+  const [isViewingAllCompanies, setIsViewingAllCompanies] = useState(false);
 
   // Auto-select The Uniform Hub as default company
   useEffect(() => {
-    if (companies.length > 0 && !selectedCompany) {
+    if (companies.length > 0 && !selectedCompany && !isViewingAllCompanies) {
       const uniformHub = companies.find(c => c.code === 'TUH');
       const defaultCompany = uniformHub || companies[0];
       setSelectedCompany(defaultCompany);
     }
-  }, [companies, selectedCompany]);
+  }, [companies, selectedCompany, isViewingAllCompanies]);
+
+  const handleSetSelectedCompany = (company: Company | null) => {
+    if (company === null) {
+      setIsViewingAllCompanies(true);
+      setSelectedCompany(null);
+    } else {
+      setIsViewingAllCompanies(false);
+      setSelectedCompany(company);
+    }
+  };
 
   return (
     <CompanyContext.Provider value={{
       selectedCompany,
-      setSelectedCompany,
+      setSelectedCompany: handleSetSelectedCompany,
       companies,
-      isLoading
+      isLoading,
+      isViewingAllCompanies
     }}>
       {children}
     </CompanyContext.Provider>
