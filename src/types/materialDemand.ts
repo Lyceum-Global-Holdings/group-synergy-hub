@@ -84,6 +84,14 @@ export interface DemandAnalysisResult {
     supplier_name: string;
     last_unit_cost?: number;
   };
+  po_details?: {
+    po_number: string;
+    supplier_name: string;
+    quantity_ordered: number;
+    quantity_pending: number;
+    delivery_date?: string;
+    expected_delivery?: string;
+  }[];
 }
 
 export interface MRPReport {

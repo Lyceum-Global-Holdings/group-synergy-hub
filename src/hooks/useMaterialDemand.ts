@@ -175,12 +175,22 @@ export const useDemandCalculation = () => {
         .select(`
           item_code, 
           quantity_pending,
-          po:purchase_orders(status, expected_delivery_date)
+          quantity_ordered,
+          delivery_date,
+          po:purchase_orders(status, expected_delivery_date, po_number, supplier:suppliers(name))
         `)
         .in('item_code', itemCodes)
         .in('po.status', ['sent', 'acknowledged', 'partially_received']);
 
       if (poError) throw poError;
+
+      // Group PO items by item_code for better matching
+      const poItemsByCode = poItems?.reduce((acc, item) => {
+        if (!item.item_code) return acc;
+        if (!acc[item.item_code]) acc[item.item_code] = [];
+        acc[item.item_code].push(item);
+        return acc;
+      }, {} as Record<string, any[]>) || {};
 
       // Calculate demand analysis
       const analysis: DemandAnalysisResult[] = [];
@@ -189,11 +199,11 @@ export const useDemandCalculation = () => {
         if (!bomItem.item_code) continue;
 
         const warehouseItem = warehouseItems?.find(w => w.item_code === bomItem.item_code);
-        const onOrderItems = poItems?.filter(p => p.item_code === bomItem.item_code) || [];
+        const relatedPOItems = poItemsByCode[bomItem.item_code] || [];
         
         const totalRequired = (bomItem.consumption || bomItem.quantity || 0) * input.production_quantity;
         const availableStock = warehouseItem?.current_stock || 0;
-        const onOrder = onOrderItems.reduce((sum, item) => sum + (item.quantity_pending || 0), 0);
+        const onOrder = relatedPOItems.reduce((sum, item) => sum + (item.quantity_pending || 0), 0);
         const shortage = Math.max(0, totalRequired - availableStock - onOrder);
         const safetyStock = input.include_safety_stock ? (warehouseItem?.min_stock_level || 0) : 0;
         const suggestedOrder = shortage > 0 ? shortage + safetyStock : 0;
@@ -204,6 +214,16 @@ export const useDemandCalculation = () => {
         else if (shortage > totalRequired * 0.5) priority = 'high';
         else if (shortage > 0) priority = 'medium';
         else priority = 'low';
+
+        // Get PO information for this item
+        const poInfo = relatedPOItems.map(item => ({
+          po_number: item.po?.po_number,
+          supplier_name: item.po?.supplier?.name,
+          quantity_ordered: item.quantity_ordered,
+          quantity_pending: item.quantity_pending,
+          delivery_date: item.delivery_date,
+          expected_delivery: item.po?.expected_delivery_date
+        }));
 
         analysis.push({
           item_code: bomItem.item_code,
@@ -221,7 +241,8 @@ export const useDemandCalculation = () => {
             supplier_id: warehouseItem.supplier_id,
             supplier_name: '', // Would need to join suppliers table
             last_unit_cost: warehouseItem.unit_cost
-          } : undefined
+          } : undefined,
+          po_details: poInfo.length > 0 ? poInfo : undefined
         });
       }
 

@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Calendar, Calculator, FileText, AlertTriangle, CheckCircle, Clock, TrendingUp } from 'lucide-react';
 import { useMaterialDemand, useDemandCalculation } from '@/hooks/useMaterialDemand';
 import { useBillOfMaterials } from '@/hooks/useBillOfMaterials';
+import { usePurchaseOrders } from '@/hooks/usePurchaseOrders';
 import { useCompany } from '@/contexts/CompanyContext';
 import { format } from 'date-fns';
 import { DemandPriority } from '@/types/materialDemand';
@@ -18,6 +19,7 @@ const MaterialDemandPlanning = () => {
   const { selectedCompany } = useCompany();
   const { demands, isLoading } = useMaterialDemand(selectedCompany?.id);
   const { boms } = useBillOfMaterials(selectedCompany?.id);
+  const { data: purchaseOrders } = usePurchaseOrders();
   const { calculateBOMDemand, calculationResult, isCalculating } = useDemandCalculation();
   
   const [selectedBomId, setSelectedBomId] = useState<string>('');
@@ -50,6 +52,24 @@ const MaterialDemandPlanning = () => {
   const getStatusIcon = (shortage: number) => {
     if (shortage > 0) return <AlertTriangle className="h-4 w-4 text-destructive" />;
     return <CheckCircle className="h-4 w-4 text-success" />;
+  };
+
+  // Get related Purchase Orders for selected BOM
+  const getRelatedPOs = (bomId: string) => {
+    if (!bomId || !purchaseOrders) return [];
+    
+    const selectedBom = boms?.find(bom => bom.id === bomId);
+    if (!selectedBom) return [];
+
+    // Find POs that are referenced by this BOM or have matching items
+    return purchaseOrders.filter(po => {
+      // Check if BOM has this PO referenced
+      if (selectedBom.po_id === po.id) return true;
+      
+      // Check if PO items match BOM items (this would need BOM items data)
+      // For now, return all POs as potentially related
+      return po.status !== 'cancelled';
+    });
   };
 
   return (
@@ -185,60 +205,118 @@ const MaterialDemandPlanning = () => {
           </div>
 
           {calculationResult && calculationResult.length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Material Demand Analysis Results</CardTitle>
-                <CardDescription>
-                  Material requirements based on your production parameters
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Item Code</TableHead>
-                      <TableHead>Item Name</TableHead>
-                      <TableHead>Category</TableHead>
-                      <TableHead>Required</TableHead>
-                      <TableHead>Available</TableHead>
-                      <TableHead>On Order</TableHead>
-                      <TableHead>Shortage</TableHead>
-                      <TableHead>Suggested Order</TableHead>
-                      <TableHead>Priority</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {calculationResult.map((item, index) => (
-                      <TableRow key={index}>
-                        <TableCell>{getStatusIcon(item.shortage)}</TableCell>
-                        <TableCell className="font-mono text-sm">
-                          {item.item_code}
-                        </TableCell>
-                        <TableCell>{item.item_name}</TableCell>
-                        <TableCell>
-                          <Badge variant="outline">{item.category || 'N/A'}</Badge>
-                        </TableCell>
-                        <TableCell>{item.total_required} {item.unit_of_measure}</TableCell>
-                        <TableCell>{item.available_stock} {item.unit_of_measure}</TableCell>
-                        <TableCell>{item.on_order} {item.unit_of_measure}</TableCell>
-                        <TableCell className={item.shortage > 0 ? 'text-destructive font-medium' : ''}>
-                          {item.shortage} {item.unit_of_measure}
-                        </TableCell>
-                        <TableCell className={item.suggested_order > 0 ? 'text-primary font-medium' : ''}>
-                          {item.suggested_order} {item.unit_of_measure}
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={getPriorityColor(item.priority)}>
-                            {item.priority}
-                          </Badge>
-                        </TableCell>
+            <div className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Material Demand Analysis Results</CardTitle>
+                  <CardDescription>
+                    Material requirements based on your production parameters
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Item Code</TableHead>
+                        <TableHead>Item Name</TableHead>
+                        <TableHead>Category</TableHead>
+                        <TableHead>Required</TableHead>
+                        <TableHead>Available</TableHead>
+                        <TableHead>On Order</TableHead>
+                        <TableHead>Shortage</TableHead>
+                        <TableHead>Suggested Order</TableHead>
+                        <TableHead>Priority</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
+                    </TableHeader>
+                    <TableBody>
+                      {calculationResult.map((item, index) => (
+                        <TableRow key={index}>
+                          <TableCell>{getStatusIcon(item.shortage)}</TableCell>
+                          <TableCell className="font-mono text-sm">
+                            {item.item_code}
+                          </TableCell>
+                          <TableCell>{item.item_name}</TableCell>
+                          <TableCell>
+                            <Badge variant="outline">{item.category || 'N/A'}</Badge>
+                          </TableCell>
+                          <TableCell>{item.total_required} {item.unit_of_measure}</TableCell>
+                          <TableCell>{item.available_stock} {item.unit_of_measure}</TableCell>
+                          <TableCell>{item.on_order} {item.unit_of_measure}</TableCell>
+                          <TableCell className={item.shortage > 0 ? 'text-destructive font-medium' : ''}>
+                            {item.shortage} {item.unit_of_measure}
+                          </TableCell>
+                          <TableCell className={item.suggested_order > 0 ? 'text-primary font-medium' : ''}>
+                            {item.suggested_order} {item.unit_of_measure}
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant={getPriorityColor(item.priority)}>
+                              {item.priority}
+                            </Badge>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+
+              {selectedBomId && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Related Purchase Orders</CardTitle>
+                    <CardDescription>
+                      Purchase orders that may fulfill the material requirements for this BOM
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {getRelatedPOs(selectedBomId).length > 0 ? (
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>PO Number</TableHead>
+                            <TableHead>Supplier</TableHead>
+                            <TableHead>Status</TableHead>
+                            <TableHead>Expected Delivery</TableHead>
+                            <TableHead>Total Amount</TableHead>
+                            <TableHead>Items Count</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {getRelatedPOs(selectedBomId).map((po) => (
+                            <TableRow key={po.id}>
+                              <TableCell className="font-mono">{po.po_number}</TableCell>
+                              <TableCell>{po.supplier?.name || 'N/A'}</TableCell>
+                              <TableCell>
+                                <Badge variant={po.status === 'completed' ? 'default' : 'secondary'}>
+                                  {po.status}
+                                </Badge>
+                              </TableCell>
+                              <TableCell>
+                                {po.expected_delivery_date ? 
+                                  format(new Date(po.expected_delivery_date), 'MMM dd, yyyy') : 
+                                  'Not set'
+                                }
+                              </TableCell>
+                              <TableCell>{po.currency} {po.final_amount.toLocaleString()}</TableCell>
+                              <TableCell>{po.items?.length || 0}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    ) : (
+                      <div className="text-center py-8 text-muted-foreground">
+                        <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                        <p>No related Purchase Orders found for this BOM</p>
+                        <p className="text-sm mt-2">
+                          Consider creating a Purchase Order based on the material shortages above
+                        </p>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
+            </div>
           )}
         </TabsContent>
 
