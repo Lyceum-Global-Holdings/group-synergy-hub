@@ -24,6 +24,7 @@ import { useCompany } from "@/contexts/CompanyContext";
 import { BillOfMaterials } from "@/types/bom";
 import { CreateBomDialog } from "@/components/procurement/CreateBomDialog";
 import { BomDetailsDialog } from "@/components/procurement/BomDetailsDialog";
+import { EditBomDialog } from "@/components/procurement/EditBomDialog";
 
 const statusColors = {
   active: "bg-success text-success-foreground",
@@ -267,12 +268,18 @@ export default function BillOfMaterialsPage() {
         }}
       />
 
-      {/* Edit BOM Dialog - placeholder for now */}
-      {isEditMode && selectedBom && (
-        <div>
-          {/* TODO: Implement EditBomDialog or reuse CreateBomDialog with edit mode */}
-        </div>
-      )}
+      {/* Edit BOM Dialog */}
+      <EditBomDialog
+        bom={selectedBom}
+        open={isDetailsDialogOpen && isEditMode}
+        onOpenChange={(open) => {
+          setIsDetailsDialogOpen(open);
+          if (!open) {
+            setSelectedBom(null);
+            setIsEditMode(false);
+          }
+        }}
+      />
     </div>
   );
 }
