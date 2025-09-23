@@ -51,7 +51,7 @@ export function useBillOfMaterials(companyId?: string) {
         const bomItems = items.map(item => ({
           ...item,
           bom_id: bomResult.id,
-          total_cost: item.unit_cost ? item.quantity * item.unit_cost : undefined
+          total_cost: item.unit_cost ? (item.consumption || 0) * item.unit_cost : undefined
         }));
 
         const { error: itemsError } = await supabase

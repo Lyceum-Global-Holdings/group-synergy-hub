@@ -271,7 +271,7 @@ export function CreateBomDialog({ children }: CreateBomDialogProps) {
                         />
                       </td>
                       <td className="p-2 text-right font-medium">
-                        {((item.unit_cost || 0) * item.quantity).toFixed(2)}
+                        {((item.unit_cost || 0) * (item.consumption || 0)).toFixed(2)}
                       </td>
                       <td className="p-2 text-center">
                         <Button
