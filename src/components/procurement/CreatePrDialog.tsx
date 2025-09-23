@@ -148,6 +148,8 @@ export function CreatePrDialog({ open, onOpenChange }: CreatePrDialogProps) {
       justification: data.justification,
       company_id: selectedCompany?.id, // Auto-capture company ID
       items: data.items.map(item => ({
+        warehouse_item_id: item.warehouse_item_id,
+        item_code: item.item_code,
         item_name: item.item_name,
         description: item.description,
         quantity: item.quantity,
@@ -414,6 +416,20 @@ export function CreatePrDialog({ open, onOpenChange }: CreatePrDialogProps) {
                           <strong>Selected:</strong> {form.watch(`items.${index}.item_code`)} - {form.watch(`items.${index}.item_name`)}
                         </div>
                       )}
+
+                      <FormField
+                        control={form.control}
+                        name={`items.${index}.item_code`}
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Item Code</FormLabel>
+                            <FormControl>
+                              <Input placeholder="Enter item code" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
 
                       <FormField
                         control={form.control}

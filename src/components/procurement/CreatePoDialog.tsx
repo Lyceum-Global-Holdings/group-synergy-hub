@@ -414,19 +414,33 @@ export function CreatePoDialog({ open, onOpenChange, prId }: CreatePoDialogProps
                              </div>
                            )}
 
-                           <FormField
-                             control={form.control}
-                             name={`items.${index}.item_name`}
-                             render={({ field }) => (
-                               <FormItem>
-                                 <FormLabel>Item Name *</FormLabel>
-                                 <FormControl>
-                                   <Input {...field} />
-                                 </FormControl>
-                                 <FormMessage />
-                               </FormItem>
-                             )}
-                           />
+                            <FormField
+                              control={form.control}
+                              name={`items.${index}.item_code`}
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Item Code</FormLabel>
+                                  <FormControl>
+                                    <Input placeholder="Enter item code" {...field} />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+
+                            <FormField
+                              control={form.control}
+                              name={`items.${index}.item_name`}
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Item Name *</FormLabel>
+                                  <FormControl>
+                                    <Input {...field} />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
 
                           <FormField
                             control={form.control}
