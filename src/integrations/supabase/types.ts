@@ -354,6 +354,164 @@ export type Database = {
         }
         Relationships: []
       }
+      goods_receipt_notes: {
+        Row: {
+          approved_by: string | null
+          approved_date: string | null
+          branch: string | null
+          company_id: string | null
+          created_at: string
+          created_by: string | null
+          grn_date: string
+          grn_number: string
+          id: string
+          invoice_date: string | null
+          invoice_number: string | null
+          mr_number: string | null
+          po_id: string | null
+          po_number: string | null
+          pr_number: string | null
+          received_by: string | null
+          remarks: string | null
+          status: string
+          supplier_address: string | null
+          supplier_id: string | null
+          supplier_name: string
+          total_value: number | null
+          updated_at: string
+        }
+        Insert: {
+          approved_by?: string | null
+          approved_date?: string | null
+          branch?: string | null
+          company_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          grn_date?: string
+          grn_number: string
+          id?: string
+          invoice_date?: string | null
+          invoice_number?: string | null
+          mr_number?: string | null
+          po_id?: string | null
+          po_number?: string | null
+          pr_number?: string | null
+          received_by?: string | null
+          remarks?: string | null
+          status?: string
+          supplier_address?: string | null
+          supplier_id?: string | null
+          supplier_name: string
+          total_value?: number | null
+          updated_at?: string
+        }
+        Update: {
+          approved_by?: string | null
+          approved_date?: string | null
+          branch?: string | null
+          company_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          grn_date?: string
+          grn_number?: string
+          id?: string
+          invoice_date?: string | null
+          invoice_number?: string | null
+          mr_number?: string | null
+          po_id?: string | null
+          po_number?: string | null
+          pr_number?: string | null
+          received_by?: string | null
+          remarks?: string | null
+          status?: string
+          supplier_address?: string | null
+          supplier_id?: string | null
+          supplier_name?: string
+          total_value?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "goods_receipt_notes_po_id_fkey"
+            columns: ["po_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "goods_receipt_notes_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      grn_items: {
+        Row: {
+          created_at: string
+          description: string | null
+          grn_id: string
+          id: string
+          item_code: string | null
+          item_name: string
+          po_item_id: string | null
+          quality_status: string | null
+          quantity_ordered: number | null
+          quantity_received: number
+          remarks: string | null
+          total_cost: number | null
+          unit_of_measure: string
+          unit_price: number | null
+          updated_at: string
+          warehouse_item_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          grn_id: string
+          id?: string
+          item_code?: string | null
+          item_name: string
+          po_item_id?: string | null
+          quality_status?: string | null
+          quantity_ordered?: number | null
+          quantity_received: number
+          remarks?: string | null
+          total_cost?: number | null
+          unit_of_measure?: string
+          unit_price?: number | null
+          updated_at?: string
+          warehouse_item_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          grn_id?: string
+          id?: string
+          item_code?: string | null
+          item_name?: string
+          po_item_id?: string | null
+          quality_status?: string | null
+          quantity_ordered?: number | null
+          quantity_received?: number
+          remarks?: string | null
+          total_cost?: number | null
+          unit_of_measure?: string
+          unit_price?: number | null
+          updated_at?: string
+          warehouse_item_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "grn_items_grn_id_fkey"
+            columns: ["grn_id"]
+            isOneToOne: false
+            referencedRelation: "goods_receipt_notes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       item_categories: {
         Row: {
           code: string | null
@@ -1951,6 +2109,10 @@ export type Database = {
         Returns: string
       }
       generate_bom_number: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
+      generate_grn_number: {
         Args: Record<PropertyKey, never>
         Returns: string
       }
