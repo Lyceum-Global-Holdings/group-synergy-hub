@@ -4,7 +4,7 @@ export interface Company {
   code: string;
   address: string | null;
   status: 'active' | 'inactive';
-  modules: string[];
+  modules: Record<string, string[]> | string[]; // Support both old and new format
   created_at: string;
   updated_at: string;
 }
@@ -14,7 +14,7 @@ export interface CreateCompanyData {
   code: string;
   address?: string;
   status: 'active' | 'inactive';
-  modules?: string[];
+  modules?: Record<string, string[]>;
 }
 
 export interface UpdateCompanyData extends Partial<CreateCompanyData> {

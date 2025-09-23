@@ -40,6 +40,7 @@ import {
 import { CompanyForm } from "@/components/admin/CompanyForm";
 import { useCompanies } from "@/hooks/useCompanies";
 import { Company } from "@/types/company";
+import { normalizeCompanyModules, moduleConfig } from "@/constants/moduleConfig";
 
 
 export default function CompanyManagement() {
@@ -83,7 +84,10 @@ export default function CompanyManagement() {
     // For now, we'll use a mock calculation since we don't have user counts in the DB yet
     return sum + Math.floor(Math.random() * 50) + 10;
   }, 0);
-  const totalModules = companies.reduce((sum, company) => sum + company.modules.length, 0);
+  const totalModules = companies.reduce((sum, company) => {
+    const companyModules = normalizeCompanyModules(company.modules);
+    return sum + Object.keys(companyModules).length;
+  }, 0);
 
   return (
     <div className="space-y-6">
@@ -264,15 +268,20 @@ export default function CompanyManagement() {
                       </TableCell>
                       <TableCell>
                         <div className="flex flex-wrap gap-1">
-                          {company.modules.length > 0 ? (
-                            company.modules.map((module) => (
-                              <Badge key={module} variant="outline" className="text-xs">
-                                {module}
-                              </Badge>
-                            ))
-                          ) : (
-                            <span className="text-sm text-muted-foreground">No modules</span>
-                          )}
+                          {(() => {
+                            const companyModules = normalizeCompanyModules(company.modules);
+                            const moduleKeys = Object.keys(companyModules);
+                            
+                            return moduleKeys.length > 0 ? (
+                              moduleKeys.map((moduleKey) => (
+                                <Badge key={moduleKey} variant="outline" className="text-xs">
+                                  {moduleConfig[moduleKey]?.name || moduleKey}
+                                </Badge>
+                              ))
+                            ) : (
+                              <span className="text-sm text-muted-foreground">No modules</span>
+                            );
+                          })()}
                         </div>
                       </TableCell>
                       <TableCell>

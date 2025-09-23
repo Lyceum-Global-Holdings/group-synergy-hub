@@ -4,24 +4,18 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { ChevronDown } from "lucide-react";
 import { useCompanies } from "@/hooks/useCompanies";
 import { Company } from "@/types/company";
+import { moduleConfig, normalizeCompanyModules, getModuleSelectionState } from "@/constants/moduleConfig";
 import { toast } from "sonner";
-
-const availableModules = [
-  { key: 'finance', name: 'Finance', description: 'Financial management and reporting' },
-  { key: 'warehouse', name: 'Warehouse', description: 'Inventory and asset management' },
-  { key: 'sourcing', name: 'Sourcing', description: 'Supplier and vendor management' },
-  { key: 'procurement', name: 'Procurement', description: 'Purchase orders and requisitions' },
-  { key: 'management', name: 'Management', description: 'User and role management' },
-  { key: 'bom', name: 'Bill of Materials', description: 'Product structure management' }
-];
 
 export default function ModuleAllocation() {
   const { companies, updateCompany, isUpdating } = useCompanies();
   const [searchParams] = useSearchParams();
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
-  const [moduleChanges, setModuleChanges] = useState<string[]>([]);
+  const [moduleChanges, setModuleChanges] = useState<Record<string, string[]>>({});
 
   // Auto-select company from URL parameter
   useEffect(() => {
@@ -36,15 +30,46 @@ export default function ModuleAllocation() {
 
   const handleCompanySelect = (company: Company) => {
     setSelectedCompany(company);
-    setModuleChanges(company.modules || []);
+    setModuleChanges(normalizeCompanyModules(company.modules));
   };
 
-  const handleModuleToggle = (moduleKey: string) => {
-    setModuleChanges(prev => 
-      prev.includes(moduleKey)
-        ? prev.filter(m => m !== moduleKey)
-        : [...prev, moduleKey]
-    );
+  const handleModuleToggle = (moduleKey: string, enable: boolean) => {
+    const config = moduleConfig[moduleKey];
+    if (!config) return;
+
+    setModuleChanges(prev => {
+      const newModules = { ...prev };
+      if (enable) {
+        // Enable all sub-modules when main module is enabled
+        newModules[moduleKey] = config.subModules.map(sub => sub.key);
+      } else {
+        // Remove the module entirely when disabled
+        delete newModules[moduleKey];
+      }
+      return newModules;
+    });
+  };
+
+  const handleSubModuleToggle = (moduleKey: string, subModuleKey: string, enable: boolean) => {
+    setModuleChanges(prev => {
+      const newModules = { ...prev };
+      if (!newModules[moduleKey]) {
+        newModules[moduleKey] = [];
+      }
+
+      if (enable) {
+        if (!newModules[moduleKey].includes(subModuleKey)) {
+          newModules[moduleKey] = [...newModules[moduleKey], subModuleKey];
+        }
+      } else {
+        newModules[moduleKey] = newModules[moduleKey].filter(key => key !== subModuleKey);
+        // Remove the module entirely if no sub-modules are left
+        if (newModules[moduleKey].length === 0) {
+          delete newModules[moduleKey];
+        }
+      }
+      return newModules;
+    });
   };
 
   const handleSaveChanges = async () => {
@@ -66,7 +91,7 @@ export default function ModuleAllocation() {
   };
 
   const hasChanges = selectedCompany && 
-    JSON.stringify(moduleChanges.sort()) !== JSON.stringify((selectedCompany.modules || []).sort());
+    JSON.stringify(moduleChanges) !== JSON.stringify(normalizeCompanyModules(selectedCompany.modules));
 
   return (
     <div className="space-y-6">
@@ -107,9 +132,9 @@ export default function ModuleAllocation() {
                   </Badge>
                 </div>
                 <div className="mt-2 flex flex-wrap gap-1">
-                  {(company.modules || []).map((module) => (
-                    <Badge key={module} variant="outline" className="text-xs">
-                      {availableModules.find(m => m.key === module)?.name || module}
+                  {Object.keys(normalizeCompanyModules(company.modules)).map((moduleKey) => (
+                    <Badge key={moduleKey} variant="outline" className="text-xs">
+                      {moduleConfig[moduleKey]?.name || moduleKey}
                     </Badge>
                   ))}
                 </div>
@@ -132,27 +157,78 @@ export default function ModuleAllocation() {
           <CardContent>
             {selectedCompany ? (
               <div className="space-y-4">
-                <div className="space-y-3">
-                  {availableModules.map((module) => (
-                    <div key={module.key} className="flex items-start space-x-3">
-                      <Checkbox
-                        id={module.key}
-                        checked={moduleChanges.includes(module.key)}
-                        onCheckedChange={() => handleModuleToggle(module.key)}
-                      />
-                      <div className="flex-1">
-                        <label 
-                          htmlFor={module.key}
-                          className="text-sm font-medium cursor-pointer"
-                        >
-                          {module.name}
-                        </label>
-                        <p className="text-xs text-muted-foreground">
-                          {module.description}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
+                <div className="space-y-4">
+                  {Object.values(moduleConfig).map((module) => {
+                    const selectionState = getModuleSelectionState(moduleChanges, module.key);
+                    const isMainChecked = selectionState === 'all';
+                    const isIndeterminate = selectionState === 'partial';
+                    
+                    return (
+                      <Collapsible key={module.key} defaultOpen={selectionState !== 'none'}>
+                        <div className="space-y-3">
+                          {/* Main Module */}
+                          <div className="flex items-start space-x-3">
+                            <Checkbox
+                              id={module.key}
+                              checked={isMainChecked}
+                              className={isIndeterminate ? "data-[state=checked]:bg-primary data-[state=checked]:border-primary [&>svg]:opacity-50" : ""}
+                              onCheckedChange={(checked) => handleModuleToggle(module.key, checked === true)}
+                            />
+                            <div className="flex-1 flex items-center justify-between">
+                              <div className="flex-1">
+                                <label 
+                                  htmlFor={module.key}
+                                  className="text-sm font-medium cursor-pointer flex items-center gap-2"
+                                >
+                                  <module.icon className="h-4 w-4" />
+                                  {module.name}
+                                  {isIndeterminate && (
+                                    <Badge variant="secondary" className="text-xs">
+                                      Partial
+                                    </Badge>
+                                  )}
+                                </label>
+                                <p className="text-xs text-muted-foreground">
+                                  {module.description}
+                                </p>
+                              </div>
+                              <CollapsibleTrigger asChild>
+                                <Button variant="ghost" size="sm" className="h-auto p-1">
+                                  <ChevronDown className="h-4 w-4" />
+                                </Button>
+                              </CollapsibleTrigger>
+                            </div>
+                          </div>
+
+                          {/* Sub Modules */}
+                          <CollapsibleContent>
+                            <div className="ml-6 space-y-2 border-l pl-4">
+                              {module.subModules.map((subModule) => (
+                                <div key={subModule.key} className="flex items-start space-x-3">
+                                  <Checkbox
+                                    id={`${module.key}-${subModule.key}`}
+                                    checked={moduleChanges[module.key]?.includes(subModule.key) || false}
+                                    onCheckedChange={(checked) => handleSubModuleToggle(module.key, subModule.key, checked === true)}
+                                  />
+                                  <div className="flex-1">
+                                    <label 
+                                      htmlFor={`${module.key}-${subModule.key}`}
+                                      className="text-sm cursor-pointer"
+                                    >
+                                      {subModule.name}
+                                    </label>
+                                    <p className="text-xs text-muted-foreground">
+                                      {subModule.description}
+                                    </p>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </CollapsibleContent>
+                        </div>
+                      </Collapsible>
+                    );
+                  })}
                 </div>
 
                 {hasChanges && (

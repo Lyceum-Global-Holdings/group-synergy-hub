@@ -327,7 +327,7 @@ export type Database = {
           code: string
           created_at: string
           id: string
-          modules: string[] | null
+          modules: Json | null
           name: string
           status: string
           updated_at: string
@@ -337,7 +337,7 @@ export type Database = {
           code: string
           created_at?: string
           id?: string
-          modules?: string[] | null
+          modules?: Json | null
           name: string
           status?: string
           updated_at?: string
@@ -347,7 +347,7 @@ export type Database = {
           code?: string
           created_at?: string
           id?: string
-          modules?: string[] | null
+          modules?: Json | null
           name?: string
           status?: string
           updated_at?: string

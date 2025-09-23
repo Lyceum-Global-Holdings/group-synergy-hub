@@ -1,14 +1,10 @@
 import { NavLink, useLocation } from "react-router-dom";
 import {
   Building2,
-  Calculator,
-  Package,
-  ShoppingCart,
-  Users,
   BarChart3,
   Settings,
   ChevronDown,
-  FileText
+  Users
 } from "lucide-react";
 import {
   Sidebar,
@@ -32,93 +28,14 @@ import {
 import { useCompany } from "@/contexts/CompanyContext";
 import { Badge } from "@/components/ui/badge";
 import { Company } from "@/types/company";
+import { moduleConfig, normalizeCompanyModules, isSubModuleEnabled } from "@/constants/moduleConfig";
 
 type ModuleWithCompanies = {
+  key: string;
   title: string;
   icon: any;
-  items: { title: string; url: string }[];
+  items: { title: string; url: string; key: string }[];
   companiesUsing?: Company[];
-};
-
-const moduleConfig = {
-  finance: {
-    title: "Finance",
-    icon: Calculator,
-    items: [
-      { title: "General Ledger", url: "/finance/general-ledger" },
-      { title: "Accounts Payable", url: "/finance/accounts-payable" },
-      { title: "Accounts Receivable", url: "/finance/accounts-receivable" },
-      { title: "Cash & Bank", url: "/finance/cash-bank" },
-      { title: "Fixed Assets", url: "/finance/fixed-assets" },
-      { title: "Budgeting", url: "/finance/budgeting" },
-      { title: "Cost Centers", url: "/finance/cost-centers" },
-      { title: "Payments", url: "/finance/payments" },
-      { title: "Bank Reconciliation", url: "/finance/bank-reconciliation" },
-      { title: "Financial Reporting", url: "/finance/reporting" },
-    ],
-  },
-  warehouse: {
-    title: "Warehouse",
-    icon: Package,
-    items: [
-      { title: "Item & Bin Master", url: "/warehouse/item-bin-master" },
-      { title: "Goods Receipt Note", url: "/warehouse/grn" },
-      { title: "Putaway / Bin Transfer", url: "/warehouse/putaway" },
-      { title: "Pick / Pack / Dispatch", url: "/warehouse/pick-pack" },
-      { title: "Material Issue / Return", url: "/warehouse/material-issue" },
-      { title: "Stock Transfer", url: "/warehouse/stock-transfer" },
-      { title: "Cycle Count", url: "/warehouse/cycle-count" },
-      { title: "Stock Adjustment", url: "/warehouse/stock-adjustment" },
-      { title: "Delivery Order", url: "/warehouse/delivery-order" },
-      { title: "Inventory Valuation", url: "/warehouse/inventory-valuation" },
-      { title: "Asset Management", url: "/warehouse/asset-management" },
-    ],
-  },
-  sourcing: {
-    title: "Sourcing",
-    icon: Users,
-    items: [
-      { title: "Supplier Master", url: "/sourcing/supplier-master" },
-      { title: "Supplier Registration", url: "/sourcing/supplier-registration" },
-      { title: "Supplier Evaluation", url: "/sourcing/supplier-evaluation" },
-      { title: "RFQ / RFP Management", url: "/sourcing/rfq-management" },
-      { title: "Quotation Comparison", url: "/sourcing/quotation-comparison" },
-      { title: "Vendor Scorecards", url: "/sourcing/vendor-scorecards" },
-      { title: "Contract Repository", url: "/sourcing/contracts" },
-      { title: "Blacklist / Risk Flags", url: "/sourcing/blacklist" },
-    ],
-  },
-  procurement: {
-    title: "Procurement",
-    icon: ShoppingCart,
-    items: [
-      { title: "Purchase Requisition", url: "/procurement/purchase-requisition" },
-      { title: "Purchase Order", url: "/procurement/purchase-order" },
-      { title: "Blanket/Contract PO", url: "/procurement/blanket-po" },
-      { title: "PO Amendment", url: "/procurement/po-amendment" },
-      { title: "3-way Match Review", url: "/procurement/three-way-match" },
-      { title: "Category Catalogs", url: "/procurement/catalogs" },
-      { title: "Price Lists", url: "/procurement/price-lists" },
-    ],
-  },
-  bom: {
-    title: "Bill of Materials",
-    icon: FileText,
-    items: [
-      { title: "BOM Management", url: "/procurement/bill-of-materials" },
-    ],
-  },
-  management: {
-    title: "Management",
-    icon: BarChart3,
-    items: [
-      { title: "Dashboards & KPIs", url: "/management/dashboards" },
-      { title: "Approval Console", url: "/management/approvals" },
-      { title: "Audit Logs", url: "/management/audit-logs" },
-      { title: "Budget vs Actual", url: "/management/budget-actual" },
-      { title: "Exception Overrides", url: "/management/exceptions" },
-    ],
-  },
 };
 
 const adminItems = [
@@ -141,49 +58,65 @@ export function CompanySidebar() {
   const getAllUniqueModules = () => {
     const allModules = new Set<string>();
     companies.forEach(company => {
-      company.modules?.forEach(module => allModules.add(module));
+      const companyModules = normalizeCompanyModules(company.modules);
+      Object.keys(companyModules).forEach(moduleKey => allModules.add(moduleKey));
     });
     return Array.from(allModules);
   };
 
   // Get companies that use a specific module
   const getCompaniesUsingModule = (moduleKey: string) => {
-    return companies.filter(company => 
-      company.modules?.includes(moduleKey)
-    );
+    return companies.filter(company => {
+      const companyModules = normalizeCompanyModules(company.modules);
+      return Object.hasOwnProperty.call(companyModules, moduleKey);
+    });
   };
 
   // Filter modules based on selected company or show all when viewing all companies
   const availableModules = isViewingAllCompanies 
     ? getAllUniqueModules()
-    : (selectedCompany?.modules || []);
+    : Object.keys(normalizeCompanyModules(selectedCompany?.modules));
     
   const departments: ModuleWithCompanies[] = availableModules
     .map(moduleKey => {
-      const module = moduleConfig[moduleKey as keyof typeof moduleConfig];
-      if (!module) return null;
+      const config = moduleConfig[moduleKey];
+      if (!config) return null;
+      
+      // Filter enabled sub-modules for the selected company
+      let enabledItems = config.subModules.map(sub => ({
+        title: sub.name,
+        url: sub.url,
+        key: sub.key
+      }));
+
+      // When viewing a single company, filter to only enabled sub-modules
+      if (!isViewingAllCompanies && selectedCompany) {
+        const companyModules = normalizeCompanyModules(selectedCompany.modules);
+        const enabledSubModules = companyModules[moduleKey] || [];
+        enabledItems = enabledItems.filter(item => 
+          enabledSubModules.includes(item.key)
+        );
+      }
       
       // Add companies using this module when viewing all companies
       if (isViewingAllCompanies) {
         return {
-          ...module,
+          key: moduleKey,
+          title: config.name,
+          icon: config.icon,
+          items: enabledItems,
           companiesUsing: getCompaniesUsingModule(moduleKey)
         };
       }
       
-      return module;
+      return {
+        key: moduleKey,
+        title: config.name,
+        icon: config.icon,
+        items: enabledItems
+      };
     })
     .filter(Boolean) as ModuleWithCompanies[];
-
-  // Debug logging
-  console.log('CompanySidebar Debug:', {
-    selectedCompany: selectedCompany?.name,
-    isViewingAllCompanies,
-    companyModules: selectedCompany?.modules,
-    availableModules,
-    departments: departments.map(d => d.title),
-    moduleConfigKeys: Object.keys(moduleConfig)
-  });
 
   return (
     <Sidebar className="border-r">
