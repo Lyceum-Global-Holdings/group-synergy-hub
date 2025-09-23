@@ -49,6 +49,7 @@ export interface PoItem {
   id?: string;
   po_id: string;
   pr_item_id?: string;
+  warehouse_item_id?: string;
   item_name: string;
   item_code?: string;
   description?: string;
@@ -108,6 +109,7 @@ export interface CreatePoData {
   notes?: string;
   items: {
     pr_item_id?: string;
+    warehouse_item_id?: string;
     item_name: string;
     item_code?: string;
     description?: string;

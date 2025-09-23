@@ -34,6 +34,8 @@ export interface PurchaseRequisition {
 export interface PrItem {
   id?: string;
   pr_id: string;
+  warehouse_item_id?: string;
+  item_code?: string;
   item_name: string;
   description?: string;
   quantity: number;
@@ -68,6 +70,8 @@ export interface CreatePrData {
   justification?: string;
   company_id?: string;
   items: {
+    warehouse_item_id?: string;
+    item_code?: string;
     item_name: string;
     description?: string;
     quantity: number;

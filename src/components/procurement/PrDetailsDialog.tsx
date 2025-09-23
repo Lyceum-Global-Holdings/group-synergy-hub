@@ -250,6 +250,7 @@ export function PrDetailsDialog({ pr, open, onOpenChange }: PrDetailsDialogProps
                   <Table>
                     <TableHeader>
                       <TableRow>
+                        <TableHead>Item Code</TableHead>
                         <TableHead>Item Name</TableHead>
                         <TableHead>Description</TableHead>
                         <TableHead>Quantity</TableHead>
@@ -261,6 +262,15 @@ export function PrDetailsDialog({ pr, open, onOpenChange }: PrDetailsDialogProps
                     <TableBody>
                       {pr.items.map((item, index) => (
                         <TableRow key={item.id || index}>
+                          <TableCell>
+                            {item.item_code ? (
+                              <Badge variant="outline" className="text-xs">
+                                {item.item_code}
+                              </Badge>
+                            ) : (
+                              <span className="text-muted-foreground text-xs">-</span>
+                            )}
+                          </TableCell>
                           <TableCell className="font-medium">{item.item_name}</TableCell>
                           <TableCell>{item.description || '-'}</TableCell>
                           <TableCell>{item.quantity}</TableCell>
@@ -270,7 +280,7 @@ export function PrDetailsDialog({ pr, open, onOpenChange }: PrDetailsDialogProps
                         </TableRow>
                       ))}
                       <TableRow>
-                        <TableCell colSpan={5} className="text-right font-medium">
+                        <TableCell colSpan={6} className="text-right font-medium">
                           Total:
                         </TableCell>
                         <TableCell className="font-bold">

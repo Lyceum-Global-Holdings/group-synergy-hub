@@ -18,6 +18,8 @@ import { usePurchaseRequisitions } from "@/hooks/usePurchaseRequisitions";
 import { useSuppliers } from "@/hooks/useSuppliers";
 import { CreatePoData } from "@/types/purchaseOrder";
 import { cn } from "@/lib/utils";
+import { ItemSelector } from "@/components/common/ItemSelector";
+import { WarehouseItem } from "@/types/itemBin";
 
 const createPoSchema = z.object({
   pr_id: z.string().optional(),
@@ -30,6 +32,8 @@ const createPoSchema = z.object({
   notes: z.string().optional(),
   items: z.array(z.object({
     pr_item_id: z.string().optional(),
+    warehouse_item_id: z.string().optional(),
+    item_code: z.string().optional(),
     item_name: z.string().min(1, "Item name is required"),
     description: z.string().optional(),
     specifications: z.string().optional(),
@@ -91,6 +95,8 @@ export function CreatePoDialog({ open, onOpenChange, prId }: CreatePoDialogProps
       currency: "LKR",
       items: [
         {
+          warehouse_item_id: "",
+          item_code: "",
           item_name: "",
           quantity_ordered: 1,
           unit_price: 0,
@@ -114,6 +120,8 @@ export function CreatePoDialog({ open, onOpenChange, prId }: CreatePoDialogProps
       form.setValue("pr_id", prId);
       form.setValue("items", pr.items.map(item => ({
         pr_item_id: item.id,
+        warehouse_item_id: item.warehouse_item_id || "",
+        item_code: item.item_code || "",
         item_name: item.item_name,
         description: item.description,
         specifications: item.specifications,
@@ -135,12 +143,31 @@ export function CreatePoDialog({ open, onOpenChange, prId }: CreatePoDialogProps
 
   const addItem = () => {
     append({
+      warehouse_item_id: "",
+      item_code: "",
       item_name: "",
       quantity_ordered: 1,
       unit_price: 0,
       total_price: 0,
       unit_of_measure: "pcs",
     });
+  };
+
+  const handleItemSelect = (index: number, item: WarehouseItem | null) => {
+    if (item) {
+      form.setValue(`items.${index}.warehouse_item_id`, item.id);
+      form.setValue(`items.${index}.item_code`, item.item_code);
+      form.setValue(`items.${index}.item_name`, item.name);
+      form.setValue(`items.${index}.description`, item.description || '');
+      form.setValue(`items.${index}.unit_of_measure`, 'pcs'); // Default, user can change
+      form.setValue(`items.${index}.unit_price`, item.unit_cost || 0);
+      setTimeout(() => calculateTotalPrice(index), 0);
+    } else {
+      form.setValue(`items.${index}.warehouse_item_id`, '');
+      form.setValue(`items.${index}.item_code`, '');
+      form.setValue(`items.${index}.item_name`, '');
+      form.setValue(`items.${index}.description`, '');
+    }
   };
 
   const onSubmit = async (data: CreatePoFormData) => {
@@ -337,20 +364,44 @@ export function CreatePoDialog({ open, onOpenChange, prId }: CreatePoDialogProps
                   {fields.map((field, index) => (
                     <Card key={field.id}>
                       <CardContent className="pt-6">
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                          <FormField
-                            control={form.control}
-                            name={`items.${index}.item_name`}
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Item Name *</FormLabel>
-                                <FormControl>
-                                  <Input {...field} />
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
+                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                           <FormField
+                             control={form.control}
+                             name={`items.${index}.warehouse_item_id`}
+                             render={({ field }) => (
+                               <FormItem className="md:col-span-3">
+                                 <FormLabel>Select Item *</FormLabel>
+                                 <FormControl>
+                                   <ItemSelector
+                                     value={field.value}
+                                     onSelect={(item) => handleItemSelect(index, item)}
+                                     placeholder="Search and select item..."
+                                   />
+                                 </FormControl>
+                                 <FormMessage />
+                               </FormItem>
+                             )}
+                           />
+                           
+                           {form.watch(`items.${index}.warehouse_item_id`) && (
+                             <div className="md:col-span-3 text-sm text-muted-foreground bg-muted/50 p-2 rounded">
+                               <strong>Selected:</strong> {form.watch(`items.${index}.item_code`)} - {form.watch(`items.${index}.item_name`)}
+                             </div>
+                           )}
+
+                           <FormField
+                             control={form.control}
+                             name={`items.${index}.item_name`}
+                             render={({ field }) => (
+                               <FormItem>
+                                 <FormLabel>Item Name *</FormLabel>
+                                 <FormControl>
+                                   <Input {...field} />
+                                 </FormControl>
+                                 <FormMessage />
+                               </FormItem>
+                             )}
+                           />
 
                           <FormField
                             control={form.control}

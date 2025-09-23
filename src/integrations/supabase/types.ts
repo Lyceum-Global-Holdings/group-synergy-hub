@@ -830,6 +830,7 @@ export type Database = {
           unit_of_measure: string
           unit_price: number
           updated_at: string
+          warehouse_item_id: string | null
         }
         Insert: {
           created_at?: string
@@ -849,6 +850,7 @@ export type Database = {
           unit_of_measure?: string
           unit_price: number
           updated_at?: string
+          warehouse_item_id?: string | null
         }
         Update: {
           created_at?: string
@@ -868,6 +870,7 @@ export type Database = {
           unit_of_measure?: string
           unit_price?: number
           updated_at?: string
+          warehouse_item_id?: string | null
         }
         Relationships: [
           {
@@ -882,6 +885,13 @@ export type Database = {
             columns: ["pr_item_id"]
             isOneToOne: false
             referencedRelation: "pr_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "po_items_warehouse_item_id_fkey"
+            columns: ["warehouse_item_id"]
+            isOneToOne: false
+            referencedRelation: "warehouse_items"
             referencedColumns: ["id"]
           },
         ]
@@ -1020,6 +1030,7 @@ export type Database = {
           estimated_total_price: number
           estimated_unit_price: number
           id: string
+          item_code: string | null
           item_name: string
           notes: string | null
           pr_id: string
@@ -1027,6 +1038,7 @@ export type Database = {
           specifications: string | null
           unit_of_measure: string
           updated_at: string
+          warehouse_item_id: string | null
         }
         Insert: {
           created_at?: string
@@ -1034,6 +1046,7 @@ export type Database = {
           estimated_total_price: number
           estimated_unit_price: number
           id?: string
+          item_code?: string | null
           item_name: string
           notes?: string | null
           pr_id: string
@@ -1041,6 +1054,7 @@ export type Database = {
           specifications?: string | null
           unit_of_measure?: string
           updated_at?: string
+          warehouse_item_id?: string | null
         }
         Update: {
           created_at?: string
@@ -1048,6 +1062,7 @@ export type Database = {
           estimated_total_price?: number
           estimated_unit_price?: number
           id?: string
+          item_code?: string | null
           item_name?: string
           notes?: string | null
           pr_id?: string
@@ -1055,6 +1070,7 @@ export type Database = {
           specifications?: string | null
           unit_of_measure?: string
           updated_at?: string
+          warehouse_item_id?: string | null
         }
         Relationships: [
           {
@@ -1062,6 +1078,13 @@ export type Database = {
             columns: ["pr_id"]
             isOneToOne: false
             referencedRelation: "purchase_requisitions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pr_items_warehouse_item_id_fkey"
+            columns: ["warehouse_item_id"]
+            isOneToOne: false
+            referencedRelation: "warehouse_items"
             referencedColumns: ["id"]
           },
         ]

@@ -43,6 +43,8 @@ import { useCreatePurchaseRequisition } from '@/hooks/usePurchaseRequisitions';
 import { useCompany } from '@/contexts/CompanyContext';
 import { cn } from '@/lib/utils';
 import type { CreatePrData, PrPriority } from '@/types/procurement';
+import { ItemSelector } from '@/components/common/ItemSelector';
+import { WarehouseItem } from '@/types/itemBin';
 
 const createPrSchema = z.object({
   title: z.string().min(1, 'Title is required'),
@@ -56,6 +58,8 @@ const createPrSchema = z.object({
   }),
   justification: z.string().optional(),
   items: z.array(z.object({
+    warehouse_item_id: z.string().optional(),
+    item_code: z.string().optional(),
     item_name: z.string().min(1, 'Item name is required'),
     description: z.string().optional(),
     quantity: z.number().min(0.01, 'Quantity must be greater than 0'),
@@ -178,6 +182,8 @@ export function CreatePrDialog({ open, onOpenChange }: CreatePrDialogProps) {
 
   const addItem = () => {
     append({
+      warehouse_item_id: '',
+      item_code: '',
       item_name: '',
       description: '',
       quantity: 1,
@@ -187,6 +193,23 @@ export function CreatePrDialog({ open, onOpenChange }: CreatePrDialogProps) {
       specifications: '',
       notes: '',
     });
+  };
+
+  const handleItemSelect = (index: number, item: WarehouseItem | null) => {
+    if (item) {
+      form.setValue(`items.${index}.warehouse_item_id`, item.id);
+      form.setValue(`items.${index}.item_code`, item.item_code);
+      form.setValue(`items.${index}.item_name`, item.name);
+      form.setValue(`items.${index}.description`, item.description || '');
+      form.setValue(`items.${index}.unit_of_measure`, 'pcs'); // Default, user can change
+      form.setValue(`items.${index}.estimated_unit_price`, item.unit_cost || 0);
+      setTimeout(() => calculateTotalPrice(index), 0);
+    } else {
+      form.setValue(`items.${index}.warehouse_item_id`, '');
+      form.setValue(`items.${index}.item_code`, '');
+      form.setValue(`items.${index}.item_name`, '');
+      form.setValue(`items.${index}.description`, '');
+    }
   };
 
   return (
@@ -385,6 +408,30 @@ export function CreatePrDialog({ open, onOpenChange }: CreatePrDialogProps) {
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                      <FormField
+                        control={form.control}
+                        name={`items.${index}.warehouse_item_id`}
+                        render={({ field }) => (
+                          <FormItem className="md:col-span-3">
+                            <FormLabel>Select Item *</FormLabel>
+                            <FormControl>
+                              <ItemSelector
+                                value={field.value}
+                                onSelect={(item) => handleItemSelect(index, item)}
+                                placeholder="Search and select item..."
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      
+                      {form.watch(`items.${index}.warehouse_item_id`) && (
+                        <div className="md:col-span-3 text-sm text-muted-foreground bg-muted/50 p-2 rounded">
+                          <strong>Selected:</strong> {form.watch(`items.${index}.item_code`)} - {form.watch(`items.${index}.item_name`)}
+                        </div>
+                      )}
+
                       <FormField
                         control={form.control}
                         name={`items.${index}.item_name`}

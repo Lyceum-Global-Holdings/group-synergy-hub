@@ -190,6 +190,7 @@ export function PoDetailsDialog({ open, onOpenChange, purchaseOrder }: PoDetails
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead>Item Code</TableHead>
                     <TableHead>Item Name</TableHead>
                     <TableHead>Specifications</TableHead>
                     <TableHead>Qty Ordered</TableHead>
@@ -203,6 +204,15 @@ export function PoDetailsDialog({ open, onOpenChange, purchaseOrder }: PoDetails
                 <TableBody>
                   {purchaseOrder.items?.map((item) => (
                     <TableRow key={item.id}>
+                      <TableCell>
+                        {item.item_code ? (
+                          <Badge variant="outline" className="text-xs">
+                            {item.item_code}
+                          </Badge>
+                        ) : (
+                          <span className="text-muted-foreground text-xs">-</span>
+                        )}
+                      </TableCell>
                       <TableCell className="font-medium">{item.item_name}</TableCell>
                       <TableCell>{item.specifications || '-'}</TableCell>
                       <TableCell>{item.quantity_ordered}</TableCell>
