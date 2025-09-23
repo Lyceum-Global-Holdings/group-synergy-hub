@@ -36,6 +36,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Plus, Search, Wrench, AlertTriangle, CheckCircle, Package, MapPin, Building, Users, Loader2, MoreHorizontal, Edit, ArrowRightLeft, Trash2, Eye, BarChart3 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -108,6 +109,8 @@ const getStatusIcon = (status: string) => {
 export default function AssetManagement() {
   const [searchTerm, setSearchTerm] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [selectedAssetIds, setSelectedAssetIds] = useState<Set<string>>(new Set());
+  const [bulkDeleteConfirmOpen, setBulkDeleteConfirmOpen] = useState(false);
   
   const [isBulkImportOpen, setIsBulkImportOpen] = useState(false);
   const [isCategoryManagementOpen, setIsCategoryManagementOpen] = useState(false);
@@ -130,10 +133,12 @@ export default function AssetManagement() {
     createBulkAssets,
     updateAsset,
     deleteAsset,
+    deleteBulkAssets,
     isCreating: isCreatingAsset,
     isCreatingBulk,
     isUpdating,
-    isDeleting
+    isDeleting,
+    isDeletingBulk
   } = useWarehouseAssets();
 
   const { 
@@ -203,6 +208,37 @@ export default function AssetManagement() {
     
     setIsDialogOpen(false);
     form.reset();
+  };
+
+  const handleSelectAsset = (assetId: string, checked: boolean) => {
+    setSelectedAssetIds(prev => {
+      const newSet = new Set(prev);
+      if (checked) {
+        newSet.add(assetId);
+      } else {
+        newSet.delete(assetId);
+      }
+      return newSet;
+    });
+  };
+
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      setSelectedAssetIds(new Set(filteredAssets.map(asset => asset.id)));
+    } else {
+      setSelectedAssetIds(new Set());
+    }
+  };
+
+  const handleBulkDelete = () => {
+    const assetIdsArray = Array.from(selectedAssetIds);
+    deleteBulkAssets(assetIdsArray);
+    setSelectedAssetIds(new Set());
+    setBulkDeleteConfirmOpen(false);
+  };
+
+  const clearSelection = () => {
+    setSelectedAssetIds(new Set());
   };
 
 
@@ -729,14 +765,40 @@ export default function AssetManagement() {
           </div>
 
           {/* Search and Filter */}
-          <div className="flex items-center space-x-2">
-            <Search className="h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search assets by name, category, brand, or asset ID..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="max-w-sm"
-            />
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex flex-1 items-center space-x-2">
+              <Search className="h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search assets by name, category, brand, or asset ID..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="max-w-sm"
+              />
+            </div>
+            
+            {selectedAssetIds.size > 0 && (
+              <div className="flex items-center gap-2 px-3 py-2 bg-muted rounded-md">
+                <span className="text-sm text-muted-foreground">
+                  {selectedAssetIds.size} asset{selectedAssetIds.size > 1 ? 's' : ''} selected
+                </span>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => setBulkDeleteConfirmOpen(true)}
+                  disabled={isDeletingBulk}
+                >
+                  <Trash2 className="h-4 w-4 mr-1" />
+                  Delete Selected
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={clearSelection}
+                >
+                  Clear
+                </Button>
+              </div>
+            )}
           </div>
 
           {/* Assets Table */}
@@ -752,6 +814,12 @@ export default function AssetManagement() {
                 <Table>
                   <TableHeader>
                     <TableRow>
+                      <TableHead className="w-12">
+                        <Checkbox
+                          checked={filteredAssets.length > 0 && selectedAssetIds.size === filteredAssets.length}
+                          onCheckedChange={handleSelectAll}
+                        />
+                      </TableHead>
                       <TableHead>Asset ID</TableHead>
                       <TableHead>Name</TableHead>
                       <TableHead>Category</TableHead>
@@ -766,20 +834,26 @@ export default function AssetManagement() {
                   <TableBody>
                     {assetsLoading ? (
                       <TableRow>
-                        <TableCell colSpan={9} className="text-center">
+                        <TableCell colSpan={10} className="text-center">
                           <Loader2 className="h-4 w-4 animate-spin inline mr-2" />
                           Loading assets...
                         </TableCell>
                       </TableRow>
                     ) : filteredAssets.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={9} className="text-center text-muted-foreground">
+                        <TableCell colSpan={10} className="text-center text-muted-foreground">
                           No assets found
                         </TableCell>
                       </TableRow>
                     ) : (
                       filteredAssets.map((asset) => (
-                        <TableRow key={asset.id}>
+                        <TableRow key={asset.id} className={selectedAssetIds.has(asset.id) ? "bg-muted/50" : ""}>
+                          <TableCell>
+                            <Checkbox
+                              checked={selectedAssetIds.has(asset.id)}
+                              onCheckedChange={(checked) => handleSelectAsset(asset.id, checked as boolean)}
+                            />
+                          </TableCell>
                           <TableCell className="font-mono text-sm">
                             {asset.asset_id || "Auto-generated"}
                           </TableCell>
@@ -921,6 +995,27 @@ export default function AssetManagement() {
             >
               {isDeleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={bulkDeleteConfirmOpen} onOpenChange={setBulkDeleteConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Selected Assets</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete {selectedAssetIds.size} selected asset{selectedAssetIds.size > 1 ? 's' : ''}? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleBulkDelete} 
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={isDeletingBulk}
+            >
+              {isDeletingBulk ? "Deleting..." : `Delete ${selectedAssetIds.size} Asset${selectedAssetIds.size > 1 ? 's' : ''}`}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -113,6 +113,32 @@ export const useWarehouseAssets = () => {
     }
   });
 
+  const deleteBulkAssetsMutation = useMutation({
+    mutationFn: async (assetIds: string[]) => {
+      const { error } = await supabase
+        .from('warehouse_assets')
+        .delete()
+        .in('id', assetIds);
+
+      if (error) throw error;
+    },
+    onSuccess: (_, assetIds) => {
+      queryClient.invalidateQueries({ queryKey: ['warehouse-assets'] });
+      toast({
+        title: "Success",
+        description: `Successfully deleted ${assetIds.length} assets`,
+      });
+    },
+    onError: (error) => {
+      console.error('Error deleting assets:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete assets",
+        variant: "destructive",
+      });
+    }
+  });
+
   const createBulkAssetsMutation = useMutation({
     mutationFn: async (assetsData: CreateWarehouseAssetData[]) => {
       const { data: { user } } = await supabase.auth.getUser();
@@ -155,10 +181,12 @@ export const useWarehouseAssets = () => {
     createAsset: createAssetMutation.mutate,
     updateAsset: updateAssetMutation.mutate,
     deleteAsset: deleteAssetMutation.mutate,
+    deleteBulkAssets: deleteBulkAssetsMutation.mutate,
     createBulkAssets: createBulkAssetsMutation.mutate,
     isCreating: createAssetMutation.isPending,
     isUpdating: updateAssetMutation.isPending,
     isDeleting: deleteAssetMutation.isPending,
+    isDeletingBulk: deleteBulkAssetsMutation.isPending,
     isCreatingBulk: createBulkAssetsMutation.isPending,
   };
 };
