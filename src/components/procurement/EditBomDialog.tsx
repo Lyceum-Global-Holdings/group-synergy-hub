@@ -86,6 +86,7 @@ export function EditBomDialog({ bom, open, onOpenChange }: EditBomDialogProps) {
         product_name: bom.product_name,
         style_no: bom.style_no || '',
         version: bom.version || '1.0',
+        size: bom.size || '',
         description: bom.description || '',
         status: bom.status,
       });
@@ -222,6 +223,7 @@ export function EditBomDialog({ bom, open, onOpenChange }: EditBomDialogProps) {
         product_name: data.product_name,
         style_no: data.style_no,
         version: data.version,
+        size: data.size,
         description: data.description,
         status: data.status,
         items: allItems,
