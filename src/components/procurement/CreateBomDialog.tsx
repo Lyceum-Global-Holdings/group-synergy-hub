@@ -41,6 +41,7 @@ import { WarehouseItem } from '@/types/itemBin';
 
 const bomSchema = z.object({
   product_name: z.string().min(1, 'Product name is required'),
+  style_no: z.string().optional(),
   version: z.string().optional(),
   size: z.string().optional(),
   description: z.string().optional(),
@@ -169,6 +170,7 @@ export function CreateBomDialog({ children }: CreateBomDialogProps) {
 
       await createBom({
         product_name: data.product_name,
+        style_no: data.style_no,
         version: data.version,
         description: data.description,
         status: data.status,
@@ -389,6 +391,20 @@ export function CreateBomDialog({ children }: CreateBomDialogProps) {
                       <FormLabel>Product Name *</FormLabel>
                       <FormControl>
                         <Input {...field} placeholder="Enter product name" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="style_no"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Style No.</FormLabel>
+                      <FormControl>
+                        <Input {...field} placeholder="Enter style number" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>

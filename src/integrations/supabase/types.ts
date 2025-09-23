@@ -167,6 +167,7 @@ export type Database = {
           po_id: string | null
           product_name: string
           status: string
+          style_no: string | null
           updated_at: string
           version: string | null
         }
@@ -180,6 +181,7 @@ export type Database = {
           po_id?: string | null
           product_name: string
           status?: string
+          style_no?: string | null
           updated_at?: string
           version?: string | null
         }
@@ -193,6 +195,7 @@ export type Database = {
           po_id?: string | null
           product_name?: string
           status?: string
+          style_no?: string | null
           updated_at?: string
           version?: string | null
         }

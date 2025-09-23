@@ -2,6 +2,7 @@ export interface BillOfMaterials {
   id: string;
   bom_number: string;
   product_name: string;
+  style_no?: string;
   version: string;
   description?: string;
   status: 'active' | 'inactive' | 'draft';
@@ -36,6 +37,7 @@ export interface BomItem {
 
 export interface CreateBomData {
   product_name: string;
+  style_no?: string;
   version?: string;
   description?: string;
   status?: 'active' | 'inactive' | 'draft';
