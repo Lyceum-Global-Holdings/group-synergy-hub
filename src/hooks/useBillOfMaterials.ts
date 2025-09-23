@@ -80,19 +80,46 @@ export function useBillOfMaterials(companyId?: string) {
   });
 
   const updateBomMutation = useMutation({
-    mutationFn: async ({ id, ...updateData }: UpdateBomData) => {
-      const { data, error } = await supabase
+    mutationFn: async ({ id, items, ...updateData }: UpdateBomData) => {
+      // Update BOM details (excluding items)
+      const { data: bomResult, error: bomError } = await supabase
         .from('bill_of_materials')
         .update(updateData as any)
         .eq('id', id)
         .select()
         .single();
 
-      if (error) throw error;
-      return data as BillOfMaterials;
+      if (bomError) throw bomError;
+
+      // If items are provided, update them
+      if (items && items.length > 0) {
+        // Delete existing items
+        const { error: deleteError } = await supabase
+          .from('bom_items')
+          .delete()
+          .eq('bom_id', id);
+
+        if (deleteError) throw deleteError;
+
+        // Insert new items
+        const bomItems = items.map(item => ({
+          ...item,
+          bom_id: id,
+          total_cost: item.unit_cost ? (item.consumption || 0) * item.unit_cost : undefined
+        }));
+
+        const { error: itemsError } = await supabase
+          .from('bom_items')
+          .insert(bomItems);
+
+        if (itemsError) throw itemsError;
+      }
+
+      return bomResult as BillOfMaterials;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['bill-of-materials'] });
+      queryClient.invalidateQueries({ queryKey: ['bom-items', data.id] });
       toast({
         title: "Success",
         description: "BOM updated successfully",
