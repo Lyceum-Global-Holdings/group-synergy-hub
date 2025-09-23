@@ -29,6 +29,7 @@ export interface BomItem {
   colour?: string;
   consumption?: number;
   category?: string;
+  warehouse_item_id?: string; // Link to warehouse item
   created_at: string;
   updated_at: string;
 }
@@ -57,6 +58,7 @@ export interface CreateBomItemData {
   colour?: string;
   consumption?: number;
   category?: string;
+  warehouse_item_id?: string; // Link to warehouse item
 }
 
 export interface UpdateBomData extends Partial<CreateBomData> {

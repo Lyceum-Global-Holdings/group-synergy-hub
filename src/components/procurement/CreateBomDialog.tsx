@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { Plus, Trash2 } from 'lucide-react';
+import { Plus, Trash2, Link2, X } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -36,6 +36,8 @@ import { useItemUnits } from '@/hooks/useItemUnits';
 import { BOM_CATEGORIES, BomCategoryKey } from '@/constants/bomCategories';
 import { STANDARD_SIZES, SIZE_CATEGORIES, getSizesByCategory } from '@/constants/standardSizes';
 import { CreateBomItemData } from '@/types/bom';
+import { ItemSelector } from '@/components/common/ItemSelector';
+import { WarehouseItem } from '@/types/itemBin';
 
 const bomSchema = z.object({
   product_name: z.string().min(1, 'Product name is required'),
@@ -86,6 +88,7 @@ export function CreateBomDialog({ children }: CreateBomDialogProps) {
         category,
         item_code: '',
         colour: '',
+        warehouse_item_id: undefined,
       }));
       setItems(prev => ({ ...prev, [category]: categoryItems }));
     }
@@ -102,10 +105,43 @@ export function CreateBomDialog({ children }: CreateBomDialogProps) {
       category,
       item_code: '',
       colour: '',
+      warehouse_item_id: undefined,
     };
     setItems(prev => ({
       ...prev,
       [category]: [...prev[category], newItem]
+    }));
+  };
+
+  const linkItemToMaster = (category: BomCategoryKey, index: number, warehouseItem: WarehouseItem) => {
+    // Find the unit abbreviation from unit_id
+    const unitAbbreviation = units.find(unit => unit.id === warehouseItem.unit_id)?.abbreviation || 'pcs';
+    
+    setItems(prev => ({
+      ...prev,
+      [category]: prev[category].map((item, i) => 
+        i === index ? {
+          ...item,
+          warehouse_item_id: warehouseItem.id,
+          item_code: warehouseItem.item_code,
+          item_name: warehouseItem.name,
+          description: warehouseItem.description || '',
+          unit_cost: warehouseItem.unit_cost || 0,
+          unit_of_measure: unitAbbreviation,
+        } : item
+      )
+    }));
+  };
+
+  const unlinkItemFromMaster = (category: BomCategoryKey, index: number) => {
+    setItems(prev => ({
+      ...prev,
+      [category]: prev[category].map((item, i) => 
+        i === index ? {
+          ...item,
+          warehouse_item_id: undefined,
+        } : item
+      )
     }));
   };
 
@@ -187,6 +223,7 @@ export function CreateBomDialog({ children }: CreateBomDialogProps) {
               <table className="w-full text-sm">
                 <thead className="bg-muted">
                   <tr>
+                    <th className="p-2 text-left font-medium">Link Item</th>
                     <th className="p-2 text-left font-medium">Item Code</th>
                     <th className="p-2 text-left font-medium">Description</th>
                     <th className="p-2 text-left font-medium">Colour</th>
@@ -201,12 +238,39 @@ export function CreateBomDialog({ children }: CreateBomDialogProps) {
                 <tbody>
                   {categoryItems.map((item, index) => (
                     <tr key={index} className="border-t">
+                      <td className="p-2 min-w-[200px]">
+                        <div className="flex items-center gap-2">
+                          {item.warehouse_item_id ? (
+                            <div className="flex items-center gap-2 text-sm text-green-600 bg-green-50 px-2 py-1 rounded">
+                              <Link2 className="h-3 w-3" />
+                              <span>Linked</span>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => unlinkItemFromMaster(category, index)}
+                                className="h-5 w-5 p-0 hover:bg-red-100"
+                              >
+                                <X className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          ) : (
+                            <ItemSelector
+                              value={undefined}
+                              onSelect={(warehouseItem) => warehouseItem && linkItemToMaster(category, index, warehouseItem)}
+                              placeholder="Link to item master..."
+                              className="h-8 text-xs"
+                            />
+                          )}
+                        </div>
+                      </td>
                       <td className="p-2">
                         <Input
                           value={item.item_code || ''}
                           onChange={(e) => updateItem(category, index, 'item_code', e.target.value)}
                           placeholder="Item code"
                           className="h-8"
+                          disabled={!!item.warehouse_item_id}
                         />
                       </td>
                       <td className="p-2">
@@ -215,6 +279,7 @@ export function CreateBomDialog({ children }: CreateBomDialogProps) {
                           onChange={(e) => updateItem(category, index, 'item_name', e.target.value)}
                           placeholder="Description"
                           className="h-8 min-w-[150px]"
+                          disabled={!!item.warehouse_item_id}
                         />
                       </td>
                       <td className="p-2">
@@ -239,6 +304,7 @@ export function CreateBomDialog({ children }: CreateBomDialogProps) {
                         <Select
                           value={item.unit_of_measure}
                           onValueChange={(value) => updateItem(category, index, 'unit_of_measure', value)}
+                          disabled={!!item.warehouse_item_id}
                         >
                           <SelectTrigger className="h-8 w-20">
                             <SelectValue />
@@ -270,6 +336,7 @@ export function CreateBomDialog({ children }: CreateBomDialogProps) {
                           placeholder="0.00"
                           className="h-8 w-24"
                           step="0.01"
+                          disabled={!!item.warehouse_item_id}
                         />
                       </td>
                       <td className="p-2 text-right font-medium">
