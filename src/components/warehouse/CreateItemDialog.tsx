@@ -133,6 +133,8 @@ export function CreateItemDialog({ open, onOpenChange, editingItem }: CreateItem
       unit_id: formData.unit_id || undefined,
       supplier_id: formData.supplier_id || undefined,
       company_id: formData.company_id || null, // Convert empty string to null for proper database storage
+      sku: formData.sku.trim() || null, // Convert empty SKU to null to avoid unique constraint violations
+      barcode: formData.barcode.trim() || null, // Also handle barcode similarly
     };
 
     if (editingItem) {

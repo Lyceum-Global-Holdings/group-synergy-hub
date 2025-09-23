@@ -55,11 +55,23 @@ export const useWarehouseItems = () => {
         // We'll handle this in the component using the returned data
       }
     },
-    onError: (error) => {
+    onError: (error: any) => {
       console.error('Error creating item:', error);
+      
+      let errorMessage = "Failed to create item";
+      
+      // Handle specific constraint violations
+      if (error?.message?.includes('warehouse_items_sku_company_id_key')) {
+        errorMessage = "An item with this SKU already exists for the selected company";
+      } else if (error?.message?.includes('warehouse_items_barcode_key')) {
+        errorMessage = "An item with this barcode already exists";
+      } else if (error?.message?.includes('warehouse_items_item_code_key')) {
+        errorMessage = "An item with this code already exists";
+      }
+      
       toast({
         title: "Error",
-        description: "Failed to create item",
+        description: errorMessage,
         variant: "destructive",
       });
     }
@@ -91,11 +103,23 @@ export const useWarehouseItems = () => {
         description: "Item updated successfully",
       });
     },
-    onError: (error) => {
+    onError: (error: any) => {
       console.error('Error updating item:', error);
+      
+      let errorMessage = "Failed to update item";
+      
+      // Handle specific constraint violations
+      if (error?.message?.includes('warehouse_items_sku_company_id_key')) {
+        errorMessage = "An item with this SKU already exists for the selected company";
+      } else if (error?.message?.includes('warehouse_items_barcode_key')) {
+        errorMessage = "An item with this barcode already exists";
+      } else if (error?.message?.includes('warehouse_items_item_code_key')) {
+        errorMessage = "An item with this code already exists";
+      }
+      
       toast({
         title: "Error",
-        description: "Failed to update item",
+        description: errorMessage,
         variant: "destructive",
       });
     }
