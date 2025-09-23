@@ -471,6 +471,38 @@ export function EditBomDialog({ bom, open, onOpenChange }: EditBomDialogProps) {
 
                   <FormField
                     control={form.control}
+                    name="size"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Size</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select size" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent className="bg-background border z-50 max-h-60">
+                            {SIZE_CATEGORIES.map((cat) => (
+                              <div key={cat}>
+                                <div className="px-2 py-1 text-xs font-medium text-muted-foreground border-b">
+                                  {cat}
+                                </div>
+                                {getSizesByCategory(cat).map((size) => (
+                                  <SelectItem key={size.value} value={size.value}>
+                                    {size.label}
+                                  </SelectItem>
+                                ))}
+                              </div>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
                     name="status"
                     render={({ field }) => (
                       <FormItem>
