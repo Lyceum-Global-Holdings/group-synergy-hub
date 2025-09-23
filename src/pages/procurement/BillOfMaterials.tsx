@@ -23,6 +23,7 @@ import { useBillOfMaterials } from "@/hooks/useBillOfMaterials";
 import { useCompany } from "@/contexts/CompanyContext";
 import { BillOfMaterials } from "@/types/bom";
 import { CreateBomDialog } from "@/components/procurement/CreateBomDialog";
+import { BomDetailsDialog } from "@/components/procurement/BomDetailsDialog";
 
 const statusColors = {
   active: "bg-success text-success-foreground",
@@ -42,6 +43,8 @@ export default function BillOfMaterialsPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [selectedBom, setSelectedBom] = useState<BillOfMaterials | null>(null);
+  const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
 
   // Filter BOMs
   const filteredBoms = boms.filter((bom) => {
@@ -206,14 +209,22 @@ export default function BillOfMaterialsPage() {
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => setSelectedBom(bom)}
+                        onClick={() => {
+                          setSelectedBom(bom);
+                          setIsEditMode(false);
+                          setIsDetailsDialogOpen(true);
+                        }}
                       >
                         <Eye className="h-4 w-4" />
                       </Button>
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => setSelectedBom(bom)}
+                        onClick={() => {
+                          setSelectedBom(bom);
+                          setIsEditMode(true);
+                          setIsDetailsDialogOpen(true);
+                        }}
                       >
                         <Edit className="h-4 w-4" />
                       </Button>
@@ -238,6 +249,30 @@ export default function BillOfMaterialsPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* BOM Details Dialog */}
+      <BomDetailsDialog
+        bom={selectedBom}
+        open={isDetailsDialogOpen && !isEditMode}
+        onOpenChange={(open) => {
+          setIsDetailsDialogOpen(open);
+          if (!open) {
+            setSelectedBom(null);
+            setIsEditMode(false);
+          }
+        }}
+        onEdit={(bom) => {
+          setSelectedBom(bom);
+          setIsEditMode(true);
+        }}
+      />
+
+      {/* Edit BOM Dialog - placeholder for now */}
+      {isEditMode && selectedBom && (
+        <div>
+          {/* TODO: Implement EditBomDialog or reuse CreateBomDialog with edit mode */}
+        </div>
+      )}
     </div>
   );
 }
