@@ -8,8 +8,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Users, UserPlus, Shield, Edit, Trash2, Crown, Loader2 } from 'lucide-react';
 import { AddUserDialog } from '@/components/admin/AddUserDialog';
 import { AddRoleDialog } from '@/components/admin/AddRoleDialog';
+import { EditUserDialog } from '@/components/admin/EditUserDialog';
+import { EditRoleDialog } from '@/components/admin/EditRoleDialog';
+import { DeleteConfirmationDialog } from '@/components/admin/DeleteConfirmationDialog';
 import { AdminBootstrap } from '@/components/admin/AdminBootstrap';
-import { useUsers, useRoles, useAssignRole, useRemoveRole } from '@/hooks/useUsers';
+import { useUsers, useRoles, useAssignRole, useRemoveRole, type User, type Role } from '@/hooks/useUsers';
+import { useDeleteUser, useDeleteRole } from '@/hooks/useUserMutations';
 import { useSuperAdmin, useIsAdmin } from '@/hooks/useSuperAdmin';
 import { useCompanies } from '@/hooks/useCompanies';
 import { useAuth } from '@/contexts/AuthContext';
@@ -22,6 +26,12 @@ export default function UserRoleManagement() {
   const [activeTab, setActiveTab] = useState('users');
   const [addUserOpen, setAddUserOpen] = useState(false);
   const [addRoleOpen, setAddRoleOpen] = useState(false);
+  const [editUserOpen, setEditUserOpen] = useState(false);
+  const [editRoleOpen, setEditRoleOpen] = useState(false);
+  const [deleteUserOpen, setDeleteUserOpen] = useState(false);
+  const [deleteRoleOpen, setDeleteRoleOpen] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [selectedRole, setSelectedRole] = useState<Role | null>(null);
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
   const [hasAnyAdmins, setHasAnyAdmins] = useState<boolean | null>(null);
   
@@ -32,6 +42,8 @@ export default function UserRoleManagement() {
   const { companies } = useCompanies();
   const assignRole = useAssignRole();
   const removeRole = useRemoveRole();
+  const deleteUser = useDeleteUser();
+  const deleteRole = useDeleteRole();
   const { toast } = useToast();
 
   // Check admin status and if any admins exist
@@ -90,6 +102,42 @@ export default function UserRoleManagement() {
         description: error.message,
         variant: "destructive",
       });
+    }
+  };
+
+  const handleEditUser = (user: User) => {
+    setSelectedUser(user);
+    setEditUserOpen(true);
+  };
+
+  const handleDeleteUser = (user: User) => {
+    setSelectedUser(user);
+    setDeleteUserOpen(true);
+  };
+
+  const handleConfirmDeleteUser = async () => {
+    if (selectedUser) {
+      await deleteUser.mutateAsync(selectedUser.id);
+      setDeleteUserOpen(false);
+      setSelectedUser(null);
+    }
+  };
+
+  const handleEditRole = (role: Role) => {
+    setSelectedRole(role);
+    setEditRoleOpen(true);
+  };
+
+  const handleDeleteRole = (role: Role) => {
+    setSelectedRole(role);
+    setDeleteRoleOpen(true);
+  };
+
+  const handleConfirmDeleteRole = async () => {
+    if (selectedRole) {
+      await deleteRole.mutateAsync(selectedRole.id);
+      setDeleteRoleOpen(false);
+      setSelectedRole(null);
     }
   };
 
@@ -313,10 +361,10 @@ export default function UserRoleManagement() {
                             </TableCell>
                             <TableCell className="text-right">
                               <div className="flex justify-end space-x-2">
-                                <Button variant="ghost" size="sm">
+                                <Button variant="ghost" size="sm" onClick={() => handleEditUser(user)}>
                                   <Edit className="h-4 w-4" />
                                 </Button>
-                                <Button variant="ghost" size="sm" className="text-destructive">
+                                <Button variant="ghost" size="sm" className="text-destructive" onClick={() => handleDeleteUser(user)}>
                                   <Trash2 className="h-4 w-4" />
                                 </Button>
                               </div>
@@ -374,11 +422,11 @@ export default function UserRoleManagement() {
                     </div>
 
                     <div className="flex justify-between pt-4">
-                      <Button variant="ghost" size="sm">
+                      <Button variant="ghost" size="sm" onClick={() => handleEditRole(role)}>
                         <Edit className="h-4 w-4 mr-2" />
                         Edit
                       </Button>
-                      <Button variant="ghost" size="sm" className="text-destructive">
+                      <Button variant="ghost" size="sm" className="text-destructive" onClick={() => handleDeleteRole(role)}>
                         <Trash2 className="h-4 w-4 mr-2" />
                         Delete
                       </Button>
@@ -401,6 +449,42 @@ export default function UserRoleManagement() {
         open={addRoleOpen}
         onOpenChange={setAddRoleOpen}
         onRoleAdded={handleRoleAdded}
+      />
+
+      <EditUserDialog
+        open={editUserOpen}
+        onOpenChange={setEditUserOpen}
+        user={selectedUser}
+        onUserUpdated={handleUserAdded}
+      />
+
+      <EditRoleDialog
+        open={editRoleOpen}
+        onOpenChange={setEditRoleOpen}
+        role={selectedRole}
+        onRoleUpdated={handleRoleAdded}
+      />
+
+      <DeleteConfirmationDialog
+        open={deleteUserOpen}
+        onOpenChange={setDeleteUserOpen}
+        title="Delete User"
+        description="Are you sure you want to delete this user? This will permanently remove the user account and all associated data."
+        itemName={selectedUser?.full_name || selectedUser?.email}
+        onConfirm={handleConfirmDeleteUser}
+        isLoading={deleteUser.isPending}
+        destructiveText="Delete User"
+      />
+
+      <DeleteConfirmationDialog
+        open={deleteRoleOpen}
+        onOpenChange={setDeleteRoleOpen}
+        title="Delete Role"
+        description="Are you sure you want to delete this role? This will remove the role and unassign it from all users."
+        itemName={selectedRole?.name}
+        onConfirm={handleConfirmDeleteRole}
+        isLoading={deleteRole.isPending}
+        destructiveText="Delete Role"
       />
     </div>
   );
