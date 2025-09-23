@@ -82,6 +82,7 @@ export const moduleConfig: Record<string, ModuleConfig> = {
     subModules: [
       { key: 'purchase-requisition', name: 'Purchase Requisition', description: 'Internal purchase requests', url: '/procurement/purchase-requisition' },
       { key: 'purchase-order', name: 'Purchase Order', description: 'Supplier purchase orders', url: '/procurement/purchase-order' },
+      { key: 'material-demand', name: 'Material Demand Planning', description: 'MRP and material requirement planning', url: '/procurement/material-demand' },
       { key: 'blanket-po', name: 'Blanket/Contract PO', description: 'Long-term purchase agreements', url: '/procurement/blanket-po' },
       { key: 'po-amendment', name: 'PO Amendment', description: 'Modify existing orders', url: '/procurement/po-amendment' },
       { key: 'three-way-match', name: '3-way Match Review', description: 'PO, receipt, and invoice matching', url: '/procurement/three-way-match' },

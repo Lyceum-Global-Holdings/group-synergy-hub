@@ -14,6 +14,7 @@ import ModuleAllocation from "./pages/admin/ModuleAllocation";
 import PurchaseRequisition from "./pages/procurement/PurchaseRequisition";
 import PurchaseOrder from "./pages/procurement/PurchaseOrder";
 import BillOfMaterials from "./pages/procurement/BillOfMaterials";
+import MaterialDemandPlanning from "./pages/procurement/MaterialDemandPlanning";
 import { SupplierMaster } from "./pages/sourcing/SupplierMaster";
 import AssetManagement from "./pages/warehouse/AssetManagement";
 import ItemBinMaster from "./pages/warehouse/ItemBinMaster";
@@ -81,6 +82,13 @@ const App = () => (
                 <ProtectedRoute>
                   <AppLayout>
                     <BillOfMaterials />
+                  </AppLayout>
+                </ProtectedRoute>
+              } />
+              <Route path="/procurement/material-demand" element={
+                <ProtectedRoute>
+                  <AppLayout>
+                    <MaterialDemandPlanning />
                   </AppLayout>
                 </ProtectedRoute>
               } />

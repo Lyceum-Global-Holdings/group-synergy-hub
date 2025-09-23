@@ -431,6 +431,140 @@ export type Database = {
         }
         Relationships: []
       }
+      material_demand: {
+        Row: {
+          company_id: string | null
+          created_at: string
+          created_by: string | null
+          current_stock: number
+          demand_date: string
+          demand_source: string
+          gross_requirement: number
+          id: string
+          item_code: string
+          item_name: string
+          lead_time_days: number | null
+          net_requirement: number
+          notes: string | null
+          on_order_quantity: number
+          reference_id: string | null
+          reorder_level: number | null
+          safety_stock: number | null
+          status: string
+          suggested_order_quantity: number
+          updated_at: string
+        }
+        Insert: {
+          company_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          current_stock?: number
+          demand_date: string
+          demand_source: string
+          gross_requirement?: number
+          id?: string
+          item_code: string
+          item_name: string
+          lead_time_days?: number | null
+          net_requirement?: number
+          notes?: string | null
+          on_order_quantity?: number
+          reference_id?: string | null
+          reorder_level?: number | null
+          safety_stock?: number | null
+          status?: string
+          suggested_order_quantity?: number
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          current_stock?: number
+          demand_date?: string
+          demand_source?: string
+          gross_requirement?: number
+          id?: string
+          item_code?: string
+          item_name?: string
+          lead_time_days?: number | null
+          net_requirement?: number
+          notes?: string | null
+          on_order_quantity?: number
+          reference_id?: string | null
+          reorder_level?: number | null
+          safety_stock?: number | null
+          status?: string
+          suggested_order_quantity?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      material_demand_items: {
+        Row: {
+          bom_id: string | null
+          bom_item_id: string | null
+          created_at: string
+          demand_id: string
+          id: string
+          notes: string | null
+          po_id: string | null
+          po_item_id: string | null
+          priority: string
+          quantity_required: number
+          required_date: string
+          total_cost: number | null
+          unit_cost: number | null
+          unit_of_measure: string
+          updated_at: string
+          warehouse_item_id: string | null
+        }
+        Insert: {
+          bom_id?: string | null
+          bom_item_id?: string | null
+          created_at?: string
+          demand_id: string
+          id?: string
+          notes?: string | null
+          po_id?: string | null
+          po_item_id?: string | null
+          priority?: string
+          quantity_required?: number
+          required_date: string
+          total_cost?: number | null
+          unit_cost?: number | null
+          unit_of_measure?: string
+          updated_at?: string
+          warehouse_item_id?: string | null
+        }
+        Update: {
+          bom_id?: string | null
+          bom_item_id?: string | null
+          created_at?: string
+          demand_id?: string
+          id?: string
+          notes?: string | null
+          po_id?: string | null
+          po_item_id?: string | null
+          priority?: string
+          quantity_required?: number
+          required_date?: string
+          total_cost?: number | null
+          unit_cost?: number | null
+          unit_of_measure?: string
+          updated_at?: string
+          warehouse_item_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "material_demand_items_demand_id_fkey"
+            columns: ["demand_id"]
+            isOneToOne: false
+            referencedRelation: "material_demand"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       material_issue_items: {
         Row: {
           created_at: string
@@ -683,6 +817,7 @@ export type Database = {
           delivery_date: string | null
           description: string | null
           id: string
+          item_code: string | null
           item_name: string
           notes: string | null
           po_id: string
@@ -701,6 +836,7 @@ export type Database = {
           delivery_date?: string | null
           description?: string | null
           id?: string
+          item_code?: string | null
           item_name: string
           notes?: string | null
           po_id: string
@@ -719,6 +855,7 @@ export type Database = {
           delivery_date?: string | null
           description?: string | null
           id?: string
+          item_code?: string | null
           item_name?: string
           notes?: string | null
           po_id?: string
