@@ -16,6 +16,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useCreatePurchaseOrder } from "@/hooks/usePurchaseOrders";
 import { usePurchaseRequisitions } from "@/hooks/usePurchaseRequisitions";
 import { useSuppliers } from "@/hooks/useSuppliers";
+import { useCompany } from "@/contexts/CompanyContext";
 import { CreatePoData } from "@/types/purchaseOrder";
 import { cn } from "@/lib/utils";
 import { ItemSelector } from "@/components/common/ItemSelector";
@@ -24,6 +25,7 @@ import { WarehouseItem } from "@/types/itemBin";
 const createPoSchema = z.object({
   pr_id: z.string().optional(),
   supplier_id: z.string().min(1, "Supplier is required"),
+  company: z.string().optional(),
   expected_delivery_date: z.string().optional(),
   payment_terms: z.string().optional(),
   delivery_terms: z.string().optional(),
@@ -81,6 +83,7 @@ export function CreatePoDialog({ open, onOpenChange, prId }: CreatePoDialogProps
   
   const { data: suppliers = [] } = useSuppliers();
   const { data: purchaseRequisitions = [] } = usePurchaseRequisitions();
+  const { selectedCompany } = useCompany();
   const createPoMutation = useCreatePurchaseOrder();
 
   // Filter approved PRs
@@ -92,6 +95,7 @@ export function CreatePoDialog({ open, onOpenChange, prId }: CreatePoDialogProps
     defaultValues: {
       pr_id: prId,
       supplier_id: "",
+      company: selectedCompany?.name || "",
       currency: "LKR",
       items: [
         {
@@ -245,6 +249,27 @@ export function CreatePoDialog({ open, onOpenChange, prId }: CreatePoDialogProps
                           ))}
                         </SelectContent>
                       </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {/* Company Field */}
+                <FormField
+                  control={form.control}
+                  name="company"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Company</FormLabel>
+                      <FormControl>
+                        <Input 
+                          {...field} 
+                          value={selectedCompany?.name || ''} 
+                          readOnly 
+                          className="bg-muted"
+                          placeholder="No company selected"
+                        />
+                      </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}

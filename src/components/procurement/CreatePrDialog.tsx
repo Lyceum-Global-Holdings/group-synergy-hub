@@ -49,7 +49,7 @@ import { WarehouseItem } from '@/types/itemBin';
 const createPrSchema = z.object({
   title: z.string().min(1, 'Title is required'),
   description: z.string().optional(),
-  department: z.string().optional(),
+  company: z.string().optional(),
   priority: z.enum(['low', 'medium', 'high', 'urgent']),
   required_date: z.date({
     required_error: 'Required date is required',
@@ -78,18 +78,6 @@ interface CreatePrDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
-const departments = [
-  'Administration',
-  'Finance',
-  'Human Resources',
-  'IT',
-  'Operations',
-  'Marketing',
-  'Sales',
-  'Procurement',
-  'Legal',
-  'Other',
-];
 
 const unitsOfMeasure = [
   // Quantity
@@ -120,7 +108,7 @@ export function CreatePrDialog({ open, onOpenChange }: CreatePrDialogProps) {
     defaultValues: {
       title: '',
       description: '',
-      department: '',
+      company: selectedCompany?.name || '',
       priority: 'medium',
       justification: '',
       items: [
@@ -154,7 +142,7 @@ export function CreatePrDialog({ open, onOpenChange }: CreatePrDialogProps) {
     const createData: CreatePrData = {
       title: data.title,
       description: data.description,
-      department: data.department,
+      department: data.company,
       priority: data.priority,
       required_date: format(data.required_date, 'yyyy-MM-dd'),
       justification: data.justification,
@@ -247,24 +235,19 @@ export function CreatePrDialog({ open, onOpenChange }: CreatePrDialogProps) {
 
                   <FormField
                     control={form.control}
-                    name="department"
+                    name="company"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Department</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select department" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {departments.map((dept) => (
-                              <SelectItem key={dept} value={dept}>
-                                {dept}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        <FormLabel>Company</FormLabel>
+                        <FormControl>
+                          <Input 
+                            {...field} 
+                            value={selectedCompany?.name || ''} 
+                            readOnly 
+                            className="bg-muted"
+                            placeholder="No company selected"
+                          />
+                        </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
