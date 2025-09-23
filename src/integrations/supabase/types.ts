@@ -266,6 +266,7 @@ export type Database = {
           unit_cost: number | null
           unit_of_measure: string
           updated_at: string
+          warehouse_item_id: string | null
         }
         Insert: {
           bom_id: string
@@ -286,6 +287,7 @@ export type Database = {
           unit_cost?: number | null
           unit_of_measure?: string
           updated_at?: string
+          warehouse_item_id?: string | null
         }
         Update: {
           bom_id?: string
@@ -306,6 +308,7 @@ export type Database = {
           unit_cost?: number | null
           unit_of_measure?: string
           updated_at?: string
+          warehouse_item_id?: string | null
         }
         Relationships: [
           {
@@ -320,6 +323,13 @@ export type Database = {
             columns: ["po_item_id"]
             isOneToOne: false
             referencedRelation: "po_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bom_items_warehouse_item_id_fkey"
+            columns: ["warehouse_item_id"]
+            isOneToOne: false
+            referencedRelation: "warehouse_items"
             referencedColumns: ["id"]
           },
         ]
