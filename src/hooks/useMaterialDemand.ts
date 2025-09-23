@@ -191,7 +191,7 @@ export const useDemandCalculation = () => {
         const warehouseItem = warehouseItems?.find(w => w.item_code === bomItem.item_code);
         const onOrderItems = poItems?.filter(p => p.item_code === bomItem.item_code) || [];
         
-        const totalRequired = (bomItem.quantity || 0) * input.production_quantity;
+        const totalRequired = (bomItem.consumption || bomItem.quantity || 0) * input.production_quantity;
         const availableStock = warehouseItem?.current_stock || 0;
         const onOrder = onOrderItems.reduce((sum, item) => sum + (item.quantity_pending || 0), 0);
         const shortage = Math.max(0, totalRequired - availableStock - onOrder);
