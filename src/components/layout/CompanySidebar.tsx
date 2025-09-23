@@ -58,8 +58,12 @@ export function CompanySidebar() {
   const getAllUniqueModules = () => {
     const allModules = new Set<string>();
     companies.forEach(company => {
-      const companyModules = normalizeCompanyModules(company.modules);
-      Object.keys(companyModules).forEach(moduleKey => allModules.add(moduleKey));
+      try {
+        const companyModules = normalizeCompanyModules(company.modules);
+        Object.keys(companyModules).forEach(moduleKey => allModules.add(moduleKey));
+      } catch (error) {
+        console.warn('Error processing company modules:', error, company);
+      }
     });
     return Array.from(allModules);
   };
@@ -67,8 +71,13 @@ export function CompanySidebar() {
   // Get companies that use a specific module
   const getCompaniesUsingModule = (moduleKey: string) => {
     return companies.filter(company => {
-      const companyModules = normalizeCompanyModules(company.modules);
-      return Object.hasOwnProperty.call(companyModules, moduleKey);
+      try {
+        const companyModules = normalizeCompanyModules(company.modules);
+        return Object.hasOwnProperty.call(companyModules, moduleKey);
+      } catch (error) {
+        console.warn('Error processing company modules:', error, company);
+        return false;
+      }
     });
   };
 
@@ -77,7 +86,10 @@ export function CompanySidebar() {
     ? getAllUniqueModules()
     : Object.keys(normalizeCompanyModules(selectedCompany?.modules));
     
-  const departments: ModuleWithCompanies[] = availableModules
+  // Ensure availableModules is always an array
+  const safeAvailableModules = Array.isArray(availableModules) ? availableModules : [];
+    
+  const departments: ModuleWithCompanies[] = safeAvailableModules
     .map(moduleKey => {
       const config = moduleConfig[moduleKey];
       if (!config) return null;
@@ -138,7 +150,7 @@ export function CompanySidebar() {
                 </div>
               </div>
               <Badge variant="secondary" className="text-xs">
-                {availableModules.length}
+                {safeAvailableModules.length}
               </Badge>
             </div>
           </div>

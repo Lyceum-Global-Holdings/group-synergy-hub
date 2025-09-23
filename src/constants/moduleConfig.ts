@@ -113,28 +113,32 @@ export const moduleConfig: Record<string, ModuleConfig> = {
   }
 };
 
-// Helper functions for backward compatibility
 export function normalizeCompanyModules(modules: Record<string, string[]> | string[] | null | undefined): Record<string, string[]> {
-  if (!modules) return {};
-  
-  // If it's already the new format, return as-is
-  if (typeof modules === 'object' && !Array.isArray(modules)) {
-    return modules;
+  try {
+    if (!modules) return {};
+    
+    // If it's already the new format, return as-is
+    if (typeof modules === 'object' && !Array.isArray(modules)) {
+      return modules;
+    }
+    
+    // Convert old format (string array) to new format
+    if (Array.isArray(modules)) {
+      const normalized: Record<string, string[]> = {};
+      modules.forEach(moduleKey => {
+        const config = moduleConfig[moduleKey];
+        if (config) {
+          normalized[moduleKey] = config.subModules.map(sub => sub.key);
+        }
+      });
+      return normalized;
+    }
+    
+    return {};
+  } catch (error) {
+    console.warn('Error normalizing company modules:', error, modules);
+    return {};
   }
-  
-  // Convert old format (string array) to new format
-  if (Array.isArray(modules)) {
-    const normalized: Record<string, string[]> = {};
-    modules.forEach(moduleKey => {
-      const config = moduleConfig[moduleKey];
-      if (config) {
-        normalized[moduleKey] = config.subModules.map(sub => sub.key);
-      }
-    });
-    return normalized;
-  }
-  
-  return {};
 }
 
 export function getAllEnabledSubModules(modules: Record<string, string[]> | string[] | null | undefined): string[] {

@@ -132,11 +132,23 @@ export default function ModuleAllocation() {
                   </Badge>
                 </div>
                 <div className="mt-2 flex flex-wrap gap-1">
-                  {Object.keys(normalizeCompanyModules(company.modules)).map((moduleKey) => (
-                    <Badge key={moduleKey} variant="outline" className="text-xs">
-                      {moduleConfig[moduleKey]?.name || moduleKey}
-                    </Badge>
-                  ))}
+                  {(() => {
+                    const companyModules = normalizeCompanyModules(company.modules);
+                    const moduleKeys = Object.keys(companyModules);
+                    
+                    // Ensure moduleKeys is always an array
+                    const safeModuleKeys = Array.isArray(moduleKeys) ? moduleKeys : [];
+                    
+                    return safeModuleKeys.length > 0 ? (
+                      safeModuleKeys.map((moduleKey) => (
+                        <Badge key={moduleKey} variant="outline" className="text-xs">
+                          {moduleConfig[moduleKey]?.name || moduleKey}
+                        </Badge>
+                      ))
+                    ) : (
+                      <span className="text-sm text-muted-foreground">No modules</span>
+                    );
+                  })()}
                 </div>
               </div>
             ))}
