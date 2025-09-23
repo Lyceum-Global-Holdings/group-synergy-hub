@@ -32,6 +32,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useBillOfMaterials } from '@/hooks/useBillOfMaterials';
 import { useCompany } from '@/contexts/CompanyContext';
+import { useItemUnits } from '@/hooks/useItemUnits';
 import { BOM_CATEGORIES, BomCategoryKey } from '@/constants/bomCategories';
 import { STANDARD_SIZES, SIZE_CATEGORIES, getSizesByCategory } from '@/constants/standardSizes';
 import { CreateBomItemData } from '@/types/bom';
@@ -61,6 +62,7 @@ export function CreateBomDialog({ children }: CreateBomDialogProps) {
 
   const { selectedCompany } = useCompany();
   const { createBom, isCreating } = useBillOfMaterials(selectedCompany?.id);
+  const { units } = useItemUnits();
 
   const form = useForm<BomFormData>({
     resolver: zodResolver(bomSchema),
@@ -241,12 +243,12 @@ export function CreateBomDialog({ children }: CreateBomDialogProps) {
                           <SelectTrigger className="h-8 w-20">
                             <SelectValue />
                           </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="pcs">pcs</SelectItem>
-                            <SelectItem value="mtr">mtr</SelectItem>
-                            <SelectItem value="kg">kg</SelectItem>
-                            <SelectItem value="cone">cone</SelectItem>
-                            <SelectItem value="yard">yard</SelectItem>
+                          <SelectContent className="bg-background border z-50">
+                            {units.map((unit) => (
+                              <SelectItem key={unit.id} value={unit.abbreviation}>
+                                {unit.name} ({unit.abbreviation})
+                              </SelectItem>
+                            ))}
                           </SelectContent>
                         </Select>
                       </td>
