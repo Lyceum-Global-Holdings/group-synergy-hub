@@ -91,6 +91,11 @@ export interface DemandAnalysisResult {
     bom_number: string;
     product_name: string;
   };
+  finished_good_info?: {
+    product_code: string;
+    product_name: string;
+    current_stock: number;
+  };
   supplier_info?: {
     supplier_id: string;
     supplier_name: string;

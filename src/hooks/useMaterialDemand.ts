@@ -310,7 +310,9 @@ export const useDemandCalculation = (companyId?: string) => {
         throw new Error('No purchase orders selected for analysis');
       }
 
-      // Get PO data with items and their linked BOM items
+      console.log('Starting PO demand calculation for POs:', input.po_ids);
+
+      // Get PO data with items
       const { data: poData, error: poError } = await supabase
         .from('purchase_orders')  
         .select(`
@@ -336,99 +338,194 @@ export const useDemandCalculation = (companyId?: string) => {
         .eq('status', 'approved');
 
       if (poError) throw poError;
+      console.log('Retrieved PO data:', poData.length, 'POs');
 
-      // Get all PO item IDs to find linked BOM items
-      const allPoItemIds = poData.flatMap(po => po.po_items.map(item => item.id));
+      // Get all PO item codes for matching with finished goods
+      const allPoItemCodes = poData.flatMap(po => 
+        po.po_items.map(item => item.item_code).filter(Boolean)
+      );
 
-      // Get BOM items that are linked to these PO items (only if we have PO items)
-      let bomItems: any[] = [];
-      if (allPoItemIds.length > 0) {
-        const { data: bomData, error: bomError } = await supabase
-          .from('bom_items')
+      // Match PO items to finished goods using item_code -> product_code
+      let finishedGoods: any[] = [];
+      let finishedGoodsBOMs: any[] = [];
+      
+      if (allPoItemCodes.length > 0) {
+        console.log('Looking for finished goods with product codes:', allPoItemCodes);
+        
+        // Get finished goods that match PO item codes
+        const { data: fgData, error: fgError } = await supabase
+          .from('finished_goods')
           .select(`
             id,
+            product_code,
+            product_name,
+            current_stock,
             bom_id,
-            po_item_id,
-            item_name,
-            item_code,
-            quantity,
-            consumption,
             unit_of_measure,
-            category,
-            warehouse_item_id,
-            bill_of_materials!inner(
+            company_id
+          `)
+          .in('product_code', allPoItemCodes);
+
+        if (fgError) throw fgError;
+        finishedGoods = fgData || [];
+        console.log('Found finished goods matches:', finishedGoods.length);
+
+        // Get BOMs for matched finished goods
+        const bomIds = finishedGoods.map(fg => fg.bom_id).filter(Boolean);
+        if (bomIds.length > 0) {
+          const { data: bomData, error: bomError } = await supabase
+            .from('bill_of_materials')
+            .select(`
               id,
               bom_number,
-              product_name
-            )
-          `)
-          .in('po_item_id', allPoItemIds)
-          .not('po_item_id', 'is', null);
+              product_name,
+              bom_items (
+                id,
+                item_name,
+                item_code,
+                quantity,
+                consumption,
+                unit_of_measure,
+                category,
+                warehouse_item_id
+              )
+            `)
+            .in('id', bomIds);
 
-        if (bomError) throw bomError;
-        bomItems = bomData || [];
+          if (bomError) throw bomError;
+          finishedGoodsBOMs = bomData || [];
+          console.log('Retrieved BOMs for finished goods:', finishedGoodsBOMs.length);
+        }
       }
 
-      // Get warehouse items for stock levels from both BOM items and PO items
-      const bomWarehouseItemIds = bomItems.map(item => item.warehouse_item_id).filter(Boolean);
+      // Get all potential warehouse item IDs and codes for stock checking
+      const bomWarehouseItemIds = finishedGoodsBOMs.flatMap(bom => 
+        bom.bom_items.map(item => item.warehouse_item_id).filter(Boolean)
+      );
       const poWarehouseItemIds = poData.flatMap(po => 
         po.po_items.map(item => item.warehouse_item_id).filter(Boolean)
       );
       const allWarehouseItemIds = [...new Set([...bomWarehouseItemIds, ...poWarehouseItemIds])];
       
-      // Also collect all item codes and names for fallback matching
-      const bomItemCodes = bomItems.map(item => item.item_code).filter(Boolean);
+      const bomItemCodes = finishedGoodsBOMs.flatMap(bom => 
+        bom.bom_items.map(item => item.item_code).filter(Boolean)
+      );
       const poItemCodes = poData.flatMap(po => 
         po.po_items.map(item => item.item_code).filter(Boolean)
       );
       const allItemCodes = [...new Set([...bomItemCodes, ...poItemCodes])];
-      
-      const bomItemNames = bomItems.map(item => item.item_name).filter(Boolean);
-      const poItemNames = poData.flatMap(po => 
-        po.po_items.map(item => item.item_name).filter(Boolean)
-      );
-      const allItemNames = [...new Set([...bomItemNames, ...poItemNames])];
 
+      // Get warehouse items for raw material stock checking
       let warehouseItems: any[] = [];
-      if (allWarehouseItemIds.length > 0 || allItemCodes.length > 0 || allItemNames.length > 0) {
+      if (allWarehouseItemIds.length > 0 || allItemCodes.length > 0) {
         let query = supabase
           .from('warehouse_items')
           .select('id, item_code, name, current_stock, min_stock_level, unit_cost, company_id');
         
-        // Add company filter if available
         if (companyId) {
           query = query.eq('company_id', companyId);
         }
         
-        // Use OR condition to match by id, item_code, or name
         if (allWarehouseItemIds.length > 0) {
-          query = query.or(`id.in.(${allWarehouseItemIds.join(',')}),item_code.in.(${allItemCodes.join(',')}),name.in.(${allItemNames.join(',')})`);
-        } else if (allItemCodes.length > 0) {
-          query = query.or(`item_code.in.(${allItemCodes.join(',')}),name.in.(${allItemNames.join(',')})`);
+          query = query.or(`id.in.(${allWarehouseItemIds.join(',')}),item_code.in.(${allItemCodes.join(',')})`);
         } else {
-          query = query.in('name', allItemNames);
+          query = query.in('item_code', allItemCodes);
         }
 
         const { data: warehouseData, error: warehouseError } = await query;
         if (warehouseError) throw warehouseError;
         warehouseItems = warehouseData || [];
-        
-        console.log('Warehouse items retrieved:', warehouseItems.length, 'items');
+        console.log('Retrieved warehouse items:', warehouseItems.length);
       }
 
       const analysisResults: DemandAnalysisResult[] = [];
       const materialMap = new Map();
-      let matchedCount = 0;
-      let unmatchedCount = 0;
+      let finishedGoodsCount = 0;
+      let rawMaterialsCount = 0;
 
-      // Process BOM items linked to PO items
+      // Process each PO and its items
       for (const po of poData) {
         for (const poItem of po.po_items) {
-          // Find BOM items linked to this PO item
-          const linkedBomItems = bomItems.filter(bomItem => bomItem.po_item_id === poItem.id);
+          console.log(`Processing PO item: ${poItem.item_name} (${poItem.item_code})`);
           
-          if (linkedBomItems.length === 0) {
-            // Handle unlinked PO items - treat as direct material requirement
+          // Check if this PO item matches a finished good
+          const matchedFinishedGood = finishedGoods.find(fg => 
+            fg.product_code === poItem.item_code
+          );
+
+          if (matchedFinishedGood) {
+            finishedGoodsCount++;
+            console.log(`PO item ${poItem.item_name} matched to finished good: ${matchedFinishedGood.product_name}`);
+            
+            // Find the BOM for this finished good
+            const linkedBOM = finishedGoodsBOMs.find(bom => bom.id === matchedFinishedGood.bom_id);
+            
+            if (linkedBOM && linkedBOM.bom_items) {
+              console.log(`Found BOM with ${linkedBOM.bom_items.length} items for finished good`);
+              
+              // Calculate material requirements from BOM
+              for (const bomItem of linkedBOM.bom_items) {
+                const materialKey = bomItem.warehouse_item_id || bomItem.item_code || bomItem.item_name;
+                
+                if (!materialMap.has(materialKey)) {
+                  materialMap.set(materialKey, {
+                    item_code: bomItem.item_code || '',
+                    item_name: bomItem.item_name,
+                    warehouse_item_id: bomItem.warehouse_item_id,
+                    total_required: 0,
+                    on_order: 0,
+                    unit_of_measure: bomItem.unit_of_measure,
+                    category: bomItem.category || 'raw_material',
+                    po_details: [],
+                    is_linked_to_bom: true,
+                    bom_info: {
+                      bom_number: linkedBOM.bom_number,
+                      product_name: linkedBOM.product_name
+                    },
+                    finished_good_info: {
+                      product_code: matchedFinishedGood.product_code,
+                      product_name: matchedFinishedGood.product_name,
+                      current_stock: matchedFinishedGood.current_stock
+                    }
+                  });
+                }
+
+                const material = materialMap.get(materialKey);
+                
+                // Calculate material requirement based on BOM consumption and PO quantity
+                const consumptionRatio = bomItem.consumption || bomItem.quantity || 1;
+                const poQuantity = poItem.quantity_ordered * (input.multiplier || 1);
+                const materialRequired = consumptionRatio * poQuantity;
+                
+                const pendingPoQuantity = (poItem.quantity_ordered - (poItem.quantity_received || 0)) * (input.multiplier || 1);
+                const pendingMaterialRequired = consumptionRatio * pendingPoQuantity;
+                
+                material.total_required += materialRequired;
+                material.on_order += pendingMaterialRequired;
+                
+                // Add PO details
+                const existingPoDetail = material.po_details.find(detail => detail.po_number === po.po_number);
+                if (existingPoDetail) {
+                  existingPoDetail.quantity_ordered += materialRequired;
+                  existingPoDetail.quantity_pending += pendingMaterialRequired;
+                } else {
+                  material.po_details.push({
+                    po_number: po.po_number,
+                    supplier_name: po.supplier?.name || '',
+                    quantity_ordered: materialRequired,
+                    quantity_pending: pendingMaterialRequired,
+                    expected_delivery: po.expected_delivery_date
+                  });
+                }
+              }
+            } else {
+              console.log(`No BOM found for finished good: ${matchedFinishedGood.product_name}`);
+            }
+          } else {
+            // Handle as raw material/direct purchase
+            rawMaterialsCount++;
+            console.log(`PO item ${poItem.item_name} treated as raw material`);
+            
             const key = poItem.warehouse_item_id || poItem.item_code || poItem.item_name;
             if (!materialMap.has(key)) {
               materialMap.set(key, {
@@ -438,7 +535,7 @@ export const useDemandCalculation = (companyId?: string) => {
                 total_required: 0,
                 on_order: 0,
                 unit_of_measure: poItem.unit_of_measure,
-                category: 'unlinked',
+                category: 'raw_material',
                 po_details: [],
                 is_linked_to_bom: false
               });
@@ -457,63 +554,18 @@ export const useDemandCalculation = (companyId?: string) => {
               quantity_pending: pendingQuantity,
               expected_delivery: po.expected_delivery_date
             });
-          } else {
-            // Process linked BOM items - use BOM consumption ratios
-            for (const bomItem of linkedBomItems) {
-              const materialKey = bomItem.warehouse_item_id || bomItem.item_code || bomItem.item_name;
-              if (!materialMap.has(materialKey)) {
-                materialMap.set(materialKey, {
-                  item_code: bomItem.item_code || '',
-                  item_name: bomItem.item_name,
-                  warehouse_item_id: bomItem.warehouse_item_id,
-                  total_required: 0,
-                  on_order: 0,
-                  unit_of_measure: bomItem.unit_of_measure,
-                  category: bomItem.category,
-                  po_details: [],
-                  is_linked_to_bom: true,
-                  bom_info: {
-                    bom_number: bomItem.bill_of_materials.bom_number,
-                    product_name: bomItem.bill_of_materials.product_name
-                  }
-                });
-              }
-
-              const material = materialMap.get(materialKey);
-              
-              // Calculate material requirement based on BOM consumption and PO quantity
-              const consumptionRatio = bomItem.consumption || bomItem.quantity || 1;
-              const poQuantity = poItem.quantity_ordered * (input.multiplier || 1);
-              const materialRequired = consumptionRatio * poQuantity;
-              
-              const pendingPoQuantity = (poItem.quantity_ordered - (poItem.quantity_received || 0)) * (input.multiplier || 1);
-              const pendingMaterialRequired = consumptionRatio * pendingPoQuantity;
-              
-              material.total_required += materialRequired;
-              material.on_order += pendingMaterialRequired;
-              
-              // Add PO details with calculated material quantities
-              const existingPoDetail = material.po_details.find(detail => detail.po_number === po.po_number);
-              if (existingPoDetail) {
-                existingPoDetail.quantity_ordered += materialRequired;
-                existingPoDetail.quantity_pending += pendingMaterialRequired;
-              } else {
-                material.po_details.push({
-                  po_number: po.po_number,
-                  supplier_name: po.supplier?.name || '',
-                  quantity_ordered: materialRequired,
-                  quantity_pending: pendingMaterialRequired,
-                  expected_delivery: po.expected_delivery_date
-                });
-              }
-            }
           }
         }
       }
 
+      console.log(`Processed ${finishedGoodsCount} finished goods items and ${rawMaterialsCount} raw material items`);
+
       // Calculate analysis for each material
+      let matchedCount = 0;
+      let unmatchedCount = 0;
+      
       for (const [key, materialData] of materialMap.entries()) {
-        // Improved warehouse item matching: id → item_code → name
+        // Enhanced warehouse item matching: id → item_code → name
         const warehouseItem = warehouseItems?.find(w => {
           // First, try to match by warehouse_item_id if available
           if (materialData.warehouse_item_id && w.id === materialData.warehouse_item_id) {
@@ -564,7 +616,11 @@ export const useDemandCalculation = (companyId?: string) => {
         });
       }
 
-      console.log(`PO Demand Calculation: ${matchedCount} matched, ${unmatchedCount} unmatched items`);
+      console.log(`PO Demand Calculation Complete:`);
+      console.log(`- Finished goods items: ${finishedGoodsCount}`);
+      console.log(`- Raw material items: ${rawMaterialsCount}`);
+      console.log(`- Materials with stock match: ${matchedCount}`);
+      console.log(`- Materials without stock match: ${unmatchedCount}`);
       
       // Create demand records
       const demandRecords = analysisResults.map(result => ({

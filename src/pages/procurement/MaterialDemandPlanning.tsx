@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Calendar, Calculator, FileText, AlertTriangle, CheckCircle, Clock, TrendingUp } from 'lucide-react';
+import { Calendar, Calculator, FileText, AlertTriangle, CheckCircle, Clock, TrendingUp, Package, Box, ShoppingCart } from 'lucide-react';
 import { useMaterialDemand, useDemandCalculation } from '@/hooks/useMaterialDemand';
 import { useBillOfMaterials } from '@/hooks/useBillOfMaterials';
 import { usePurchaseOrders } from '@/hooks/usePurchaseOrders';
@@ -347,58 +347,80 @@ const MaterialDemandPlanning = () => {
                   </div>
                   <Table>
                     <TableHeader>
-                      <TableRow>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Item Code</TableHead>
-                        <TableHead>Item Name</TableHead>
-                        <TableHead>Category</TableHead>
-                        <TableHead>Required</TableHead>
-                        <TableHead>Available</TableHead>
-                        <TableHead>On Order</TableHead>
-                        <TableHead>Shortage</TableHead>
-                        <TableHead>Suggested Order</TableHead>
-                        <TableHead>Priority</TableHead>
-                      </TableRow>
+                       <TableRow>
+                         <TableHead>Status</TableHead>
+                         <TableHead>Item Code</TableHead>
+                         <TableHead>Item Name</TableHead>
+                         <TableHead>Type</TableHead>
+                         <TableHead>Category</TableHead>
+                         <TableHead>Required</TableHead>
+                         <TableHead>Available</TableHead>
+                         <TableHead>On Order</TableHead>
+                         <TableHead>Shortage</TableHead>
+                         <TableHead>Suggested Order</TableHead>
+                         <TableHead>Priority</TableHead>
+                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {calculationResult.map((item, index) => (
-                        <TableRow key={index}>
-                          <TableCell>{getStatusIcon(item.shortage)}</TableCell>
-                          <TableCell className="font-mono text-sm">
-                            {item.item_code}
-                          </TableCell>
-                          <TableCell>
-                            {item.item_name}
-                            {(item as any).is_linked_to_bom && (
-                              <Badge variant="secondary" className="ml-2">
-                                BOM Linked
-                              </Badge>
-                            )}
-                            {(item as any).is_linked_to_bom === false && (
-                              <Badge variant="outline" className="ml-2">
-                                Direct PO Item
-                              </Badge>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant="outline">{item.category || 'N/A'}</Badge>
-                          </TableCell>
-                          <TableCell>{item.total_required} {item.unit_of_measure}</TableCell>
-                          <TableCell>{item.available_stock} {item.unit_of_measure}</TableCell>
-                          <TableCell>{item.on_order} {item.unit_of_measure}</TableCell>
-                          <TableCell className={item.shortage > 0 ? 'text-destructive font-medium' : ''}>
-                            {item.shortage} {item.unit_of_measure}
-                          </TableCell>
-                          <TableCell className={item.suggested_order > 0 ? 'text-primary font-medium' : ''}>
-                            {item.suggested_order} {item.unit_of_measure}
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant={getPriorityColor(item.priority)}>
-                              {item.priority}
-                            </Badge>
-                          </TableCell>
-                        </TableRow>
-                      ))}
+                       {calculationResult.map((item, index) => (
+                         <TableRow key={index}>
+                           <TableCell>{getStatusIcon(item.shortage)}</TableCell>
+                           <TableCell className="font-mono text-sm">
+                             {item.item_code}
+                           </TableCell>
+                           <TableCell>
+                             <div className="space-y-1">
+                               <div>{item.item_name}</div>
+                               {item.finished_good_info && (
+                                 <div className="text-xs text-muted-foreground">
+                                   For: {item.finished_good_info.product_name} 
+                                   (Stock: {item.finished_good_info.current_stock})
+                                 </div>
+                               )}
+                               {item.bom_info && (
+                                 <div className="text-xs text-muted-foreground">
+                                   BOM: {item.bom_info.bom_number}
+                                 </div>
+                               )}
+                             </div>
+                           </TableCell>
+                           <TableCell>
+                             {item.finished_good_info ? (
+                               <Badge variant="default" className="bg-blue-500">
+                                 <Package className="h-3 w-3 mr-1" />
+                                 From Finished Good
+                               </Badge>
+                             ) : item.is_linked_to_bom ? (
+                               <Badge variant="secondary">
+                                 <Box className="h-3 w-3 mr-1" />
+                                 BOM Material
+                               </Badge>
+                             ) : (
+                               <Badge variant="outline">
+                                 <ShoppingCart className="h-3 w-3 mr-1" />
+                                 Direct Purchase
+                               </Badge>
+                             )}
+                           </TableCell>
+                           <TableCell>
+                             <Badge variant="outline">{item.category || 'N/A'}</Badge>
+                           </TableCell>
+                           <TableCell>{item.total_required} {item.unit_of_measure}</TableCell>
+                           <TableCell>{item.available_stock} {item.unit_of_measure}</TableCell>
+                           <TableCell>{item.on_order} {item.unit_of_measure}</TableCell>
+                           <TableCell className={item.shortage > 0 ? 'text-destructive font-medium' : ''}>
+                             {item.shortage} {item.unit_of_measure}
+                           </TableCell>
+                           <TableCell className={item.suggested_order > 0 ? 'text-primary font-medium' : ''}>
+                             {item.suggested_order} {item.unit_of_measure}
+                           </TableCell>
+                           <TableCell>
+                             <Badge variant={getPriorityColor(item.priority)}>
+                               {item.priority}
+                             </Badge>
+                           </TableCell>
+                         </TableRow>
+                       ))}
                     </TableBody>
                   </Table>
                 </CardContent>
