@@ -368,40 +368,39 @@ const MaterialDemandPlanning = () => {
                            <TableCell className="font-mono text-sm">
                              {item.item_code}
                            </TableCell>
-                           <TableCell>
-                             <div className="space-y-1">
-                               <div>{item.item_name}</div>
-                               {item.finished_good_info && (
-                                 <div className="text-xs text-muted-foreground">
-                                   For: {item.finished_good_info.product_name} 
-                                   (Stock: {item.finished_good_info.current_stock})
-                                 </div>
-                               )}
-                               {item.bom_info && (
-                                 <div className="text-xs text-muted-foreground">
-                                   BOM: {item.bom_info.bom_number}
-                                 </div>
-                               )}
-                             </div>
-                           </TableCell>
-                           <TableCell>
-                             {item.finished_good_info ? (
-                               <Badge variant="default" className="bg-blue-500">
-                                 <Package className="h-3 w-3 mr-1" />
-                                 From Finished Good
-                               </Badge>
-                             ) : item.is_linked_to_bom ? (
-                               <Badge variant="secondary">
-                                 <Box className="h-3 w-3 mr-1" />
-                                 BOM Material
-                               </Badge>
-                             ) : (
-                               <Badge variant="outline">
-                                 <ShoppingCart className="h-3 w-3 mr-1" />
-                                 Direct Purchase
-                               </Badge>
-                             )}
-                           </TableCell>
+                            <TableCell>
+                              <div className="flex flex-col">
+                                <span className="font-medium">{item.item_name}</span>
+                                {item.finished_good_info && (
+                                  <span className="text-sm text-muted-foreground">
+                                    FG: {item.finished_good_info.product_name} (Stock: {item.finished_good_info.current_stock})
+                                  </span>
+                                )}
+                                {item.bom_info && (
+                                  <span className="text-sm text-muted-foreground">
+                                    BOM: {item.bom_info.bom_number}
+                                  </span>
+                                )}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              {item.finished_good_info && item.category === 'Fulfilled from Stock' ? (
+                                <Badge variant="secondary" className="bg-green-500 text-white">
+                                  <Package className="h-3 w-3 mr-1" />
+                                  Fulfilled from Stock
+                                </Badge>
+                              ) : item.category === 'BOM Material' ? (
+                                <Badge variant="default">
+                                  <Box className="h-3 w-3 mr-1" />
+                                  BOM Material
+                                </Badge>
+                              ) : (
+                                <Badge variant="outline">
+                                  <ShoppingCart className="h-3 w-3 mr-1" />
+                                  Direct Purchase
+                                </Badge>
+                              )}
+                            </TableCell>
                            <TableCell>
                              <Badge variant="outline">{item.category || 'N/A'}</Badge>
                            </TableCell>

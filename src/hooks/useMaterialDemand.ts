@@ -302,6 +302,9 @@ export const useDemandCalculation = (companyId?: string) => {
 
   const calculatePODemandMutation = useMutation({
     mutationFn: async (input: PODemandCalculationInput): Promise<DemandAnalysisResult[]> => {
+      console.log('=== Enhanced PO Demand Calculation Started ===');
+      console.log('Input:', input);
+      
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User not authenticated');
 
@@ -310,350 +313,252 @@ export const useDemandCalculation = (companyId?: string) => {
         throw new Error('No purchase orders selected for analysis');
       }
 
-      console.log('Starting PO demand calculation for POs:', input.po_ids);
-
-      // Get PO data with items
-      const { data: poData, error: poError } = await supabase
-        .from('purchase_orders')  
-        .select(`
-          id,
-          po_number,
-          supplier_id,
-          status,
-          expected_delivery_date,
-          po_items (
-            id,
-            item_name,
-            item_code,
-            quantity_ordered,
-            quantity_received,
-            unit_of_measure,
-            warehouse_item_id
-          ),
-          supplier:suppliers (
-            name
-          )
-        `)
-        .in('id', input.po_ids)
-        .eq('status', 'approved');
-
-      if (poError) throw poError;
-      console.log('Retrieved PO data:', poData.length, 'POs');
-
-      // Get all PO item codes for matching with finished goods
-      const allPoItemCodes = poData.flatMap(po => 
-        po.po_items.map(item => item.item_code).filter(Boolean)
-      );
-
-      // Match PO items to finished goods using item_code -> product_code
-      let finishedGoods: any[] = [];
-      let finishedGoodsBOMs: any[] = [];
-      
-      if (allPoItemCodes.length > 0) {
-        console.log('Looking for finished goods with product codes:', allPoItemCodes);
-        
-        // Get finished goods that match PO item codes
-        const { data: fgData, error: fgError } = await supabase
-          .from('finished_goods')
-          .select(`
-            id,
-            product_code,
-            product_name,
-            current_stock,
-            bom_id,
-            unit_of_measure,
-            company_id
-          `)
-          .in('product_code', allPoItemCodes);
-
-        if (fgError) throw fgError;
-        finishedGoods = fgData || [];
-        console.log('Found finished goods matches:', finishedGoods.length);
-
-        // Get BOMs for matched finished goods
-        const bomIds = finishedGoods.map(fg => fg.bom_id).filter(Boolean);
-        if (bomIds.length > 0) {
-          const { data: bomData, error: bomError } = await supabase
-            .from('bill_of_materials')
-            .select(`
-              id,
-              bom_number,
-              product_name,
-              bom_items (
-                id,
-                item_name,
-                item_code,
-                quantity,
-                consumption,
-                unit_of_measure,
-                category,
-                warehouse_item_id
-              )
-            `)
-            .in('id', bomIds);
-
-          if (bomError) throw bomError;
-          finishedGoodsBOMs = bomData || [];
-          console.log('Retrieved BOMs for finished goods:', finishedGoodsBOMs.length);
-        }
-      }
-
-      // Get all potential warehouse item IDs and codes for stock checking
-      const bomWarehouseItemIds = finishedGoodsBOMs.flatMap(bom => 
-        bom.bom_items.map(item => item.warehouse_item_id).filter(Boolean)
-      );
-      const poWarehouseItemIds = poData.flatMap(po => 
-        po.po_items.map(item => item.warehouse_item_id).filter(Boolean)
-      );
-      const allWarehouseItemIds = [...new Set([...bomWarehouseItemIds, ...poWarehouseItemIds])];
-      
-      const bomItemCodes = finishedGoodsBOMs.flatMap(bom => 
-        bom.bom_items.map(item => item.item_code).filter(Boolean)
-      );
-      const poItemCodes = poData.flatMap(po => 
-        po.po_items.map(item => item.item_code).filter(Boolean)
-      );
-      const allItemCodes = [...new Set([...bomItemCodes, ...poItemCodes])];
-
-      // Get warehouse items for raw material stock checking
-      let warehouseItems: any[] = [];
-      if (allWarehouseItemIds.length > 0 || allItemCodes.length > 0) {
-        let query = supabase
-          .from('warehouse_items')
-          .select('id, item_code, name, current_stock, min_stock_level, unit_cost, company_id');
-        
-        if (companyId) {
-          query = query.eq('company_id', companyId);
-        }
-        
-        if (allWarehouseItemIds.length > 0) {
-          query = query.or(`id.in.(${allWarehouseItemIds.join(',')}),item_code.in.(${allItemCodes.join(',')})`);
-        } else {
-          query = query.in('item_code', allItemCodes);
-        }
-
-        const { data: warehouseData, error: warehouseError } = await query;
-        if (warehouseError) throw warehouseError;
-        warehouseItems = warehouseData || [];
-        console.log('Retrieved warehouse items:', warehouseItems.length);
-      }
-
       const analysisResults: DemandAnalysisResult[] = [];
-      const materialMap = new Map();
-      let finishedGoodsCount = 0;
-      let rawMaterialsCount = 0;
+      
+      // Fetch all purchase orders and their items
+      const { data: purchaseOrders, error: poError } = await supabase
+        .from('purchase_orders')
+        .select(`
+          *,
+          po_items (*),
+          supplier:suppliers (name)
+        `)
+        .in('id', input.po_ids);
 
-      // Process each PO and its items
-      for (const po of poData) {
-        for (const poItem of po.po_items) {
-          console.log(`Processing PO item: ${poItem.item_name} (${poItem.item_code})`);
+      if (poError) {
+        console.error('Error fetching purchase orders:', poError);
+        throw new Error('Failed to fetch purchase orders');
+      }
+
+      console.log('Fetched purchase orders:', purchaseOrders?.length);
+
+      // Fetch finished goods with their BOMs - matching by product_code
+      const { data: finishedGoods, error: fgError } = await supabase
+        .from('finished_goods')
+        .select(`
+          *,
+          bill_of_materials (
+            id,
+            bom_number,
+            product_name,
+            bom_items (
+              id,
+              item_name,
+              item_code,
+              quantity,
+              unit_of_measure,
+              consumption,
+              warehouse_item_id
+            )
+          )
+        `);
+
+      if (fgError) {
+        console.error('Error fetching finished goods:', fgError);
+        throw new Error('Failed to fetch finished goods');
+      }
+
+      console.log('Fetched finished goods:', finishedGoods?.length);
+
+      // Fetch warehouse items for stock information
+      const { data: warehouseItems, error: wiError } = await supabase
+        .from('warehouse_items')
+        .select('*');
+
+      if (wiError) {
+        console.error('Error fetching warehouse items:', wiError);
+        throw new Error('Failed to fetch warehouse items');
+      }
+
+      console.log('Fetched warehouse items:', warehouseItems?.length);
+
+      // Create lookup maps for efficient matching
+      const finishedGoodsMap = new Map();
+      const warehouseItemsMap = new Map();
+      
+      finishedGoods?.forEach(fg => {
+        if (fg.product_code) {
+          finishedGoodsMap.set(fg.product_code, fg);
+        }
+      });
+      
+      warehouseItems?.forEach(wi => {
+        if (wi.item_code) {
+          warehouseItemsMap.set(wi.item_code, wi);
+        }
+      });
+
+      console.log(`Finished goods mapping: ${finishedGoodsMap.size} items`);
+      console.log(`Warehouse items mapping: ${warehouseItemsMap.size} items`);
+
+      // Process each purchase order with enhanced logic
+      for (const po of purchaseOrders || []) {
+        console.log(`\n--- Processing PO: ${po.po_number} ---`);
+        
+        for (const poItem of po.po_items || []) {
+          console.log(`\nProcessing PO Item: ${poItem.item_name} (Code: ${poItem.item_code})`);
+          console.log(`PO Quantity: ${poItem.quantity_ordered}`);
           
-          // Check if this PO item matches a finished good
-          const matchedFinishedGood = finishedGoods.find(fg => 
-            fg.product_code === poItem.item_code
-          );
-
+          // Step 1: Check if PO item matches a finished good by item_code
+          const matchedFinishedGood = finishedGoodsMap.get(poItem.item_code);
+          
           if (matchedFinishedGood) {
-            finishedGoodsCount++;
-            console.log(`PO item ${poItem.item_name} matched to finished good: ${matchedFinishedGood.product_name}`);
+            console.log(`✓ Matched with finished good: ${matchedFinishedGood.product_name}`);
+            console.log(`Current FG Stock: ${matchedFinishedGood.current_stock}`);
             
-            // Find the BOM for this finished good
-            const linkedBOM = finishedGoodsBOMs.find(bom => bom.id === matchedFinishedGood.bom_id);
+            // Step 2: Apply the formula - (PO Quantity - Available FG Stock)
+            const availableStock = Number(matchedFinishedGood.current_stock) || 0;
+            const poQuantity = Number(poItem.quantity_ordered) * (input.multiplier || 1);
+            const requiredProduction = Math.max(0, poQuantity - availableStock);
             
-            if (linkedBOM && linkedBOM.bom_items) {
-              console.log(`Found BOM with ${linkedBOM.bom_items.length} items for finished good`);
+            console.log(`Formula: max(0, ${poQuantity} - ${availableStock}) = ${requiredProduction}`);
+            
+            if (requiredProduction > 0) {
+              console.log(`⚡ Production required: ${requiredProduction} units`);
               
-              // Calculate material requirements from BOM
-              for (const bomItem of linkedBOM.bom_items) {
-                const materialKey = bomItem.warehouse_item_id || bomItem.item_code || bomItem.item_name;
+              // Step 3: Calculate BOM material requirements ONLY for the shortfall
+              if (matchedFinishedGood.bill_of_materials?.bom_items) {
+                console.log('📋 Expanding BOM for shortfall quantity...');
                 
-                if (!materialMap.has(materialKey)) {
-                  materialMap.set(materialKey, {
-                    item_code: bomItem.item_code || '',
-                    item_name: bomItem.item_name,
-                    warehouse_item_id: bomItem.warehouse_item_id,
-                    total_required: 0,
-                    on_order: 0,
-                    unit_of_measure: bomItem.unit_of_measure,
-                    category: bomItem.category || 'raw_material',
-                    po_details: [],
-                    is_linked_to_bom: true,
-                    bom_info: {
-                      bom_number: linkedBOM.bom_number,
-                      product_name: linkedBOM.product_name
-                    },
-                    finished_good_info: {
-                      product_code: matchedFinishedGood.product_code,
-                      product_name: matchedFinishedGood.product_name,
-                      current_stock: matchedFinishedGood.current_stock
-                    }
-                  });
+                for (const bomItem of matchedFinishedGood.bill_of_materials.bom_items) {
+                  const consumptionPerUnit = Number(bomItem.consumption) || Number(bomItem.quantity) || 0;
+                  const materialRequired = requiredProduction * consumptionPerUnit;
+                  
+                  const warehouseItem = warehouseItemsMap.get(bomItem.item_code);
+                  const currentMaterialStock = Number(warehouseItem?.current_stock) || 0;
+                  const materialShortage = Math.max(0, materialRequired - currentMaterialStock);
+                  
+                  console.log(`  📦 ${bomItem.item_name}:`);
+                  console.log(`    Consumption: ${consumptionPerUnit} per unit`);
+                  console.log(`    Required: ${materialRequired} (${requiredProduction} × ${consumptionPerUnit})`);
+                  console.log(`    Stock: ${currentMaterialStock}`);
+                  console.log(`    Shortage: ${materialShortage}`);
+                  
+                  // Find existing result or create new one
+                  let existingResult = analysisResults.find(r => r.item_code === bomItem.item_code);
+                  
+                  if (existingResult) {
+                    existingResult.total_required += materialRequired;
+                    existingResult.shortage = Math.max(0, existingResult.total_required - existingResult.available_stock);
+                    existingResult.suggested_order = existingResult.shortage;
+                  } else {
+                    analysisResults.push({
+                      item_code: bomItem.item_code || 'N/A',
+                      item_name: bomItem.item_name,
+                      total_required: materialRequired,
+                      available_stock: currentMaterialStock,
+                      on_order: 0,
+                      shortage: materialShortage,
+                      suggested_order: materialShortage,
+                      unit_of_measure: bomItem.unit_of_measure,
+                      category: 'BOM Material',
+                      priority: materialShortage > 0 ? 'high' : 'medium',
+                      lead_time_days: 7,
+                      is_linked_to_bom: true,
+                      bom_info: {
+                        bom_number: matchedFinishedGood.bill_of_materials.bom_number,
+                        product_name: matchedFinishedGood.bill_of_materials.product_name
+                      },
+                      finished_good_info: {
+                        product_code: matchedFinishedGood.product_code,
+                        product_name: matchedFinishedGood.product_name,
+                        current_stock: availableStock
+                      },
+                      po_details: [{
+                        po_number: po.po_number,
+                        supplier_name: po.supplier?.name || 'Unknown',
+                        quantity_ordered: poItem.quantity_ordered,
+                        quantity_pending: poItem.quantity_pending || 0,
+                        delivery_date: poItem.delivery_date,
+                        expected_delivery: po.expected_delivery_date
+                      }]
+                    });
+                  }
                 }
-
-                const material = materialMap.get(materialKey);
-                
-                // Calculate material requirement based on BOM consumption and PO quantity
-                const consumptionRatio = bomItem.consumption || bomItem.quantity || 1;
-                const poQuantity = poItem.quantity_ordered * (input.multiplier || 1);
-                const materialRequired = consumptionRatio * poQuantity;
-                
-                const pendingPoQuantity = (poItem.quantity_ordered - (poItem.quantity_received || 0)) * (input.multiplier || 1);
-                const pendingMaterialRequired = consumptionRatio * pendingPoQuantity;
-                
-                material.total_required += materialRequired;
-                material.on_order += pendingMaterialRequired;
-                
-                // Add PO details
-                const existingPoDetail = material.po_details.find(detail => detail.po_number === po.po_number);
-                if (existingPoDetail) {
-                  existingPoDetail.quantity_ordered += materialRequired;
-                  existingPoDetail.quantity_pending += pendingMaterialRequired;
-                } else {
-                  material.po_details.push({
-                    po_number: po.po_number,
-                    supplier_name: po.supplier?.name || '',
-                    quantity_ordered: materialRequired,
-                    quantity_pending: pendingMaterialRequired,
-                    expected_delivery: po.expected_delivery_date
-                  });
-                }
+              } else {
+                console.log('⚠️ No BOM found for finished good');
               }
             } else {
-              console.log(`No BOM found for finished good: ${matchedFinishedGood.product_name}`);
-            }
-          } else {
-            // Handle as raw material/direct purchase
-            rawMaterialsCount++;
-            console.log(`PO item ${poItem.item_name} treated as raw material`);
-            
-            const key = poItem.warehouse_item_id || poItem.item_code || poItem.item_name;
-            if (!materialMap.has(key)) {
-              materialMap.set(key, {
-                item_code: poItem.item_code || '',
-                item_name: poItem.item_name,
-                warehouse_item_id: poItem.warehouse_item_id,
-                total_required: 0,
+              console.log(`✓ Fully satisfied from stock (${availableStock} >= ${poQuantity})`);
+              
+              // Add entry to show stock fulfillment
+              analysisResults.push({
+                item_code: matchedFinishedGood.product_code,
+                item_name: matchedFinishedGood.product_name,
+                total_required: poQuantity,
+                available_stock: availableStock,
                 on_order: 0,
-                unit_of_measure: poItem.unit_of_measure,
-                category: 'raw_material',
-                po_details: [],
-                is_linked_to_bom: false
+                shortage: 0,
+                suggested_order: 0,
+                unit_of_measure: matchedFinishedGood.unit_of_measure,
+                category: 'Fulfilled from Stock',
+                priority: 'low',
+                lead_time_days: 0,
+                finished_good_info: {
+                  product_code: matchedFinishedGood.product_code,
+                  product_name: matchedFinishedGood.product_name,
+                  current_stock: availableStock
+                },
+                po_details: [{
+                  po_number: po.po_number,
+                  supplier_name: po.supplier?.name || 'Unknown',
+                  quantity_ordered: poItem.quantity_ordered,
+                  quantity_pending: poItem.quantity_pending || 0,
+                  delivery_date: poItem.delivery_date,
+                  expected_delivery: po.expected_delivery_date
+                }]
               });
             }
-
-            const material = materialMap.get(key);
-            const multipliedQuantity = poItem.quantity_ordered * (input.multiplier || 1);
-            const pendingQuantity = (poItem.quantity_ordered - (poItem.quantity_received || 0)) * (input.multiplier || 1);
+          } else {
+            console.log('❌ No finished good match - treating as direct raw material purchase');
             
-            material.total_required += multipliedQuantity;
-            material.on_order += pendingQuantity;
-            material.po_details.push({
-              po_number: po.po_number,
-              supplier_name: po.supplier?.name || '',
-              quantity_ordered: multipliedQuantity,
-              quantity_pending: pendingQuantity,
-              expected_delivery: po.expected_delivery_date
+            // Direct raw material purchase - no BOM expansion needed
+            const warehouseItem = warehouseItemsMap.get(poItem.item_code);
+            const currentStock = Number(warehouseItem?.current_stock) || 0;
+            const poQuantityWithMultiplier = Number(poItem.quantity_ordered) * (input.multiplier || 1);
+            const shortage = Math.max(0, poQuantityWithMultiplier - currentStock);
+            
+            console.log(`  Direct material: ${poItem.item_name}`);
+            console.log(`  Required: ${poQuantityWithMultiplier}, Stock: ${currentStock}, Shortage: ${shortage}`);
+            
+            analysisResults.push({
+              item_code: poItem.item_code || 'N/A',
+              item_name: poItem.item_name,
+              total_required: poQuantityWithMultiplier,
+              available_stock: currentStock,
+              on_order: 0,
+              shortage: shortage,
+              suggested_order: shortage,
+              unit_of_measure: poItem.unit_of_measure,
+              category: 'Direct Purchase',
+              priority: shortage > 0 ? 'medium' : 'low',
+              lead_time_days: 7,
+              po_details: [{
+                po_number: po.po_number,
+                supplier_name: po.supplier?.name || 'Unknown',
+                quantity_ordered: poItem.quantity_ordered,
+                quantity_pending: poItem.quantity_pending || 0,
+                delivery_date: poItem.delivery_date,
+                expected_delivery: po.expected_delivery_date
+              }]
             });
           }
         }
       }
 
-      console.log(`Processed ${finishedGoodsCount} finished goods items and ${rawMaterialsCount} raw material items`);
-
-      // Calculate analysis for each material
-      let matchedCount = 0;
-      let unmatchedCount = 0;
+      console.log(`\n=== Enhanced PO Demand Calculation Complete ===`);
+      console.log(`Total material demands identified: ${analysisResults.length}`);
+      console.log('Categories:', analysisResults.reduce((acc, r) => {
+        acc[r.category] = (acc[r.category] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>));
       
-      for (const [key, materialData] of materialMap.entries()) {
-        // Enhanced warehouse item matching: id → item_code → name
-        const warehouseItem = warehouseItems?.find(w => {
-          // First, try to match by warehouse_item_id if available
-          if (materialData.warehouse_item_id && w.id === materialData.warehouse_item_id) {
-            return true;
-          }
-          // Then try to match by item_code
-          if (materialData.item_code && w.item_code === materialData.item_code) {
-            return true;
-          }
-          // Finally, try to match by item name
-          if (materialData.item_name && w.name === materialData.item_name) {
-            return true;
-          }
-          return false;
-        });
-        
-        if (warehouseItem) {
-          matchedCount++;
-        } else {
-          unmatchedCount++;
-          console.log(`No warehouse item found for material: ${materialData.item_name} (${materialData.item_code})`);
-        }
-        
-        const currentStock = warehouseItem?.current_stock || 0;
-        const safetyStock = input.include_safety_stock ? (warehouseItem?.min_stock_level || 0) : 0;
-        const shortage = Math.max(0, materialData.total_required - currentStock - materialData.on_order);
-        const suggestedOrder = shortage > 0 ? shortage + safetyStock : 0;
-
-        // Determine priority based on shortage and requirement
-        let priority: 'low' | 'medium' | 'high' | 'urgent' = 'medium';
-        if (shortage > materialData.total_required * 0.8) priority = 'urgent';
-        else if (shortage > materialData.total_required * 0.5) priority = 'high';
-        else if (shortage > 0) priority = 'medium';
-        else priority = 'low';
-
-        analysisResults.push({
-          ...materialData,
-          available_stock: currentStock,
-          shortage,
-          suggested_order: suggestedOrder,
-          priority,
-          lead_time_days: 7, // Default lead time
-          supplier_info: warehouseItem ? {
-            supplier_id: '',
-            supplier_name: '',
-            last_unit_cost: warehouseItem.unit_cost
-          } : undefined
-        });
-      }
-
-      console.log(`PO Demand Calculation Complete:`);
-      console.log(`- Finished goods items: ${finishedGoodsCount}`);
-      console.log(`- Raw material items: ${rawMaterialsCount}`);
-      console.log(`- Materials with stock match: ${matchedCount}`);
-      console.log(`- Materials without stock match: ${unmatchedCount}`);
-      
-      // Create demand records
-      const demandRecords = analysisResults.map(result => ({
-        item_code: result.item_code,
-        item_name: result.item_name,
-        gross_requirement: result.total_required,
-        current_stock: result.available_stock,
-        on_order_quantity: result.on_order,
-        net_requirement: result.shortage,
-        suggested_order_quantity: result.suggested_order,
-        demand_date: input.analysis_date,
-        demand_source: 'purchase_order' as const,
-        reference_id: input.po_ids[0], // Use first PO as reference
-        status: 'calculated' as const,
-        company_id: companyId,
-        created_by: user.id
-      }));
-
-      // Only insert if we have records to insert
-      if (demandRecords.length > 0) {
-        const { error: insertError } = await supabase
-          .from('material_demand')
-          .insert(demandRecords);
-
-        if (insertError) throw insertError;
-      }
-
       return analysisResults;
     },
     onSuccess: () => {
       toast({
         title: "Success",
-        description: "PO demand calculated successfully",
+        description: "PO material demand calculated successfully",
       });
     },
     onError: (error) => {
