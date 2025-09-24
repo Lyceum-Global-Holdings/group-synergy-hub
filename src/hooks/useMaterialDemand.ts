@@ -186,8 +186,9 @@ export const useDemandCalculation = (companyId?: string) => {
         }
 
         const { data: warehouseData, error: warehouseError } = await query;
-
-      if (warehouseError) throw warehouseError;
+        if (warehouseError) throw warehouseError;
+        warehouseItems = warehouseData || [];
+      }
 
       // Get on-order quantities from PO items
       const { data: poItems, error: poError } = await supabase
@@ -212,10 +213,6 @@ export const useDemandCalculation = (companyId?: string) => {
         return acc;
       }, {} as Record<string, any[]>) || {};
 
-        if (warehouseError) throw warehouseError;
-        warehouseItems = warehouseData || [];
-      }
-
       // Calculate demand analysis
       const analysis: DemandAnalysisResult[] = [];
       let matchedItems = 0;
@@ -237,7 +234,7 @@ export const useDemandCalculation = (companyId?: string) => {
           console.log(`No warehouse item found for BOM item: ${bomItem.item_name} (${bomItem.item_code})`);
         }
 
-        const relatedPOItems = poItems?.filter(item => item.item_code === bomItem.item_code) || [];
+        const relatedPOItems = poItemsByCode[bomItem.item_code] || [];
         
         const totalRequired = (bomItem.consumption || bomItem.quantity || 0) * input.production_quantity;
         const availableStock = warehouseItem?.current_stock || 0;
