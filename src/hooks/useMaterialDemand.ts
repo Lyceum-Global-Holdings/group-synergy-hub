@@ -333,17 +333,37 @@ export const useDemandCalculation = (companyId?: string) => {
         bomItems = bomData || [];
       }
 
-      // Get warehouse items for stock levels (only if we have warehouse item IDs)
-      const warehouseItemIds = [...new Set(bomItems.map(item => item.warehouse_item_id).filter(Boolean))];
-      let warehouseItems: any[] = [];
-      if (warehouseItemIds.length > 0) {
-        const { data: warehouseData, error: warehouseError } = await supabase
-          .from('warehouse_items')
-          .select('id, item_code, current_stock, min_stock_level, unit_cost')
-          .in('id', warehouseItemIds);
+      // Get warehouse items for stock levels from both BOM items and PO items
+      const bomWarehouseItemIds = bomItems.map(item => item.warehouse_item_id).filter(Boolean);
+      const poWarehouseItemIds = poData.flatMap(po => 
+        po.po_items.map(item => item.warehouse_item_id).filter(Boolean)
+      );
+      const allWarehouseItemIds = [...new Set([...bomWarehouseItemIds, ...poWarehouseItemIds])];
+      
+      // Also collect all item codes for fallback matching
+      const bomItemCodes = bomItems.map(item => item.item_code).filter(Boolean);
+      const poItemCodes = poData.flatMap(po => 
+        po.po_items.map(item => item.item_code).filter(Boolean)
+      );
+      const allItemCodes = [...new Set([...bomItemCodes, ...poItemCodes])];
 
+      let warehouseItems: any[] = [];
+      if (allWarehouseItemIds.length > 0 || allItemCodes.length > 0) {
+        let query = supabase
+          .from('warehouse_items')
+          .select('id, item_code, current_stock, min_stock_level, unit_cost');
+        
+        if (allWarehouseItemIds.length > 0) {
+          query = query.in('id', allWarehouseItemIds);
+        } else if (allItemCodes.length > 0) {
+          query = query.in('item_code', allItemCodes);
+        }
+
+        const { data: warehouseData, error: warehouseError } = await query;
         if (warehouseError) throw warehouseError;
         warehouseItems = warehouseData || [];
+        
+        console.log('Warehouse items retrieved:', warehouseItems.length, 'items');
       }
 
       const analysisResults: DemandAnalysisResult[] = [];
@@ -357,11 +377,12 @@ export const useDemandCalculation = (companyId?: string) => {
           
           if (linkedBomItems.length === 0) {
             // Handle unlinked PO items - treat as direct material requirement
-            const key = poItem.warehouse_item_id || poItem.item_code;
+            const key = poItem.warehouse_item_id || poItem.item_code || poItem.item_name;
             if (!materialMap.has(key)) {
               materialMap.set(key, {
                 item_code: poItem.item_code || '',
                 item_name: poItem.item_name,
+                warehouse_item_id: poItem.warehouse_item_id,
                 total_required: 0,
                 on_order: 0,
                 unit_of_measure: poItem.unit_of_measure,
@@ -387,11 +408,12 @@ export const useDemandCalculation = (companyId?: string) => {
           } else {
             // Process linked BOM items - use BOM consumption ratios
             for (const bomItem of linkedBomItems) {
-              const materialKey = bomItem.warehouse_item_id || bomItem.item_code;
+              const materialKey = bomItem.warehouse_item_id || bomItem.item_code || bomItem.item_name;
               if (!materialMap.has(materialKey)) {
                 materialMap.set(materialKey, {
                   item_code: bomItem.item_code || '',
                   item_name: bomItem.item_name,
+                  warehouse_item_id: bomItem.warehouse_item_id,
                   total_required: 0,
                   on_order: 0,
                   unit_of_measure: bomItem.unit_of_measure,
@@ -439,14 +461,38 @@ export const useDemandCalculation = (companyId?: string) => {
 
       // Calculate analysis for each material
       for (const [key, materialData] of materialMap.entries()) {
-        const warehouseItem = warehouseItems?.find(w => 
-          w.id === key || w.item_code === materialData.item_code
-        );
+        // Improved warehouse item matching logic
+        const warehouseItem = warehouseItems?.find(w => {
+          // First, try to match by warehouse_item_id if available
+          if (materialData.warehouse_item_id && w.id === materialData.warehouse_item_id) {
+            return true;
+          }
+          // Then try to match by item_code
+          if (materialData.item_code && w.item_code === materialData.item_code) {
+            return true;
+          }
+          // Finally, try to match by the key itself (in case key is warehouse_item_id)
+          if (w.id === key) {
+            return true;
+          }
+          return false;
+        });
         
         const currentStock = warehouseItem?.current_stock || 0;
         const safetyStock = input.include_safety_stock ? (warehouseItem?.min_stock_level || 0) : 0;
         const shortage = Math.max(0, materialData.total_required - currentStock - materialData.on_order);
         const suggestedOrder = shortage > 0 ? shortage + safetyStock : 0;
+
+        // Debug logging for stock matching
+        if (materialData.item_code) {
+          console.log(`Stock lookup for ${materialData.item_name} (${materialData.item_code}):`, {
+            warehouse_item_id: materialData.warehouse_item_id,
+            found_warehouse_item: !!warehouseItem,
+            current_stock: currentStock,
+            total_required: materialData.total_required,
+            shortage: shortage
+          });
+        }
 
         // Determine priority based on shortage and requirement
         let priority: 'low' | 'medium' | 'high' | 'urgent' = 'medium';
