@@ -45,7 +45,9 @@ import { useCompany } from '@/contexts/CompanyContext';
 import { cn } from '@/lib/utils';
 import type { CreatePrData, PrPriority } from '@/types/procurement';
 import { ItemSelector } from '@/components/common/ItemSelector';
+import { FinishedGoodsItemSelector } from '@/components/common/FinishedGoodsItemSelector';
 import { WarehouseItem } from '@/types/itemBin';
+import { FinishedGood } from '@/hooks/useFinishedGoods';
 
 const createPrSchema = z.object({
   title: z.string().min(1, 'Title is required'),
@@ -61,6 +63,7 @@ const createPrSchema = z.object({
   bom_id: z.string().optional(),
   items: z.array(z.object({
     warehouse_item_id: z.string().optional(),
+    finished_good_id: z.string().optional(),
     item_code: z.string().optional(),
     item_name: z.string().min(1, 'Item name is required'),
     description: z.string().optional(),
@@ -117,6 +120,8 @@ export function CreatePrDialog({ open, onOpenChange }: CreatePrDialogProps) {
       bom_id: '',
       items: [
         {
+          warehouse_item_id: '',
+          finished_good_id: '',
           item_name: '',
           description: '',
           quantity: 1,
@@ -154,6 +159,7 @@ export function CreatePrDialog({ open, onOpenChange }: CreatePrDialogProps) {
       company_id: selectedCompany?.id, // Auto-capture company ID
       items: data.items.map(item => ({
         warehouse_item_id: item.warehouse_item_id,
+        finished_good_id: item.finished_good_id,
         item_code: item.item_code,
         item_name: item.item_name,
         description: item.description,
@@ -178,6 +184,7 @@ export function CreatePrDialog({ open, onOpenChange }: CreatePrDialogProps) {
   const addItem = () => {
     append({
       warehouse_item_id: '',
+      finished_good_id: '',
       item_code: '',
       item_name: '',
       description: '',
@@ -193,6 +200,7 @@ export function CreatePrDialog({ open, onOpenChange }: CreatePrDialogProps) {
   const handleItemSelect = (index: number, item: WarehouseItem | null) => {
     if (item) {
       form.setValue(`items.${index}.warehouse_item_id`, item.id);
+      form.setValue(`items.${index}.finished_good_id`, '');
       form.setValue(`items.${index}.item_code`, item.item_code);
       form.setValue(`items.${index}.item_name`, item.name);
       form.setValue(`items.${index}.description`, item.description || '');
@@ -201,6 +209,26 @@ export function CreatePrDialog({ open, onOpenChange }: CreatePrDialogProps) {
       setTimeout(() => calculateTotalPrice(index), 0);
     } else {
       form.setValue(`items.${index}.warehouse_item_id`, '');
+      form.setValue(`items.${index}.finished_good_id`, '');
+      form.setValue(`items.${index}.item_code`, '');
+      form.setValue(`items.${index}.item_name`, '');
+      form.setValue(`items.${index}.description`, '');
+    }
+  };
+
+  const handleFinishedGoodSelect = (index: number, product: FinishedGood | null) => {
+    if (product) {
+      form.setValue(`items.${index}.warehouse_item_id`, '');
+      form.setValue(`items.${index}.finished_good_id`, product.id);
+      form.setValue(`items.${index}.item_code`, product.product_code);
+      form.setValue(`items.${index}.item_name`, product.product_name);
+      form.setValue(`items.${index}.description`, product.description || '');
+      form.setValue(`items.${index}.unit_of_measure`, product.unit_of_measure);
+      form.setValue(`items.${index}.estimated_unit_price`, product.selling_price || product.standard_cost || 0);
+      setTimeout(() => calculateTotalPrice(index), 0);
+    } else {
+      form.setValue(`items.${index}.warehouse_item_id`, '');
+      form.setValue(`items.${index}.finished_good_id`, '');
       form.setValue(`items.${index}.item_code`, '');
       form.setValue(`items.${index}.item_name`, '');
       form.setValue(`items.${index}.description`, '');
@@ -398,27 +426,77 @@ export function CreatePrDialog({ open, onOpenChange }: CreatePrDialogProps) {
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                      <FormField
-                        control={form.control}
-                        name={`items.${index}.warehouse_item_id`}
-                        render={({ field }) => (
-                          <FormItem className="md:col-span-3">
-                            <FormLabel>Select Item *</FormLabel>
-                            <FormControl>
-                              <ItemSelector
-                                value={field.value}
-                                onSelect={(item) => handleItemSelect(index, item)}
-                                placeholder="Search and select item..."
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
+                      {/* Show different selectors based on company */}
+                      {selectedCompany?.code === 'TUH' ? (
+                        <>
+                          <FormField
+                            control={form.control}
+                            name={`items.${index}.warehouse_item_id`}
+                            render={({ field }) => (
+                              <FormItem className="md:col-span-1">
+                                <FormLabel>Select from Warehouse Items</FormLabel>
+                                <FormControl>
+                                  <ItemSelector
+                                    value={field.value}
+                                    onSelect={(item) => handleItemSelect(index, item)}
+                                    placeholder="Search warehouse items..."
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          
+                          <div className="md:col-span-1 flex items-center justify-center">
+                            <span className="text-sm text-muted-foreground">OR</span>
+                          </div>
+                          
+                          <FormField
+                            control={form.control}
+                            name={`items.${index}.finished_good_id`}
+                            render={({ field }) => (
+                              <FormItem className="md:col-span-1">
+                                <FormLabel>Select from Product Master</FormLabel>
+                                <FormControl>
+                                  <FinishedGoodsItemSelector
+                                    value={field.value}
+                                    onSelect={(product) => handleFinishedGoodSelect(index, product)}
+                                    placeholder="Search finished goods..."
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </>
+                      ) : (
+                        <FormField
+                          control={form.control}
+                          name={`items.${index}.warehouse_item_id`}
+                          render={({ field }) => (
+                            <FormItem className="md:col-span-3">
+                              <FormLabel>Select Item *</FormLabel>
+                              <FormControl>
+                                <ItemSelector
+                                  value={field.value}
+                                  onSelect={(item) => handleItemSelect(index, item)}
+                                  placeholder="Search and select item..."
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      )}
                       
-                      {form.watch(`items.${index}.warehouse_item_id`) && (
+                      {(form.watch(`items.${index}.warehouse_item_id`) || form.watch(`items.${index}.finished_good_id`)) && (
                         <div className="md:col-span-3 text-sm text-muted-foreground bg-muted/50 p-2 rounded">
                           <strong>Selected:</strong> {form.watch(`items.${index}.item_code`)} - {form.watch(`items.${index}.item_name`)}
+                          {form.watch(`items.${index}.finished_good_id`) && (
+                            <span className="ml-2 text-xs bg-primary/10 text-primary px-2 py-1 rounded">
+                              From Product Master
+                            </span>
+                          )}
                         </div>
                       )}
 

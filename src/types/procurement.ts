@@ -36,6 +36,7 @@ export interface PrItem {
   id?: string;
   pr_id: string;
   warehouse_item_id?: string;
+  finished_good_id?: string;
   item_code?: string;
   item_name: string;
   description?: string;
@@ -73,6 +74,7 @@ export interface CreatePrData {
   company_id?: string;
   items: {
     warehouse_item_id?: string;
+    finished_good_id?: string;
     item_code?: string;
     item_name: string;
     description?: string;
