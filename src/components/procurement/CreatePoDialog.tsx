@@ -23,19 +23,19 @@ import { ItemSelector } from "@/components/common/ItemSelector";
 import { WarehouseItem } from "@/types/itemBin";
 
 const createPoSchema = z.object({
-  pr_id: z.string().optional(),
+  pr_id: z.string().nullable().optional(),
   supplier_id: z.string().min(1, "Supplier is required"),
   company: z.string().optional(),
   expected_delivery_date: z.string().optional(),
   payment_terms: z.string().optional(),
   delivery_terms: z.string().optional(),
   currency: z.string().default("LKR"),
-  buyer_id: z.string().optional(),
+  buyer_id: z.string().nullable().optional(),
   notes: z.string().optional(),
   items: z.array(z.object({
-    pr_item_id: z.string().optional(),
-    warehouse_item_id: z.string().optional(),
-    item_code: z.string().optional(),
+    pr_item_id: z.string().nullable().optional(),
+    warehouse_item_id: z.string().nullable().optional(),
+    item_code: z.string().nullable().optional(),
     item_name: z.string().min(1, "Item name is required"),
     description: z.string().optional(),
     specifications: z.string().optional(),
@@ -93,14 +93,14 @@ export function CreatePoDialog({ open, onOpenChange, prId }: CreatePoDialogProps
   const form = useForm<CreatePoFormData>({
     resolver: zodResolver(createPoSchema),
     defaultValues: {
-      pr_id: prId,
+      pr_id: prId || null,
       supplier_id: "",
       company: selectedCompany?.name || "",
       currency: "LKR",
       items: [
         {
-          warehouse_item_id: "",
-          item_code: "",
+          warehouse_item_id: null,
+          item_code: null,
           item_name: "",
           quantity_ordered: 1,
           unit_price: 0,
@@ -124,8 +124,8 @@ export function CreatePoDialog({ open, onOpenChange, prId }: CreatePoDialogProps
       form.setValue("pr_id", prId);
       form.setValue("items", pr.items.map(item => ({
         pr_item_id: item.id,
-        warehouse_item_id: item.warehouse_item_id || "",
-        item_code: item.item_code || "",
+        warehouse_item_id: item.warehouse_item_id || null,
+        item_code: item.item_code || null,
         item_name: item.item_name,
         description: item.description,
         specifications: item.specifications,
@@ -147,8 +147,8 @@ export function CreatePoDialog({ open, onOpenChange, prId }: CreatePoDialogProps
 
   const addItem = () => {
     append({
-      warehouse_item_id: "",
-      item_code: "",
+      warehouse_item_id: null,
+      item_code: null,
       item_name: "",
       quantity_ordered: 1,
       unit_price: 0,
@@ -167,8 +167,8 @@ export function CreatePoDialog({ open, onOpenChange, prId }: CreatePoDialogProps
       form.setValue(`items.${index}.unit_price`, item.unit_cost || 0);
       setTimeout(() => calculateTotalPrice(index), 0);
     } else {
-      form.setValue(`items.${index}.warehouse_item_id`, '');
-      form.setValue(`items.${index}.item_code`, '');
+      form.setValue(`items.${index}.warehouse_item_id`, null);
+      form.setValue(`items.${index}.item_code`, null);
       form.setValue(`items.${index}.item_name`, '');
       form.setValue(`items.${index}.description`, '');
     }
@@ -176,7 +176,33 @@ export function CreatePoDialog({ open, onOpenChange, prId }: CreatePoDialogProps
 
   const onSubmit = async (data: CreatePoFormData) => {
     try {
-      await createPoMutation.mutateAsync(data as CreatePoData);
+      // Clean data: convert empty strings to null for UUID fields
+      const cleanedData: CreatePoData = {
+        pr_id: data.pr_id || null,
+        supplier_id: data.supplier_id,
+        expected_delivery_date: data.expected_delivery_date,
+        payment_terms: data.payment_terms,
+        delivery_terms: data.delivery_terms,
+        currency: data.currency,
+        buyer_id: data.buyer_id || null,
+        notes: data.notes,
+        items: data.items.map(item => ({
+          pr_item_id: item.pr_item_id || null,
+          warehouse_item_id: item.warehouse_item_id || null,
+          item_code: item.item_code || null,
+          item_name: item.item_name,
+          description: item.description,
+          specifications: item.specifications,
+          quantity_ordered: item.quantity_ordered,
+          unit_price: item.unit_price,
+          total_price: item.total_price,
+          unit_of_measure: item.unit_of_measure,
+          delivery_date: item.delivery_date,
+          notes: item.notes,
+        }))
+      };
+      
+      await createPoMutation.mutateAsync(cleanedData);
       form.reset();
       onOpenChange(false);
     } catch (error) {

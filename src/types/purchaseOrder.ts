@@ -105,19 +105,19 @@ export interface PoReceiptItem {
 }
 
 export interface CreatePoData {
-  pr_id?: string;
+  pr_id?: string | null;
   supplier_id: string;
   expected_delivery_date?: string;
   payment_terms?: string;
   delivery_terms?: string;
   currency?: string;
-  buyer_id?: string;
+  buyer_id?: string | null;
   notes?: string;
   items: {
-    pr_item_id?: string;
-    warehouse_item_id?: string;
+    pr_item_id?: string | null;
+    warehouse_item_id?: string | null;
     item_name: string;
-    item_code?: string;
+    item_code?: string | null;
     description?: string;
     specifications?: string;
     quantity_ordered: number;
