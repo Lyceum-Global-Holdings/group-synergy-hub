@@ -160,12 +160,32 @@ export const useDemandCalculation = (companyId?: string) => {
 
       if (bomError) throw bomError;
 
-      // Get warehouse items for stock levels
+      // Get warehouse items for stock levels - collect all identifiers for better matching
+      const warehouseItemIds = bomItems?.map(item => item.warehouse_item_id).filter(Boolean) || [];
       const itemCodes = bomItems?.map(item => item.item_code).filter(Boolean) || [];
-      const { data: warehouseItems, error: warehouseError } = await supabase
-        .from('warehouse_items')
-        .select('item_code, current_stock, reorder_level, min_stock_level, unit_cost, supplier_id')
-        .in('item_code', itemCodes);
+      const itemNames = bomItems?.map(item => item.item_name).filter(Boolean) || [];
+      
+      let warehouseItems: any[] = [];
+      if (warehouseItemIds.length > 0 || itemCodes.length > 0 || itemNames.length > 0) {
+        let query = supabase
+          .from('warehouse_items')
+          .select('id, item_code, name, current_stock, reorder_level, min_stock_level, unit_cost, supplier_id, company_id');
+        
+        // Add company filter if available
+        if (companyId) {
+          query = query.eq('company_id', companyId);
+        }
+        
+        // Use OR condition to match by id, item_code, or name
+        if (warehouseItemIds.length > 0) {
+          query = query.or(`id.in.(${warehouseItemIds.join(',')}),item_code.in.(${itemCodes.join(',')}),name.in.(${itemNames.join(',')})`);
+        } else if (itemCodes.length > 0) {
+          query = query.or(`item_code.in.(${itemCodes.join(',')}),name.in.(${itemNames.join(',')})`);
+        } else {
+          query = query.in('name', itemNames);
+        }
+
+        const { data: warehouseData, error: warehouseError } = await query;
 
       if (warehouseError) throw warehouseError;
 
@@ -192,14 +212,32 @@ export const useDemandCalculation = (companyId?: string) => {
         return acc;
       }, {} as Record<string, any[]>) || {};
 
+        if (warehouseError) throw warehouseError;
+        warehouseItems = warehouseData || [];
+      }
+
       // Calculate demand analysis
       const analysis: DemandAnalysisResult[] = [];
+      let matchedItems = 0;
+      let unmatchedItems = 0;
 
       for (const bomItem of bomItems || []) {
-        if (!bomItem.item_code) continue;
+        // Improved warehouse item matching: id → item_code → name
+        const warehouseItem = warehouseItems?.find(w => {
+          if (bomItem.warehouse_item_id && w.id === bomItem.warehouse_item_id) return true;
+          if (bomItem.item_code && w.item_code === bomItem.item_code) return true;
+          if (bomItem.item_name && w.name === bomItem.item_name) return true;
+          return false;
+        });
+        
+        if (warehouseItem) {
+          matchedItems++;
+        } else {
+          unmatchedItems++;
+          console.log(`No warehouse item found for BOM item: ${bomItem.item_name} (${bomItem.item_code})`);
+        }
 
-        const warehouseItem = warehouseItems?.find(w => w.item_code === bomItem.item_code);
-        const relatedPOItems = poItemsByCode[bomItem.item_code] || [];
+        const relatedPOItems = poItems?.filter(item => item.item_code === bomItem.item_code) || [];
         
         const totalRequired = (bomItem.consumption || bomItem.quantity || 0) * input.production_quantity;
         const availableStock = warehouseItem?.current_stock || 0;
@@ -226,7 +264,7 @@ export const useDemandCalculation = (companyId?: string) => {
         }));
 
         analysis.push({
-          item_code: bomItem.item_code,
+          item_code: bomItem.item_code || '',
           item_name: bomItem.item_name,
           total_required: totalRequired,
           available_stock: availableStock,
@@ -246,6 +284,7 @@ export const useDemandCalculation = (companyId?: string) => {
         });
       }
 
+      console.log(`BOM Demand Calculation: ${matchedItems} matched, ${unmatchedItems} unmatched items`);
       return analysis;
     },
     onSuccess: () => {
@@ -340,23 +379,37 @@ export const useDemandCalculation = (companyId?: string) => {
       );
       const allWarehouseItemIds = [...new Set([...bomWarehouseItemIds, ...poWarehouseItemIds])];
       
-      // Also collect all item codes for fallback matching
+      // Also collect all item codes and names for fallback matching
       const bomItemCodes = bomItems.map(item => item.item_code).filter(Boolean);
       const poItemCodes = poData.flatMap(po => 
         po.po_items.map(item => item.item_code).filter(Boolean)
       );
       const allItemCodes = [...new Set([...bomItemCodes, ...poItemCodes])];
+      
+      const bomItemNames = bomItems.map(item => item.item_name).filter(Boolean);
+      const poItemNames = poData.flatMap(po => 
+        po.po_items.map(item => item.item_name).filter(Boolean)
+      );
+      const allItemNames = [...new Set([...bomItemNames, ...poItemNames])];
 
       let warehouseItems: any[] = [];
-      if (allWarehouseItemIds.length > 0 || allItemCodes.length > 0) {
+      if (allWarehouseItemIds.length > 0 || allItemCodes.length > 0 || allItemNames.length > 0) {
         let query = supabase
           .from('warehouse_items')
-          .select('id, item_code, current_stock, min_stock_level, unit_cost');
+          .select('id, item_code, name, current_stock, min_stock_level, unit_cost, company_id');
         
+        // Add company filter if available
+        if (companyId) {
+          query = query.eq('company_id', companyId);
+        }
+        
+        // Use OR condition to match by id, item_code, or name
         if (allWarehouseItemIds.length > 0) {
-          query = query.in('id', allWarehouseItemIds);
+          query = query.or(`id.in.(${allWarehouseItemIds.join(',')}),item_code.in.(${allItemCodes.join(',')}),name.in.(${allItemNames.join(',')})`);
         } else if (allItemCodes.length > 0) {
-          query = query.in('item_code', allItemCodes);
+          query = query.or(`item_code.in.(${allItemCodes.join(',')}),name.in.(${allItemNames.join(',')})`);
+        } else {
+          query = query.in('name', allItemNames);
         }
 
         const { data: warehouseData, error: warehouseError } = await query;
@@ -368,6 +421,8 @@ export const useDemandCalculation = (companyId?: string) => {
 
       const analysisResults: DemandAnalysisResult[] = [];
       const materialMap = new Map();
+      let matchedCount = 0;
+      let unmatchedCount = 0;
 
       // Process BOM items linked to PO items
       for (const po of poData) {
@@ -461,7 +516,7 @@ export const useDemandCalculation = (companyId?: string) => {
 
       // Calculate analysis for each material
       for (const [key, materialData] of materialMap.entries()) {
-        // Improved warehouse item matching logic
+        // Improved warehouse item matching: id → item_code → name
         const warehouseItem = warehouseItems?.find(w => {
           // First, try to match by warehouse_item_id if available
           if (materialData.warehouse_item_id && w.id === materialData.warehouse_item_id) {
@@ -471,28 +526,24 @@ export const useDemandCalculation = (companyId?: string) => {
           if (materialData.item_code && w.item_code === materialData.item_code) {
             return true;
           }
-          // Finally, try to match by the key itself (in case key is warehouse_item_id)
-          if (w.id === key) {
+          // Finally, try to match by item name
+          if (materialData.item_name && w.name === materialData.item_name) {
             return true;
           }
           return false;
         });
         
+        if (warehouseItem) {
+          matchedCount++;
+        } else {
+          unmatchedCount++;
+          console.log(`No warehouse item found for material: ${materialData.item_name} (${materialData.item_code})`);
+        }
+        
         const currentStock = warehouseItem?.current_stock || 0;
         const safetyStock = input.include_safety_stock ? (warehouseItem?.min_stock_level || 0) : 0;
         const shortage = Math.max(0, materialData.total_required - currentStock - materialData.on_order);
         const suggestedOrder = shortage > 0 ? shortage + safetyStock : 0;
-
-        // Debug logging for stock matching
-        if (materialData.item_code) {
-          console.log(`Stock lookup for ${materialData.item_name} (${materialData.item_code}):`, {
-            warehouse_item_id: materialData.warehouse_item_id,
-            found_warehouse_item: !!warehouseItem,
-            current_stock: currentStock,
-            total_required: materialData.total_required,
-            shortage: shortage
-          });
-        }
 
         // Determine priority based on shortage and requirement
         let priority: 'low' | 'medium' | 'high' | 'urgent' = 'medium';
@@ -516,6 +567,8 @@ export const useDemandCalculation = (companyId?: string) => {
         });
       }
 
+      console.log(`PO Demand Calculation: ${matchedCount} matched, ${unmatchedCount} unmatched items`);
+      
       // Create demand records
       const demandRecords = analysisResults.map(result => ({
         item_code: result.item_code,

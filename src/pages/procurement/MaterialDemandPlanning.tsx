@@ -331,6 +331,20 @@ const MaterialDemandPlanning = () => {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
+                  {/* Stock matching feedback */}
+                  <div className="mb-4 p-3 bg-muted rounded-lg">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">Stock Data Matching:</span>
+                      <div className="flex gap-4">
+                        <span className="text-green-600">
+                          ✓ {calculationResult.filter(item => item.available_stock > 0).length} items with stock
+                        </span>
+                        <span className="text-amber-600">
+                          ⚠ {calculationResult.filter(item => item.available_stock === 0).length} items without stock data
+                        </span>
+                      </div>
+                    </div>
+                  </div>
                   <Table>
                     <TableHeader>
                       <TableRow>
