@@ -58,7 +58,7 @@ export function FinishedGoodsStockAdjustmentDialog({
     createMovement({
       finished_good_id: finishedGoodId,
       movement_type: 'adjustment',
-      reference_type: 'manual',
+      reference_type: 'adjustment',
       quantity_change: quantityChange,
       quantity_before: currentStock,
       quantity_after: newQuantity,
