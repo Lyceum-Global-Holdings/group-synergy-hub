@@ -1562,6 +1562,7 @@ export type Database = {
           description: string | null
           estimated_total_price: number
           estimated_unit_price: number
+          finished_good_id: string | null
           id: string
           item_code: string | null
           item_name: string
@@ -1578,6 +1579,7 @@ export type Database = {
           description?: string | null
           estimated_total_price: number
           estimated_unit_price: number
+          finished_good_id?: string | null
           id?: string
           item_code?: string | null
           item_name: string
@@ -1594,6 +1596,7 @@ export type Database = {
           description?: string | null
           estimated_total_price?: number
           estimated_unit_price?: number
+          finished_good_id?: string | null
           id?: string
           item_code?: string | null
           item_name?: string
@@ -1606,6 +1609,13 @@ export type Database = {
           warehouse_item_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "pr_items_finished_good_id_fkey"
+            columns: ["finished_good_id"]
+            isOneToOne: false
+            referencedRelation: "finished_goods"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "pr_items_pr_id_fkey"
             columns: ["pr_id"]
