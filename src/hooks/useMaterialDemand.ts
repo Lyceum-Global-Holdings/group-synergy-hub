@@ -269,6 +269,11 @@ export const useDemandCalculation = (companyId?: string) => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User not authenticated');
 
+      // Validate input
+      if (!input.po_ids || input.po_ids.length === 0) {
+        throw new Error('No purchase orders selected for analysis');
+      }
+
       // Get PO data with items and their linked BOM items
       const { data: poData, error: poError } = await supabase
         .from('purchase_orders')  
@@ -299,39 +304,47 @@ export const useDemandCalculation = (companyId?: string) => {
       // Get all PO item IDs to find linked BOM items
       const allPoItemIds = poData.flatMap(po => po.po_items.map(item => item.id));
 
-      // Get BOM items that are linked to these PO items
-      const { data: bomItems, error: bomError } = await supabase
-        .from('bom_items')
-        .select(`
-          id,
-          bom_id,
-          po_item_id,
-          item_name,
-          item_code,
-          quantity,
-          consumption,
-          unit_of_measure,
-          category,
-          warehouse_item_id,
-          bill_of_materials!inner(
+      // Get BOM items that are linked to these PO items (only if we have PO items)
+      let bomItems: any[] = [];
+      if (allPoItemIds.length > 0) {
+        const { data: bomData, error: bomError } = await supabase
+          .from('bom_items')
+          .select(`
             id,
-            bom_number,
-            product_name
-          )
-        `)
-        .in('po_item_id', allPoItemIds)
-        .not('po_item_id', 'is', null);
+            bom_id,
+            po_item_id,
+            item_name,
+            item_code,
+            quantity,
+            consumption,
+            unit_of_measure,
+            category,
+            warehouse_item_id,
+            bill_of_materials!inner(
+              id,
+              bom_number,
+              product_name
+            )
+          `)
+          .in('po_item_id', allPoItemIds)
+          .not('po_item_id', 'is', null);
 
-      if (bomError) throw bomError;
+        if (bomError) throw bomError;
+        bomItems = bomData || [];
+      }
 
-      // Get warehouse items for stock levels
+      // Get warehouse items for stock levels (only if we have warehouse item IDs)
       const warehouseItemIds = [...new Set(bomItems.map(item => item.warehouse_item_id).filter(Boolean))];
-      const { data: warehouseItems, error: warehouseError } = await supabase
-        .from('warehouse_items')
-        .select('id, item_code, current_stock, min_stock_level, unit_cost')
-        .in('id', warehouseItemIds);
+      let warehouseItems: any[] = [];
+      if (warehouseItemIds.length > 0) {
+        const { data: warehouseData, error: warehouseError } = await supabase
+          .from('warehouse_items')
+          .select('id, item_code, current_stock, min_stock_level, unit_cost')
+          .in('id', warehouseItemIds);
 
-      if (warehouseError) throw warehouseError;
+        if (warehouseError) throw warehouseError;
+        warehouseItems = warehouseData || [];
+      }
 
       const analysisResults: DemandAnalysisResult[] = [];
       const materialMap = new Map();
@@ -470,14 +483,18 @@ export const useDemandCalculation = (companyId?: string) => {
         demand_source: 'purchase_order' as const,
         reference_id: input.po_ids[0], // Use first PO as reference
         status: 'calculated' as const,
-        company_id: companyId
+        company_id: companyId,
+        created_by: user.id
       }));
 
-      const { error: insertError } = await supabase
-        .from('material_demand')
-        .insert(demandRecords);
+      // Only insert if we have records to insert
+      if (demandRecords.length > 0) {
+        const { error: insertError } = await supabase
+          .from('material_demand')
+          .insert(demandRecords);
 
-      if (insertError) throw insertError;
+        if (insertError) throw insertError;
+      }
 
       return analysisResults;
     },
@@ -491,7 +508,7 @@ export const useDemandCalculation = (companyId?: string) => {
       console.error('Error calculating PO demand:', error);
       toast({
         title: "Error",
-        description: "Failed to calculate PO demand",
+        description: `Failed to calculate PO demand: ${error.message}`,
         variant: "destructive",
       });
     }
