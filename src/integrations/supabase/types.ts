@@ -380,6 +380,320 @@ export type Database = {
         }
         Relationships: []
       }
+      finished_goods: {
+        Row: {
+          available_stock: number | null
+          bin_id: string | null
+          bom_id: string | null
+          category: string | null
+          color: string | null
+          company_id: string | null
+          created_at: string | null
+          created_by: string | null
+          current_stock: number
+          description: string | null
+          id: string
+          lead_time_days: number | null
+          location_id: string | null
+          maximum_stock: number | null
+          minimum_stock: number | null
+          product_code: string
+          product_name: string
+          quality_status: string | null
+          reorder_point: number | null
+          reserved_stock: number
+          selling_price: number | null
+          size: string | null
+          standard_cost: number | null
+          status: string | null
+          style_no: string | null
+          sublocation_id: string | null
+          unit_of_measure: string
+          updated_at: string | null
+          variant: string | null
+          warehouse_item_id: string | null
+        }
+        Insert: {
+          available_stock?: number | null
+          bin_id?: string | null
+          bom_id?: string | null
+          category?: string | null
+          color?: string | null
+          company_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          current_stock?: number
+          description?: string | null
+          id?: string
+          lead_time_days?: number | null
+          location_id?: string | null
+          maximum_stock?: number | null
+          minimum_stock?: number | null
+          product_code: string
+          product_name: string
+          quality_status?: string | null
+          reorder_point?: number | null
+          reserved_stock?: number
+          selling_price?: number | null
+          size?: string | null
+          standard_cost?: number | null
+          status?: string | null
+          style_no?: string | null
+          sublocation_id?: string | null
+          unit_of_measure?: string
+          updated_at?: string | null
+          variant?: string | null
+          warehouse_item_id?: string | null
+        }
+        Update: {
+          available_stock?: number | null
+          bin_id?: string | null
+          bom_id?: string | null
+          category?: string | null
+          color?: string | null
+          company_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          current_stock?: number
+          description?: string | null
+          id?: string
+          lead_time_days?: number | null
+          location_id?: string | null
+          maximum_stock?: number | null
+          minimum_stock?: number | null
+          product_code?: string
+          product_name?: string
+          quality_status?: string | null
+          reorder_point?: number | null
+          reserved_stock?: number
+          selling_price?: number | null
+          size?: string | null
+          standard_cost?: number | null
+          status?: string | null
+          style_no?: string | null
+          sublocation_id?: string | null
+          unit_of_measure?: string
+          updated_at?: string | null
+          variant?: string | null
+          warehouse_item_id?: string | null
+        }
+        Relationships: []
+      }
+      finished_goods_batches: {
+        Row: {
+          batch_number: string
+          company_id: string | null
+          created_at: string | null
+          created_by: string | null
+          expiry_date: string | null
+          finished_good_id: string
+          id: string
+          notes: string | null
+          production_cost: number | null
+          production_date: string
+          quality_check_by: string | null
+          quality_check_date: string | null
+          quality_check_status: string | null
+          quantity: number
+          status: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          batch_number: string
+          company_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          expiry_date?: string | null
+          finished_good_id: string
+          id?: string
+          notes?: string | null
+          production_cost?: number | null
+          production_date: string
+          quality_check_by?: string | null
+          quality_check_date?: string | null
+          quality_check_status?: string | null
+          quantity: number
+          status?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          batch_number?: string
+          company_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          expiry_date?: string | null
+          finished_good_id?: string
+          id?: string
+          notes?: string | null
+          production_cost?: number | null
+          production_date?: string
+          quality_check_by?: string | null
+          quality_check_date?: string | null
+          quality_check_status?: string | null
+          quantity?: number
+          status?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "finished_goods_batches_finished_good_id_fkey"
+            columns: ["finished_good_id"]
+            isOneToOne: false
+            referencedRelation: "finished_goods"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      finished_goods_movements: {
+        Row: {
+          batch_id: string | null
+          company_id: string | null
+          created_at: string | null
+          created_by: string | null
+          finished_good_id: string
+          from_location_id: string | null
+          id: string
+          movement_type: string
+          notes: string | null
+          quantity_after: number
+          quantity_before: number
+          quantity_change: number
+          reference_id: string | null
+          reference_number: string | null
+          reference_type: string | null
+          to_location_id: string | null
+          total_value: number | null
+          unit_cost: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          batch_id?: string | null
+          company_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          finished_good_id: string
+          from_location_id?: string | null
+          id?: string
+          movement_type: string
+          notes?: string | null
+          quantity_after?: number
+          quantity_before?: number
+          quantity_change: number
+          reference_id?: string | null
+          reference_number?: string | null
+          reference_type?: string | null
+          to_location_id?: string | null
+          total_value?: number | null
+          unit_cost?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          batch_id?: string | null
+          company_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          finished_good_id?: string
+          from_location_id?: string | null
+          id?: string
+          movement_type?: string
+          notes?: string | null
+          quantity_after?: number
+          quantity_before?: number
+          quantity_change?: number
+          reference_id?: string | null
+          reference_number?: string | null
+          reference_type?: string | null
+          to_location_id?: string | null
+          total_value?: number | null
+          unit_cost?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "finished_goods_movements_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "finished_goods_batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "finished_goods_movements_finished_good_id_fkey"
+            columns: ["finished_good_id"]
+            isOneToOne: false
+            referencedRelation: "finished_goods"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      finished_goods_reservations: {
+        Row: {
+          batch_id: string | null
+          company_id: string | null
+          created_at: string | null
+          created_by: string | null
+          finished_good_id: string
+          id: string
+          notes: string | null
+          reference_id: string
+          reference_number: string | null
+          reference_type: string
+          required_date: string | null
+          reserved_date: string
+          reserved_quantity: number
+          status: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          batch_id?: string | null
+          company_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          finished_good_id: string
+          id?: string
+          notes?: string | null
+          reference_id: string
+          reference_number?: string | null
+          reference_type: string
+          required_date?: string | null
+          reserved_date?: string
+          reserved_quantity: number
+          status?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          batch_id?: string | null
+          company_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          finished_good_id?: string
+          id?: string
+          notes?: string | null
+          reference_id?: string
+          reference_number?: string | null
+          reference_type?: string
+          required_date?: string | null
+          reserved_date?: string
+          reserved_quantity?: number
+          status?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "finished_goods_reservations_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "finished_goods_batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "finished_goods_reservations_finished_good_id_fkey"
+            columns: ["finished_good_id"]
+            isOneToOne: false
+            referencedRelation: "finished_goods"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       goods_receipt_notes: {
         Row: {
           approved_by: string | null

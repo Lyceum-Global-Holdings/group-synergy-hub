@@ -20,6 +20,7 @@ import AssetManagement from "./pages/warehouse/AssetManagement";
 import ItemBinMaster from "./pages/warehouse/ItemBinMaster";
 import MaterialIssueReturn from "./pages/warehouse/MaterialIssueReturn";
 import GoodsReceiptNote from "./pages/warehouse/GoodsReceiptNote";
+import FinishedGoods from "./pages/warehouse/FinishedGoods";
 import PublicAssetView from "./pages/PublicAssetView";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
@@ -125,6 +126,13 @@ const App = () => (
                 <ProtectedRoute>
                   <AppLayout>
                     <GoodsReceiptNote />
+                  </AppLayout>
+                </ProtectedRoute>
+              } />
+              <Route path="/warehouse/finished-goods" element={
+                <ProtectedRoute>
+                  <AppLayout>
+                    <FinishedGoods />
                   </AppLayout>
                 </ProtectedRoute>
               } />

@@ -55,7 +55,8 @@ export const moduleConfig: Record<string, ModuleConfig> = {
       { key: 'stock-adjustment', name: 'Stock Adjustment', description: 'Adjust inventory levels', url: '/warehouse/stock-adjustment' },
       { key: 'delivery-order', name: 'Delivery Order', description: 'Outbound delivery management', url: '/warehouse/delivery-order' },
       { key: 'inventory-valuation', name: 'Inventory Valuation', description: 'Stock value calculations', url: '/warehouse/inventory-valuation' },
-      { key: 'asset-management', name: 'Asset Management', description: 'Track and manage assets', url: '/warehouse/asset-management' }
+      { key: 'asset-management', name: 'Asset Management', description: 'Track and manage assets', url: '/warehouse/asset-management' },
+      { key: 'finished-goods', name: 'Finished Goods', description: 'Finished goods inventory management', url: '/warehouse/finished-goods' }
     ]
   },
   sourcing: {
