@@ -126,13 +126,24 @@ export const useWarehouseItems = () => {
   });
 
   const deleteItemMutation = useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase
-        .from('warehouse_items')
-        .delete()
-        .eq('id', id);
+    mutationFn: async ({ id, forceDelete }: { id: string; forceDelete: boolean }) => {
+      if (forceDelete) {
+        // Force delete - this will cascade delete references
+        const { error } = await supabase
+          .from('warehouse_items')
+          .delete()
+          .eq('id', id);
 
-      if (error) throw error;
+        if (error) throw error;
+      } else {
+        // Safe delete - check for references first
+        const { error } = await supabase
+          .from('warehouse_items')
+          .delete()
+          .eq('id', id);
+
+        if (error) throw error;
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['warehouse-items'] });
@@ -141,11 +152,50 @@ export const useWarehouseItems = () => {
         description: "Item deleted successfully",
       });
     },
-    onError: (error) => {
+    onError: (error: any) => {
       console.error('Error deleting item:', error);
+      
+      let errorMessage = "Failed to delete item";
+      
+      // Handle foreign key constraint errors
+      if (error?.message?.includes('foreign key constraint') || 
+          error?.message?.includes('violates foreign key') ||
+          error?.code === '23503') {
+        errorMessage = "Cannot delete item as it is referenced in other records. Please mark it as inactive instead.";
+      }
+      
       toast({
         title: "Error",
-        description: "Failed to delete item",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    }
+  });
+
+  const markItemInactiveMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { data, error } = await supabase
+        .from('warehouse_items')
+        .update({ status: 'inactive' })
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['warehouse-items'] });
+      toast({
+        title: "Success",
+        description: "Item marked as inactive successfully",
+      });
+    },
+    onError: (error: any) => {
+      console.error('Error marking item inactive:', error);
+      toast({
+        title: "Error",
+        description: "Failed to mark item as inactive",
         variant: "destructive",
       });
     }
@@ -158,9 +208,12 @@ export const useWarehouseItems = () => {
     createItem: createItemMutation.mutate,
     createItemAsync: createItemMutation.mutateAsync,
     updateItem: updateItemMutation.mutate,
-    deleteItem: deleteItemMutation.mutate,
+    deleteItem: ({ id, forceDelete = false }: { id: string; forceDelete?: boolean }) => 
+      deleteItemMutation.mutate({ id, forceDelete }),
+    markItemInactive: markItemInactiveMutation.mutate,
     isCreating: createItemMutation.isPending,
     isUpdating: updateItemMutation.isPending,
     isDeleting: deleteItemMutation.isPending,
+    isMarkingInactive: markItemInactiveMutation.isPending,
   };
 };

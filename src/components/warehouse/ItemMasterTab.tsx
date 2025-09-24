@@ -18,6 +18,7 @@ import { useCompany } from '@/contexts/CompanyContext';
 import { CreateItemDialog } from '@/components/warehouse/CreateItemDialog';
 import { StockMovementDialog } from '@/components/warehouse/StockMovementDialog';
 import { StockAdjustmentDialog } from '@/components/warehouse/StockAdjustmentDialog';
+import { DeleteItemConfirmationDialog } from '@/components/warehouse/DeleteItemConfirmationDialog';
 import { WarehouseItem } from '@/types/itemBin';
 
 export function ItemMasterTab() {
@@ -26,8 +27,16 @@ export function ItemMasterTab() {
   const [editingItem, setEditingItem] = useState<WarehouseItem | null>(null);
   const [stockMovementItem, setStockMovementItem] = useState<WarehouseItem | null>(null);
   const [stockAdjustmentItem, setStockAdjustmentItem] = useState<WarehouseItem | null>(null);
+  const [deletingItem, setDeletingItem] = useState<WarehouseItem | null>(null);
   
-  const { items, isLoading, deleteItem, isDeleting } = useWarehouseItems();
+  const { 
+    items, 
+    isLoading, 
+    deleteItem, 
+    markItemInactive, 
+    isDeleting, 
+    isMarkingInactive 
+  } = useWarehouseItems();
   const { categories } = useItemCategories();
   const { units } = useItemUnits();
   const { companies } = useCompany();
@@ -167,8 +176,8 @@ export function ItemMasterTab() {
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => deleteItem(item.id)}
-                        disabled={isDeleting}
+                        onClick={() => setDeletingItem(item)}
+                        disabled={isDeleting || isMarkingInactive}
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -213,6 +222,17 @@ export function ItemMasterTab() {
           currentStock={stockAdjustmentItem.current_stock || 0}
         />
       )}
+
+      <DeleteItemConfirmationDialog
+        open={!!deletingItem}
+        onOpenChange={(open) => {
+          if (!open) setDeletingItem(null);
+        }}
+        item={deletingItem}
+        onConfirmDelete={(itemId, forceDelete) => deleteItem({ id: itemId, forceDelete })}
+        onMarkInactive={markItemInactive}
+        isLoading={isDeleting || isMarkingInactive}
+      />
     </div>
   );
 }
