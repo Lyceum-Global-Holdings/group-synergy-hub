@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Calendar, Calculator, FileText, AlertTriangle, CheckCircle, Clock, TrendingUp } from 'lucide-react';
 import { useMaterialDemand, useDemandCalculation } from '@/hooks/useMaterialDemand';
 import { useBillOfMaterials } from '@/hooks/useBillOfMaterials';
@@ -14,7 +15,7 @@ import { usePurchaseOrders } from '@/hooks/usePurchaseOrders';
 import { usePurchaseRequisitions } from '@/hooks/usePurchaseRequisitions';
 import { useCompany } from '@/contexts/CompanyContext';
 import { format } from 'date-fns';
-import { DemandPriority } from '@/types/materialDemand';
+import { DemandPriority, DemandSource } from '@/types/materialDemand';
 
 const MaterialDemandPlanning = () => {
   const { selectedCompany } = useCompany();
@@ -22,23 +23,49 @@ const MaterialDemandPlanning = () => {
   const { boms } = useBillOfMaterials(selectedCompany?.id);
   const { data: purchaseOrders } = usePurchaseOrders();
   const { data: purchaseRequisitions } = usePurchaseRequisitions();
-  const { calculateBOMDemand, calculationResult, isCalculating } = useDemandCalculation();
+  const { calculateBOMDemand, calculatePODemand, calculationResult, isCalculating } = useDemandCalculation(selectedCompany?.id);
   
+  const [demandSource, setDemandSource] = useState<DemandSource>('bom');
   const [selectedBomId, setSelectedBomId] = useState<string>('');
+  const [selectedPOs, setSelectedPOs] = useState<string[]>([]);
   const [productionQuantity, setProductionQuantity] = useState<number>(100);
   const [productionDate, setProductionDate] = useState<string>(
     format(new Date(), 'yyyy-MM-dd')
   );
+  const [multiplier, setMultiplier] = useState<string>('1');
+  const [analysisDate, setAnalysisDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
+
+  // Filter approved POs for PO-based demand calculation
+  const approvedPOs = purchaseOrders?.filter(po => po.status === 'approved') || [];
 
   const handleCalculateDemand = () => {
-    if (!selectedBomId) return;
-    
-    calculateBOMDemand({
-      bom_id: selectedBomId,
-      production_quantity: productionQuantity,
-      production_date: productionDate,
-      include_safety_stock: true
-    });
+    if (demandSource === 'bom') {
+      if (!selectedBomId) return;
+      
+      calculateBOMDemand({
+        bom_id: selectedBomId,
+        production_quantity: productionQuantity,
+        production_date: productionDate,
+        include_safety_stock: true
+      });
+    } else if (demandSource === 'purchase_order') {
+      if (selectedPOs.length === 0) return;
+
+      calculatePODemand({
+        po_ids: selectedPOs,
+        multiplier: parseFloat(multiplier),
+        analysis_date: analysisDate,
+        include_safety_stock: true
+      });
+    }
+  };
+
+  const handlePOSelection = (poId: string, checked: boolean) => {
+    if (checked) {
+      setSelectedPOs(prev => [...prev, poId]);
+    } else {
+      setSelectedPOs(prev => prev.filter(id => id !== poId));
+    }
   };
 
   const getPriorityColor = (priority: DemandPriority) => {
@@ -112,53 +139,136 @@ const MaterialDemandPlanning = () => {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Calculator className="h-5 w-5" />
-                  Production Requirements
+                  Material Requirements
                 </CardTitle>
                 <CardDescription>
-                  Select a BOM and production parameters to calculate material demand
+                  Calculate material demand from BOMs or Purchase Orders
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="bom-select">Bill of Materials</Label>
-                  <Select value={selectedBomId} onValueChange={setSelectedBomId}>
+                  <Label htmlFor="demand-source">Demand Source</Label>
+                  <Select value={demandSource} onValueChange={(value: DemandSource) => setDemandSource(value)}>
                     <SelectTrigger>
-                      <SelectValue placeholder="Select a BOM" />
+                      <SelectValue placeholder="Select demand source" />
                     </SelectTrigger>
                     <SelectContent>
-                      {boms?.map((bom) => (
-                        <SelectItem key={bom.id} value={bom.id}>
-                          {bom.bom_number} - {bom.product_name}
-                        </SelectItem>
-                      ))}
+                      <SelectItem value="bom">Bill of Materials (BOM)</SelectItem>
+                      <SelectItem value="purchase_order">Purchase Orders (PO)</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="quantity">Production Quantity</Label>
-                  <Input
-                    id="quantity"
-                    type="number"
-                    value={productionQuantity}
-                    onChange={(e) => setProductionQuantity(Number(e.target.value))}
-                    placeholder="Enter production quantity"
-                  />
-                </div>
+                {demandSource === 'bom' && (
+                  <>
+                    <div className="space-y-2">
+                      <Label htmlFor="bom-select">Bill of Materials</Label>
+                      <Select value={selectedBomId} onValueChange={setSelectedBomId}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select a BOM" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {boms?.map((bom) => (
+                            <SelectItem key={bom.id} value={bom.id}>
+                              {bom.bom_number} - {bom.product_name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="date">Production Date</Label>
-                  <Input
-                    id="date"
-                    type="date"
-                    value={productionDate}
-                    onChange={(e) => setProductionDate(e.target.value)}
-                  />
-                </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="quantity">Production Quantity</Label>
+                      <Input
+                        id="quantity"
+                        type="number"
+                        value={productionQuantity}
+                        onChange={(e) => setProductionQuantity(Number(e.target.value))}
+                        placeholder="Enter production quantity"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="date">Production Date</Label>
+                      <Input
+                        id="date"
+                        type="date"
+                        value={productionDate}
+                        onChange={(e) => setProductionDate(e.target.value)}
+                      />
+                    </div>
+                  </>
+                )}
+
+                {demandSource === 'purchase_order' && (
+                  <>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="multiplier">Analysis Multiplier</Label>
+                        <Input
+                          id="multiplier"
+                          type="number"
+                          min="0.1"
+                          step="0.1"
+                          value={multiplier}
+                          onChange={(e) => setMultiplier(e.target.value)}
+                          placeholder="1.0"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="analysis-date">Analysis Date</Label>
+                        <Input
+                          id="analysis-date"
+                          type="date"
+                          value={analysisDate}
+                          onChange={(e) => setAnalysisDate(e.target.value)}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Select Approved Purchase Orders</Label>
+                      <div className="border rounded-lg p-3 max-h-48 overflow-y-auto">
+                        {approvedPOs.length === 0 ? (
+                          <p className="text-muted-foreground text-center py-4 text-sm">
+                            No approved purchase orders found
+                          </p>
+                        ) : (
+                          <div className="space-y-2">
+                            {approvedPOs.map((po) => (
+                              <div key={po.id} className="flex items-center space-x-2 p-2 border rounded">
+                                <Checkbox
+                                  id={po.id}
+                                  checked={selectedPOs.includes(po.id)}
+                                  onCheckedChange={(checked) => handlePOSelection(po.id, checked as boolean)}
+                                />
+                                <div className="flex-1 min-w-0">
+                                  <Label htmlFor={po.id} className="text-sm font-medium cursor-pointer">
+                                    {po.po_number}
+                                  </Label>
+                                  <p className="text-xs text-muted-foreground truncate">
+                                    {po.supplier?.name} - {po.total_amount ? `$${po.total_amount.toFixed(2)}` : 'N/A'}
+                                  </p>
+                                </div>
+                                <Badge variant="outline" className="text-xs">
+                                  {po.items?.length || 0} items
+                                </Badge>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </>
+                )}
 
                 <Button 
                   onClick={handleCalculateDemand}
-                  disabled={!selectedBomId || isCalculating}
+                  disabled={
+                    isCalculating || 
+                    (demandSource === 'bom' && !selectedBomId) ||
+                    (demandSource === 'purchase_order' && selectedPOs.length === 0)
+                  }
                   className="w-full"
                 >
                   {isCalculating ? (
@@ -169,7 +279,7 @@ const MaterialDemandPlanning = () => {
                   ) : (
                     <>
                       <Calculator className="h-4 w-4 mr-2" />
-                      Calculate Material Demand
+                      Calculate {demandSource === 'bom' ? 'BOM' : 'PO'} Demand
                     </>
                   )}
                 </Button>

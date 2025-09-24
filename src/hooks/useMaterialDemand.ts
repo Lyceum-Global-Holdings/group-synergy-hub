@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { MaterialDemand, MaterialDemandItem, CreateMaterialDemandData, DemandCalculationInput, DemandAnalysisResult, MRPReport } from '@/types/materialDemand';
+import { MaterialDemand, MaterialDemandItem, CreateMaterialDemandData, DemandCalculationInput, PODemandCalculationInput, DemandAnalysisResult, MRPReport } from '@/types/materialDemand';
 import { useToast } from '@/hooks/use-toast';
 
 export const useMaterialDemand = (companyId?: string) => {
@@ -140,7 +140,7 @@ export const useMaterialDemand = (companyId?: string) => {
   };
 };
 
-export const useDemandCalculation = () => {
+export const useDemandCalculation = (companyId?: string) => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -264,6 +264,138 @@ export const useDemandCalculation = () => {
     }
   });
 
+  const calculatePODemandMutation = useMutation({
+    mutationFn: async (input: PODemandCalculationInput): Promise<DemandAnalysisResult[]> => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User not authenticated');
+
+      // Get PO data with items
+      const { data: poData, error: poError } = await supabase
+        .from('purchase_orders')
+        .select(`
+          id,
+          po_number,
+          supplier_id,
+          status,
+          expected_delivery_date,
+          po_items (
+            id,
+            item_name,
+            item_code,
+            quantity_ordered,
+            quantity_received,
+            unit_of_measure,
+            warehouse_item_id
+          ),
+          supplier:suppliers (
+            name
+          )
+        `)
+        .in('id', input.po_ids)
+        .eq('status', 'approved');
+
+      if (poError) throw poError;
+
+      const analysisResults: DemandAnalysisResult[] = [];
+      const itemMap = new Map();
+
+      // Process all PO items
+      for (const po of poData) {
+        for (const item of po.po_items) {
+          const key = item.warehouse_item_id || item.item_code;
+          if (!itemMap.has(key)) {
+            itemMap.set(key, {
+              item_code: item.item_code || '',
+              item_name: item.item_name,
+              total_required: 0,
+              on_order: 0,
+              unit_of_measure: item.unit_of_measure,
+              po_details: []
+            });
+          }
+
+          const existingItem = itemMap.get(key);
+          const pendingQuantity = (item.quantity_ordered - (item.quantity_received || 0)) * (input.multiplier || 1);
+          
+          existingItem.total_required += item.quantity_ordered * (input.multiplier || 1);
+          existingItem.on_order += pendingQuantity;
+          existingItem.po_details.push({
+            po_number: po.po_number,
+            supplier_name: po.supplier?.name || '',
+            quantity_ordered: item.quantity_ordered * (input.multiplier || 1),
+            quantity_pending: pendingQuantity,
+            expected_delivery: po.expected_delivery_date
+          });
+        }
+      }
+
+      // Get current stock levels and calculate analysis
+      for (const [key, itemData] of itemMap.entries()) {
+        let currentStock = 0;
+        
+        if (itemData.item_code) {
+          const { data: stockData } = await supabase
+            .from('warehouse_items')
+            .select('current_stock')
+            .eq('item_code', itemData.item_code)
+            .single();
+          
+          currentStock = stockData?.current_stock || 0;
+        }
+
+        const shortage = Math.max(0, itemData.total_required - currentStock - itemData.on_order);
+        const suggestedOrder = shortage > 0 ? shortage : 0;
+
+        analysisResults.push({
+          ...itemData,
+          available_stock: currentStock,
+          shortage,
+          suggested_order: suggestedOrder,
+          priority: shortage > 0 ? (shortage > itemData.total_required * 0.5 ? 'high' : 'medium') : 'low',
+          lead_time_days: 7 // Default lead time
+        });
+      }
+
+      // Create demand records
+      const demandRecords = analysisResults.map(result => ({
+        item_code: result.item_code,
+        item_name: result.item_name,
+        gross_requirement: result.total_required,
+        current_stock: result.available_stock,
+        on_order_quantity: result.on_order,
+        net_requirement: result.shortage,
+        suggested_order_quantity: result.suggested_order,
+        demand_date: input.analysis_date,
+        demand_source: 'purchase_order' as const,
+        reference_id: input.po_ids[0], // Use first PO as reference
+        status: 'calculated' as const,
+        company_id: companyId
+      }));
+
+      const { error: insertError } = await supabase
+        .from('material_demand')
+        .insert(demandRecords);
+
+      if (insertError) throw insertError;
+
+      return analysisResults;
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "PO demand calculated successfully",
+      });
+    },
+    onError: (error) => {
+      console.error('Error calculating PO demand:', error);
+      toast({
+        title: "Error",
+        description: "Failed to calculate PO demand",
+        variant: "destructive",
+      });
+    }
+  });
+
   const generateMRPReportMutation = useMutation({
     mutationFn: async (bomIds: string[]): Promise<MRPReport> => {
       // This would generate a comprehensive MRP report
@@ -285,9 +417,10 @@ export const useDemandCalculation = () => {
 
   return {
     calculateBOMDemand: calculateBOMDemandMutation.mutate,
+    calculatePODemand: calculatePODemandMutation.mutate,
     generateMRPReport: generateMRPReportMutation.mutate,
-    isCalculating: calculateBOMDemandMutation.isPending,
-    calculationResult: calculateBOMDemandMutation.data,
+    isCalculating: calculateBOMDemandMutation.isPending || calculatePODemandMutation.isPending,
+    calculationResult: calculateBOMDemandMutation.data || calculatePODemandMutation.data,
     isGeneratingReport: generateMRPReportMutation.isPending,
     mrpReport: generateMRPReportMutation.data,
   };
