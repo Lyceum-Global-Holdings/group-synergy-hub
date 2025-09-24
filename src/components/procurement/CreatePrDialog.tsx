@@ -62,8 +62,8 @@ const createPrSchema = z.object({
   justification: z.string().optional(),
   bom_id: z.string().optional(),
   items: z.array(z.object({
-    warehouse_item_id: z.string().optional(),
-    finished_good_id: z.string().optional(),
+    warehouse_item_id: z.string().nullable().optional(),
+    finished_good_id: z.string().nullable().optional(),
     item_code: z.string().optional(),
     item_name: z.string().min(1, 'Item name is required'),
     description: z.string().optional(),
@@ -120,8 +120,8 @@ export function CreatePrDialog({ open, onOpenChange }: CreatePrDialogProps) {
       bom_id: '',
       items: [
         {
-          warehouse_item_id: '',
-          finished_good_id: '',
+          warehouse_item_id: null,
+          finished_good_id: null,
           item_name: '',
           description: '',
           quantity: 1,
@@ -158,8 +158,8 @@ export function CreatePrDialog({ open, onOpenChange }: CreatePrDialogProps) {
       bom_id: data.bom_id || undefined,
       company_id: selectedCompany?.id, // Auto-capture company ID
       items: data.items.map(item => ({
-        warehouse_item_id: item.warehouse_item_id,
-        finished_good_id: item.finished_good_id,
+        warehouse_item_id: item.warehouse_item_id || null,
+        finished_good_id: item.finished_good_id || null,
         item_code: item.item_code,
         item_name: item.item_name,
         description: item.description,
@@ -183,8 +183,8 @@ export function CreatePrDialog({ open, onOpenChange }: CreatePrDialogProps) {
 
   const addItem = () => {
     append({
-      warehouse_item_id: '',
-      finished_good_id: '',
+      warehouse_item_id: null,
+      finished_good_id: null,
       item_code: '',
       item_name: '',
       description: '',
@@ -200,7 +200,7 @@ export function CreatePrDialog({ open, onOpenChange }: CreatePrDialogProps) {
   const handleItemSelect = (index: number, item: WarehouseItem | null) => {
     if (item) {
       form.setValue(`items.${index}.warehouse_item_id`, item.id);
-      form.setValue(`items.${index}.finished_good_id`, '');
+      form.setValue(`items.${index}.finished_good_id`, null);
       form.setValue(`items.${index}.item_code`, item.item_code);
       form.setValue(`items.${index}.item_name`, item.name);
       form.setValue(`items.${index}.description`, item.description || '');
@@ -208,8 +208,8 @@ export function CreatePrDialog({ open, onOpenChange }: CreatePrDialogProps) {
       form.setValue(`items.${index}.estimated_unit_price`, item.unit_cost || 0);
       setTimeout(() => calculateTotalPrice(index), 0);
     } else {
-      form.setValue(`items.${index}.warehouse_item_id`, '');
-      form.setValue(`items.${index}.finished_good_id`, '');
+      form.setValue(`items.${index}.warehouse_item_id`, null);
+      form.setValue(`items.${index}.finished_good_id`, null);
       form.setValue(`items.${index}.item_code`, '');
       form.setValue(`items.${index}.item_name`, '');
       form.setValue(`items.${index}.description`, '');
@@ -218,7 +218,7 @@ export function CreatePrDialog({ open, onOpenChange }: CreatePrDialogProps) {
 
   const handleFinishedGoodSelect = (index: number, product: FinishedGood | null) => {
     if (product) {
-      form.setValue(`items.${index}.warehouse_item_id`, '');
+      form.setValue(`items.${index}.warehouse_item_id`, null);
       form.setValue(`items.${index}.finished_good_id`, product.id);
       form.setValue(`items.${index}.item_code`, product.product_code);
       form.setValue(`items.${index}.item_name`, product.product_name);
@@ -227,8 +227,8 @@ export function CreatePrDialog({ open, onOpenChange }: CreatePrDialogProps) {
       form.setValue(`items.${index}.estimated_unit_price`, product.selling_price || product.standard_cost || 0);
       setTimeout(() => calculateTotalPrice(index), 0);
     } else {
-      form.setValue(`items.${index}.warehouse_item_id`, '');
-      form.setValue(`items.${index}.finished_good_id`, '');
+      form.setValue(`items.${index}.warehouse_item_id`, null);
+      form.setValue(`items.${index}.finished_good_id`, null);
       form.setValue(`items.${index}.item_code`, '');
       form.setValue(`items.${index}.item_name`, '');
       form.setValue(`items.${index}.description`, '');
