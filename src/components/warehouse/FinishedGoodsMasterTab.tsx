@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Plus, Search, Filter, Edit, Trash2, Package, TrendingUp, TrendingDown } from 'lucide-react';
+import { Plus, Search, Filter, Edit, Trash2, Package, TrendingUp, TrendingDown, History, Settings } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -15,12 +15,16 @@ import {
 import { useFinishedGoods } from '@/hooks/useFinishedGoods';
 import { CreateFinishedGoodDialog } from './CreateFinishedGoodDialog';
 import { EditFinishedGoodDialog } from './EditFinishedGoodDialog';
+import { FinishedGoodsMovementDialog } from './FinishedGoodsMovementDialog';
+import { FinishedGoodsStockAdjustmentDialog } from './FinishedGoodsStockAdjustmentDialog';
 import { useToast } from '@/hooks/use-toast';
 
 export function FinishedGoodsMasterTab() {
   const [searchTerm, setSearchTerm] = useState('');
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [editingProduct, setEditingProduct] = useState<string | null>(null);
+  const [movementDialogProduct, setMovementDialogProduct] = useState<{id: string, name: string, stock: number} | null>(null);
+  const [adjustmentDialogProduct, setAdjustmentDialogProduct] = useState<{id: string, name: string, stock: number} | null>(null);
   const { products, isLoading, error, deleteProduct, isDeleting } = useFinishedGoods();
   const { toast } = useToast();
 
@@ -124,13 +128,14 @@ export function FinishedGoodsMasterTab() {
                   <TableHead>Current Stock</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Selling Price</TableHead>
+                  <TableHead>Stock Actions</TableHead>
                   <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredProducts.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
+                    <TableCell colSpan={9} className="text-center text-muted-foreground py-8">
                       No finished goods found. {searchTerm ? 'Try adjusting your search.' : 'Add your first product to get started.'}
                     </TableCell>
                   </TableRow>
@@ -159,6 +164,26 @@ export function FinishedGoodsMasterTab() {
                       </TableCell>
                       <TableCell>{getStockStatusBadge(product)}</TableCell>
                       <TableCell>{product.selling_price ? `LKR ${product.selling_price.toFixed(2)}` : '-'}</TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setMovementDialogProduct({id: product.id, name: product.product_name, stock: product.current_stock})}
+                            title="View stock movement history"
+                          >
+                            <History className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost" 
+                            size="sm"
+                            onClick={() => setAdjustmentDialogProduct({id: product.id, name: product.product_name, stock: product.current_stock})}
+                            title="Adjust stock"
+                          >
+                            <Settings className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
                           <Button
@@ -197,6 +222,26 @@ export function FinishedGoodsMasterTab() {
           productId={editingProduct}
           open={true}
           onOpenChange={(open) => !open && setEditingProduct(null)}
+        />
+      )}
+
+      {movementDialogProduct && (
+        <FinishedGoodsMovementDialog
+          open={!!movementDialogProduct}
+          onOpenChange={(open) => !open && setMovementDialogProduct(null)}
+          finishedGoodId={movementDialogProduct.id}
+          productName={movementDialogProduct.name}
+          currentStock={movementDialogProduct.stock}
+        />
+      )}
+
+      {adjustmentDialogProduct && (
+        <FinishedGoodsStockAdjustmentDialog
+          open={!!adjustmentDialogProduct}
+          onOpenChange={(open) => !open && setAdjustmentDialogProduct(null)}
+          finishedGoodId={adjustmentDialogProduct.id}
+          productName={adjustmentDialogProduct.name}
+          currentStock={adjustmentDialogProduct.stock}
         />
       )}
     </>
