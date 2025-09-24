@@ -995,6 +995,41 @@ export type Database = {
         }
         Relationships: []
       }
+      po_approvals: {
+        Row: {
+          action: Database["public"]["Enums"]["po_status"]
+          approver_id: string
+          comments: string | null
+          created_at: string
+          id: string
+          po_id: string
+        }
+        Insert: {
+          action: Database["public"]["Enums"]["po_status"]
+          approver_id: string
+          comments?: string | null
+          created_at?: string
+          id?: string
+          po_id: string
+        }
+        Update: {
+          action?: Database["public"]["Enums"]["po_status"]
+          approver_id?: string
+          comments?: string | null
+          created_at?: string
+          id?: string
+          po_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "po_approvals_po_id_fkey"
+            columns: ["po_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       po_items: {
         Row: {
           created_at: string
@@ -1324,6 +1359,7 @@ export type Database = {
         Row: {
           actual_delivery_date: string | null
           approved_by: string | null
+          approved_date: string | null
           buyer_id: string | null
           company_id: string | null
           created_at: string
@@ -1339,7 +1375,7 @@ export type Database = {
           po_date: string
           po_number: string
           pr_id: string | null
-          status: string
+          status: Database["public"]["Enums"]["po_status"]
           supplier_id: string
           tax_amount: number | null
           total_amount: number | null
@@ -1348,6 +1384,7 @@ export type Database = {
         Insert: {
           actual_delivery_date?: string | null
           approved_by?: string | null
+          approved_date?: string | null
           buyer_id?: string | null
           company_id?: string | null
           created_at?: string
@@ -1363,7 +1400,7 @@ export type Database = {
           po_date?: string
           po_number: string
           pr_id?: string | null
-          status?: string
+          status?: Database["public"]["Enums"]["po_status"]
           supplier_id: string
           tax_amount?: number | null
           total_amount?: number | null
@@ -1372,6 +1409,7 @@ export type Database = {
         Update: {
           actual_delivery_date?: string | null
           approved_by?: string | null
+          approved_date?: string | null
           buyer_id?: string | null
           company_id?: string | null
           created_at?: string
@@ -1387,7 +1425,7 @@ export type Database = {
           po_date?: string
           po_number?: string
           pr_id?: string | null
-          status?: string
+          status?: Database["public"]["Enums"]["po_status"]
           supplier_id?: string
           tax_amount?: number | null
           total_amount?: number | null
@@ -2194,6 +2232,16 @@ export type Database = {
     }
     Enums: {
       app_role: "super_admin" | "admin" | "manager" | "user"
+      po_status:
+        | "draft"
+        | "pending_approval"
+        | "approved"
+        | "rejected"
+        | "sent"
+        | "acknowledged"
+        | "partially_received"
+        | "completed"
+        | "cancelled"
       pr_priority: "low" | "medium" | "high" | "urgent"
       pr_status:
         | "draft"
@@ -2339,6 +2387,17 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["super_admin", "admin", "manager", "user"],
+      po_status: [
+        "draft",
+        "pending_approval",
+        "approved",
+        "rejected",
+        "sent",
+        "acknowledged",
+        "partially_received",
+        "completed",
+        "cancelled",
+      ],
       pr_priority: ["low", "medium", "high", "urgent"],
       pr_status: [
         "draft",

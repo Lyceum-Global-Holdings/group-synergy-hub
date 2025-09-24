@@ -16,6 +16,9 @@ import { format } from "date-fns";
 
 const statusColors: Record<PoStatus, string> = {
   draft: "bg-gray-100 text-gray-800",
+  pending_approval: "bg-amber-100 text-amber-800",
+  approved: "bg-green-100 text-green-800",
+  rejected: "bg-red-100 text-red-800",
   sent: "bg-blue-100 text-blue-800",
   acknowledged: "bg-yellow-100 text-yellow-800",
   partially_received: "bg-orange-100 text-orange-800",
@@ -25,6 +28,9 @@ const statusColors: Record<PoStatus, string> = {
 
 const statusLabels: Record<PoStatus, string> = {
   draft: "Draft",
+  pending_approval: "Pending Approval",
+  approved: "Approved",
+  rejected: "Rejected",
   sent: "Sent",
   acknowledged: "Acknowledged",
   partially_received: "Partially Received",
@@ -81,7 +87,9 @@ export default function PurchaseOrderPage() {
   };
 
   const canEdit = (po: PurchaseOrder) => po.status === 'draft';
-  const canSend = (po: PurchaseOrder) => po.status === 'draft';
+  const canSubmit = (po: PurchaseOrder) => po.status === 'draft';
+  const canApprove = (po: PurchaseOrder) => po.status === 'pending_approval';
+  const canSend = (po: PurchaseOrder) => po.status === 'approved';
   const canReceive = (po: PurchaseOrder) => ['sent', 'acknowledged', 'partially_received'].includes(po.status);
 
   return (
@@ -159,6 +167,9 @@ export default function PurchaseOrderPage() {
               <SelectContent>
                 <SelectItem value="all">All Status</SelectItem>
                 <SelectItem value="draft">Draft</SelectItem>
+                <SelectItem value="pending_approval">Pending Approval</SelectItem>
+                <SelectItem value="approved">Approved</SelectItem>
+                <SelectItem value="rejected">Rejected</SelectItem>
                 <SelectItem value="sent">Sent</SelectItem>
                 <SelectItem value="acknowledged">Acknowledged</SelectItem>
                 <SelectItem value="partially_received">Partially Received</SelectItem>

@@ -1,4 +1,4 @@
-export type PoStatus = 'draft' | 'sent' | 'acknowledged' | 'partially_received' | 'completed' | 'cancelled';
+export type PoStatus = 'draft' | 'pending_approval' | 'approved' | 'rejected' | 'sent' | 'acknowledged' | 'partially_received' | 'completed' | 'cancelled';
 export type ReceiptStatus = 'partial' | 'complete';
 export type QualityStatus = 'good' | 'damaged' | 'rejected';
 
@@ -21,11 +21,13 @@ export interface PurchaseOrder {
   buyer_id?: string;
   created_by: string;
   approved_by?: string;
+  approved_date?: string;
   notes?: string;
   created_at: string;
   updated_at: string;
   items?: PoItem[];
   receipts?: PoReceipt[];
+  approvals?: PoApproval[];
   supplier?: {
     name: string;
     email?: string;
@@ -40,6 +42,10 @@ export interface PurchaseOrder {
     email?: string;
   };
   buyer_profile?: {
+    full_name?: string;
+    email?: string;
+  };
+  approved_by_profile?: {
     full_name?: string;
     email?: string;
   };
@@ -136,9 +142,25 @@ export interface CreateReceiptData {
   }[];
 }
 
+export interface PoApproval {
+  id: string;
+  po_id: string;
+  approver_id: string;
+  action: PoStatus;
+  comments?: string;
+  created_at: string;
+  approver_profile?: {
+    full_name?: string;
+    email?: string;
+  };
+}
+
 export interface PoSummary {
   total_pos: number;
   draft_pos: number;
+  pending_approval_pos: number;
+  approved_pos: number;
+  rejected_pos: number;
   sent_pos: number;
   completed_pos: number;
   pending_deliveries: number;

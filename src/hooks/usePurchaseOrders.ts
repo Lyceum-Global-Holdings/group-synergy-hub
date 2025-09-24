@@ -339,6 +339,9 @@ export function usePoSummaryStats() {
       const summary: PoSummary = {
         total_pos: data.length,
         draft_pos: data.filter(po => po.status === 'draft').length,
+        pending_approval_pos: data.filter(po => po.status === 'pending_approval').length,
+        approved_pos: data.filter(po => po.status === 'approved').length,
+        rejected_pos: data.filter(po => po.status === 'rejected').length,
         sent_pos: data.filter(po => po.status === 'sent').length,
         completed_pos: data.filter(po => po.status === 'completed').length,
         pending_deliveries: data.filter(po => ['sent', 'acknowledged', 'partially_received'].includes(po.status)).length,
