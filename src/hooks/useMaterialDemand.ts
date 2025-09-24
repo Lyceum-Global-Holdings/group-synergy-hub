@@ -269,9 +269,9 @@ export const useDemandCalculation = (companyId?: string) => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User not authenticated');
 
-      // Get PO data with items
+      // Get PO data with items and their linked BOM items
       const { data: poData, error: poError } = await supabase
-        .from('purchase_orders')
+        .from('purchase_orders')  
         .select(`
           id,
           po_number,
@@ -296,63 +296,164 @@ export const useDemandCalculation = (companyId?: string) => {
 
       if (poError) throw poError;
 
+      // Get all PO item IDs to find linked BOM items
+      const allPoItemIds = poData.flatMap(po => po.po_items.map(item => item.id));
+
+      // Get BOM items that are linked to these PO items
+      const { data: bomItems, error: bomError } = await supabase
+        .from('bom_items')
+        .select(`
+          id,
+          bom_id,
+          po_item_id,
+          item_name,
+          item_code,
+          quantity,
+          consumption,
+          unit_of_measure,
+          category,
+          warehouse_item_id,
+          bill_of_materials!inner(
+            id,
+            bom_number,
+            product_name
+          )
+        `)
+        .in('po_item_id', allPoItemIds)
+        .not('po_item_id', 'is', null);
+
+      if (bomError) throw bomError;
+
+      // Get warehouse items for stock levels
+      const warehouseItemIds = [...new Set(bomItems.map(item => item.warehouse_item_id).filter(Boolean))];
+      const { data: warehouseItems, error: warehouseError } = await supabase
+        .from('warehouse_items')
+        .select('id, item_code, current_stock, min_stock_level, unit_cost')
+        .in('id', warehouseItemIds);
+
+      if (warehouseError) throw warehouseError;
+
       const analysisResults: DemandAnalysisResult[] = [];
-      const itemMap = new Map();
+      const materialMap = new Map();
 
-      // Process all PO items
+      // Process BOM items linked to PO items
       for (const po of poData) {
-        for (const item of po.po_items) {
-          const key = item.warehouse_item_id || item.item_code;
-          if (!itemMap.has(key)) {
-            itemMap.set(key, {
-              item_code: item.item_code || '',
-              item_name: item.item_name,
-              total_required: 0,
-              on_order: 0,
-              unit_of_measure: item.unit_of_measure,
-              po_details: []
-            });
-          }
-
-          const existingItem = itemMap.get(key);
-          const pendingQuantity = (item.quantity_ordered - (item.quantity_received || 0)) * (input.multiplier || 1);
+        for (const poItem of po.po_items) {
+          // Find BOM items linked to this PO item
+          const linkedBomItems = bomItems.filter(bomItem => bomItem.po_item_id === poItem.id);
           
-          existingItem.total_required += item.quantity_ordered * (input.multiplier || 1);
-          existingItem.on_order += pendingQuantity;
-          existingItem.po_details.push({
-            po_number: po.po_number,
-            supplier_name: po.supplier?.name || '',
-            quantity_ordered: item.quantity_ordered * (input.multiplier || 1),
-            quantity_pending: pendingQuantity,
-            expected_delivery: po.expected_delivery_date
-          });
+          if (linkedBomItems.length === 0) {
+            // Handle unlinked PO items - treat as direct material requirement
+            const key = poItem.warehouse_item_id || poItem.item_code;
+            if (!materialMap.has(key)) {
+              materialMap.set(key, {
+                item_code: poItem.item_code || '',
+                item_name: poItem.item_name,
+                total_required: 0,
+                on_order: 0,
+                unit_of_measure: poItem.unit_of_measure,
+                category: 'unlinked',
+                po_details: [],
+                is_linked_to_bom: false
+              });
+            }
+
+            const material = materialMap.get(key);
+            const multipliedQuantity = poItem.quantity_ordered * (input.multiplier || 1);
+            const pendingQuantity = (poItem.quantity_ordered - (poItem.quantity_received || 0)) * (input.multiplier || 1);
+            
+            material.total_required += multipliedQuantity;
+            material.on_order += pendingQuantity;
+            material.po_details.push({
+              po_number: po.po_number,
+              supplier_name: po.supplier?.name || '',
+              quantity_ordered: multipliedQuantity,
+              quantity_pending: pendingQuantity,
+              expected_delivery: po.expected_delivery_date
+            });
+          } else {
+            // Process linked BOM items - use BOM consumption ratios
+            for (const bomItem of linkedBomItems) {
+              const materialKey = bomItem.warehouse_item_id || bomItem.item_code;
+              if (!materialMap.has(materialKey)) {
+                materialMap.set(materialKey, {
+                  item_code: bomItem.item_code || '',
+                  item_name: bomItem.item_name,
+                  total_required: 0,
+                  on_order: 0,
+                  unit_of_measure: bomItem.unit_of_measure,
+                  category: bomItem.category,
+                  po_details: [],
+                  is_linked_to_bom: true,
+                  bom_info: {
+                    bom_number: bomItem.bill_of_materials.bom_number,
+                    product_name: bomItem.bill_of_materials.product_name
+                  }
+                });
+              }
+
+              const material = materialMap.get(materialKey);
+              
+              // Calculate material requirement based on BOM consumption and PO quantity
+              const consumptionRatio = bomItem.consumption || bomItem.quantity || 1;
+              const poQuantity = poItem.quantity_ordered * (input.multiplier || 1);
+              const materialRequired = consumptionRatio * poQuantity;
+              
+              const pendingPoQuantity = (poItem.quantity_ordered - (poItem.quantity_received || 0)) * (input.multiplier || 1);
+              const pendingMaterialRequired = consumptionRatio * pendingPoQuantity;
+              
+              material.total_required += materialRequired;
+              material.on_order += pendingMaterialRequired;
+              
+              // Add PO details with calculated material quantities
+              const existingPoDetail = material.po_details.find(detail => detail.po_number === po.po_number);
+              if (existingPoDetail) {
+                existingPoDetail.quantity_ordered += materialRequired;
+                existingPoDetail.quantity_pending += pendingMaterialRequired;
+              } else {
+                material.po_details.push({
+                  po_number: po.po_number,
+                  supplier_name: po.supplier?.name || '',
+                  quantity_ordered: materialRequired,
+                  quantity_pending: pendingMaterialRequired,
+                  expected_delivery: po.expected_delivery_date
+                });
+              }
+            }
+          }
         }
       }
 
-      // Get current stock levels and calculate analysis
-      for (const [key, itemData] of itemMap.entries()) {
-        let currentStock = 0;
+      // Calculate analysis for each material
+      for (const [key, materialData] of materialMap.entries()) {
+        const warehouseItem = warehouseItems?.find(w => 
+          w.id === key || w.item_code === materialData.item_code
+        );
         
-        if (itemData.item_code) {
-          const { data: stockData } = await supabase
-            .from('warehouse_items')
-            .select('current_stock')
-            .eq('item_code', itemData.item_code)
-            .single();
-          
-          currentStock = stockData?.current_stock || 0;
-        }
+        const currentStock = warehouseItem?.current_stock || 0;
+        const safetyStock = input.include_safety_stock ? (warehouseItem?.min_stock_level || 0) : 0;
+        const shortage = Math.max(0, materialData.total_required - currentStock - materialData.on_order);
+        const suggestedOrder = shortage > 0 ? shortage + safetyStock : 0;
 
-        const shortage = Math.max(0, itemData.total_required - currentStock - itemData.on_order);
-        const suggestedOrder = shortage > 0 ? shortage : 0;
+        // Determine priority based on shortage and requirement
+        let priority: 'low' | 'medium' | 'high' | 'urgent' = 'medium';
+        if (shortage > materialData.total_required * 0.8) priority = 'urgent';
+        else if (shortage > materialData.total_required * 0.5) priority = 'high';
+        else if (shortage > 0) priority = 'medium';
+        else priority = 'low';
 
         analysisResults.push({
-          ...itemData,
+          ...materialData,
           available_stock: currentStock,
           shortage,
           suggested_order: suggestedOrder,
-          priority: shortage > 0 ? (shortage > itemData.total_required * 0.5 ? 'high' : 'medium') : 'low',
-          lead_time_days: 7 // Default lead time
+          priority,
+          lead_time_days: 7, // Default lead time
+          supplier_info: warehouseItem ? {
+            supplier_id: '',
+            supplier_name: '',
+            last_unit_cost: warehouseItem.unit_cost
+          } : undefined
         });
       }
 

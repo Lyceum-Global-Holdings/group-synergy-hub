@@ -353,7 +353,19 @@ const MaterialDemandPlanning = () => {
                           <TableCell className="font-mono text-sm">
                             {item.item_code}
                           </TableCell>
-                          <TableCell>{item.item_name}</TableCell>
+                          <TableCell>
+                            {item.item_name}
+                            {(item as any).is_linked_to_bom && (
+                              <Badge variant="secondary" className="ml-2">
+                                BOM Linked
+                              </Badge>
+                            )}
+                            {(item as any).is_linked_to_bom === false && (
+                              <Badge variant="outline" className="ml-2">
+                                Direct PO Item
+                              </Badge>
+                            )}
+                          </TableCell>
                           <TableCell>
                             <Badge variant="outline">{item.category || 'N/A'}</Badge>
                           </TableCell>

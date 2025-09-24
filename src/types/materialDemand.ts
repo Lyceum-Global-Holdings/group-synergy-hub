@@ -86,6 +86,11 @@ export interface DemandAnalysisResult {
   category?: string;
   priority: DemandPriority;
   lead_time_days: number;
+  is_linked_to_bom?: boolean;
+  bom_info?: {
+    bom_number: string;
+    product_name: string;
+  };
   supplier_info?: {
     supplier_id: string;
     supplier_name: string;
