@@ -106,6 +106,8 @@ export function useCreatePurchaseOrder() {
       const poItems = data.items.map(item => ({
         po_id: po.id,
         pr_item_id: item.pr_item_id,
+        warehouse_item_id: item.warehouse_item_id,
+        item_code: item.item_code,
         item_name: item.item_name,
         description: item.description,
         specifications: item.specifications,
