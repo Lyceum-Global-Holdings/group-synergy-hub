@@ -82,6 +82,8 @@ export function EditBomDialog({ bom, open, onOpenChange }: EditBomDialogProps) {
   // Load existing BOM data when dialog opens
   useEffect(() => {
     if (bom && open) {
+      console.log('Loading BOM data:', bom);
+      console.log('BOM size value:', bom.size);
       form.reset({
         product_name: bom.product_name,
         style_no: bom.style_no || '',
@@ -90,6 +92,10 @@ export function EditBomDialog({ bom, open, onOpenChange }: EditBomDialogProps) {
         description: bom.description || '',
         status: bom.status,
       });
+      // Log form values after reset
+      setTimeout(() => {
+        console.log('Form values after reset:', form.getValues());
+      }, 100);
     }
   }, [bom, open, form]);
 
@@ -419,7 +425,7 @@ export function EditBomDialog({ bom, open, onOpenChange }: EditBomDialogProps) {
           <DialogTitle>Edit Bill of Materials - {bom.bom_number}</DialogTitle>
         </DialogHeader>
 
-        {itemsLoading ? (
+        {itemsLoading || !bom ? (
           <div className="text-center py-8">Loading BOM data...</div>
         ) : (
           <Form {...form}>
@@ -474,33 +480,42 @@ export function EditBomDialog({ bom, open, onOpenChange }: EditBomDialogProps) {
                   <FormField
                     control={form.control}
                     name="size"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Size</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select size" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent className="bg-background border z-50 max-h-60">
-                            {SIZE_CATEGORIES.map((cat) => (
-                              <div key={cat}>
-                                <div className="px-2 py-1 text-xs font-medium text-muted-foreground border-b">
-                                  {cat}
+                    render={({ field }) => {
+                      console.log('Size field render - value:', field.value);
+                      return (
+                        <FormItem>
+                          <FormLabel>Size</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value || ''}>
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select size" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent className="bg-background border z-50 max-h-60">
+                              {/* Add custom size option if current value doesn't match predefined sizes */}
+                              {field.value && !STANDARD_SIZES.some(size => size.value === field.value) && (
+                                <SelectItem value={field.value}>
+                                  {field.value} (Custom)
+                                </SelectItem>
+                              )}
+                              {SIZE_CATEGORIES.map((cat) => (
+                                <div key={cat}>
+                                  <div className="px-2 py-1 text-xs font-medium text-muted-foreground border-b">
+                                    {cat}
+                                  </div>
+                                  {getSizesByCategory(cat).map((size) => (
+                                    <SelectItem key={size.value} value={size.value}>
+                                      {size.label}
+                                    </SelectItem>
+                                  ))}
                                 </div>
-                                {getSizesByCategory(cat).map((size) => (
-                                  <SelectItem key={size.value} value={size.value}>
-                                    {size.label}
-                                  </SelectItem>
-                                ))}
-                              </div>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      );
+                    }}
                   />
 
                   <FormField
