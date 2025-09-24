@@ -17,6 +17,7 @@ export interface PurchaseRequisition {
   approved_by?: string;
   approved_date?: string;
   rejection_reason?: string;
+  bom_id?: string; // Link to BOM for material planning
   created_at: string;
   updated_at: string;
   items?: PrItem[];
@@ -68,6 +69,7 @@ export interface CreatePrData {
   priority: PrPriority;
   required_date: string;
   justification?: string;
+  bom_id?: string; // Link to BOM for material planning
   company_id?: string;
   items: {
     warehouse_item_id?: string;

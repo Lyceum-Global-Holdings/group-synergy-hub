@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { Plus, Trash2, Link2, X } from 'lucide-react';
+import { Plus, Trash2, Link2, X, Package } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -40,6 +40,7 @@ import { WarehouseItem } from '@/types/itemBin';
 
 const bomSchema = z.object({
   product_name: z.string().min(1, 'Product name is required'),
+  warehouse_item_id: z.string().optional(),
   style_no: z.string().optional(),
   version: z.string().optional(),
   size: z.string().optional(),
@@ -72,6 +73,7 @@ export function EditBomDialog({ bom, open, onOpenChange }: EditBomDialogProps) {
     resolver: zodResolver(bomSchema),
     defaultValues: {
       product_name: '',
+      warehouse_item_id: '',
       version: '1.0',
       size: '',
       description: '',
@@ -86,6 +88,7 @@ export function EditBomDialog({ bom, open, onOpenChange }: EditBomDialogProps) {
       console.log('BOM size value:', bom.size);
       form.reset({
         product_name: bom.product_name,
+        warehouse_item_id: bom.warehouse_item_id || '',
         style_no: bom.style_no || '',
         version: bom.version || '1.0',
         size: bom.size || '',
@@ -227,6 +230,7 @@ export function EditBomDialog({ bom, open, onOpenChange }: EditBomDialogProps) {
       await updateBom({
         id: bom.id,
         product_name: data.product_name,
+        warehouse_item_id: data.warehouse_item_id || undefined,
         style_no: data.style_no,
         version: data.version,
         size: data.size,
@@ -446,10 +450,31 @@ export function EditBomDialog({ bom, open, onOpenChange }: EditBomDialogProps) {
                         </FormControl>
                         <FormMessage />
                       </FormItem>
-                    )}
-                  />
+                  )}
+                />
 
-                  <FormField
+                <div className="space-y-2">
+                  <FormLabel>Link to Inventory Product (Optional)</FormLabel>
+                  <ItemSelector
+                    onSelect={(item: WarehouseItem | null) => {
+                      if (item) {
+                        form.setValue('warehouse_item_id', item.id);
+                        if (!form.getValues('product_name')) {
+                          form.setValue('product_name', item.name);
+                        }
+                      } else {
+                        form.setValue('warehouse_item_id', '');
+                      }
+                    }}
+                    value={form.watch('warehouse_item_id')}
+                    placeholder="Select product from inventory"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Link this BOM to an existing product in your warehouse inventory
+                  </p>
+                </div>
+
+                <FormField
                     control={form.control}
                     name="style_no"
                     render={({ field }) => (

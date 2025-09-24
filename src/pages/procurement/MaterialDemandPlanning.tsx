@@ -11,6 +11,7 @@ import { Calendar, Calculator, FileText, AlertTriangle, CheckCircle, Clock, Tren
 import { useMaterialDemand, useDemandCalculation } from '@/hooks/useMaterialDemand';
 import { useBillOfMaterials } from '@/hooks/useBillOfMaterials';
 import { usePurchaseOrders } from '@/hooks/usePurchaseOrders';
+import { usePurchaseRequisitions } from '@/hooks/usePurchaseRequisitions';
 import { useCompany } from '@/contexts/CompanyContext';
 import { format } from 'date-fns';
 import { DemandPriority } from '@/types/materialDemand';
@@ -20,6 +21,7 @@ const MaterialDemandPlanning = () => {
   const { demands, isLoading } = useMaterialDemand(selectedCompany?.id);
   const { boms } = useBillOfMaterials(selectedCompany?.id);
   const { data: purchaseOrders } = usePurchaseOrders();
+  const { data: purchaseRequisitions } = usePurchaseRequisitions();
   const { calculateBOMDemand, calculationResult, isCalculating } = useDemandCalculation();
   
   const [selectedBomId, setSelectedBomId] = useState<string>('');
@@ -61,14 +63,19 @@ const MaterialDemandPlanning = () => {
     const selectedBom = boms?.find(bom => bom.id === bomId);
     if (!selectedBom) return [];
 
-    // Find POs that are referenced by this BOM or have matching items
+    // Find POs that are directly linked to this BOM or have matching material requirements
     return purchaseOrders.filter(po => {
-      // Check if BOM has this PO referenced
+      // Direct BOM-PO link (if BOM references a PO)
       if (selectedBom.po_id === po.id) return true;
       
-      // Check if PO items match BOM items (this would need BOM items data)
-      // For now, return all POs as potentially related
-      return po.status !== 'cancelled';
+      // Check if PO has pr_id and that PR references this BOM
+      if (po.pr_id) {
+        // This would need PR data to check bom_id relationship
+        // For now, show POs that are active and could be related
+        return ['draft', 'approved', 'sent', 'partial'].includes(po.status);
+      }
+      
+      return false;
     });
   };
 
@@ -261,57 +268,103 @@ const MaterialDemandPlanning = () => {
                 </CardContent>
               </Card>
 
-              {selectedBomId && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Related Purchase Orders</CardTitle>
-                    <CardDescription>
-                      Purchase orders that may fulfill the material requirements for this BOM
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    {getRelatedPOs(selectedBomId).length > 0 ? (
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>PO Number</TableHead>
-                            <TableHead>Supplier</TableHead>
-                            <TableHead>Status</TableHead>
-                            <TableHead>Expected Delivery</TableHead>
-                            <TableHead>Total Amount</TableHead>
-                            <TableHead>Items Count</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {getRelatedPOs(selectedBomId).map((po) => (
-                            <TableRow key={po.id}>
-                              <TableCell className="font-mono">{po.po_number}</TableCell>
-                              <TableCell>{po.supplier?.name || 'N/A'}</TableCell>
-                              <TableCell>
-                                <Badge variant={po.status === 'completed' ? 'default' : 'secondary'}>
-                                  {po.status}
-                                </Badge>
-                              </TableCell>
-                              <TableCell>
-                                {po.expected_delivery_date ? 
-                                  format(new Date(po.expected_delivery_date), 'MMM dd, yyyy') : 
-                                  'Not set'
-                                }
-                              </TableCell>
-                              <TableCell>{po.currency} {po.final_amount.toLocaleString()}</TableCell>
-                              <TableCell>{po.items?.length || 0}</TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    ) : (
-                      <div className="text-center py-8 text-muted-foreground">
-                        <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                        <p>No related Purchase Orders found for this BOM</p>
-                        <p className="text-sm mt-2">
-                          Consider creating a Purchase Order based on the material shortages above
-                        </p>
-                      </div>
+                {selectedBomId && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Related Purchase Orders & Requisitions</CardTitle>
+                      <CardDescription>
+                        Purchase orders and requisitions linked to this BOM for comprehensive material planning
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      {getRelatedPOs(selectedBomId).length > 0 ? (
+                        <div className="space-y-6">
+                          <div>
+                            <h4 className="font-medium mb-3">Purchase Orders</h4>
+                            <Table>
+                              <TableHeader>
+                                <TableRow>
+                                  <TableHead>PO Number</TableHead>
+                                  <TableHead>Supplier</TableHead>
+                                  <TableHead>Status</TableHead>
+                                  <TableHead>Expected Delivery</TableHead>
+                                  <TableHead>Total Amount</TableHead>
+                                  <TableHead>Items Count</TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {getRelatedPOs(selectedBomId).map((po) => (
+                                  <TableRow key={po.id}>
+                                    <TableCell className="font-mono">{po.po_number}</TableCell>
+                                    <TableCell>{po.supplier?.name || 'N/A'}</TableCell>
+                                    <TableCell>
+                                      <Badge variant={po.status === 'completed' ? 'default' : 'secondary'}>
+                                        {po.status}
+                                      </Badge>
+                                    </TableCell>
+                                    <TableCell>
+                                      {po.expected_delivery_date ? 
+                                        format(new Date(po.expected_delivery_date), 'MMM dd, yyyy') : 
+                                        'Not set'
+                                      }
+                                    </TableCell>
+                                    <TableCell>{po.currency} {po.final_amount.toLocaleString()}</TableCell>
+                                    <TableCell>{po.items?.length || 0}</TableCell>
+                                  </TableRow>
+                                ))}
+                              </TableBody>
+                            </Table>
+                          </div>
+
+                          {/* Related Purchase Requisitions */}
+                          {purchaseRequisitions && purchaseRequisitions.filter(pr => pr.bom_id === selectedBomId).length > 0 && (
+                            <div>
+                              <h4 className="font-medium mb-3">Related Purchase Requisitions</h4>
+                              <Table>
+                                <TableHeader>
+                                  <TableRow>
+                                    <TableHead>PR Number</TableHead>
+                                    <TableHead>Title</TableHead>
+                                    <TableHead>Status</TableHead>
+                                    <TableHead>Priority</TableHead>
+                                    <TableHead>Required Date</TableHead>
+                                    <TableHead>Estimated Amount</TableHead>
+                                  </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                  {purchaseRequisitions.filter(pr => pr.bom_id === selectedBomId).map((pr) => (
+                                    <TableRow key={pr.id}>
+                                      <TableCell className="font-mono">{pr.pr_number}</TableCell>
+                                      <TableCell>{pr.title}</TableCell>
+                                      <TableCell>
+                                        <Badge variant={pr.status === 'approved' ? 'default' : 'secondary'}>
+                                          {pr.status}
+                                        </Badge>
+                                      </TableCell>
+                                      <TableCell>
+                                        <Badge variant={pr.priority === 'urgent' ? 'destructive' : 'outline'}>
+                                          {pr.priority}
+                                        </Badge>
+                                      </TableCell>
+                                      <TableCell>
+                                        {format(new Date(pr.required_date), 'MMM dd, yyyy')}
+                                      </TableCell>
+                                      <TableCell>LKR {pr.total_estimated_amount.toLocaleString()}</TableCell>
+                                    </TableRow>
+                                  ))}
+                                </TableBody>
+                              </Table>
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="text-center py-8 text-muted-foreground">
+                          <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                          <p>No related Purchase Orders found for this BOM</p>
+                          <p className="text-sm mt-2">
+                            Create Purchase Requisitions and Orders based on the material shortages above to establish the complete supply chain
+                          </p>
+                        </div>
                     )}
                   </CardContent>
                 </Card>

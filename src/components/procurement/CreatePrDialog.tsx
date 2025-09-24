@@ -40,6 +40,7 @@ import {
 } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useCreatePurchaseRequisition } from '@/hooks/usePurchaseRequisitions';
+import { useBillOfMaterials } from '@/hooks/useBillOfMaterials';
 import { useCompany } from '@/contexts/CompanyContext';
 import { cn } from '@/lib/utils';
 import type { CreatePrData, PrPriority } from '@/types/procurement';
@@ -57,6 +58,7 @@ const createPrSchema = z.object({
     message: 'Required date cannot be in the past',
   }),
   justification: z.string().optional(),
+  bom_id: z.string().optional(),
   items: z.array(z.object({
     warehouse_item_id: z.string().optional(),
     item_code: z.string().optional(),
@@ -102,6 +104,7 @@ const unitsOfMeasure = [
 export function CreatePrDialog({ open, onOpenChange }: CreatePrDialogProps) {
   const createPrMutation = useCreatePurchaseRequisition();
   const { selectedCompany } = useCompany();
+  const { boms } = useBillOfMaterials(selectedCompany?.id);
   
   const form = useForm<CreatePrFormData>({
     resolver: zodResolver(createPrSchema),
@@ -111,6 +114,7 @@ export function CreatePrDialog({ open, onOpenChange }: CreatePrDialogProps) {
       company: selectedCompany?.name || '',
       priority: 'medium',
       justification: '',
+      bom_id: '',
       items: [
         {
           item_name: '',
@@ -146,6 +150,7 @@ export function CreatePrDialog({ open, onOpenChange }: CreatePrDialogProps) {
       priority: data.priority,
       required_date: format(data.required_date, 'yyyy-MM-dd'),
       justification: data.justification,
+      bom_id: data.bom_id || undefined,
       company_id: selectedCompany?.id, // Auto-capture company ID
       items: data.items.map(item => ({
         warehouse_item_id: item.warehouse_item_id,

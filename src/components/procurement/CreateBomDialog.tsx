@@ -41,6 +41,7 @@ import { WarehouseItem } from '@/types/itemBin';
 
 const bomSchema = z.object({
   product_name: z.string().min(1, 'Product name is required'),
+  warehouse_item_id: z.string().optional(),
   style_no: z.string().optional(),
   version: z.string().optional(),
   size: z.string().optional(),
@@ -71,6 +72,7 @@ export function CreateBomDialog({ children }: CreateBomDialogProps) {
     resolver: zodResolver(bomSchema),
     defaultValues: {
       product_name: '',
+      warehouse_item_id: '',
       version: '1.0',
       size: '',
       description: '',
@@ -396,6 +398,27 @@ export function CreateBomDialog({ children }: CreateBomDialogProps) {
                     </FormItem>
                   )}
                 />
+
+                <div className="space-y-2">
+                  <FormLabel>Link to Inventory Product (Optional)</FormLabel>
+                  <ItemSelector
+                    onSelect={(item: WarehouseItem | null) => {
+                      if (item) {
+                        form.setValue('warehouse_item_id', item.id);
+                        if (!form.getValues('product_name')) {
+                          form.setValue('product_name', item.name);
+                        }
+                      } else {
+                        form.setValue('warehouse_item_id', '');
+                      }
+                    }}
+                    value={form.watch('warehouse_item_id')}
+                    placeholder="Select product from inventory"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Link this BOM to an existing product in your warehouse inventory
+                  </p>
+                </div>
 
                 <FormField
                   control={form.control}

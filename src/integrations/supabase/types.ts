@@ -171,6 +171,7 @@ export type Database = {
           style_no: string | null
           updated_at: string
           version: string | null
+          warehouse_item_id: string | null
         }
         Insert: {
           bom_number: string
@@ -186,6 +187,7 @@ export type Database = {
           style_no?: string | null
           updated_at?: string
           version?: string | null
+          warehouse_item_id?: string | null
         }
         Update: {
           bom_number?: string
@@ -201,6 +203,7 @@ export type Database = {
           style_no?: string | null
           updated_at?: string
           version?: string | null
+          warehouse_item_id?: string | null
         }
         Relationships: [
           {
@@ -215,6 +218,13 @@ export type Database = {
             columns: ["po_id"]
             isOneToOne: false
             referencedRelation: "purchase_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bill_of_materials_warehouse_item_id_fkey"
+            columns: ["warehouse_item_id"]
+            isOneToOne: false
+            referencedRelation: "warehouse_items"
             referencedColumns: ["id"]
           },
         ]
@@ -1411,6 +1421,7 @@ export type Database = {
         Row: {
           approved_by: string | null
           approved_date: string | null
+          bom_id: string | null
           company_id: string | null
           created_at: string
           department: string | null
@@ -1431,6 +1442,7 @@ export type Database = {
         Insert: {
           approved_by?: string | null
           approved_date?: string | null
+          bom_id?: string | null
           company_id?: string | null
           created_at?: string
           department?: string | null
@@ -1451,6 +1463,7 @@ export type Database = {
         Update: {
           approved_by?: string | null
           approved_date?: string | null
+          bom_id?: string | null
           company_id?: string | null
           created_at?: string
           department?: string | null
@@ -1469,6 +1482,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "purchase_requisitions_bom_id_fkey"
+            columns: ["bom_id"]
+            isOneToOne: false
+            referencedRelation: "bill_of_materials"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "purchase_requisitions_company_id_fkey"
             columns: ["company_id"]
