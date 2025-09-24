@@ -332,25 +332,16 @@ export const useDemandCalculation = (companyId?: string) => {
 
       console.log('Fetched purchase orders:', purchaseOrders?.length);
 
-      // Fetch finished goods with their BOMs - matching by product_code
+      // Fetch finished goods first
       const { data: finishedGoods, error: fgError } = await supabase
         .from('finished_goods')
         .select(`
-          *,
-          bill_of_materials (
-            id,
-            bom_number,
-            product_name,
-            bom_items (
-              id,
-              item_name,
-              item_code,
-              quantity,
-              unit_of_measure,
-              consumption,
-              warehouse_item_id
-            )
-          )
+          id,
+          product_code,
+          product_name,
+          current_stock,
+          available_stock,
+          bom_id
         `);
 
       if (fgError) {
@@ -359,6 +350,57 @@ export const useDemandCalculation = (companyId?: string) => {
       }
 
       console.log('Fetched finished goods:', finishedGoods?.length);
+
+      // Get unique BOM IDs from finished goods
+      const bomIds = [...new Set(finishedGoods?.map(fg => fg.bom_id).filter(Boolean))] as string[];
+      
+      // Fetch BOMs and their items separately
+      let billOfMaterials: any[] = [];
+      let bomItems: any[] = [];
+      
+      if (bomIds.length > 0) {
+        // Fetch BOMs
+        const { data: bomsData, error: bomError } = await supabase
+          .from('bill_of_materials')
+          .select(`
+            id,
+            bom_number,
+            product_name
+          `)
+          .in('id', bomIds);
+
+        if (bomError) {
+          console.error('Error fetching BOMs:', bomError);
+          throw new Error('Failed to fetch BOMs');
+        }
+
+        billOfMaterials = bomsData || [];
+
+        // Fetch BOM items
+        const { data: bomItemsData, error: bomItemsError } = await supabase
+          .from('bom_items')
+          .select(`
+            id,
+            bom_id,
+            item_name,
+            item_code,
+            quantity,
+            unit_of_measure,
+            consumption,
+            warehouse_item_id
+          `)
+          .in('bom_id', bomIds);
+
+        if (bomItemsError) {
+          console.error('Error fetching BOM items:', bomItemsError);
+          throw new Error('Failed to fetch BOM items');
+        }
+
+        bomItems = bomItemsData || [];
+      }
+
+      console.log('Fetched BOMs:', billOfMaterials?.length);
+      console.log('Fetched BOM items:', bomItems?.length);
 
       // Fetch warehouse items for stock information
       const { data: warehouseItems, error: wiError } = await supabase
@@ -375,6 +417,8 @@ export const useDemandCalculation = (companyId?: string) => {
       // Create lookup maps for efficient matching
       const finishedGoodsMap = new Map();
       const warehouseItemsMap = new Map();
+      const bomMap = new Map();
+      const bomItemsMap = new Map();
       
       finishedGoods?.forEach(fg => {
         if (fg.product_code) {
@@ -386,6 +430,19 @@ export const useDemandCalculation = (companyId?: string) => {
         if (wi.item_code) {
           warehouseItemsMap.set(wi.item_code, wi);
         }
+      });
+
+      // Map BOMs by ID
+      billOfMaterials?.forEach(bom => {
+        bomMap.set(bom.id, bom);
+      });
+
+      // Group BOM items by BOM ID
+      bomItems?.forEach(item => {
+        if (!bomItemsMap.has(item.bom_id)) {
+          bomItemsMap.set(item.bom_id, []);
+        }
+        bomItemsMap.get(item.bom_id).push(item);
       });
 
       console.log(`Finished goods mapping: ${finishedGoodsMap.size} items`);
@@ -417,10 +474,13 @@ export const useDemandCalculation = (companyId?: string) => {
               console.log(`⚡ Production required: ${requiredProduction} units`);
               
               // Step 3: Calculate BOM material requirements ONLY for the shortfall
-              if (matchedFinishedGood.bill_of_materials?.bom_items) {
+              const matchedBOM = matchedFinishedGood.bom_id ? bomMap.get(matchedFinishedGood.bom_id) : null;
+              const bomItemsList = matchedFinishedGood.bom_id ? bomItemsMap.get(matchedFinishedGood.bom_id) : null;
+              
+              if (matchedBOM && bomItemsList && bomItemsList.length > 0) {
                 console.log('📋 Expanding BOM for shortfall quantity...');
                 
-                for (const bomItem of matchedFinishedGood.bill_of_materials.bom_items) {
+                for (const bomItem of bomItemsList) {
                   const consumptionPerUnit = Number(bomItem.consumption) || Number(bomItem.quantity) || 0;
                   const materialRequired = requiredProduction * consumptionPerUnit;
                   
@@ -455,10 +515,10 @@ export const useDemandCalculation = (companyId?: string) => {
                       priority: materialShortage > 0 ? 'high' : 'medium',
                       lead_time_days: 7,
                       is_linked_to_bom: true,
-                      bom_info: {
-                        bom_number: matchedFinishedGood.bill_of_materials.bom_number,
-                        product_name: matchedFinishedGood.bill_of_materials.product_name
-                      },
+                       bom_info: {
+                         bom_number: matchedBOM?.bom_number || 'N/A',
+                         product_name: matchedBOM?.product_name || 'N/A'
+                       },
                       finished_good_info: {
                         product_code: matchedFinishedGood.product_code,
                         product_name: matchedFinishedGood.product_name,
