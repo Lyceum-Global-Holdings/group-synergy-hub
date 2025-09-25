@@ -17,6 +17,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useFinishedGoods } from '@/hooks/useFinishedGoods';
+import { getSizesByCategory } from '@/constants/standardSizes';
 
 interface EditFinishedGoodDialogProps {
   productId: string;
@@ -132,11 +133,19 @@ export function EditFinishedGoodDialog({ productId, open, onOpenChange }: EditFi
             </div>
             <div className="space-y-2">
               <Label htmlFor="size">Size</Label>
-              <Input
-                id="size"
-                value={formData.size}
-                onChange={(e) => setFormData({ ...formData, size: e.target.value })}
-              />
+              <Select value={formData.size} onValueChange={(value) => setFormData({ ...formData, size: value })}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select size" />
+                </SelectTrigger>
+                <SelectContent>
+                  {getSizesByCategory('Apparel').map((size) => (
+                    <SelectItem key={size.value} value={size.value}>
+                      {size.label}
+                    </SelectItem>
+                  ))}
+                  <SelectItem value="CUSTOM">Custom</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-2">
               <Label htmlFor="color">Color</Label>

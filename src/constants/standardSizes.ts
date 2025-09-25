@@ -69,6 +69,18 @@ export const STANDARD_SIZES: SizeOption[] = [
   { value: 'US14', label: 'US 14', category: 'Shoes' },
   { value: 'US15', label: 'US 15', category: 'Shoes' },
   
+  // Apparel Sizes (Finished Goods)
+  { value: 'KIDS', label: 'KIDS', category: 'Apparel' },
+  { value: 'KIDM', label: 'KIDM', category: 'Apparel' },
+  { value: 'KIDL', label: 'KIDL', category: 'Apparel' },
+  { value: 'XS', label: 'XS', category: 'Apparel' },
+  { value: 'S', label: 'S', category: 'Apparel' },
+  { value: 'M', label: 'M', category: 'Apparel' },
+  { value: 'L', label: 'L', category: 'Apparel' },
+  { value: 'XL', label: 'XL', category: 'Apparel' },
+  { value: '2XL', label: '2XL', category: 'Apparel' },
+  { value: '3XL', label: '3XL', category: 'Apparel' },
+  
   // Special Sizes
   { value: 'ONE_SIZE', label: 'One Size', category: 'Special' },
   { value: 'FREE_SIZE', label: 'Free Size', category: 'Special' },
@@ -80,6 +92,7 @@ export const SIZE_CATEGORIES = [
   'Numeric', 
   'Kids',
   'Shoes',
+  'Apparel',
   'Special'
 ];
 
