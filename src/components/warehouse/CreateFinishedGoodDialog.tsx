@@ -18,6 +18,7 @@ import {
 } from '@/components/ui/select';
 import { useFinishedGoods } from '@/hooks/useFinishedGoods';
 import { getSizesByCategory } from '@/constants/standardSizes';
+import { MultiSizeSelector } from '@/components/common/MultiSizeSelector';
 
 interface CreateFinishedGoodDialogProps {
   open: boolean;
@@ -43,6 +44,7 @@ export function CreateFinishedGoodDialog({ open, onOpenChange }: CreateFinishedG
     lead_time_days: '',
     quality_status: 'approved',
     status: 'active',
+    available_sizes: [] as string[],
   });
 
   const { createProduct, isCreating } = useFinishedGoods();
@@ -50,8 +52,15 @@ export function CreateFinishedGoodDialog({ open, onOpenChange }: CreateFinishedG
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
+    // Validation: ensure at least one size is selected
+    if (formData.available_sizes.length === 0) {
+      alert('Please select at least one size.');
+      return;
+    }
+    
     const data = {
       ...formData,
+      available_sizes: formData.available_sizes,
       selling_price: formData.selling_price ? parseFloat(formData.selling_price) : undefined,
       standard_cost: formData.standard_cost ? parseFloat(formData.standard_cost) : undefined,
       minimum_stock: formData.minimum_stock ? parseFloat(formData.minimum_stock) : undefined,
@@ -80,6 +89,7 @@ export function CreateFinishedGoodDialog({ open, onOpenChange }: CreateFinishedG
       lead_time_days: '',
       quality_status: 'approved',
       status: 'active',
+      available_sizes: [],
     });
   };
 
@@ -112,7 +122,7 @@ export function CreateFinishedGoodDialog({ open, onOpenChange }: CreateFinishedG
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="style_no">Style No</Label>
               <Input
@@ -122,22 +132,6 @@ export function CreateFinishedGoodDialog({ open, onOpenChange }: CreateFinishedG
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="size">Size</Label>
-              <Select value={formData.size} onValueChange={(value) => setFormData({ ...formData, size: value })}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select size" />
-                </SelectTrigger>
-                <SelectContent>
-                  {getSizesByCategory('Apparel').map((size) => (
-                    <SelectItem key={size.value} value={size.value}>
-                      {size.label}
-                    </SelectItem>
-                  ))}
-                  <SelectItem value="CUSTOM">Custom</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
               <Label htmlFor="color">Color</Label>
               <Input
                 id="color"
@@ -145,6 +139,17 @@ export function CreateFinishedGoodDialog({ open, onOpenChange }: CreateFinishedG
                 onChange={(e) => setFormData({ ...formData, color: e.target.value })}
               />
             </div>
+          </div>
+
+          {/* Available Sizes Selection */}
+          <div className="space-y-2">
+            <Label>Available Sizes *</Label>
+            <MultiSizeSelector
+              selectedSizes={formData.available_sizes}
+              onSizesChange={(sizes) => setFormData({ ...formData, available_sizes: sizes })}
+              showSelectAll={true}
+              groupByCategory={true}
+            />
           </div>
 
           <div className="grid grid-cols-2 gap-4">
