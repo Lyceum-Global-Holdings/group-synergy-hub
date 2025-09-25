@@ -167,8 +167,10 @@ export type Database = {
           po_id: string | null
           product_name: string
           size: string | null
+          size_specific: boolean | null
           status: string
           style_no: string | null
+          target_sizes: Json | null
           updated_at: string
           version: string | null
           warehouse_item_id: string | null
@@ -183,8 +185,10 @@ export type Database = {
           po_id?: string | null
           product_name: string
           size?: string | null
+          size_specific?: boolean | null
           status?: string
           style_no?: string | null
+          target_sizes?: Json | null
           updated_at?: string
           version?: string | null
           warehouse_item_id?: string | null
@@ -199,8 +203,10 @@ export type Database = {
           po_id?: string | null
           product_name?: string
           size?: string | null
+          size_specific?: boolean | null
           status?: string
           style_no?: string | null
+          target_sizes?: Json | null
           updated_at?: string
           version?: string | null
           warehouse_item_id?: string | null
@@ -576,6 +582,7 @@ export type Database = {
       }
       finished_goods: {
         Row: {
+          available_sizes: Json | null
           available_stock: number | null
           bin_id: string | null
           bom_id: string | null
@@ -598,6 +605,7 @@ export type Database = {
           reserved_stock: number
           selling_price: number | null
           size: string | null
+          size_specific_stock: Json | null
           standard_cost: number | null
           status: string | null
           style_no: string | null
@@ -608,6 +616,7 @@ export type Database = {
           warehouse_item_id: string | null
         }
         Insert: {
+          available_sizes?: Json | null
           available_stock?: number | null
           bin_id?: string | null
           bom_id?: string | null
@@ -630,6 +639,7 @@ export type Database = {
           reserved_stock?: number
           selling_price?: number | null
           size?: string | null
+          size_specific_stock?: Json | null
           standard_cost?: number | null
           status?: string | null
           style_no?: string | null
@@ -640,6 +650,7 @@ export type Database = {
           warehouse_item_id?: string | null
         }
         Update: {
+          available_sizes?: Json | null
           available_stock?: number | null
           bin_id?: string | null
           bom_id?: string | null
@@ -662,6 +673,7 @@ export type Database = {
           reserved_stock?: number
           selling_price?: number | null
           size?: string | null
+          size_specific_stock?: Json | null
           standard_cost?: number | null
           status?: string | null
           style_no?: string | null
