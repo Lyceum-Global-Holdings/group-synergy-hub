@@ -14,6 +14,7 @@ import ModuleAllocation from "./pages/admin/ModuleAllocation";
 import PurchaseRequisition from "./pages/procurement/PurchaseRequisition";
 import PurchaseOrder from "./pages/procurement/PurchaseOrder";
 import BillOfMaterials from "./pages/procurement/BillOfMaterials";
+import CustomerMaster from "./pages/tuh-modules/CustomerMaster";
 import CustomerPO from "./pages/tuh-modules/CustomerPO";
 import MaterialDemandPlanning from "./pages/procurement/MaterialDemandPlanning";
 import { SupplierMaster } from "./pages/sourcing/SupplierMaster";
@@ -87,6 +88,13 @@ function App() {
                   <ProtectedRoute>
                     <AppLayout>
                       <BillOfMaterials />
+                    </AppLayout>
+                  </ProtectedRoute>
+                } />
+                <Route path="/tuh-modules/customer-master" element={
+                  <ProtectedRoute>
+                    <AppLayout>
+                      <CustomerMaster />
                     </AppLayout>
                   </ProtectedRoute>
                 } />

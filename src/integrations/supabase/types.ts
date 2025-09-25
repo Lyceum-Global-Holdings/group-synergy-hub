@@ -504,43 +504,64 @@ export type Database = {
         Row: {
           address: string | null
           company_id: string | null
+          company_registration_document_url: string | null
           contact_person: string | null
           created_at: string
           created_by: string | null
           customer_code: string
           customer_name: string
+          customer_type: string
           email: string | null
+          first_name: string | null
           id: string
+          id_passport_number: string | null
+          last_name: string | null
           phone: string | null
+          registration_number: string | null
           status: string
+          tax_id: string | null
           updated_at: string
         }
         Insert: {
           address?: string | null
           company_id?: string | null
+          company_registration_document_url?: string | null
           contact_person?: string | null
           created_at?: string
           created_by?: string | null
           customer_code: string
           customer_name: string
+          customer_type?: string
           email?: string | null
+          first_name?: string | null
           id?: string
+          id_passport_number?: string | null
+          last_name?: string | null
           phone?: string | null
+          registration_number?: string | null
           status?: string
+          tax_id?: string | null
           updated_at?: string
         }
         Update: {
           address?: string | null
           company_id?: string | null
+          company_registration_document_url?: string | null
           contact_person?: string | null
           created_at?: string
           created_by?: string | null
           customer_code?: string
           customer_name?: string
+          customer_type?: string
           email?: string | null
+          first_name?: string | null
           id?: string
+          id_passport_number?: string | null
+          last_name?: string | null
           phone?: string | null
+          registration_number?: string | null
           status?: string
+          tax_id?: string | null
           updated_at?: string
         }
         Relationships: [

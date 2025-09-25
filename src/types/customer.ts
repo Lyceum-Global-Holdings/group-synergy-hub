@@ -2,6 +2,7 @@ export interface Customer {
   id: string;
   customer_code: string;
   customer_name: string;
+  customer_type: 'person' | 'company';
   contact_person?: string;
   email?: string;
   phone?: string;
@@ -11,16 +12,33 @@ export interface Customer {
   created_by?: string;
   created_at: string;
   updated_at: string;
+  // Company-specific fields
+  company_registration_document_url?: string;
+  registration_number?: string;
+  tax_id?: string;
+  // Person-specific fields
+  first_name?: string;
+  last_name?: string;
+  id_passport_number?: string;
 }
 
 export interface CreateCustomerData {
   customer_name: string;
+  customer_type: 'person' | 'company';
   contact_person?: string;
   email?: string;
   phone?: string;
   address?: string;
   company_id?: string;
   status?: 'active' | 'inactive';
+  // Company-specific fields
+  company_registration_document_url?: string;
+  registration_number?: string;
+  tax_id?: string;
+  // Person-specific fields
+  first_name?: string;
+  last_name?: string;
+  id_passport_number?: string;
 }
 
 export interface CustomerPurchaseOrder {

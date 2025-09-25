@@ -98,6 +98,7 @@ export const moduleConfig: Record<string, ModuleConfig> = {
     description: 'The Uniform Hub specific modules',
     icon: Building2,
     subModules: [
+      { key: 'customer-master', name: 'Customer Master', description: 'Customer profiles and details', url: '/tuh-modules/customer-master' },
       { key: 'customer-po', name: 'Customer PO', description: 'Customer purchase order management', url: '/tuh-modules/customer-po' },
       { key: 'bom-management', name: 'BOM Management', description: 'Product structure and components', url: '/tuh-modules/bill-of-materials' }
     ]

@@ -32,6 +32,7 @@ import { CreateCustomerData } from "@/types/customer";
 
 const createCustomerSchema = z.object({
   customer_name: z.string().min(1, "Customer name is required"),
+  customer_type: z.enum(['person', 'company']).default('person'),
   contact_person: z.string().optional(),
   email: z.string().email("Invalid email").optional().or(z.literal("")),
   phone: z.string().optional(),
@@ -58,6 +59,7 @@ export default function CreateCustomerDialog({
     resolver: zodResolver(createCustomerSchema),
     defaultValues: {
       customer_name: "",
+      customer_type: "person",
       contact_person: "",
       email: "",
       phone: "",
@@ -71,6 +73,7 @@ export default function CreateCustomerDialog({
     try {
       const cleanedData: CreateCustomerData = {
         customer_name: data.customer_name,
+        customer_type: data.customer_type,
         contact_person: data.contact_person || undefined,
         email: data.email || undefined,
         phone: data.phone || undefined,
