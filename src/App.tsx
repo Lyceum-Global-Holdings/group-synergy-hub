@@ -14,6 +14,7 @@ import ModuleAllocation from "./pages/admin/ModuleAllocation";
 import PurchaseRequisition from "./pages/procurement/PurchaseRequisition";
 import PurchaseOrder from "./pages/procurement/PurchaseOrder";
 import BillOfMaterials from "./pages/procurement/BillOfMaterials";
+import CustomerPO from "./pages/tuh-modules/CustomerPO";
 import MaterialDemandPlanning from "./pages/procurement/MaterialDemandPlanning";
 import { SupplierMaster } from "./pages/sourcing/SupplierMaster";
 import AssetManagement from "./pages/warehouse/AssetManagement";
@@ -80,6 +81,21 @@ const App = () => (
                   </AppLayout>
                 </ProtectedRoute>
               } />
+              <Route path="/tuh-modules/bill-of-materials" element={
+                <ProtectedRoute>
+                  <AppLayout>
+                    <BillOfMaterials />
+                  </AppLayout>
+                </ProtectedRoute>
+              } />
+              <Route path="/tuh-modules/customer-po" element={
+                <ProtectedRoute>
+                  <AppLayout>
+                    <CustomerPO />
+                  </AppLayout>
+                </ProtectedRoute>
+              } />
+              {/* Legacy route redirect */}
               <Route path="/procurement/bill-of-materials" element={
                 <ProtectedRoute>
                   <AppLayout>

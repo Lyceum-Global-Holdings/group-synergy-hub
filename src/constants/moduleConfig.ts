@@ -4,7 +4,8 @@ import {
   ShoppingCart,
   Users,
   BarChart3,
-  FileText
+  Building2,
+  ClipboardList
 } from "lucide-react";
 
 export interface ModuleConfig {
@@ -91,13 +92,14 @@ export const moduleConfig: Record<string, ModuleConfig> = {
       { key: 'price-lists', name: 'Price Lists', description: 'Supplier pricing management', url: '/procurement/price-lists' }
     ]
   },
-  bom: {
-    key: 'bom',
-    name: 'Bill of Materials',
-    description: 'Product structure management',
-    icon: FileText,
+  'tuh-modules': {
+    key: 'tuh-modules',
+    name: 'TUH Modules',
+    description: 'The Uniform Hub specific modules',
+    icon: Building2,
     subModules: [
-      { key: 'bom-management', name: 'BOM Management', description: 'Product structure and components', url: '/procurement/bill-of-materials' }
+      { key: 'customer-po', name: 'Customer PO', description: 'Customer purchase order management', url: '/tuh-modules/customer-po' },
+      { key: 'bom-management', name: 'BOM Management', description: 'Product structure and components', url: '/tuh-modules/bill-of-materials' }
     ]
   },
   management: {

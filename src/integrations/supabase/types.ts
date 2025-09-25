@@ -380,6 +380,179 @@ export type Database = {
         }
         Relationships: []
       }
+      customer_po_items: {
+        Row: {
+          cpo_id: string
+          created_at: string
+          delivery_date: string | null
+          description: string | null
+          finished_good_id: string | null
+          id: string
+          item_name: string
+          quantity_ordered: number
+          status: string
+          total_price: number | null
+          unit_price: number | null
+          updated_at: string
+        }
+        Insert: {
+          cpo_id: string
+          created_at?: string
+          delivery_date?: string | null
+          description?: string | null
+          finished_good_id?: string | null
+          id?: string
+          item_name: string
+          quantity_ordered?: number
+          status?: string
+          total_price?: number | null
+          unit_price?: number | null
+          updated_at?: string
+        }
+        Update: {
+          cpo_id?: string
+          created_at?: string
+          delivery_date?: string | null
+          description?: string | null
+          finished_good_id?: string | null
+          id?: string
+          item_name?: string
+          quantity_ordered?: number
+          status?: string
+          total_price?: number | null
+          unit_price?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_po_items_cpo_id_fkey"
+            columns: ["cpo_id"]
+            isOneToOne: false
+            referencedRelation: "customer_purchase_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_po_items_finished_good_id_fkey"
+            columns: ["finished_good_id"]
+            isOneToOne: false
+            referencedRelation: "finished_goods"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      customer_purchase_orders: {
+        Row: {
+          company_id: string | null
+          cpo_number: string
+          created_at: string
+          created_by: string | null
+          customer_id: string
+          delivery_date: string | null
+          id: string
+          notes: string | null
+          po_date: string
+          status: string
+          total_amount: number | null
+          updated_at: string
+        }
+        Insert: {
+          company_id?: string | null
+          cpo_number: string
+          created_at?: string
+          created_by?: string | null
+          customer_id: string
+          delivery_date?: string | null
+          id?: string
+          notes?: string | null
+          po_date?: string
+          status?: string
+          total_amount?: number | null
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string | null
+          cpo_number?: string
+          created_at?: string
+          created_by?: string | null
+          customer_id?: string
+          delivery_date?: string | null
+          id?: string
+          notes?: string | null
+          po_date?: string
+          status?: string
+          total_amount?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_purchase_orders_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_purchase_orders_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      customers: {
+        Row: {
+          address: string | null
+          company_id: string | null
+          contact_person: string | null
+          created_at: string
+          created_by: string | null
+          customer_code: string
+          customer_name: string
+          email: string | null
+          id: string
+          phone: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          address?: string | null
+          company_id?: string | null
+          contact_person?: string | null
+          created_at?: string
+          created_by?: string | null
+          customer_code: string
+          customer_name: string
+          email?: string | null
+          id?: string
+          phone?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          address?: string | null
+          company_id?: string | null
+          contact_person?: string | null
+          created_at?: string
+          created_by?: string | null
+          customer_code?: string
+          customer_name?: string
+          email?: string | null
+          id?: string
+          phone?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customers_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       finished_goods: {
         Row: {
           available_stock: number | null
@@ -2507,6 +2680,14 @@ export type Database = {
         Returns: string
       }
       generate_bom_number: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
+      generate_cpo_number: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
+      generate_customer_code: {
         Args: Record<PropertyKey, never>
         Returns: string
       }

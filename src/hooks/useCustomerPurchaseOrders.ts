@@ -1,0 +1,135 @@
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { CustomerPurchaseOrder, CreateCustomerPoData } from "@/types/customer";
+import { toast } from "sonner";
+
+export function useCustomerPurchaseOrders(companyId?: string) {
+  const { data: customerPOs = [], isLoading, error } = useQuery({
+    queryKey: ['customer-purchase-orders', companyId],
+    queryFn: async () => {
+      let query = supabase
+        .from('customer_purchase_orders')
+        .select(`
+          *,
+          customer:customers(customer_name, customer_code),
+          items:customer_po_items(*)
+        `)
+        .order('created_at', { ascending: false });
+      
+      if (companyId) {
+        query = query.eq('company_id', companyId);
+      }
+      
+      const { data, error } = await query;
+      
+      if (error) throw error;
+      return data as CustomerPurchaseOrder[];
+    },
+  });
+
+  const queryClient = useQueryClient();
+
+  const createCustomerPO = useMutation({
+    mutationFn: async (poData: CreateCustomerPoData) => {
+      const user = await supabase.auth.getUser();
+      
+      // Create customer PO
+      const insertData = {
+        customer_id: poData.customer_id,
+        company_id: poData.company_id,
+        po_date: poData.po_date || new Date().toISOString().split('T')[0],
+        delivery_date: poData.delivery_date,
+        notes: poData.notes,
+        created_by: user.data.user?.id
+      };
+      
+      const { data: cpo, error: cpoError } = await supabase
+        .from('customer_purchase_orders')
+        .insert(insertData as any) // Bypass TypeScript check for auto-generated fields
+        .select()
+        .single();
+      
+      if (cpoError) throw cpoError;
+
+      // Create customer PO items
+      if (poData.items.length > 0) {
+        const { error: itemsError } = await supabase
+          .from('customer_po_items')
+          .insert(
+            poData.items.map(item => ({
+              cpo_id: cpo.id,
+              finished_good_id: item.finished_good_id,
+              item_name: item.item_name,
+              description: item.description,
+              quantity_ordered: item.quantity_ordered,
+              unit_price: item.unit_price,
+              total_price: item.total_price,
+              delivery_date: item.delivery_date
+            }))
+          );
+        
+        if (itemsError) throw itemsError;
+      }
+
+      return cpo;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['customer-purchase-orders'] });
+      toast.success("Customer PO created successfully");
+    },
+    onError: (error: any) => {
+      toast.error(`Failed to create customer PO: ${error.message}`);
+    },
+  });
+
+  const updateCustomerPO = useMutation({
+    mutationFn: async ({ id, ...updateData }: { id: string } & Partial<CustomerPurchaseOrder>) => {
+      const { data, error } = await supabase
+        .from('customer_purchase_orders')
+        .update(updateData)
+        .eq('id', id)
+        .select()
+        .single();
+      
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['customer-purchase-orders'] });
+      toast.success("Customer PO updated successfully");
+    },
+    onError: (error: any) => {
+      toast.error(`Failed to update customer PO: ${error.message}`);
+    },
+  });
+
+  const deleteCustomerPO = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from('customer_purchase_orders')
+        .delete()
+        .eq('id', id);
+      
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['customer-purchase-orders'] });
+      toast.success("Customer PO deleted successfully");
+    },
+    onError: (error: any) => {
+      toast.error(`Failed to delete customer PO: ${error.message}`);
+    },
+  });
+
+  return {
+    customerPOs,
+    isLoading,
+    error,
+    createCustomerPO,
+    updateCustomerPO,
+    deleteCustomerPO,
+    isCreating: createCustomerPO.isPending,
+    isUpdating: updateCustomerPO.isPending,
+    isDeleting: deleteCustomerPO.isPending,
+  };
+}
