@@ -17,6 +17,7 @@ import BillOfMaterials from "./pages/procurement/BillOfMaterials";
 import CustomerPO from "./pages/tuh-modules/CustomerPO";
 import MaterialDemandPlanning from "./pages/procurement/MaterialDemandPlanning";
 import { SupplierMaster } from "./pages/sourcing/SupplierMaster";
+import SupplierScorecard from "./pages/sourcing/SupplierScorecard";
 import AssetManagement from "./pages/warehouse/AssetManagement";
 import ItemBinMaster from "./pages/warehouse/ItemBinMaster";
 import MaterialIssueReturn from "./pages/warehouse/MaterialIssueReturn";
@@ -28,138 +29,147 @@ import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <AuthProvider>
-      <CompanyProvider>
-        <TooltipProvider>
-          <Toaster />
-          <Sonner />
-          <BrowserRouter>
-            <Routes>
-              <Route path="/auth" element={<Auth />} />
-              <Route path="/asset/:assetId" element={<PublicAssetView />} />
-              <Route path="/" element={
-                <ProtectedRoute>
-                  <AppLayout>
-                    <Dashboard />
-                  </AppLayout>
-                </ProtectedRoute>
-              } />
-              <Route path="/admin/companies" element={
-                <ProtectedRoute>
-                  <AppLayout>
-                    <CompanyManagement />
-                  </AppLayout>
-                </ProtectedRoute>
-              } />
-              <Route path="/admin/users-roles" element={
-                <ProtectedRoute>
-                  <AppLayout>
-                    <UserRoleManagement />
-                  </AppLayout>
-                </ProtectedRoute>
-              } />
-              <Route path="/admin/modules" element={
-                <ProtectedRoute>
-                  <AppLayout>
-                    <ModuleAllocation />
-                  </AppLayout>
-                </ProtectedRoute>
-              } />
-              <Route path="/procurement/purchase-requisition" element={
-                <ProtectedRoute>
-                  <AppLayout>
-                    <PurchaseRequisition />
-                  </AppLayout>
-                </ProtectedRoute>
-              } />
-              <Route path="/procurement/purchase-order" element={
-                <ProtectedRoute>
-                  <AppLayout>
-                    <PurchaseOrder />
-                  </AppLayout>
-                </ProtectedRoute>
-              } />
-              <Route path="/tuh-modules/bill-of-materials" element={
-                <ProtectedRoute>
-                  <AppLayout>
-                    <BillOfMaterials />
-                  </AppLayout>
-                </ProtectedRoute>
-              } />
-              <Route path="/tuh-modules/customer-po" element={
-                <ProtectedRoute>
-                  <AppLayout>
-                    <CustomerPO />
-                  </AppLayout>
-                </ProtectedRoute>
-              } />
-              {/* Legacy route redirect */}
-              <Route path="/procurement/bill-of-materials" element={
-                <ProtectedRoute>
-                  <AppLayout>
-                    <BillOfMaterials />
-                  </AppLayout>
-                </ProtectedRoute>
-              } />
-              <Route path="/procurement/material-demand" element={
-                <ProtectedRoute>
-                  <AppLayout>
-                    <MaterialDemandPlanning />
-                  </AppLayout>
-                </ProtectedRoute>
-              } />
-              <Route path="/sourcing/supplier-master" element={
-                <ProtectedRoute>
-                  <AppLayout>
-                    <SupplierMaster />
-                  </AppLayout>
-                </ProtectedRoute>
-              } />
-              <Route path="/warehouse/asset-management" element={
-                <ProtectedRoute>
-                  <AppLayout>
-                    <AssetManagement />
-                  </AppLayout>
-                </ProtectedRoute>
-              } />
-              <Route path="/warehouse/item-bin-master" element={
-                <ProtectedRoute>
-                  <AppLayout>
-                    <ItemBinMaster />
-                  </AppLayout>
-                </ProtectedRoute>
-              } />
-              <Route path="/warehouse/material-issue" element={
-                <ProtectedRoute>
-                  <AppLayout>
-                    <MaterialIssueReturn />
-                  </AppLayout>
-                </ProtectedRoute>
-              } />
-              <Route path="/warehouse/grn" element={
-                <ProtectedRoute>
-                  <AppLayout>
-                    <GoodsReceiptNote />
-                  </AppLayout>
-                </ProtectedRoute>
-              } />
-              <Route path="/warehouse/finished-goods" element={
-                <ProtectedRoute>
-                  <AppLayout>
-                    <FinishedGoods />
-                  </AppLayout>
-                </ProtectedRoute>
-              } />
-              {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </BrowserRouter>
-        </TooltipProvider>
-      </CompanyProvider>
-    </AuthProvider>
-  </QueryClientProvider>
-);
+function App() {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <AuthProvider>
+        <CompanyProvider>
+          <TooltipProvider>
+            <Toaster />
+            <Sonner />
+            <BrowserRouter>
+              <Routes>
+                <Route path="/auth" element={<Auth />} />
+                <Route path="/asset/:assetId" element={<PublicAssetView />} />
+                <Route path="/" element={
+                  <ProtectedRoute>
+                    <AppLayout>
+                      <Dashboard />
+                    </AppLayout>
+                  </ProtectedRoute>
+                } />
+                <Route path="/admin/companies" element={
+                  <ProtectedRoute>
+                    <AppLayout>
+                      <CompanyManagement />
+                    </AppLayout>
+                  </ProtectedRoute>
+                } />
+                <Route path="/admin/users-roles" element={
+                  <ProtectedRoute>
+                    <AppLayout>
+                      <UserRoleManagement />
+                    </AppLayout>
+                  </ProtectedRoute>
+                } />
+                <Route path="/admin/modules" element={
+                  <ProtectedRoute>
+                    <AppLayout>
+                      <ModuleAllocation />
+                    </AppLayout>
+                  </ProtectedRoute>
+                } />
+                <Route path="/procurement/purchase-requisition" element={
+                  <ProtectedRoute>
+                    <AppLayout>
+                      <PurchaseRequisition />
+                    </AppLayout>
+                  </ProtectedRoute>
+                } />
+                <Route path="/procurement/purchase-order" element={
+                  <ProtectedRoute>
+                    <AppLayout>
+                      <PurchaseOrder />
+                    </AppLayout>
+                  </ProtectedRoute>
+                } />
+                <Route path="/tuh-modules/bill-of-materials" element={
+                  <ProtectedRoute>
+                    <AppLayout>
+                      <BillOfMaterials />
+                    </AppLayout>
+                  </ProtectedRoute>
+                } />
+                <Route path="/tuh-modules/customer-po" element={
+                  <ProtectedRoute>
+                    <AppLayout>
+                      <CustomerPO />
+                    </AppLayout>
+                  </ProtectedRoute>
+                } />
+                {/* Legacy route redirect */}
+                <Route path="/procurement/bill-of-materials" element={
+                  <ProtectedRoute>
+                    <AppLayout>
+                      <BillOfMaterials />
+                    </AppLayout>
+                  </ProtectedRoute>
+                } />
+                <Route path="/procurement/material-demand" element={
+                  <ProtectedRoute>
+                    <AppLayout>
+                      <MaterialDemandPlanning />
+                    </AppLayout>
+                  </ProtectedRoute>
+                } />
+                <Route path="/sourcing/supplier-master" element={
+                  <ProtectedRoute>
+                    <AppLayout>
+                      <SupplierMaster />
+                    </AppLayout>
+                  </ProtectedRoute>
+                } />
+                <Route path="/sourcing/supplier-scorecard" element={
+                  <ProtectedRoute>
+                    <AppLayout>
+                      <SupplierScorecard />
+                    </AppLayout>
+                  </ProtectedRoute>
+                } />
+                <Route path="/warehouse/asset-management" element={
+                  <ProtectedRoute>
+                    <AppLayout>
+                      <AssetManagement />
+                    </AppLayout>
+                  </ProtectedRoute>
+                } />
+                <Route path="/warehouse/item-bin-master" element={
+                  <ProtectedRoute>
+                    <AppLayout>
+                      <ItemBinMaster />
+                    </AppLayout>
+                  </ProtectedRoute>
+                } />
+                <Route path="/warehouse/material-issue" element={
+                  <ProtectedRoute>
+                    <AppLayout>
+                      <MaterialIssueReturn />
+                    </AppLayout>
+                  </ProtectedRoute>
+                } />
+                <Route path="/warehouse/grn" element={
+                  <ProtectedRoute>
+                    <AppLayout>
+                      <GoodsReceiptNote />
+                    </AppLayout>
+                  </ProtectedRoute>
+                } />
+                <Route path="/warehouse/finished-goods" element={
+                  <ProtectedRoute>
+                    <AppLayout>
+                      <FinishedGoods />
+                    </AppLayout>
+                  </ProtectedRoute>
+                } />
+                {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </BrowserRouter>
+          </TooltipProvider>
+        </CompanyProvider>
+      </AuthProvider>
+    </QueryClientProvider>
+  );
+}
 
 export default App;

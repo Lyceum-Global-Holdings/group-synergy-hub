@@ -72,7 +72,7 @@ const departments = [
       { title: "Supplier Evaluation", url: "/sourcing/supplier-evaluation" },
       { title: "RFQ / RFP Management", url: "/sourcing/rfq-management" },
       { title: "Quotation Comparison", url: "/sourcing/quotation-comparison" },
-      { title: "Vendor Scorecards", url: "/sourcing/vendor-scorecards" },
+      { title: "Supplier Scorecard", url: "/sourcing/supplier-scorecard" },
       { title: "Contract Repository", url: "/sourcing/contracts" },
       { title: "Blacklist / Risk Flags", url: "/sourcing/blacklist" },
     ],

@@ -2200,6 +2200,145 @@ export type Database = {
           },
         ]
       }
+      supplier_evaluation_entries: {
+        Row: {
+          created_at: string
+          evaluation_id: string
+          failed_but_accepted: boolean | null
+          failed_returned: boolean | null
+          five_days_late: boolean | null
+          id: string
+          notes: string | null
+          over_14_days_late: boolean | null
+          passed_after_rework: boolean | null
+          passed_first_time: boolean | null
+          po_delivery_date: string
+          po_number: string | null
+          punctuality_score: number
+          quality_score: number
+          receipt_date: string
+          total_score: number
+          updated_at: string
+          within_14_days: boolean | null
+          within_due_date: boolean | null
+        }
+        Insert: {
+          created_at?: string
+          evaluation_id: string
+          failed_but_accepted?: boolean | null
+          failed_returned?: boolean | null
+          five_days_late?: boolean | null
+          id?: string
+          notes?: string | null
+          over_14_days_late?: boolean | null
+          passed_after_rework?: boolean | null
+          passed_first_time?: boolean | null
+          po_delivery_date: string
+          po_number?: string | null
+          punctuality_score?: number
+          quality_score?: number
+          receipt_date: string
+          total_score?: number
+          updated_at?: string
+          within_14_days?: boolean | null
+          within_due_date?: boolean | null
+        }
+        Update: {
+          created_at?: string
+          evaluation_id?: string
+          failed_but_accepted?: boolean | null
+          failed_returned?: boolean | null
+          five_days_late?: boolean | null
+          id?: string
+          notes?: string | null
+          over_14_days_late?: boolean | null
+          passed_after_rework?: boolean | null
+          passed_first_time?: boolean | null
+          po_delivery_date?: string
+          po_number?: string | null
+          punctuality_score?: number
+          quality_score?: number
+          receipt_date?: string
+          total_score?: number
+          updated_at?: string
+          within_14_days?: boolean | null
+          within_due_date?: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "supplier_evaluation_entries_evaluation_id_fkey"
+            columns: ["evaluation_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_evaluations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      supplier_evaluations: {
+        Row: {
+          company_id: string | null
+          created_at: string
+          created_by: string | null
+          evaluated_by: string | null
+          evaluation_number: string
+          evaluation_period_end: string
+          evaluation_period_start: string
+          id: string
+          performance_rate: number
+          product_name: string
+          status: string
+          supplier_id: string
+          total_deliveries: number
+          total_points_achieved: number
+          total_possible_points: number
+          updated_at: string
+        }
+        Insert: {
+          company_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          evaluated_by?: string | null
+          evaluation_number: string
+          evaluation_period_end: string
+          evaluation_period_start: string
+          id?: string
+          performance_rate?: number
+          product_name: string
+          status?: string
+          supplier_id: string
+          total_deliveries?: number
+          total_points_achieved?: number
+          total_possible_points?: number
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          evaluated_by?: string | null
+          evaluation_number?: string
+          evaluation_period_end?: string
+          evaluation_period_start?: string
+          id?: string
+          performance_rate?: number
+          product_name?: string
+          status?: string
+          supplier_id?: string
+          total_deliveries?: number
+          total_points_achieved?: number
+          total_possible_points?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "supplier_evaluations_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       suppliers: {
         Row: {
           address_line1: string | null
@@ -2688,6 +2827,10 @@ export type Database = {
         Returns: string
       }
       generate_customer_code: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
+      generate_evaluation_number: {
         Args: Record<PropertyKey, never>
         Returns: string
       }
