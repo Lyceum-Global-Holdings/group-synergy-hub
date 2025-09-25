@@ -34,6 +34,8 @@ import { useCustomerPurchaseOrders } from "@/hooks/useCustomerPurchaseOrders";
 import { useCompany } from "@/contexts/CompanyContext";
 import { CreateCustomerPoData } from "@/types/customer";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { FinishedGoodsItemSelector } from "@/components/common/FinishedGoodsItemSelector";
+import { FinishedGood } from "@/hooks/useFinishedGoods";
 
 const createCpoSchema = z.object({
   customer_id: z.string().min(1, "Customer is required"),
@@ -42,6 +44,7 @@ const createCpoSchema = z.object({
   delivery_date: z.string().optional(),
   notes: z.string().optional(),
   items: z.array(z.object({
+    finished_good_id: z.string().optional(),
     item_name: z.string().min(1, "Item name is required"),
     description: z.string().optional(),
     quantity_ordered: z.number().min(1, "Quantity must be at least 1"),
@@ -74,6 +77,7 @@ export default function CreateCustomerPoDialog({
       po_date: new Date().toISOString().split('T')[0],
       items: [
         {
+          finished_good_id: "",
           item_name: "",
           quantity_ordered: 1,
           unit_price: 0,
@@ -99,11 +103,29 @@ export default function CreateCustomerPoDialog({
 
   const addItem = () => {
     append({
+      finished_good_id: "",
       item_name: "",
       quantity_ordered: 1,
       unit_price: 0,
       total_price: 0,
     });
+  };
+
+  const handleFinishedGoodSelect = (index: number, finishedGood: FinishedGood | null) => {
+    if (finishedGood) {
+      form.setValue(`items.${index}.finished_good_id`, finishedGood.id);
+      form.setValue(`items.${index}.item_name`, finishedGood.product_name);
+      form.setValue(`items.${index}.description`, finishedGood.description || "");
+      form.setValue(`items.${index}.unit_price`, finishedGood.selling_price || 0);
+      // Recalculate total price
+      setTimeout(() => calculateTotalPrice(index), 0);
+    } else {
+      form.setValue(`items.${index}.finished_good_id`, "");
+      form.setValue(`items.${index}.item_name`, "");
+      form.setValue(`items.${index}.description`, "");
+      form.setValue(`items.${index}.unit_price`, 0);
+      form.setValue(`items.${index}.total_price`, 0);
+    }
   };
 
   const onSubmit = async (data: CreateCpoFormData) => {
@@ -115,7 +137,7 @@ export default function CreateCustomerPoDialog({
         delivery_date: data.delivery_date,
         notes: data.notes,
         items: data.items.map(item => ({
-          finished_good_id: null, // TODO: Add finished goods selector
+          finished_good_id: item.finished_good_id || null,
           item_name: item.item_name,
           description: item.description,
           quantity_ordered: item.quantity_ordered,
@@ -270,50 +292,18 @@ export default function CreateCustomerPoDialog({
                       )}
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-4">
                       <FormField
                         control={form.control}
-                        name={`items.${index}.item_name`}
+                        name={`items.${index}.finished_good_id`}
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Item Name *</FormLabel>
+                            <FormLabel>Select Finished Good *</FormLabel>
                             <FormControl>
-                              <Input placeholder="Enter item name" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-
-                      <FormField
-                        control={form.control}
-                        name={`items.${index}.description`}
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Description</FormLabel>
-                            <FormControl>
-                              <Input placeholder="Item description" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-
-                      <FormField
-                        control={form.control}
-                        name={`items.${index}.quantity_ordered`}
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Quantity *</FormLabel>
-                            <FormControl>
-                              <Input
-                                type="number"
-                                min="1"
-                                {...field}
-                                onChange={(e) => {
-                                  field.onChange(parseInt(e.target.value) || 0);
-                                  setTimeout(() => calculateTotalPrice(index), 0);
-                                }}
+                              <FinishedGoodsItemSelector
+                                value={field.value}
+                                onSelect={(finishedGood) => handleFinishedGoodSelect(index, finishedGood)}
+                                placeholder="Select finished good..."
                               />
                             </FormControl>
                             <FormMessage />
@@ -321,48 +311,112 @@ export default function CreateCustomerPoDialog({
                         )}
                       />
 
-                      <FormField
-                        control={form.control}
-                        name={`items.${index}.unit_price`}
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Unit Price *</FormLabel>
-                            <FormControl>
-                              <Input
-                                type="number"
-                                step="0.01"
-                                min="0"
-                                {...field}
-                                onChange={(e) => {
-                                  field.onChange(parseFloat(e.target.value) || 0);
-                                  setTimeout(() => calculateTotalPrice(index), 0);
-                                }}
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <FormField
+                          control={form.control}
+                          name={`items.${index}.item_name`}
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Item Name</FormLabel>
+                              <FormControl>
+                                <Input 
+                                  placeholder="Auto-filled from finished good" 
+                                  {...field} 
+                                  readOnly
+                                  className="bg-muted"
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
 
-                      <FormField
-                        control={form.control}
-                        name={`items.${index}.total_price`}
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Total Price</FormLabel>
-                            <FormControl>
-                              <Input
-                                type="number"
-                                step="0.01"
-                                readOnly
-                                {...field}
-                                className="bg-muted"
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
+                        <FormField
+                          control={form.control}
+                          name={`items.${index}.description`}
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Description</FormLabel>
+                              <FormControl>
+                                <Input 
+                                  placeholder="Auto-filled from finished good" 
+                                  {...field} 
+                                  readOnly
+                                  className="bg-muted"
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <FormField
+                          control={form.control}
+                          name={`items.${index}.quantity_ordered`}
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Quantity *</FormLabel>
+                              <FormControl>
+                                <Input
+                                  type="number"
+                                  min="1"
+                                  {...field}
+                                  onChange={(e) => {
+                                    field.onChange(parseInt(e.target.value) || 0);
+                                    setTimeout(() => calculateTotalPrice(index), 0);
+                                  }}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        <FormField
+                          control={form.control}
+                          name={`items.${index}.unit_price`}
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Unit Price *</FormLabel>
+                              <FormControl>
+                                <Input
+                                  type="number"
+                                  step="0.01"
+                                  min="0"
+                                  {...field}
+                                  onChange={(e) => {
+                                    field.onChange(parseFloat(e.target.value) || 0);
+                                    setTimeout(() => calculateTotalPrice(index), 0);
+                                  }}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        <FormField
+                          control={form.control}
+                          name={`items.${index}.total_price`}
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Total Price</FormLabel>
+                              <FormControl>
+                                <Input
+                                  type="number"
+                                  step="0.01"
+                                  readOnly
+                                  {...field}
+                                  className="bg-muted"
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
 
                       <FormField
                         control={form.control}
