@@ -54,7 +54,9 @@ export function DocumentUploadField({
       setUploading(true);
       setUploadProgress(0);
 
-      const fileName = `${customerId}/documents/br_${Date.now()}_${file.name}`;
+      const fileName = customerId 
+        ? `${customerId}/documents/br_${Date.now()}_${file.name}`
+        : `temp/br_${Date.now()}_${file.name}`;
       
       const { data, error } = await supabase.storage
         .from('customer-documents')
@@ -65,13 +67,15 @@ export function DocumentUploadField({
       setDocumentUrl(data.path);
       onUpload(data.path);
 
-      // Update customer record with document URL
-      const { error: updateError } = await supabase
-        .from('customers')
-        .update({ company_registration_document_url: data.path })
-        .eq('id', customerId);
+      // Only update customer record if customerId is provided (existing customer)
+      if (customerId) {
+        const { error: updateError } = await supabase
+          .from('customers')
+          .update({ company_registration_document_url: data.path })
+          .eq('id', customerId);
 
-      if (updateError) throw updateError;
+        if (updateError) throw updateError;
+      }
 
       toast({
         title: "Success",
@@ -130,13 +134,15 @@ export function DocumentUploadField({
 
       if (error) throw error;
 
-      // Update customer record to remove document URL
-      const { error: updateError } = await supabase
-        .from('customers')
-        .update({ company_registration_document_url: null })
-        .eq('id', customerId);
+      // Only update customer record if customerId is provided (existing customer)
+      if (customerId) {
+        const { error: updateError } = await supabase
+          .from('customers')
+          .update({ company_registration_document_url: null })
+          .eq('id', customerId);
 
-      if (updateError) throw updateError;
+        if (updateError) throw updateError;
+      }
 
       setDocumentUrl(undefined);
       onUpload('');

@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { DataTable } from "@/components/ui/data-table";
 import { useCustomers } from "@/hooks/useCustomers";
 import { useCompany } from "@/contexts/CompanyContext";
-import CreateCustomerDialog from "@/components/tuh-modules/customer-po/CreateCustomerDialog";
+import CreateCustomerDialog from "@/components/tuh-modules/customer-master/CreateCustomerDialog";
 import { CustomerDetailsDialog } from "@/components/tuh-modules/customer-master/CustomerDetailsDialog";
 import { Customer } from "@/types/customer";
 import { ColumnDef } from "@tanstack/react-table";
