@@ -56,8 +56,7 @@ export const moduleConfig: Record<string, ModuleConfig> = {
       { key: 'stock-adjustment', name: 'Stock Adjustment', description: 'Adjust inventory levels', url: '/warehouse/stock-adjustment' },
       { key: 'delivery-order', name: 'Delivery Order', description: 'Outbound delivery management', url: '/warehouse/delivery-order' },
       { key: 'inventory-valuation', name: 'Inventory Valuation', description: 'Stock value calculations', url: '/warehouse/inventory-valuation' },
-      { key: 'asset-management', name: 'Asset Management', description: 'Track and manage assets', url: '/warehouse/asset-management' },
-      { key: 'finished-goods', name: 'Finished Goods', description: 'Finished goods inventory management', url: '/warehouse/finished-goods' }
+      { key: 'asset-management', name: 'Asset Management', description: 'Track and manage assets', url: '/warehouse/asset-management' }
     ]
   },
   sourcing: {
@@ -100,7 +99,8 @@ export const moduleConfig: Record<string, ModuleConfig> = {
     subModules: [
       { key: 'customer-master', name: 'Customer Master', description: 'Customer profiles and details', url: '/tuh-modules/customer-master' },
       { key: 'customer-po', name: 'Customer PO', description: 'Customer purchase order management', url: '/tuh-modules/customer-po' },
-      { key: 'bom-management', name: 'BOM Management', description: 'Product structure and components', url: '/tuh-modules/bill-of-materials' }
+      { key: 'bom-management', name: 'BOM Management', description: 'Product structure and components', url: '/tuh-modules/bill-of-materials' },
+      { key: 'finished-goods', name: 'Finished Goods', description: 'Finished goods inventory management', url: '/tuh-modules/finished-goods' }
     ]
   },
   management: {
