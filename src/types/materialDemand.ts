@@ -1,4 +1,4 @@
-export type DemandSource = 'bom' | 'purchase_order' | 'forecast' | 'manual';
+export type DemandSource = 'bom' | 'customer_po' | 'forecast' | 'manual';
 export type DemandStatus = 'calculated' | 'ordered' | 'fulfilled';
 export type DemandPriority = 'low' | 'medium' | 'high' | 'urgent';
 
@@ -69,6 +69,13 @@ export interface DemandCalculationInput {
 
 export interface PODemandCalculationInput {
   po_ids: string[];
+  multiplier?: number;
+  analysis_date: string;
+  include_safety_stock?: boolean;
+}
+
+export interface CPODemandCalculationInput {
+  cpo_ids: string[];
   multiplier?: number;
   analysis_date: string;
   include_safety_stock?: boolean;

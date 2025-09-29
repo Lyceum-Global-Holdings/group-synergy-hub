@@ -11,7 +11,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Calendar, Calculator, FileText, AlertTriangle, CheckCircle, Clock, TrendingUp, Package, Box, ShoppingCart } from 'lucide-react';
 import { useMaterialDemand, useDemandCalculation } from '@/hooks/useMaterialDemand';
 import { useBillOfMaterials } from '@/hooks/useBillOfMaterials';
-import { usePurchaseOrders } from '@/hooks/usePurchaseOrders';
+import { useCustomerPurchaseOrders } from '@/hooks/useCustomerPurchaseOrders';
 import { usePurchaseRequisitions } from '@/hooks/usePurchaseRequisitions';
 import { useCompany } from '@/contexts/CompanyContext';
 import { format } from 'date-fns';
@@ -21,13 +21,13 @@ const MaterialDemandPlanning = () => {
   const { selectedCompany } = useCompany();
   const { demands, isLoading } = useMaterialDemand(selectedCompany?.id);
   const { boms } = useBillOfMaterials(selectedCompany?.id);
-  const { data: purchaseOrders } = usePurchaseOrders();
+  const { customerPOs } = useCustomerPurchaseOrders(selectedCompany?.id);
   const { data: purchaseRequisitions } = usePurchaseRequisitions();
-  const { calculateBOMDemand, calculatePODemand, calculationResult, isCalculating } = useDemandCalculation(selectedCompany?.id);
+  const { calculateBOMDemand, calculateCPODemand, calculationResult, isCalculating } = useDemandCalculation(selectedCompany?.id);
   
   const [demandSource, setDemandSource] = useState<DemandSource>('bom');
   const [selectedBomId, setSelectedBomId] = useState<string>('');
-  const [selectedPOs, setSelectedPOs] = useState<string[]>([]);
+  const [selectedCPOs, setSelectedCPOs] = useState<string[]>([]);
   const [productionQuantity, setProductionQuantity] = useState<number>(100);
   const [productionDate, setProductionDate] = useState<string>(
     format(new Date(), 'yyyy-MM-dd')
@@ -35,8 +35,8 @@ const MaterialDemandPlanning = () => {
   const [multiplier, setMultiplier] = useState<string>('1');
   const [analysisDate, setAnalysisDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
 
-  // Filter approved POs for PO-based demand calculation
-  const approvedPOs = purchaseOrders?.filter(po => po.status === 'approved') || [];
+  // Filter confirmed CPOs for CPO-based demand calculation
+  const confirmedCPOs = customerPOs?.filter(cpo => cpo.status === 'confirmed') || [];
 
   const handleCalculateDemand = () => {
     if (demandSource === 'bom') {
@@ -48,11 +48,11 @@ const MaterialDemandPlanning = () => {
         production_date: productionDate,
         include_safety_stock: true
       });
-    } else if (demandSource === 'purchase_order') {
-      if (selectedPOs.length === 0) return;
+    } else if (demandSource === 'customer_po') {
+      if (selectedCPOs.length === 0) return;
 
-      calculatePODemand({
-        po_ids: selectedPOs,
+      calculateCPODemand({
+        cpo_ids: selectedCPOs,
         multiplier: parseFloat(multiplier),
         analysis_date: analysisDate,
         include_safety_stock: true
@@ -60,11 +60,11 @@ const MaterialDemandPlanning = () => {
     }
   };
 
-  const handlePOSelection = (poId: string, checked: boolean) => {
+  const handleCPOSelection = (cpoId: string, checked: boolean) => {
     if (checked) {
-      setSelectedPOs(prev => [...prev, poId]);
+      setSelectedCPOs(prev => [...prev, cpoId]);
     } else {
-      setSelectedPOs(prev => prev.filter(id => id !== poId));
+      setSelectedCPOs(prev => prev.filter(id => id !== cpoId));
     }
   };
 
@@ -83,26 +83,16 @@ const MaterialDemandPlanning = () => {
     return <CheckCircle className="h-4 w-4 text-success" />;
   };
 
-  // Get related Purchase Orders for selected BOM
-  const getRelatedPOs = (bomId: string) => {
-    if (!bomId || !purchaseOrders) return [];
+  // Get related Customer POs for selected BOM
+  const getRelatedCPOs = (bomId: string) => {
+    if (!bomId || !customerPOs) return [];
     
     const selectedBom = boms?.find(bom => bom.id === bomId);
     if (!selectedBom) return [];
 
-    // Find POs that are directly linked to this BOM or have matching material requirements
-    return purchaseOrders.filter(po => {
-      // Direct BOM-PO link (if BOM references a PO)
-      if (selectedBom.po_id === po.id) return true;
-      
-      // Check if PO has pr_id and that PR references this BOM
-      if (po.pr_id) {
-        // This would need PR data to check bom_id relationship
-        // For now, show POs that are active and could be related
-        return ['draft', 'approved', 'sent', 'partial'].includes(po.status);
-      }
-      
-      return false;
+    // Find CPOs that could be related to this BOM through finished goods
+    return customerPOs.filter(cpo => {
+      return ['confirmed', 'in_production'].includes(cpo.status);
     });
   };
 
@@ -142,7 +132,7 @@ const MaterialDemandPlanning = () => {
                   Material Requirements
                 </CardTitle>
                 <CardDescription>
-                  Calculate material demand from BOMs or Purchase Orders
+                  Calculate material demand from BOMs or Customer Purchase Orders
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -154,7 +144,7 @@ const MaterialDemandPlanning = () => {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="bom">Bill of Materials (BOM)</SelectItem>
-                      <SelectItem value="purchase_order">Purchase Orders (PO)</SelectItem>
+                      <SelectItem value="customer_po">Customer Purchase Orders (CPO)</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -200,7 +190,7 @@ const MaterialDemandPlanning = () => {
                   </>
                 )}
 
-                {demandSource === 'purchase_order' && (
+                {demandSource === 'customer_po' && (
                   <>
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
@@ -227,31 +217,31 @@ const MaterialDemandPlanning = () => {
                     </div>
 
                     <div className="space-y-2">
-                      <Label>Select Approved Purchase Orders</Label>
+                      <Label>Select Confirmed Customer Purchase Orders</Label>
                       <div className="border rounded-lg p-3 max-h-48 overflow-y-auto">
-                        {approvedPOs.length === 0 ? (
+                        {confirmedCPOs.length === 0 ? (
                           <p className="text-muted-foreground text-center py-4 text-sm">
-                            No approved purchase orders found
+                            No confirmed customer purchase orders found
                           </p>
                         ) : (
                           <div className="space-y-2">
-                            {approvedPOs.map((po) => (
-                              <div key={po.id} className="flex items-center space-x-2 p-2 border rounded">
+                            {confirmedCPOs.map((cpo) => (
+                              <div key={cpo.id} className="flex items-center space-x-2 p-2 border rounded">
                                 <Checkbox
-                                  id={po.id}
-                                  checked={selectedPOs.includes(po.id)}
-                                  onCheckedChange={(checked) => handlePOSelection(po.id, checked as boolean)}
+                                  id={cpo.id}
+                                  checked={selectedCPOs.includes(cpo.id)}
+                                  onCheckedChange={(checked) => handleCPOSelection(cpo.id, checked as boolean)}
                                 />
                                 <div className="flex-1 min-w-0">
-                                  <Label htmlFor={po.id} className="text-sm font-medium cursor-pointer">
-                                    {po.po_number}
+                                  <Label htmlFor={cpo.id} className="text-sm font-medium cursor-pointer">
+                                    {cpo.cpo_number}
                                   </Label>
                                   <p className="text-xs text-muted-foreground truncate">
-                                    {po.supplier?.name} - {po.total_amount ? `$${po.total_amount.toFixed(2)}` : 'N/A'}
+                                    {cpo.customer?.customer_name} - {cpo.total_amount ? `$${cpo.total_amount.toFixed(2)}` : 'N/A'}
                                   </p>
                                 </div>
                                 <Badge variant="outline" className="text-xs">
-                                  {po.items?.length || 0} items
+                                  {cpo.items?.length || 0} items
                                 </Badge>
                               </div>
                             ))}
@@ -267,7 +257,7 @@ const MaterialDemandPlanning = () => {
                   disabled={
                     isCalculating || 
                     (demandSource === 'bom' && !selectedBomId) ||
-                    (demandSource === 'purchase_order' && selectedPOs.length === 0)
+                    (demandSource === 'customer_po' && selectedCPOs.length === 0)
                   }
                   className="w-full"
                 >
@@ -279,7 +269,7 @@ const MaterialDemandPlanning = () => {
                   ) : (
                     <>
                       <Calculator className="h-4 w-4 mr-2" />
-                      Calculate {demandSource === 'bom' ? 'BOM' : 'PO'} Demand
+                      Calculate {demandSource === 'bom' ? 'BOM' : 'CPO'} Demand
                     </>
                   )}
                 </Button>
@@ -434,7 +424,7 @@ const MaterialDemandPlanning = () => {
                       </CardDescription>
                     </CardHeader>
                     <CardContent>
-                      {getRelatedPOs(selectedBomId).length > 0 ? (
+                      {getRelatedCPOs(selectedBomId).length > 0 ? (
                         <div className="space-y-6">
                           <div>
                             <h4 className="font-medium mb-3">Purchase Orders</h4>
@@ -450,24 +440,24 @@ const MaterialDemandPlanning = () => {
                                 </TableRow>
                               </TableHeader>
                               <TableBody>
-                                {getRelatedPOs(selectedBomId).map((po) => (
-                                  <TableRow key={po.id}>
-                                    <TableCell className="font-mono">{po.po_number}</TableCell>
-                                    <TableCell>{po.supplier?.name || 'N/A'}</TableCell>
-                                    <TableCell>
-                                      <Badge variant={po.status === 'completed' ? 'default' : 'secondary'}>
-                                        {po.status}
-                                      </Badge>
-                                    </TableCell>
-                                    <TableCell>
-                                      {po.expected_delivery_date ? 
-                                        format(new Date(po.expected_delivery_date), 'MMM dd, yyyy') : 
-                                        'Not set'
-                                      }
-                                    </TableCell>
-                                    <TableCell>{po.currency} {po.final_amount.toLocaleString()}</TableCell>
-                                    <TableCell>{po.items?.length || 0}</TableCell>
-                                  </TableRow>
+                                 {getRelatedCPOs(selectedBomId).map((cpo) => (
+                                   <TableRow key={cpo.id}>
+                                     <TableCell className="font-mono">{cpo.cpo_number}</TableCell>
+                                     <TableCell>{cpo.customer?.customer_name || 'N/A'}</TableCell>
+                                     <TableCell>
+                                       <Badge variant={cpo.status === 'completed' ? 'default' : 'secondary'}>
+                                         {cpo.status}
+                                       </Badge>
+                                     </TableCell>
+                                     <TableCell>
+                                       {cpo.delivery_date ? 
+                                         format(new Date(cpo.delivery_date), 'MMM dd, yyyy') : 
+                                         'Not set'
+                                       }
+                                     </TableCell>
+                                     <TableCell>${cpo.total_amount?.toLocaleString()}</TableCell>
+                                     <TableCell>{cpo.items?.length || 0}</TableCell>
+                                   </TableRow>
                                 ))}
                               </TableBody>
                             </Table>
