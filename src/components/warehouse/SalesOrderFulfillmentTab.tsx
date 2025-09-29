@@ -1,44 +1,311 @@
+import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { TrendingUp, Package, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Plus, Package, Truck, CheckCircle, Clock, User, MapPin } from 'lucide-react';
+import { usePickPack } from '@/hooks/usePickPack';
+import { CreateSalesOrderDialog } from './CreateSalesOrderDialog';
+import { CreatePickListDialog } from './CreatePickListDialog';
+import { format } from 'date-fns';
 
 export function SalesOrderFulfillmentTab() {
+  const { 
+    useConfirmedCPOs, 
+    useSalesOrders, 
+    usePickLists 
+  } = usePickPack();
+  
+  const { data: confirmedCPOs, isLoading: loadingCPOs } = useConfirmedCPOs();
+  const { data: salesOrders, isLoading: loadingSalesOrders } = useSalesOrders();
+  const { data: pickLists, isLoading: loadingPickLists } = usePickLists();
+  
+  const [showCreateSalesOrder, setShowCreateSalesOrder] = useState(false);
+  const [showCreatePickList, setShowCreatePickList] = useState(false);
+  const [selectedCPO, setSelectedCPO] = useState<any>(null);
+  const [selectedSalesOrder, setSelectedSalesOrder] = useState<any>(null);
+
+  const handleCreateSalesOrderFromCPO = (cpo: any) => {
+    setSelectedCPO(cpo);
+    setShowCreateSalesOrder(true);
+  };
+
+  const handleCreatePickList = (salesOrder: any) => {
+    setSelectedSalesOrder(salesOrder);
+    setShowCreatePickList(true);
+  };
+
+  const getStatusBadge = (status: string) => {
+    const statusConfig = {
+      confirmed: { variant: 'default' as const, label: 'Confirmed' },
+      picking: { variant: 'secondary' as const, label: 'Picking' },
+      picked: { variant: 'default' as const, label: 'Picked' },
+      packing: { variant: 'secondary' as const, label: 'Packing' },
+      packed: { variant: 'default' as const, label: 'Packed' },
+      dispatched: { variant: 'outline' as const, label: 'Dispatched' },
+      delivered: { variant: 'default' as const, label: 'Delivered' }
+    };
+
+    const config = statusConfig[status as keyof typeof statusConfig] || { variant: 'default' as const, label: status };
+    return <Badge variant={config.variant}>{config.label}</Badge>;
+  };
+
+  const getPriorityBadge = (priority: string) => {
+    const priorityConfig = {
+      low: { variant: 'outline' as const, label: 'Low' },
+      medium: { variant: 'secondary' as const, label: 'Medium' },
+      high: { variant: 'default' as const, label: 'High' },
+      urgent: { variant: 'destructive' as const, label: 'Urgent' }
+    };
+
+    const config = priorityConfig[priority as keyof typeof priorityConfig] || { variant: 'default' as const, label: priority };
+    return <Badge variant={config.variant}>{config.label}</Badge>;
+  };
+
   return (
     <div className="space-y-6">
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <TrendingUp className="h-5 w-5" />
-            Sales Order Fulfillment
+            <Package className="h-5 w-5" />
+            Pick, Pack & Dispatch
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="flex flex-col items-center justify-center py-12 text-center">
-            <Package className="h-16 w-16 text-muted-foreground mb-4" />
-            <h3 className="text-lg font-semibold mb-2">Sales Order Fulfillment Coming Soon</h3>
-            <p className="text-muted-foreground mb-6 max-w-md">
-              This feature will allow you to manage pick, pack, and dispatch operations for finished goods sales orders.
-            </p>
-            <div className="space-y-2 text-sm text-muted-foreground">
-              <div className="flex items-center gap-2">
-                <AlertTriangle className="h-4 w-4" />
-                <span>Sales order integration</span>
+          <Tabs defaultValue="ready-orders" className="w-full">
+            <TabsList className="grid w-full grid-cols-4">
+              <TabsTrigger value="ready-orders">Ready Orders</TabsTrigger>
+              <TabsTrigger value="sales-orders">Sales Orders</TabsTrigger>
+              <TabsTrigger value="pick-lists">Pick Lists</TabsTrigger>
+              <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="ready-orders" className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-semibold">Confirmed Customer Orders</h3>
+                <p className="text-sm text-muted-foreground">
+                  Ready for sales order creation and fulfillment
+                </p>
               </div>
-              <div className="flex items-center gap-2">
-                <AlertTriangle className="h-4 w-4" />
-                <span>Pick list generation</span>
+
+              {loadingCPOs ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="text-muted-foreground">Loading confirmed orders...</div>
+                </div>
+              ) : confirmedCPOs && confirmedCPOs.length > 0 ? (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>CPO Number</TableHead>
+                      <TableHead>Customer</TableHead>
+                      <TableHead>Items</TableHead>
+                      <TableHead>Total Amount</TableHead>
+                      <TableHead>Order Date</TableHead>
+                      <TableHead>Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {confirmedCPOs.map((cpo) => (
+                      <TableRow key={cpo.id}>
+                        <TableCell className="font-medium">{cpo.cpo_number}</TableCell>
+                        <TableCell>{cpo.customers?.customer_name}</TableCell>
+                        <TableCell>{cpo.customer_po_items?.length || 0}</TableCell>
+                        <TableCell>${cpo.total_amount?.toFixed(2) || '0.00'}</TableCell>
+                        <TableCell>{format(new Date(cpo.po_date), 'MMM dd, yyyy')}</TableCell>
+                        <TableCell>
+                          <Button 
+                            size="sm" 
+                            onClick={() => handleCreateSalesOrderFromCPO(cpo)}
+                          >
+                            <Plus className="h-4 w-4 mr-1" />
+                            Create Sales Order
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              ) : (
+                <div className="text-center py-8 text-muted-foreground">
+                  No confirmed customer orders ready for fulfillment
+                </div>
+              )}
+            </TabsContent>
+
+            <TabsContent value="sales-orders" className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-semibold">Sales Orders</h3>
               </div>
-              <div className="flex items-center gap-2">
-                <AlertTriangle className="h-4 w-4" />
-                <span>Packing and dispatch tracking</span>
+
+              {loadingSalesOrders ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="text-muted-foreground">Loading sales orders...</div>
+                </div>
+              ) : salesOrders && salesOrders.length > 0 ? (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Order Number</TableHead>
+                      <TableHead>Customer</TableHead>
+                      <TableHead>Priority</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Required Date</TableHead>
+                      <TableHead>Progress</TableHead>
+                      <TableHead>Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {salesOrders.map((order) => (
+                      <TableRow key={order.id}>
+                        <TableCell className="font-medium">{order.order_number}</TableCell>
+                        <TableCell>{order.customer?.customer_name}</TableCell>
+                        <TableCell>{getPriorityBadge(order.priority)}</TableCell>
+                        <TableCell>{getStatusBadge(order.status)}</TableCell>
+                        <TableCell>
+                          {order.required_date ? format(new Date(order.required_date), 'MMM dd, yyyy') : '-'}
+                        </TableCell>
+                        <TableCell>
+                          <div className="text-sm">
+                            {order.picked_items}/{order.total_items} picked
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          {order.status === 'confirmed' && (
+                            <Button 
+                              size="sm" 
+                              variant="outline"
+                              onClick={() => handleCreatePickList(order)}
+                            >
+                              <Package className="h-4 w-4 mr-1" />
+                              Create Pick List
+                            </Button>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              ) : (
+                <div className="text-center py-8 text-muted-foreground">
+                  No sales orders found
+                </div>
+              )}
+            </TabsContent>
+
+            <TabsContent value="pick-lists" className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-semibold">Pick Lists</h3>
               </div>
-            </div>
-            <Button variant="outline" className="mt-6" disabled>
-              Configure Sales Integration
-            </Button>
-          </div>
+
+              {loadingPickLists ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="text-muted-foreground">Loading pick lists...</div>
+                </div>
+              ) : pickLists && pickLists.length > 0 ? (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Pick List #</TableHead>
+                      <TableHead>Sales Order</TableHead>
+                      <TableHead>Picker</TableHead>
+                      <TableHead>Priority</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Progress</TableHead>
+                      <TableHead>Zone</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {pickLists.map((pickList) => (
+                      <TableRow key={pickList.id}>
+                        <TableCell className="font-medium">{pickList.pick_list_number}</TableCell>
+                        <TableCell>{pickList.sales_order?.order_number}</TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <User className="h-4 w-4" />
+                            {pickList.picker?.full_name || 'Unassigned'}
+                          </div>
+                        </TableCell>
+                        <TableCell>{getPriorityBadge(pickList.priority)}</TableCell>
+                        <TableCell>{getStatusBadge(pickList.status)}</TableCell>
+                        <TableCell>
+                          <div className="text-sm">
+                            {pickList.picked_items}/{pickList.total_items} items
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <MapPin className="h-4 w-4" />
+                            {pickList.pick_zone || 'Not specified'}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              ) : (
+                <div className="text-center py-8 text-muted-foreground">
+                  No pick lists found
+                </div>
+              )}
+            </TabsContent>
+
+            <TabsContent value="dashboard" className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Pending Orders</CardTitle>
+                    <Clock className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">{confirmedCPOs?.length || 0}</div>
+                    <p className="text-xs text-muted-foreground">Ready for fulfillment</p>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Active Picks</CardTitle>
+                    <Package className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">
+                      {pickLists?.filter(p => p.status === 'in_progress').length || 0}
+                    </div>
+                    <p className="text-xs text-muted-foreground">In progress</p>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Completed Today</CardTitle>
+                    <CheckCircle className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">
+                      {pickLists?.filter(p => p.status === 'completed').length || 0}
+                    </div>
+                    <p className="text-xs text-muted-foreground">Pick lists completed</p>
+                  </CardContent>
+                </Card>
+              </div>
+            </TabsContent>
+          </Tabs>
         </CardContent>
       </Card>
+
+      <CreateSalesOrderDialog
+        open={showCreateSalesOrder}
+        onOpenChange={setShowCreateSalesOrder}
+        cpoId={selectedCPO?.id}
+        customerId={selectedCPO?.customer_id}
+      />
+
+      <CreatePickListDialog
+        open={showCreatePickList}
+        onOpenChange={setShowCreatePickList}
+        salesOrderId={selectedSalesOrder?.id}
+      />
     </div>
   );
 }

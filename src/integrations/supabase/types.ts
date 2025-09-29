@@ -701,6 +701,87 @@ export type Database = {
           },
         ]
       }
+      dispatch_records: {
+        Row: {
+          actual_delivery_date: string | null
+          company_id: string | null
+          courier_name: string | null
+          created_at: string
+          created_by: string | null
+          delivery_address: string
+          delivery_contact: string | null
+          delivery_notes: string | null
+          delivery_phone: string | null
+          dispatch_date: string
+          dispatch_number: string
+          estimated_delivery_date: string | null
+          id: string
+          packing_list_id: string
+          proof_of_delivery_url: string | null
+          sales_order_id: string
+          status: string
+          tracking_number: string | null
+          updated_at: string
+        }
+        Insert: {
+          actual_delivery_date?: string | null
+          company_id?: string | null
+          courier_name?: string | null
+          created_at?: string
+          created_by?: string | null
+          delivery_address: string
+          delivery_contact?: string | null
+          delivery_notes?: string | null
+          delivery_phone?: string | null
+          dispatch_date?: string
+          dispatch_number: string
+          estimated_delivery_date?: string | null
+          id?: string
+          packing_list_id: string
+          proof_of_delivery_url?: string | null
+          sales_order_id: string
+          status?: string
+          tracking_number?: string | null
+          updated_at?: string
+        }
+        Update: {
+          actual_delivery_date?: string | null
+          company_id?: string | null
+          courier_name?: string | null
+          created_at?: string
+          created_by?: string | null
+          delivery_address?: string
+          delivery_contact?: string | null
+          delivery_notes?: string | null
+          delivery_phone?: string | null
+          dispatch_date?: string
+          dispatch_number?: string
+          estimated_delivery_date?: string | null
+          id?: string
+          packing_list_id?: string
+          proof_of_delivery_url?: string | null
+          sales_order_id?: string
+          status?: string
+          tracking_number?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dispatch_records_packing_list_id_fkey"
+            columns: ["packing_list_id"]
+            isOneToOne: false
+            referencedRelation: "packing_lists"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dispatch_records_sales_order_id_fkey"
+            columns: ["sales_order_id"]
+            isOneToOne: false
+            referencedRelation: "sales_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       finished_goods: {
         Row: {
           available_sizes: Json | null
@@ -1609,6 +1690,78 @@ export type Database = {
         }
         Relationships: []
       }
+      packing_lists: {
+        Row: {
+          company_id: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          notes: string | null
+          package_dimensions: string | null
+          package_type: string | null
+          package_weight: number | null
+          packer_id: string | null
+          packing_list_number: string
+          pick_list_id: string
+          quality_checked_at: string | null
+          quality_checked_by: string | null
+          sales_order_id: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          company_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          package_dimensions?: string | null
+          package_type?: string | null
+          package_weight?: number | null
+          packer_id?: string | null
+          packing_list_number: string
+          pick_list_id: string
+          quality_checked_at?: string | null
+          quality_checked_by?: string | null
+          sales_order_id: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          package_dimensions?: string | null
+          package_type?: string | null
+          package_weight?: number | null
+          packer_id?: string | null
+          packing_list_number?: string
+          pick_list_id?: string
+          quality_checked_at?: string | null
+          quality_checked_by?: string | null
+          sales_order_id?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "packing_lists_pick_list_id_fkey"
+            columns: ["pick_list_id"]
+            isOneToOne: false
+            referencedRelation: "pick_lists"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "packing_lists_sales_order_id_fkey"
+            columns: ["sales_order_id"]
+            isOneToOne: false
+            referencedRelation: "sales_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       permissions: {
         Row: {
           category: string
@@ -1635,6 +1788,157 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: []
+      }
+      pick_list_items: {
+        Row: {
+          bin_id: string | null
+          created_at: string
+          finished_good_id: string
+          id: string
+          location_id: string | null
+          notes: string | null
+          pick_list_id: string
+          pick_sequence: number
+          picked_at: string | null
+          picked_by: string | null
+          quantity_picked: number
+          quantity_to_pick: number
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          bin_id?: string | null
+          created_at?: string
+          finished_good_id: string
+          id?: string
+          location_id?: string | null
+          notes?: string | null
+          pick_list_id: string
+          pick_sequence?: number
+          picked_at?: string | null
+          picked_by?: string | null
+          quantity_picked?: number
+          quantity_to_pick: number
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          bin_id?: string | null
+          created_at?: string
+          finished_good_id?: string
+          id?: string
+          location_id?: string | null
+          notes?: string | null
+          pick_list_id?: string
+          pick_sequence?: number
+          picked_at?: string | null
+          picked_by?: string | null
+          quantity_picked?: number
+          quantity_to_pick?: number
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pick_list_items_bin_id_fkey"
+            columns: ["bin_id"]
+            isOneToOne: false
+            referencedRelation: "warehouse_bins"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pick_list_items_finished_good_id_fkey"
+            columns: ["finished_good_id"]
+            isOneToOne: false
+            referencedRelation: "finished_goods"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pick_list_items_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "warehouse_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pick_list_items_pick_list_id_fkey"
+            columns: ["pick_list_id"]
+            isOneToOne: false
+            referencedRelation: "pick_lists"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pick_lists: {
+        Row: {
+          actual_pick_time: number | null
+          company_id: string | null
+          completed_at: string | null
+          created_at: string
+          created_by: string | null
+          estimated_pick_time: number | null
+          id: string
+          notes: string | null
+          pick_list_number: string
+          pick_zone: string | null
+          picked_items: number
+          picker_id: string | null
+          priority: string
+          sales_order_id: string
+          started_at: string | null
+          status: string
+          total_items: number
+          updated_at: string
+        }
+        Insert: {
+          actual_pick_time?: number | null
+          company_id?: string | null
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          estimated_pick_time?: number | null
+          id?: string
+          notes?: string | null
+          pick_list_number: string
+          pick_zone?: string | null
+          picked_items?: number
+          picker_id?: string | null
+          priority?: string
+          sales_order_id: string
+          started_at?: string | null
+          status?: string
+          total_items?: number
+          updated_at?: string
+        }
+        Update: {
+          actual_pick_time?: number | null
+          company_id?: string | null
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          estimated_pick_time?: number | null
+          id?: string
+          notes?: string | null
+          pick_list_number?: string
+          pick_zone?: string | null
+          picked_items?: number
+          picker_id?: string | null
+          priority?: string
+          sales_order_id?: string
+          started_at?: string | null
+          status?: string
+          total_items?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pick_lists_sales_order_id_fkey"
+            columns: ["sales_order_id"]
+            isOneToOne: false
+            referencedRelation: "sales_orders"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       po_approvals: {
         Row: {
@@ -2252,6 +2556,81 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: []
+      }
+      sales_orders: {
+        Row: {
+          company_id: string | null
+          cpo_id: string
+          created_at: string
+          created_by: string | null
+          customer_id: string
+          delivery_address: string | null
+          id: string
+          order_date: string
+          order_number: string
+          packed_items: number
+          picked_items: number
+          priority: string
+          required_date: string | null
+          special_instructions: string | null
+          status: string
+          total_items: number
+          updated_at: string
+        }
+        Insert: {
+          company_id?: string | null
+          cpo_id: string
+          created_at?: string
+          created_by?: string | null
+          customer_id: string
+          delivery_address?: string | null
+          id?: string
+          order_date?: string
+          order_number: string
+          packed_items?: number
+          picked_items?: number
+          priority?: string
+          required_date?: string | null
+          special_instructions?: string | null
+          status?: string
+          total_items?: number
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string | null
+          cpo_id?: string
+          created_at?: string
+          created_by?: string | null
+          customer_id?: string
+          delivery_address?: string | null
+          id?: string
+          order_date?: string
+          order_number?: string
+          packed_items?: number
+          picked_items?: number
+          priority?: string
+          required_date?: string | null
+          special_instructions?: string | null
+          status?: string
+          total_items?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sales_orders_cpo_id_fkey"
+            columns: ["cpo_id"]
+            isOneToOne: false
+            referencedRelation: "customer_purchase_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sales_orders_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       stock_transactions: {
         Row: {
@@ -3000,11 +3379,19 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: string
       }
+      generate_pick_list_number: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
       generate_po_number: {
         Args: Record<PropertyKey, never>
         Returns: string
       }
       generate_pr_number: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
+      generate_sales_order_number: {
         Args: Record<PropertyKey, never>
         Returns: string
       }
