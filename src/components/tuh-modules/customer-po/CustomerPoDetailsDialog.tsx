@@ -129,7 +129,7 @@ export default function CustomerPoDetailsDialog({
         onSuccess: (data) => {
           console.log('[CPO] Material demand created', data);
           setTimeout(() => {
-            navigate('/procurement/material-demand-planning', { 
+            navigate('/procurement/material-demand', { 
               state: { selectedCpoId: cpoId } 
             });
             onOpenChange(false);
