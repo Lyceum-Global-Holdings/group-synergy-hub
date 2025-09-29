@@ -17,8 +17,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useFinishedGoods } from '@/hooks/useFinishedGoods';
-import { getSizesByCategory } from '@/constants/standardSizes';
-import { MultiSizeSelector } from '@/components/common/MultiSizeSelector';
+import { STANDARD_SIZES } from '@/constants/standardSizes';
 
 interface EditFinishedGoodDialogProps {
   productId: string;
@@ -45,7 +44,7 @@ export function EditFinishedGoodDialog({ productId, open, onOpenChange }: EditFi
     lead_time_days: '',
     quality_status: 'approved',
     status: 'active',
-    available_sizes: [] as string[],
+    
   });
 
   const { products, updateProduct, isUpdating } = useFinishedGoods();
@@ -72,7 +71,7 @@ export function EditFinishedGoodDialog({ productId, open, onOpenChange }: EditFi
         lead_time_days: product.lead_time_days?.toString() || '',
         quality_status: product.quality_status || 'approved',
         status: product.status || 'active',
-        available_sizes: (product as any).available_sizes || [],
+        
       });
     }
   }, [product]);
@@ -80,15 +79,15 @@ export function EditFinishedGoodDialog({ productId, open, onOpenChange }: EditFi
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Validation: ensure at least one size is selected
-    if (formData.available_sizes.length === 0) {
-      alert('Please select at least one size.');
+    // Validation: ensure a size is selected
+    if (!formData.size) {
+      alert('Please select a size.');
       return;
     }
     
     const data = {
       ...formData,
-      available_sizes: formData.available_sizes,
+      available_sizes: formData.size ? [formData.size] : [],
       selling_price: formData.selling_price ? parseFloat(formData.selling_price) : undefined,
       standard_cost: formData.standard_cost ? parseFloat(formData.standard_cost) : undefined,
       minimum_stock: formData.minimum_stock ? parseFloat(formData.minimum_stock) : undefined,
@@ -151,15 +150,20 @@ export function EditFinishedGoodDialog({ productId, open, onOpenChange }: EditFi
             </div>
           </div>
 
-          {/* Available Sizes Selection */}
           <div className="space-y-2">
-            <Label>Available Sizes *</Label>
-            <MultiSizeSelector
-              selectedSizes={formData.available_sizes}
-              onSizesChange={(sizes) => setFormData({ ...formData, available_sizes: sizes })}
-              showSelectAll={true}
-              groupByCategory={true}
-            />
+            <Label htmlFor="size">Size *</Label>
+            <Select value={formData.size} onValueChange={(value) => setFormData({ ...formData, size: value })}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select a size" />
+              </SelectTrigger>
+              <SelectContent>
+                {STANDARD_SIZES.map((size) => (
+                  <SelectItem key={size.value} value={size.value}>
+                    {size.label} ({size.category})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
