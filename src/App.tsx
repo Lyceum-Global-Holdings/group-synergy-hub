@@ -24,6 +24,7 @@ import ItemBinMaster from "./pages/warehouse/ItemBinMaster";
 import MaterialIssueReturn from "./pages/warehouse/MaterialIssueReturn";
 import GoodsReceiptNote from "./pages/warehouse/GoodsReceiptNote";
 import FinishedGoods from "./pages/tuh-modules/FinishedGoods";
+import PickPackDispatch from "./pages/warehouse/PickPackDispatch";
 import PublicAssetView from "./pages/PublicAssetView";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
@@ -166,6 +167,13 @@ function App() {
                   <ProtectedRoute>
                     <AppLayout>
                       <FinishedGoods />
+                    </AppLayout>
+                  </ProtectedRoute>
+                } />
+                <Route path="/warehouse/pick-pack" element={
+                  <ProtectedRoute>
+                    <AppLayout>
+                      <PickPackDispatch />
                     </AppLayout>
                   </ProtectedRoute>
                 } />
