@@ -61,7 +61,7 @@ export default function CustomerPoDetailsDialog({
   const { approveCPO, submitForApproval, isApproving, isSubmitting } = useCustomerPurchaseOrders();
   const { workflowTracking, createMaterialDemandFromCPO, createPRFromCPO, isCreatingMaterialDemand, isCreatingPR } = useCpoWorkflow(cpoId);
 
-  const { data: cpo, isLoading } = useQuery({
+  const { data: cpo, isLoading, isError, error: cpoError } = useQuery({
     queryKey: ['customer-purchase-order', cpoId],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -89,32 +89,74 @@ export default function CustomerPoDetailsDialog({
   };
 
   const handleApprovalSubmit = (action: 'approved' | 'rejected', comments?: string) => {
-    approveCPO.mutate({ id: cpoId, action, comments });
+    console.log('[CPO] Approval submit clicked', { cpoId, action, comments });
+    approveCPO.mutate(
+      { id: cpoId, action, comments },
+      {
+        onSuccess: (data) => {
+          console.log('[CPO] Approval success', data);
+          setApprovalDialogOpen(false);
+        },
+        onError: (err: any) => {
+          console.error('[CPO] Approval error', err);
+        },
+      }
+    );
   };
 
   const handleSubmitForApproval = () => {
-    submitForApproval.mutate(cpoId);
+    console.log('[CPO] Submit for approval clicked', { cpoId });
+    submitForApproval.mutate(cpoId, {
+      onSuccess: (data) => {
+        console.log('[CPO] Submit for approval success', data);
+      },
+      onError: (err: any) => {
+        console.error('[CPO] Submit for approval error', err);
+      },
+    });
   };
 
   const handleMaterialDemandPlanning = () => {
-    createMaterialDemandFromCPO.mutate({ 
-      cpoId, 
-      analysisDate: new Date().toISOString().split('T')[0] 
-    });
-    // Navigate to Material Demand Planning page with CPO pre-selected
-    setTimeout(() => {
-      navigate('/procurement/material-demand-planning', { 
-        state: { selectedCpoId: cpoId } 
-      });
-      onOpenChange(false);
-    }, 1000);
+    console.log('[CPO] Material demand planning clicked', { cpoId });
+    createMaterialDemandFromCPO.mutate(
+      { 
+        cpoId, 
+        analysisDate: new Date().toISOString().split('T')[0] 
+      },
+      {
+        onSuccess: (data) => {
+          console.log('[CPO] Material demand created', data);
+          setTimeout(() => {
+            navigate('/procurement/material-demand-planning', { 
+              state: { selectedCpoId: cpoId } 
+            });
+            onOpenChange(false);
+          }, 800);
+        },
+        onError: (err: any) => {
+          console.error('[CPO] Material demand error', err);
+        },
+      }
+    );
   };
 
   const handleCreatePR = (prData: any) => {
-    createPRFromCPO.mutate({
-      cpoId,
-      ...prData,
-    });
+    console.log('[CPO] Create PR clicked', { cpoId, prData });
+    createPRFromCPO.mutate(
+      {
+        cpoId,
+        ...prData,
+      },
+      {
+        onSuccess: (data) => {
+          console.log('[CPO] PR created', data);
+          setCreatePrDialogOpen(false);
+        },
+        onError: (err: any) => {
+          console.error('[CPO] Create PR error', err);
+        },
+      }
+    );
   };
 
   const canApprove = cpo?.status === 'pending_approval';
@@ -141,6 +183,27 @@ export default function CustomerPoDetailsDialog({
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <div className="flex items-center justify-center h-64">
             <div className="text-center">Loading...</div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
+  if (isError) {
+    console.error('[CPO] Failed to load CPO details', cpoError);
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Failed to load CPO</DialogTitle>
+            <DialogDescription>
+              {cpoError?.message || 'An unexpected error occurred while loading the CPO.'}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end">
+            <Button variant="outline" onClick={() => onOpenChange(false)}>
+              Close
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
