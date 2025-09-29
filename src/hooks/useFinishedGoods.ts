@@ -61,17 +61,23 @@ export interface CreateFinishedGoodData {
   company_id?: string;
 }
 
-export function useFinishedGoods() {
+export function useFinishedGoods(companyId?: string) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
   // Fetch finished goods
   const { data: products, isLoading, error } = useQuery({
-    queryKey: ['finished-goods'],
+    queryKey: ['finished-goods', companyId],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from('finished_goods')
-        .select('*')
+        .select('*');
+
+      if (companyId) {
+        query = query.eq('company_id', companyId);
+      }
+
+      const { data, error } = await query
         .order('created_at', { ascending: false });
 
       if (error) throw error;

@@ -17,6 +17,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useFinishedGoods, FinishedGood } from '@/hooks/useFinishedGoods';
+import { useCompany } from '@/contexts/CompanyContext';
 
 interface FinishedGoodsItemSelectorProps {
   value?: string;
@@ -36,7 +37,8 @@ export function FinishedGoodsItemSelector({
   showAvailableSizes = false,
 }: FinishedGoodsItemSelectorProps) {
   const [open, setOpen] = useState(false);
-  const { products, isLoading } = useFinishedGoods();
+  const { selectedCompany } = useCompany();
+  const { products, isLoading, error } = useFinishedGoods(selectedCompany?.id);
 
   const activeProducts = products?.filter(product => product.status === 'active') || [];
   const selectedProduct = activeProducts.find(product => product.id === value);
@@ -82,8 +84,8 @@ export function FinishedGoodsItemSelector({
           <Command>
             <CommandInput placeholder="Search finished goods by code or name..." />
             <CommandList>
-              <CommandEmpty>
-                {isLoading ? "Loading finished goods..." : "No finished goods found."}
+            <CommandEmpty>
+                {isLoading ? "Loading finished goods..." : error ? "Error loading finished goods." : "No finished goods found."}
               </CommandEmpty>
               <CommandGroup>
                 {selectedProduct && (
@@ -147,8 +149,8 @@ export function FinishedGoodsItemSelector({
         <div className="space-y-2">
           <div className="text-sm font-medium text-muted-foreground">Available Sizes:</div>
           <div className="flex flex-wrap gap-1">
-            {((selectedProduct as any).available_sizes as string[]).map((size: string) => (
-              <Badge key={size} variant="outline" className="text-xs">
+            {Array.from(new Set((selectedProduct as any).available_sizes as string[])).map((size: string, index: number) => (
+              <Badge key={`${size}-${index}`} variant="outline" className="text-xs">
                 {size}
               </Badge>
             ))}
