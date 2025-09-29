@@ -64,21 +64,36 @@ export default function CustomerPoDetailsDialog({
   const { data: cpo, isLoading, isError, error: cpoError } = useQuery({
     queryKey: ['customer-purchase-order', cpoId],
     queryFn: async () => {
-      const { data, error } = await supabase
+      // First get the basic CPO data
+      const { data: cpoData, error: cpoError } = await supabase
         .from('customer_purchase_orders')
         .select(`
           *,
           customer:customers(customer_name, customer_code, contact_person, email, phone),
-          items:customer_po_items(*),
-          approvals:customer_po_approvals(*,
-            approver_profile:profiles!approver_id(full_name, email)
-          )
+          items:customer_po_items(*)
         `)
         .eq('id', cpoId)
         .single();
       
-      if (error) throw error;
-      return data as any; // Type assertion to handle complex joined data
+      if (cpoError) throw cpoError;
+
+      // Then get approvals with profiles
+      const { data: approvals, error: approvalsError } = await supabase
+        .from('customer_po_approvals')
+        .select(`
+          *,
+          approver_profile:profiles!inner(full_name, email)
+        `)
+        .eq('cpo_id', cpoId);
+      
+      if (approvalsError && approvalsError.code !== 'PGRST116') {
+        console.warn('Failed to load approvals:', approvalsError);
+      }
+
+      return {
+        ...cpoData,
+        approvals: approvals || []
+      };
     },
     enabled: !!cpoId,
   });
