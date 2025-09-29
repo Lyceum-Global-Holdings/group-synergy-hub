@@ -36,17 +36,30 @@ import { BOM_CATEGORIES, BomCategoryKey } from '@/constants/bomCategories';
 import { STANDARD_SIZES, SIZE_CATEGORIES, getSizesByCategory } from '@/constants/standardSizes';
 import { CreateBomItemData, BillOfMaterials } from '@/types/bom';
 import { ItemSelector } from '@/components/common/ItemSelector';
+import { FinishedGoodsItemSelector } from '@/components/common/FinishedGoodsItemSelector';
 import { WarehouseItem } from '@/types/itemBin';
 
 const bomSchema = z.object({
   product_name: z.string().min(1, 'Product name is required'),
   warehouse_item_id: z.string().optional(),
+  finished_good_id: z.string().optional(),
   style_no: z.string().optional(),
   version: z.string().optional(),
   size: z.string().optional(),
   description: z.string().optional(),
   status: z.enum(['active', 'inactive', 'draft']).default('draft'),
-});
+}).refine(
+  (data) => {
+    // Ensure only one of warehouse_item_id or finished_good_id is set
+    const hasWarehouseItem = Boolean(data.warehouse_item_id);
+    const hasFinishedGood = Boolean(data.finished_good_id);
+    return !hasWarehouseItem || !hasFinishedGood;
+  },
+  {
+    message: "Cannot link to both warehouse item and finished good",
+    path: ["finished_good_id"],
+  }
+);
 
 type BomFormData = z.infer<typeof bomSchema>;
 
@@ -74,6 +87,7 @@ export function EditBomDialog({ bom, open, onOpenChange }: EditBomDialogProps) {
     defaultValues: {
       product_name: '',
       warehouse_item_id: '',
+      finished_good_id: '',
       version: '1.0',
       size: '',
       description: '',
@@ -89,6 +103,7 @@ export function EditBomDialog({ bom, open, onOpenChange }: EditBomDialogProps) {
       form.reset({
         product_name: bom.product_name,
         warehouse_item_id: bom.warehouse_item_id || '',
+        finished_good_id: bom.finished_good_id || '',
         style_no: bom.style_no || '',
         version: bom.version || '1.0',
         size: bom.size || '',
@@ -231,6 +246,7 @@ export function EditBomDialog({ bom, open, onOpenChange }: EditBomDialogProps) {
         id: bom.id,
         product_name: data.product_name,
         warehouse_item_id: data.warehouse_item_id || undefined,
+        finished_good_id: data.finished_good_id || undefined,
         style_no: data.style_no,
         version: data.version,
         size: data.size,
@@ -454,11 +470,41 @@ export function EditBomDialog({ bom, open, onOpenChange }: EditBomDialogProps) {
                 />
 
                 <div className="space-y-2">
-                  <FormLabel>Link to Inventory Product (Optional)</FormLabel>
+                  <FormLabel>Link to Product Master (Recommended)</FormLabel>
+                  <FinishedGoodsItemSelector
+                    onSelect={(product) => {
+                      if (product) {
+                        form.setValue('finished_good_id', product.id);
+                        form.setValue('warehouse_item_id', ''); // Clear warehouse item
+                        if (!form.getValues('product_name')) {
+                          form.setValue('product_name', product.product_name);
+                        }
+                        if (!form.getValues('style_no')) {
+                          form.setValue('style_no', product.style_no || '');
+                        }
+                        if (!form.getValues('size')) {
+                          form.setValue('size', product.size || '');
+                        }
+                      } else {
+                        form.setValue('finished_good_id', '');
+                      }
+                    }}
+                    value={form.watch('finished_good_id')}
+                    placeholder="Select from finished goods..."
+                    disabled={!!form.watch('warehouse_item_id')}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Link this BOM to a finished goods product master
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <FormLabel>Or Link to Inventory Item</FormLabel>
                   <ItemSelector
                     onSelect={(item: WarehouseItem | null) => {
                       if (item) {
                         form.setValue('warehouse_item_id', item.id);
+                        form.setValue('finished_good_id', ''); // Clear finished good
                         if (!form.getValues('product_name')) {
                           form.setValue('product_name', item.name);
                         }
@@ -467,10 +513,11 @@ export function EditBomDialog({ bom, open, onOpenChange }: EditBomDialogProps) {
                       }
                     }}
                     value={form.watch('warehouse_item_id')}
-                    placeholder="Select product from inventory"
+                    placeholder="Select from warehouse inventory..."
+                    disabled={!!form.watch('finished_good_id')}
                   />
                   <p className="text-xs text-muted-foreground">
-                    Link this BOM to an existing product in your warehouse inventory
+                    Alternative: Link to an existing warehouse inventory item
                   </p>
                 </div>
 

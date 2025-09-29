@@ -3,6 +3,7 @@ export interface BillOfMaterials {
   bom_number: string;
   product_name: string;
   warehouse_item_id?: string; // Link to warehouse item for the product
+  finished_good_id?: string; // Link to finished goods product master
   style_no?: string;
   version: string;
   size?: string;
@@ -40,6 +41,7 @@ export interface BomItem {
 export interface CreateBomData {
   product_name: string;
   warehouse_item_id?: string; // Link to warehouse item for the product
+  finished_good_id?: string; // Link to finished goods product master
   style_no?: string;
   version?: string;
   size?: string;

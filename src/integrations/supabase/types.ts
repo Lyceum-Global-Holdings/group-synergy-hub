@@ -163,6 +163,7 @@ export type Database = {
           created_at: string
           created_by: string | null
           description: string | null
+          finished_good_id: string | null
           id: string
           po_id: string | null
           product_name: string
@@ -181,6 +182,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           description?: string | null
+          finished_good_id?: string | null
           id?: string
           po_id?: string | null
           product_name: string
@@ -199,6 +201,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           description?: string | null
+          finished_good_id?: string | null
           id?: string
           po_id?: string | null
           product_name?: string
@@ -217,6 +220,13 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bill_of_materials_finished_good_id_fkey"
+            columns: ["finished_good_id"]
+            isOneToOne: false
+            referencedRelation: "finished_goods"
             referencedColumns: ["id"]
           },
           {
