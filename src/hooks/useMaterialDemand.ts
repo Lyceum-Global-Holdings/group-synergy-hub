@@ -172,6 +172,31 @@ export const useDemandCalculation = (companyId?: string) => {
     return null;
   };
 
+  // Helper function to fetch BOM by finished good ID
+  const fetchBomByFinishedGoodId = async (finishedGoodId: string) => {
+    const cacheKey = `fg_${finishedGoodId}`;
+    if (bomByWarehouseItemIdCache.has(cacheKey)) {
+      return bomByWarehouseItemIdCache.get(cacheKey);
+    }
+
+    const { data: bomData, error } = await supabase
+      .from('bill_of_materials')
+      .select('id, bom_number, product_name')
+      .eq('finished_good_id', finishedGoodId)
+      .single();
+
+    if (!error && bomData) {
+      const bomMeta = {
+        bom_id: bomData.id,
+        bom_number: bomData.bom_number,
+        product_name: bomData.product_name
+      };
+      bomByWarehouseItemIdCache.set(cacheKey, bomMeta);
+      return bomMeta;
+    }
+    return null;
+  };
+
   // Helper function to fetch BOM items
   const fetchBomItems = async (bomId: string) => {
     if (bomItemsByBomIdCache.has(bomId)) {
@@ -909,8 +934,13 @@ export const useDemandCalculation = (companyId?: string) => {
             
             if (requiredProduction > 0) {
               console.log(`⚡ Production required: ${requiredProduction} units`);
-              const bomId = matchedFinishedGood.bom_id;
-              if (bomId) {
+              
+              // Fetch BOM by finished_good_id (new relationship)
+              const bomMeta = await fetchBomByFinishedGoodId(matchedFinishedGood.id);
+              if (bomMeta) {
+                const bomId = bomMeta.bom_id;
+                console.log(`📋 Found BOM: ${bomMeta.bom_number} for finished good: ${matchedFinishedGood.product_name}`);
+                
                 // Fetch BOM items (with caching)
                 let bomItems = bomItemsCache.get(bomId);
                 if (!bomItems) {
@@ -923,20 +953,6 @@ export const useDemandCalculation = (companyId?: string) => {
                   }
                   bomItems = fetchedBomItems || [];
                   bomItemsCache.set(bomId, bomItems);
-                }
-                
-                // Fetch BOM meta (with caching)
-                let bomMeta = bomMetaCache.get(bomId);
-                if (!bomMeta) {
-                  const { data: bomData, error: bomMetaErr } = await supabase
-                    .from('bill_of_materials')
-                    .select('id,bom_number,product_name')
-                    .eq('id', bomId)
-                    .single();
-                  if (!bomMetaErr && bomData) {
-                    bomMeta = { bom_number: bomData.bom_number, product_name: bomData.product_name };
-                    bomMetaCache.set(bomId, bomMeta);
-                  }
                 }
                 
                 if (bomItems && bomItems.length > 0) {
@@ -1006,10 +1022,10 @@ export const useDemandCalculation = (companyId?: string) => {
                         priority: materialShortage > 0 ? 'high' : 'medium',
                         lead_time_days: 7,
                         is_linked_to_bom: true,
-                        bom_info: bomMeta ? {
+                        bom_info: {
                           bom_number: bomMeta.bom_number,
                           product_name: bomMeta.product_name
-                        } : undefined,
+                        },
                         finished_good_info: {
                           product_code: matchedFinishedGood.product_code,
                           product_name: matchedFinishedGood.product_name,
@@ -1040,7 +1056,8 @@ export const useDemandCalculation = (companyId?: string) => {
                   });
                 }
               } else {
-                // No BOM ID associated
+                // No BOM found for this finished good
+                console.log(`⚠️ No BOM found for finished good: ${matchedFinishedGood.product_name}`);
                 analysisResults.push({
                   item_code: matchedFinishedGood.product_code || 'N/A',
                   item_name: cpoItem.item_name,
