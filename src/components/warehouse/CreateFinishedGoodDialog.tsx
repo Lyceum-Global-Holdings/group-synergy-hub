@@ -17,6 +17,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useFinishedGoods } from '@/hooks/useFinishedGoods';
+import { useCompany } from '@/contexts/CompanyContext';
 import { STANDARD_SIZES } from '@/constants/standardSizes';
 
 interface CreateFinishedGoodDialogProps {
@@ -25,6 +26,7 @@ interface CreateFinishedGoodDialogProps {
 }
 
 export function CreateFinishedGoodDialog({ open, onOpenChange }: CreateFinishedGoodDialogProps) {
+  const { selectedCompany } = useCompany();
   const [formData, setFormData] = useState({
     product_name: '',
     product_code: '',
@@ -60,6 +62,7 @@ export function CreateFinishedGoodDialog({ open, onOpenChange }: CreateFinishedG
     const data = {
       ...formData,
       available_sizes: formData.size ? [formData.size] : [],
+      company_id: selectedCompany?.id,
       selling_price: formData.selling_price ? parseFloat(formData.selling_price) : undefined,
       standard_cost: formData.standard_cost ? parseFloat(formData.standard_cost) : undefined,
       minimum_stock: formData.minimum_stock ? parseFloat(formData.minimum_stock) : undefined,

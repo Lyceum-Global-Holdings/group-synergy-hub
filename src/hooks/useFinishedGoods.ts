@@ -74,7 +74,8 @@ export function useFinishedGoods(companyId?: string) {
         .select('*');
 
       if (companyId) {
-        query = query.eq('company_id', companyId);
+        // Include both company-specific items AND global items (company_id is null)
+        query = query.or(`company_id.eq.${companyId},company_id.is.null`);
       }
 
       const { data, error } = await query
