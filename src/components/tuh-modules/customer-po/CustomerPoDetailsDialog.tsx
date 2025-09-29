@@ -27,7 +27,8 @@ import {
   ShoppingCart,
   Clock,
   User,
-  MessageSquare
+  MessageSquare,
+  Ban
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
@@ -58,7 +59,7 @@ export default function CustomerPoDetailsDialog({
   const [approvalAction, setApprovalAction] = useState<'approve' | 'reject'>('approve');
   const [createPrDialogOpen, setCreatePrDialogOpen] = useState(false);
 
-  const { approveCPO, submitForApproval, isApproving, isSubmitting } = useCustomerPurchaseOrders();
+  const { approveCPO, submitForApproval, cancelCPO, isApproving, isSubmitting, isCancelling } = useCustomerPurchaseOrders();
   const { workflowTracking, createMaterialDemandFromCPO, createPRFromCPO, isCreatingMaterialDemand, isCreatingPR } = useCpoWorkflow(cpoId);
 
   const { data: cpo, isLoading, isError, error: cpoError } = useQuery({
@@ -163,6 +164,7 @@ export default function CustomerPoDetailsDialog({
   const canApprove = cpo?.status === 'pending_approval';
   const canSubmitForApproval = cpo?.status === 'draft';
   const canProceedToNextStage = cpo?.status === 'confirmed';
+  const canCancel = ['draft', 'pending_approval', 'confirmed', 'in_production', 'delivered'].includes(cpo?.status || '');
 
   const getWorkflowStageIcon = (stage: string) => {
     switch (stage) {
@@ -232,7 +234,7 @@ export default function CustomerPoDetailsDialog({
 
         <div className="space-y-6">
           {/* Action Buttons */}
-          {(canSubmitForApproval || canApprove || canProceedToNextStage) && (
+          {(canSubmitForApproval || canApprove || canProceedToNextStage || canCancel) && (
             <Card>
               <CardHeader>
                 <CardTitle>Actions</CardTitle>
@@ -293,6 +295,21 @@ export default function CustomerPoDetailsDialog({
                         Create Purchase Requisition
                       </Button>
                     </>
+                  )}
+
+                  {canCancel && cpo.status !== 'cancelled' && cpo.status !== 'completed' && (
+                    <Button 
+                      variant="destructive"
+                      onClick={() => cancelCPO.mutate({ 
+                        id: cpoId, 
+                        reason: `Order cancelled from ${cpo.status} status` 
+                      })}
+                      disabled={isCancelling}
+                      className="gap-2"
+                    >
+                      <Ban className="h-4 w-4" />
+                      {isCancelling ? 'Cancelling...' : 'Cancel Order'}
+                    </Button>
                   )}
                 </div>
               </CardContent>

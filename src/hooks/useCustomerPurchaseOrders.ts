@@ -190,6 +190,35 @@ export function useCustomerPurchaseOrders(companyId?: string) {
     },
   });
 
+  const cancelCPO = useMutation({
+    mutationFn: async ({ id, reason }: { id: string; reason?: string }) => {
+      const user = await supabase.auth.getUser();
+      
+      const { data, error } = await supabase
+        .from('customer_purchase_orders')
+        .update({
+          status: 'cancelled',
+          approval_comments: reason || 'Order cancelled',
+          approved_by: user.data.user?.id,
+          approved_date: new Date().toISOString(),
+          pending_approval: false
+        })
+        .eq('id', id)
+        .select()
+        .single();
+      
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['customer-purchase-orders'] });
+      toast.success("Customer PO cancelled successfully");
+    },
+    onError: (error: any) => {
+      toast.error(`Failed to cancel customer PO: ${error.message}`);
+    },
+  });
+
   return {
     customerPOs,
     isLoading,
@@ -199,10 +228,12 @@ export function useCustomerPurchaseOrders(companyId?: string) {
     deleteCustomerPO,
     approveCPO,
     submitForApproval,
+    cancelCPO,
     isCreating: createCustomerPO.isPending,
     isUpdating: updateCustomerPO.isPending,
     isDeleting: deleteCustomerPO.isPending,
     isApproving: approveCPO.isPending,
     isSubmitting: submitForApproval.isPending,
+    isCancelling: cancelCPO.isPending,
   };
 }
