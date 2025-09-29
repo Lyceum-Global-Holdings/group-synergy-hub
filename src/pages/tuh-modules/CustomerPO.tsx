@@ -12,7 +12,9 @@ import { formatCurrency } from "@/lib/utils";
 
 const statusColors = {
   draft: "default",
-  confirmed: "secondary",
+  pending_approval: "secondary",
+  confirmed: "default",
+  rejected: "destructive",
   in_production: "outline",
   delivered: "default",
   completed: "default",
@@ -130,11 +132,11 @@ export default function CustomerPO() {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Completed</CardTitle>
+            <CardTitle className="text-sm font-medium">Pending Approval</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {customerPOs.filter(po => ['delivered', 'completed'].includes(po.status)).length}
+              {customerPOs.filter(po => po.status === 'pending_approval').length}
             </div>
           </CardContent>
         </Card>

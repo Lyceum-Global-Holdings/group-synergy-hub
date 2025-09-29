@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -7,15 +8,34 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { formatCurrency } from "@/lib/utils";
 import { CustomerPurchaseOrder } from "@/types/customer";
+import { useCustomerPurchaseOrders } from "@/hooks/useCustomerPurchaseOrders";
+import { useCpoWorkflow } from "@/hooks/useCpoWorkflow";
+import CpoApprovalDialog from "./CpoApprovalDialog";
+import CreatePrFromCpoDialog from "./CreatePrFromCpoDialog";
+import { 
+  CheckCircle, 
+  XCircle, 
+  Send, 
+  TrendingUp, 
+  FileText, 
+  ShoppingCart,
+  Clock,
+  User,
+  MessageSquare
+} from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 const statusColors = {
   draft: "default",
-  confirmed: "secondary",
+  pending_approval: "secondary",
+  confirmed: "default",
+  rejected: "destructive",
   in_production: "outline",
   delivered: "default",
   completed: "default",
@@ -33,6 +53,14 @@ export default function CustomerPoDetailsDialog({
   open,
   onOpenChange,
 }: CustomerPoDetailsDialogProps) {
+  const navigate = useNavigate();
+  const [approvalDialogOpen, setApprovalDialogOpen] = useState(false);
+  const [approvalAction, setApprovalAction] = useState<'approve' | 'reject'>('approve');
+  const [createPrDialogOpen, setCreatePrDialogOpen] = useState(false);
+
+  const { approveCPO, submitForApproval, isApproving, isSubmitting } = useCustomerPurchaseOrders();
+  const { workflowTracking, createMaterialDemandFromCPO, createPRFromCPO, isCreatingMaterialDemand, isCreatingPR } = useCpoWorkflow(cpoId);
+
   const { data: cpo, isLoading } = useQuery({
     queryKey: ['customer-purchase-order', cpoId],
     queryFn: async () => {
@@ -41,16 +69,71 @@ export default function CustomerPoDetailsDialog({
         .select(`
           *,
           customer:customers(customer_name, customer_code, contact_person, email, phone),
-          items:customer_po_items(*)
+          items:customer_po_items(*),
+          approvals:customer_po_approvals(*,
+            approver_profile:profiles!approver_id(full_name, email)
+          )
         `)
         .eq('id', cpoId)
         .single();
       
       if (error) throw error;
-      return data as CustomerPurchaseOrder;
+      return data as any; // Type assertion to handle complex joined data
     },
     enabled: !!cpoId,
   });
+
+  const handleApproval = (action: 'approve' | 'reject') => {
+    setApprovalAction(action);
+    setApprovalDialogOpen(true);
+  };
+
+  const handleApprovalSubmit = (action: 'approved' | 'rejected', comments?: string) => {
+    approveCPO.mutate({ id: cpoId, action, comments });
+  };
+
+  const handleSubmitForApproval = () => {
+    submitForApproval.mutate(cpoId);
+  };
+
+  const handleMaterialDemandPlanning = () => {
+    createMaterialDemandFromCPO.mutate({ 
+      cpoId, 
+      analysisDate: new Date().toISOString().split('T')[0] 
+    });
+    // Navigate to Material Demand Planning page with CPO pre-selected
+    setTimeout(() => {
+      navigate('/procurement/material-demand-planning', { 
+        state: { selectedCpoId: cpoId } 
+      });
+      onOpenChange(false);
+    }, 1000);
+  };
+
+  const handleCreatePR = (prData: any) => {
+    createPRFromCPO.mutate({
+      cpoId,
+      ...prData,
+    });
+  };
+
+  const canApprove = cpo?.status === 'pending_approval';
+  const canSubmitForApproval = cpo?.status === 'draft';
+  const canProceedToNextStage = cpo?.status === 'confirmed';
+
+  const getWorkflowStageIcon = (stage: string) => {
+    switch (stage) {
+      case 'cpo_created': return <FileText className="h-4 w-4" />;
+      case 'cpo_approved': return <CheckCircle className="h-4 w-4" />;
+      case 'material_demand_planned': return <TrendingUp className="h-4 w-4" />;
+      case 'pr_created': return <FileText className="h-4 w-4" />;
+      case 'pr_approved': return <CheckCircle className="h-4 w-4" />;
+      case 'po_created': return <ShoppingCart className="h-4 w-4" />;
+      case 'po_approved': return <CheckCircle className="h-4 w-4" />;
+      case 'completed': return <CheckCircle className="h-4 w-4" />;
+      default: return <Clock className="h-4 w-4" />;
+    }
+  };
 
   if (isLoading) {
     return (
@@ -84,6 +167,74 @@ export default function CustomerPoDetailsDialog({
         </DialogHeader>
 
         <div className="space-y-6">
+          {/* Action Buttons */}
+          {(canSubmitForApproval || canApprove || canProceedToNextStage) && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Actions</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex flex-wrap gap-2">
+                  {canSubmitForApproval && (
+                    <Button 
+                      onClick={handleSubmitForApproval}
+                      disabled={isSubmitting}
+                      className="gap-2"
+                    >
+                      <Send className="h-4 w-4" />
+                      {isSubmitting ? 'Submitting...' : 'Submit for Approval'}
+                    </Button>
+                  )}
+                  
+                  {canApprove && (
+                    <>
+                      <Button 
+                        onClick={() => handleApproval('approve')}
+                        disabled={isApproving}
+                        className="gap-2"
+                      >
+                        <CheckCircle className="h-4 w-4" />
+                        Approve
+                      </Button>
+                      <Button 
+                        variant="destructive"
+                        onClick={() => handleApproval('reject')}
+                        disabled={isApproving}
+                        className="gap-2"
+                      >
+                        <XCircle className="h-4 w-4" />
+                        Reject
+                      </Button>
+                    </>
+                  )}
+
+                  {canProceedToNextStage && (
+                    <>
+                      <Button 
+                        onClick={handleMaterialDemandPlanning}
+                        disabled={isCreatingMaterialDemand}
+                        className="gap-2"
+                        variant="outline"
+                      >
+                        <TrendingUp className="h-4 w-4" />
+                        {isCreatingMaterialDemand ? 'Processing...' : 'Material Demand Planning'}
+                      </Button>
+                      <Button 
+                        onClick={() => setCreatePrDialogOpen(true)}
+                        disabled={isCreatingPR}
+                        className="gap-2"
+                        variant="outline"
+                      >
+                        <FileText className="h-4 w-4" />
+                        Create Purchase Requisition
+                      </Button>
+                    </>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           {/* Customer Information */}
           <Card>
             <CardHeader>
@@ -145,6 +296,34 @@ export default function CustomerPoDetailsDialog({
                   <p className="font-medium">{cpo.notes}</p>
                 </div>
               )}
+              {cpo.approved_by && (
+                <>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Approved By</p>
+                    <div className="flex items-center gap-2">
+                      <User className="h-4 w-4" />
+                      <p className="font-medium">
+                        {cpo.approvals?.[0]?.approver_profile?.full_name || 'Admin'}
+                      </p>
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Approved Date</p>
+                    <p className="font-medium">
+                      {new Date(cpo.approved_date!).toLocaleDateString()}
+                    </p>
+                  </div>
+                  {cpo.approval_comments && (
+                    <div className="md:col-span-2">
+                      <p className="text-sm text-muted-foreground">Approval Comments</p>
+                      <div className="flex items-start gap-2">
+                        <MessageSquare className="h-4 w-4 mt-0.5" />
+                        <p className="font-medium">{cpo.approval_comments}</p>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
             </CardContent>
           </Card>
 
@@ -199,7 +378,102 @@ export default function CustomerPoDetailsDialog({
               </div>
             </CardContent>
           </Card>
+
+          {/* Workflow Tracking */}
+          {workflowTracking.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Workflow Progress</CardTitle>
+                <CardDescription>
+                  Track the progress of this CPO through the procurement workflow
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {workflowTracking.map((tracking, index) => (
+                    <div key={tracking.id}>
+                      {index > 0 && <Separator />}
+                      <div className="flex items-start gap-4 py-2">
+                        <div className="flex-shrink-0 p-2 rounded-lg bg-muted">
+                          {getWorkflowStageIcon(tracking.workflow_stage)}
+                        </div>
+                        <div className="flex-1">
+                          <h4 className="font-medium">
+                            {tracking.workflow_stage.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                          </h4>
+                          <p className="text-sm text-muted-foreground">
+                            {new Date(tracking.stage_completed_at).toLocaleString()}
+                          </p>
+                          {tracking.notes && (
+                            <p className="text-sm mt-1">{tracking.notes}</p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Approval History */}
+          {cpo.approvals && cpo.approvals.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Approval History</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {cpo.approvals.map((approval, index) => (
+                    <div key={approval.id}>
+                      {index > 0 && <Separator />}
+                      <div className="flex items-start justify-between py-2">
+                        <div className="flex items-start gap-2">
+                          {approval.action === 'approved' ? (
+                            <CheckCircle className="h-4 w-4 text-green-600 mt-0.5" />
+                          ) : (
+                            <XCircle className="h-4 w-4 text-red-600 mt-0.5" />
+                          )}
+                          <div>
+                            <p className="font-medium">
+                              {approval.approver_profile?.full_name || 'Admin'}
+                            </p>
+                            <p className="text-sm text-muted-foreground">
+                              {approval.action.charAt(0).toUpperCase() + approval.action.slice(1)} - {new Date(approval.created_at).toLocaleString()}
+                            </p>
+                            {approval.comments && (
+                              <p className="text-sm mt-1 p-2 bg-muted rounded">
+                                {approval.comments}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </div>
+
+        <CpoApprovalDialog
+          open={approvalDialogOpen}
+          onOpenChange={setApprovalDialogOpen}
+          onApprove={(comments) => handleApprovalSubmit('approved', comments)}
+          onReject={(comments) => handleApprovalSubmit('rejected', comments)}
+          isLoading={isApproving}
+          action={approvalAction}
+          cpoNumber={cpo?.cpo_number || ''}
+        />
+
+        <CreatePrFromCpoDialog
+          open={createPrDialogOpen}
+          onOpenChange={setCreatePrDialogOpen}
+          onCreatePR={handleCreatePR}
+          isLoading={isCreatingPR}
+          cpoNumber={cpo?.cpo_number || ''}
+        />
       </DialogContent>
     </Dialog>
   );

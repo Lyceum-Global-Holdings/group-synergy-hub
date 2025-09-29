@@ -49,14 +49,48 @@ export interface CustomerPurchaseOrder {
   po_date: string;
   delivery_date?: string;
   total_amount: number;
-  status: 'draft' | 'confirmed' | 'in_production' | 'delivered' | 'completed' | 'cancelled';
+  status: 'draft' | 'pending_approval' | 'confirmed' | 'in_production' | 'delivered' | 'completed' | 'cancelled' | 'rejected';
   notes?: string;
   created_by?: string;
   created_at: string;
   updated_at: string;
+  // Approval fields
+  pending_approval?: boolean;
+  approved_by?: string;
+  approved_date?: string;
+  approval_comments?: string;
   // Joined data
   customer?: Customer;
   items?: CustomerPoItem[];
+  approvals?: CustomerPoApproval[];
+  workflow_tracking?: CustomerPoWorkflowTracking[];
+}
+
+export interface CustomerPoApproval {
+  id: string;
+  cpo_id: string;
+  approver_id: string;
+  action: 'approved' | 'rejected' | 'pending_approval';
+  comments?: string;
+  created_at: string;
+  approver_profile?: {
+    full_name?: string;
+    email?: string;
+  };
+}
+
+export interface CustomerPoWorkflowTracking {
+  id: string;
+  cpo_id: string;
+  material_demand_id?: string;
+  pr_id?: string;
+  po_id?: string;
+  workflow_stage: 'cpo_created' | 'cpo_approved' | 'material_demand_planned' | 'pr_created' | 'pr_approved' | 'po_created' | 'po_approved' | 'completed';
+  stage_completed_at: string;
+  stage_completed_by?: string;
+  notes?: string;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface CustomerPoItem {

@@ -122,6 +122,74 @@ export function useCustomerPurchaseOrders(companyId?: string) {
     },
   });
 
+  const approveCPO = useMutation({
+    mutationFn: async ({ id, action, comments }: { id: string; action: 'approved' | 'rejected'; comments?: string }) => {
+      const user = await supabase.auth.getUser();
+      
+      // Update CPO status and approval fields
+      const newStatus = action === 'approved' ? 'confirmed' : 'rejected';
+      const { data, error } = await supabase
+        .from('customer_purchase_orders')
+        .update({
+          status: newStatus,
+          approved_by: user.data.user?.id,
+          approved_date: new Date().toISOString(),
+          approval_comments: comments,
+          pending_approval: false
+        })
+        .eq('id', id)
+        .select()
+        .single();
+      
+      if (error) throw error;
+      
+      // Create approval record
+      const { error: approvalError } = await supabase
+        .from('customer_po_approvals')
+        .insert({
+          cpo_id: id,
+          approver_id: user.data.user?.id,
+          action,
+          comments
+        });
+      
+      if (approvalError) throw approvalError;
+      
+      return data;
+    },
+    onSuccess: (_, { action }) => {
+      queryClient.invalidateQueries({ queryKey: ['customer-purchase-orders'] });
+      toast.success(`Customer PO ${action} successfully`);
+    },
+    onError: (error: any) => {
+      toast.error(`Failed to process approval: ${error.message}`);
+    },
+  });
+
+  const submitForApproval = useMutation({
+    mutationFn: async (id: string) => {
+      const { data, error } = await supabase
+        .from('customer_purchase_orders')
+        .update({
+          status: 'pending_approval',
+          pending_approval: true
+        })
+        .eq('id', id)
+        .select()
+        .single();
+      
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['customer-purchase-orders'] });
+      toast.success("Customer PO submitted for approval");
+    },
+    onError: (error: any) => {
+      toast.error(`Failed to submit for approval: ${error.message}`);
+    },
+  });
+
   return {
     customerPOs,
     isLoading,
@@ -129,8 +197,12 @@ export function useCustomerPurchaseOrders(companyId?: string) {
     createCustomerPO,
     updateCustomerPO,
     deleteCustomerPO,
+    approveCPO,
+    submitForApproval,
     isCreating: createCustomerPO.isPending,
     isUpdating: updateCustomerPO.isPending,
     isDeleting: deleteCustomerPO.isPending,
+    isApproving: approveCPO.isPending,
+    isSubmitting: submitForApproval.isPending,
   };
 }

@@ -386,6 +386,41 @@ export type Database = {
         }
         Relationships: []
       }
+      customer_po_approvals: {
+        Row: {
+          action: string
+          approver_id: string
+          comments: string | null
+          cpo_id: string
+          created_at: string
+          id: string
+        }
+        Insert: {
+          action: string
+          approver_id: string
+          comments?: string | null
+          cpo_id: string
+          created_at?: string
+          id?: string
+        }
+        Update: {
+          action?: string
+          approver_id?: string
+          comments?: string | null
+          cpo_id?: string
+          created_at?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_po_approvals_cpo_id_fkey"
+            columns: ["cpo_id"]
+            isOneToOne: false
+            referencedRelation: "customer_purchase_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       customer_po_items: {
         Row: {
           cpo_id: string
@@ -446,8 +481,68 @@ export type Database = {
           },
         ]
       }
+      customer_po_workflow_tracking: {
+        Row: {
+          cpo_id: string
+          created_at: string
+          id: string
+          material_demand_id: string | null
+          notes: string | null
+          po_id: string | null
+          pr_id: string | null
+          stage_completed_at: string | null
+          stage_completed_by: string | null
+          updated_at: string
+          workflow_stage: string
+        }
+        Insert: {
+          cpo_id: string
+          created_at?: string
+          id?: string
+          material_demand_id?: string | null
+          notes?: string | null
+          po_id?: string | null
+          pr_id?: string | null
+          stage_completed_at?: string | null
+          stage_completed_by?: string | null
+          updated_at?: string
+          workflow_stage?: string
+        }
+        Update: {
+          cpo_id?: string
+          created_at?: string
+          id?: string
+          material_demand_id?: string | null
+          notes?: string | null
+          po_id?: string | null
+          pr_id?: string | null
+          stage_completed_at?: string | null
+          stage_completed_by?: string | null
+          updated_at?: string
+          workflow_stage?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_po_workflow_tracking_cpo_id_fkey"
+            columns: ["cpo_id"]
+            isOneToOne: false
+            referencedRelation: "customer_purchase_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_po_workflow_tracking_material_demand_id_fkey"
+            columns: ["material_demand_id"]
+            isOneToOne: false
+            referencedRelation: "material_demand"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       customer_purchase_orders: {
         Row: {
+          approval_comments: string | null
+          approved_by: string | null
+          approved_date: string | null
           company_id: string | null
           cpo_number: string
           created_at: string
@@ -456,12 +551,16 @@ export type Database = {
           delivery_date: string | null
           id: string
           notes: string | null
+          pending_approval: boolean | null
           po_date: string
           status: string
           total_amount: number | null
           updated_at: string
         }
         Insert: {
+          approval_comments?: string | null
+          approved_by?: string | null
+          approved_date?: string | null
           company_id?: string | null
           cpo_number: string
           created_at?: string
@@ -470,12 +569,16 @@ export type Database = {
           delivery_date?: string | null
           id?: string
           notes?: string | null
+          pending_approval?: boolean | null
           po_date?: string
           status?: string
           total_amount?: number | null
           updated_at?: string
         }
         Update: {
+          approval_comments?: string | null
+          approved_by?: string | null
+          approved_date?: string | null
           company_id?: string | null
           cpo_number?: string
           created_at?: string
@@ -484,6 +587,7 @@ export type Database = {
           delivery_date?: string | null
           id?: string
           notes?: string | null
+          pending_approval?: boolean | null
           po_date?: string
           status?: string
           total_amount?: number | null
