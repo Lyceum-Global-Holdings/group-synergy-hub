@@ -73,7 +73,7 @@ export default function CustomerPoDetailsDialog({
           items:customer_po_items(*),
           approvals:customer_po_approvals(
             *,
-            approver_profile:profiles(full_name, email)
+            approver_profile:profiles!customer_po_approvals_approver_id_fkey(full_name, email)
           )
         `)
         .eq('id', cpoId)

@@ -12,7 +12,7 @@ export function useCpoWorkflow(cpoId?: string) {
         .from('customer_po_workflow_tracking')
         .select(`
           *,
-          stage_completed_by_profile:profiles!stage_completed_by(full_name, email)
+          stage_completed_by_profile:profiles!customer_po_workflow_tracking_stage_completed_by_fkey(full_name, email)
         `)
         .eq('cpo_id', cpoId)
         .order('created_at', { ascending: true });
