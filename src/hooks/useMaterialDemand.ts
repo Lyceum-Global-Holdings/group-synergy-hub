@@ -700,7 +700,7 @@ export const useDemandCalculation = (companyId?: string) => {
               console.log(`⚡ Production required: ${requiredProduction} units`);
               
               // Step 3: Calculate BOM material requirements ONLY for the shortfall
-              if (matchedFinishedGood.bill_of_materials?.bom_items) {
+              if (matchedFinishedGood.bill_of_materials?.bom_items && matchedFinishedGood.bill_of_materials.bom_items.length > 0) {
                 console.log('📋 Expanding BOM for shortfall quantity...');
                 
                 for (const bomItem of matchedFinishedGood.bill_of_materials.bom_items) {
@@ -750,6 +750,28 @@ export const useDemandCalculation = (companyId?: string) => {
                     });
                   }
                 }
+              } else {
+                // BOM not found or empty - add entry for production requirement without BOM
+                console.log('⚠️ Production required but no BOM found');
+                
+                analysisResults.push({
+                  item_code: matchedFinishedGood.product_code || 'N/A',
+                  item_name: cpoItem.item_name,
+                  total_required: requiredProduction,
+                  available_stock: availableStock,
+                  on_order: 0,
+                  shortage: requiredProduction,
+                  suggested_order: requiredProduction,
+                  unit_of_measure: 'pcs',
+                  category: 'Production Required (No BOM)',
+                  priority: 'urgent',
+                  lead_time_days: 14,
+                  finished_good_info: {
+                    product_code: matchedFinishedGood.product_code,
+                    product_name: matchedFinishedGood.product_name,
+                    current_stock: matchedFinishedGood.current_stock
+                  }
+                });
               }
             } else {
               console.log('✅ Can be fulfilled from existing finished goods stock');
@@ -799,6 +821,8 @@ export const useDemandCalculation = (companyId?: string) => {
       console.log(`Total analysis results: ${analysisResults.length}`);
       console.log(`Items requiring production: ${analysisResults.filter(r => r.category === 'BOM Material' && r.shortage > 0).length}`);
       console.log(`Items fulfilled from stock: ${analysisResults.filter(r => r.category === 'Fulfilled from Stock').length}`);
+      console.log(`Items needing BOM creation: ${analysisResults.filter(r => r.category === 'Production Required (No BOM)').length}`);
+      console.log(`Unmatched items: ${analysisResults.filter(r => r.category === 'No BOM Found').length}`);
 
       return analysisResults;
     },
