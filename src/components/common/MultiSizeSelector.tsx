@@ -144,7 +144,7 @@ export function MultiSizeSelector({
                   <div className="flex items-center space-x-1">
                     <Checkbox
                       checked={selectedSizes.includes(size.value)}
-                      onChange={() => handleSizeToggle(size.value)}
+                      onCheckedChange={() => handleSizeToggle(size.value)}
                       className="sr-only"
                     />
                     <span className="text-sm font-medium">{size.label}</span>
