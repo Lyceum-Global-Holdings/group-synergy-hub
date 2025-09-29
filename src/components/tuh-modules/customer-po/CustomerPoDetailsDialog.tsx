@@ -64,36 +64,22 @@ export default function CustomerPoDetailsDialog({
   const { data: cpo, isLoading, isError, error: cpoError } = useQuery({
     queryKey: ['customer-purchase-order', cpoId],
     queryFn: async () => {
-      // First get the basic CPO data
-      const { data: cpoData, error: cpoError } = await supabase
+      const { data, error } = await supabase
         .from('customer_purchase_orders')
         .select(`
           *,
           customer:customers(customer_name, customer_code, contact_person, email, phone),
-          items:customer_po_items(*)
+          items:customer_po_items(*),
+          approvals:customer_po_approvals(
+            *,
+            approver_profile:profiles!customer_po_approvals_approver_id_fkey(full_name, email)
+          )
         `)
         .eq('id', cpoId)
         .single();
       
-      if (cpoError) throw cpoError;
-
-      // Then get approvals with profiles
-      const { data: approvals, error: approvalsError } = await supabase
-        .from('customer_po_approvals')
-        .select(`
-          *,
-          approver_profile:profiles!inner(full_name, email)
-        `)
-        .eq('cpo_id', cpoId);
-      
-      if (approvalsError && approvalsError.code !== 'PGRST116') {
-        console.warn('Failed to load approvals:', approvalsError);
-      }
-
-      return {
-        ...cpoData,
-        approvals: approvals || []
-      };
+      if (error) throw error;
+      return data as any; // Type assertion to handle complex joined data
     },
     enabled: !!cpoId,
   });
@@ -380,9 +366,9 @@ export default function CustomerPoDetailsDialog({
                     <p className="text-sm text-muted-foreground">Approved By</p>
                     <div className="flex items-center gap-2">
                       <User className="h-4 w-4" />
-                      <p className="font-medium">
-                        {cpo.approvals?.[0]?.approver_profile?.full_name || 'Admin'}
-                      </p>
+                       <p className="font-medium">
+                         {(cpo.approvals?.[0]?.approver_profile as any)?.full_name || 'Admin'}
+                       </p>
                     </div>
                   </div>
                   <div>
@@ -513,9 +499,9 @@ export default function CustomerPoDetailsDialog({
                             <XCircle className="h-4 w-4 text-red-600 mt-0.5" />
                           )}
                           <div>
-                            <p className="font-medium">
-                              {approval.approver_profile?.full_name || 'Admin'}
-                            </p>
+                             <p className="font-medium">
+                               {(approval.approver_profile as any)?.full_name || 'Admin'}
+                             </p>
                             <p className="text-sm text-muted-foreground">
                               {approval.action.charAt(0).toUpperCase() + approval.action.slice(1)} - {new Date(approval.created_at).toLocaleString()}
                             </p>
