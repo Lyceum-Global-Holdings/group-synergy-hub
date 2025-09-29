@@ -144,10 +144,158 @@ export const useDemandCalculation = (companyId?: string) => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
+  // Caches for multi-level BOM explosion
+  const bomByWarehouseItemIdCache = new Map<string, { bom_id: string; bom_number: string; product_name: string }>();
+  const bomItemsByBomIdCache = new Map<string, any[]>();
+
+  // Helper function to fetch BOM by warehouse item ID
+  const fetchBomByWarehouseItemId = async (warehouseItemId: string) => {
+    if (bomByWarehouseItemIdCache.has(warehouseItemId)) {
+      return bomByWarehouseItemIdCache.get(warehouseItemId);
+    }
+
+    const { data: bomData, error } = await supabase
+      .from('bill_of_materials')
+      .select('id, bom_number, product_name')
+      .eq('warehouse_item_id', warehouseItemId)
+      .single();
+
+    if (!error && bomData) {
+      const bomMeta = {
+        bom_id: bomData.id,
+        bom_number: bomData.bom_number,
+        product_name: bomData.product_name
+      };
+      bomByWarehouseItemIdCache.set(warehouseItemId, bomMeta);
+      return bomMeta;
+    }
+    return null;
+  };
+
+  // Helper function to fetch BOM items
+  const fetchBomItems = async (bomId: string) => {
+    if (bomItemsByBomIdCache.has(bomId)) {
+      return bomItemsByBomIdCache.get(bomId);
+    }
+
+    const { data: bomItems, error } = await supabase
+      .from('bom_items')
+      .select('*')
+      .eq('bom_id', bomId);
+
+    if (!error && bomItems) {
+      bomItemsByBomIdCache.set(bomId, bomItems);
+      return bomItems;
+    }
+    return [];
+  };
+
+  // Recursive function to explode sub-BOMs
+  const explodeSubBom = async (params: {
+    warehouse_item_id: string;
+    requiredQty: number;
+    visitedBomIds: Set<string>;
+    path: string[];
+    warehouseItemsMap: Map<string, any>;
+  }): Promise<DemandAnalysisResult[]> => {
+    const { warehouse_item_id, requiredQty, visitedBomIds, path, warehouseItemsMap } = params;
+    
+    console.log(`🔍 Exploding sub-BOM for warehouse_item_id: ${warehouse_item_id}, required: ${requiredQty}, path: ${path.join(' -> ')}`);
+    
+    const results: DemandAnalysisResult[] = [];
+    
+    // Check if this warehouse item has a BOM
+    const bomMeta = await fetchBomByWarehouseItemId(warehouse_item_id);
+    if (!bomMeta) {
+      console.log(`  ❌ No BOM found for warehouse_item_id: ${warehouse_item_id}`);
+      return results;
+    }
+
+    // Prevent cycles
+    if (visitedBomIds.has(bomMeta.bom_id)) {
+      console.log(`  🔄 Cycle detected, skipping BOM: ${bomMeta.bom_number}`);
+      return results;
+    }
+
+    visitedBomIds.add(bomMeta.bom_id);
+    console.log(`  📋 Found BOM: ${bomMeta.bom_number} for ${bomMeta.product_name}`);
+
+    const bomItems = await fetchBomItems(bomMeta.bom_id);
+    
+    for (const subItem of bomItems) {
+      const consumptionPerUnit = Number(subItem.consumption) || Number(subItem.quantity) || 0;
+      const subRequired = requiredQty * consumptionPerUnit;
+      
+      console.log(`    📦 Sub-item: ${subItem.item_name} (${subItem.item_code}), consumption: ${consumptionPerUnit}, required: ${subRequired}`);
+      
+      const warehouseItem = warehouseItemsMap.get(subItem.item_code);
+      const availableStock = Number(warehouseItem?.current_stock) || 0;
+      const subShortage = Math.max(0, subRequired - availableStock);
+      
+      console.log(`      Stock: ${availableStock}, shortage: ${subShortage}`);
+      
+      // If there's a shortage and this sub-item has its own BOM, recurse
+      if (subShortage > 0 && subItem.warehouse_item_id) {
+        const nestedResults = await explodeSubBom({
+          warehouse_item_id: subItem.warehouse_item_id,
+          requiredQty: subShortage,
+          visitedBomIds: new Set(visitedBomIds),
+          path: [...path, subItem.item_name],
+          warehouseItemsMap
+        });
+        
+        // Merge nested results
+        for (const nestedResult of nestedResults) {
+          const existingIndex = results.findIndex(r => r.item_code === nestedResult.item_code);
+          if (existingIndex >= 0) {
+            results[existingIndex].total_required += nestedResult.total_required;
+            results[existingIndex].shortage = Math.max(0, results[existingIndex].total_required - results[existingIndex].available_stock);
+            results[existingIndex].suggested_order = results[existingIndex].shortage;
+          } else {
+            results.push(nestedResult);
+          }
+        }
+      } else {
+        // Add leaf material requirement
+        const existingIndex = results.findIndex(r => r.item_code === subItem.item_code);
+        if (existingIndex >= 0) {
+          results[existingIndex].total_required += subRequired;
+          results[existingIndex].shortage = Math.max(0, results[existingIndex].total_required - results[existingIndex].available_stock);
+          results[existingIndex].suggested_order = results[existingIndex].shortage;
+        } else {
+          results.push({
+            item_code: subItem.item_code || 'N/A',
+            item_name: subItem.item_name,
+            total_required: subRequired,
+            available_stock: availableStock,
+            on_order: 0, // Sub-level on-order quantities are initially 0
+            shortage: subShortage,
+            suggested_order: subShortage,
+            unit_of_measure: subItem.unit_of_measure,
+            category: 'BOM Material',
+            priority: subShortage > 0 ? 'high' : 'medium',
+            lead_time_days: 7,
+            is_linked_to_bom: true,
+            bom_info: {
+              bom_number: bomMeta.bom_number,
+              product_name: bomMeta.product_name
+            }
+          });
+        }
+      }
+    }
+    
+    visitedBomIds.delete(bomMeta.bom_id);
+    return results;
+  };
+
   const calculateBOMDemandMutation = useMutation({
     mutationFn: async (input: DemandCalculationInput): Promise<DemandAnalysisResult[]> => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User not authenticated');
+
+      console.log('=== Multi-level BOM Demand Calculation Started ===');
+      console.log('Input:', input);
 
       // Get BOM items
       const { data: bomItems, error: bomError } = await supabase
@@ -190,6 +338,14 @@ export const useDemandCalculation = (companyId?: string) => {
         warehouseItems = warehouseData || [];
       }
 
+      // Create warehouse items map for efficient lookup
+      const warehouseItemsMap = new Map();
+      warehouseItems?.forEach(wi => {
+        if (wi.item_code) {
+          warehouseItemsMap.set(wi.item_code, wi);
+        }
+      });
+
       // Get on-order quantities from PO items
       const { data: poItems, error: poError } = await supabase
         .from('po_items')
@@ -213,7 +369,7 @@ export const useDemandCalculation = (companyId?: string) => {
         return acc;
       }, {} as Record<string, any[]>) || {};
 
-      // Calculate demand analysis
+      // Calculate demand analysis with multi-level BOM explosion
       const analysis: DemandAnalysisResult[] = [];
       let matchedItems = 0;
       let unmatchedItems = 0;
@@ -243,6 +399,41 @@ export const useDemandCalculation = (companyId?: string) => {
         const safetyStock = input.include_safety_stock ? (warehouseItem?.min_stock_level || 0) : 0;
         const suggestedOrder = shortage > 0 ? shortage + safetyStock : 0;
 
+        // Check if this component has sub-BOM and shortage exists
+        if (shortage > 0 && bomItem.warehouse_item_id) {
+          console.log(`🔍 Checking for sub-BOM for component: ${bomItem.item_name} (shortage: ${shortage})`);
+          
+          const subBomResults = await explodeSubBom({
+            warehouse_item_id: bomItem.warehouse_item_id,
+            requiredQty: shortage,
+            visitedBomIds: new Set([input.bom_id]),
+            path: [bomItem.item_name],
+            warehouseItemsMap
+          });
+
+          if (subBomResults.length > 0) {
+            console.log(`  ✓ Found sub-BOM materials: ${subBomResults.length} items`);
+            
+            // Merge sub-BOM results into analysis, aggregating by item_code
+            for (const subResult of subBomResults) {
+              const existingIndex = analysis.findIndex(r => r.item_code === subResult.item_code);
+              if (existingIndex >= 0) {
+                analysis[existingIndex].total_required += subResult.total_required;
+                analysis[existingIndex].shortage = Math.max(0, analysis[existingIndex].total_required - analysis[existingIndex].available_stock - analysis[existingIndex].on_order);
+                analysis[existingIndex].suggested_order = analysis[existingIndex].shortage + (input.include_safety_stock ? (warehouseItemsMap.get(subResult.item_code)?.min_stock_level || 0) : 0);
+              } else {
+                analysis.push({
+                  ...subResult,
+                  suggested_order: subResult.shortage + (input.include_safety_stock ? (warehouseItemsMap.get(subResult.item_code)?.min_stock_level || 0) : 0)
+                });
+              }
+            }
+            
+            // Do NOT add the component shortage line (avoid double counting)
+            continue;
+          }
+        }
+
         // Determine priority based on shortage and lead time
         let priority: 'low' | 'medium' | 'high' | 'urgent' = 'medium';
         if (shortage > totalRequired * 0.8) priority = 'urgent';
@@ -260,6 +451,7 @@ export const useDemandCalculation = (companyId?: string) => {
           expected_delivery: item.po?.expected_delivery_date
         }));
 
+        // Add component-level analysis
         analysis.push({
           item_code: bomItem.item_code || '',
           item_name: bomItem.item_name,
@@ -281,7 +473,9 @@ export const useDemandCalculation = (companyId?: string) => {
         });
       }
 
-      console.log(`BOM Demand Calculation: ${matchedItems} matched, ${unmatchedItems} unmatched items`);
+      console.log(`=== Multi-level BOM Demand Calculation Complete ===`);
+      console.log(`${matchedItems} matched, ${unmatchedItems} unmatched items`);
+      console.log(`Analysis results: ${analysis.length} items`);
       return analysis;
     },
     onSuccess: () => {
@@ -755,10 +949,47 @@ export const useDemandCalculation = (companyId?: string) => {
                     const currentMaterialStock = Number(warehouseItem?.current_stock) || 0;
                     const materialShortage = Math.max(0, materialRequired - currentMaterialStock);
                     
+                    console.log(`    📦 Component: ${bomItem.item_name} (${bomItem.item_code})`);
+                    console.log(`      Required: ${materialRequired}, Stock: ${currentMaterialStock}, Shortage: ${materialShortage}`);
+                    
+                    // Check for sub-BOM if there's a shortage and warehouse_item_id exists
+                    if (materialShortage > 0 && bomItem.warehouse_item_id) {
+                      console.log(`      🔍 Checking for sub-BOM...`);
+                      
+                      const subBomResults = await explodeSubBom({
+                        warehouse_item_id: bomItem.warehouse_item_id,
+                        requiredQty: materialShortage,
+                        visitedBomIds: new Set([bomId]),
+                        path: [bomItem.item_name],
+                        warehouseItemsMap
+                      });
+
+                      if (subBomResults.length > 0) {
+                        console.log(`        ✓ Found sub-BOM materials: ${subBomResults.length} items`);
+                        
+                        // Merge sub-BOM results into analysis, aggregating by item_code
+                        for (const subResult of subBomResults) {
+                          let existingResult = analysisResults.find(r => r.item_code === subResult.item_code);
+                          if (existingResult) {
+                            existingResult.total_required += subResult.total_required;
+                            existingResult.available_stock = Math.max(existingResult.available_stock, subResult.available_stock);
+                            existingResult.shortage = Math.max(0, existingResult.total_required - existingResult.available_stock);
+                            existingResult.suggested_order = existingResult.shortage;
+                          } else {
+                            analysisResults.push(subResult);
+                          }
+                        }
+                        
+                        // Do NOT add the component shortage line (avoid double counting)
+                        continue;
+                      }
+                    }
+                    
+                    // Add component-level analysis (leaf material or no sub-BOM)
                     let existingResult = analysisResults.find(r => r.item_code === bomItem.item_code);
+                    
                     if (existingResult) {
                       existingResult.total_required += materialRequired;
-                      existingResult.available_stock = currentMaterialStock;
                       existingResult.shortage = Math.max(0, existingResult.total_required - existingResult.available_stock);
                       existingResult.suggested_order = existingResult.shortage;
                     } else {
