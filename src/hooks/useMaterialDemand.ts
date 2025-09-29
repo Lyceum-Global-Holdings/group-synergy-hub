@@ -622,26 +622,10 @@ export const useDemandCalculation = (companyId?: string) => {
 
       console.log('Fetched customer POs:', customerPOs?.length);
 
-      // Fetch finished goods with their BOMs
+      // Fetch finished goods without nested relations (no FK between finished_goods and bill_of_materials)
       const { data: finishedGoods, error: fgError } = await supabase
         .from('finished_goods')
-        .select(`
-          *,
-          bill_of_materials (
-            id,
-            bom_number,
-            product_name,
-            bom_items (
-              id,
-              item_name,
-              item_code,
-              quantity,
-              unit_of_measure,
-              consumption,
-              warehouse_item_id
-            )
-          )
-        `);
+        .select('*');
 
       if (fgError) {
         console.error('Error fetching finished goods:', fgError);
@@ -661,10 +645,16 @@ export const useDemandCalculation = (companyId?: string) => {
       // Create lookup maps for efficient matching
       const finishedGoodsMap = new Map();
       const warehouseItemsMap = new Map();
+      // Track remaining FG stock across all CPO items during this calculation
+      const remainingFgStock = new Map();
+      // Cache BOM data to avoid repeated network calls
+      const bomItemsCache = new Map();
+      const bomMetaCache = new Map();
       
       finishedGoods?.forEach(fg => {
         if (fg.id) {
           finishedGoodsMap.set(fg.id, fg);
+          remainingFgStock.set(fg.id, Number(fg.current_stock) || 0);
         }
       });
       
@@ -674,8 +664,13 @@ export const useDemandCalculation = (companyId?: string) => {
         }
       });
 
-      // Process each customer purchase order
-      for (const cpo of customerPOs || []) {
+      // Process each customer purchase order in deterministic order (by delivery/PO date)
+      const sortedCPOs = [...(customerPOs || [])].sort((a, b) => {
+        const da = new Date(a.delivery_date || a.po_date || a.created_at);
+        const db = new Date(b.delivery_date || b.po_date || b.created_at);
+        return da.getTime() - db.getTime();
+      });
+      for (const cpo of sortedCPOs) {
         console.log(`\n--- Processing CPO: ${cpo.cpo_number} ---`);
         
         for (const cpoItem of cpo.items || []) {
@@ -687,101 +682,22 @@ export const useDemandCalculation = (companyId?: string) => {
           
           if (matchedFinishedGood) {
             console.log(`✓ Matched with finished good: ${matchedFinishedGood.product_name}`);
-            console.log(`Current FG Stock: ${matchedFinishedGood.current_stock}`);
-            
-            // Step 2: Apply the formula - (CPO Quantity - Available FG Stock)
-            const availableStock = Number(matchedFinishedGood.current_stock) || 0;
+            const fgId = matchedFinishedGood.id;
+            const currentRemaining = Number(remainingFgStock.get(fgId)) || 0;
             const cpoQuantity = Number(cpoItem.quantity_ordered) * (input.multiplier || 1);
-            const requiredProduction = Math.max(0, cpoQuantity - availableStock);
+            const usedFromStock = Math.min(currentRemaining, cpoQuantity);
+            const requiredProduction = Math.max(0, cpoQuantity - usedFromStock);
+            remainingFgStock.set(fgId, currentRemaining - usedFromStock);
             
-            console.log(`Formula: max(0, ${cpoQuantity} - ${availableStock}) = ${requiredProduction}`);
+            console.log(`FG stock consumption -> requested: ${cpoQuantity}, usedFromStock: ${usedFromStock}, remaining: ${remainingFgStock.get(fgId)}, requiredProduction: ${requiredProduction}`);
             
-            if (requiredProduction > 0) {
-              console.log(`⚡ Production required: ${requiredProduction} units`);
-              
-              // Step 3: Calculate BOM material requirements ONLY for the shortfall
-              if (matchedFinishedGood.bill_of_materials?.bom_items && matchedFinishedGood.bill_of_materials.bom_items.length > 0) {
-                console.log('📋 Expanding BOM for shortfall quantity...');
-                
-                for (const bomItem of matchedFinishedGood.bill_of_materials.bom_items) {
-                  const consumptionPerUnit = Number(bomItem.consumption) || Number(bomItem.quantity) || 0;
-                  const materialRequired = requiredProduction * consumptionPerUnit;
-                  
-                  const warehouseItem = warehouseItemsMap.get(bomItem.item_code);
-                  const currentMaterialStock = Number(warehouseItem?.current_stock) || 0;
-                  const materialShortage = Math.max(0, materialRequired - currentMaterialStock);
-                  
-                  console.log(`  📦 ${bomItem.item_name}:`);
-                  console.log(`    Consumption: ${consumptionPerUnit} per unit`);
-                  console.log(`    Required: ${materialRequired} (${requiredProduction} × ${consumptionPerUnit})`);
-                  console.log(`    Stock: ${currentMaterialStock}`);
-                  console.log(`    Shortage: ${materialShortage}`);
-                  
-                  // Find existing result or create new one
-                  let existingResult = analysisResults.find(r => r.item_code === bomItem.item_code);
-                  
-                  if (existingResult) {
-                    existingResult.total_required += materialRequired;
-                    existingResult.shortage = Math.max(0, existingResult.total_required - existingResult.available_stock);
-                    existingResult.suggested_order = existingResult.shortage;
-                  } else {
-                    analysisResults.push({
-                      item_code: bomItem.item_code || 'N/A',
-                      item_name: bomItem.item_name,
-                      total_required: materialRequired,
-                      available_stock: currentMaterialStock,
-                      on_order: 0,
-                      shortage: materialShortage,
-                      suggested_order: materialShortage,
-                      unit_of_measure: bomItem.unit_of_measure,
-                      category: 'BOM Material',
-                      priority: materialShortage > 0 ? 'high' : 'medium',
-                      lead_time_days: 7,
-                      is_linked_to_bom: true,
-                      bom_info: {
-                        bom_number: matchedFinishedGood.bill_of_materials.bom_number,
-                        product_name: matchedFinishedGood.bill_of_materials.product_name
-                      },
-                      finished_good_info: {
-                        product_code: matchedFinishedGood.product_code,
-                        product_name: matchedFinishedGood.product_name,
-                        current_stock: matchedFinishedGood.current_stock
-                      }
-                    });
-                  }
-                }
-              } else {
-                // BOM not found or empty - add entry for production requirement without BOM
-                console.log('⚠️ Production required but no BOM found');
-                
-                analysisResults.push({
-                  item_code: matchedFinishedGood.product_code || 'N/A',
-                  item_name: cpoItem.item_name,
-                  total_required: requiredProduction,
-                  available_stock: availableStock,
-                  on_order: 0,
-                  shortage: requiredProduction,
-                  suggested_order: requiredProduction,
-                  unit_of_measure: 'pcs',
-                  category: 'Production Required (No BOM)',
-                  priority: 'urgent',
-                  lead_time_days: 14,
-                  finished_good_info: {
-                    product_code: matchedFinishedGood.product_code,
-                    product_name: matchedFinishedGood.product_name,
-                    current_stock: matchedFinishedGood.current_stock
-                  }
-                });
-              }
-            } else {
-              console.log('✅ Can be fulfilled from existing finished goods stock');
-              
-              // Add entry for fulfilled from stock
+            // If any part is fulfilled from stock, record it
+            if (usedFromStock > 0) {
               analysisResults.push({
                 item_code: matchedFinishedGood.product_code || 'N/A',
                 item_name: cpoItem.item_name,
-                total_required: cpoQuantity,
-                available_stock: availableStock,
+                total_required: usedFromStock,
+                available_stock: currentRemaining,
                 on_order: 0,
                 shortage: 0,
                 suggested_order: 0,
@@ -792,9 +708,127 @@ export const useDemandCalculation = (companyId?: string) => {
                 finished_good_info: {
                   product_code: matchedFinishedGood.product_code,
                   product_name: matchedFinishedGood.product_name,
-                  current_stock: matchedFinishedGood.current_stock
+                  current_stock: currentRemaining
                 }
               });
+            }
+            
+            if (requiredProduction > 0) {
+              console.log(`⚡ Production required: ${requiredProduction} units`);
+              const bomId = matchedFinishedGood.bom_id;
+              if (bomId) {
+                // Fetch BOM items (with caching)
+                let bomItems = bomItemsCache.get(bomId);
+                if (!bomItems) {
+                  const { data: fetchedBomItems, error: bomErr } = await supabase
+                    .from('bom_items')
+                    .select('id,item_name,item_code,quantity,unit_of_measure,consumption,warehouse_item_id')
+                    .eq('bom_id', bomId);
+                  if (bomErr) {
+                    console.warn('Failed to fetch BOM items for', bomId, bomErr);
+                  }
+                  bomItems = fetchedBomItems || [];
+                  bomItemsCache.set(bomId, bomItems);
+                }
+                
+                // Fetch BOM meta (with caching)
+                let bomMeta = bomMetaCache.get(bomId);
+                if (!bomMeta) {
+                  const { data: bomData, error: bomMetaErr } = await supabase
+                    .from('bill_of_materials')
+                    .select('id,bom_number,product_name')
+                    .eq('id', bomId)
+                    .single();
+                  if (!bomMetaErr && bomData) {
+                    bomMeta = { bom_number: bomData.bom_number, product_name: bomData.product_name };
+                    bomMetaCache.set(bomId, bomMeta);
+                  }
+                }
+                
+                if (bomItems && bomItems.length > 0) {
+                  console.log('📋 Expanding BOM for shortfall quantity...');
+                  for (const bomItem of bomItems) {
+                    const consumptionPerUnit = Number(bomItem.consumption) || Number(bomItem.quantity) || 0;
+                    const materialRequired = requiredProduction * consumptionPerUnit;
+                    
+                    const warehouseItem = warehouseItemsMap.get(bomItem.item_code);
+                    const currentMaterialStock = Number(warehouseItem?.current_stock) || 0;
+                    const materialShortage = Math.max(0, materialRequired - currentMaterialStock);
+                    
+                    let existingResult = analysisResults.find(r => r.item_code === bomItem.item_code);
+                    if (existingResult) {
+                      existingResult.total_required += materialRequired;
+                      existingResult.available_stock = currentMaterialStock;
+                      existingResult.shortage = Math.max(0, existingResult.total_required - existingResult.available_stock);
+                      existingResult.suggested_order = existingResult.shortage;
+                    } else {
+                      analysisResults.push({
+                        item_code: bomItem.item_code || 'N/A',
+                        item_name: bomItem.item_name,
+                        total_required: materialRequired,
+                        available_stock: currentMaterialStock,
+                        on_order: 0,
+                        shortage: materialShortage,
+                        suggested_order: materialShortage,
+                        unit_of_measure: bomItem.unit_of_measure,
+                        category: 'BOM Material',
+                        priority: materialShortage > 0 ? 'high' : 'medium',
+                        lead_time_days: 7,
+                        is_linked_to_bom: true,
+                        bom_info: bomMeta ? {
+                          bom_number: bomMeta.bom_number,
+                          product_name: bomMeta.product_name
+                        } : undefined,
+                        finished_good_info: {
+                          product_code: matchedFinishedGood.product_code,
+                          product_name: matchedFinishedGood.product_name,
+                          current_stock: currentRemaining
+                        }
+                      });
+                    }
+                  }
+                } else {
+                  // No BOM items found
+                  analysisResults.push({
+                    item_code: matchedFinishedGood.product_code || 'N/A',
+                    item_name: cpoItem.item_name,
+                    total_required: requiredProduction,
+                    available_stock: currentRemaining,
+                    on_order: 0,
+                    shortage: requiredProduction,
+                    suggested_order: requiredProduction,
+                    unit_of_measure: 'pcs',
+                    category: 'Production Required (No BOM)',
+                    priority: 'urgent',
+                    lead_time_days: 14,
+                    finished_good_info: {
+                      product_code: matchedFinishedGood.product_code,
+                      product_name: matchedFinishedGood.product_name,
+                      current_stock: currentRemaining
+                    }
+                  });
+                }
+              } else {
+                // No BOM ID associated
+                analysisResults.push({
+                  item_code: matchedFinishedGood.product_code || 'N/A',
+                  item_name: cpoItem.item_name,
+                  total_required: requiredProduction,
+                  available_stock: currentRemaining,
+                  on_order: 0,
+                  shortage: requiredProduction,
+                  suggested_order: requiredProduction,
+                  unit_of_measure: 'pcs',
+                  category: 'Production Required (No BOM)',
+                  priority: 'urgent',
+                  lead_time_days: 14,
+                  finished_good_info: {
+                    product_code: matchedFinishedGood.product_code,
+                    product_name: matchedFinishedGood.product_name,
+                    current_stock: currentRemaining
+                  }
+                });
+              }
             }
           } else {
             console.log('❌ No finished good found for CPO item');
