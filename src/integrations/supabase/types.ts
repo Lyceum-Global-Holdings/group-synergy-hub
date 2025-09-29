@@ -413,6 +413,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "customer_po_approvals_approver_id_fkey"
+            columns: ["approver_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
             foreignKeyName: "customer_po_approvals_cpo_id_fkey"
             columns: ["cpo_id"]
             isOneToOne: false

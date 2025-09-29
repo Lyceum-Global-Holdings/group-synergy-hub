@@ -72,7 +72,7 @@ export default function CustomerPoDetailsDialog({
           items:customer_po_items(*),
           approvals:customer_po_approvals(
             *,
-            approver_profile:profiles!customer_po_approvals_approver_id_fkey(full_name, email)
+            approver_profile:profiles(full_name, email)
           )
         `)
         .eq('id', cpoId)
@@ -367,7 +367,7 @@ export default function CustomerPoDetailsDialog({
                     <div className="flex items-center gap-2">
                       <User className="h-4 w-4" />
                        <p className="font-medium">
-                         {(cpo.approvals?.[0]?.approver_profile as any)?.full_name || 'Admin'}
+                         {cpo.approvals?.[0]?.approver_profile?.full_name || 'Admin'}
                        </p>
                     </div>
                   </div>
@@ -500,7 +500,7 @@ export default function CustomerPoDetailsDialog({
                           )}
                           <div>
                              <p className="font-medium">
-                               {(approval.approver_profile as any)?.full_name || 'Admin'}
+                               {approval.approver_profile?.full_name || 'Admin'}
                              </p>
                             <p className="text-sm text-muted-foreground">
                               {approval.action.charAt(0).toUpperCase() + approval.action.slice(1)} - {new Date(approval.created_at).toLocaleString()}
