@@ -77,6 +77,7 @@ export interface CustomerPoItem {
 export interface CreateCustomerPoData {
   customer_id: string;
   company_id?: string;
+  cpo_number?: string;
   po_date?: string;
   delivery_date?: string;
   notes?: string;

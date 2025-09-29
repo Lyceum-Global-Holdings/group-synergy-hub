@@ -37,6 +37,7 @@ export function useCustomerPurchaseOrders(companyId?: string) {
       const insertData = {
         customer_id: poData.customer_id,
         company_id: poData.company_id,
+        cpo_number: poData.cpo_number || undefined, // Let trigger generate if not provided
         po_date: poData.po_date || new Date().toISOString().split('T')[0],
         delivery_date: poData.delivery_date,
         notes: poData.notes,

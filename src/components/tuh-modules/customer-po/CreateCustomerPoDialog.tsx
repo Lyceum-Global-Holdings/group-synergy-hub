@@ -40,6 +40,7 @@ import { FinishedGood } from "@/hooks/useFinishedGoods";
 const createCpoSchema = z.object({
   customer_id: z.string().min(1, "Customer is required"),
   company_id: z.string().optional(),
+  cpo_number: z.string().optional(),
   po_date: z.string().optional(),
   delivery_date: z.string().optional(),
   notes: z.string().optional(),
@@ -68,12 +69,14 @@ export default function CreateCustomerPoDialog({
   const { selectedCompany, isViewingAllCompanies, companies } = useCompany();
   const { customers } = useCustomers();
   const { createCustomerPO } = useCustomerPurchaseOrders();
+  const [manualCpoNumber, setManualCpoNumber] = useState(false);
 
   const form = useForm<CreateCpoFormData>({
     resolver: zodResolver(createCpoSchema),
     defaultValues: {
       customer_id: "",
       company_id: selectedCompany?.id || "",
+      cpo_number: "",
       po_date: new Date().toISOString().split('T')[0],
       items: [
         {
@@ -133,6 +136,7 @@ export default function CreateCustomerPoDialog({
       const cleanedData: CreateCustomerPoData = {
         customer_id: data.customer_id,
         company_id: data.company_id || null,
+        cpo_number: manualCpoNumber ? data.cpo_number : undefined,
         po_date: data.po_date,
         delivery_date: data.delivery_date,
         notes: data.notes,
@@ -149,6 +153,7 @@ export default function CreateCustomerPoDialog({
       
       await createCustomerPO.mutateAsync(cleanedData);
       form.reset();
+      setManualCpoNumber(false);
       onOpenChange(false);
     } catch (error) {
       console.error('Failed to create customer PO:', error);
@@ -169,6 +174,83 @@ export default function CreateCustomerPoDialog({
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+            {/* Company and CPO Number Header */}
+            <div className="bg-muted/50 p-4 rounded-lg border">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Company Information */}
+                {!isViewingAllCompanies ? (
+                  <div>
+                    <Label className="text-sm font-medium text-muted-foreground">Company</Label>
+                    <div className="text-lg font-semibold">{selectedCompany?.name}</div>
+                    <div className="text-sm text-muted-foreground">Code: {selectedCompany?.code}</div>
+                  </div>
+                ) : (
+                  <FormField
+                    control={form.control}
+                    name="company_id"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Company</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select company" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {companies.map((company) => (
+                              <SelectItem key={company.id} value={company.id}>
+                                {company.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
+
+                {/* CPO Number */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-sm font-medium">CPO Number</Label>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setManualCpoNumber(!manualCpoNumber)}
+                      className="h-auto p-1 text-xs"
+                    >
+                      {manualCpoNumber ? "Auto-generate" : "Manual entry"}
+                    </Button>
+                  </div>
+                  {manualCpoNumber ? (
+                    <FormField
+                      control={form.control}
+                      name="cpo_number"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormControl>
+                            <Input 
+                              {...field} 
+                              placeholder="Enter CPO number"
+                              className="font-mono"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  ) : (
+                    <div className="bg-background p-2 rounded border font-mono text-sm text-muted-foreground">
+                      Will be auto-generated (CPO-YYYYMMDD-XXX)
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <FormField
                 control={form.control}
@@ -194,33 +276,6 @@ export default function CreateCustomerPoDialog({
                   </FormItem>
                 )}
               />
-
-              {isViewingAllCompanies && (
-                <FormField
-                  control={form.control}
-                  name="company_id"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Company</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select company" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {companies.map((company) => (
-                            <SelectItem key={company.id} value={company.id}>
-                              {company.name} ({company.code})
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              )}
 
               <FormField
                 control={form.control}
