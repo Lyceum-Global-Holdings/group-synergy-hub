@@ -8,16 +8,17 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Calendar, Calculator, FileText, AlertTriangle, CheckCircle, Clock, TrendingUp, Package, Box, ShoppingCart } from 'lucide-react';
+import { Calendar, Calculator, FileText, AlertTriangle, CheckCircle, Clock, TrendingUp, Package, Box, ShoppingCart, Truck } from 'lucide-react';
 import { useMaterialDemand, useDemandCalculation } from '@/hooks/useMaterialDemand';
 import { useBillOfMaterials } from '@/hooks/useBillOfMaterials';
 import { useCustomerPurchaseOrders } from '@/hooks/useCustomerPurchaseOrders';
 import { usePurchaseRequisitions, useCreatePurchaseRequisition } from '@/hooks/usePurchaseRequisitions';
 import { useCompany } from '@/contexts/CompanyContext';
 import { format } from 'date-fns';
-import { DemandPriority, DemandSource } from '@/types/materialDemand';
+import { DemandPriority, DemandSource, DemandAnalysisResult } from '@/types/materialDemand';
 import { useToast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
+import { CreateDispatchNoteDialog } from '@/components/warehouse/CreateDispatchNoteDialog';
 
 const MaterialDemandPlanning = () => {
   const { selectedCompany } = useCompany();
@@ -39,6 +40,10 @@ const MaterialDemandPlanning = () => {
   );
   const [multiplier, setMultiplier] = useState<string>('1');
   const [analysisDate, setAnalysisDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
+  
+  // Dialog states
+  const [dispatchDialogOpen, setDispatchDialogOpen] = useState(false);
+  const [selectedDispatchItem, setSelectedDispatchItem] = useState<DemandAnalysisResult | null>(null);
 
   // Filter confirmed CPOs for CPO-based demand calculation
   const confirmedCPOs = customerPOs?.filter(cpo => cpo.status === 'confirmed') || [];
@@ -183,6 +188,61 @@ const MaterialDemandPlanning = () => {
   const bomMaterialsWithShortage = calculationResult?.filter(
     item => item.category === 'BOM Material' && item.shortage > 0
   ) || [];
+
+  // Individual PR generation for single item
+  const handleGenerateIndividualPR = (item: DemandAnalysisResult) => {
+    if (item.shortage <= 0) return;
+
+    const selectedBom = boms?.find(bom => bom.id === selectedBomId);
+    const prTitle = `Material Requisition - ${item.item_name}`;
+    const prDescription = `Individual material requisition for ${item.item_name} from Material Demand Planning.`;
+
+    const prData = {
+      title: prTitle,
+      description: prDescription,
+      department: 'Production',
+      priority: item.priority,
+      required_date: demandSource === 'bom' ? productionDate : analysisDate,
+      justification: `Individual material requisition. Required: ${item.total_required}, Available: ${item.available_stock}, Shortage: ${item.shortage}`,
+      bom_id: demandSource === 'bom' && selectedBomId ? selectedBomId : undefined,
+      company_id: selectedCompany?.id,
+      items: [{
+        warehouse_item_id: undefined,
+        finished_good_id: undefined,
+        item_code: item.item_code,
+        item_name: item.item_name,
+        description: item.bom_info ? `BOM: ${item.bom_info.bom_number} - ${item.bom_info.product_name}` : '',
+        quantity: item.suggested_order,
+        unit_of_measure: item.unit_of_measure,
+        estimated_unit_price: item.supplier_info?.last_unit_cost || 0,
+        estimated_total_price: item.suggested_order * (item.supplier_info?.last_unit_cost || 0),
+        specifications: `Required: ${item.total_required}, Available: ${item.available_stock}, Shortage: ${item.shortage}`,
+        notes: `Lead time: ${item.lead_time_days} days. Priority: ${item.priority}.`,
+      }],
+    };
+
+    createPrMutation.mutate(prData, {
+      onSuccess: (data) => {
+        toast({
+          title: "Purchase Requisition Created",
+          description: `PR ${data.pr_number} created for ${item.item_name}.`,
+        });
+      },
+      onError: (error) => {
+        toast({
+          title: "Error creating PR",
+          description: error.message || "Failed to create purchase requisition.",
+          variant: "destructive",
+        });
+      },
+    });
+  };
+
+  // Handle dispatch note creation
+  const handleCreateDispatchNote = (item: DemandAnalysisResult) => {
+    setSelectedDispatchItem(item);
+    setDispatchDialogOpen(true);
+  };
 
   return (
     <div className="space-y-6">
@@ -445,7 +505,7 @@ const MaterialDemandPlanning = () => {
                     </div>
                   </div>
                   <Table>
-                    <TableHeader>
+                     <TableHeader>
                        <TableRow>
                          <TableHead>Status</TableHead>
                          <TableHead>Item Code</TableHead>
@@ -458,9 +518,10 @@ const MaterialDemandPlanning = () => {
                          <TableHead>Shortage</TableHead>
                          <TableHead>Suggested Order</TableHead>
                          <TableHead>Priority</TableHead>
+                         <TableHead>Actions</TableHead>
                        </TableRow>
-                    </TableHeader>
-                    <TableBody>
+                     </TableHeader>
+                     <TableBody>
                        {calculationResult.map((item, index) => (
                          <TableRow key={index}>
                            <TableCell>{getStatusIcon(item.shortage)}</TableCell>
@@ -516,6 +577,31 @@ const MaterialDemandPlanning = () => {
                              <Badge variant={getPriorityColor(item.priority)}>
                                {item.priority}
                              </Badge>
+                           </TableCell>
+                           <TableCell>
+                             <div className="flex gap-2">
+                               {item.category === 'BOM Material' && item.shortage > 0 && (
+                                 <Button
+                                   size="sm"
+                                   variant="default"
+                                   onClick={() => handleGenerateIndividualPR(item)}
+                                   disabled={createPrMutation.isPending}
+                                 >
+                                   <FileText className="h-3 w-3 mr-1" />
+                                   Generate PR
+                                 </Button>
+                               )}
+                               {item.category === 'Fulfilled from Stock' && item.finished_good_info && (
+                                 <Button
+                                   size="sm"
+                                   variant="secondary"
+                                   onClick={() => handleCreateDispatchNote(item)}
+                                 >
+                                   <Truck className="h-3 w-3 mr-1" />
+                                   Create Dispatch
+                                 </Button>
+                               )}
+                             </div>
                            </TableCell>
                          </TableRow>
                        ))}
@@ -665,6 +751,17 @@ const MaterialDemandPlanning = () => {
           </Card>
         </TabsContent>
       </Tabs>
+    </div>
+  );
+};
+
+      {selectedDispatchItem && (
+        <CreateDispatchNoteDialog
+          open={dispatchDialogOpen}
+          onOpenChange={setDispatchDialogOpen}
+          item={selectedDispatchItem}
+        />
+      )}
     </div>
   );
 };
