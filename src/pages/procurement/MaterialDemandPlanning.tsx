@@ -751,9 +751,6 @@ const MaterialDemandPlanning = () => {
           </Card>
         </TabsContent>
       </Tabs>
-    </div>
-  );
-};
 
       {selectedDispatchItem && (
         <CreateDispatchNoteDialog
