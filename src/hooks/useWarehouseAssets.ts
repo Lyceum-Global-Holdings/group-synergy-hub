@@ -139,6 +139,40 @@ export const useWarehouseAssets = () => {
     }
   });
 
+  const updateBulkAssetsMutation = useMutation({
+    mutationFn: async ({ 
+      assetIds, 
+      updateData 
+    }: { 
+      assetIds: string[], 
+      updateData: Partial<WarehouseAsset> 
+    }) => {
+      const { data, error } = await supabase
+        .from('warehouse_assets')
+        .update(updateData)
+        .in('id', assetIds)
+        .select();
+      
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['warehouse-assets'] });
+      toast({
+        title: "Success",
+        description: `Successfully updated ${data.length} asset${data.length > 1 ? 's' : ''}`,
+      });
+    },
+    onError: (error) => {
+      console.error('Error updating assets:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update assets",
+        variant: "destructive",
+      });
+    }
+  });
+
   const createBulkAssetsMutation = useMutation({
     mutationFn: async (assetsData: CreateWarehouseAssetData[]) => {
       const { data: { user } } = await supabase.auth.getUser();
@@ -182,11 +216,13 @@ export const useWarehouseAssets = () => {
     updateAsset: updateAssetMutation.mutate,
     deleteAsset: deleteAssetMutation.mutate,
     deleteBulkAssets: deleteBulkAssetsMutation.mutate,
+    updateBulkAssets: updateBulkAssetsMutation.mutate,
     createBulkAssets: createBulkAssetsMutation.mutate,
     isCreating: createAssetMutation.isPending,
     isUpdating: updateAssetMutation.isPending,
     isDeleting: deleteAssetMutation.isPending,
     isDeletingBulk: deleteBulkAssetsMutation.isPending,
+    isUpdatingBulk: updateBulkAssetsMutation.isPending,
     isCreatingBulk: createBulkAssetsMutation.isPending,
   };
 };

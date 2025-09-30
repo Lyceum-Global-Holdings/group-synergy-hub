@@ -56,6 +56,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { WarehouseAsset, WarehouseLocation, AssetCategory, CreateWarehouseAssetData, CreateWarehouseLocationData } from "@/types/warehouse";
 import { AssetAnalytics } from "@/components/warehouse/AssetAnalytics";
+import { BulkAssetUpdateDialog } from "@/components/warehouse/BulkAssetUpdateDialog";
 
 const assetFormSchema = z.object({
   name: z.string().min(1, "Asset name is required"),
@@ -111,6 +112,7 @@ export default function AssetManagement() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedAssetIds, setSelectedAssetIds] = useState<Set<string>>(new Set());
   const [bulkDeleteConfirmOpen, setBulkDeleteConfirmOpen] = useState(false);
+  const [isBulkUpdateOpen, setIsBulkUpdateOpen] = useState(false);
   
   const [isBulkImportOpen, setIsBulkImportOpen] = useState(false);
   const [isCategoryManagementOpen, setIsCategoryManagementOpen] = useState(false);
@@ -134,11 +136,13 @@ export default function AssetManagement() {
     updateAsset,
     deleteAsset,
     deleteBulkAssets,
+    updateBulkAssets,
     isCreating: isCreatingAsset,
     isCreatingBulk,
     isUpdating,
     isDeleting,
-    isDeletingBulk
+    isDeletingBulk,
+    isUpdatingBulk
   } = useWarehouseAssets();
 
   const { 
@@ -238,6 +242,12 @@ export default function AssetManagement() {
   };
 
   const clearSelection = () => {
+    setSelectedAssetIds(new Set());
+  };
+
+  const handleBulkUpdate = (updateData: Partial<WarehouseAsset>) => {
+    const assetIdsArray = Array.from(selectedAssetIds);
+    updateBulkAssets({ assetIds: assetIdsArray, updateData });
     setSelectedAssetIds(new Set());
   };
 
@@ -782,6 +792,14 @@ export default function AssetManagement() {
                   {selectedAssetIds.size} asset{selectedAssetIds.size > 1 ? 's' : ''} selected
                 </span>
                 <Button
+                  size="sm"
+                  onClick={() => setIsBulkUpdateOpen(true)}
+                  disabled={isUpdatingBulk}
+                >
+                  <Edit className="h-4 w-4 mr-1" />
+                  Update Selected
+                </Button>
+                <Button
                   variant="destructive"
                   size="sm"
                   onClick={() => setBulkDeleteConfirmOpen(true)}
@@ -1020,6 +1038,16 @@ export default function AssetManagement() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <BulkAssetUpdateDialog
+        open={isBulkUpdateOpen}
+        onOpenChange={setIsBulkUpdateOpen}
+        selectedAssetIds={selectedAssetIds}
+        locations={locations}
+        getLocationsByType={getLocationsByType}
+        onUpdate={handleBulkUpdate}
+        isUpdating={isUpdatingBulk}
+      />
     </div>
   );
 }
