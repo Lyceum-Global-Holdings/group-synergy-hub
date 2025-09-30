@@ -12,10 +12,12 @@ import { Calendar, Calculator, FileText, AlertTriangle, CheckCircle, Clock, Tren
 import { useMaterialDemand, useDemandCalculation } from '@/hooks/useMaterialDemand';
 import { useBillOfMaterials } from '@/hooks/useBillOfMaterials';
 import { useCustomerPurchaseOrders } from '@/hooks/useCustomerPurchaseOrders';
-import { usePurchaseRequisitions } from '@/hooks/usePurchaseRequisitions';
+import { usePurchaseRequisitions, useCreatePurchaseRequisition } from '@/hooks/usePurchaseRequisitions';
 import { useCompany } from '@/contexts/CompanyContext';
 import { format } from 'date-fns';
 import { DemandPriority, DemandSource } from '@/types/materialDemand';
+import { useToast } from '@/hooks/use-toast';
+import { useNavigate } from 'react-router-dom';
 
 const MaterialDemandPlanning = () => {
   const { selectedCompany } = useCompany();
@@ -24,6 +26,9 @@ const MaterialDemandPlanning = () => {
   const { customerPOs } = useCustomerPurchaseOrders(selectedCompany?.id);
   const { data: purchaseRequisitions } = usePurchaseRequisitions();
   const { calculateBOMDemand, calculateCPODemand, calculationResult, isCalculating } = useDemandCalculation(selectedCompany?.id);
+  const createPrMutation = useCreatePurchaseRequisition();
+  const { toast } = useToast();
+  const navigate = useNavigate();
   
   const [demandSource, setDemandSource] = useState<DemandSource>('bom');
   const [selectedBomId, setSelectedBomId] = useState<string>('');
@@ -95,6 +100,89 @@ const MaterialDemandPlanning = () => {
       return ['confirmed', 'in_production'].includes(cpo.status);
     });
   };
+
+  // Generate PR from BOM materials with shortage
+  const handleGeneratePR = () => {
+    if (!calculationResult || calculationResult.length === 0) return;
+
+    // Filter BOM materials with shortage
+    const bomMaterialsWithShortage = calculationResult.filter(
+      item => item.category === 'BOM Material' && item.shortage > 0
+    );
+
+    if (bomMaterialsWithShortage.length === 0) {
+      toast({
+        title: "No items to requisition",
+        description: "All BOM materials are sufficiently stocked.",
+        variant: "default",
+      });
+      return;
+    }
+
+    // Determine highest priority
+    const priorities: DemandPriority[] = ['urgent', 'high', 'medium', 'low'];
+    const highestPriority = priorities.find(p => 
+      bomMaterialsWithShortage.some(item => item.priority === p)
+    ) || 'medium';
+
+    // Prepare PR title and description
+    const selectedBom = boms?.find(bom => bom.id === selectedBomId);
+    const prTitle = demandSource === 'bom' && selectedBom
+      ? `Material Requisition for BOM ${selectedBom.bom_number}`
+      : `Material Requisition for CPO Analysis ${format(new Date(), 'MMM dd, yyyy')}`;
+    
+    const prDescription = `Auto-generated from Material Demand Planning. ${bomMaterialsWithShortage.length} BOM materials with shortage. Total required materials: ${calculationResult.length}.`;
+
+    // Map to PR items format
+    const prItems = bomMaterialsWithShortage.map(item => ({
+      warehouse_item_id: undefined,
+      finished_good_id: undefined,
+      item_code: item.item_code,
+      item_name: item.item_name,
+      description: item.bom_info ? `BOM: ${item.bom_info.bom_number} - ${item.bom_info.product_name}` : '',
+      quantity: item.suggested_order,
+      unit_of_measure: item.unit_of_measure,
+      estimated_unit_price: item.supplier_info?.last_unit_cost || 0,
+      estimated_total_price: item.suggested_order * (item.supplier_info?.last_unit_cost || 0),
+      specifications: `Required: ${item.total_required}, Available: ${item.available_stock}, Shortage: ${item.shortage}`,
+      notes: `Lead time: ${item.lead_time_days} days. Priority: ${item.priority}.`,
+    }));
+
+    // Create PR data
+    const prData = {
+      title: prTitle,
+      description: prDescription,
+      department: 'Production',
+      priority: highestPriority,
+      required_date: demandSource === 'bom' ? productionDate : analysisDate,
+      justification: 'Auto-generated from Material Demand Planning calculation to fulfill material shortages.',
+      bom_id: demandSource === 'bom' && selectedBomId ? selectedBomId : undefined,
+      company_id: selectedCompany?.id,
+      items: prItems,
+    };
+
+    createPrMutation.mutate(prData, {
+      onSuccess: (data) => {
+        toast({
+          title: "Purchase Requisition Created",
+          description: `PR ${data.pr_number} has been created with ${prItems.length} items.`,
+        });
+        // Optionally navigate to PR page
+        // navigate('/procurement/purchase-requisition');
+      },
+      onError: (error) => {
+        toast({
+          title: "Error creating PR",
+          description: error.message || "Failed to create purchase requisition.",
+          variant: "destructive",
+        });
+      },
+    });
+  };
+
+  const bomMaterialsWithShortage = calculationResult?.filter(
+    item => item.category === 'BOM Material' && item.shortage > 0
+  ) || [];
 
   return (
     <div className="space-y-6">
@@ -314,11 +402,32 @@ const MaterialDemandPlanning = () => {
           {calculationResult && calculationResult.length > 0 && (
             <div className="space-y-6">
               <Card>
-                <CardHeader>
-                  <CardTitle>Material Demand Analysis Results</CardTitle>
-                  <CardDescription>
-                    Material requirements based on your production parameters
-                  </CardDescription>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-6">
+                  <div className="space-y-1">
+                    <CardTitle>Material Demand Analysis Results</CardTitle>
+                    <CardDescription>
+                      Material requirements based on your production parameters
+                    </CardDescription>
+                  </div>
+                  {bomMaterialsWithShortage.length > 0 && (
+                    <Button 
+                      onClick={handleGeneratePR} 
+                      disabled={createPrMutation.isPending}
+                      variant="default"
+                    >
+                      {createPrMutation.isPending ? (
+                        <>
+                          <Clock className="h-4 w-4 mr-2 animate-spin" />
+                          Creating PR...
+                        </>
+                      ) : (
+                        <>
+                          <FileText className="h-4 w-4 mr-2" />
+                          Generate PR ({bomMaterialsWithShortage.length} items)
+                        </>
+                      )}
+                    </Button>
+                  )}
                 </CardHeader>
                 <CardContent>
                   {/* Stock matching feedback */}
