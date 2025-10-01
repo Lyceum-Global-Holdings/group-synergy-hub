@@ -19,6 +19,7 @@ import { DemandPriority, DemandSource, DemandAnalysisResult } from '@/types/mate
 import { useToast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
 import { CreateDispatchNoteDialog } from '@/components/warehouse/CreateDispatchNoteDialog';
+import { CreatePrFromDemandDialog } from '@/components/procurement/CreatePrFromDemandDialog';
 
 const MaterialDemandPlanning = () => {
   const { selectedCompany } = useCompany();
@@ -44,6 +45,8 @@ const MaterialDemandPlanning = () => {
   // Dialog states
   const [dispatchDialogOpen, setDispatchDialogOpen] = useState(false);
   const [selectedDispatchItem, setSelectedDispatchItem] = useState<DemandAnalysisResult | null>(null);
+  const [prAdjustmentDialogOpen, setPrAdjustmentDialogOpen] = useState(false);
+  const [selectedPrItem, setSelectedPrItem] = useState<DemandAnalysisResult | null>(null);
 
   // Filter confirmed CPOs for CPO-based demand calculation
   const confirmedCPOs = customerPOs?.filter(cpo => cpo.status === 'confirmed') || [];
@@ -189,21 +192,37 @@ const MaterialDemandPlanning = () => {
     item => item.category === 'BOM Material' && item.shortage > 0
   ) || [];
 
-  // Individual PR generation for single item
-  const handleGenerateIndividualPR = (item: DemandAnalysisResult) => {
-    if (item.shortage <= 0) return;
+  // Open PR adjustment dialog
+  const handleOpenPrAdjustment = (item: DemandAnalysisResult) => {
+    setSelectedPrItem(item);
+    setPrAdjustmentDialogOpen(true);
+  };
 
-    const selectedBom = boms?.find(bom => bom.id === selectedBomId);
+  // Individual PR generation for single item with adjusted parameters
+  const handleGenerateIndividualPR = (
+    item: DemandAnalysisResult,
+    adjustedQuantity: number,
+    adjustedUnitPrice: number,
+    adjustedPriority: DemandPriority,
+    additionalNotes: string
+  ) => {
+    if (adjustedQuantity <= 0) return;
+
     const prTitle = `Material Requisition - ${item.item_name}`;
     const prDescription = `Individual material requisition for ${item.item_name} from Material Demand Planning.`;
+    
+    const baseJustification = `Material requisition. Required: ${item.total_required}, Available: ${item.available_stock}, Shortage: ${item.shortage}. Ordered quantity: ${adjustedQuantity}`;
+    const fullJustification = additionalNotes 
+      ? `${baseJustification}\n\nAdditional notes: ${additionalNotes}`
+      : baseJustification;
 
     const prData = {
       title: prTitle,
       description: prDescription,
       department: 'Production',
-      priority: item.priority,
+      priority: adjustedPriority,
       required_date: demandSource === 'bom' ? productionDate : analysisDate,
-      justification: `Individual material requisition. Required: ${item.total_required}, Available: ${item.available_stock}, Shortage: ${item.shortage}`,
+      justification: fullJustification,
       bom_id: demandSource === 'bom' && selectedBomId ? selectedBomId : undefined,
       company_id: selectedCompany?.id,
       items: [{
@@ -212,12 +231,12 @@ const MaterialDemandPlanning = () => {
         item_code: item.item_code,
         item_name: item.item_name,
         description: item.bom_info ? `BOM: ${item.bom_info.bom_number} - ${item.bom_info.product_name}` : '',
-        quantity: item.suggested_order,
+        quantity: adjustedQuantity,
         unit_of_measure: item.unit_of_measure,
-        estimated_unit_price: item.supplier_info?.last_unit_cost || 0,
-        estimated_total_price: item.suggested_order * (item.supplier_info?.last_unit_cost || 0),
+        estimated_unit_price: adjustedUnitPrice,
+        estimated_total_price: adjustedQuantity * adjustedUnitPrice,
         specifications: `Required: ${item.total_required}, Available: ${item.available_stock}, Shortage: ${item.shortage}`,
-        notes: `Lead time: ${item.lead_time_days} days. Priority: ${item.priority}.`,
+        notes: `Lead time: ${item.lead_time_days} days. Priority: ${adjustedPriority}.`,
       }],
     };
 
@@ -580,17 +599,17 @@ const MaterialDemandPlanning = () => {
                            </TableCell>
                            <TableCell>
                              <div className="flex gap-2">
-                               {item.category === 'BOM Material' && item.shortage > 0 && (
-                                 <Button
-                                   size="sm"
-                                   variant="default"
-                                   onClick={() => handleGenerateIndividualPR(item)}
-                                   disabled={createPrMutation.isPending}
-                                 >
-                                   <FileText className="h-3 w-3 mr-1" />
-                                   Generate PR
-                                 </Button>
-                               )}
+                                {item.category === 'BOM Material' && item.shortage > 0 && (
+                                  <Button
+                                    size="sm"
+                                    variant="default"
+                                    onClick={() => handleOpenPrAdjustment(item)}
+                                    disabled={createPrMutation.isPending}
+                                  >
+                                    <FileText className="h-3 w-3 mr-1" />
+                                    Generate PR...
+                                  </Button>
+                                )}
                                {item.category === 'Fulfilled from Stock' && item.finished_good_info && (
                                  <Button
                                    size="sm"
@@ -757,6 +776,17 @@ const MaterialDemandPlanning = () => {
           open={dispatchDialogOpen}
           onOpenChange={setDispatchDialogOpen}
           item={selectedDispatchItem}
+        />
+      )}
+
+      {selectedPrItem && (
+        <CreatePrFromDemandDialog
+          item={selectedPrItem}
+          open={prAdjustmentDialogOpen}
+          onOpenChange={setPrAdjustmentDialogOpen}
+          onConfirm={(adjustedQuantity, adjustedUnitPrice, priority, notes) => 
+            handleGenerateIndividualPR(selectedPrItem, adjustedQuantity, adjustedUnitPrice, priority, notes)
+          }
         />
       )}
     </div>
