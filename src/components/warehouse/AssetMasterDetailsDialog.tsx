@@ -126,13 +126,13 @@ export function AssetMasterDetailsDialog({ asset, open, onOpenChange }: AssetMas
                   <div>
                     <p className="text-sm text-muted-foreground">Current Purchase Price</p>
                     <p className="text-xl font-bold">
-                      {asset.purchase_price ? `$${asset.purchase_price.toFixed(2)}` : 'N/A'}
+                      {asset.purchase_price ? `LKR ${asset.purchase_price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'N/A'}
                     </p>
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">Current Value</p>
                     <p className="text-xl font-bold">
-                      {asset.current_value ? `$${asset.current_value.toFixed(2)}` : 'N/A'}
+                      {asset.current_value ? `LKR ${asset.current_value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'N/A'}
                     </p>
                   </div>
                 </div>
@@ -172,7 +172,7 @@ export function AssetMasterDetailsDialog({ asset, open, onOpenChange }: AssetMas
                       purchaseHistory.map((history) => (
                         <TableRow key={history.id}>
                           <TableCell>{format(new Date(history.purchase_date), 'MMM dd, yyyy')}</TableCell>
-                          <TableCell className="font-medium">${history.purchase_price.toFixed(2)}</TableCell>
+                          <TableCell className="font-medium">LKR {history.purchase_price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
                           <TableCell>{history.vendor || 'N/A'}</TableCell>
                           <TableCell>{history.quantity_purchased || 'N/A'}</TableCell>
                           <TableCell>{history.notes || '-'}</TableCell>

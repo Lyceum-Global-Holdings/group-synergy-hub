@@ -408,7 +408,7 @@ export default function AssetManagement() {
                         <p className="font-medium">{selectedAssetMaster.asset_name}</p>
                         <p className="text-sm text-muted-foreground">
                           {selectedAssetMaster.brand && `${selectedAssetMaster.brand} • `}
-                          {selectedAssetMaster.purchase_price && `$${selectedAssetMaster.purchase_price}`}
+                          {selectedAssetMaster.purchase_price && `LKR ${selectedAssetMaster.purchase_price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
                         </p>
                         <p className="text-xs text-muted-foreground mt-1">
                           ✓ Form fields auto-filled from Asset Master

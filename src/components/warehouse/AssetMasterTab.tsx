@@ -151,10 +151,10 @@ export function AssetMasterTab() {
                   <TableCell>{asset.brand || 'N/A'}</TableCell>
                   <TableCell>{getCategoryName(asset.category_id)}</TableCell>
                   <TableCell>
-                    {asset.purchase_price ? `$${asset.purchase_price.toFixed(2)}` : 'N/A'}
+                    {asset.purchase_price ? `LKR ${asset.purchase_price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'N/A'}
                   </TableCell>
                   <TableCell>
-                    {asset.current_value ? `$${asset.current_value.toFixed(2)}` : 'N/A'}
+                    {asset.current_value ? `LKR ${asset.current_value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'N/A'}
                   </TableCell>
                   <TableCell>
                     <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${

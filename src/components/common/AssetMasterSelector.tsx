@@ -113,7 +113,7 @@ export function AssetMasterSelector({
                         </span>
                         <span className="text-sm text-muted-foreground truncate">
                           {item.brand && `${item.brand} • `}
-                          {item.purchase_price && `$${item.purchase_price}`}
+                          {item.purchase_price && `LKR ${item.purchase_price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
                         </span>
                       </div>
                     </div>
