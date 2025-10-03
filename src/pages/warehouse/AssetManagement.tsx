@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -58,8 +58,11 @@ import { WarehouseAsset, WarehouseLocation, AssetCategory, CreateWarehouseAssetD
 import { AssetAnalytics } from "@/components/warehouse/AssetAnalytics";
 import { BulkAssetUpdateDialog } from "@/components/warehouse/BulkAssetUpdateDialog";
 import { AssetMasterTab } from "@/components/warehouse/AssetMasterTab";
+import { AssetMasterSelector } from "@/components/common/AssetMasterSelector";
+import { AssetMaster } from "@/types/assetMaster";
 
 const assetFormSchema = z.object({
+  asset_master_id: z.string().optional(),
   name: z.string().min(1, "Asset name is required"),
   quantity: z.string().transform(val => parseInt(val)).pipe(
     z.number().min(1, "Quantity must be at least 1").max(100, "Quantity cannot exceed 100")
@@ -122,6 +125,7 @@ export default function AssetManagement() {
   const [isTransferDialogOpen, setIsTransferDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [selectedAsset, setSelectedAsset] = useState<WarehouseAsset | null>(null);
+  const [selectedAssetMaster, setSelectedAssetMaster] = useState<AssetMaster | null>(null);
   
   const { 
     locations,
@@ -160,6 +164,7 @@ export default function AssetManagement() {
   const form = useForm<AssetFormValues>({
     resolver: zodResolver(assetFormSchema),
     defaultValues: {
+      asset_master_id: undefined,
       name: "",
       quantity: 1,
       company_id: "",
@@ -180,6 +185,31 @@ export default function AssetManagement() {
     },
   });
 
+  // Auto-fill form when Asset Master is selected
+  useEffect(() => {
+    if (selectedAssetMaster) {
+      form.setValue("name", selectedAssetMaster.asset_name);
+      if (selectedAssetMaster.brand) {
+        form.setValue("brand", selectedAssetMaster.brand);
+      }
+      if (selectedAssetMaster.category_id) {
+        form.setValue("category_id", selectedAssetMaster.category_id);
+      }
+      if (selectedAssetMaster.subcategory_id) {
+        form.setValue("subcategory_id", selectedAssetMaster.subcategory_id);
+      }
+      if (selectedAssetMaster.purchase_price) {
+        form.setValue("purchase_price", selectedAssetMaster.purchase_price.toString());
+      }
+      if (selectedAssetMaster.current_value) {
+        form.setValue("current_value", selectedAssetMaster.current_value.toString());
+      }
+      if (selectedAssetMaster.description) {
+        form.setValue("description", selectedAssetMaster.description);
+      }
+    }
+  }, [selectedAssetMaster, form]);
+
 
   const onSubmit = (data: AssetFormValues) => {
     // Get category name from ID for backward compatibility
@@ -187,6 +217,7 @@ export default function AssetManagement() {
     
     const assetData = {
       name: data.name,
+      asset_master_id: data.asset_master_id || undefined,
       category: selectedCategory?.name || "",
       category_id: data.category_id || undefined,
       subcategory_id: data.subcategory_id || undefined,
@@ -213,6 +244,7 @@ export default function AssetManagement() {
     
     setIsDialogOpen(false);
     form.reset();
+    setSelectedAssetMaster(null);
   };
 
   const handleSelectAsset = (assetId: string, checked: boolean) => {
@@ -345,6 +377,46 @@ export default function AssetManagement() {
               </DialogHeader>
               <Form {...form}>
                 <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                  <FormField
+                    control={form.control}
+                    name="asset_master_id"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Select from Asset Master (Optional)</FormLabel>
+                        <FormControl>
+                          <AssetMasterSelector
+                            value={field.value}
+                            onValueChange={field.onChange}
+                            onAssetSelected={setSelectedAssetMaster}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  {selectedAssetMaster && (
+                    <div className="p-3 bg-muted rounded-lg flex items-start gap-3">
+                      {selectedAssetMaster.image_url && (
+                        <img
+                          src={selectedAssetMaster.image_url}
+                          alt={selectedAssetMaster.asset_name}
+                          className="h-16 w-16 rounded object-cover"
+                        />
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium">{selectedAssetMaster.asset_name}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {selectedAssetMaster.brand && `${selectedAssetMaster.brand} • `}
+                          {selectedAssetMaster.purchase_price && `$${selectedAssetMaster.purchase_price}`}
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          ✓ Form fields auto-filled from Asset Master
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
                   <div className="grid grid-cols-4 gap-4">
                     <FormField
                       control={form.control}
