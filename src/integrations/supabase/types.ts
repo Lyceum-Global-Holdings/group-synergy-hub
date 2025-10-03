@@ -55,6 +55,116 @@ export type Database = {
           },
         ]
       }
+      asset_master: {
+        Row: {
+          asset_name: string
+          brand: string | null
+          category_id: string | null
+          company_id: string | null
+          created_at: string
+          created_by: string | null
+          current_value: number | null
+          description: string | null
+          id: string
+          image_url: string | null
+          purchase_price: number | null
+          status: string | null
+          subcategory_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          asset_name: string
+          brand?: string | null
+          category_id?: string | null
+          company_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          current_value?: number | null
+          description?: string | null
+          id?: string
+          image_url?: string | null
+          purchase_price?: number | null
+          status?: string | null
+          subcategory_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          asset_name?: string
+          brand?: string | null
+          category_id?: string | null
+          company_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          current_value?: number | null
+          description?: string | null
+          id?: string
+          image_url?: string | null
+          purchase_price?: number | null
+          status?: string | null
+          subcategory_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "asset_master_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "asset_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "asset_master_subcategory_id_fkey"
+            columns: ["subcategory_id"]
+            isOneToOne: false
+            referencedRelation: "asset_categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      asset_master_purchase_history: {
+        Row: {
+          asset_master_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          notes: string | null
+          purchase_date: string
+          purchase_price: number
+          quantity_purchased: number | null
+          vendor: string | null
+        }
+        Insert: {
+          asset_master_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          purchase_date: string
+          purchase_price: number
+          quantity_purchased?: number | null
+          vendor?: string | null
+        }
+        Update: {
+          asset_master_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          purchase_date?: string
+          purchase_price?: number
+          quantity_purchased?: number | null
+          vendor?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "asset_master_purchase_history_asset_master_id_fkey"
+            columns: ["asset_master_id"]
+            isOneToOne: false
+            referencedRelation: "asset_master"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       asset_transfers: {
         Row: {
           asset_id: string
@@ -2997,6 +3107,7 @@ export type Database = {
       warehouse_assets: {
         Row: {
           asset_id: string | null
+          asset_master_id: string | null
           asset_tag: string | null
           brand: string | null
           category: string
@@ -3022,6 +3133,7 @@ export type Database = {
         }
         Insert: {
           asset_id?: string | null
+          asset_master_id?: string | null
           asset_tag?: string | null
           brand?: string | null
           category: string
@@ -3047,6 +3159,7 @@ export type Database = {
         }
         Update: {
           asset_id?: string | null
+          asset_master_id?: string | null
           asset_tag?: string | null
           brand?: string | null
           category?: string
@@ -3071,6 +3184,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "warehouse_assets_asset_master_id_fkey"
+            columns: ["asset_master_id"]
+            isOneToOne: false
+            referencedRelation: "asset_master"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "warehouse_assets_category_id_fkey"
             columns: ["category_id"]

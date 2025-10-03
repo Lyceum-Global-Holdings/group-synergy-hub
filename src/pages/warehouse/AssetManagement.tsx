@@ -57,6 +57,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { WarehouseAsset, WarehouseLocation, AssetCategory, CreateWarehouseAssetData, CreateWarehouseLocationData } from "@/types/warehouse";
 import { AssetAnalytics } from "@/components/warehouse/AssetAnalytics";
 import { BulkAssetUpdateDialog } from "@/components/warehouse/BulkAssetUpdateDialog";
+import { AssetMasterTab } from "@/components/warehouse/AssetMasterTab";
 
 const assetFormSchema = z.object({
   name: z.string().min(1, "Asset name is required"),
@@ -952,127 +953,7 @@ export default function AssetManagement() {
         </TabsContent>
 
         <TabsContent value="asset-master" className="space-y-6 mt-6">
-          <div className="grid gap-6 md:grid-cols-2">
-            {/* Categories Section */}
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
-                <div>
-                  <CardTitle>Asset Categories</CardTitle>
-                  <CardDescription>Manage asset category hierarchies</CardDescription>
-                </div>
-                <CategoryManagementDialog />
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  {mainCategories.length === 0 ? (
-                    <p className="text-sm text-muted-foreground py-8 text-center">
-                      No categories yet. Add your first category to get started.
-                    </p>
-                  ) : (
-                    mainCategories.map(category => (
-                      <div key={category.id} className="p-3 border rounded-lg hover:bg-muted/50 transition-colors">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <Package className="h-4 w-4 text-muted-foreground" />
-                            <span className="font-medium">{category.name}</span>
-                          </div>
-                          <Badge variant="secondary" className="text-xs">
-                            {getSubcategories(category.id).length} subcategories
-                          </Badge>
-                        </div>
-                        {category.description && (
-                          <p className="text-sm text-muted-foreground mt-1 ml-6">{category.description}</p>
-                        )}
-                      </div>
-                    ))
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Locations Section */}
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
-                <div>
-                  <CardTitle>Asset Locations</CardTitle>
-                  <CardDescription>Manage warehouse locations and areas</CardDescription>
-                </div>
-                <LocationManagementDialog />
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  {getLocationsByType("location").length === 0 ? (
-                    <p className="text-sm text-muted-foreground py-8 text-center">
-                      No locations yet. Add your first location to get started.
-                    </p>
-                  ) : (
-                    getLocationsByType("location").map(location => (
-                      <div key={location.id} className="p-3 border rounded-lg hover:bg-muted/50 transition-colors">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <MapPin className="h-4 w-4 text-muted-foreground" />
-                            <span className="font-medium">{location.name}</span>
-                          </div>
-                          <Badge variant="secondary" className="text-xs">
-                            {getLocationsByType("sublocation", location.id).length} sublocations
-                          </Badge>
-                        </div>
-                        {location.description && (
-                          <p className="text-sm text-muted-foreground mt-1 ml-6">{location.description}</p>
-                        )}
-                      </div>
-                    ))
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Summary Stats */}
-          <div className="grid gap-4 md:grid-cols-4">
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium">Total Categories</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{mainCategories.length}</div>
-                <p className="text-xs text-muted-foreground mt-1">Main categories</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium">Total Subcategories</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">
-                  {mainCategories.reduce((sum, cat) => sum + getSubcategories(cat.id).length, 0)}
-                </div>
-                <p className="text-xs text-muted-foreground mt-1">Nested categories</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium">Total Locations</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{getLocationsByType("location").length}</div>
-                <p className="text-xs text-muted-foreground mt-1">Main locations</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium">Total Sublocations</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">
-                  {getLocationsByType("location").reduce((sum, loc) => 
-                    sum + getLocationsByType("sublocation", loc.id).length, 0
-                  )}
-                </div>
-                <p className="text-xs text-muted-foreground mt-1">Nested locations</p>
-              </CardContent>
-            </Card>
-          </div>
+          <AssetMasterTab />
         </TabsContent>
 
         <TabsContent value="analytics" className="mt-6">
