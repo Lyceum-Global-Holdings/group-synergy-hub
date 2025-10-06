@@ -1,10 +1,13 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.4';
+import { Resend } from 'npm:resend@4.0.0';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
+
+const resend = new Resend(Deno.env.get('RESEND_API_KEY'));
 
 serve(async (req) => {
   // Handle CORS preflight requests
@@ -84,9 +87,28 @@ serve(async (req) => {
 
     console.log('Registration created:', registration.id);
 
-    // TODO: Send email verification (implement with Resend)
-    // const verificationToken = crypto.randomUUID();
-    // await sendVerificationEmail(supplier_data.email, verificationToken);
+    // Send email confirmation
+    try {
+      await resend.emails.send({
+        from: 'Supplier Registration <onboarding@resend.dev>',
+        to: [supplier_data.email],
+        subject: 'Supplier Registration Received',
+        html: `
+          <h1>Thank you for registering!</h1>
+          <p>Dear ${supplier_data.supplier_name},</p>
+          <p>We have successfully received your supplier registration request.</p>
+          <p><strong>Registration ID:</strong> ${registration.id}</p>
+          <p>Our team will review your application and contact you within 2-3 business days.</p>
+          <p>If you have any questions, please don't hesitate to reach out.</p>
+          <br>
+          <p>Best regards,<br>The Procurement Team</p>
+        `,
+      });
+      console.log('Confirmation email sent to:', supplier_data.email);
+    } catch (emailError) {
+      console.error('Failed to send email:', emailError);
+      // Don't fail the registration if email fails
+    }
 
     return new Response(
       JSON.stringify({ 
