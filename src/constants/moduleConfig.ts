@@ -68,8 +68,6 @@ export const moduleConfig: Record<string, ModuleConfig> = {
       { key: 'supplier-master', name: 'Supplier Master', description: 'Supplier database and profiles', url: '/sourcing/supplier-master' },
       { key: 'supplier-registration', name: 'Supplier Registration', description: 'New supplier onboarding', url: '/sourcing/supplier-registration' },
       { key: 'supplier-evaluation', name: 'Supplier Evaluation', description: 'Performance assessment', url: '/sourcing/supplier-evaluation' },
-      { key: 'rfq-management', name: 'RFQ / RFP Management', description: 'Request for quotes process', url: '/sourcing/rfq-management' },
-      { key: 'quotation-comparison', name: 'Quotation Comparison', description: 'Compare supplier quotes', url: '/sourcing/quotation-comparison' },
       { key: 'supplier-scorecard', name: 'Supplier Scorecard', description: 'Supplier performance metrics', url: '/sourcing/supplier-scorecard' },
       { key: 'contracts', name: 'Contract Repository', description: 'Contract management', url: '/sourcing/contracts' },
       { key: 'blacklist', name: 'Blacklist / Risk Flags', description: 'Manage supplier risks', url: '/sourcing/blacklist' }
@@ -83,6 +81,7 @@ export const moduleConfig: Record<string, ModuleConfig> = {
     subModules: [
       { key: 'purchase-requisition', name: 'Purchase Requisition', description: 'Internal purchase requests', url: '/procurement/purchase-requisition' },
       { key: 'purchase-order', name: 'Purchase Order', description: 'Supplier purchase orders', url: '/procurement/purchase-order' },
+      { key: 'rfq-rfp', name: 'RFQ / RFP Management', description: 'Request for quotes and proposals', url: '/procurement/rfq-rfp' },
       { key: 'material-demand', name: 'Material Demand Planning', description: 'MRP and material requirement planning', url: '/procurement/material-demand' },
       { key: 'blanket-po', name: 'Blanket/Contract PO', description: 'Long-term purchase agreements', url: '/procurement/blanket-po' },
       { key: 'po-amendment', name: 'PO Amendment', description: 'Modify existing orders', url: '/procurement/po-amendment' },

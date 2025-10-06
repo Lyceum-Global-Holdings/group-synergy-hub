@@ -17,6 +17,7 @@ import BillOfMaterials from "./pages/procurement/BillOfMaterials";
 import CustomerMaster from "./pages/tuh-modules/CustomerMaster";
 import CustomerPO from "./pages/tuh-modules/CustomerPO";
 import MaterialDemandPlanning from "./pages/procurement/MaterialDemandPlanning";
+import RfqRfp from "./pages/procurement/RfqRfp";
 import { SupplierMaster } from "./pages/sourcing/SupplierMaster";
 import SupplierScorecard from "./pages/sourcing/SupplierScorecard";
 import SupplierEvaluation from "./pages/sourcing/SupplierEvaluation";
@@ -121,6 +122,13 @@ function App() {
                   <ProtectedRoute>
                     <AppLayout>
                       <MaterialDemandPlanning />
+                    </AppLayout>
+                  </ProtectedRoute>
+                } />
+                <Route path="/procurement/rfq-rfp" element={
+                  <ProtectedRoute>
+                    <AppLayout>
+                      <RfqRfp />
                     </AppLayout>
                   </ProtectedRoute>
                 } />

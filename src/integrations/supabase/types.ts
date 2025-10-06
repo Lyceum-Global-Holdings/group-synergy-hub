@@ -2651,6 +2651,357 @@ export type Database = {
           },
         ]
       }
+      quote_comparisons: {
+        Row: {
+          comparison_data: Json | null
+          created_at: string | null
+          created_by: string | null
+          id: string
+          request_id: string
+        }
+        Insert: {
+          comparison_data?: Json | null
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          request_id: string
+        }
+        Update: {
+          comparison_data?: Json | null
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          request_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quote_comparisons_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "rfq_rfp_requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      quote_evaluations: {
+        Row: {
+          comments: string | null
+          commercial_score: number | null
+          compliance_score: number | null
+          created_at: string | null
+          criteria_scores: Json | null
+          evaluation_date: string | null
+          evaluator_id: string
+          id: string
+          overall_score: number | null
+          quote_id: string
+          recommendation:
+            | Database["public"]["Enums"]["evaluation_recommendation"]
+            | null
+          strengths: string | null
+          technical_score: number | null
+          weaknesses: string | null
+        }
+        Insert: {
+          comments?: string | null
+          commercial_score?: number | null
+          compliance_score?: number | null
+          created_at?: string | null
+          criteria_scores?: Json | null
+          evaluation_date?: string | null
+          evaluator_id: string
+          id?: string
+          overall_score?: number | null
+          quote_id: string
+          recommendation?:
+            | Database["public"]["Enums"]["evaluation_recommendation"]
+            | null
+          strengths?: string | null
+          technical_score?: number | null
+          weaknesses?: string | null
+        }
+        Update: {
+          comments?: string | null
+          commercial_score?: number | null
+          compliance_score?: number | null
+          created_at?: string | null
+          criteria_scores?: Json | null
+          evaluation_date?: string | null
+          evaluator_id?: string
+          id?: string
+          overall_score?: number | null
+          quote_id?: string
+          recommendation?:
+            | Database["public"]["Enums"]["evaluation_recommendation"]
+            | null
+          strengths?: string | null
+          technical_score?: number | null
+          weaknesses?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quote_evaluations_quote_id_fkey"
+            columns: ["quote_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_quotes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      rfq_rfp_invited_suppliers: {
+        Row: {
+          created_at: string | null
+          declined_reason: string | null
+          id: string
+          invitation_date: string | null
+          invitation_notes: string | null
+          invitation_status: Database["public"]["Enums"]["invitation_status"]
+          request_id: string
+          supplier_id: string
+          viewed_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          declined_reason?: string | null
+          id?: string
+          invitation_date?: string | null
+          invitation_notes?: string | null
+          invitation_status?: Database["public"]["Enums"]["invitation_status"]
+          request_id: string
+          supplier_id: string
+          viewed_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          declined_reason?: string | null
+          id?: string
+          invitation_date?: string | null
+          invitation_notes?: string | null
+          invitation_status?: Database["public"]["Enums"]["invitation_status"]
+          request_id?: string
+          supplier_id?: string
+          viewed_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rfq_rfp_invited_suppliers_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "rfq_rfp_requests"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rfq_rfp_invited_suppliers_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      rfq_rfp_items: {
+        Row: {
+          created_at: string | null
+          delivery_date: string | null
+          description: string | null
+          estimated_total_price: number | null
+          estimated_unit_price: number | null
+          id: string
+          item_code: string | null
+          item_name: string
+          line_number: number
+          notes: string | null
+          quantity: number
+          request_id: string
+          specifications: string | null
+          unit_of_measure: string
+          updated_at: string | null
+          warehouse_item_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          delivery_date?: string | null
+          description?: string | null
+          estimated_total_price?: number | null
+          estimated_unit_price?: number | null
+          id?: string
+          item_code?: string | null
+          item_name: string
+          line_number: number
+          notes?: string | null
+          quantity: number
+          request_id: string
+          specifications?: string | null
+          unit_of_measure?: string
+          updated_at?: string | null
+          warehouse_item_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          delivery_date?: string | null
+          description?: string | null
+          estimated_total_price?: number | null
+          estimated_unit_price?: number | null
+          id?: string
+          item_code?: string | null
+          item_name?: string
+          line_number?: number
+          notes?: string | null
+          quantity?: number
+          request_id?: string
+          specifications?: string | null
+          unit_of_measure?: string
+          updated_at?: string | null
+          warehouse_item_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rfq_rfp_items_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "rfq_rfp_requests"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rfq_rfp_items_warehouse_item_id_fkey"
+            columns: ["warehouse_item_id"]
+            isOneToOne: false
+            referencedRelation: "warehouse_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      rfq_rfp_requests: {
+        Row: {
+          approved_by: string | null
+          approved_date: string | null
+          awarded_date: string | null
+          awarded_supplier_id: string | null
+          bom_id: string | null
+          budget_estimate: number | null
+          category: string | null
+          company_id: string | null
+          compliance_requirements: string | null
+          created_at: string | null
+          created_by: string | null
+          currency: string | null
+          delivery_requirements: string | null
+          description: string | null
+          evaluation_criteria: Json | null
+          evaluation_deadline: string | null
+          id: string
+          issue_date: string
+          payment_terms: string | null
+          pr_id: string | null
+          priority: Database["public"]["Enums"]["rfq_rfp_priority"]
+          publish_type: Database["public"]["Enums"]["rfq_rfp_publish_type"]
+          request_number: string
+          request_type: Database["public"]["Enums"]["rfq_rfp_type"]
+          status: Database["public"]["Enums"]["rfq_rfp_status"]
+          submission_deadline: string
+          technical_specifications: string | null
+          terms_and_conditions: string | null
+          title: string
+          updated_at: string | null
+          warranty_requirements: string | null
+        }
+        Insert: {
+          approved_by?: string | null
+          approved_date?: string | null
+          awarded_date?: string | null
+          awarded_supplier_id?: string | null
+          bom_id?: string | null
+          budget_estimate?: number | null
+          category?: string | null
+          company_id?: string | null
+          compliance_requirements?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          currency?: string | null
+          delivery_requirements?: string | null
+          description?: string | null
+          evaluation_criteria?: Json | null
+          evaluation_deadline?: string | null
+          id?: string
+          issue_date?: string
+          payment_terms?: string | null
+          pr_id?: string | null
+          priority?: Database["public"]["Enums"]["rfq_rfp_priority"]
+          publish_type?: Database["public"]["Enums"]["rfq_rfp_publish_type"]
+          request_number: string
+          request_type: Database["public"]["Enums"]["rfq_rfp_type"]
+          status?: Database["public"]["Enums"]["rfq_rfp_status"]
+          submission_deadline: string
+          technical_specifications?: string | null
+          terms_and_conditions?: string | null
+          title: string
+          updated_at?: string | null
+          warranty_requirements?: string | null
+        }
+        Update: {
+          approved_by?: string | null
+          approved_date?: string | null
+          awarded_date?: string | null
+          awarded_supplier_id?: string | null
+          bom_id?: string | null
+          budget_estimate?: number | null
+          category?: string | null
+          company_id?: string | null
+          compliance_requirements?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          currency?: string | null
+          delivery_requirements?: string | null
+          description?: string | null
+          evaluation_criteria?: Json | null
+          evaluation_deadline?: string | null
+          id?: string
+          issue_date?: string
+          payment_terms?: string | null
+          pr_id?: string | null
+          priority?: Database["public"]["Enums"]["rfq_rfp_priority"]
+          publish_type?: Database["public"]["Enums"]["rfq_rfp_publish_type"]
+          request_number?: string
+          request_type?: Database["public"]["Enums"]["rfq_rfp_type"]
+          status?: Database["public"]["Enums"]["rfq_rfp_status"]
+          submission_deadline?: string
+          technical_specifications?: string | null
+          terms_and_conditions?: string | null
+          title?: string
+          updated_at?: string | null
+          warranty_requirements?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rfq_rfp_requests_awarded_supplier_id_fkey"
+            columns: ["awarded_supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rfq_rfp_requests_bom_id_fkey"
+            columns: ["bom_id"]
+            isOneToOne: false
+            referencedRelation: "bill_of_materials"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rfq_rfp_requests_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rfq_rfp_requests_pr_id_fkey"
+            columns: ["pr_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_requisitions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       role_permissions: {
         Row: {
           created_at: string | null
@@ -3387,6 +3738,156 @@ export type Database = {
           },
         ]
       }
+      supplier_quote_items: {
+        Row: {
+          alternative_description: string | null
+          alternative_offered: boolean | null
+          created_at: string | null
+          delivery_days: number | null
+          id: string
+          line_number: number
+          notes: string | null
+          quote_id: string
+          rfq_item_id: string
+          total_price: number
+          unit_price: number
+          updated_at: string | null
+        }
+        Insert: {
+          alternative_description?: string | null
+          alternative_offered?: boolean | null
+          created_at?: string | null
+          delivery_days?: number | null
+          id?: string
+          line_number: number
+          notes?: string | null
+          quote_id: string
+          rfq_item_id: string
+          total_price: number
+          unit_price: number
+          updated_at?: string | null
+        }
+        Update: {
+          alternative_description?: string | null
+          alternative_offered?: boolean | null
+          created_at?: string | null
+          delivery_days?: number | null
+          id?: string
+          line_number?: number
+          notes?: string | null
+          quote_id?: string
+          rfq_item_id?: string
+          total_price?: number
+          unit_price?: number
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "supplier_quote_items_quote_id_fkey"
+            columns: ["quote_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_quotes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_quote_items_rfq_item_id_fkey"
+            columns: ["rfq_item_id"]
+            isOneToOne: false
+            referencedRelation: "rfq_rfp_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      supplier_quotes: {
+        Row: {
+          attachments: Json | null
+          created_at: string | null
+          created_by: string | null
+          currency: string | null
+          delivery_commitment: string | null
+          evaluated_at: string | null
+          evaluated_by: string | null
+          evaluation_notes: string | null
+          evaluation_score: number | null
+          id: string
+          notes: string | null
+          payment_terms: string | null
+          quote_number: string
+          rejection_reason: string | null
+          request_id: string
+          status: Database["public"]["Enums"]["quote_status"]
+          submission_date: string | null
+          supplier_id: string
+          total_quoted_amount: number | null
+          updated_at: string | null
+          validity_period: number | null
+          warranty_offered: string | null
+        }
+        Insert: {
+          attachments?: Json | null
+          created_at?: string | null
+          created_by?: string | null
+          currency?: string | null
+          delivery_commitment?: string | null
+          evaluated_at?: string | null
+          evaluated_by?: string | null
+          evaluation_notes?: string | null
+          evaluation_score?: number | null
+          id?: string
+          notes?: string | null
+          payment_terms?: string | null
+          quote_number: string
+          rejection_reason?: string | null
+          request_id: string
+          status?: Database["public"]["Enums"]["quote_status"]
+          submission_date?: string | null
+          supplier_id: string
+          total_quoted_amount?: number | null
+          updated_at?: string | null
+          validity_period?: number | null
+          warranty_offered?: string | null
+        }
+        Update: {
+          attachments?: Json | null
+          created_at?: string | null
+          created_by?: string | null
+          currency?: string | null
+          delivery_commitment?: string | null
+          evaluated_at?: string | null
+          evaluated_by?: string | null
+          evaluation_notes?: string | null
+          evaluation_score?: number | null
+          id?: string
+          notes?: string | null
+          payment_terms?: string | null
+          quote_number?: string
+          rejection_reason?: string | null
+          request_id?: string
+          status?: Database["public"]["Enums"]["quote_status"]
+          submission_date?: string | null
+          supplier_id?: string
+          total_quoted_amount?: number | null
+          updated_at?: string | null
+          validity_period?: number | null
+          warranty_offered?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "supplier_quotes_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "rfq_rfp_requests"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_quotes_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       supplier_recommendations: {
         Row: {
           action_taken: boolean | null
@@ -4072,6 +4573,18 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: string
       }
+      generate_quote_number: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
+      generate_rfp_number: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
+      generate_rfq_number: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
       generate_sales_order_number: {
         Args: Record<PropertyKey, never>
         Returns: string
@@ -4102,6 +4615,13 @@ export type Database = {
     }
     Enums: {
       app_role: "super_admin" | "admin" | "manager" | "user"
+      evaluation_recommendation:
+        | "strongly_recommend"
+        | "recommend"
+        | "neutral"
+        | "not_recommend"
+        | "reject"
+      invitation_status: "invited" | "viewed" | "declined" | "submitted"
       po_status:
         | "draft"
         | "pending_approval"
@@ -4120,6 +4640,24 @@ export type Database = {
         | "approved"
         | "rejected"
         | "cancelled"
+      quote_status:
+        | "draft"
+        | "submitted"
+        | "under_evaluation"
+        | "shortlisted"
+        | "awarded"
+        | "rejected"
+      rfq_rfp_priority: "low" | "medium" | "high" | "urgent"
+      rfq_rfp_publish_type: "public" | "invited" | "limited"
+      rfq_rfp_status:
+        | "draft"
+        | "published"
+        | "in_progress"
+        | "evaluation"
+        | "awarded"
+        | "cancelled"
+        | "closed"
+      rfq_rfp_type: "rfq" | "rfp"
       stock_reference_type: "manual" | "grn" | "mrn" | "adjustment" | "transfer"
       stock_transaction_type:
         | "opening_stock"
@@ -4257,6 +4795,14 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["super_admin", "admin", "manager", "user"],
+      evaluation_recommendation: [
+        "strongly_recommend",
+        "recommend",
+        "neutral",
+        "not_recommend",
+        "reject",
+      ],
+      invitation_status: ["invited", "viewed", "declined", "submitted"],
       po_status: [
         "draft",
         "pending_approval",
@@ -4277,6 +4823,26 @@ export const Constants = {
         "rejected",
         "cancelled",
       ],
+      quote_status: [
+        "draft",
+        "submitted",
+        "under_evaluation",
+        "shortlisted",
+        "awarded",
+        "rejected",
+      ],
+      rfq_rfp_priority: ["low", "medium", "high", "urgent"],
+      rfq_rfp_publish_type: ["public", "invited", "limited"],
+      rfq_rfp_status: [
+        "draft",
+        "published",
+        "in_progress",
+        "evaluation",
+        "awarded",
+        "cancelled",
+        "closed",
+      ],
+      rfq_rfp_type: ["rfq", "rfp"],
       stock_reference_type: ["manual", "grn", "mrn", "adjustment", "transfer"],
       stock_transaction_type: [
         "opening_stock",
