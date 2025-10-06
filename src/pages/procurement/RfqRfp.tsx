@@ -10,6 +10,8 @@ import { useRfqRfpRequests } from "@/hooks/useRfqRfp";
 import { useCompany } from "@/contexts/CompanyContext";
 import { format } from "date-fns";
 import { ColumnDef } from "@tanstack/react-table";
+import { CreateRfqRfpDialog } from "@/components/procurement/CreateRfqRfpDialog";
+import { RfqRfpDetailsDialog } from "@/components/procurement/RfqRfpDetailsDialog";
 import type { RfqRfpRequest } from "@/types/rfqRfp";
 
 export default function RfqRfp() {
@@ -17,6 +19,9 @@ export default function RfqRfp() {
   const [activeTab, setActiveTab] = useState("all");
   const { selectedCompany } = useCompany();
   const { data: requests = [], isLoading } = useRfqRfpRequests(selectedCompany?.id);
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
+  const [selectedRequestId, setSelectedRequestId] = useState<string | null>(null);
 
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -115,6 +120,22 @@ export default function RfqRfp() {
         }).format(row.original.budget_estimate);
       },
     },
+    {
+      accessorKey: "actions",
+      header: "",
+      cell: ({ row }) => (
+        <Button 
+          variant="ghost" 
+          size="sm"
+          onClick={() => {
+            setSelectedRequestId(row.original.id);
+            setDetailsDialogOpen(true);
+          }}
+        >
+          View Details
+        </Button>
+      ),
+    },
   ];
 
   const filterByStatus = (status?: string) => {
@@ -168,7 +189,7 @@ export default function RfqRfp() {
             </p>
           </div>
         </div>
-        <Button onClick={() => {/* TODO: Open create dialog */}}>
+        <Button onClick={() => setCreateDialogOpen(true)}>
           <Plus className="w-4 h-4 mr-2" />
           Create RFQ/RFP
         </Button>
@@ -223,6 +244,13 @@ export default function RfqRfp() {
           </Tabs>
         </CardContent>
       </Card>
+
+      <CreateRfqRfpDialog open={createDialogOpen} onOpenChange={setCreateDialogOpen} />
+      <RfqRfpDetailsDialog 
+        requestId={selectedRequestId}
+        open={detailsDialogOpen} 
+        onOpenChange={setDetailsDialogOpen} 
+      />
     </div>
   );
 }
