@@ -1,11 +1,12 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Plus, FileCheck, Clock, CheckCircle, XCircle } from "lucide-react";
+import { ArrowLeft, Plus, FileCheck, Clock, CheckCircle, XCircle, UserCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import SupplierRegistrationWizard from "@/components/sourcing/SupplierRegistrationWizard";
+import ApprovalDashboard from "@/components/sourcing/ApprovalDashboard";
 import { useSupplierRegistrations } from "@/hooks/useSupplierRegistration";
 import { useCompany } from "@/contexts/CompanyContext";
 import { format } from "date-fns";
@@ -13,6 +14,7 @@ import { format } from "date-fns";
 export default function SupplierRegistration() {
   const navigate = useNavigate();
   const [showWizard, setShowWizard] = useState(false);
+  const [activeTab, setActiveTab] = useState("registrations");
   const { selectedCompany } = useCompany();
   const { data: registrations = [], isLoading } = useSupplierRegistrations(selectedCompany?.id);
 
@@ -69,6 +71,20 @@ export default function SupplierRegistration() {
   const pendingRegistrations = registrations.filter(r => r.status === 'pending_approval');
   const processedRegistrations = registrations.filter(r => ['approved', 'rejected'].includes(r.status));
 
+  if (activeTab === "approvals") {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="sm" onClick={() => setActiveTab("registrations")}>
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Back to Registrations
+          </Button>
+        </div>
+        <ApprovalDashboard />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -78,10 +94,16 @@ export default function SupplierRegistration() {
             Register new suppliers with a guided workflow
           </p>
         </div>
-        <Button onClick={() => setShowWizard(true)}>
-          <Plus className="w-4 h-4 mr-2" />
-          New Registration
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => setActiveTab("approvals")}>
+            <UserCheck className="w-4 h-4 mr-2" />
+            Approval Dashboard ({pendingRegistrations.length})
+          </Button>
+          <Button onClick={() => setShowWizard(true)}>
+            <Plus className="w-4 h-4 mr-2" />
+            New Registration
+          </Button>
+        </div>
       </div>
 
       <Tabs defaultValue="drafts" className="space-y-4">
