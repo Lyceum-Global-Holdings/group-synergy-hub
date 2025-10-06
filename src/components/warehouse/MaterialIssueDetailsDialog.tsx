@@ -17,11 +17,13 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { CheckCircle, XCircle, FileCheck, Truck } from 'lucide-react';
+import { CheckCircle, XCircle, FileCheck, Truck, Package } from 'lucide-react';
 import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { MaterialIssueNote, MaterialIssueItem } from '@/types/materialIssueReturn';
 import { useToast } from '@/hooks/use-toast';
+import { IssueItemsDialog } from './IssueItemsDialog';
+import { ReceiveItemsDialog } from './ReceiveItemsDialog';
 
 interface MaterialIssueDetailsDialogProps {
   open: boolean;
@@ -33,6 +35,8 @@ export function MaterialIssueDetailsDialog({ open, onOpenChange, issueId }: Mate
   const [issue, setIssue] = useState<MaterialIssueNote | null>(null);
   const [items, setItems] = useState<MaterialIssueItem[]>([]);
   const [loading, setLoading] = useState(false);
+  const [issueDialogOpen, setIssueDialogOpen] = useState(false);
+  const [receiveDialogOpen, setReceiveDialogOpen] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -385,7 +389,42 @@ export function MaterialIssueDetailsDialog({ open, onOpenChange, issueId }: Mate
             </div>
           </TabsContent>
         </Tabs>
+
+        {issue.status === 'approved' && !issue.issued_by && (
+          <div className="flex justify-end gap-2 pt-4 border-t">
+            <Button onClick={() => setIssueDialogOpen(true)}>
+              <Package className="h-4 w-4 mr-2" />
+              Issue Items
+            </Button>
+          </div>
+        )}
+
+        {issue.status === 'issued' && !issue.received_by && (
+          <div className="flex justify-end gap-2 pt-4 border-t">
+            <Button onClick={() => setReceiveDialogOpen(true)}>
+              <Truck className="h-4 w-4 mr-2" />
+              Receive Items
+            </Button>
+          </div>
+        )}
       </DialogContent>
+
+      {issueId && (
+        <>
+          <IssueItemsDialog
+            open={issueDialogOpen}
+            onOpenChange={setIssueDialogOpen}
+            issueId={issueId}
+            onSuccess={fetchIssueDetails}
+          />
+          <ReceiveItemsDialog
+            open={receiveDialogOpen}
+            onOpenChange={setReceiveDialogOpen}
+            issueId={issueId}
+            onSuccess={fetchIssueDetails}
+          />
+        </>
+      )}
     </Dialog>
   );
 }

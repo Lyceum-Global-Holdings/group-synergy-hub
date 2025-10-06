@@ -13,6 +13,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Plus, Trash2 } from 'lucide-react';
 import { useMaterialIssues } from '@/hooks/useMaterialIssues';
+import { useMaterialIssueItems } from '@/hooks/useMaterialIssueItems';
 import { ItemSelector } from '@/components/common/ItemSelector';
 import { useWarehouseItems } from '@/hooks/useWarehouseItems';
 import {
@@ -59,6 +60,7 @@ export function CreateMaterialIssueDialog({ open, onOpenChange }: MaterialIssueD
 
   const { items: warehouseItems } = useWarehouseItems();
   const { createMaterialIssueAsync, isCreating } = useMaterialIssues();
+  const { createItems } = useMaterialIssueItems();
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -107,7 +109,20 @@ export function CreateMaterialIssueDialog({ open, onOpenChange }: MaterialIssueD
         po_number: formData.po_number || undefined,
       });
 
-      // TODO: Add items to the issue note
+      // Create items
+      const itemsToCreate = items.map((item, index) => ({
+        min_id: issueNote.id,
+        item_id: item.item_id,
+        quantity_issued: item.quantity_required,
+        quantity_required: item.quantity_required,
+        line_number: index + 1,
+        item_code: item.item_code,
+        description: item.description,
+        unit_of_measure: item.unit_of_measure,
+        purpose: item.purpose || undefined,
+      }));
+
+      await createItems(itemsToCreate);
 
       // Reset form
       setFormData({
