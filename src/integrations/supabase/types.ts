@@ -2796,6 +2796,78 @@ export type Database = {
         }
         Relationships: []
       }
+      supplier_analytics_cache: {
+        Row: {
+          avg_performance_rate: number
+          avg_punctuality_score: number
+          avg_quality_score: number
+          calculation_date: string
+          company_id: string | null
+          consistency_score: number
+          created_at: string
+          id: string
+          improvement_rate: number
+          performance_grade: string
+          reliability_index: number
+          supplier_id: string
+          total_deliveries: number
+          total_evaluations: number
+          trend_direction: string
+          updated_at: string
+        }
+        Insert: {
+          avg_performance_rate?: number
+          avg_punctuality_score?: number
+          avg_quality_score?: number
+          calculation_date?: string
+          company_id?: string | null
+          consistency_score?: number
+          created_at?: string
+          id?: string
+          improvement_rate?: number
+          performance_grade?: string
+          reliability_index?: number
+          supplier_id: string
+          total_deliveries?: number
+          total_evaluations?: number
+          trend_direction?: string
+          updated_at?: string
+        }
+        Update: {
+          avg_performance_rate?: number
+          avg_punctuality_score?: number
+          avg_quality_score?: number
+          calculation_date?: string
+          company_id?: string | null
+          consistency_score?: number
+          created_at?: string
+          id?: string
+          improvement_rate?: number
+          performance_grade?: string
+          reliability_index?: number
+          supplier_id?: string
+          total_deliveries?: number
+          total_evaluations?: number
+          trend_direction?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "supplier_analytics_cache_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_analytics_cache_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       supplier_contacts: {
         Row: {
           created_at: string
@@ -3555,6 +3627,21 @@ export type Database = {
       bootstrap_admin: {
         Args: { _role_name?: string; _user_id: string }
         Returns: undefined
+      }
+      calculate_supplier_analytics: {
+        Args: { p_period_months?: number; p_supplier_id: string }
+        Returns: {
+          avg_performance_rate: number
+          avg_punctuality_score: number
+          avg_quality_score: number
+          consistency_score: number
+          improvement_rate: number
+          performance_grade: string
+          reliability_index: number
+          total_deliveries: number
+          total_evaluations: number
+          trend_direction: string
+        }[]
       }
       create_user_with_roles: {
         Args: {
