@@ -92,20 +92,35 @@ export function ReceiveItemsDialog({ open, onOpenChange, issueId, onSuccess }: R
       await Promise.all(updatePromises);
 
       // Check if all items are fully received
-      const allFullyReceived = items.every(item => {
+      const allReceived = items.every((item) => {
         const received = receivedQuantities[item.id] || 0;
         const required = item.quantity_required || item.quantity_issued || 0;
         return received >= required;
       });
 
-      // Update material issue note status
+      // Check if any items are received
+      const anyReceived = items.some(item => {
+        const received = receivedQuantities[item.id] || 0;
+        return received > 0;
+      });
+
+      // Determine new status
+      let newStatus = 'issued';
+      if (allReceived) {
+        newStatus = 'completed';
+      } else if (anyReceived) {
+        newStatus = 'partially_received';
+      }
+
+      // Update the material issue note
       const { error: updateError } = await supabase
         .from('material_issue_notes')
         .update({
+          status: newStatus,
           received_by: user.id,
           received_by_name: profile?.full_name || user.email,
           received_date: new Date().toISOString(),
-          order_completed: allFullyReceived,
+          order_completed: allReceived,
         })
         .eq('id', issueId);
 

@@ -24,6 +24,7 @@ import { MaterialIssueNote, MaterialIssueItem } from '@/types/materialIssueRetur
 import { useToast } from '@/hooks/use-toast';
 import { IssueItemsDialog } from './IssueItemsDialog';
 import { ReceiveItemsDialog } from './ReceiveItemsDialog';
+import { UpdateQuantitiesDialog } from './UpdateQuantitiesDialog';
 
 interface MaterialIssueDetailsDialogProps {
   open: boolean;
@@ -37,6 +38,7 @@ export function MaterialIssueDetailsDialog({ open, onOpenChange, issueId }: Mate
   const [loading, setLoading] = useState(false);
   const [issueDialogOpen, setIssueDialogOpen] = useState(false);
   const [receiveDialogOpen, setReceiveDialogOpen] = useState(false);
+  const [updateDialogOpen, setUpdateDialogOpen] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -238,23 +240,45 @@ export function MaterialIssueDetailsDialog({ open, onOpenChange, issueId }: Mate
                     <TableHead>Item Code</TableHead>
                     <TableHead>Description</TableHead>
                     <TableHead>UOM</TableHead>
-                    <TableHead>Qty Required</TableHead>
-                    <TableHead>Qty Received</TableHead>
-                    <TableHead>Purpose</TableHead>
+                    <TableHead className="text-right">Required</TableHead>
+                    <TableHead className="text-right">Received</TableHead>
+                    <TableHead className="text-right">Variance</TableHead>
+                    <TableHead>Status</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {items.map((item, index) => (
-                    <TableRow key={item.id}>
-                      <TableCell>{item.line_number || index + 1}</TableCell>
-                      <TableCell>{item.item_code || '-'}</TableCell>
-                      <TableCell>{item.description || '-'}</TableCell>
-                      <TableCell>{item.unit_of_measure || 'pcs'}</TableCell>
-                      <TableCell>{item.quantity_required || item.quantity_issued}</TableCell>
-                      <TableCell>{item.quantity_received || '-'}</TableCell>
-                      <TableCell>{item.purpose || '-'}</TableCell>
-                    </TableRow>
-                  ))}
+                  {items.map((item, index) => {
+                    const qtyRequired = item.quantity_required || item.quantity_issued;
+                    const qtyReceived = item.quantity_received || 0;
+                    const variance = qtyReceived - qtyRequired;
+                    
+                    const getStatusBadge = () => {
+                      if (qtyReceived >= qtyRequired) {
+                        return <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">✓ Complete</span>;
+                      }
+                      if (qtyReceived > 0) {
+                        return <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">⚠ Partial</span>;
+                      }
+                      return <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">○ Pending</span>;
+                    };
+
+                    return (
+                      <TableRow key={item.id}>
+                        <TableCell>{item.line_number || index + 1}</TableCell>
+                        <TableCell>{item.item_code || '-'}</TableCell>
+                        <TableCell>{item.description || '-'}</TableCell>
+                        <TableCell>{item.unit_of_measure || 'pcs'}</TableCell>
+                        <TableCell className="text-right">{qtyRequired}</TableCell>
+                        <TableCell className="text-right font-medium">{qtyReceived}</TableCell>
+                        <TableCell className={`text-right font-medium ${
+                          variance > 0 ? 'text-green-600' : variance < 0 ? 'text-red-600' : 'text-muted-foreground'
+                        }`}>
+                          {variance !== 0 && (variance > 0 ? '+' : '')}{variance}
+                        </TableCell>
+                        <TableCell>{getStatusBadge()}</TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
             </div>
@@ -390,21 +414,25 @@ export function MaterialIssueDetailsDialog({ open, onOpenChange, issueId }: Mate
           </TabsContent>
         </Tabs>
 
-        {issue.status === 'approved' && !issue.issued_by && (
+        {(issue.status === 'approved' || issue.status === 'issued' || issue.status === 'partially_received') && (
           <div className="flex justify-end gap-2 pt-4 border-t">
-            <Button onClick={() => setIssueDialogOpen(true)}>
-              <Package className="h-4 w-4 mr-2" />
-              Issue Items
-            </Button>
-          </div>
-        )}
-
-        {issue.status === 'issued' && !issue.received_by && (
-          <div className="flex justify-end gap-2 pt-4 border-t">
-            <Button onClick={() => setReceiveDialogOpen(true)}>
-              <Truck className="h-4 w-4 mr-2" />
-              Receive Items
-            </Button>
+            {(issue.status === 'approved' || issue.status === 'issued' || issue.status === 'partially_received') && (
+              <Button variant="outline" onClick={() => setUpdateDialogOpen(true)}>
+                Update Quantities
+              </Button>
+            )}
+            {issue.status === 'approved' && !issue.issued_by && (
+              <Button onClick={() => setIssueDialogOpen(true)}>
+                <Package className="h-4 w-4 mr-2" />
+                Issue Items
+              </Button>
+            )}
+            {(issue.status === 'issued' || issue.status === 'partially_received') && (
+              <Button onClick={() => setReceiveDialogOpen(true)}>
+                <Truck className="h-4 w-4 mr-2" />
+                Receive Items
+              </Button>
+            )}
           </div>
         )}
       </DialogContent>
@@ -420,6 +448,12 @@ export function MaterialIssueDetailsDialog({ open, onOpenChange, issueId }: Mate
           <ReceiveItemsDialog
             open={receiveDialogOpen}
             onOpenChange={setReceiveDialogOpen}
+            issueId={issueId}
+            onSuccess={fetchIssueDetails}
+          />
+          <UpdateQuantitiesDialog
+            open={updateDialogOpen}
+            onOpenChange={setUpdateDialogOpen}
             issueId={issueId}
             onSuccess={fetchIssueDetails}
           />

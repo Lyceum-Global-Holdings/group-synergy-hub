@@ -1,4 +1,4 @@
-export type MaterialIssueStatus = 'draft' | 'approved' | 'issued' | 'cancelled';
+export type MaterialIssueStatus = 'draft' | 'approved' | 'issued' | 'partially_received' | 'completed' | 'cancelled';
 export type MaterialReturnStatus = 'draft' | 'approved' | 'returned' | 'cancelled';
 export type MaterialReturnType = 'internal' | 'supplier';
 export type MaterialReferenceType = 'material_issue' | 'purchase_order' | 'other';
