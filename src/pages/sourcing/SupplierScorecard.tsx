@@ -1,13 +1,18 @@
 import { useState } from "react";
-import { Plus, Search, Calendar, TrendingUp, FileText, BarChart3 } from "lucide-react";
+import { Plus, Search, Calendar, TrendingUp, FileText, BarChart3, GitCompare } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { DataTable } from "@/components/ui/data-table";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useSupplierEvaluations } from "@/hooks/useSupplierEvaluations";
 import { CreateSupplierEvaluationDialog } from "@/components/sourcing/CreateSupplierEvaluationDialog";
 import { SupplierEvaluationDetailsDialog } from "@/components/sourcing/SupplierEvaluationDetailsDialog";
+import { ScorecardFilters } from "@/components/sourcing/ScorecardFilters";
+import { ScorecardCharts } from "@/components/sourcing/ScorecardCharts";
+import { ScorecardComparison } from "@/components/sourcing/ScorecardComparison";
+import { ScorecardRecommendations } from "@/components/sourcing/ScorecardRecommendations";
 import { SupplierEvaluation } from "@/types/supplierEvaluation";
 import { ColumnDef } from "@tanstack/react-table";
 import { formatCurrency } from "@/lib/utils";
@@ -21,24 +26,96 @@ const statusColors = {
 
 export default function SupplierScorecard() {
   const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [performanceFilter, setPerformanceFilter] = useState("all");
+  const [dateFrom, setDateFrom] = useState<Date | undefined>();
+  const [dateTo, setDateTo] = useState<Date | undefined>();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [selectedEvaluation, setSelectedEvaluation] = useState<SupplierEvaluation | null>(null);
   const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false);
+  const [comparisonIds, setComparisonIds] = useState<string[]>([]);
 
   const { data: evaluations = [], isLoading } = useSupplierEvaluations();
 
-  const filteredEvaluations = evaluations.filter((evaluation) =>
-    evaluation.supplier?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    evaluation.product_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    evaluation.evaluation_number.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredEvaluations = evaluations.filter((evaluation) => {
+    // Search filter
+    const matchesSearch = evaluation.supplier?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      evaluation.product_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      evaluation.evaluation_number.toLowerCase().includes(searchTerm.toLowerCase());
+
+    // Status filter
+    const matchesStatus = statusFilter === 'all' || evaluation.status === statusFilter;
+
+    // Performance filter
+    let matchesPerformance = true;
+    if (performanceFilter === 'excellent') matchesPerformance = evaluation.performance_rate >= 85;
+    else if (performanceFilter === 'good') matchesPerformance = evaluation.performance_rate >= 70 && evaluation.performance_rate < 85;
+    else if (performanceFilter === 'fair') matchesPerformance = evaluation.performance_rate >= 55 && evaluation.performance_rate < 70;
+    else if (performanceFilter === 'poor') matchesPerformance = evaluation.performance_rate < 55;
+
+    // Date filter
+    const evalDate = new Date(evaluation.evaluation_period_start);
+    const matchesDateFrom = !dateFrom || evalDate >= dateFrom;
+    const matchesDateTo = !dateTo || evalDate <= dateTo;
+
+    return matchesSearch && matchesStatus && matchesPerformance && matchesDateFrom && matchesDateTo;
+  });
+
+  const comparisonEvaluations = evaluations.filter(e => comparisonIds.includes(e.id));
 
   const handleViewDetails = (evaluation: SupplierEvaluation) => {
     setSelectedEvaluation(evaluation);
     setIsDetailsDialogOpen(true);
   };
 
+  const handleResetFilters = () => {
+    setSearchTerm("");
+    setStatusFilter("all");
+    setPerformanceFilter("all");
+    setDateFrom(undefined);
+    setDateTo(undefined);
+  };
+
+  const toggleComparison = (id: string) => {
+    setComparisonIds(prev => 
+      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+    );
+  };
+
+  const clearComparison = () => setComparisonIds([]);
+  const removeFromComparison = (id: string) => {
+    setComparisonIds(prev => prev.filter(i => i !== id));
+  };
+
   const columns: ColumnDef<SupplierEvaluation>[] = [
+    {
+      id: "select",
+      header: ({ table }) => (
+        <div className="flex items-center gap-2">
+          <Checkbox
+            checked={table.getIsAllPageRowsSelected()}
+            onCheckedChange={(value) => {
+              table.toggleAllPageRowsSelected(!!value);
+              if (value) {
+                setComparisonIds(table.getRowModel().rows.map(row => row.original.id));
+              } else {
+                clearComparison();
+              }
+            }}
+            aria-label="Select all"
+          />
+        </div>
+      ),
+      cell: ({ row }) => (
+        <Checkbox
+          checked={comparisonIds.includes(row.original.id)}
+          onCheckedChange={() => toggleComparison(row.original.id)}
+          aria-label="Select row"
+        />
+      ),
+      enableSorting: false,
+      enableHiding: false,
+    },
     {
       accessorKey: "evaluation_number",
       header: "Evaluation No.",
@@ -148,10 +225,18 @@ export default function SupplierScorecard() {
             Evaluate and track supplier performance metrics
           </p>
         </div>
-        <Button onClick={() => setIsCreateDialogOpen(true)}>
-          <Plus className="mr-2 h-4 w-4" />
-          New Evaluation
-        </Button>
+        <div className="flex gap-2">
+          {comparisonIds.length > 0 && (
+            <Button variant="outline" onClick={clearComparison}>
+              <GitCompare className="mr-2 h-4 w-4" />
+              Compare ({comparisonIds.length})
+            </Button>
+          )}
+          <Button onClick={() => setIsCreateDialogOpen(true)}>
+            <Plus className="mr-2 h-4 w-4" />
+            New Evaluation
+          </Button>
+        </div>
       </div>
 
       {/* Summary Cards */}
@@ -211,7 +296,20 @@ export default function SupplierScorecard() {
         </Card>
       </div>
 
-      {/* Filters */}
+      {/* Charts */}
+      <ScorecardCharts evaluations={evaluations} />
+
+      {/* Recommendations */}
+      <ScorecardRecommendations evaluations={evaluations} />
+
+      {/* Comparison View */}
+      <ScorecardComparison 
+        evaluations={comparisonEvaluations} 
+        onRemove={removeFromComparison}
+        onClear={clearComparison}
+      />
+
+      {/* Filters & Table */}
       <Card>
         <CardHeader>
           <CardTitle>Supplier Evaluations</CardTitle>
@@ -220,23 +318,27 @@ export default function SupplierScorecard() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="flex items-center gap-4 mb-4">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search by supplier, product, or evaluation number..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
-              />
-            </div>
-          </div>
-
-          <DataTable
-            columns={columns}
-            data={filteredEvaluations}
-            isLoading={isLoading}
+          <ScorecardFilters
+            searchTerm={searchTerm}
+            onSearchChange={setSearchTerm}
+            statusFilter={statusFilter}
+            onStatusFilterChange={setStatusFilter}
+            performanceFilter={performanceFilter}
+            onPerformanceFilterChange={setPerformanceFilter}
+            dateFrom={dateFrom}
+            dateTo={dateTo}
+            onDateFromChange={setDateFrom}
+            onDateToChange={setDateTo}
+            onReset={handleResetFilters}
           />
+
+          <div className="mt-4">
+            <DataTable
+              columns={columns}
+              data={filteredEvaluations}
+              isLoading={isLoading}
+            />
+          </div>
         </CardContent>
       </Card>
 
