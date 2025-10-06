@@ -39,11 +39,13 @@ import { Calendar } from "@/components/ui/calendar";
 import { useSuppliers } from "@/hooks/useSuppliers";
 import { useCreateSupplierEvaluation } from "@/hooks/useSupplierEvaluations";
 import { useCompany } from "@/contexts/CompanyContext";
+import { useSupplierItems } from "@/hooks/useSupplierItems";
 import { cn } from "@/lib/utils";
 
 const formSchema = z.object({
   supplier_id: z.string().min(1, "Please select a supplier"),
   product_name: z.string().min(1, "Product name is required"),
+  warehouse_item_id: z.string().optional(),
   evaluation_period_start: z.date({
     required_error: "Start date is required",
   }),
@@ -75,16 +77,24 @@ export function CreateSupplierEvaluationDialog({
     defaultValues: {
       supplier_id: "",
       product_name: "",
+      warehouse_item_id: "",
     },
   });
 
+  const selectedSupplierId = form.watch("supplier_id");
+  const { data: supplierItems = [] } = useSupplierItems(selectedSupplierId);
+
   const onSubmit = async (data: FormData) => {
     try {
+      const supplierItem = supplierItems.find(si => si.warehouse_item_id === data.warehouse_item_id);
+      
       await createEvaluationMutation.mutateAsync({
         supplier_id: data.supplier_id,
         product_name: data.product_name,
         evaluation_period_start: data.evaluation_period_start.toISOString().split('T')[0],
         evaluation_period_end: data.evaluation_period_end.toISOString().split('T')[0],
+        warehouse_item_id: data.warehouse_item_id || undefined,
+        supplier_item_id: supplierItem?.id || undefined,
         company_id: selectedCompany?.id,
       });
       
@@ -140,18 +150,58 @@ export function CreateSupplierEvaluationDialog({
 
               <FormField
                 control={form.control}
-                name="product_name"
+                name="warehouse_item_id"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Product Name</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Enter product name" {...field} />
-                    </FormControl>
+                    <FormLabel>Item (Optional)</FormLabel>
+                    <Select 
+                      onValueChange={(value) => {
+                        field.onChange(value);
+                        const item = supplierItems.find(si => si.warehouse_item_id === value);
+                        if (item) {
+                          form.setValue('product_name', item.warehouse_item?.name || '');
+                        }
+                      }} 
+                      value={field.value}
+                      disabled={!selectedSupplierId}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder={selectedSupplierId ? "Select item or enter manually" : "Select supplier first"} />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {supplierItems.map((item) => (
+                          <SelectItem key={item.id} value={item.warehouse_item_id}>
+                            <div className="flex flex-col">
+                              <span className="font-medium">{item.warehouse_item?.name}</span>
+                              <span className="text-xs text-muted-foreground">
+                                {item.warehouse_item?.item_code}
+                              </span>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                     <FormMessage />
                   </FormItem>
                 )}
               />
             </div>
+
+            <FormField
+              control={form.control}
+              name="product_name"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Product Name</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Enter product name or select item above" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
             <div className="grid grid-cols-2 gap-4">
               <FormField

@@ -9,17 +9,24 @@ export interface SupplierEvaluation {
   total_points_achieved: number;
   total_possible_points: number;
   performance_rate: number;
-  status: string; // Changed from union to string to match database
+  status: string;
   evaluated_by?: string;
   company_id?: string;
   created_by?: string;
   created_at: string;
   updated_at: string;
+  warehouse_item_id?: string;
+  supplier_item_id?: string;
   // Related data
   supplier?: {
     id: string;
     name: string;
     supplier_code: string;
+  };
+  warehouse_item?: {
+    id: string;
+    item_code: string;
+    name: string;
   };
   entries?: SupplierEvaluationEntry[];
 }
@@ -30,6 +37,7 @@ export interface SupplierEvaluationEntry {
   receipt_date: string;
   po_delivery_date: string;
   po_number?: string;
+  warehouse_item_id?: string;
   // Product Quality flags
   passed_first_time: boolean;
   passed_after_rework: boolean;
@@ -47,6 +55,12 @@ export interface SupplierEvaluationEntry {
   notes?: string;
   created_at: string;
   updated_at: string;
+  // Related data
+  warehouse_item?: {
+    id: string;
+    item_code: string;
+    name: string;
+  };
 }
 
 export interface CreateSupplierEvaluationData {
@@ -54,6 +68,8 @@ export interface CreateSupplierEvaluationData {
   product_name: string;
   evaluation_period_start: string;
   evaluation_period_end: string;
+  warehouse_item_id?: string;
+  supplier_item_id?: string;
   company_id?: string;
 }
 
@@ -62,6 +78,7 @@ export interface CreateSupplierEvaluationEntryData {
   receipt_date: string;
   po_delivery_date: string;
   po_number?: string;
+  warehouse_item_id?: string;
   // Only one quality option should be true
   passed_first_time?: boolean;
   passed_after_rework?: boolean;

@@ -2862,6 +2862,7 @@ export type Database = {
           receipt_date: string
           total_score: number
           updated_at: string
+          warehouse_item_id: string | null
           within_14_days: boolean | null
           within_due_date: boolean | null
         }
@@ -2883,6 +2884,7 @@ export type Database = {
           receipt_date: string
           total_score?: number
           updated_at?: string
+          warehouse_item_id?: string | null
           within_14_days?: boolean | null
           within_due_date?: boolean | null
         }
@@ -2904,6 +2906,7 @@ export type Database = {
           receipt_date?: string
           total_score?: number
           updated_at?: string
+          warehouse_item_id?: string | null
           within_14_days?: boolean | null
           within_due_date?: boolean | null
         }
@@ -2913,6 +2916,13 @@ export type Database = {
             columns: ["evaluation_id"]
             isOneToOne: false
             referencedRelation: "supplier_evaluations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_evaluation_entries_warehouse_item_id_fkey"
+            columns: ["warehouse_item_id"]
+            isOneToOne: false
+            referencedRelation: "warehouse_items"
             referencedColumns: ["id"]
           },
         ]
@@ -2931,10 +2941,12 @@ export type Database = {
           product_name: string
           status: string
           supplier_id: string
+          supplier_item_id: string | null
           total_deliveries: number
           total_points_achieved: number
           total_possible_points: number
           updated_at: string
+          warehouse_item_id: string | null
         }
         Insert: {
           company_id?: string | null
@@ -2949,10 +2961,12 @@ export type Database = {
           product_name: string
           status?: string
           supplier_id: string
+          supplier_item_id?: string | null
           total_deliveries?: number
           total_points_achieved?: number
           total_possible_points?: number
           updated_at?: string
+          warehouse_item_id?: string | null
         }
         Update: {
           company_id?: string | null
@@ -2967,10 +2981,12 @@ export type Database = {
           product_name?: string
           status?: string
           supplier_id?: string
+          supplier_item_id?: string | null
           total_deliveries?: number
           total_points_achieved?: number
           total_possible_points?: number
           updated_at?: string
+          warehouse_item_id?: string | null
         }
         Relationships: [
           {
@@ -2978,6 +2994,20 @@ export type Database = {
             columns: ["supplier_id"]
             isOneToOne: false
             referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_evaluations_supplier_item_id_fkey"
+            columns: ["supplier_item_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_evaluations_warehouse_item_id_fkey"
+            columns: ["warehouse_item_id"]
+            isOneToOne: false
+            referencedRelation: "warehouse_items"
             referencedColumns: ["id"]
           },
         ]

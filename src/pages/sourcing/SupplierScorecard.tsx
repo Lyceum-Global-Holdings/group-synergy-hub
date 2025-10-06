@@ -65,6 +65,16 @@ export default function SupplierScorecard() {
     {
       accessorKey: "product_name",
       header: "Product",
+      cell: ({ row }) => (
+        <div>
+          <div className="font-medium">{row.original.product_name}</div>
+          {row.original.warehouse_item && (
+            <div className="text-sm text-muted-foreground">
+              {row.original.warehouse_item.item_code}
+            </div>
+          )}
+        </div>
+      ),
     },
     {
       accessorKey: "evaluation_period_start",

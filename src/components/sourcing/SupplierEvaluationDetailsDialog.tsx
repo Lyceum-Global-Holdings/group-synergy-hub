@@ -15,8 +15,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { DataTable } from "@/components/ui/data-table";
 import { SupplierEvaluation, SupplierEvaluationEntry } from "@/types/supplierEvaluation";
-import { useSupplierEvaluationEntries } from "@/hooks/useSupplierEvaluations";
+import { useSupplierEvaluationEntries, useCreateSupplierEvaluationEntry } from "@/hooks/useSupplierEvaluations";
 import { ColumnDef } from "@tanstack/react-table";
+import { BulkEvaluationEntryForm } from "./BulkEvaluationEntryForm";
 
 const statusColors = {
   draft: "bg-yellow-100 text-yellow-800 border-yellow-200",
@@ -35,7 +36,9 @@ export function SupplierEvaluationDetailsDialog({
   open,
   onOpenChange,
 }: SupplierEvaluationDetailsDialogProps) {
+  const [showBulkEntry, setShowBulkEntry] = useState(false);
   const { data: entries = [], isLoading } = useSupplierEvaluationEntries(evaluation.id);
+  const createEntryMutation = useCreateSupplierEvaluationEntry();
 
   const columns: ColumnDef<SupplierEvaluationEntry>[] = [
     {
@@ -200,20 +203,41 @@ export function SupplierEvaluationDetailsDialog({
               <div className="flex items-center justify-between">
                 <CardTitle className="flex items-center gap-2">
                   <FileText className="h-5 w-5" />
-                  Evaluation Entries
+                  {showBulkEntry ? "Add Delivery Records" : "Evaluation Entries"}
                 </CardTitle>
-                <Button size="sm" variant="outline">
-                  <Plus className="mr-2 h-4 w-4" />
-                  Add Entry
-                </Button>
+                {!showBulkEntry && (
+                  <Button size="sm" variant="outline" onClick={() => setShowBulkEntry(true)}>
+                    <Plus className="mr-2 h-4 w-4" />
+                    Add Deliveries
+                  </Button>
+                )}
               </div>
             </CardHeader>
             <CardContent>
-              <DataTable
-                columns={columns}
-                data={entries}
-                isLoading={isLoading}
-              />
+              {showBulkEntry ? (
+                <BulkEvaluationEntryForm
+                  onSubmit={(bulkEntries) => {
+                    Promise.all(
+                      bulkEntries.map(entry =>
+                        createEntryMutation.mutateAsync({
+                          ...entry,
+                          evaluation_id: evaluation.id,
+                          warehouse_item_id: evaluation.warehouse_item_id,
+                        })
+                      )
+                    ).then(() => {
+                      setShowBulkEntry(false);
+                    });
+                  }}
+                  onCancel={() => setShowBulkEntry(false)}
+                />
+              ) : (
+                <DataTable
+                  columns={columns}
+                  data={entries}
+                  isLoading={isLoading}
+                />
+              )}
             </CardContent>
           </Card>
         </div>

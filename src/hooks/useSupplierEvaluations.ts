@@ -17,7 +17,8 @@ export const useSupplierEvaluations = () => {
         .from("supplier_evaluations")
         .select(`
           *,
-          supplier:suppliers(id, name, supplier_code)
+          supplier:suppliers(id, name, supplier_code),
+          warehouse_item:warehouse_items(id, item_code, name)
         `)
         .order("created_at", { ascending: false });
 
@@ -37,7 +38,11 @@ export const useSupplierEvaluation = (id: string) => {
         .select(`
           *,
           supplier:suppliers(id, name, supplier_code),
-          entries:supplier_evaluation_entries(*)
+          warehouse_item:warehouse_items(id, item_code, name),
+          entries:supplier_evaluation_entries(
+            *,
+            warehouse_item:warehouse_items(id, item_code, name)
+          )
         `)
         .eq("id", id)
         .maybeSingle();
@@ -71,7 +76,8 @@ export const useCreateSupplierEvaluation = () => {
         .insert(evaluationData)
         .select(`
           *,
-          supplier:suppliers(id, name, supplier_code)
+          supplier:suppliers(id, name, supplier_code),
+          warehouse_item:warehouse_items(id, item_code, name)
         `)
         .single();
 
@@ -113,7 +119,8 @@ export const useUpdateSupplierEvaluation = () => {
         .eq("id", id)
         .select(`
           *,
-          supplier:suppliers(id, name, supplier_code)
+          supplier:suppliers(id, name, supplier_code),
+          warehouse_item:warehouse_items(id, item_code, name)
         `)
         .single();
 
@@ -175,7 +182,10 @@ export const useSupplierEvaluationEntries = (evaluationId: string) => {
     queryFn: async (): Promise<SupplierEvaluationEntry[]> => {
       const { data, error } = await supabase
         .from("supplier_evaluation_entries")
-        .select("*")
+        .select(`
+          *,
+          warehouse_item:warehouse_items(id, item_code, name)
+        `)
         .eq("evaluation_id", evaluationId)
         .order("receipt_date", { ascending: false });
 
