@@ -892,6 +892,56 @@ export type Database = {
           },
         ]
       }
+      evaluation_rules: {
+        Row: {
+          action_type: string
+          company_id: string | null
+          comparison_operator: string
+          created_at: string
+          created_by: string | null
+          id: string
+          is_active: boolean | null
+          rule_name: string
+          rule_type: string
+          threshold_value: number
+          updated_at: string
+        }
+        Insert: {
+          action_type: string
+          company_id?: string | null
+          comparison_operator: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean | null
+          rule_name: string
+          rule_type: string
+          threshold_value: number
+          updated_at?: string
+        }
+        Update: {
+          action_type?: string
+          company_id?: string | null
+          comparison_operator?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean | null
+          rule_name?: string
+          rule_type?: string
+          threshold_value?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "evaluation_rules_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       finished_goods: {
         Row: {
           available_sizes: Json | null
@@ -2796,6 +2846,85 @@ export type Database = {
         }
         Relationships: []
       }
+      supplier_action_items: {
+        Row: {
+          assigned_to: string | null
+          company_id: string | null
+          completed_at: string | null
+          completed_by: string | null
+          created_at: string
+          created_by: string | null
+          description: string | null
+          due_date: string | null
+          id: string
+          notes: string | null
+          priority: string
+          recommendation_id: string | null
+          status: string
+          supplier_id: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          assigned_to?: string | null
+          company_id?: string | null
+          completed_at?: string | null
+          completed_by?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          due_date?: string | null
+          id?: string
+          notes?: string | null
+          priority?: string
+          recommendation_id?: string | null
+          status?: string
+          supplier_id: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          assigned_to?: string | null
+          company_id?: string | null
+          completed_at?: string | null
+          completed_by?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          due_date?: string | null
+          id?: string
+          notes?: string | null
+          priority?: string
+          recommendation_id?: string | null
+          status?: string
+          supplier_id?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "supplier_action_items_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_action_items_recommendation_id_fkey"
+            columns: ["recommendation_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_recommendations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_action_items_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       supplier_analytics_cache: {
         Row: {
           avg_performance_rate: number
@@ -3153,6 +3282,72 @@ export type Database = {
             columns: ["warehouse_item_id"]
             isOneToOne: false
             referencedRelation: "warehouse_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      supplier_recommendations: {
+        Row: {
+          action_taken: boolean | null
+          action_taken_at: string | null
+          action_taken_by: string | null
+          company_id: string | null
+          created_at: string
+          description: string
+          expires_at: string | null
+          id: string
+          potential_savings: number | null
+          priority: string
+          recommendation_type: string
+          risk_level: string | null
+          supplier_id: string
+          title: string
+        }
+        Insert: {
+          action_taken?: boolean | null
+          action_taken_at?: string | null
+          action_taken_by?: string | null
+          company_id?: string | null
+          created_at?: string
+          description: string
+          expires_at?: string | null
+          id?: string
+          potential_savings?: number | null
+          priority?: string
+          recommendation_type: string
+          risk_level?: string | null
+          supplier_id: string
+          title: string
+        }
+        Update: {
+          action_taken?: boolean | null
+          action_taken_at?: string | null
+          action_taken_by?: string | null
+          company_id?: string | null
+          created_at?: string
+          description?: string
+          expires_at?: string | null
+          id?: string
+          potential_savings?: number | null
+          priority?: string
+          recommendation_type?: string
+          risk_level?: string | null
+          supplier_id?: string
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "supplier_recommendations_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_recommendations_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
             referencedColumns: ["id"]
           },
         ]
