@@ -19,11 +19,23 @@ export const LocationManagementDialog = () => {
     type: LocationType;
     parent_id: string;
     description: string;
+    location_code: string;
+    capacity: string;
+    contact_person: string;
+    contact_phone: string;
+    physical_address: string;
+    status: 'active' | 'inactive' | 'maintenance' | 'closed';
   }>({
     name: '',
     type: 'location',
     parent_id: 'none',
-    description: ''
+    description: '',
+    location_code: '',
+    capacity: '',
+    contact_person: '',
+    contact_phone: '',
+    physical_address: '',
+    status: 'active'
   });
 
   const { 
@@ -45,7 +57,13 @@ export const LocationManagementDialog = () => {
       name: formData.name,
       type: formData.type,
       parent_id: formData.parent_id === 'none' ? undefined : formData.parent_id,
-      description: formData.description || undefined
+      description: formData.description || undefined,
+      location_code: formData.location_code || undefined,
+      capacity: formData.capacity ? parseFloat(formData.capacity) : undefined,
+      contact_person: formData.contact_person || undefined,
+      contact_phone: formData.contact_phone || undefined,
+      physical_address: formData.physical_address || undefined,
+      status: formData.status
     };
 
     if (editingLocation) {
@@ -58,7 +76,18 @@ export const LocationManagementDialog = () => {
   };
 
   const resetForm = () => {
-    setFormData({ name: '', type: 'location', parent_id: 'none', description: '' });
+    setFormData({ 
+      name: '', 
+      type: 'location', 
+      parent_id: 'none', 
+      description: '',
+      location_code: '',
+      capacity: '',
+      contact_person: '',
+      contact_phone: '',
+      physical_address: '',
+      status: 'active'
+    });
     setEditingLocation(null);
   };
 
@@ -67,7 +96,13 @@ export const LocationManagementDialog = () => {
       name: location.name,
       type: location.type,
       parent_id: location.parent_id || 'none',
-      description: location.description || ''
+      description: location.description || '',
+      location_code: location.location_code || '',
+      capacity: location.capacity ? location.capacity.toString() : '',
+      contact_person: location.contact_person || '',
+      contact_phone: location.contact_phone || '',
+      physical_address: location.physical_address || '',
+      status: location.status || 'active'
     });
     setEditingLocation(location.id);
   };
@@ -176,13 +211,89 @@ export const LocationManagementDialog = () => {
               )}
 
               <div>
+                <Label htmlFor="location_code">Location Code</Label>
+                <Input
+                  id="location_code"
+                  value={formData.location_code}
+                  onChange={(e) => setFormData({ ...formData, location_code: e.target.value })}
+                  placeholder="e.g., WH-001, BAY-A12"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="capacity">Capacity</Label>
+                  <Input
+                    id="capacity"
+                    type="number"
+                    step="0.01"
+                    value={formData.capacity}
+                    onChange={(e) => setFormData({ ...formData, capacity: e.target.value })}
+                    placeholder="Storage capacity"
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="status">Status</Label>
+                  <Select
+                    value={formData.status}
+                    onValueChange={(value: 'active' | 'inactive' | 'maintenance' | 'closed') => 
+                      setFormData({ ...formData, status: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="active">Active</SelectItem>
+                      <SelectItem value="inactive">Inactive</SelectItem>
+                      <SelectItem value="maintenance">Maintenance</SelectItem>
+                      <SelectItem value="closed">Closed</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="contact_person">Contact Person</Label>
+                  <Input
+                    id="contact_person"
+                    value={formData.contact_person}
+                    onChange={(e) => setFormData({ ...formData, contact_person: e.target.value })}
+                    placeholder="Location manager name"
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="contact_phone">Contact Phone</Label>
+                  <Input
+                    id="contact_phone"
+                    value={formData.contact_phone}
+                    onChange={(e) => setFormData({ ...formData, contact_phone: e.target.value })}
+                    placeholder="Phone number"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <Label htmlFor="physical_address">Physical Address</Label>
+                <Textarea
+                  id="physical_address"
+                  value={formData.physical_address}
+                  onChange={(e) => setFormData({ ...formData, physical_address: e.target.value })}
+                  placeholder="Enter physical address"
+                  rows={2}
+                />
+              </div>
+
+              <div>
                 <Label htmlFor="description">Description</Label>
                 <Textarea
                   id="description"
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                   placeholder="Enter location description"
-                  rows={3}
+                  rows={2}
                 />
               </div>
 

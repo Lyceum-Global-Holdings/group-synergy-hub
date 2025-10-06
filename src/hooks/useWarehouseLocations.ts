@@ -124,7 +124,7 @@ export const useWarehouseLocations = () => {
     locations,
     isLoading,
     error,
-    createLocation: createLocationMutation.mutate,
+    createLocation: createLocationMutation.mutateAsync,
     updateLocation: updateLocationMutation.mutate,
     deleteLocation: deleteLocationMutation.mutate,
     isCreating: createLocationMutation.isPending,

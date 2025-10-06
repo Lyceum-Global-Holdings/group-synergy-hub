@@ -21,7 +21,12 @@ import {
 } from '@/components/ui/select';
 import { useWarehouseLocations } from '@/hooks/useWarehouseLocations';
 import { LocationManagementDialog } from '@/components/warehouse/LocationManagementDialog';
+import { LocationAnalytics } from '@/components/warehouse/LocationAnalytics';
+import { LocationUtilizationChart } from '@/components/warehouse/LocationUtilizationChart';
+import { ImportLocationsDialog } from '@/components/warehouse/ImportLocationsDialog';
+import { LocationTemplateDialog } from '@/components/warehouse/LocationTemplateDialog';
 import { useToast } from '@/hooks/use-toast';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 export default function WarehouseManagement() {
   const [searchTerm, setSearchTerm] = useState('');
@@ -132,7 +137,11 @@ export default function WarehouseManagement() {
             Manage warehouse locations, sublocations, and departments
           </p>
         </div>
-        <LocationManagementDialog />
+        <div className="flex items-center gap-2">
+          <ImportLocationsDialog />
+          <LocationTemplateDialog />
+          <LocationManagementDialog />
+        </div>
       </div>
 
       {/* Statistics Cards */}
@@ -227,8 +236,17 @@ export default function WarehouseManagement() {
         </CardContent>
       </Card>
 
-      {/* Locations Table */}
-      <Card>
+      {/* Tabs for different views */}
+      <Tabs defaultValue="locations" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="locations">Locations</TabsTrigger>
+          <TabsTrigger value="analytics">Analytics</TabsTrigger>
+          <TabsTrigger value="utilization">Utilization Chart</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="locations" className="space-y-4">
+          {/* Locations Table */}
+          <Card>
         <CardHeader>
           <CardTitle>Warehouse Locations</CardTitle>
         </CardHeader>
@@ -335,6 +353,16 @@ export default function WarehouseManagement() {
           </div>
         </CardContent>
       </Card>
+        </TabsContent>
+
+        <TabsContent value="analytics">
+          <LocationAnalytics />
+        </TabsContent>
+
+        <TabsContent value="utilization">
+          <LocationUtilizationChart />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

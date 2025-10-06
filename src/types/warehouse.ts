@@ -60,6 +60,12 @@ export interface CreateWarehouseLocationData {
   parent_id?: string;
   description?: string;
   company_id?: string;
+  location_code?: string;
+  capacity?: number;
+  contact_person?: string;
+  contact_phone?: string;
+  physical_address?: string;
+  status?: 'active' | 'inactive' | 'maintenance' | 'closed';
 }
 
 export interface CreateAssetCategoryData {

@@ -5,7 +5,8 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Loader2, ArrowRight, MapPin } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Loader2, ArrowRight, MapPin, AlertTriangle } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -101,6 +102,35 @@ export function AssetTransferDialog({
   const sublocations = getLocationsByType('sublocation', selectedLocationId);
   const departments = getLocationsByType('department', selectedSublocationId || selectedLocationId);
 
+  // Get selected location details for capacity warning
+  const selectedLocation = selectedLocationId 
+    ? locations.find(l => l.id === selectedLocationId)
+    : null;
+  const selectedSublocation = selectedSublocationId
+    ? locations.find(l => l.id === selectedSublocationId)
+    : null;
+
+  const getCapacityWarning = (location: WarehouseLocation | null | undefined) => {
+    if (!location || !location.capacity) return null;
+    
+    const usage = (location.current_usage || 0) / location.capacity;
+    if (usage > 0.9) {
+      return {
+        level: 'error',
+        message: `Warning: ${location.name} is at ${(usage * 100).toFixed(0)}% capacity!`
+      };
+    } else if (usage > 0.75) {
+      return {
+        level: 'warning',
+        message: `${location.name} is at ${(usage * 100).toFixed(0)}% capacity`
+      };
+    }
+    return null;
+  };
+
+  const locationWarning = getCapacityWarning(selectedLocation);
+  const sublocationWarning = getCapacityWarning(selectedSublocation);
+
   if (!asset) return null;
 
   return (
@@ -162,6 +192,11 @@ export function AssetTransferDialog({
                             {mainLocations.map((location) => (
                               <SelectItem key={location.id} value={location.id}>
                                 {location.name}
+                                {location.capacity && location.current_usage !== undefined && (
+                                  <span className="text-xs text-muted-foreground ml-2">
+                                    ({((location.current_usage / location.capacity) * 100).toFixed(0)}% full)
+                                  </span>
+                                )}
                               </SelectItem>
                             ))}
                           </SelectContent>
@@ -170,6 +205,13 @@ export function AssetTransferDialog({
                       </FormItem>
                     )}
                   />
+                  
+                  {locationWarning && (
+                    <Alert variant={locationWarning.level === 'error' ? 'destructive' : 'default'}>
+                      <AlertTriangle className="h-4 w-4" />
+                      <AlertDescription>{locationWarning.message}</AlertDescription>
+                    </Alert>
+                  )}
                   
                   {selectedLocationId && (
                     <FormField
@@ -188,6 +230,11 @@ export function AssetTransferDialog({
                               {sublocations.map((sublocation) => (
                                 <SelectItem key={sublocation.id} value={sublocation.id}>
                                   {sublocation.name}
+                                  {sublocation.capacity && sublocation.current_usage !== undefined && (
+                                    <span className="text-xs text-muted-foreground ml-2">
+                                      ({((sublocation.current_usage / sublocation.capacity) * 100).toFixed(0)}% full)
+                                    </span>
+                                  )}
                                 </SelectItem>
                               ))}
                             </SelectContent>
@@ -196,6 +243,13 @@ export function AssetTransferDialog({
                         </FormItem>
                       )}
                     />
+                  )}
+
+                  {sublocationWarning && (
+                    <Alert variant={sublocationWarning.level === 'error' ? 'destructive' : 'default'}>
+                      <AlertTriangle className="h-4 w-4" />
+                      <AlertDescription>{sublocationWarning.message}</AlertDescription>
+                    </Alert>
                   )}
 
                   {(selectedLocationId || selectedSublocationId) && (
