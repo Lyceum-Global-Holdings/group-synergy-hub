@@ -1636,6 +1636,7 @@ export type Database = {
           created_at: string
           description: string | null
           id: string
+          issued_at: string | null
           item_code: string | null
           item_id: string
           line_number: number | null
@@ -1645,6 +1646,7 @@ export type Database = {
           quantity_issued: number
           quantity_received: number | null
           quantity_required: number | null
+          received_at: string | null
           recipient_signature: string | null
           total_cost: number | null
           unit_cost: number | null
@@ -1655,6 +1657,7 @@ export type Database = {
           created_at?: string
           description?: string | null
           id?: string
+          issued_at?: string | null
           item_code?: string | null
           item_id: string
           line_number?: number | null
@@ -1664,6 +1667,7 @@ export type Database = {
           quantity_issued: number
           quantity_received?: number | null
           quantity_required?: number | null
+          received_at?: string | null
           recipient_signature?: string | null
           total_cost?: number | null
           unit_cost?: number | null
@@ -1674,6 +1678,7 @@ export type Database = {
           created_at?: string
           description?: string | null
           id?: string
+          issued_at?: string | null
           item_code?: string | null
           item_id?: string
           line_number?: number | null
@@ -1683,6 +1688,7 @@ export type Database = {
           quantity_issued?: number
           quantity_received?: number | null
           quantity_required?: number | null
+          received_at?: string | null
           recipient_signature?: string | null
           total_cost?: number | null
           unit_cost?: number | null

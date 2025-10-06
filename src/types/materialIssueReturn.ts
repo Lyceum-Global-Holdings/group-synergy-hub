@@ -77,6 +77,8 @@ export interface MaterialIssueItem {
   quantity_required: number | null;
   quantity_received: number | null;
   recipient_signature: string | null;
+  issued_at: string | null;
+  received_at: string | null;
 }
 
 export interface CreateMaterialIssueItemData {

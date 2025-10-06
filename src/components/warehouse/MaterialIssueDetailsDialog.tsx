@@ -243,6 +243,8 @@ export function MaterialIssueDetailsDialog({ open, onOpenChange, issueId }: Mate
                     <TableHead className="text-right">Required</TableHead>
                     <TableHead className="text-right">Received</TableHead>
                     <TableHead className="text-right">Variance</TableHead>
+                    <TableHead>Issued At</TableHead>
+                    <TableHead>Received At</TableHead>
                     <TableHead>Status</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -274,6 +276,22 @@ export function MaterialIssueDetailsDialog({ open, onOpenChange, issueId }: Mate
                           variance > 0 ? 'text-green-600' : variance < 0 ? 'text-red-600' : 'text-muted-foreground'
                         }`}>
                           {variance !== 0 && (variance > 0 ? '+' : '')}{variance}
+                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
+                          {item.issued_at ? new Date(item.issued_at).toLocaleString('en-US', { 
+                            month: 'short', 
+                            day: 'numeric', 
+                            hour: '2-digit', 
+                            minute: '2-digit' 
+                          }) : '-'}
+                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
+                          {item.received_at ? new Date(item.received_at).toLocaleString('en-US', { 
+                            month: 'short', 
+                            day: 'numeric', 
+                            hour: '2-digit', 
+                            minute: '2-digit' 
+                          }) : '-'}
                         </TableCell>
                         <TableCell>{getStatusBadge()}</TableCell>
                       </TableRow>

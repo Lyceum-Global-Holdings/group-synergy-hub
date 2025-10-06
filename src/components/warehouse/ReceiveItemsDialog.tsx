@@ -79,12 +79,15 @@ export function ReceiveItemsDialog({ open, onOpenChange, issueId, onSuccess }: R
         .eq('user_id', user.id)
         .single();
 
-      // Update each item with received quantity
+      const currentTimestamp = new Date().toISOString();
+
+      // Update each item with received quantity and received_at timestamp
       const updatePromises = items.map(item => 
         supabase
           .from('material_issue_items')
           .update({
             quantity_received: receivedQuantities[item.id] || 0,
+            received_at: currentTimestamp
           })
           .eq('id', item.id)
       );

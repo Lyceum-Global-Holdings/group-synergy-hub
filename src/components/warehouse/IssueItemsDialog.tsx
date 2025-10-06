@@ -67,6 +67,15 @@ export function IssueItemsDialog({ open, onOpenChange, issueId, onSuccess }: Iss
         .eq('user_id', user.id)
         .single();
 
+      // Fetch company_id from material issue note
+      const { data: issueNote, error: issueNoteError } = await supabase
+        .from('material_issue_notes')
+        .select('company_id')
+        .eq('id', issueId)
+        .single();
+
+      if (issueNoteError) throw issueNoteError;
+
       // Fetch current stock for all items and validate
       const itemIds = items.map(item => item.item_id);
       const { data: warehouseItems, error: stockFetchError } = await supabase
@@ -93,7 +102,9 @@ export function IssueItemsDialog({ open, onOpenChange, issueId, onSuccess }: Iss
         return;
       }
 
-      // Create stock transactions with correct before/after values
+      const currentTimestamp = new Date().toISOString();
+
+      // Create stock transactions with correct before/after values and company_id
       const stockTransactions = items.map(item => {
         const currentStock = stockMap.get(item.item_id) || 0;
         return {
@@ -107,6 +118,8 @@ export function IssueItemsDialog({ open, onOpenChange, issueId, onSuccess }: Iss
           unit_cost: item.unit_cost || 0,
           total_value: item.total_cost || 0,
           notes: `Material Issue: ${issueId}`,
+          company_id: issueNote.company_id,
+          created_by: user.id
         };
       });
 
@@ -117,9 +130,11 @@ export function IssueItemsDialog({ open, onOpenChange, issueId, onSuccess }: Iss
 
       if (stockError) throw stockError;
 
-      // Update warehouse items stock levels
+      // Update warehouse items stock levels and material_issue_items with issued_at
       for (const item of items) {
         const currentStock = stockMap.get(item.item_id) || 0;
+        
+        // Update warehouse stock
         const { error: updateStockError } = await supabase
           .from('warehouse_items')
           .update({ 
@@ -128,6 +143,17 @@ export function IssueItemsDialog({ open, onOpenChange, issueId, onSuccess }: Iss
           .eq('id', item.item_id);
 
         if (updateStockError) throw updateStockError;
+
+        // Update material_issue_items with issued_at and default quantity_received
+        const { error: updateItemError } = await supabase
+          .from('material_issue_items')
+          .update({ 
+            issued_at: currentTimestamp,
+            quantity_received: item.quantity_issued // Default qty_received to qty_issued
+          })
+          .eq('id', item.id);
+
+        if (updateItemError) throw updateItemError;
       }
 
       // Update material issue note status
@@ -189,7 +215,7 @@ export function IssueItemsDialog({ open, onOpenChange, issueId, onSuccess }: Iss
                   <TableCell>{item.item_code}</TableCell>
                   <TableCell>{item.description}</TableCell>
                   <TableCell>{item.unit_of_measure}</TableCell>
-                  <TableCell>{item.quantity_required || item.quantity_issued}</TableCell>
+                  <TableCell>{item.quantity_issued || item.quantity_required}</TableCell>
                 </TableRow>
               ))}
             </TableBody>
