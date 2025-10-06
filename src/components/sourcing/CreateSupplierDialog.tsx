@@ -169,12 +169,12 @@ export const CreateSupplierDialog: React.FC<CreateSupplierDialogProps> = ({
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
             <Tabs value={activeTab} onValueChange={setActiveTab}>
-              <TabsList className="grid w-full grid-cols-4">
-                <TabsTrigger value="basic">Basic Info</TabsTrigger>
-                <TabsTrigger value="contact">Contact</TabsTrigger>
-                <TabsTrigger value="business">Business</TabsTrigger>
-                <TabsTrigger value="contacts">Contacts</TabsTrigger>
-              </TabsList>
+            <TabsList className="grid w-full grid-cols-4">
+              <TabsTrigger value="basic">Basic Info</TabsTrigger>
+              <TabsTrigger value="contact">Contact</TabsTrigger>
+              <TabsTrigger value="business">Business</TabsTrigger>
+              <TabsTrigger value="contacts">Contacts</TabsTrigger>
+            </TabsList>
 
               <TabsContent value="basic" className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

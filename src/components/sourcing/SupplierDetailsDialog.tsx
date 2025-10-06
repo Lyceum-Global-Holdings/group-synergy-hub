@@ -14,6 +14,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { useDeleteSupplierContact } from '@/hooks/useSuppliers';
 import type { Supplier, SupplierContact } from '@/types/supplier';
 import { SUPPLIER_TYPES, SUPPLIER_STATUSES, SUPPLIER_CATEGORIES, PAYMENT_TERMS } from '@/types/supplier';
+import { SupplierItemsSection } from './SupplierItemsSection';
 
 interface SupplierDetailsDialogProps {
   supplier: Supplier;
@@ -115,10 +116,11 @@ export const SupplierDetailsDialog: React.FC<SupplierDetailsDialogProps> = ({
           </DialogHeader>
 
           <Tabs defaultValue="overview" className="w-full">
-            <TabsList className="grid w-full grid-cols-4">
+            <TabsList className="grid w-full grid-cols-5">
               <TabsTrigger value="overview">Overview</TabsTrigger>
               <TabsTrigger value="contacts">Contacts</TabsTrigger>
               <TabsTrigger value="business">Business Info</TabsTrigger>
+              <TabsTrigger value="items">Items</TabsTrigger>
               <TabsTrigger value="activity">Activity</TabsTrigger>
             </TabsList>
 
@@ -390,6 +392,16 @@ export const SupplierDetailsDialog: React.FC<SupplierDetailsDialogProps> = ({
                   </CardContent>
                 </Card>
               </div>
+            </TabsContent>
+
+            <TabsContent value="items" className="space-y-6">
+              <div className="space-y-2">
+                <h3 className="text-lg font-semibold">Supplier Item Catalog</h3>
+                <p className="text-sm text-muted-foreground">
+                  Manage the items this supplier can provide, including pricing and lead times.
+                </p>
+              </div>
+              <SupplierItemsSection supplierId={supplier.id} />
             </TabsContent>
 
             <TabsContent value="activity" className="space-y-6">
