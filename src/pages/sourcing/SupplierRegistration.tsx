@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Plus, FileCheck, Clock, CheckCircle, XCircle, UserCheck } from "lucide-react";
+import { ArrowLeft, Plus, FileCheck, Clock, CheckCircle, XCircle, UserCheck, Copy, ExternalLink, Link2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -10,6 +10,7 @@ import ApprovalDashboard from "@/components/sourcing/ApprovalDashboard";
 import { useSupplierRegistrations } from "@/hooks/useSupplierRegistration";
 import { useCompany } from "@/contexts/CompanyContext";
 import { format } from "date-fns";
+import { useToast } from "@/hooks/use-toast";
 
 export default function SupplierRegistration() {
   const navigate = useNavigate();
@@ -17,6 +18,25 @@ export default function SupplierRegistration() {
   const [activeTab, setActiveTab] = useState("registrations");
   const { selectedCompany } = useCompany();
   const { data: registrations = [], isLoading } = useSupplierRegistrations(selectedCompany?.id);
+  const { toast } = useToast();
+
+  const publicRegistrationUrl = `${window.location.origin}/register-supplier`;
+
+  const copyToClipboard = async () => {
+    try {
+      await navigator.clipboard.writeText(publicRegistrationUrl);
+      toast({
+        title: "Link copied!",
+        description: "Public registration link copied to clipboard",
+      });
+    } catch (error) {
+      toast({
+        title: "Failed to copy",
+        description: "Please copy the link manually",
+        variant: "destructive",
+      });
+    }
+  };
 
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -105,6 +125,44 @@ export default function SupplierRegistration() {
           </Button>
         </div>
       </div>
+
+      <Card className="bg-accent/50 border-primary/20">
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <Link2 className="w-5 h-5 text-primary" />
+            <CardTitle>Public Registration Portal</CardTitle>
+          </div>
+          <CardDescription>
+            Share this link with external suppliers to allow them to register directly
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center gap-2 p-3 bg-background rounded-md border">
+            <code className="flex-1 text-sm">{publicRegistrationUrl}</code>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={copyToClipboard}
+            >
+              <Copy className="w-4 h-4 mr-2" />
+              Copy
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => window.open(publicRegistrationUrl, '_blank')}
+            >
+              <ExternalLink className="w-4 h-4 mr-2" />
+              Preview
+            </Button>
+          </div>
+          <div className="flex items-start gap-2 text-sm text-muted-foreground">
+            <div className="flex-1">
+              <p>Suppliers can fill out their registration information independently. All submissions will appear in the "Pending Approval" tab for review.</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       <Tabs defaultValue="drafts" className="space-y-4">
         <TabsList>
