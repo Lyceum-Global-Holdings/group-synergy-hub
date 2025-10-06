@@ -2997,6 +2997,50 @@ export type Database = {
           },
         ]
       }
+      supplier_approval_workflow: {
+        Row: {
+          assigned_to: string | null
+          completed_at: string | null
+          completed_by: string | null
+          created_at: string
+          id: string
+          notes: string | null
+          registration_request_id: string
+          stage: string
+          status: string
+        }
+        Insert: {
+          assigned_to?: string | null
+          completed_at?: string | null
+          completed_by?: string | null
+          created_at?: string
+          id?: string
+          notes?: string | null
+          registration_request_id: string
+          stage: string
+          status?: string
+        }
+        Update: {
+          assigned_to?: string | null
+          completed_at?: string | null
+          completed_by?: string | null
+          created_at?: string
+          id?: string
+          notes?: string | null
+          registration_request_id?: string
+          stage?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "supplier_approval_workflow_registration_request_id_fkey"
+            columns: ["registration_request_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_registration_requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       supplier_contacts: {
         Row: {
           created_at: string
@@ -3037,6 +3081,63 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "supplier_contacts_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      supplier_documents: {
+        Row: {
+          created_at: string
+          document_type: string
+          file_name: string
+          file_size: number | null
+          file_url: string
+          id: string
+          registration_request_id: string | null
+          supplier_id: string | null
+          uploaded_by: string | null
+          verified_at: string | null
+          verified_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          document_type: string
+          file_name: string
+          file_size?: number | null
+          file_url: string
+          id?: string
+          registration_request_id?: string | null
+          supplier_id?: string | null
+          uploaded_by?: string | null
+          verified_at?: string | null
+          verified_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          document_type?: string
+          file_name?: string
+          file_size?: number | null
+          file_url?: string
+          id?: string
+          registration_request_id?: string | null
+          supplier_id?: string | null
+          uploaded_by?: string | null
+          verified_at?: string | null
+          verified_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "supplier_documents_registration_request_id_fkey"
+            columns: ["registration_request_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_registration_requests"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_documents_supplier_id_fkey"
             columns: ["supplier_id"]
             isOneToOne: false
             referencedRelation: "suppliers"
@@ -3348,6 +3449,65 @@ export type Database = {
             columns: ["supplier_id"]
             isOneToOne: false
             referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      supplier_registration_requests: {
+        Row: {
+          company_id: string | null
+          created_at: string
+          created_by: string | null
+          documents: Json | null
+          id: string
+          rejection_reason: string | null
+          request_type: string
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+          submitted_at: string | null
+          submitted_by: string | null
+          supplier_data: Json
+          updated_at: string
+        }
+        Insert: {
+          company_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          documents?: Json | null
+          id?: string
+          rejection_reason?: string | null
+          request_type?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          submitted_at?: string | null
+          submitted_by?: string | null
+          supplier_data: Json
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          documents?: Json | null
+          id?: string
+          rejection_reason?: string | null
+          request_type?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          submitted_at?: string | null
+          submitted_by?: string | null
+          supplier_data?: Json
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "supplier_registration_requests_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
             referencedColumns: ["id"]
           },
         ]
@@ -3836,6 +3996,22 @@ export type Database = {
           total_deliveries: number
           total_evaluations: number
           trend_direction: string
+        }[]
+      }
+      check_duplicate_supplier: {
+        Args: {
+          p_email?: string
+          p_phone?: string
+          p_supplier_name: string
+          p_tax_id?: string
+        }
+        Returns: {
+          email: string
+          id: string
+          match_reason: string
+          phone: string
+          supplier_name: string
+          tax_id: string
         }[]
       }
       create_user_with_roles: {
