@@ -14,7 +14,8 @@ import { Badge } from '@/components/ui/badge';
 import { Plus, FileText, Eye, Edit, Trash2 } from 'lucide-react';
 import { useMaterialIssues } from '@/hooks/useMaterialIssues';
 import { useMaterialReturns } from '@/hooks/useMaterialReturns';
-import { MaterialIssueDialog } from '@/components/warehouse/MaterialIssueDialog';
+import { CreateMaterialIssueDialog } from '@/components/warehouse/CreateMaterialIssueDialog';
+import { MaterialIssueDetailsDialog } from '@/components/warehouse/MaterialIssueDetailsDialog';
 import { MaterialReturnDialog } from '@/components/warehouse/MaterialReturnDialog';
 import { format } from 'date-fns';
 
@@ -36,10 +37,17 @@ const getStatusColor = (status: string) => {
 
 export default function MaterialIssueReturn() {
   const [issueDialogOpen, setIssueDialogOpen] = useState(false);
+  const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
+  const [selectedIssueId, setSelectedIssueId] = useState<string | null>(null);
   const [returnDialogOpen, setReturnDialogOpen] = useState(false);
   
   const { materialIssues, isLoading: issuesLoading } = useMaterialIssues();
   const { materialReturns, isLoading: returnsLoading } = useMaterialReturns();
+
+  const handleViewDetails = (issueId: string) => {
+    setSelectedIssueId(issueId);
+    setDetailsDialogOpen(true);
+  };
 
   return (
     <div className="space-y-6">
@@ -124,14 +132,8 @@ export default function MaterialIssueReturn() {
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2">
-                            <Button variant="ghost" size="sm">
+                            <Button variant="ghost" size="sm" onClick={() => handleViewDetails(issue.id)}>
                               <Eye className="h-4 w-4" />
-                            </Button>
-                            <Button variant="ghost" size="sm">
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                            <Button variant="ghost" size="sm">
-                              <Trash2 className="h-4 w-4" />
                             </Button>
                           </div>
                         </TableCell>
@@ -237,9 +239,15 @@ export default function MaterialIssueReturn() {
         </TabsContent>
       </Tabs>
 
-      <MaterialIssueDialog
+      <CreateMaterialIssueDialog
         open={issueDialogOpen}
         onOpenChange={setIssueDialogOpen}
+      />
+
+      <MaterialIssueDetailsDialog
+        open={detailsDialogOpen}
+        onOpenChange={setDetailsDialogOpen}
+        issueId={selectedIssueId}
       />
 
       <MaterialReturnDialog

@@ -1634,35 +1634,59 @@ export type Database = {
       material_issue_items: {
         Row: {
           created_at: string
+          description: string | null
           id: string
+          item_code: string | null
           item_id: string
+          line_number: number | null
           min_id: string
           notes: string | null
+          purpose: string | null
           quantity_issued: number
+          quantity_received: number | null
+          quantity_required: number | null
+          recipient_signature: string | null
           total_cost: number | null
           unit_cost: number | null
+          unit_of_measure: string | null
           updated_at: string
         }
         Insert: {
           created_at?: string
+          description?: string | null
           id?: string
+          item_code?: string | null
           item_id: string
+          line_number?: number | null
           min_id: string
           notes?: string | null
+          purpose?: string | null
           quantity_issued: number
+          quantity_received?: number | null
+          quantity_required?: number | null
+          recipient_signature?: string | null
           total_cost?: number | null
           unit_cost?: number | null
+          unit_of_measure?: string | null
           updated_at?: string
         }
         Update: {
           created_at?: string
+          description?: string | null
           id?: string
+          item_code?: string | null
           item_id?: string
+          line_number?: number | null
           min_id?: string
           notes?: string | null
+          purpose?: string | null
           quantity_issued?: number
+          quantity_received?: number | null
+          quantity_required?: number | null
+          recipient_signature?: string | null
           total_cost?: number | null
           unit_cost?: number | null
+          unit_of_measure?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -1687,15 +1711,36 @@ export type Database = {
           approved_by: string | null
           approved_date: string | null
           company_id: string | null
+          contact_number: string | null
           created_at: string
           created_by: string | null
           department: string | null
+          dispatch_note: string | null
+          epf_number: string | null
+          form_reference: string | null
+          hod_approval_date: string | null
+          hod_approved_by: string | null
           id: string
           issue_date: string
+          issued_by: string | null
+          issued_by_name: string | null
           issued_to: string
+          items_required_date: string | null
+          job_number: string | null
+          management_approval_date: string | null
+          management_approved_by: string | null
           min_number: string
+          mr_received_by: string | null
+          mr_received_date: string | null
           notes: string | null
+          order_completed: boolean | null
+          po_number: string | null
+          pr_number: string | null
           purpose: string | null
+          received_by: string | null
+          received_by_name: string | null
+          received_date: string | null
+          requested_by: string | null
           status: string
           total_value: number | null
           updated_at: string
@@ -1704,15 +1749,36 @@ export type Database = {
           approved_by?: string | null
           approved_date?: string | null
           company_id?: string | null
+          contact_number?: string | null
           created_at?: string
           created_by?: string | null
           department?: string | null
+          dispatch_note?: string | null
+          epf_number?: string | null
+          form_reference?: string | null
+          hod_approval_date?: string | null
+          hod_approved_by?: string | null
           id?: string
           issue_date?: string
+          issued_by?: string | null
+          issued_by_name?: string | null
           issued_to: string
+          items_required_date?: string | null
+          job_number?: string | null
+          management_approval_date?: string | null
+          management_approved_by?: string | null
           min_number: string
+          mr_received_by?: string | null
+          mr_received_date?: string | null
           notes?: string | null
+          order_completed?: boolean | null
+          po_number?: string | null
+          pr_number?: string | null
           purpose?: string | null
+          received_by?: string | null
+          received_by_name?: string | null
+          received_date?: string | null
+          requested_by?: string | null
           status?: string
           total_value?: number | null
           updated_at?: string
@@ -1721,15 +1787,36 @@ export type Database = {
           approved_by?: string | null
           approved_date?: string | null
           company_id?: string | null
+          contact_number?: string | null
           created_at?: string
           created_by?: string | null
           department?: string | null
+          dispatch_note?: string | null
+          epf_number?: string | null
+          form_reference?: string | null
+          hod_approval_date?: string | null
+          hod_approved_by?: string | null
           id?: string
           issue_date?: string
+          issued_by?: string | null
+          issued_by_name?: string | null
           issued_to?: string
+          items_required_date?: string | null
+          job_number?: string | null
+          management_approval_date?: string | null
+          management_approved_by?: string | null
           min_number?: string
+          mr_received_by?: string | null
+          mr_received_date?: string | null
           notes?: string | null
+          order_completed?: boolean | null
+          po_number?: string | null
+          pr_number?: string | null
           purpose?: string | null
+          received_by?: string | null
+          received_by_name?: string | null
+          received_date?: string | null
+          requested_by?: string | null
           status?: string
           total_value?: number | null
           updated_at?: string

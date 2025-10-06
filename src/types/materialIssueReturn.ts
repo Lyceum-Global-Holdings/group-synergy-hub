@@ -20,6 +20,27 @@ export interface MaterialIssueNote {
   approved_date: string | null;
   created_at: string;
   updated_at: string;
+  requested_by: string | null;
+  contact_number: string | null;
+  epf_number: string | null;
+  items_required_date: string | null;
+  job_number: string | null;
+  pr_number: string | null;
+  po_number: string | null;
+  dispatch_note: string | null;
+  received_by: string | null;
+  received_by_name: string | null;
+  received_date: string | null;
+  issued_by: string | null;
+  issued_by_name: string | null;
+  order_completed: boolean | null;
+  hod_approved_by: string | null;
+  hod_approval_date: string | null;
+  management_approved_by: string | null;
+  management_approval_date: string | null;
+  mr_received_by: string | null;
+  mr_received_date: string | null;
+  form_reference: string | null;
 }
 
 export interface CreateMaterialIssueData {
@@ -29,6 +50,13 @@ export interface CreateMaterialIssueData {
   purpose?: string;
   notes?: string;
   company_id?: string;
+  requested_by?: string;
+  contact_number?: string;
+  epf_number?: string;
+  items_required_date?: string;
+  job_number?: string;
+  pr_number?: string;
+  po_number?: string;
 }
 
 export interface MaterialIssueItem {
@@ -41,6 +69,14 @@ export interface MaterialIssueItem {
   notes: string | null;
   created_at: string;
   updated_at: string;
+  line_number: number | null;
+  item_code: string | null;
+  description: string | null;
+  purpose: string | null;
+  unit_of_measure: string | null;
+  quantity_required: number | null;
+  quantity_received: number | null;
+  recipient_signature: string | null;
 }
 
 export interface CreateMaterialIssueItemData {
