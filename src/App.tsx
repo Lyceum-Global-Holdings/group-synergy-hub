@@ -11,6 +11,7 @@ import Dashboard from "./pages/Dashboard";
 import CompanyManagement from "./pages/admin/CompanyManagement";
 import UserRoleManagement from "./pages/admin/UserRoleManagement";
 import ModuleAllocation from "./pages/admin/ModuleAllocation";
+import WarehouseManagement from "./pages/admin/WarehouseManagement";
 import PurchaseRequisition from "./pages/procurement/PurchaseRequisition";
 import PurchaseOrder from "./pages/procurement/PurchaseOrder";
 import BillOfMaterials from "./pages/procurement/BillOfMaterials";
@@ -72,6 +73,13 @@ function App() {
                   <ProtectedRoute>
                     <AppLayout>
                       <ModuleAllocation />
+                    </AppLayout>
+                  </ProtectedRoute>
+                } />
+                <Route path="/admin/warehouse-management" element={
+                  <ProtectedRoute>
+                    <AppLayout>
+                      <WarehouseManagement />
                     </AppLayout>
                   </ProtectedRoute>
                 } />

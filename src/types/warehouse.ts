@@ -8,6 +8,13 @@ export interface WarehouseLocation {
   created_at: string;
   updated_at: string;
   created_by: string | null;
+  capacity?: number | null;
+  current_usage?: number | null;
+  contact_person?: string | null;
+  contact_phone?: string | null;
+  physical_address?: string | null;
+  location_code?: string | null;
+  status?: 'active' | 'inactive' | 'maintenance' | 'closed';
 }
 
 export interface AssetCategory {

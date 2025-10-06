@@ -4526,35 +4526,56 @@ export type Database = {
       }
       warehouse_locations: {
         Row: {
+          capacity: number | null
           company_id: string | null
+          contact_person: string | null
+          contact_phone: string | null
           created_at: string
           created_by: string | null
+          current_usage: number | null
           description: string | null
           id: string
+          location_code: string | null
           name: string
           parent_id: string | null
+          physical_address: string | null
+          status: string | null
           type: string
           updated_at: string
         }
         Insert: {
+          capacity?: number | null
           company_id?: string | null
+          contact_person?: string | null
+          contact_phone?: string | null
           created_at?: string
           created_by?: string | null
+          current_usage?: number | null
           description?: string | null
           id?: string
+          location_code?: string | null
           name: string
           parent_id?: string | null
+          physical_address?: string | null
+          status?: string | null
           type: string
           updated_at?: string
         }
         Update: {
+          capacity?: number | null
           company_id?: string | null
+          contact_person?: string | null
+          contact_phone?: string | null
           created_at?: string
           created_by?: string | null
+          current_usage?: number | null
           description?: string | null
           id?: string
+          location_code?: string | null
           name?: string
           parent_id?: string | null
+          physical_address?: string | null
+          status?: string | null
           type?: string
           updated_at?: string
         }

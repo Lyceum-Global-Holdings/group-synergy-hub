@@ -107,6 +107,7 @@ const adminItems = [
   { title: "Company Management", url: "/admin/companies", icon: Building2 },
   { title: "User & Role Management", url: "/admin/users-roles", icon: Users },
   { title: "Module Allocation", url: "/admin/modules", icon: Settings },
+  { title: "Warehouse Management", url: "/admin/warehouse-management", icon: Package },
 ];
 
 export function AppSidebar() {
