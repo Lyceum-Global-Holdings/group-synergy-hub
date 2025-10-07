@@ -113,6 +113,8 @@ const getStatusIcon = (status: string) => {
 
 export default function AssetManagement() {
   const [searchTerm, setSearchTerm] = useState("");
+  const [locationFilter, setLocationFilter] = useState<string>("all");
+  const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedAssetIds, setSelectedAssetIds] = useState<Set<string>>(new Set());
   const [bulkDeleteConfirmOpen, setBulkDeleteConfirmOpen] = useState(false);
@@ -285,12 +287,22 @@ export default function AssetManagement() {
   };
 
 
-  const filteredAssets = assets.filter((asset) =>
-    asset.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    asset.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (asset.brand && asset.brand.toLowerCase().includes(searchTerm.toLowerCase())) ||
-    (asset.asset_id && asset.asset_id.toLowerCase().includes(searchTerm.toLowerCase()))
-  );
+  const filteredAssets = assets.filter((asset) => {
+    // Search term filter
+    const matchesSearch = 
+      asset.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      asset.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (asset.brand && asset.brand.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (asset.asset_id && asset.asset_id.toLowerCase().includes(searchTerm.toLowerCase()));
+    
+    // Location filter
+    const matchesLocation = locationFilter === "all" || asset.location_id === locationFilter;
+    
+    // Category filter
+    const matchesCategory = categoryFilter === "all" || asset.category_id === categoryFilter;
+    
+    return matchesSearch && matchesLocation && matchesCategory;
+  });
 
   const getLocationsByType = (type: "location" | "sublocation" | "department", parentId?: string) => {
     if (type === "location") {
@@ -853,14 +865,44 @@ export default function AssetManagement() {
 
           {/* Search and Filter */}
           <div className="flex items-center justify-between gap-4">
-            <div className="flex flex-1 items-center space-x-2">
-              <Search className="h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search assets by name, category, brand, or asset ID..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="max-w-sm"
-              />
+            <div className="flex flex-1 items-center gap-3">
+              <div className="flex items-center space-x-2">
+                <Search className="h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search assets by name, category, brand, or asset ID..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-[300px]"
+                />
+              </div>
+              
+              <Select value={locationFilter} onValueChange={setLocationFilter}>
+                <SelectTrigger className="w-[200px]">
+                  <SelectValue placeholder="Filter by Location" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Locations</SelectItem>
+                  {getLocationsByType("location").map((location) => (
+                    <SelectItem key={location.id} value={location.id}>
+                      {location.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                <SelectTrigger className="w-[200px]">
+                  <SelectValue placeholder="Filter by Category" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Categories</SelectItem>
+                  {mainCategories.map((category) => (
+                    <SelectItem key={category.id} value={category.id}>
+                      {category.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             
             {selectedAssetIds.size > 0 && (
