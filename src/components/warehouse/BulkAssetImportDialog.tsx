@@ -333,7 +333,33 @@ export function BulkAssetImportDialog() {
     }
 
     try {
-      await createBulkAssets(validData);
+      // Clean the data - remove validation fields and ensure proper UUID handling
+      const cleanedData: CreateWarehouseAssetData[] = validData.map(asset => {
+        const cleanAsset: CreateWarehouseAssetData = {
+          name: asset.name,
+          category: asset.category,
+          brand: asset.brand || undefined,
+          condition: asset.condition,
+          status: asset.status,
+          description: asset.description || undefined,
+          notes: asset.notes || undefined,
+          purchase_date: asset.purchase_date || undefined,
+          purchase_price: asset.purchase_price || undefined,
+          current_value: asset.current_value || undefined,
+        };
+
+        // Only add UUID fields if they have valid values
+        if (asset.category_id) cleanAsset.category_id = asset.category_id;
+        if (asset.subcategory_id) cleanAsset.subcategory_id = asset.subcategory_id;
+        if (asset.location_id) cleanAsset.location_id = asset.location_id;
+        if (asset.sublocation_id) cleanAsset.sublocation_id = asset.sublocation_id;
+        if (asset.department_id) cleanAsset.department_id = asset.department_id;
+
+        return cleanAsset;
+      });
+
+      await createBulkAssets(cleanedData);
+      
       toast({
         title: "Success",
         description: `Successfully imported ${validData.length} assets`,
@@ -341,6 +367,7 @@ export function BulkAssetImportDialog() {
       setIsOpen(false);
       resetState();
     } catch (error) {
+      console.error('Bulk import error:', error);
       toast({
         title: "Error",
         description: "Failed to import assets",
