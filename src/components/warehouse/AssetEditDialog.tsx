@@ -101,9 +101,13 @@ export function AssetEditDialog({
   const onSubmit = (data: EditAssetFormValues) => {
     if (!asset) return;
 
-    const updateData = {
+    // Get the category name from the selected category_id
+    const selectedCategory = categories.find(cat => cat.id === data.category_id);
+    
+    const updateData: any = {
       name: data.name,
-      category_id: data.category_id,
+      category: selectedCategory?.name || asset.category, // Required field
+      category_id: data.category_id || null,
       subcategory_id: data.subcategory_id || null,
       brand: data.brand || null,
       location_id: data.location_id || null,
@@ -120,6 +124,14 @@ export function AssetEditDialog({
       notes: data.notes || null,
     };
 
+    // Clean UUID fields - convert empty strings to null
+    Object.keys(updateData).forEach(key => {
+      if (updateData[key] === "") {
+        updateData[key] = null;
+      }
+    });
+
+    console.log('Updating asset with data:', updateData);
     updateAsset({ id: asset.id, ...updateData });
     onOpenChange(false);
   };
