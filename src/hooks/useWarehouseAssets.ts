@@ -29,12 +29,20 @@ export const useWarehouseAssets = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User not authenticated');
 
+      // Sanitize UUID fields - convert "none" or empty strings to null
+      const sanitizedData = {
+        ...assetData,
+        category_id: assetData.category_id || null,
+        subcategory_id: assetData.subcategory_id && assetData.subcategory_id !== "none" ? assetData.subcategory_id : null,
+        location_id: assetData.location_id && assetData.location_id !== "none" ? assetData.location_id : null,
+        sublocation_id: assetData.sublocation_id && assetData.sublocation_id !== "none" ? assetData.sublocation_id : null,
+        department_id: assetData.department_id && assetData.department_id !== "none" ? assetData.department_id : null,
+        created_by: user.id
+      };
+
       const { data, error } = await supabase
         .from('warehouse_assets')
-        .insert({
-          ...assetData,
-          created_by: user.id
-        })
+        .insert(sanitizedData)
         .select()
         .single();
 
@@ -178,8 +186,14 @@ export const useWarehouseAssets = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User not authenticated');
 
+      // Sanitize each asset's UUID fields
       const assetsWithUser = assetsData.map(asset => ({
         ...asset,
+        category_id: asset.category_id || null,
+        subcategory_id: asset.subcategory_id && asset.subcategory_id !== "none" ? asset.subcategory_id : null,
+        location_id: asset.location_id && asset.location_id !== "none" ? asset.location_id : null,
+        sublocation_id: asset.sublocation_id && asset.sublocation_id !== "none" ? asset.sublocation_id : null,
+        department_id: asset.department_id && asset.department_id !== "none" ? asset.department_id : null,
         created_by: user.id
       }));
 

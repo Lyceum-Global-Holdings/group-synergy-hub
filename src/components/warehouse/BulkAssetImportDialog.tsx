@@ -348,12 +348,12 @@ export function BulkAssetImportDialog() {
           current_value: asset.current_value || undefined,
         };
 
-        // Only add UUID fields if they have valid values
-        if (asset.category_id) cleanAsset.category_id = asset.category_id;
-        if (asset.subcategory_id) cleanAsset.subcategory_id = asset.subcategory_id;
-        if (asset.location_id) cleanAsset.location_id = asset.location_id;
-        if (asset.sublocation_id) cleanAsset.sublocation_id = asset.sublocation_id;
-        if (asset.department_id) cleanAsset.department_id = asset.department_id;
+        // Only add UUID fields if they have valid values (not empty, not "none")
+        if (asset.category_id && asset.category_id !== "none") cleanAsset.category_id = asset.category_id;
+        if (asset.subcategory_id && asset.subcategory_id !== "none") cleanAsset.subcategory_id = asset.subcategory_id;
+        if (asset.location_id && asset.location_id !== "none") cleanAsset.location_id = asset.location_id;
+        if (asset.sublocation_id && asset.sublocation_id !== "none") cleanAsset.sublocation_id = asset.sublocation_id;
+        if (asset.department_id && asset.department_id !== "none") cleanAsset.department_id = asset.department_id;
 
         return cleanAsset;
       });

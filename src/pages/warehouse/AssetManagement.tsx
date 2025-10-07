@@ -62,19 +62,19 @@ import { AssetMasterSelector } from "@/components/common/AssetMasterSelector";
 import { AssetMaster } from "@/types/assetMaster";
 
 const assetFormSchema = z.object({
-  asset_master_id: z.string().optional(),
+  asset_master_id: z.string().optional().transform(v => (v === "none" || v === "" ? undefined : v)),
   name: z.string().min(1, "Asset name is required"),
   quantity: z.string().transform(val => parseInt(val)).pipe(
     z.number().min(1, "Quantity must be at least 1").max(100, "Quantity cannot exceed 100")
   ),
   company_id: z.string().min(1, "Company is required"),
   category: z.string().optional(),
-  category_id: z.string().min(1, "Category is required"),
-  subcategory_id: z.string().optional(),
+  category_id: z.string().uuid("Please select a valid category"),
+  subcategory_id: z.string().optional().transform(v => (v === "none" || v === "" ? undefined : v)),
   brand: z.string().optional(),
-  location_id: z.string().optional(),
-  sublocation_id: z.string().optional(),
-  department_id: z.string().optional(),
+  location_id: z.string().optional().transform(v => (v === "none" || v === "" ? undefined : v)),
+  sublocation_id: z.string().optional().transform(v => (v === "none" || v === "" ? undefined : v)),
+  department_id: z.string().optional().transform(v => (v === "none" || v === "" ? undefined : v)),
   condition: z.enum(["good", "fair", "poor", "needs_repair"]),
   status: z.enum(["active", "inactive", "maintenance", "disposed"]),
   purchase_date: z.string().optional(),
@@ -214,21 +214,26 @@ export default function AssetManagement() {
 
 
   const onSubmit = (data: AssetFormValues) => {
+    console.log("Form submitted with values:", data);
+    
+    // Helper to normalize ID fields - convert undefined/empty to undefined
+    const normalizeId = (v: string | undefined) => (v && v !== "none" ? v : undefined);
+    
     // Get category name from ID for backward compatibility
     const selectedCategory = mainCategories.find(cat => cat.id === data.category_id);
     
     const assetData = {
       name: data.name,
-      asset_master_id: data.asset_master_id || undefined,
+      asset_master_id: normalizeId(data.asset_master_id),
       category: selectedCategory?.name || "",
-      category_id: data.category_id || undefined,
-      subcategory_id: data.subcategory_id || undefined,
+      category_id: data.category_id,
+      subcategory_id: normalizeId(data.subcategory_id),
       brand: data.brand,
       condition: data.condition,
       status: data.status,
-      location_id: data.location_id || undefined,
-      sublocation_id: data.sublocation_id || undefined,
-      department_id: data.department_id || undefined,
+      location_id: normalizeId(data.location_id),
+      sublocation_id: normalizeId(data.sublocation_id),
+      department_id: normalizeId(data.department_id),
       purchase_date: data.purchase_date,
       purchase_price: data.purchase_price ? parseFloat(data.purchase_price) : undefined,
       current_value: data.current_value ? parseFloat(data.current_value) : undefined,
