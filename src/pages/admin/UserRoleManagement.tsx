@@ -47,16 +47,43 @@ export default function UserRoleManagement() {
 
   // Check if any admins exist
   useEffect(() => {
+    let mounted = true;
+    
     const checkAdmins = async () => {
-      const { data: adminUsers } = await supabase
-        .from('user_roles')
-        .select('id, roles!inner(*)')
-        .or('roles.app_role.eq.admin,roles.app_role.eq.super_admin');
-
-      setHasAnyAdmins(adminUsers && adminUsers.length > 0);
+      try {
+        // First, get role IDs for admin and super_admin
+        const { data: adminRoles, error: rolesErr } = await supabase
+          .from('roles')
+          .select('id')
+          .in('app_role', ['admin', 'super_admin']);
+        
+        if (rolesErr) throw rolesErr;
+        
+        const roleIds = (adminRoles ?? []).map(r => r.id);
+        
+        if (roleIds.length === 0) {
+          if (mounted) setHasAnyAdmins(false);
+          return;
+        }
+        
+        // Then count user_roles with those role IDs
+        const { count, error: countErr } = await supabase
+          .from('user_roles')
+          .select('*', { head: true, count: 'exact' })
+          .in('role_id', roleIds);
+        
+        if (countErr) throw countErr;
+        
+        if (mounted) setHasAnyAdmins((count ?? 0) > 0);
+      } catch (e) {
+        console.error('Failed to check admin existence:', e);
+        // Default to true to avoid blocking UI on error
+        if (mounted) setHasAnyAdmins(true);
+      }
     };
 
     checkAdmins();
+    return () => { mounted = false; };
   }, [users]);
 
   const handleUserAdded = () => {
@@ -133,7 +160,7 @@ export default function UserRoleManagement() {
 
   const hasAccess = isSuperAdmin || isAdmin;
   const checkingPermissions = superAdminLoading || adminLoading;
-  const isLoading = usersLoading || rolesLoading || hasAnyAdmins === null || checkingPermissions;
+  const isLoading = usersLoading || rolesLoading || checkingPermissions || (!hasAccess && hasAnyAdmins === null);
   const hasError = usersError || rolesError;
 
   if (hasError) {

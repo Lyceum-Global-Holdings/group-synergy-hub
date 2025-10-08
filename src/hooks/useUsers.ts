@@ -341,16 +341,30 @@ export const useCreateUser = () => {
       }
 
       // Check if any admin users exist
-      const { data: adminUsers, error: adminCountError } = await supabase
-        .from('user_roles')
-        .select('id, roles!inner(*)')
-        .eq('roles.app_role', 'admin');
-
-      if (adminCountError) {
-        console.error('Admin count check error:', adminCountError);
+      const { data: adminRoles, error: rolesErr } = await supabase
+        .from('roles')
+        .select('id')
+        .in('app_role', ['admin', 'super_admin']);
+      
+      if (rolesErr) {
+        console.error('Admin role lookup error:', rolesErr);
       }
-
-      const hasAdmins = adminUsers && adminUsers.length > 0;
+      
+      const adminRoleIds = (adminRoles ?? []).map(r => r.id);
+      let hasAdmins = false;
+      
+      if (adminRoleIds.length > 0) {
+        const { count, error: countErr } = await supabase
+          .from('user_roles')
+          .select('*', { head: true, count: 'exact' })
+          .in('role_id', adminRoleIds);
+        
+        if (countErr) {
+          console.error('Admin count check error:', countErr);
+        } else {
+          hasAdmins = (count ?? 0) > 0;
+        }
+      }
       const isCurrentUserAdmin = isAdminResult === true;
 
       if (hasAdmins && !isCurrentUserAdmin) {
