@@ -17,7 +17,8 @@ export const useWarehouseAssets = () => {
       const { data, error } = await supabase
         .from('warehouse_assets')
         .select('*')
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .limit(10000);
 
       if (error) throw error;
       return data as WarehouseAsset[];
