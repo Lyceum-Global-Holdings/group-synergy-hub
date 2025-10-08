@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
@@ -18,6 +19,9 @@ import {
 } from '@/components/ui/select';
 import { useFinishedGoodsBatches } from '@/hooks/useFinishedGoodsBatches';
 import { useFinishedGoods } from '@/hooks/useFinishedGoods';
+import { useToast } from '@/hooks/use-toast';
+import { AlertCircle } from 'lucide-react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 interface CreateProductionReceiptDialogProps {
   open: boolean;
@@ -39,6 +43,7 @@ export function CreateProductionReceiptDialog({ open, onOpenChange }: CreateProd
 
   const { createBatch, isCreating } = useFinishedGoodsBatches();
   const { products } = useFinishedGoods();
+  const { toast } = useToast();
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -50,18 +55,25 @@ export function CreateProductionReceiptDialog({ open, onOpenChange }: CreateProd
       expiry_date: formData.expiry_date || undefined,
     };
 
-    createBatch(data);
-    onOpenChange(false);
-    setFormData({
-      batch_number: '',
-      finished_good_id: '',
-      quantity: '',
-      production_date: new Date().toISOString().split('T')[0],
-      expiry_date: '',
-      production_cost: '',
-      quality_check_status: 'pending',
-      notes: '',
-      status: 'active',
+    createBatch(data, {
+      onSuccess: () => {
+        toast({
+          title: "Success",
+          description: "Production receipt created and sent for admin approval",
+        });
+        onOpenChange(false);
+        setFormData({
+          batch_number: '',
+          finished_good_id: '',
+          quantity: '',
+          production_date: new Date().toISOString().split('T')[0],
+          expiry_date: '',
+          production_cost: '',
+          quality_check_status: 'pending',
+          notes: '',
+          status: 'active',
+        });
+      },
     });
   };
 
@@ -70,7 +82,17 @@ export function CreateProductionReceiptDialog({ open, onOpenChange }: CreateProd
       <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle>Create Production Receipt</DialogTitle>
+          <DialogDescription>
+            Record a new production batch. This receipt will be sent for admin approval before stock is updated.
+          </DialogDescription>
         </DialogHeader>
+
+        <Alert>
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            Stock will only be updated after an admin approves this production receipt.
+          </AlertDescription>
+        </Alert>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">

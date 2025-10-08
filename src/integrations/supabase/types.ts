@@ -1047,8 +1047,47 @@ export type Database = {
         }
         Relationships: []
       }
+      finished_goods_batch_approvals: {
+        Row: {
+          action: string
+          approver_id: string
+          batch_id: string
+          comments: string | null
+          created_at: string
+          id: string
+        }
+        Insert: {
+          action: string
+          approver_id: string
+          batch_id: string
+          comments?: string | null
+          created_at?: string
+          id?: string
+        }
+        Update: {
+          action?: string
+          approver_id?: string
+          batch_id?: string
+          comments?: string | null
+          created_at?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "finished_goods_batch_approvals_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "finished_goods_batches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       finished_goods_batches: {
         Row: {
+          approval_comments: string | null
+          approval_status: string | null
+          approved_by: string | null
+          approved_date: string | null
           batch_number: string
           company_id: string | null
           created_at: string | null
@@ -1063,10 +1102,15 @@ export type Database = {
           quality_check_date: string | null
           quality_check_status: string | null
           quantity: number
+          rejection_reason: string | null
           status: string | null
           updated_at: string | null
         }
         Insert: {
+          approval_comments?: string | null
+          approval_status?: string | null
+          approved_by?: string | null
+          approved_date?: string | null
           batch_number: string
           company_id?: string | null
           created_at?: string | null
@@ -1081,10 +1125,15 @@ export type Database = {
           quality_check_date?: string | null
           quality_check_status?: string | null
           quantity: number
+          rejection_reason?: string | null
           status?: string | null
           updated_at?: string | null
         }
         Update: {
+          approval_comments?: string | null
+          approval_status?: string | null
+          approved_by?: string | null
+          approved_date?: string | null
           batch_number?: string
           company_id?: string | null
           created_at?: string | null
@@ -1099,6 +1148,7 @@ export type Database = {
           quality_check_date?: string | null
           quality_check_status?: string | null
           quantity?: number
+          rejection_reason?: string | null
           status?: string | null
           updated_at?: string | null
         }

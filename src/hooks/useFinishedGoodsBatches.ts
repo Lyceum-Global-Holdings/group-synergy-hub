@@ -15,6 +15,11 @@ export interface FinishedGoodsBatch {
   quality_check_by?: string;
   notes?: string;
   status: string;
+  approval_status: string;
+  approved_by?: string;
+  approved_date?: string;
+  approval_comments?: string;
+  rejection_reason?: string;
   company_id?: string;
   created_by?: string;
   created_at: string;
@@ -61,6 +66,7 @@ export function useFinishedGoodsBatches() {
         .from('finished_goods_batches')
         .insert([{
           ...data,
+          approval_status: 'pending',
           created_by: user.user?.id,
         }])
         .select()
@@ -143,6 +149,108 @@ export function useFinishedGoodsBatches() {
     },
   });
 
+  // Approve finished goods batch
+  const approveBatchMutation = useMutation({
+    mutationFn: async ({ id, comments }: { id: string; comments?: string }) => {
+      const { data: user } = await supabase.auth.getUser();
+      
+      // Update batch approval status
+      const { data: batch, error: batchError } = await supabase
+        .from('finished_goods_batches')
+        .update({
+          approval_status: 'approved',
+          approved_by: user.user?.id,
+          approved_date: new Date().toISOString(),
+          approval_comments: comments,
+        })
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (batchError) throw batchError;
+
+      // Record approval in audit table
+      const { error: auditError } = await supabase
+        .from('finished_goods_batch_approvals')
+        .insert({
+          batch_id: id,
+          approver_id: user.user?.id,
+          action: 'approved',
+          comments: comments,
+        });
+
+      if (auditError) throw auditError;
+
+      return batch;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['finished-goods-batches'] });
+      toast({
+        title: "Success",
+        description: "Batch approved successfully",
+      });
+    },
+    onError: (error: any) => {
+      console.error('Error approving batch:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to approve batch",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Reject finished goods batch
+  const rejectBatchMutation = useMutation({
+    mutationFn: async ({ id, reason }: { id: string; reason: string }) => {
+      const { data: user } = await supabase.auth.getUser();
+      
+      // Update batch approval status
+      const { data: batch, error: batchError } = await supabase
+        .from('finished_goods_batches')
+        .update({
+          approval_status: 'rejected',
+          approved_by: user.user?.id,
+          approved_date: new Date().toISOString(),
+          rejection_reason: reason,
+        })
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (batchError) throw batchError;
+
+      // Record rejection in audit table
+      const { error: auditError } = await supabase
+        .from('finished_goods_batch_approvals')
+        .insert({
+          batch_id: id,
+          approver_id: user.user?.id,
+          action: 'rejected',
+          comments: reason,
+        });
+
+      if (auditError) throw auditError;
+
+      return batch;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['finished-goods-batches'] });
+      toast({
+        title: "Success",
+        description: "Batch rejected",
+      });
+    },
+    onError: (error: any) => {
+      console.error('Error rejecting batch:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to reject batch",
+        variant: "destructive",
+      });
+    },
+  });
+
   return {
     batches,
     isLoading,
@@ -150,8 +258,12 @@ export function useFinishedGoodsBatches() {
     createBatch: createBatchMutation.mutate,
     updateBatch: updateBatchMutation.mutate,
     deleteBatch: deleteBatchMutation.mutate,
+    approveBatch: approveBatchMutation.mutate,
+    rejectBatch: rejectBatchMutation.mutate,
     isCreating: createBatchMutation.isPending,
     isUpdating: updateBatchMutation.isPending,
     isDeleting: deleteBatchMutation.isPending,
+    isApproving: approveBatchMutation.isPending,
+    isRejecting: rejectBatchMutation.isPending,
   };
 }
