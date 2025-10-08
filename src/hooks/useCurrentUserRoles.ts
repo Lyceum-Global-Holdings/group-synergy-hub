@@ -57,7 +57,6 @@ export const useCurrentUserRoles = () => {
         .from("user_roles")
         .select(`
           id,
-          role,
           roles:role_id (
             name,
             description,
