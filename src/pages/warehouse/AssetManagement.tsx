@@ -137,7 +137,10 @@ export default function AssetManagement() {
   
   const { 
     assets, 
-    isLoading: assetsLoading, 
+    isLoading: assetsLoading,
+    totalCount,
+    activeCount,
+    maintenanceCount,
     createAsset, 
     createBulkAssets,
     updateAsset,
@@ -361,8 +364,10 @@ export default function AssetManagement() {
   };
 
   const totalValue = assets.reduce((sum, asset) => sum + (asset.purchase_price || 0), 0);
-  const activeAssets = assets.filter(asset => asset.status === "active").length;
-  const maintenanceAssets = assets.filter(asset => asset.status === "maintenance").length;
+  // Use server-side counts for accurate totals, fallback to client-side if not available
+  const displayTotalAssets = totalCount ?? assets.length;
+  const displayActiveAssets = activeCount ?? assets.filter(asset => asset.status === "active").length;
+  const displayMaintenanceAssets = maintenanceCount ?? assets.filter(asset => asset.status === "maintenance").length;
 
   return (
     <div className="space-y-6">
@@ -821,7 +826,7 @@ export default function AssetManagement() {
                 <Package className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{assets.length}</div>
+                <div className="text-2xl font-bold">{displayTotalAssets.toLocaleString()}</div>
                 <p className="text-xs text-muted-foreground">
                   All registered assets
                 </p>
@@ -834,7 +839,7 @@ export default function AssetManagement() {
                 <CheckCircle className="h-4 w-4 text-success" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-success">{activeAssets}</div>
+                <div className="text-2xl font-bold text-success">{displayActiveAssets.toLocaleString()}</div>
                 <p className="text-xs text-muted-foreground">
                   Currently in use
                 </p>
@@ -847,7 +852,7 @@ export default function AssetManagement() {
                 <Wrench className="h-4 w-4 text-warning" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-warning">{maintenanceAssets}</div>
+                <div className="text-2xl font-bold text-warning">{displayMaintenanceAssets.toLocaleString()}</div>
                 <p className="text-xs text-muted-foreground">
                   Under maintenance
                 </p>

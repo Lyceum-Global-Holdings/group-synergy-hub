@@ -25,6 +25,48 @@ export const useWarehouseAssets = () => {
     }
   });
 
+  // Get accurate counts from server
+  const { data: totalCount } = useQuery({
+    queryKey: ['warehouse-assets-total-count'],
+    queryFn: async () => {
+      const { count, error } = await supabase
+        .from('warehouse_assets')
+        .select('*', { count: 'exact', head: true });
+      
+      if (error) throw error;
+      return count || 0;
+    },
+    staleTime: 30000 // Cache for 30 seconds
+  });
+
+  const { data: activeCount } = useQuery({
+    queryKey: ['warehouse-assets-active-count'],
+    queryFn: async () => {
+      const { count, error } = await supabase
+        .from('warehouse_assets')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'active');
+      
+      if (error) throw error;
+      return count || 0;
+    },
+    staleTime: 30000
+  });
+
+  const { data: maintenanceCount } = useQuery({
+    queryKey: ['warehouse-assets-maintenance-count'],
+    queryFn: async () => {
+      const { count, error } = await supabase
+        .from('warehouse_assets')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'maintenance');
+      
+      if (error) throw error;
+      return count || 0;
+    },
+    staleTime: 30000
+  });
+
   const createAssetMutation = useMutation({
     mutationFn: async (assetData: CreateWarehouseAssetData) => {
       const { data: { user } } = await supabase.auth.getUser();
@@ -52,6 +94,9 @@ export const useWarehouseAssets = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['warehouse-assets'] });
+      queryClient.invalidateQueries({ queryKey: ['warehouse-assets-total-count'] });
+      queryClient.invalidateQueries({ queryKey: ['warehouse-assets-active-count'] });
+      queryClient.invalidateQueries({ queryKey: ['warehouse-assets-maintenance-count'] });
       toast({
         title: "Success",
         description: "Asset created successfully",
@@ -81,6 +126,9 @@ export const useWarehouseAssets = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['warehouse-assets'] });
+      queryClient.invalidateQueries({ queryKey: ['warehouse-assets-total-count'] });
+      queryClient.invalidateQueries({ queryKey: ['warehouse-assets-active-count'] });
+      queryClient.invalidateQueries({ queryKey: ['warehouse-assets-maintenance-count'] });
       toast({
         title: "Success",
         description: "Asset updated successfully",
@@ -107,6 +155,9 @@ export const useWarehouseAssets = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['warehouse-assets'] });
+      queryClient.invalidateQueries({ queryKey: ['warehouse-assets-total-count'] });
+      queryClient.invalidateQueries({ queryKey: ['warehouse-assets-active-count'] });
+      queryClient.invalidateQueries({ queryKey: ['warehouse-assets-maintenance-count'] });
       toast({
         title: "Success",
         description: "Asset deleted successfully",
@@ -133,6 +184,9 @@ export const useWarehouseAssets = () => {
     },
     onSuccess: (_, assetIds) => {
       queryClient.invalidateQueries({ queryKey: ['warehouse-assets'] });
+      queryClient.invalidateQueries({ queryKey: ['warehouse-assets-total-count'] });
+      queryClient.invalidateQueries({ queryKey: ['warehouse-assets-active-count'] });
+      queryClient.invalidateQueries({ queryKey: ['warehouse-assets-maintenance-count'] });
       toast({
         title: "Success",
         description: `Successfully deleted ${assetIds.length} assets`,
@@ -167,6 +221,9 @@ export const useWarehouseAssets = () => {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['warehouse-assets'] });
+      queryClient.invalidateQueries({ queryKey: ['warehouse-assets-total-count'] });
+      queryClient.invalidateQueries({ queryKey: ['warehouse-assets-active-count'] });
+      queryClient.invalidateQueries({ queryKey: ['warehouse-assets-maintenance-count'] });
       toast({
         title: "Success",
         description: `Successfully updated ${data.length} asset${data.length > 1 ? 's' : ''}`,
@@ -208,6 +265,9 @@ export const useWarehouseAssets = () => {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['warehouse-assets'] });
+      queryClient.invalidateQueries({ queryKey: ['warehouse-assets-total-count'] });
+      queryClient.invalidateQueries({ queryKey: ['warehouse-assets-active-count'] });
+      queryClient.invalidateQueries({ queryKey: ['warehouse-assets-maintenance-count'] });
       toast({
         title: "Success",
         description: `Successfully created ${data.length} assets`,
@@ -227,6 +287,9 @@ export const useWarehouseAssets = () => {
     assets,
     isLoading,
     error,
+    totalCount,
+    activeCount,
+    maintenanceCount,
     createAsset: createAssetMutation.mutate,
     updateAsset: updateAssetMutation.mutate,
     deleteAsset: deleteAssetMutation.mutate,
