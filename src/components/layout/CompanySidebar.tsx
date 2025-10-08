@@ -29,6 +29,7 @@ import { useCompany } from "@/contexts/CompanyContext";
 import { Badge } from "@/components/ui/badge";
 import { Company } from "@/types/company";
 import { moduleConfig, normalizeCompanyModules, isSubModuleEnabled } from "@/constants/moduleConfig";
+import { useSuperAdmin } from "@/hooks/useSuperAdmin";
 
 type ModuleWithCompanies = {
   key: string;
@@ -48,6 +49,7 @@ export function CompanySidebar() {
   const { state } = useSidebar();
   const location = useLocation();
   const { selectedCompany, companies, isViewingAllCompanies } = useCompany();
+  const { data: isSuperAdmin } = useSuperAdmin();
   const currentPath = location.pathname;
 
   const isActive = (path: string) => currentPath === path;
@@ -82,9 +84,12 @@ export function CompanySidebar() {
   };
 
   // Filter modules based on selected company or show all when viewing all companies
-  const availableModules = isViewingAllCompanies 
-    ? getAllUniqueModules()
-    : Object.keys(normalizeCompanyModules(selectedCompany?.modules));
+  // Super admins always see all modules regardless of company selection
+  const availableModules = isSuperAdmin
+    ? Object.keys(moduleConfig)
+    : isViewingAllCompanies 
+      ? getAllUniqueModules()
+      : Object.keys(normalizeCompanyModules(selectedCompany?.modules));
     
   // Ensure availableModules is always an array
   const safeAvailableModules = Array.isArray(availableModules) ? availableModules : [];
@@ -101,8 +106,8 @@ export function CompanySidebar() {
         key: sub.key
       }));
 
-      // When viewing a single company, filter to only enabled sub-modules
-      if (!isViewingAllCompanies && selectedCompany) {
+      // Super admins see all sub-modules, others see based on company settings
+      if (!isSuperAdmin && !isViewingAllCompanies && selectedCompany) {
         const companyModules = normalizeCompanyModules(selectedCompany.modules);
         const enabledSubModules = companyModules[moduleKey] || [];
         enabledItems = enabledItems.filter(item => 
