@@ -51,7 +51,10 @@ export const useCurrentUserRoles = () => {
     queryKey: ["current-user-roles"],
     queryFn: async () => {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return [];
+      if (!user) {
+        console.log('[useCurrentUserRoles] No user found');
+        return [];
+      }
 
       const { data, error } = await supabase
         .from("user_roles")
@@ -70,13 +73,17 @@ export const useCurrentUserRoles = () => {
         return [];
       }
 
-      return data.map((ur: any) => ({
+      const roles = data.map((ur: any) => ({
         id: ur.id,
         role: ur.roles?.app_role || "user",
         role_name: ur.roles?.name || "User",
         role_description: ur.roles?.description || "",
       }));
+
+      console.log('[useCurrentUserRoles] Fetched roles:', roles);
+      return roles;
     },
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 60 * 1000, // 1 minute
+    refetchOnMount: 'always',
   });
 };

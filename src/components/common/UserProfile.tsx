@@ -12,16 +12,27 @@ import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { useCurrentUserRoles, getHighestPriorityRole } from "@/hooks/useCurrentUserRoles";
+import { useSuperAdmin, useIsAdmin } from "@/hooks/useSuperAdmin";
 
 export function UserProfile() {
   const { user, signOut } = useAuth();
   const { toast } = useToast();
   const { data: roles, isLoading: rolesLoading } = useCurrentUserRoles();
+  const { data: isSuperAdmin, isLoading: superAdminLoading } = useSuperAdmin();
+  const { data: isAdminRole, isLoading: adminLoading } = useIsAdmin();
 
   if (!user) return null;
 
-  const highestRole = roles ? getHighestPriorityRole(roles) : { display: "User", appRole: "user" };
-  const isAdmin = highestRole.appRole === "admin" || highestRole.appRole === "super_admin";
+  // Priority: Super Admin > Admin > roles hook > User
+  const roleLabel = superAdminLoading || adminLoading || rolesLoading
+    ? "Loading..."
+    : isSuperAdmin
+      ? "Super Admin"
+      : isAdminRole
+        ? "Admin"
+        : (roles && roles.length > 0 ? getHighestPriorityRole(roles).display : "User");
+  
+  const isAdmin = isSuperAdmin || isAdminRole;
 
   const handleSignOut = async () => {
     try {
@@ -62,7 +73,7 @@ export function UserProfile() {
             {user.user_metadata?.full_name || user.email?.split('@')[0]}
           </p>
           <p className={`text-xs ${isAdmin ? 'text-primary font-medium' : 'text-muted-foreground'}`}>
-            {rolesLoading ? "Loading..." : highestRole.display}
+            {roleLabel}
           </p>
         </div>
       </DropdownMenuTrigger>
