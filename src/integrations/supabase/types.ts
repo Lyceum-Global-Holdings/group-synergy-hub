@@ -4942,6 +4942,10 @@ export type Database = {
         Args: { p_id: string }
         Returns: Json
       }
+      get_user_company_ids: {
+        Args: { _user_id: string }
+        Returns: string[]
+      }
       has_role: {
         Args: {
           _app_role: Database["public"]["Enums"]["app_role"]
