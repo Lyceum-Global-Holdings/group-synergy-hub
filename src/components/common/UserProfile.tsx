@@ -11,12 +11,17 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
+import { useCurrentUserRoles, getHighestPriorityRole } from "@/hooks/useCurrentUserRoles";
 
 export function UserProfile() {
   const { user, signOut } = useAuth();
   const { toast } = useToast();
+  const { data: roles, isLoading: rolesLoading } = useCurrentUserRoles();
 
   if (!user) return null;
+
+  const highestRole = roles ? getHighestPriorityRole(roles) : { display: "User", appRole: "user" };
+  const isAdmin = highestRole.appRole === "admin" || highestRole.appRole === "super_admin";
 
   const handleSignOut = async () => {
     try {
@@ -56,7 +61,9 @@ export function UserProfile() {
           <p className="text-sm font-medium">
             {user.user_metadata?.full_name || user.email?.split('@')[0]}
           </p>
-          <p className="text-xs text-muted-foreground">User</p>
+          <p className={`text-xs ${isAdmin ? 'text-primary font-medium' : 'text-muted-foreground'}`}>
+            {rolesLoading ? "Loading..." : highestRole.display}
+          </p>
         </div>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56">
