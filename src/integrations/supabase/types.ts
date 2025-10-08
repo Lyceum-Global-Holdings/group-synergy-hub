@@ -1746,6 +1746,7 @@ export type Database = {
           received_by: string | null
           received_by_name: string | null
           received_date: string | null
+          request_id: string | null
           requested_by: string | null
           status: string
           total_value: number | null
@@ -1784,6 +1785,7 @@ export type Database = {
           received_by?: string | null
           received_by_name?: string | null
           received_date?: string | null
+          request_id?: string | null
           requested_by?: string | null
           status?: string
           total_value?: number | null
@@ -1822,12 +1824,176 @@ export type Database = {
           received_by?: string | null
           received_by_name?: string | null
           received_date?: string | null
+          request_id?: string | null
           requested_by?: string | null
           status?: string
           total_value?: number | null
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "material_issue_notes_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "material_requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      material_request_items: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          item_code: string | null
+          item_id: string
+          line_number: number | null
+          notes: string | null
+          purpose: string | null
+          quantity_approved: number | null
+          quantity_requested: number
+          request_id: string
+          unit_of_measure: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          item_code?: string | null
+          item_id: string
+          line_number?: number | null
+          notes?: string | null
+          purpose?: string | null
+          quantity_approved?: number | null
+          quantity_requested: number
+          request_id: string
+          unit_of_measure?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          item_code?: string | null
+          item_id?: string
+          line_number?: number | null
+          notes?: string | null
+          purpose?: string | null
+          quantity_approved?: number | null
+          quantity_requested?: number
+          request_id?: string
+          unit_of_measure?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "material_request_items_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "warehouse_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "material_request_items_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "material_requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      material_requests: {
+        Row: {
+          company_id: string | null
+          contact_number: string | null
+          created_at: string
+          created_by: string | null
+          department: string | null
+          epf_number: string | null
+          hod_approval_date: string | null
+          hod_approved_by: string | null
+          hod_comments: string | null
+          id: string
+          items_required_date: string
+          job_number: string | null
+          management_approval_date: string | null
+          management_approved_by: string | null
+          management_comments: string | null
+          min_id: string | null
+          notes: string | null
+          priority: string
+          purpose: string
+          rejection_reason: string | null
+          request_date: string
+          request_number: string
+          requested_by: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          company_id?: string | null
+          contact_number?: string | null
+          created_at?: string
+          created_by?: string | null
+          department?: string | null
+          epf_number?: string | null
+          hod_approval_date?: string | null
+          hod_approved_by?: string | null
+          hod_comments?: string | null
+          id?: string
+          items_required_date: string
+          job_number?: string | null
+          management_approval_date?: string | null
+          management_approved_by?: string | null
+          management_comments?: string | null
+          min_id?: string | null
+          notes?: string | null
+          priority?: string
+          purpose: string
+          rejection_reason?: string | null
+          request_date?: string
+          request_number: string
+          requested_by: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string | null
+          contact_number?: string | null
+          created_at?: string
+          created_by?: string | null
+          department?: string | null
+          epf_number?: string | null
+          hod_approval_date?: string | null
+          hod_approved_by?: string | null
+          hod_comments?: string | null
+          id?: string
+          items_required_date?: string
+          job_number?: string | null
+          management_approval_date?: string | null
+          management_approved_by?: string | null
+          management_comments?: string | null
+          min_id?: string | null
+          notes?: string | null
+          priority?: string
+          purpose?: string
+          rejection_reason?: string | null
+          request_date?: string
+          request_number?: string
+          requested_by?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "material_requests_min_id_fkey"
+            columns: ["min_id"]
+            isOneToOne: false
+            referencedRelation: "material_issue_notes"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       material_return_items: {
         Row: {
@@ -4668,6 +4834,10 @@ export type Database = {
         Returns: string
       }
       generate_min_number: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
+      generate_mr_number: {
         Args: Record<PropertyKey, never>
         Returns: string
       }

@@ -19,7 +19,26 @@ import { MaterialIssueDetailsDialog } from '@/components/warehouse/MaterialIssue
 import { MaterialReturnDialog } from '@/components/warehouse/MaterialReturnDialog';
 import { format } from 'date-fns';
 
-const getStatusColor = (status: string) => {
+  ];
+
+  const requestColumns: ColumnDef<MaterialRequest>[] = [
+    { accessorKey: "request_number", header: "Request #" },
+    { accessorKey: "request_date", header: "Date", cell: ({ row }) => format(new Date(row.original.request_date), 'PP') },
+    { accessorKey: "requested_by", header: "Requested By" },
+    { accessorKey: "department", header: "Department" },
+    { accessorKey: "priority", header: "Priority", cell: ({ row }) => <Badge variant="outline">{row.original.priority}</Badge> },
+    { accessorKey: "status", header: "Status", cell: ({ row }) => <Badge>{row.original.status}</Badge> },
+    {
+      id: "actions",
+      cell: ({ row }) => (
+        <Button variant="ghost" size="sm" onClick={() => { setSelectedRequest(row.original); setRequestDetailsOpen(true); }}>
+          <Eye className="h-4 w-4" />
+        </Button>
+      ),
+    },
+  ];
+
+  const issueColumns: ColumnDef<MaterialIssueNote>[] = [
   switch (status) {
     case 'draft':
       return 'secondary';

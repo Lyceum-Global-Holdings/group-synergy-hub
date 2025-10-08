@@ -1,0 +1,420 @@
+import { useState } from "react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Plus, Trash2, ArrowLeft, ArrowRight, CheckCircle } from "lucide-react";
+import { useMaterialRequests } from "@/hooks/useMaterialRequests";
+import { useMaterialRequestItems } from "@/hooks/useMaterialRequestItems";
+import { useWarehouseItems } from "@/hooks/useWarehouseItems";
+import { ItemSelector } from "@/components/common/ItemSelector";
+import { MaterialRequestPriority } from "@/types/materialIssueReturn";
+
+interface CreateMaterialRequestDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}
+
+interface RequestItem {
+  item_id: string;
+  item_code: string;
+  description: string;
+  unit_of_measure: string;
+  quantity_requested: number;
+  purpose?: string;
+  notes?: string;
+}
+
+export function CreateMaterialRequestDialog({ open, onOpenChange }: CreateMaterialRequestDialogProps) {
+  const [step, setStep] = useState(1);
+  const [requestData, setRequestData] = useState({
+    request_date: new Date().toISOString().split('T')[0],
+    requested_by: "",
+    department: "",
+    contact_number: "",
+    epf_number: "",
+    job_number: "",
+    items_required_date: "",
+    purpose: "",
+    priority: "medium" as MaterialRequestPriority,
+    notes: "",
+  });
+  const [items, setItems] = useState<RequestItem[]>([]);
+  const [selectedItemId, setSelectedItemId] = useState<string>("");
+  
+  const { createRequestAsync, isCreating } = useMaterialRequests();
+  const { createItems } = useMaterialRequestItems();
+  const { items: warehouseItems } = useWarehouseItems();
+
+  const handleAddItem = () => {
+    const selectedItem = warehouseItems?.find((item) => item.id === selectedItemId);
+    if (!selectedItem) return;
+
+    setItems([...items, {
+      item_id: selectedItem.id,
+      item_code: selectedItem.item_code || "",
+      description: selectedItem.description || "",
+      unit_of_measure: selectedItem.unit_of_measure || "pcs",
+      quantity_requested: 1,
+      purpose: "",
+      notes: "",
+    }]);
+    setSelectedItemId("");
+  };
+
+  const handleRemoveItem = (index: number) => {
+    setItems(items.filter((_, i) => i !== index));
+  };
+
+  const handleItemChange = (index: number, field: keyof RequestItem, value: string | number) => {
+    const updatedItems = [...items];
+    updatedItems[index] = { ...updatedItems[index], [field]: value };
+    setItems(updatedItems);
+  };
+
+  const handleSubmit = async (submitForApproval: boolean = false) => {
+    try {
+      // Create the request
+      const newRequest = await createRequestAsync(requestData);
+      
+      // Create the items
+      if (items.length > 0 && newRequest) {
+        await createItems(items.map((item, index) => ({
+          request_id: newRequest.id,
+          ...item,
+          line_number: index + 1,
+        })));
+      }
+
+      onOpenChange(false);
+      resetForm();
+    } catch (error) {
+      console.error("Error creating material request:", error);
+    }
+  };
+
+  const resetForm = () => {
+    setStep(1);
+    setRequestData({
+      request_date: new Date().toISOString().split('T')[0],
+      requested_by: "",
+      department: "",
+      contact_number: "",
+      epf_number: "",
+      job_number: "",
+      items_required_date: "",
+      purpose: "",
+      priority: "medium",
+      notes: "",
+    });
+    setItems([]);
+  };
+
+  const canProceedToStep2 = requestData.requested_by && requestData.items_required_date && requestData.purpose;
+  const canSubmit = items.length > 0;
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Create Material Request</DialogTitle>
+        </DialogHeader>
+
+        {/* Progress indicator */}
+        <div className="flex items-center justify-center gap-2 mb-4">
+          <div className={`flex items-center gap-2 ${step >= 1 ? 'text-primary' : 'text-muted-foreground'}`}>
+            <div className={`w-8 h-8 rounded-full flex items-center justify-center border-2 ${step >= 1 ? 'border-primary bg-primary text-primary-foreground' : 'border-muted'}`}>
+              1
+            </div>
+            <span className="text-sm font-medium">Header</span>
+          </div>
+          <div className="w-12 h-px bg-border" />
+          <div className={`flex items-center gap-2 ${step >= 2 ? 'text-primary' : 'text-muted-foreground'}`}>
+            <div className={`w-8 h-8 rounded-full flex items-center justify-center border-2 ${step >= 2 ? 'border-primary bg-primary text-primary-foreground' : 'border-muted'}`}>
+              2
+            </div>
+            <span className="text-sm font-medium">Items</span>
+          </div>
+          <div className="w-12 h-px bg-border" />
+          <div className={`flex items-center gap-2 ${step >= 3 ? 'text-primary' : 'text-muted-foreground'}`}>
+            <div className={`w-8 h-8 rounded-full flex items-center justify-center border-2 ${step >= 3 ? 'border-primary bg-primary text-primary-foreground' : 'border-muted'}`}>
+              3
+            </div>
+            <span className="text-sm font-medium">Review</span>
+          </div>
+        </div>
+
+        {/* Step 1: Header Information */}
+        {step === 1 && (
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="request_date">Request Date</Label>
+                <Input
+                  id="request_date"
+                  type="date"
+                  value={requestData.request_date}
+                  onChange={(e) => setRequestData({ ...requestData, request_date: e.target.value })}
+                />
+              </div>
+              <div>
+                <Label htmlFor="items_required_date">Date Items Required *</Label>
+                <Input
+                  id="items_required_date"
+                  type="date"
+                  value={requestData.items_required_date}
+                  onChange={(e) => setRequestData({ ...requestData, items_required_date: e.target.value })}
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="requested_by">Requested By *</Label>
+                <Input
+                  id="requested_by"
+                  value={requestData.requested_by}
+                  onChange={(e) => setRequestData({ ...requestData, requested_by: e.target.value })}
+                  placeholder="Employee name"
+                  required
+                />
+              </div>
+              <div>
+                <Label htmlFor="department">Department</Label>
+                <Input
+                  id="department"
+                  value={requestData.department}
+                  onChange={(e) => setRequestData({ ...requestData, department: e.target.value })}
+                  placeholder="e.g., Production, Warehouse"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-3 gap-4">
+              <div>
+                <Label htmlFor="contact_number">Contact Number</Label>
+                <Input
+                  id="contact_number"
+                  value={requestData.contact_number}
+                  onChange={(e) => setRequestData({ ...requestData, contact_number: e.target.value })}
+                  placeholder="Phone number"
+                />
+              </div>
+              <div>
+                <Label htmlFor="epf_number">EPF Number</Label>
+                <Input
+                  id="epf_number"
+                  value={requestData.epf_number}
+                  onChange={(e) => setRequestData({ ...requestData, epf_number: e.target.value })}
+                  placeholder="Employee EPF number"
+                />
+              </div>
+              <div>
+                <Label htmlFor="job_number">Job Number</Label>
+                <Input
+                  id="job_number"
+                  value={requestData.job_number}
+                  onChange={(e) => setRequestData({ ...requestData, job_number: e.target.value })}
+                  placeholder="Job/Work order number"
+                />
+              </div>
+            </div>
+
+            <div>
+              <Label htmlFor="purpose">Purpose *</Label>
+              <Textarea
+                id="purpose"
+                value={requestData.purpose}
+                onChange={(e) => setRequestData({ ...requestData, purpose: e.target.value })}
+                placeholder="Reason for material request"
+                required
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="priority">Priority</Label>
+                <Select value={requestData.priority} onValueChange={(value: MaterialRequestPriority) => setRequestData({ ...requestData, priority: value })}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="low">Low</SelectItem>
+                    <SelectItem value="medium">Medium</SelectItem>
+                    <SelectItem value="high">High</SelectItem>
+                    <SelectItem value="urgent">Urgent</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="notes">Notes</Label>
+                <Input
+                  id="notes"
+                  value={requestData.notes}
+                  onChange={(e) => setRequestData({ ...requestData, notes: e.target.value })}
+                  placeholder="Additional notes"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end">
+              <Button onClick={() => setStep(2)} disabled={!canProceedToStep2}>
+                Next <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* Step 2: Items */}
+        {step === 2 && (
+          <div className="space-y-4">
+            <div className="flex gap-2">
+              <div className="flex-1">
+                <ItemSelector
+                  value={selectedItemId}
+                  onChange={setSelectedItemId}
+                />
+              </div>
+              <Button onClick={handleAddItem} disabled={!selectedItemId}>
+                <Plus className="h-4 w-4 mr-2" />
+                Add Item
+              </Button>
+            </div>
+
+            <div className="border rounded-lg">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Item Code</TableHead>
+                    <TableHead>Description</TableHead>
+                    <TableHead>UOM</TableHead>
+                    <TableHead>Qty Required</TableHead>
+                    <TableHead>Purpose</TableHead>
+                    <TableHead>Notes</TableHead>
+                    <TableHead className="w-[50px]"></TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {items.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={7} className="text-center text-muted-foreground">
+                        No items added yet
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    items.map((item, index) => (
+                      <TableRow key={index}>
+                        <TableCell>{item.item_code}</TableCell>
+                        <TableCell>{item.description}</TableCell>
+                        <TableCell>{item.unit_of_measure}</TableCell>
+                        <TableCell>
+                          <Input
+                            type="number"
+                            value={item.quantity_requested}
+                            onChange={(e) => handleItemChange(index, 'quantity_requested', parseFloat(e.target.value))}
+                            className="w-20"
+                            min="0.01"
+                            step="0.01"
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Input
+                            value={item.purpose || ""}
+                            onChange={(e) => handleItemChange(index, 'purpose', e.target.value)}
+                            placeholder="Purpose"
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Input
+                            value={item.notes || ""}
+                            onChange={(e) => handleItemChange(index, 'notes', e.target.value)}
+                            placeholder="Notes"
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Button variant="ghost" size="icon" onClick={() => handleRemoveItem(index)}>
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+
+            <div className="flex justify-between">
+              <Button variant="outline" onClick={() => setStep(1)}>
+                <ArrowLeft className="mr-2 h-4 w-4" />
+                Back
+              </Button>
+              <Button onClick={() => setStep(3)} disabled={!canSubmit}>
+                Next <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* Step 3: Review */}
+        {step === 3 && (
+          <div className="space-y-4">
+            <div className="border rounded-lg p-4 space-y-2">
+              <h3 className="font-semibold">Request Details</h3>
+              <div className="grid grid-cols-2 gap-2 text-sm">
+                <div><span className="text-muted-foreground">Requested By:</span> {requestData.requested_by}</div>
+                <div><span className="text-muted-foreground">Department:</span> {requestData.department || "N/A"}</div>
+                <div><span className="text-muted-foreground">Date Required:</span> {requestData.items_required_date}</div>
+                <div><span className="text-muted-foreground">Priority:</span> {requestData.priority}</div>
+                <div className="col-span-2"><span className="text-muted-foreground">Purpose:</span> {requestData.purpose}</div>
+              </div>
+            </div>
+
+            <div className="border rounded-lg p-4">
+              <h3 className="font-semibold mb-2">Items ({items.length})</h3>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Item Code</TableHead>
+                    <TableHead>Description</TableHead>
+                    <TableHead>Qty Required</TableHead>
+                    <TableHead>UOM</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {items.map((item, index) => (
+                    <TableRow key={index}>
+                      <TableCell>{item.item_code}</TableCell>
+                      <TableCell>{item.description}</TableCell>
+                      <TableCell>{item.quantity_requested}</TableCell>
+                      <TableCell>{item.unit_of_measure}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+
+            <div className="flex justify-between">
+              <Button variant="outline" onClick={() => setStep(2)}>
+                <ArrowLeft className="mr-2 h-4 w-4" />
+                Back
+              </Button>
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={() => handleSubmit(false)} disabled={isCreating}>
+                  Save as Draft
+                </Button>
+                <Button onClick={() => handleSubmit(true)} disabled={isCreating}>
+                  <CheckCircle className="mr-2 h-4 w-4" />
+                  Submit for Approval
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}

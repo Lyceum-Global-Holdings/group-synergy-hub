@@ -4,6 +4,17 @@ export type MaterialReturnType = 'internal' | 'supplier';
 export type MaterialReferenceType = 'material_issue' | 'purchase_order' | 'other';
 export type MaterialCondition = 'good' | 'damaged' | 'expired';
 
+export type MaterialRequestStatus = 
+  | 'draft' 
+  | 'pending_hod_approval' 
+  | 'pending_management_approval' 
+  | 'approved' 
+  | 'rejected' 
+  | 'issued' 
+  | 'cancelled';
+
+export type MaterialRequestPriority = 'low' | 'medium' | 'high' | 'urgent';
+
 export interface MaterialIssueNote {
   id: string;
   min_number: string;
@@ -141,5 +152,76 @@ export interface CreateMaterialReturnItemData {
   unit_cost?: number;
   total_cost?: number;
   condition?: MaterialCondition;
+  notes?: string;
+}
+
+export interface MaterialRequest {
+  id: string;
+  request_number: string;
+  request_date: string;
+  requested_by: string;
+  department: string | null;
+  contact_number: string | null;
+  epf_number: string | null;
+  job_number: string | null;
+  items_required_date: string;
+  purpose: string;
+  priority: MaterialRequestPriority;
+  status: MaterialRequestStatus;
+  hod_approved_by: string | null;
+  hod_approval_date: string | null;
+  hod_comments: string | null;
+  management_approved_by: string | null;
+  management_approval_date: string | null;
+  management_comments: string | null;
+  rejection_reason: string | null;
+  min_id: string | null;
+  notes: string | null;
+  company_id: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateMaterialRequestData {
+  request_date: string;
+  requested_by: string;
+  department?: string;
+  contact_number?: string;
+  epf_number?: string;
+  job_number?: string;
+  items_required_date: string;
+  purpose: string;
+  priority?: MaterialRequestPriority;
+  notes?: string;
+  company_id?: string;
+}
+
+export interface MaterialRequestItem {
+  id: string;
+  request_id: string;
+  item_id: string;
+  line_number: number | null;
+  item_code: string | null;
+  description: string | null;
+  unit_of_measure: string;
+  quantity_requested: number;
+  quantity_approved: number | null;
+  purpose: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateMaterialRequestItemData {
+  request_id: string;
+  item_id: string;
+  line_number?: number;
+  item_code?: string;
+  description?: string;
+  unit_of_measure?: string;
+  quantity_requested: number;
+  quantity_approved?: number;
+  purpose?: string;
   notes?: string;
 }
