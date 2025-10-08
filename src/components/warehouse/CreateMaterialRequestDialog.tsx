@@ -9,9 +9,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Plus, Trash2, ArrowLeft, ArrowRight, CheckCircle } from "lucide-react";
 import { useMaterialRequests } from "@/hooks/useMaterialRequests";
 import { useMaterialRequestItems } from "@/hooks/useMaterialRequestItems";
-import { useWarehouseItems } from "@/hooks/useWarehouseItems";
 import { ItemSelector } from "@/components/common/ItemSelector";
 import { MaterialRequestPriority } from "@/types/materialIssueReturn";
+import { WarehouseItem } from "@/types/itemBin";
 
 interface CreateMaterialRequestDialogProps {
   open: boolean;
@@ -43,26 +43,22 @@ export function CreateMaterialRequestDialog({ open, onOpenChange }: CreateMateri
     notes: "",
   });
   const [items, setItems] = useState<RequestItem[]>([]);
-  const [selectedItemId, setSelectedItemId] = useState<string>("");
   
   const { createRequestAsync, isCreating } = useMaterialRequests();
   const { createItems } = useMaterialRequestItems();
-  const { items: warehouseItems } = useWarehouseItems();
 
-  const handleAddItem = () => {
-    const selectedItem = warehouseItems?.find((item) => item.id === selectedItemId);
+  const handleAddItem = (selectedItem: WarehouseItem | null) => {
     if (!selectedItem) return;
 
     setItems([...items, {
       item_id: selectedItem.id,
       item_code: selectedItem.item_code || "",
       description: selectedItem.description || "",
-      unit_of_measure: selectedItem.unit_of_measure || "pcs",
+      unit_of_measure: "pcs", // Default unit, can be enhanced later
       quantity_requested: 1,
       purpose: "",
       notes: "",
     }]);
-    setSelectedItemId("");
   };
 
   const handleRemoveItem = (index: number) => {
@@ -275,14 +271,11 @@ export function CreateMaterialRequestDialog({ open, onOpenChange }: CreateMateri
             <div className="flex gap-2">
               <div className="flex-1">
                 <ItemSelector
-                  value={selectedItemId}
-                  onChange={setSelectedItemId}
+                  value=""
+                  onSelect={handleAddItem}
+                  placeholder="Select item to add"
                 />
               </div>
-              <Button onClick={handleAddItem} disabled={!selectedItemId}>
-                <Plus className="h-4 w-4 mr-2" />
-                Add Item
-              </Button>
             </div>
 
             <div className="border rounded-lg">
