@@ -14,13 +14,25 @@ export default function Auth() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('signin');
+  const [isResettingPassword, setIsResettingPassword] = useState(false);
   
-  const { signIn, signUp, user } = useAuth();
+  const { signIn, signUp, user, resetPassword, updatePassword } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const { toast } = useToast();
+
+  // Check if this is a password reset callback
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    if (params.get('reset') === 'true' && user) {
+      setIsResettingPassword(true);
+      setActiveTab('reset-password');
+    }
+  }, [location, user]);
 
   // Redirect if already authenticated
   useEffect(() => {
@@ -97,6 +109,81 @@ export default function Auth() {
         setEmail('');
         setPassword('');
         setFullName('');
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+    
+    try {
+      const { error } = await resetPassword(email);
+      
+      if (error) {
+        console.error('Password reset error:', error);
+        toast({
+          title: "Password reset failed",
+          description: getErrorMessage(error),
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Password reset email sent!",
+          description: "Please check your email for the password reset link.",
+        });
+        setEmail('');
+        setActiveTab('signin');
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleUpdatePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (newPassword !== confirmPassword) {
+      toast({
+        title: "Passwords don't match",
+        description: "Please make sure both passwords are the same.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (newPassword.length < 6) {
+      toast({
+        title: "Password too short",
+        description: "Password must be at least 6 characters long.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsLoading(true);
+    
+    try {
+      const { error } = await updatePassword(newPassword);
+      
+      if (error) {
+        console.error('Password update error:', error);
+        toast({
+          title: "Password update failed",
+          description: getErrorMessage(error),
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Password updated successfully!",
+          description: "You can now sign in with your new password.",
+        });
+        setNewPassword('');
+        setConfirmPassword('');
+        setIsResettingPassword(false);
+        navigate('/', { replace: true });
       }
     } finally {
       setIsLoading(false);
@@ -200,9 +287,11 @@ export default function Auth() {
           </CardHeader>
           <CardContent>
             <Tabs value={activeTab} onValueChange={setActiveTab}>
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="signin">Sign In</TabsTrigger>
-                <TabsTrigger value="signup">Sign Up</TabsTrigger>
+              <TabsList className={`grid w-full ${isResettingPassword ? 'grid-cols-1' : 'grid-cols-3'}`}>
+                {!isResettingPassword && <TabsTrigger value="signin">Sign In</TabsTrigger>}
+                {!isResettingPassword && <TabsTrigger value="signup">Sign Up</TabsTrigger>}
+                {!isResettingPassword && <TabsTrigger value="forgot">Forgot Password</TabsTrigger>}
+                {isResettingPassword && <TabsTrigger value="reset-password">Reset Password</TabsTrigger>}
               </TabsList>
               
               <TabsContent value="signin" className="space-y-4">
@@ -275,6 +364,62 @@ export default function Auth() {
                   <Button type="submit" className="w-full" disabled={isLoading}>
                     {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                     Sign Up
+                  </Button>
+                </form>
+              </TabsContent>
+              
+              <TabsContent value="forgot" className="space-y-4">
+                <form onSubmit={handleForgotPassword} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="forgot-email">Email</Label>
+                    <Input
+                      id="forgot-email"
+                      type="email"
+                      placeholder="Enter your email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      required
+                    />
+                  </div>
+                  <Button type="submit" className="w-full" disabled={isLoading}>
+                    {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Send Reset Link
+                  </Button>
+                  <p className="text-xs text-muted-foreground text-center">
+                    Enter your email and we'll send you a link to reset your password.
+                  </p>
+                </form>
+              </TabsContent>
+              
+              <TabsContent value="reset-password" className="space-y-4">
+                <form onSubmit={handleUpdatePassword} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="new-password">New Password</Label>
+                    <Input
+                      id="new-password"
+                      type="password"
+                      placeholder="Enter new password"
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      required
+                      minLength={6}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="confirm-password">Confirm Password</Label>
+                    <Input
+                      id="confirm-password"
+                      type="password"
+                      placeholder="Confirm new password"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      required
+                      minLength={6}
+                    />
+                  </div>
+                  <Button type="submit" className="w-full" disabled={isLoading}>
+                    {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Update Password
                   </Button>
                 </form>
               </TabsContent>
