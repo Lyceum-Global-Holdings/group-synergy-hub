@@ -131,10 +131,10 @@ export function StockMovementDialog({ open, onOpenChange, itemId, itemName, curr
                       {transaction.quantity_after}
                     </TableCell>
                     <TableCell className="text-right">
-                      {transaction.unit_cost ? `$${transaction.unit_cost.toFixed(2)}` : '-'}
+                      {transaction.unit_cost ? `LKR ${transaction.unit_cost.toFixed(2)}` : '-'}
                     </TableCell>
                     <TableCell className="text-right">
-                      {transaction.total_value ? `$${transaction.total_value.toFixed(2)}` : '-'}
+                      {transaction.total_value ? `LKR ${transaction.total_value.toFixed(2)}` : '-'}
                     </TableCell>
                     <TableCell>
                       {transaction.notes || '-'}

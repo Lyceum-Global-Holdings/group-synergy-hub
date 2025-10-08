@@ -158,7 +158,7 @@ export function ItemMasterTab() {
                       </Button>
                     </div>
                   </TableCell>
-                  <TableCell>{item.unit_cost ? `$${item.unit_cost}` : '-'}</TableCell>
+                  <TableCell>{item.unit_cost ? `LKR ${item.unit_cost}` : '-'}</TableCell>
                   <TableCell>
                     <Badge className={getStatusColor(item.status)}>
                       {item.status}

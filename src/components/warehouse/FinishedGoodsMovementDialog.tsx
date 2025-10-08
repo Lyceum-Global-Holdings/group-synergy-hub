@@ -134,10 +134,10 @@ export function FinishedGoodsMovementDialog({
                       {movement.quantity_after}
                     </TableCell>
                     <TableCell className="text-right">
-                      {movement.unit_cost ? `$${movement.unit_cost.toFixed(2)}` : '-'}
+                      {movement.unit_cost ? `LKR ${movement.unit_cost.toFixed(2)}` : '-'}
                     </TableCell>
                     <TableCell className="text-right">
-                      {movement.total_value ? `$${movement.total_value.toFixed(2)}` : '-'}
+                      {movement.total_value ? `LKR ${movement.total_value.toFixed(2)}` : '-'}
                     </TableCell>
                     <TableCell>
                       {movement.notes || '-'}
