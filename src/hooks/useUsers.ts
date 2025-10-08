@@ -196,6 +196,15 @@ export const useAssignRole = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users'] });
       queryClient.invalidateQueries({ queryKey: ['roles'] });
+      toast.success('Role assigned successfully');
+    },
+    onError: (error: any) => {
+      console.error('Role assignment failed:', error);
+      if (error.code === '42501') {
+        toast.error('Permission denied: Only administrators can assign roles');
+      } else {
+        toast.error(`Failed to assign role: ${error.message}`);
+      }
     },
   });
 };
@@ -215,6 +224,15 @@ export const useRemoveRole = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users'] });
       queryClient.invalidateQueries({ queryKey: ['roles'] });
+      toast.success('Role removed successfully');
+    },
+    onError: (error: any) => {
+      console.error('Role removal failed:', error);
+      if (error.code === '42501') {
+        toast.error('Permission denied: Only administrators can remove roles');
+      } else {
+        toast.error(`Failed to remove role: ${error.message}`);
+      }
     },
   });
 };
