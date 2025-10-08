@@ -4328,6 +4328,7 @@ export type Database = {
           address_line2: string | null
           category: string | null
           city: string | null
+          company_id: string | null
           country: string | null
           created_at: string
           created_by: string | null
@@ -4358,6 +4359,7 @@ export type Database = {
           address_line2?: string | null
           category?: string | null
           city?: string | null
+          company_id?: string | null
           country?: string | null
           created_at?: string
           created_by?: string | null
@@ -4388,6 +4390,7 @@ export type Database = {
           address_line2?: string | null
           category?: string | null
           city?: string | null
+          company_id?: string | null
           country?: string | null
           created_at?: string
           created_by?: string | null
@@ -4413,7 +4416,15 @@ export type Database = {
           updated_at?: string
           website?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "suppliers_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_roles: {
         Row: {
