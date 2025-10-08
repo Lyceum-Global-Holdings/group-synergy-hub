@@ -32,13 +32,12 @@ export default function UserRoleManagement() {
   const [deleteRoleOpen, setDeleteRoleOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [selectedRole, setSelectedRole] = useState<Role | null>(null);
-  const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
   const [hasAnyAdmins, setHasAnyAdmins] = useState<boolean | null>(null);
   
   const { data: users = [], isLoading: usersLoading, error: usersError, refetch } = useUsers();
   const { data: roles = [], isLoading: rolesLoading, error: rolesError } = useRoles();
-  const { data: isSuperAdmin } = useSuperAdmin();
-  const { data: isAdminCheck } = useIsAdmin();
+  const { data: isSuperAdmin, isLoading: superAdminLoading } = useSuperAdmin();
+  const { data: isAdmin, isLoading: adminLoading } = useIsAdmin();
   const { companies } = useCompanies();
   const assignRole = useAssignRole();
   const removeRole = useRemoveRole();
@@ -46,28 +45,19 @@ export default function UserRoleManagement() {
   const deleteRole = useDeleteRole();
   const { toast } = useToast();
 
-  // Check admin status and if any admins exist
+  // Check if any admins exist
   useEffect(() => {
-    const checkAdminStatus = async () => {
-      if (!user?.id) return;
-
-      // Check if current user is admin
-      const { data: isAdminResult } = await supabase
-        .rpc('is_admin', { _user_id: user.id });
-      
-      setIsAdmin(isAdminResult === true);
-
-      // Check if any admin users exist
+    const checkAdmins = async () => {
       const { data: adminUsers } = await supabase
         .from('user_roles')
         .select('id, roles!inner(*)')
-        .eq('roles.app_role', 'admin');
+        .or('roles.app_role.eq.admin,roles.app_role.eq.super_admin');
 
       setHasAnyAdmins(adminUsers && adminUsers.length > 0);
     };
 
-    checkAdminStatus();
-  }, [user?.id, users]); // Re-check when users change
+    checkAdmins();
+  }, [users]);
 
   const handleUserAdded = () => {
     // Refetch users after adding a new one and recheck admin status
@@ -141,7 +131,9 @@ export default function UserRoleManagement() {
     }
   };
 
-  const isLoading = usersLoading || rolesLoading || isAdmin === null || hasAnyAdmins === null;
+  const hasAccess = isSuperAdmin || isAdmin;
+  const checkingPermissions = superAdminLoading || adminLoading;
+  const isLoading = usersLoading || rolesLoading || hasAnyAdmins === null || checkingPermissions;
   const hasError = usersError || rolesError;
 
   if (hasError) {
@@ -179,7 +171,7 @@ export default function UserRoleManagement() {
   }
 
   // Show access denied if user is not admin
-  if (!isAdmin) {
+  if (!hasAccess) {
     return (
       <div className="container mx-auto py-8">
         <Card className="w-full max-w-md mx-auto">

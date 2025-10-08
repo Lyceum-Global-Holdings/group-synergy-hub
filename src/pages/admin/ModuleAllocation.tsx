@@ -5,17 +5,25 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, Loader2 } from "lucide-react";
 import { useCompanies } from "@/hooks/useCompanies";
 import { Company } from "@/types/company";
 import { moduleConfig, normalizeCompanyModules, getModuleSelectionState } from "@/constants/moduleConfig";
 import { toast } from "sonner";
+import { useSuperAdmin, useIsAdmin } from "@/hooks/useSuperAdmin";
 
 export default function ModuleAllocation() {
   const { companies, updateCompany, isUpdating } = useCompanies();
   const [searchParams] = useSearchParams();
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
   const [moduleChanges, setModuleChanges] = useState<Record<string, string[]>>({});
+  
+  const { data: isSuperAdmin, isLoading: superAdminLoading } = useSuperAdmin();
+  const { data: isAdmin, isLoading: adminLoading } = useIsAdmin();
+
+  // Check permissions
+  const hasAccess = isSuperAdmin || isAdmin;
+  const checkingPermissions = superAdminLoading || adminLoading;
 
   // Auto-select company from URL parameter
   useEffect(() => {
@@ -92,6 +100,29 @@ export default function ModuleAllocation() {
 
   const hasChanges = selectedCompany && 
     JSON.stringify(moduleChanges) !== JSON.stringify(normalizeCompanyModules(selectedCompany.modules));
+
+  if (checkingPermissions) {
+    return (
+      <div className="flex justify-center items-center py-8">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    );
+  }
+
+  if (!hasAccess) {
+    return (
+      <Card className="w-full max-w-md mx-auto">
+        <CardHeader>
+          <CardTitle>Access Denied</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-center text-muted-foreground">
+            You need administrator privileges to access module allocation.
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <div className="space-y-6">

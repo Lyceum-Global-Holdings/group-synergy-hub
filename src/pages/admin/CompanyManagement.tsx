@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { useSuperAdmin, useIsAdmin } from "@/hooks/useSuperAdmin";
 import {
   Table,
   TableBody,
@@ -49,6 +50,9 @@ export default function CompanyManagement() {
   const [editingCompany, setEditingCompany] = useState<Company | null>(null);
   const [deletingCompany, setDeletingCompany] = useState<Company | null>(null);
   
+  const { data: isSuperAdmin, isLoading: superAdminLoading } = useSuperAdmin();
+  const { data: isAdmin, isLoading: adminLoading } = useIsAdmin();
+  
   const {
     companies,
     isLoading,
@@ -59,6 +63,33 @@ export default function CompanyManagement() {
     isUpdating,
     isDeleting,
   } = useCompanies();
+
+  // Check permissions
+  const hasAccess = isSuperAdmin || isAdmin;
+  const checkingPermissions = superAdminLoading || adminLoading;
+
+  if (checkingPermissions) {
+    return (
+      <div className="flex justify-center items-center py-8">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    );
+  }
+
+  if (!hasAccess) {
+    return (
+      <Card className="w-full max-w-md mx-auto">
+        <CardHeader>
+          <CardTitle>Access Denied</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-center text-muted-foreground">
+            You need administrator privileges to access company management.
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
 
   const handleCreateCompany = async (data: any) => {
     await createCompany(data);
