@@ -1,3 +1,18 @@
+/**
+ * @deprecated This component is deprecated. Use CreateGrnDialog from warehouse instead.
+ * 
+ * This dialog creates po_receipts which are NOT connected to warehouse stock management.
+ * All goods receipt should go through the unified GRN system which properly updates
+ * warehouse stock and creates stock transactions.
+ * 
+ * Migration Path:
+ * 1. Use CreateGrnDialog with preselectedPo prop
+ * 2. GRNs will auto-update PO quantities via database trigger
+ * 3. Stock transactions will be created when GRN is approved
+ * 
+ * @see CreateGrnDialog in src/components/warehouse/CreateGrnDialog.tsx
+ */
+
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";

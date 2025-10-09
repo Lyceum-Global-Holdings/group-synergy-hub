@@ -12,6 +12,8 @@ import { Send, Package, Edit, FileText, Check, X, Clock } from "lucide-react";
 import { useSendPurchaseOrder } from "@/hooks/usePurchaseOrders";
 import { useSubmitPurchaseOrder, useApprovePurchaseOrder, usePurchaseOrderApprovals } from "@/hooks/usePurchaseOrderApprovals";
 import { useState } from "react";
+import { CreateGrnDialog } from "@/components/warehouse/CreateGrnDialog";
+import { GrnListForPo } from "@/components/procurement/GrnListForPo";
 
 interface PoDetailsDialogProps {
   open: boolean;
@@ -45,6 +47,7 @@ const statusLabels: Record<PoStatus, string> = {
 
 export function PoDetailsDialog({ open, onOpenChange, purchaseOrder }: PoDetailsDialogProps) {
   const [comments, setComments] = useState("");
+  const [showGrnDialog, setShowGrnDialog] = useState(false);
   
   const sendMutation = useSendPurchaseOrder();
   const submitMutation = useSubmitPurchaseOrder();
@@ -121,14 +124,21 @@ export function PoDetailsDialog({ open, onOpenChange, purchaseOrder }: PoDetails
                   Send PO
                 </Button>
               )}
+              {canReceive && (
+                <Button size="sm" onClick={() => setShowGrnDialog(true)}>
+                  <Package className="h-4 w-4 mr-2" />
+                  Create GRN
+                </Button>
+              )}
             </div>
           </div>
         </DialogHeader>
 
         <Tabs defaultValue="details" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="details">Details</TabsTrigger>
             <TabsTrigger value="items">Items</TabsTrigger>
+            <TabsTrigger value="grns">GRNs</TabsTrigger>
             <TabsTrigger value="approvals">Approvals</TabsTrigger>
           </TabsList>
 
@@ -354,6 +364,17 @@ export function PoDetailsDialog({ open, onOpenChange, purchaseOrder }: PoDetails
             )}
           </TabsContent>
 
+          <TabsContent value="grns" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Goods Receipt Notes</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <GrnListForPo poId={purchaseOrder.id} />
+              </CardContent>
+            </Card>
+          </TabsContent>
+
           <TabsContent value="approvals" className="space-y-6">
             {/* Approval Actions */}
             {canApprove && (
@@ -425,6 +446,13 @@ export function PoDetailsDialog({ open, onOpenChange, purchaseOrder }: PoDetails
             </Card>
           </TabsContent>
         </Tabs>
+
+        {/* GRN Creation Dialog */}
+        <CreateGrnDialog
+          open={showGrnDialog}
+          onOpenChange={setShowGrnDialog}
+          preselectedPo={purchaseOrder}
+        />
       </DialogContent>
     </Dialog>
   );

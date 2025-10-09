@@ -10,7 +10,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { usePurchaseOrders, useDeletePurchaseOrder, useSendPurchaseOrder, usePoSummaryStats } from "@/hooks/usePurchaseOrders";
 import { CreatePoDialog } from "@/components/procurement/CreatePoDialog";
 import { PoDetailsDialog } from "@/components/procurement/PoDetailsDialog";
-import { GoodsReceiptDialog } from "@/components/procurement/GoodsReceiptDialog";
+import { CreateGrnDialog } from "@/components/warehouse/CreateGrnDialog";
 import { PurchaseOrder, PoStatus } from "@/types/purchaseOrder";
 import { format } from "date-fns";
 
@@ -44,7 +44,7 @@ export default function PurchaseOrderPage() {
   const [selectedPo, setSelectedPo] = useState<PurchaseOrder | null>(null);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [showDetailsDialog, setShowDetailsDialog] = useState(false);
-  const [showReceiptDialog, setShowReceiptDialog] = useState(false);
+  const [showGrnDialog, setShowGrnDialog] = useState(false);
 
   const { data: purchaseOrders = [], isLoading } = usePurchaseOrders();
   const { data: summaryStats } = usePoSummaryStats();
@@ -75,7 +75,7 @@ export default function PurchaseOrderPage() {
 
   const handleReceiveGoods = (po: PurchaseOrder) => {
     setSelectedPo(po);
-    setShowReceiptDialog(true);
+    setShowGrnDialog(true);
   };
 
   const handleSend = (po: PurchaseOrder) => {
@@ -307,10 +307,10 @@ export default function PurchaseOrderPage() {
             onOpenChange={setShowDetailsDialog}
             purchaseOrder={selectedPo}
           />
-          <GoodsReceiptDialog
-            open={showReceiptDialog}
-            onOpenChange={setShowReceiptDialog}
-            purchaseOrder={selectedPo}
+          <CreateGrnDialog
+            open={showGrnDialog}
+            onOpenChange={setShowGrnDialog}
+            preselectedPo={selectedPo}
           />
         </>
       )}

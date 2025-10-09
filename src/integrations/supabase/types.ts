@@ -7518,6 +7518,10 @@ export type Database = {
         Args: { p_bpo_id: string; p_requested_amount: number }
         Returns: boolean
       }
+      validate_po_for_grn: {
+        Args: { p_po_id: string }
+        Returns: boolean
+      }
     }
     Enums: {
       account_category:

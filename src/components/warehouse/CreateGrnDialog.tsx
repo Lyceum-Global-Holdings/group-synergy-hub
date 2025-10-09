@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Calendar, Plus, Trash2, Search } from 'lucide-react';
+import { Calendar, Plus, Trash2, Search, FileText } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,6 +13,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { useCreateGoodsReceiptNote } from '@/hooks/useGoodsReceiptNotes';
 import { useSuppliers } from '@/hooks/useSuppliers';
 import { usePurchaseOrders } from '@/hooks/usePurchaseOrders';
@@ -56,6 +58,32 @@ type CreateGrnFormData = z.infer<typeof createGrnSchema>;
 interface CreateGrnDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  preselectedPo?: PurchaseOrder;
+}
+
+interface PurchaseOrder {
+  id: string;
+  po_number: string;
+  status: string;
+  po_date: string;
+  expected_delivery_date?: string;
+  supplier_id: string;
+  supplier?: {
+    name: string;
+    address_line1?: string;
+  };
+  items?: Array<{
+    id?: string;
+    item_code?: string;
+    item_name: string;
+    description?: string;
+    warehouse_item_id?: string;
+    quantity_ordered: number;
+    quantity_received: number;
+    quantity_pending: number;
+    unit_of_measure: string;
+    unit_price: number;
+  }>;
 }
 
 const qualityStatusOptions: { value: QualityStatus; label: string }[] = [
@@ -64,9 +92,10 @@ const qualityStatusOptions: { value: QualityStatus; label: string }[] = [
   { value: 'rejected', label: 'Rejected' },
 ];
 
-export function CreateGrnDialog({ open, onOpenChange }: CreateGrnDialogProps) {
+export function CreateGrnDialog({ open, onOpenChange, preselectedPo }: CreateGrnDialogProps) {
   const [showSupplierSearch, setShowSupplierSearch] = useState(false);
   const [showPoSearch, setShowPoSearch] = useState(false);
+  const [selectedPoData, setSelectedPoData] = useState<PurchaseOrder | null>(null);
   
   const { selectedCompany } = useCompany();
   const { data: suppliers = [] } = useSuppliers();
@@ -93,6 +122,13 @@ export function CreateGrnDialog({ open, onOpenChange }: CreateGrnDialogProps) {
     control: form.control,
     name: 'items',
   });
+
+  // Handle preselected PO
+  React.useEffect(() => {
+    if (preselectedPo && open) {
+      handleSelectPo(preselectedPo);
+    }
+  }, [preselectedPo, open]);
 
   const calculateItemTotal = (index: number) => {
     const item = form.getValues(`items.${index}`);
@@ -135,6 +171,7 @@ export function CreateGrnDialog({ open, onOpenChange }: CreateGrnDialogProps) {
   };
 
   const handleSelectPo = (po: any) => {
+    setSelectedPoData(po);
     form.setValue('po_id', po.id);
     form.setValue('po_number', po.po_number);
     form.setValue('supplier_id', po.supplier_id);
@@ -150,7 +187,7 @@ export function CreateGrnDialog({ open, onOpenChange }: CreateGrnDialogProps) {
         warehouse_item_id: item.warehouse_item_id,
         po_item_id: item.id,
         quantity_ordered: item.quantity_ordered || 0,
-        quantity_received: 0,
+        quantity_received: item.quantity_received || 0,
         unit_of_measure: item.unit_of_measure || 'pcs',
         unit_price: item.unit_price || 0,
         total_cost: 0,
@@ -322,6 +359,41 @@ export function CreateGrnDialog({ open, onOpenChange }: CreateGrnDialogProps) {
               />
             </div>
 
+            {/* PO Details Section - Show when PO is selected */}
+            {form.watch('po_id') && selectedPoData && (
+              <Card className="bg-blue-50 border-blue-200">
+                <CardHeader>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <FileText className="w-5 h-5" />
+                    Purchase Order Details
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-4 gap-4">
+                    <div>
+                      <p className="text-sm text-muted-foreground">PO Number</p>
+                      <p className="font-semibold">{form.watch('po_number')}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Status</p>
+                      <Badge>{selectedPoData.status}</Badge>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">PO Date</p>
+                      <p>{format(new Date(selectedPoData.po_date), 'MMM dd, yyyy')}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Expected Delivery</p>
+                      <p>{selectedPoData.expected_delivery_date ? format(new Date(selectedPoData.expected_delivery_date), 'MMM dd, yyyy') : '-'}</p>
+                    </div>
+                  </div>
+                  <div className="mt-3 pt-3 border-t border-blue-300">
+                    <p className="text-sm text-blue-800">✓ Supplier locked from PO</p>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
             {/* Supplier Information */}
             <div className="space-y-4">
               <h3 className="text-lg font-semibold">Supplier Information</h3>
@@ -334,13 +406,18 @@ export function CreateGrnDialog({ open, onOpenChange }: CreateGrnDialogProps) {
                       <FormLabel>Supplier Name</FormLabel>
                       <div className="flex gap-2">
                         <FormControl>
-                          <Input placeholder="Supplier name" {...field} />
+                          <Input 
+                            placeholder="Supplier name" 
+                            {...field} 
+                            disabled={!!form.watch('po_id')}
+                          />
                         </FormControl>
                         <Button 
                           type="button" 
                           variant="outline" 
                           size="icon"
                           onClick={() => setShowSupplierSearch(true)}
+                          disabled={!!form.watch('po_id')}
                         >
                           <Search className="w-4 h-4" />
                         </Button>
@@ -397,7 +474,10 @@ export function CreateGrnDialog({ open, onOpenChange }: CreateGrnDialogProps) {
                       <TableHead>Item Code</TableHead>
                       <TableHead>Description</TableHead>
                       <TableHead>Qty Ordered</TableHead>
-                      <TableHead>Qty Received</TableHead>
+                      <TableHead>Already Received</TableHead>
+                      <TableHead>Pending</TableHead>
+                      <TableHead>Receiving Now *</TableHead>
+                      <TableHead>Quality Status</TableHead>
                       <TableHead>UOM</TableHead>
                       <TableHead>Unit Price</TableHead>
                       <TableHead>Total Cost</TableHead>
@@ -406,118 +486,161 @@ export function CreateGrnDialog({ open, onOpenChange }: CreateGrnDialogProps) {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {fields.map((field, index) => (
-                      <TableRow key={field.id}>
-                        <TableCell>
-                          <FormField
-                            control={form.control}
-                            name={`items.${index}.item_code`}
-                            render={({ field }) => (
-                              <Input placeholder="Item code" {...field} />
-                            )}
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <FormField
-                            control={form.control}
-                            name={`items.${index}.item_name`}
-                            render={({ field }) => (
-                              <Input placeholder="Item name" {...field} />
-                            )}
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <FormField
-                            control={form.control}
-                            name={`items.${index}.quantity_ordered`}
-                            render={({ field }) => (
-                              <Input 
-                                type="number" 
-                                {...field}
-                                onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
-                              />
-                            )}
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <FormField
-                            control={form.control}
-                            name={`items.${index}.quantity_received`}
-                            render={({ field }) => (
-                              <Input 
-                                type="number" 
-                                {...field}
-                                onChange={(e) => {
+                    {fields.map((field, index) => {
+                      const item = form.watch(`items.${index}`);
+                      const quantityOrdered = item?.quantity_ordered || 0;
+                      const alreadyReceived = selectedPoData?.items?.[index]?.quantity_received || 0;
+                      const pending = quantityOrdered - alreadyReceived;
+                      
+                      return (
+                        <TableRow key={field.id}>
+                          <TableCell>
+                            <FormField
+                              control={form.control}
+                              name={`items.${index}.item_code`}
+                              render={({ field }) => (
+                                <Input placeholder="Item code" className="w-28" {...field} />
+                              )}
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <FormField
+                              control={form.control}
+                              name={`items.${index}.item_name`}
+                              render={({ field }) => (
+                                <Input placeholder="Item name" className="w-40" {...field} />
+                              )}
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <FormField
+                              control={form.control}
+                              name={`items.${index}.quantity_ordered`}
+                              render={({ field }) => (
+                                <Input 
+                                  type="number" 
+                                  className="w-24"
+                                  disabled={!!selectedPoData}
+                                  {...field}
+                                  onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                                />
+                              )}
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <div className="w-24 text-center text-muted-foreground">
+                              {alreadyReceived}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="w-24 text-center font-semibold text-orange-600">
+                              {pending}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <FormField
+                              control={form.control}
+                              name={`items.${index}.quantity_received`}
+                              render={({ field }) => (
+                                <Input 
+                                  type="number" 
+                                  className="w-24"
+                                  max={pending}
+                                  {...field}
+                                  onChange={(e) => {
                                   field.onChange(parseFloat(e.target.value) || 0);
                                   calculateItemTotal(index);
                                 }}
                               />
                             )}
                           />
-                        </TableCell>
-                        <TableCell>
-                          <FormField
-                            control={form.control}
-                            name={`items.${index}.unit_of_measure`}
-                            render={({ field }) => (
-                              <Input placeholder="UOM" {...field} />
+                          </TableCell>
+                          <TableCell>
+                            <FormField
+                              control={form.control}
+                              name={`items.${index}.quality_status`}
+                              render={({ field }) => (
+                                <Select value={field.value} onValueChange={field.onChange}>
+                                  <SelectTrigger className="w-28">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {qualityStatusOptions.map((option) => (
+                                      <SelectItem key={option.value} value={option.value}>
+                                        {option.label}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              )}
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <FormField
+                              control={form.control}
+                              name={`items.${index}.unit_of_measure`}
+                              render={({ field }) => (
+                                <Input placeholder="UOM" className="w-20" {...field} />
+                              )}
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <FormField
+                              control={form.control}
+                              name={`items.${index}.unit_price`}
+                              render={({ field }) => (
+                                <Input 
+                                  type="number" 
+                                  step="0.01"
+                                  className="w-28"
+                                  {...field}
+                                  onChange={(e) => {
+                                    field.onChange(parseFloat(e.target.value) || 0);
+                                    calculateItemTotal(index);
+                                  }}
+                                />
+                              )}
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <FormField
+                              control={form.control}
+                              name={`items.${index}.total_cost`}
+                              render={({ field }) => (
+                                <Input 
+                                  type="number" 
+                                  step="0.01"
+                                  className="w-28"
+                                  readOnly
+                                  {...field}
+                                />
+                              )}
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <FormField
+                              control={form.control}
+                              name={`items.${index}.remarks`}
+                              render={({ field }) => (
+                                <Input placeholder="Remarks" className="w-32" {...field} />
+                              )}
+                            />
+                          </TableCell>
+                          <TableCell>
+                            {fields.length > 1 && (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => remove(index)}
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
                             )}
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <FormField
-                            control={form.control}
-                            name={`items.${index}.unit_price`}
-                            render={({ field }) => (
-                              <Input 
-                                type="number" 
-                                step="0.01"
-                                {...field}
-                                onChange={(e) => {
-                                  field.onChange(parseFloat(e.target.value) || 0);
-                                  calculateItemTotal(index);
-                                }}
-                              />
-                            )}
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <FormField
-                            control={form.control}
-                            name={`items.${index}.total_cost`}
-                            render={({ field }) => (
-                              <Input 
-                                type="number" 
-                                step="0.01"
-                                readOnly
-                                {...field}
-                              />
-                            )}
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <FormField
-                            control={form.control}
-                            name={`items.${index}.remarks`}
-                            render={({ field }) => (
-                              <Input placeholder="Remarks" {...field} />
-                            )}
-                          />
-                        </TableCell>
-                        <TableCell>
-                          {fields.length > 1 && (
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => remove(index)}
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
                   </TableBody>
                 </Table>
               </div>
@@ -594,16 +717,21 @@ export function CreateGrnDialog({ open, onOpenChange }: CreateGrnDialogProps) {
             <div className="bg-white p-6 rounded-lg max-w-md w-full mx-4">
               <h3 className="text-lg font-semibold mb-4">Select Purchase Order</h3>
               <div className="space-y-2 max-h-60 overflow-y-auto">
-                {purchaseOrders.filter(po => po.status === 'sent').map((po) => (
+                {purchaseOrders.filter(po => 
+                  ['approved', 'sent', 'acknowledged', 'partially_received'].includes(po.status)
+                ).map((po) => (
                   <div
                     key={po.id}
-                    className="p-2 hover:bg-gray-100 cursor-pointer rounded"
+                    className="p-2 hover:bg-gray-100 cursor-pointer rounded flex items-center justify-between"
                     onClick={() => handleSelectPo(po)}
                   >
-                    <div className="font-medium">{po.po_number}</div>
-                    <div className="text-sm text-gray-500">
-                      {po.supplier?.name} - LKR {po.final_amount?.toLocaleString()}
+                    <div>
+                      <div className="font-medium">{po.po_number}</div>
+                      <div className="text-sm text-gray-500">
+                        {po.supplier?.name} - LKR {po.final_amount?.toLocaleString()}
+                      </div>
                     </div>
+                    <Badge variant="outline">{po.status}</Badge>
                   </div>
                 ))}
               </div>
