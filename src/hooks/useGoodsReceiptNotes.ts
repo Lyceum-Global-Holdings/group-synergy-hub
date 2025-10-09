@@ -65,17 +65,30 @@ export const useCreateGoodsReceiptNote = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User not authenticated');
 
-      // Generate GRN number
-      const { data: grnNumber, error: numberError } = await supabase
+      // Generate GRN number with fallback
+      let grnNumberStr = '';
+      const { data: rpcNumber, error: numberError } = await supabase
         .rpc('generate_grn_number');
-      
-      if (numberError) throw numberError;
+      if (!numberError && rpcNumber) {
+        grnNumberStr = rpcNumber as string;
+      } else {
+        const now = new Date();
+        const yyyymmdd = now.toISOString().slice(0,10).replace(/-/g,'');
+        const rand = Math.floor(1000 + Math.random() * 9000);
+        grnNumberStr = `GRN-${yyyymmdd}-${rand}`;
+      }
+
+      // Compute total value
+      const totalValue = (grnData.items || []).reduce((sum, item) => {
+        const lineTotal = item.total_cost ?? ((item.unit_price || 0) * (item.quantity_received || 0));
+        return sum + (lineTotal || 0);
+      }, 0);
 
       // Create GRN header
       const { data: grn, error: grnError } = await supabase
         .from('goods_receipt_notes')
         .insert({
-          grn_number: grnNumber,
+          grn_number: grnNumberStr,
           grn_date: grnData.grn_date,
           invoice_number: grnData.invoice_number,
           invoice_date: grnData.invoice_date,
@@ -90,7 +103,9 @@ export const useCreateGoodsReceiptNote = () => {
           remarks: grnData.remarks,
           company_id: grnData.company_id,
           received_by: user.id,
-          created_by: user.id
+          created_by: user.id,
+          status: 'submitted',
+          total_value: totalValue
         })
         .select()
         .single();
