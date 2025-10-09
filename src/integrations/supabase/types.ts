@@ -385,6 +385,442 @@ export type Database = {
         }
         Relationships: []
       }
+      blanket_po_amendments: {
+        Row: {
+          amendment_date: string
+          amendment_number: string
+          amendment_type: Database["public"]["Enums"]["amendment_type"]
+          approved_by: string | null
+          approved_date: string | null
+          bpo_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          new_value: Json | null
+          notes: string | null
+          previous_value: Json | null
+          reason: string
+        }
+        Insert: {
+          amendment_date?: string
+          amendment_number: string
+          amendment_type: Database["public"]["Enums"]["amendment_type"]
+          approved_by?: string | null
+          approved_date?: string | null
+          bpo_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          new_value?: Json | null
+          notes?: string | null
+          previous_value?: Json | null
+          reason: string
+        }
+        Update: {
+          amendment_date?: string
+          amendment_number?: string
+          amendment_type?: Database["public"]["Enums"]["amendment_type"]
+          approved_by?: string | null
+          approved_date?: string | null
+          bpo_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          new_value?: Json | null
+          notes?: string | null
+          previous_value?: Json | null
+          reason?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "blanket_po_amendments_bpo_id_fkey"
+            columns: ["bpo_id"]
+            isOneToOne: false
+            referencedRelation: "blanket_purchase_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      blanket_po_items: {
+        Row: {
+          bpo_id: string
+          category: string | null
+          created_at: string
+          description: string | null
+          discount_percentage: number | null
+          discount_terms: string | null
+          id: string
+          item_code: string | null
+          item_name: string
+          lead_time_days: number | null
+          max_order_quantity: number | null
+          min_order_quantity: number | null
+          notes: string | null
+          price_validity_end: string | null
+          price_validity_start: string | null
+          quantity_released: number | null
+          remaining_quantity: number | null
+          specifications: string | null
+          total_quantity_limit: number | null
+          unit_of_measure: string
+          unit_price: number
+          updated_at: string
+          warehouse_item_id: string | null
+        }
+        Insert: {
+          bpo_id: string
+          category?: string | null
+          created_at?: string
+          description?: string | null
+          discount_percentage?: number | null
+          discount_terms?: string | null
+          id?: string
+          item_code?: string | null
+          item_name: string
+          lead_time_days?: number | null
+          max_order_quantity?: number | null
+          min_order_quantity?: number | null
+          notes?: string | null
+          price_validity_end?: string | null
+          price_validity_start?: string | null
+          quantity_released?: number | null
+          remaining_quantity?: number | null
+          specifications?: string | null
+          total_quantity_limit?: number | null
+          unit_of_measure?: string
+          unit_price: number
+          updated_at?: string
+          warehouse_item_id?: string | null
+        }
+        Update: {
+          bpo_id?: string
+          category?: string | null
+          created_at?: string
+          description?: string | null
+          discount_percentage?: number | null
+          discount_terms?: string | null
+          id?: string
+          item_code?: string | null
+          item_name?: string
+          lead_time_days?: number | null
+          max_order_quantity?: number | null
+          min_order_quantity?: number | null
+          notes?: string | null
+          price_validity_end?: string | null
+          price_validity_start?: string | null
+          quantity_released?: number | null
+          remaining_quantity?: number | null
+          specifications?: string | null
+          total_quantity_limit?: number | null
+          unit_of_measure?: string
+          unit_price?: number
+          updated_at?: string
+          warehouse_item_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "blanket_po_items_bpo_id_fkey"
+            columns: ["bpo_id"]
+            isOneToOne: false
+            referencedRelation: "blanket_purchase_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "blanket_po_items_warehouse_item_id_fkey"
+            columns: ["warehouse_item_id"]
+            isOneToOne: false
+            referencedRelation: "warehouse_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      blanket_po_release_items: {
+        Row: {
+          bpo_item_id: string
+          created_at: string
+          delivery_date: string | null
+          delivery_location_id: string | null
+          id: string
+          notes: string | null
+          quantity_approved: number | null
+          quantity_received: number | null
+          quantity_requested: number
+          release_id: string
+          total_price: number
+          unit_price: number
+          updated_at: string
+        }
+        Insert: {
+          bpo_item_id: string
+          created_at?: string
+          delivery_date?: string | null
+          delivery_location_id?: string | null
+          id?: string
+          notes?: string | null
+          quantity_approved?: number | null
+          quantity_received?: number | null
+          quantity_requested: number
+          release_id: string
+          total_price: number
+          unit_price: number
+          updated_at?: string
+        }
+        Update: {
+          bpo_item_id?: string
+          created_at?: string
+          delivery_date?: string | null
+          delivery_location_id?: string | null
+          id?: string
+          notes?: string | null
+          quantity_approved?: number | null
+          quantity_received?: number | null
+          quantity_requested?: number
+          release_id?: string
+          total_price?: number
+          unit_price?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "blanket_po_release_items_bpo_item_id_fkey"
+            columns: ["bpo_item_id"]
+            isOneToOne: false
+            referencedRelation: "blanket_po_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "blanket_po_release_items_delivery_location_id_fkey"
+            columns: ["delivery_location_id"]
+            isOneToOne: false
+            referencedRelation: "warehouse_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "blanket_po_release_items_release_id_fkey"
+            columns: ["release_id"]
+            isOneToOne: false
+            referencedRelation: "blanket_po_releases"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      blanket_po_releases: {
+        Row: {
+          actual_delivery_date: string | null
+          approved_by: string | null
+          approved_date: string | null
+          bpo_id: string
+          created_at: string
+          delivery_location: string | null
+          expected_delivery_date: string | null
+          id: string
+          notes: string | null
+          release_date: string
+          release_number: string
+          release_status: Database["public"]["Enums"]["bpo_release_status"]
+          requested_by: string | null
+          total_amount: number | null
+          updated_at: string
+          urgency_level: Database["public"]["Enums"]["urgency_level"] | null
+        }
+        Insert: {
+          actual_delivery_date?: string | null
+          approved_by?: string | null
+          approved_date?: string | null
+          bpo_id: string
+          created_at?: string
+          delivery_location?: string | null
+          expected_delivery_date?: string | null
+          id?: string
+          notes?: string | null
+          release_date?: string
+          release_number: string
+          release_status?: Database["public"]["Enums"]["bpo_release_status"]
+          requested_by?: string | null
+          total_amount?: number | null
+          updated_at?: string
+          urgency_level?: Database["public"]["Enums"]["urgency_level"] | null
+        }
+        Update: {
+          actual_delivery_date?: string | null
+          approved_by?: string | null
+          approved_date?: string | null
+          bpo_id?: string
+          created_at?: string
+          delivery_location?: string | null
+          expected_delivery_date?: string | null
+          id?: string
+          notes?: string | null
+          release_date?: string
+          release_number?: string
+          release_status?: Database["public"]["Enums"]["bpo_release_status"]
+          requested_by?: string | null
+          total_amount?: number | null
+          updated_at?: string
+          urgency_level?: Database["public"]["Enums"]["urgency_level"] | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "blanket_po_releases_bpo_id_fkey"
+            columns: ["bpo_id"]
+            isOneToOne: false
+            referencedRelation: "blanket_purchase_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      blanket_po_spending_analytics: {
+        Row: {
+          analysis_period: string
+          average_lead_time: number | null
+          bpo_id: string
+          created_at: string
+          id: string
+          period_end: string
+          period_start: string
+          savings_achieved: number | null
+          total_quantity: number | null
+          total_releases: number | null
+          total_spent: number | null
+          utilization_percentage: number | null
+        }
+        Insert: {
+          analysis_period: string
+          average_lead_time?: number | null
+          bpo_id: string
+          created_at?: string
+          id?: string
+          period_end: string
+          period_start: string
+          savings_achieved?: number | null
+          total_quantity?: number | null
+          total_releases?: number | null
+          total_spent?: number | null
+          utilization_percentage?: number | null
+        }
+        Update: {
+          analysis_period?: string
+          average_lead_time?: number | null
+          bpo_id?: string
+          created_at?: string
+          id?: string
+          period_end?: string
+          period_start?: string
+          savings_achieved?: number | null
+          total_quantity?: number | null
+          total_releases?: number | null
+          total_spent?: number | null
+          utilization_percentage?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "blanket_po_spending_analytics_bpo_id_fkey"
+            columns: ["bpo_id"]
+            isOneToOne: false
+            referencedRelation: "blanket_purchase_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      blanket_purchase_orders: {
+        Row: {
+          approval_workflow_required: boolean | null
+          approved_by: string | null
+          approved_date: string | null
+          auto_renew: boolean | null
+          bpo_number: string
+          company_id: string | null
+          contract_end_date: string
+          contract_start_date: string
+          contract_status: Database["public"]["Enums"]["blanket_contract_status"]
+          contract_terms: string | null
+          contract_type: Database["public"]["Enums"]["blanket_contract_type"]
+          created_at: string
+          created_by: string | null
+          currency: string | null
+          delivery_terms: string | null
+          early_termination_terms: string | null
+          id: string
+          notes: string | null
+          payment_terms: string | null
+          penalty_clauses: Json | null
+          remaining_value: number
+          renewal_terms: string | null
+          supplier_id: string
+          total_contract_value: number
+          updated_at: string
+        }
+        Insert: {
+          approval_workflow_required?: boolean | null
+          approved_by?: string | null
+          approved_date?: string | null
+          auto_renew?: boolean | null
+          bpo_number: string
+          company_id?: string | null
+          contract_end_date: string
+          contract_start_date: string
+          contract_status?: Database["public"]["Enums"]["blanket_contract_status"]
+          contract_terms?: string | null
+          contract_type?: Database["public"]["Enums"]["blanket_contract_type"]
+          created_at?: string
+          created_by?: string | null
+          currency?: string | null
+          delivery_terms?: string | null
+          early_termination_terms?: string | null
+          id?: string
+          notes?: string | null
+          payment_terms?: string | null
+          penalty_clauses?: Json | null
+          remaining_value?: number
+          renewal_terms?: string | null
+          supplier_id: string
+          total_contract_value?: number
+          updated_at?: string
+        }
+        Update: {
+          approval_workflow_required?: boolean | null
+          approved_by?: string | null
+          approved_date?: string | null
+          auto_renew?: boolean | null
+          bpo_number?: string
+          company_id?: string | null
+          contract_end_date?: string
+          contract_start_date?: string
+          contract_status?: Database["public"]["Enums"]["blanket_contract_status"]
+          contract_terms?: string | null
+          contract_type?: Database["public"]["Enums"]["blanket_contract_type"]
+          created_at?: string
+          created_by?: string | null
+          currency?: string | null
+          delivery_terms?: string | null
+          early_termination_terms?: string | null
+          id?: string
+          notes?: string | null
+          payment_terms?: string | null
+          penalty_clauses?: Json | null
+          remaining_value?: number
+          renewal_terms?: string | null
+          supplier_id?: string
+          total_contract_value?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "blanket_purchase_orders_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "blanket_purchase_orders_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       bom_items: {
         Row: {
           bom_id: string
@@ -5998,6 +6434,18 @@ export type Database = {
         Args: { _role_name?: string; _user_id: string }
         Returns: undefined
       }
+      calculate_bpo_item_remaining_quantity: {
+        Args: { p_bpo_item_id: string }
+        Returns: number
+      }
+      calculate_bpo_remaining_value: {
+        Args: { p_bpo_id: string }
+        Returns: number
+      }
+      calculate_bpo_utilization: {
+        Args: { p_bpo_id: string }
+        Returns: number
+      }
       calculate_supplier_analytics: {
         Args: { p_period_months?: number; p_supplier_id: string }
         Returns: {
@@ -6048,6 +6496,10 @@ export type Database = {
         Returns: string
       }
       generate_bom_number: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
+      generate_bpo_number: {
         Args: Record<PropertyKey, never>
         Returns: string
       }
@@ -6111,6 +6563,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: string
       }
+      generate_release_number: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
       generate_rfp_number: {
         Args: Record<PropertyKey, never>
         Returns: string
@@ -6154,9 +6610,39 @@ export type Database = {
         Args: { _user_id: string }
         Returns: boolean
       }
+      validate_bpo_release: {
+        Args: { p_bpo_id: string; p_requested_amount: number }
+        Returns: boolean
+      }
     }
     Enums: {
+      amendment_type:
+        | "price_change"
+        | "quantity_change"
+        | "term_extension"
+        | "item_addition"
+        | "item_removal"
+        | "other"
       app_role: "super_admin" | "admin" | "manager" | "user"
+      blanket_contract_status:
+        | "draft"
+        | "active"
+        | "suspended"
+        | "expired"
+        | "closed"
+        | "cancelled"
+      blanket_contract_type:
+        | "blanket_po"
+        | "contract_po"
+        | "framework_agreement"
+      bpo_release_status:
+        | "draft"
+        | "submitted"
+        | "approved"
+        | "sent"
+        | "received"
+        | "completed"
+        | "cancelled"
       evaluation_recommendation:
         | "strongly_recommend"
         | "recommend"
@@ -6209,6 +6695,7 @@ export type Database = {
         | "adjustment"
         | "transfer_in"
         | "transfer_out"
+      urgency_level: "normal" | "urgent" | "emergency"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -6336,7 +6823,37 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      amendment_type: [
+        "price_change",
+        "quantity_change",
+        "term_extension",
+        "item_addition",
+        "item_removal",
+        "other",
+      ],
       app_role: ["super_admin", "admin", "manager", "user"],
+      blanket_contract_status: [
+        "draft",
+        "active",
+        "suspended",
+        "expired",
+        "closed",
+        "cancelled",
+      ],
+      blanket_contract_type: [
+        "blanket_po",
+        "contract_po",
+        "framework_agreement",
+      ],
+      bpo_release_status: [
+        "draft",
+        "submitted",
+        "approved",
+        "sent",
+        "received",
+        "completed",
+        "cancelled",
+      ],
       evaluation_recommendation: [
         "strongly_recommend",
         "recommend",
@@ -6395,6 +6912,7 @@ export const Constants = {
         "transfer_in",
         "transfer_out",
       ],
+      urgency_level: ["normal", "urgent", "emergency"],
     },
   },
 } as const
