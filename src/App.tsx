@@ -33,6 +33,7 @@ import PickPackDispatch from "./pages/warehouse/PickPackDispatch";
 import Putaway from "./pages/warehouse/Putaway";
 import StockTransfer from "./pages/warehouse/StockTransfer";
 import CycleCount from "./pages/warehouse/CycleCount";
+import DeliveryOrder from "./pages/warehouse/DeliveryOrder";
 import PublicAssetView from "./pages/PublicAssetView";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
@@ -228,13 +229,20 @@ function App() {
                     </AppLayout>
                   </ProtectedRoute>
                 } />
-                <Route path="/warehouse/cycle-count" element={
-                  <ProtectedRoute>
-                    <AppLayout>
-                      <CycleCount />
-                    </AppLayout>
-                  </ProtectedRoute>
-                } />
+            <Route path="/warehouse/cycle-count" element={
+              <ProtectedRoute>
+                <AppLayout>
+                  <CycleCount />
+                </AppLayout>
+              </ProtectedRoute>
+            } />
+            <Route path="/warehouse/delivery-order" element={
+              <ProtectedRoute>
+                <AppLayout>
+                  <DeliveryOrder />
+                </AppLayout>
+              </ProtectedRoute>
+            } />
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                 <Route path="*" element={<NotFound />} />
               </Routes>
