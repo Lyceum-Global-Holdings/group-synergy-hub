@@ -2960,6 +2960,145 @@ export type Database = {
           },
         ]
       }
+      putaway_items: {
+        Row: {
+          created_at: string
+          from_location_id: string | null
+          id: string
+          item_code: string | null
+          item_name: string
+          notes: string | null
+          putaway_id: string
+          putaway_sequence: number | null
+          quantity: number
+          status: string
+          to_bin_id: string | null
+          unit_of_measure: string | null
+          updated_at: string
+          warehouse_item_id: string
+        }
+        Insert: {
+          created_at?: string
+          from_location_id?: string | null
+          id?: string
+          item_code?: string | null
+          item_name: string
+          notes?: string | null
+          putaway_id: string
+          putaway_sequence?: number | null
+          quantity: number
+          status?: string
+          to_bin_id?: string | null
+          unit_of_measure?: string | null
+          updated_at?: string
+          warehouse_item_id: string
+        }
+        Update: {
+          created_at?: string
+          from_location_id?: string | null
+          id?: string
+          item_code?: string | null
+          item_name?: string
+          notes?: string | null
+          putaway_id?: string
+          putaway_sequence?: number | null
+          quantity?: number
+          status?: string
+          to_bin_id?: string | null
+          unit_of_measure?: string | null
+          updated_at?: string
+          warehouse_item_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "putaway_items_from_location_id_fkey"
+            columns: ["from_location_id"]
+            isOneToOne: false
+            referencedRelation: "warehouse_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "putaway_items_putaway_id_fkey"
+            columns: ["putaway_id"]
+            isOneToOne: false
+            referencedRelation: "putaway_records"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "putaway_items_to_bin_id_fkey"
+            columns: ["to_bin_id"]
+            isOneToOne: false
+            referencedRelation: "warehouse_bins"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "putaway_items_warehouse_item_id_fkey"
+            columns: ["warehouse_item_id"]
+            isOneToOne: false
+            referencedRelation: "warehouse_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      putaway_records: {
+        Row: {
+          assigned_to: string | null
+          company_id: string | null
+          completed_by: string | null
+          completed_date: string | null
+          created_at: string
+          created_by: string | null
+          grn_id: string | null
+          grn_number: string | null
+          id: string
+          notes: string | null
+          putaway_date: string
+          putaway_number: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          assigned_to?: string | null
+          company_id?: string | null
+          completed_by?: string | null
+          completed_date?: string | null
+          created_at?: string
+          created_by?: string | null
+          grn_id?: string | null
+          grn_number?: string | null
+          id?: string
+          notes?: string | null
+          putaway_date?: string
+          putaway_number: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          assigned_to?: string | null
+          company_id?: string | null
+          completed_by?: string | null
+          completed_date?: string | null
+          created_at?: string
+          created_by?: string | null
+          grn_id?: string | null
+          grn_number?: string | null
+          id?: string
+          notes?: string | null
+          putaway_date?: string
+          putaway_number?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "putaway_records_grn_id_fkey"
+            columns: ["grn_id"]
+            isOneToOne: false
+            referencedRelation: "goods_receipt_notes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       quote_comparisons: {
         Row: {
           comparison_data: Json | null
@@ -4915,6 +5054,10 @@ export type Database = {
         Returns: string
       }
       generate_pr_number: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
+      generate_putaway_number: {
         Args: Record<PropertyKey, never>
         Returns: string
       }

@@ -30,6 +30,7 @@ import MaterialIssueReturn from "./pages/warehouse/MaterialIssueReturn";
 import GoodsReceiptNote from "./pages/warehouse/GoodsReceiptNote";
 import FinishedGoods from "./pages/tuh-modules/FinishedGoods";
 import PickPackDispatch from "./pages/warehouse/PickPackDispatch";
+import Putaway from "./pages/warehouse/Putaway";
 import PublicAssetView from "./pages/PublicAssetView";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
@@ -208,6 +209,13 @@ function App() {
                   <ProtectedRoute>
                     <AppLayout>
                       <PickPackDispatch />
+                    </AppLayout>
+                  </ProtectedRoute>
+                } />
+                <Route path="/warehouse/putaway" element={
+                  <ProtectedRoute>
+                    <AppLayout>
+                      <Putaway />
                     </AppLayout>
                   </ProtectedRoute>
                 } />
