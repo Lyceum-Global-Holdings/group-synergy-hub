@@ -16,34 +16,37 @@ import {
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
-import { useFinishedGoodsMovements } from '@/hooks/useFinishedGoodsMovements';
-import { FinishedGoodsStockAdjustmentDialog } from './FinishedGoodsStockAdjustmentDialog';
+import { useStockTransactions } from '@/hooks/useStockTransactions';
+import { StockAdjustmentDialog } from './StockAdjustmentDialog';
 import { Loader2, Plus } from 'lucide-react';
 
-interface FinishedGoodsMovementDialogProps {
+interface StockMovementDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  finishedGoodId: string;
-  productName: string;
+  itemId: string;
+  itemName: string;
   currentStock?: number;
 }
 
-const movementTypeLabels = {
+const transactionTypeLabels = {
+  opening_stock: 'Opening Stock',
+  goods_receipt: 'Goods Receipt',
+  material_issue: 'Material Issue',
+  material_return: 'Material Return',
   adjustment: 'Stock Adjustment',
-  production_receipt: 'Production Receipt',
-  sales_issue: 'Sales Issue',
   transfer_in: 'Transfer In',
   transfer_out: 'Transfer Out',
-  return: 'Return',
 };
 
-const getMovementTypeColor = (type: string) => {
+const getTransactionTypeColor = (type: string) => {
   switch (type) {
-    case 'production_receipt':
+    case 'opening_stock':
+      return 'bg-blue-100 text-blue-800';
+    case 'goods_receipt':
     case 'transfer_in':
-    case 'return':
       return 'bg-green-100 text-green-800';
-    case 'sales_issue':
+    case 'material_issue':
+    case 'material_return':
     case 'transfer_out':
       return 'bg-red-100 text-red-800';
     case 'adjustment':
@@ -53,14 +56,8 @@ const getMovementTypeColor = (type: string) => {
   }
 };
 
-export function FinishedGoodsMovementDialog({ 
-  open, 
-  onOpenChange, 
-  finishedGoodId, 
-  productName, 
-  currentStock 
-}: FinishedGoodsMovementDialogProps) {
-  const { movements, isLoading } = useFinishedGoodsMovements(finishedGoodId);
+export function StockMovementDialog({ open, onOpenChange, itemId, itemName, currentStock }: StockMovementDialogProps) {
+  const { transactions, isLoading } = useStockTransactions(itemId);
   const [isAdjustmentDialogOpen, setIsAdjustmentDialogOpen] = useState(false);
 
   return (
@@ -68,7 +65,7 @@ export function FinishedGoodsMovementDialog({
       <DialogContent className="max-w-4xl max-h-[80vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center justify-between">
-            Stock Movement History - {productName}
+            Stock Movement History - {itemName}
             <Button
               onClick={() => setIsAdjustmentDialogOpen(true)}
               size="sm"
@@ -86,9 +83,9 @@ export function FinishedGoodsMovementDialog({
               <Loader2 className="h-6 w-6 animate-spin" />
               <span className="ml-2">Loading stock movements...</span>
             </div>
-          ) : movements.length === 0 ? (
+          ) : transactions.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
-              No stock movements found for this product.
+              No stock movements found for this item.
             </div>
           ) : (
             <Table>
@@ -106,41 +103,41 @@ export function FinishedGoodsMovementDialog({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {movements.map((movement) => (
-                  <TableRow key={movement.id}>
+                {transactions.map((transaction) => (
+                  <TableRow key={transaction.id}>
                     <TableCell>
-                      {format(new Date(movement.created_at), 'MMM dd, yyyy HH:mm')}
+                      {format(new Date(transaction.created_at), 'MMM dd, yyyy HH:mm')}
                     </TableCell>
                     <TableCell>
                       <Badge 
                         variant="secondary" 
-                        className={getMovementTypeColor(movement.movement_type)}
+                        className={getTransactionTypeColor(transaction.transaction_type)}
                       >
-                        {movementTypeLabels[movement.movement_type] || movement.movement_type}
+                        {transactionTypeLabels[transaction.transaction_type]}
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      {movement.reference_number || movement.reference_id || '-'}
+                      {transaction.reference_id || '-'}
                     </TableCell>
                     <TableCell className={`text-right font-medium ${
-                      movement.quantity_change > 0 ? 'text-green-600' : 'text-red-600'
+                      transaction.quantity_change > 0 ? 'text-green-600' : 'text-red-600'
                     }`}>
-                      {movement.quantity_change > 0 ? '+' : ''}{movement.quantity_change}
+                      {transaction.quantity_change > 0 ? '+' : ''}{transaction.quantity_change}
                     </TableCell>
                     <TableCell className="text-right">
-                      {movement.quantity_before}
+                      {transaction.quantity_before}
                     </TableCell>
                     <TableCell className="text-right font-medium">
-                      {movement.quantity_after}
+                      {transaction.quantity_after}
                     </TableCell>
                     <TableCell className="text-right">
-                      {movement.unit_cost ? `LKR ${movement.unit_cost.toFixed(2)}` : '-'}
+                      {transaction.unit_cost ? `LKR ${transaction.unit_cost.toFixed(2)}` : '-'}
                     </TableCell>
                     <TableCell className="text-right">
-                      {movement.total_value ? `LKR ${movement.total_value.toFixed(2)}` : '-'}
+                      {transaction.total_value ? `LKR ${transaction.total_value.toFixed(2)}` : '-'}
                     </TableCell>
                     <TableCell>
-                      {movement.notes || '-'}
+                      {transaction.notes || '-'}
                     </TableCell>
                   </TableRow>
                 ))}
@@ -149,12 +146,12 @@ export function FinishedGoodsMovementDialog({
           )}
         </div>
 
-        <FinishedGoodsStockAdjustmentDialog
+        <StockAdjustmentDialog
           open={isAdjustmentDialogOpen}
           onOpenChange={setIsAdjustmentDialogOpen}
-          finishedGoodId={finishedGoodId}
-          productName={productName}
-          currentStock={currentStock || movements[0]?.quantity_after || 0}
+          itemId={itemId}
+          itemName={itemName}
+          currentStock={currentStock || transactions[0]?.quantity_after || 0}
         />
       </DialogContent>
     </Dialog>
