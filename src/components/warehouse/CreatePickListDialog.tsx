@@ -8,6 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { usePickPack } from '@/hooks/usePickPack';
 import { useUsers } from '@/hooks/useUsers';
 
+// Dialog for creating pick lists with auto-generated items from sales orders
 interface CreatePickListDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;

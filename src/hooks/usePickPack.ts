@@ -12,6 +12,7 @@ import {
   PickListWithDetails 
 } from '@/types/pickPack';
 
+// Main hook for Pick, Pack & Dispatch operations
 export const usePickPack = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -730,7 +731,8 @@ export const usePickPack = () => {
     }
   });
 
-  return {
+  // Return all queries and mutations
+  const hookReturn = {
     // Queries
     useConfirmedCPOs,
     useSalesOrders,
@@ -750,6 +752,7 @@ export const usePickPack = () => {
     updateIssueStatus: updateIssueStatusMutation.mutate,
     isUpdatingIssueStatus: updateIssueStatusMutation.isPending,
     
+    // Pick List mutations
     createPickList: createPickListMutation.mutate,
     createPickListWithItems: createPickListWithItemsMutation.mutate,
     isCreatingPickList: createPickListMutation.isPending || createPickListWithItemsMutation.isPending,
@@ -763,4 +766,6 @@ export const usePickPack = () => {
     updatePickListItem: updatePickListItemMutation.mutate,
     isUpdatingPickListItem: updatePickListItemMutation.isPending,
   };
+  
+  return hookReturn;
 };
