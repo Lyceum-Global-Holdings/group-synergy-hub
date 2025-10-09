@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -124,7 +124,7 @@ export function CreateGrnDialog({ open, onOpenChange, preselectedPo }: CreateGrn
   });
 
   // Handle preselected PO
-  React.useEffect(() => {
+  useEffect(() => {
     if (preselectedPo && open) {
       handleSelectPo(preselectedPo);
     }
