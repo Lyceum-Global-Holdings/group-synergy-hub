@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Plus, Search, FileText, TrendingUp, Calendar, BarChart3, Eye, Edit, Trash2 } from "lucide-react";
 import { format } from "date-fns";
-import AppLayout from "@/components/layout/AppLayout";
+
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -221,154 +221,152 @@ const SupplierEvaluation = () => {
   const totalDeliveries = evaluations.reduce((sum, e) => sum + e.total_deliveries, 0);
 
   return (
-    <AppLayout>
-      <div className="space-y-6">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">Supplier Evaluation</h1>
-            <p className="text-muted-foreground">
-              Manage and track supplier performance evaluations
-            </p>
-          </div>
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={() => navigate("/sourcing/supplier-scorecard")}>
-              <BarChart3 className="mr-2 h-4 w-4" />
-              View Analytics
-            </Button>
-            <Button onClick={() => setIsCreateDialogOpen(true)}>
-              <Plus className="mr-2 h-4 w-4" />
-              New Evaluation
-            </Button>
-          </div>
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Supplier Evaluation</h1>
+          <p className="text-muted-foreground">
+            Manage and track supplier performance evaluations
+          </p>
         </div>
-
-        {/* Summary Cards */}
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Evaluations</CardTitle>
-              <FileText className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{totalEvaluations}</div>
-              <p className="text-xs text-muted-foreground">
-                {evaluations.filter((e) => e.status === "completed").length} completed
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Average Performance</CardTitle>
-              <TrendingUp className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{averagePerformance.toFixed(1)}%</div>
-              <p className="text-xs text-muted-foreground">Across all suppliers</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Deliveries</CardTitle>
-              <BarChart3 className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{totalDeliveries}</div>
-              <p className="text-xs text-muted-foreground">Evaluated deliveries</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Active Suppliers</CardTitle>
-              <Calendar className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {new Set(evaluations.map((e) => e.supplier_id)).size}
-              </div>
-              <p className="text-xs text-muted-foreground">Under evaluation</p>
-            </CardContent>
-          </Card>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => navigate("/sourcing/supplier-scorecard")}>
+            <BarChart3 className="mr-2 h-4 w-4" />
+            View Analytics
+          </Button>
+          <Button onClick={() => setIsCreateDialogOpen(true)}>
+            <Plus className="mr-2 h-4 w-4" />
+            New Evaluation
+          </Button>
         </div>
+      </div>
 
-        {/* Filters & Table */}
+      {/* Summary Cards */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card>
-          <CardHeader>
-            <CardTitle>Supplier Evaluations</CardTitle>
-            <CardDescription>View and manage all supplier evaluations</CardDescription>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Evaluations</CardTitle>
+            <FileText className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="flex flex-col sm:flex-row gap-4 mb-4">
-              <div className="flex-1">
-                <Input
-                  placeholder="Search by supplier, product, or evaluation number..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="max-w-sm"
-                />
-              </div>
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-[180px]">
-                  <SelectValue placeholder="Filter by status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Status</SelectItem>
-                  <SelectItem value="draft">Draft</SelectItem>
-                  <SelectItem value="completed">Completed</SelectItem>
-                  <SelectItem value="archived">Archived</SelectItem>
-                </SelectContent>
-              </Select>
-              <Select value={performanceFilter} onValueChange={setPerformanceFilter}>
-                <SelectTrigger className="w-[180px]">
-                  <SelectValue placeholder="Filter by performance" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Performance</SelectItem>
-                  <SelectItem value="excellent">Excellent (≥85%)</SelectItem>
-                  <SelectItem value="good">Good (70-85%)</SelectItem>
-                  <SelectItem value="fair">Fair (55-70%)</SelectItem>
-                  <SelectItem value="poor">Poor (&lt;55%)</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <DataTable columns={columns} data={filteredEvaluations} isLoading={isLoading} />
+            <div className="text-2xl font-bold">{totalEvaluations}</div>
+            <p className="text-xs text-muted-foreground">
+              {evaluations.filter((e) => e.status === "completed").length} completed
+            </p>
           </CardContent>
         </Card>
 
-        {/* Dialogs */}
-        <CreateSupplierEvaluationDialog
-          open={isCreateDialogOpen}
-          onOpenChange={setIsCreateDialogOpen}
-        />
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Average Performance</CardTitle>
+            <TrendingUp className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{averagePerformance.toFixed(1)}%</div>
+            <p className="text-xs text-muted-foreground">Across all suppliers</p>
+          </CardContent>
+        </Card>
 
-        {selectedEvaluation && (
-          <SupplierEvaluationDetailsDialog
-            evaluation={selectedEvaluation}
-            open={isDetailsDialogOpen}
-            onOpenChange={setIsDetailsDialogOpen}
-          />
-        )}
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Deliveries</CardTitle>
+            <BarChart3 className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{totalDeliveries}</div>
+            <p className="text-xs text-muted-foreground">Evaluated deliveries</p>
+          </CardContent>
+        </Card>
 
-        <AlertDialog open={!!deleteEvaluationId} onOpenChange={() => setDeleteEvaluationId(null)}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-              <AlertDialogDescription>
-                This action cannot be undone. This will permanently delete the evaluation and all its entries.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction onClick={handleDeleteConfirm}>Delete</AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Active Suppliers</CardTitle>
+            <Calendar className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {new Set(evaluations.map((e) => e.supplier_id)).size}
+            </div>
+            <p className="text-xs text-muted-foreground">Under evaluation</p>
+          </CardContent>
+        </Card>
       </div>
-    </AppLayout>
+
+      {/* Filters & Table */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Supplier Evaluations</CardTitle>
+          <CardDescription>View and manage all supplier evaluations</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col sm:flex-row gap-4 mb-4">
+            <div className="flex-1">
+              <Input
+                placeholder="Search by supplier, product, or evaluation number..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="max-w-sm"
+              />
+            </div>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Filter by status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Status</SelectItem>
+                <SelectItem value="draft">Draft</SelectItem>
+                <SelectItem value="completed">Completed</SelectItem>
+                <SelectItem value="archived">Archived</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={performanceFilter} onValueChange={setPerformanceFilter}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Filter by performance" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Performance</SelectItem>
+                <SelectItem value="excellent">Excellent (≥85%)</SelectItem>
+                <SelectItem value="good">Good (70-85%)</SelectItem>
+                <SelectItem value="fair">Fair (55-70%)</SelectItem>
+                <SelectItem value="poor">Poor (&lt;55%)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <DataTable columns={columns} data={filteredEvaluations} isLoading={isLoading} />
+        </CardContent>
+      </Card>
+
+      {/* Dialogs */}
+      <CreateSupplierEvaluationDialog
+        open={isCreateDialogOpen}
+        onOpenChange={setIsCreateDialogOpen}
+      />
+
+      {selectedEvaluation && (
+        <SupplierEvaluationDetailsDialog
+          evaluation={selectedEvaluation}
+          open={isDetailsDialogOpen}
+          onOpenChange={setIsDetailsDialogOpen}
+        />
+      )}
+
+      <AlertDialog open={!!deleteEvaluationId} onOpenChange={() => setDeleteEvaluationId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete the evaluation and all its entries.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteConfirm}>Delete</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
   );
 };
 
