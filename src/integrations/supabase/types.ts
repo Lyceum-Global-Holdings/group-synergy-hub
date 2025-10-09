@@ -811,6 +811,289 @@ export type Database = {
           },
         ]
       }
+      cycle_count_adjustments: {
+        Row: {
+          adjustment_quantity: number
+          adjustment_type: string
+          adjustment_value: number | null
+          approved_by: string | null
+          approved_date: string | null
+          company_id: string | null
+          created_at: string | null
+          created_by: string | null
+          cycle_count_id: string
+          cycle_count_item_id: string
+          id: string
+          reason: string
+          stock_transaction_id: string | null
+        }
+        Insert: {
+          adjustment_quantity: number
+          adjustment_type: string
+          adjustment_value?: number | null
+          approved_by?: string | null
+          approved_date?: string | null
+          company_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          cycle_count_id: string
+          cycle_count_item_id: string
+          id?: string
+          reason: string
+          stock_transaction_id?: string | null
+        }
+        Update: {
+          adjustment_quantity?: number
+          adjustment_type?: string
+          adjustment_value?: number | null
+          approved_by?: string | null
+          approved_date?: string | null
+          company_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          cycle_count_id?: string
+          cycle_count_item_id?: string
+          id?: string
+          reason?: string
+          stock_transaction_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cycle_count_adjustments_cycle_count_id_fkey"
+            columns: ["cycle_count_id"]
+            isOneToOne: false
+            referencedRelation: "cycle_counts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cycle_count_adjustments_cycle_count_item_id_fkey"
+            columns: ["cycle_count_item_id"]
+            isOneToOne: false
+            referencedRelation: "cycle_count_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cycle_count_items: {
+        Row: {
+          bin_id: string | null
+          counted_at: string | null
+          counted_by: string | null
+          created_at: string | null
+          cycle_count_id: string
+          id: string
+          investigation_notes: string | null
+          physical_quantity: number | null
+          physical_value: number | null
+          recount_count: number | null
+          recount_required: boolean | null
+          status: string
+          system_quantity: number
+          system_value: number | null
+          updated_at: string | null
+          variance_percentage: number | null
+          variance_quantity: number | null
+          variance_reason: string | null
+          variance_value: number | null
+          warehouse_item_id: string
+        }
+        Insert: {
+          bin_id?: string | null
+          counted_at?: string | null
+          counted_by?: string | null
+          created_at?: string | null
+          cycle_count_id: string
+          id?: string
+          investigation_notes?: string | null
+          physical_quantity?: number | null
+          physical_value?: number | null
+          recount_count?: number | null
+          recount_required?: boolean | null
+          status?: string
+          system_quantity: number
+          system_value?: number | null
+          updated_at?: string | null
+          variance_percentage?: number | null
+          variance_quantity?: number | null
+          variance_reason?: string | null
+          variance_value?: number | null
+          warehouse_item_id: string
+        }
+        Update: {
+          bin_id?: string | null
+          counted_at?: string | null
+          counted_by?: string | null
+          created_at?: string | null
+          cycle_count_id?: string
+          id?: string
+          investigation_notes?: string | null
+          physical_quantity?: number | null
+          physical_value?: number | null
+          recount_count?: number | null
+          recount_required?: boolean | null
+          status?: string
+          system_quantity?: number
+          system_value?: number | null
+          updated_at?: string | null
+          variance_percentage?: number | null
+          variance_quantity?: number | null
+          variance_reason?: string | null
+          variance_value?: number | null
+          warehouse_item_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cycle_count_items_cycle_count_id_fkey"
+            columns: ["cycle_count_id"]
+            isOneToOne: false
+            referencedRelation: "cycle_counts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cycle_count_schedules: {
+        Row: {
+          abc_classification: string | null
+          category_ids: string[] | null
+          company_id: string | null
+          count_per_cycle: number | null
+          created_at: string | null
+          created_by: string | null
+          frequency: string
+          id: string
+          item_ids: string[] | null
+          last_count_date: string | null
+          location_ids: string[] | null
+          next_count_date: string | null
+          priority: string
+          schedule_name: string
+          schedule_type: string
+          status: string
+          updated_at: string | null
+        }
+        Insert: {
+          abc_classification?: string | null
+          category_ids?: string[] | null
+          company_id?: string | null
+          count_per_cycle?: number | null
+          created_at?: string | null
+          created_by?: string | null
+          frequency: string
+          id?: string
+          item_ids?: string[] | null
+          last_count_date?: string | null
+          location_ids?: string[] | null
+          next_count_date?: string | null
+          priority?: string
+          schedule_name: string
+          schedule_type: string
+          status?: string
+          updated_at?: string | null
+        }
+        Update: {
+          abc_classification?: string | null
+          category_ids?: string[] | null
+          company_id?: string | null
+          count_per_cycle?: number | null
+          created_at?: string | null
+          created_by?: string | null
+          frequency?: string
+          id?: string
+          item_ids?: string[] | null
+          last_count_date?: string | null
+          location_ids?: string[] | null
+          next_count_date?: string | null
+          priority?: string
+          schedule_name?: string
+          schedule_type?: string
+          status?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      cycle_counts: {
+        Row: {
+          approval_notes: string | null
+          approved_by: string | null
+          approved_date: string | null
+          assigned_to: string | null
+          company_id: string | null
+          completed_at: string | null
+          count_date: string
+          count_number: string
+          count_type: string
+          created_at: string | null
+          created_by: string | null
+          id: string
+          items_counted: number | null
+          items_with_variance: number | null
+          location_id: string | null
+          notes: string | null
+          schedule_id: string | null
+          started_at: string | null
+          status: string
+          total_items_to_count: number | null
+          total_variance_value: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          approval_notes?: string | null
+          approved_by?: string | null
+          approved_date?: string | null
+          assigned_to?: string | null
+          company_id?: string | null
+          completed_at?: string | null
+          count_date?: string
+          count_number: string
+          count_type?: string
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          items_counted?: number | null
+          items_with_variance?: number | null
+          location_id?: string | null
+          notes?: string | null
+          schedule_id?: string | null
+          started_at?: string | null
+          status?: string
+          total_items_to_count?: number | null
+          total_variance_value?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          approval_notes?: string | null
+          approved_by?: string | null
+          approved_date?: string | null
+          assigned_to?: string | null
+          company_id?: string | null
+          completed_at?: string | null
+          count_date?: string
+          count_number?: string
+          count_type?: string
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          items_counted?: number | null
+          items_with_variance?: number | null
+          location_id?: string | null
+          notes?: string | null
+          schedule_id?: string | null
+          started_at?: string | null
+          status?: string
+          total_items_to_count?: number | null
+          total_variance_value?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cycle_counts_schedule_id_fkey"
+            columns: ["schedule_id"]
+            isOneToOne: false
+            referencedRelation: "cycle_count_schedules"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       dispatch_records: {
         Row: {
           actual_delivery_date: string | null
@@ -5229,6 +5512,10 @@ export type Database = {
         Returns: string
       }
       generate_customer_code: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
+      generate_cycle_count_number: {
         Args: Record<PropertyKey, never>
         Returns: string
       }

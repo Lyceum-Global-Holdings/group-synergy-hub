@@ -32,6 +32,7 @@ import FinishedGoods from "./pages/tuh-modules/FinishedGoods";
 import PickPackDispatch from "./pages/warehouse/PickPackDispatch";
 import Putaway from "./pages/warehouse/Putaway";
 import StockTransfer from "./pages/warehouse/StockTransfer";
+import CycleCount from "./pages/warehouse/CycleCount";
 import PublicAssetView from "./pages/PublicAssetView";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
@@ -224,6 +225,13 @@ function App() {
                   <ProtectedRoute>
                     <AppLayout>
                       <StockTransfer />
+                    </AppLayout>
+                  </ProtectedRoute>
+                } />
+                <Route path="/warehouse/cycle-count" element={
+                  <ProtectedRoute>
+                    <AppLayout>
+                      <CycleCount />
                     </AppLayout>
                   </ProtectedRoute>
                 } />
