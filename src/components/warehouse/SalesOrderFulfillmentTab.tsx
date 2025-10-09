@@ -4,28 +4,38 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Plus, Package, Truck, CheckCircle, Clock, User, MapPin, List } from 'lucide-react';
+import { Plus, Package, Truck, CheckCircle, Clock, User, MapPin, List, FileText } from 'lucide-react';
 import { usePickPack } from '@/hooks/usePickPack';
+import { useDeliveryOrders } from '@/hooks/useDeliveryOrders';
+import { useCompany } from '@/contexts/CompanyContext';
 import { CreateSalesOrderDialog } from './CreateSalesOrderDialog';
 import { CreatePickListDialog } from './CreatePickListDialog';
+import { CreateDeliveryOrderDialog } from './CreateDeliveryOrderDialog';
+import { DeliveryOrderDetailsDialog } from './DeliveryOrderDetailsDialog';
 import { SalesOrderItemsView } from './SalesOrderItemsView';
 import { format } from 'date-fns';
 
 export function SalesOrderFulfillmentTab() {
+  const { selectedCompany } = useCompany();
   const { 
     useConfirmedCPOs, 
     useSalesOrders, 
     usePickLists 
   } = usePickPack();
+  const { useDeliveryOrdersQuery } = useDeliveryOrders();
   
   const { data: confirmedCPOs, isLoading: loadingCPOs } = useConfirmedCPOs();
   const { data: salesOrders, isLoading: loadingSalesOrders } = useSalesOrders();
   const { data: pickLists, isLoading: loadingPickLists } = usePickLists();
+  const { data: deliveryOrders, isLoading: loadingDeliveryOrders } = useDeliveryOrdersQuery(selectedCompany?.id);
   
   const [showCreateSalesOrder, setShowCreateSalesOrder] = useState(false);
   const [showCreatePickList, setShowCreatePickList] = useState(false);
+  const [showCreateDeliveryOrder, setShowCreateDeliveryOrder] = useState(false);
+  const [showDeliveryOrderDetails, setShowDeliveryOrderDetails] = useState(false);
   const [selectedCPO, setSelectedCPO] = useState<any>(null);
   const [selectedSalesOrder, setSelectedSalesOrder] = useState<any>(null);
+  const [selectedDeliveryOrder, setSelectedDeliveryOrder] = useState<string | null>(null);
   const [viewItemsForOrder, setViewItemsForOrder] = useState<string | null>(null);
 
   const handleCreateSalesOrderFromCPO = (cpo: any) => {
@@ -36,6 +46,16 @@ export function SalesOrderFulfillmentTab() {
   const handleCreatePickList = (salesOrder: any) => {
     setSelectedSalesOrder(salesOrder);
     setShowCreatePickList(true);
+  };
+
+  const handleCreateDeliveryOrder = (salesOrder: any) => {
+    setSelectedSalesOrder(salesOrder);
+    setShowCreateDeliveryOrder(true);
+  };
+
+  const handleViewDeliveryOrder = (doId: string) => {
+    setSelectedDeliveryOrder(doId);
+    setShowDeliveryOrderDetails(true);
   };
 
   const getStatusBadge = (status: string) => {
@@ -76,10 +96,11 @@ export function SalesOrderFulfillmentTab() {
         </CardHeader>
         <CardContent>
           <Tabs defaultValue="ready-orders" className="w-full">
-            <TabsList className="grid w-full grid-cols-4">
+            <TabsList className="grid w-full grid-cols-5">
               <TabsTrigger value="ready-orders">Ready Orders</TabsTrigger>
               <TabsTrigger value="sales-orders">Sales Orders</TabsTrigger>
               <TabsTrigger value="pick-lists">Pick Lists</TabsTrigger>
+              <TabsTrigger value="delivery-orders">Delivery Orders</TabsTrigger>
               <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
             </TabsList>
 
@@ -190,6 +211,15 @@ export function SalesOrderFulfillmentTab() {
                               Pick List
                             </Button>
                           )}
+                          {(order.status === 'picked' || order.status === 'packed') && order.picked_items > 0 && (
+                            <Button 
+                              size="sm"
+                              onClick={() => handleCreateDeliveryOrder(order)}
+                            >
+                              <Truck className="h-4 w-4 mr-1" />
+                              Delivery Order
+                            </Button>
+                          )}
                         </TableCell>
                       </TableRow>
                     ))}
@@ -259,6 +289,60 @@ export function SalesOrderFulfillmentTab() {
               )}
             </TabsContent>
 
+            <TabsContent value="delivery-orders" className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-semibold">Delivery Orders</h3>
+              </div>
+
+              {loadingDeliveryOrders ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="text-muted-foreground">Loading delivery orders...</div>
+                </div>
+              ) : deliveryOrders && deliveryOrders.length > 0 ? (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>DO Number</TableHead>
+                      <TableHead>Customer</TableHead>
+                      <TableHead>Sales Order</TableHead>
+                      <TableHead>Delivery Date</TableHead>
+                      <TableHead>Priority</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {deliveryOrders.map((deliveryOrder) => (
+                      <TableRow key={deliveryOrder.id}>
+                        <TableCell className="font-medium">{deliveryOrder.do_number}</TableCell>
+                        <TableCell>{deliveryOrder.customer?.customer_name}</TableCell>
+                        <TableCell>{deliveryOrder.sales_order?.order_number}</TableCell>
+                        <TableCell>
+                          {format(new Date(deliveryOrder.delivery_date), 'MMM dd, yyyy')}
+                        </TableCell>
+                        <TableCell>{getPriorityBadge(deliveryOrder.priority)}</TableCell>
+                        <TableCell>{getStatusBadge(deliveryOrder.status)}</TableCell>
+                        <TableCell>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleViewDeliveryOrder(deliveryOrder.id)}
+                          >
+                            <FileText className="h-4 w-4 mr-1" />
+                            View
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              ) : (
+                <div className="text-center py-8 text-muted-foreground">
+                  No delivery orders found
+                </div>
+              )}
+            </TabsContent>
+
             <TabsContent value="dashboard" className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <Card>
@@ -314,6 +398,18 @@ export function SalesOrderFulfillmentTab() {
         open={showCreatePickList}
         onOpenChange={setShowCreatePickList}
         salesOrderId={selectedSalesOrder?.id}
+      />
+
+      <CreateDeliveryOrderDialog
+        open={showCreateDeliveryOrder}
+        onOpenChange={setShowCreateDeliveryOrder}
+        salesOrderId={selectedSalesOrder?.id}
+      />
+
+      <DeliveryOrderDetailsDialog
+        open={showDeliveryOrderDetails}
+        onOpenChange={setShowDeliveryOrderDetails}
+        deliveryOrderId={selectedDeliveryOrder || undefined}
       />
 
       {viewItemsForOrder && (
