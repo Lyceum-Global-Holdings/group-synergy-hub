@@ -114,6 +114,7 @@ export function CreateGrnDialog({ open, onOpenChange, preselectedPo }: CreateGrn
         quantity_received: 0,
         unit_of_measure: 'pcs',
         quality_status: 'good',
+        total_cost: 0,
       }],
     },
   });
@@ -138,6 +139,16 @@ export function CreateGrnDialog({ open, onOpenChange, preselectedPo }: CreateGrn
 
   const onSubmit = async (data: CreateGrnFormData) => {
     try {
+      // Validate that at least one item has quantity_received > 0
+      const hasReceivingQuantity = data.items.some(item => item.quantity_received > 0);
+      if (!hasReceivingQuantity) {
+        form.setError('items', {
+          type: 'manual',
+          message: 'Enter a received quantity for at least one item'
+        });
+        return;
+      }
+
       const grnData: CreateGrnData = {
         ...data,
         supplier_name: data.supplier_name || '',
@@ -187,7 +198,7 @@ export function CreateGrnDialog({ open, onOpenChange, preselectedPo }: CreateGrn
         warehouse_item_id: item.warehouse_item_id,
         po_item_id: item.id,
         quantity_ordered: item.quantity_ordered || 0,
-        quantity_received: item.quantity_received || 0,
+        quantity_received: 0, // Start from 0 for "Receiving Now"
         unit_of_measure: item.unit_of_measure || 'pcs',
         unit_price: item.unit_price || 0,
         total_cost: 0,
@@ -548,12 +559,17 @@ export function CreateGrnDialog({ open, onOpenChange, preselectedPo }: CreateGrn
                                   max={pending}
                                   {...field}
                                   onChange={(e) => {
-                                  field.onChange(parseFloat(e.target.value) || 0);
-                                  calculateItemTotal(index);
-                                }}
-                              />
-                            )}
-                          />
+                                    const parsed = parseFloat(e.target.value) || 0;
+                                    // Clamp to [0, pending]
+                                    const clamped = Math.max(0, Math.min(pending, parsed));
+                                    field.onChange(clamped);
+                                    // Recalculate total_cost
+                                    const unitPrice = form.getValues(`items.${index}.unit_price`) || 0;
+                                    form.setValue(`items.${index}.total_cost`, unitPrice * clamped);
+                                  }}
+                                />
+                              )}
+                            />
                           </TableCell>
                           <TableCell>
                             <FormField

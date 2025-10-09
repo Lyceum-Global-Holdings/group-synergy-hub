@@ -150,6 +150,7 @@ export const useCreateGoodsReceiptNote = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['goods-receipt-notes'] });
       queryClient.invalidateQueries({ queryKey: ['warehouse-items'] });
+      queryClient.invalidateQueries({ queryKey: ['purchase-orders'] });
       toast({
         title: "Success",
         description: "Goods Receipt Note created successfully",
