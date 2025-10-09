@@ -1,16 +1,18 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, Search, Upload } from "lucide-react";
+import { Plus, Search } from "lucide-react";
 import { useChartOfAccounts } from "@/hooks/useChartOfAccounts";
 import { AccountTreeView } from "./AccountTreeView";
 import { CreateAccountDialog } from "./CreateAccountDialog";
+import { CreateJournalEntryWizard } from "./CreateJournalEntryWizard";
 import { Card } from "@/components/ui/card";
 
 export function ChartOfAccountsTab() {
   const { accounts, accountTree, isLoading } = useChartOfAccounts();
   const [searchQuery, setSearchQuery] = useState("");
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [showJournalWizard, setShowJournalWizard] = useState(false);
 
   const filteredAccounts = accounts?.filter(
     (acc) =>
@@ -32,9 +34,9 @@ export function ChartOfAccountsTab() {
           />
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm">
-            <Upload className="h-4 w-4 mr-2" />
-            Import COA
+          <Button variant="outline" size="sm" onClick={() => setShowJournalWizard(true)}>
+            <Plus className="h-4 w-4 mr-2" />
+            New Entry
           </Button>
           <Button size="sm" onClick={() => setCreateDialogOpen(true)}>
             <Plus className="h-4 w-4 mr-2" />
@@ -92,6 +94,7 @@ export function ChartOfAccountsTab() {
       </Card>
 
       <CreateAccountDialog open={createDialogOpen} onOpenChange={setCreateDialogOpen} />
+      <CreateJournalEntryWizard open={showJournalWizard} onOpenChange={setShowJournalWizard} />
     </div>
   );
 }

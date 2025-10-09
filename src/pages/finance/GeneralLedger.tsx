@@ -6,10 +6,13 @@ import { JournalEntriesTab } from "@/components/finance/JournalEntriesTab";
 import { FinancialReportsTab } from "@/components/finance/FinancialReportsTab";
 import { AccountingPeriodsTab } from "@/components/finance/AccountingPeriodsTab";
 import { GLSettingsTab } from "@/components/finance/GLSettingsTab";
+import { CreateJournalEntryWizard } from "@/components/finance/CreateJournalEntryWizard";
 import { useState } from "react";
+import { toast } from "sonner";
 
 export default function GeneralLedger() {
   const [activeTab, setActiveTab] = useState("coa");
+  const [showJournalWizard, setShowJournalWizard] = useState(false);
 
   return (
     <div className="space-y-6">
@@ -22,15 +25,15 @@ export default function GeneralLedger() {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm">
+          <Button variant="outline" size="sm" onClick={() => toast.info("Export feature coming soon")}>
             <FileDown className="h-4 w-4 mr-2" />
             Export
           </Button>
-          <Button variant="outline" size="sm">
+          <Button variant="outline" size="sm" onClick={() => toast.info("Import feature coming soon")}>
             <FileUp className="h-4 w-4 mr-2" />
             Import
           </Button>
-          <Button size="sm">
+          <Button size="sm" onClick={() => setShowJournalWizard(true)}>
             <Plus className="h-4 w-4 mr-2" />
             New Entry
           </Button>
@@ -70,6 +73,11 @@ export default function GeneralLedger() {
           <GLSettingsTab />
         </TabsContent>
       </Tabs>
+
+      <CreateJournalEntryWizard
+        open={showJournalWizard}
+        onOpenChange={setShowJournalWizard}
+      />
     </div>
   );
 }

@@ -2,7 +2,12 @@ import { useState } from "react";
 import { ChevronRight, ChevronDown, Edit, Eye, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import type { ChartOfAccount } from "@/types/generalLedger";
+import { EditAccountDialog } from "./EditAccountDialog";
+import { AccountDetailsDialog } from "./AccountDetailsDialog";
+import { useChartOfAccounts } from "@/hooks/useChartOfAccounts";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
 interface AccountTreeViewProps {
@@ -12,6 +17,11 @@ interface AccountTreeViewProps {
 
 export function AccountTreeView({ accounts, level = 0 }: AccountTreeViewProps) {
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+  const [selectedAccount, setSelectedAccount] = useState<ChartOfAccount | null>(null);
+  const [showEditDialog, setShowEditDialog] = useState(false);
+  const [showDetailsDialog, setShowDetailsDialog] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const { deleteAccount } = useChartOfAccounts();
 
   const toggleExpand = (id: string) => {
     const newExpanded = new Set(expandedIds);
@@ -21,6 +31,34 @@ export function AccountTreeView({ accounts, level = 0 }: AccountTreeViewProps) {
       newExpanded.add(id);
     }
     setExpandedIds(newExpanded);
+  };
+
+  const handleView = (account: ChartOfAccount) => {
+    setSelectedAccount(account);
+    setShowDetailsDialog(true);
+  };
+
+  const handleEdit = (account: ChartOfAccount) => {
+    setSelectedAccount(account);
+    setShowEditDialog(true);
+  };
+
+  const handleDeleteClick = (account: ChartOfAccount) => {
+    setSelectedAccount(account);
+    setShowDeleteDialog(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (selectedAccount) {
+      try {
+        await deleteAccount.mutateAsync(selectedAccount.id);
+        toast.success("Account deleted successfully");
+        setShowDeleteDialog(false);
+        setSelectedAccount(null);
+      } catch (error) {
+        toast.error("Failed to delete account");
+      }
+    }
   };
 
   const getAccountTypeColor = (type: string) => {
@@ -93,13 +131,13 @@ export function AccountTreeView({ accounts, level = 0 }: AccountTreeViewProps) {
               )}
 
               <div className="opacity-0 group-hover:opacity-100 flex gap-1">
-                <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => handleView(account)}>
                   <Eye className="h-4 w-4" />
                 </Button>
-                <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => handleEdit(account)}>
                   <Edit className="h-4 w-4" />
                 </Button>
-                <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-destructive">
+                <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-destructive" onClick={() => handleDeleteClick(account)}>
                   <Trash2 className="h-4 w-4" />
                 </Button>
               </div>
@@ -111,6 +149,38 @@ export function AccountTreeView({ accounts, level = 0 }: AccountTreeViewProps) {
           </div>
         );
       })}
+
+      {selectedAccount && (
+        <>
+          <EditAccountDialog
+            open={showEditDialog}
+            onOpenChange={setShowEditDialog}
+            account={selectedAccount}
+          />
+          <AccountDetailsDialog
+            open={showDetailsDialog}
+            onOpenChange={setShowDetailsDialog}
+            account={selectedAccount}
+          />
+          <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Delete Account?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This will permanently delete account "{selectedAccount.account_code} - {selectedAccount.account_name}". 
+                  This action cannot be undone.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={handleDeleteConfirm} className="bg-destructive text-destructive-foreground">
+                  Delete
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </>
+      )}
     </div>
   );
 }

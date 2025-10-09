@@ -9,17 +9,30 @@ import { DataTable } from "@/components/ui/data-table";
 import type { ColumnDef } from "@tanstack/react-table";
 import type { JournalEntry } from "@/types/generalLedger";
 import { format } from "date-fns";
+import { CreateJournalEntryWizard } from "./CreateJournalEntryWizard";
+import { JournalEntryDetailsDialog } from "./JournalEntryDetailsDialog";
 
 export function JournalEntriesTab() {
   const { journalEntries, isLoading } = useJournalEntries();
   const [searchQuery, setSearchQuery] = useState("");
+  const [showJournalWizard, setShowJournalWizard] = useState(false);
+  const [selectedEntry, setSelectedEntry] = useState<JournalEntry | null>(null);
+  const [showDetailsDialog, setShowDetailsDialog] = useState(false);
 
   const columns: ColumnDef<JournalEntry>[] = [
     {
       accessorKey: "journal_number",
       header: "JE Number",
       cell: ({ row }) => (
-        <span className="font-mono font-medium">{row.original.journal_number}</span>
+        <button 
+          onClick={() => {
+            setSelectedEntry(row.original);
+            setShowDetailsDialog(true);
+          }}
+          className="font-mono font-medium hover:text-primary hover:underline"
+        >
+          {row.original.journal_number}
+        </button>
       ),
     },
     {
@@ -101,7 +114,7 @@ export function JournalEntriesTab() {
             <Filter className="h-4 w-4 mr-2" />
             Filter
           </Button>
-          <Button size="sm">
+          <Button size="sm" onClick={() => setShowJournalWizard(true)}>
             <Plus className="h-4 w-4 mr-2" />
             New Journal Entry
           </Button>
@@ -143,12 +156,27 @@ export function JournalEntriesTab() {
 
       {/* Data Table */}
       <Card className="p-6">
-        <DataTable
-          columns={columns}
-          data={filteredEntries || []}
-          isLoading={isLoading}
-        />
+        <div className="cursor-pointer">
+          <DataTable
+            columns={columns}
+            data={filteredEntries || []}
+            isLoading={isLoading}
+          />
+        </div>
       </Card>
+
+      <CreateJournalEntryWizard
+        open={showJournalWizard}
+        onOpenChange={setShowJournalWizard}
+      />
+
+      {selectedEntry && (
+        <JournalEntryDetailsDialog
+          open={showDetailsDialog}
+          onOpenChange={setShowDetailsDialog}
+          journalEntry={selectedEntry}
+        />
+      )}
     </div>
   );
 }
