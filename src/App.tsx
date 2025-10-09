@@ -19,6 +19,7 @@ import CustomerMaster from "./pages/tuh-modules/CustomerMaster";
 import CustomerPO from "./pages/tuh-modules/CustomerPO";
 import MaterialDemandPlanning from "./pages/procurement/MaterialDemandPlanning";
 import RfqRfp from "./pages/procurement/RfqRfp";
+import BlanketPurchaseOrder from "./pages/procurement/BlanketPurchaseOrder";
 import { SupplierMaster } from "./pages/sourcing/SupplierMaster";
 import SupplierScorecard from "./pages/sourcing/SupplierScorecard";
 import SupplierEvaluation from "./pages/sourcing/SupplierEvaluation";
@@ -141,6 +142,13 @@ function App() {
                   <ProtectedRoute>
                     <AppLayout>
                       <RfqRfp />
+                    </AppLayout>
+                  </ProtectedRoute>
+                } />
+                <Route path="/procurement/blanket-po" element={
+                  <ProtectedRoute>
+                    <AppLayout>
+                      <BlanketPurchaseOrder />
                     </AppLayout>
                   </ProtectedRoute>
                 } />
