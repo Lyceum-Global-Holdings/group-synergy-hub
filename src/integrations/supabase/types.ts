@@ -1094,6 +1094,217 @@ export type Database = {
           },
         ]
       }
+      delivery_order_items: {
+        Row: {
+          batch_number: string | null
+          created_at: string
+          do_id: string
+          finished_good_id: string
+          id: string
+          item_condition: string | null
+          notes: string | null
+          package_number: string | null
+          packing_list_item_id: string | null
+          quality_checked: boolean | null
+          quantity_delivered: number | null
+          quantity_ordered: number
+          quantity_to_deliver: number
+          sales_order_item_id: string | null
+          serial_numbers: Json | null
+          updated_at: string
+        }
+        Insert: {
+          batch_number?: string | null
+          created_at?: string
+          do_id: string
+          finished_good_id: string
+          id?: string
+          item_condition?: string | null
+          notes?: string | null
+          package_number?: string | null
+          packing_list_item_id?: string | null
+          quality_checked?: boolean | null
+          quantity_delivered?: number | null
+          quantity_ordered: number
+          quantity_to_deliver: number
+          sales_order_item_id?: string | null
+          serial_numbers?: Json | null
+          updated_at?: string
+        }
+        Update: {
+          batch_number?: string | null
+          created_at?: string
+          do_id?: string
+          finished_good_id?: string
+          id?: string
+          item_condition?: string | null
+          notes?: string | null
+          package_number?: string | null
+          packing_list_item_id?: string | null
+          quality_checked?: boolean | null
+          quantity_delivered?: number | null
+          quantity_ordered?: number
+          quantity_to_deliver?: number
+          sales_order_item_id?: string | null
+          serial_numbers?: Json | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "delivery_order_items_do_id_fkey"
+            columns: ["do_id"]
+            isOneToOne: false
+            referencedRelation: "delivery_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "delivery_order_items_finished_good_id_fkey"
+            columns: ["finished_good_id"]
+            isOneToOne: false
+            referencedRelation: "finished_goods"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "delivery_order_items_packing_list_item_id_fkey"
+            columns: ["packing_list_item_id"]
+            isOneToOne: false
+            referencedRelation: "packing_list_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "delivery_order_items_sales_order_item_id_fkey"
+            columns: ["sales_order_item_id"]
+            isOneToOne: false
+            referencedRelation: "sales_order_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      delivery_orders: {
+        Row: {
+          approval_notes: string | null
+          approved_by: string | null
+          approved_date: string | null
+          company_id: string | null
+          created_at: string
+          created_by: string | null
+          customer_id: string
+          delivery_address: string
+          delivery_contact: string | null
+          delivery_date: string
+          delivery_instructions: string | null
+          delivery_phone: string | null
+          delivery_time_slot: string | null
+          do_number: string
+          driver_name: string | null
+          driver_phone: string | null
+          id: string
+          internal_notes: string | null
+          packing_list_id: string | null
+          priority: string | null
+          sales_order_id: string
+          special_instructions: string | null
+          status: string
+          total_packages: number | null
+          total_volume: number | null
+          total_weight: number | null
+          updated_at: string
+          vehicle_number: string | null
+          vehicle_type: string | null
+        }
+        Insert: {
+          approval_notes?: string | null
+          approved_by?: string | null
+          approved_date?: string | null
+          company_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          customer_id: string
+          delivery_address: string
+          delivery_contact?: string | null
+          delivery_date: string
+          delivery_instructions?: string | null
+          delivery_phone?: string | null
+          delivery_time_slot?: string | null
+          do_number: string
+          driver_name?: string | null
+          driver_phone?: string | null
+          id?: string
+          internal_notes?: string | null
+          packing_list_id?: string | null
+          priority?: string | null
+          sales_order_id: string
+          special_instructions?: string | null
+          status?: string
+          total_packages?: number | null
+          total_volume?: number | null
+          total_weight?: number | null
+          updated_at?: string
+          vehicle_number?: string | null
+          vehicle_type?: string | null
+        }
+        Update: {
+          approval_notes?: string | null
+          approved_by?: string | null
+          approved_date?: string | null
+          company_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          customer_id?: string
+          delivery_address?: string
+          delivery_contact?: string | null
+          delivery_date?: string
+          delivery_instructions?: string | null
+          delivery_phone?: string | null
+          delivery_time_slot?: string | null
+          do_number?: string
+          driver_name?: string | null
+          driver_phone?: string | null
+          id?: string
+          internal_notes?: string | null
+          packing_list_id?: string | null
+          priority?: string | null
+          sales_order_id?: string
+          special_instructions?: string | null
+          status?: string
+          total_packages?: number | null
+          total_volume?: number | null
+          total_weight?: number | null
+          updated_at?: string
+          vehicle_number?: string | null
+          vehicle_type?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "delivery_orders_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "delivery_orders_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "delivery_orders_packing_list_id_fkey"
+            columns: ["packing_list_id"]
+            isOneToOne: false
+            referencedRelation: "packing_lists"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "delivery_orders_sales_order_id_fkey"
+            columns: ["sales_order_id"]
+            isOneToOne: false
+            referencedRelation: "sales_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       dispatch_records: {
         Row: {
           actual_delivery_date: string | null
@@ -1104,6 +1315,7 @@ export type Database = {
           delivery_address: string
           delivery_contact: string | null
           delivery_notes: string | null
+          delivery_order_id: string | null
           delivery_phone: string | null
           dispatch_date: string
           dispatch_number: string
@@ -1125,6 +1337,7 @@ export type Database = {
           delivery_address: string
           delivery_contact?: string | null
           delivery_notes?: string | null
+          delivery_order_id?: string | null
           delivery_phone?: string | null
           dispatch_date?: string
           dispatch_number: string
@@ -1146,6 +1359,7 @@ export type Database = {
           delivery_address?: string
           delivery_contact?: string | null
           delivery_notes?: string | null
+          delivery_order_id?: string | null
           delivery_phone?: string | null
           dispatch_date?: string
           dispatch_number?: string
@@ -1159,6 +1373,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "dispatch_records_delivery_order_id_fkey"
+            columns: ["delivery_order_id"]
+            isOneToOne: false
+            referencedRelation: "delivery_orders"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "dispatch_records_packing_list_id_fkey"
             columns: ["packing_list_id"]
@@ -5839,6 +6060,10 @@ export type Database = {
         Returns: string
       }
       generate_cycle_count_number: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
+      generate_do_number: {
         Args: Record<PropertyKey, never>
         Returns: string
       }

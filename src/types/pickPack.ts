@@ -111,6 +111,7 @@ export interface DispatchRecord {
   dispatch_number: string;
   sales_order_id: string;
   packing_list_id: string;
+  delivery_order_id: string | null;
   courier_name: string | null;
   tracking_number: string | null;
   dispatch_date: string;
@@ -126,6 +127,91 @@ export interface DispatchRecord {
   created_by: string | null;
   created_at: string;
   updated_at: string;
+}
+
+// Delivery Orders
+export interface DeliveryOrder {
+  id: string;
+  do_number: string;
+  sales_order_id: string;
+  packing_list_id: string | null;
+  customer_id: string;
+  delivery_address: string;
+  delivery_contact: string | null;
+  delivery_phone: string | null;
+  delivery_date: string;
+  delivery_time_slot: 'morning' | 'afternoon' | 'evening' | null;
+  vehicle_type: 'truck' | 'van' | 'motorcycle' | 'courier' | null;
+  vehicle_number: string | null;
+  driver_name: string | null;
+  driver_phone: string | null;
+  status: 'draft' | 'approved' | 'ready_for_dispatch' | 'dispatched' | 'in_transit' | 'delivered' | 'failed' | 'cancelled';
+  priority: 'low' | 'medium' | 'high' | 'urgent';
+  approved_by: string | null;
+  approved_date: string | null;
+  approval_notes: string | null;
+  special_instructions: string | null;
+  delivery_instructions: string | null;
+  internal_notes: string | null;
+  total_packages: number;
+  total_weight: number | null;
+  total_volume: number | null;
+  company_id: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateDeliveryOrderData {
+  sales_order_id: string;
+  packing_list_id?: string;
+  customer_id: string;
+  delivery_address: string;
+  delivery_contact?: string;
+  delivery_phone?: string;
+  delivery_date: string;
+  delivery_time_slot?: 'morning' | 'afternoon' | 'evening';
+  vehicle_type?: 'truck' | 'van' | 'motorcycle' | 'courier';
+  vehicle_number?: string;
+  driver_name?: string;
+  driver_phone?: string;
+  priority?: 'low' | 'medium' | 'high' | 'urgent';
+  special_instructions?: string;
+  delivery_instructions?: string;
+  company_id?: string;
+}
+
+export interface DeliveryOrderItem {
+  id: string;
+  do_id: string;
+  sales_order_item_id: string | null;
+  packing_list_item_id: string | null;
+  finished_good_id: string;
+  quantity_ordered: number;
+  quantity_to_deliver: number;
+  quantity_delivered: number;
+  package_number: string | null;
+  batch_number: string | null;
+  serial_numbers: any | null;
+  item_condition: 'good' | 'damaged' | 'returned';
+  quality_checked: boolean;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateDeliveryOrderItemData {
+  sales_order_item_id?: string;
+  packing_list_item_id?: string;
+  finished_good_id: string;
+  quantity_ordered: number;
+  quantity_to_deliver: number;
+  package_number?: string;
+  batch_number?: string;
+  serial_numbers?: any;
+  item_condition?: 'good' | 'damaged' | 'returned';
+  quality_checked?: boolean;
+  notes?: string;
 }
 
 // Extended types with related data for UI display
@@ -303,4 +389,33 @@ export interface PackingListItem {
   notes: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface DeliveryOrderWithDetails extends DeliveryOrder {
+  customer?: {
+    id: string;
+    customer_name: string;
+    customer_code: string;
+  };
+  sales_order?: {
+    id: string;
+    order_number: string;
+    status: string;
+  };
+  packing_list?: {
+    id: string;
+    packing_list_number: string;
+  };
+  items?: DeliveryOrderItemWithDetails[];
+  dispatch_record?: DispatchRecord;
+}
+
+export interface DeliveryOrderItemWithDetails extends DeliveryOrderItem {
+  finished_good?: {
+    id: string;
+    product_name: string;
+    product_code: string;
+  };
+  sales_order_item?: SalesOrderItem;
+  packing_list_item?: PackingListItem;
 }
