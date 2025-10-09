@@ -393,6 +393,38 @@ export const useCreateUser = () => {
 
       console.log('User created successfully:', authData.user.id);
 
+      // Wait for profile to be created by handle_new_user() trigger
+      let profileExists = false;
+      let attempts = 0;
+      const maxAttempts = 10;
+
+      while (!profileExists && attempts < maxAttempts) {
+        const { data: profile, error: profileCheckError } = await supabase
+          .from('profiles')
+          .select('user_id')
+          .eq('user_id', authData.user.id)
+          .maybeSingle();
+
+        if (profile) {
+          profileExists = true;
+          console.log('Profile found after', attempts, 'attempts');
+        } else if (profileCheckError) {
+          console.error('Profile check error:', profileCheckError);
+          // Continue retrying even on error as it might be a timing issue
+        }
+        
+        if (!profileExists) {
+          // Exponential backoff: 100ms, 200ms, 400ms, 800ms, 1600ms...
+          const delay = Math.min(100 * Math.pow(2, attempts), 1000);
+          await new Promise(resolve => setTimeout(resolve, delay));
+          attempts++;
+        }
+      }
+
+      if (!profileExists) {
+        throw new Error('Profile creation timed out. The user account was created but profile setup failed. Please contact support.');
+      }
+
       // Update profile with department and company if provided
       const profileUpdate: { department?: string; company_id?: string } = {};
       if (userData.department) {
@@ -427,8 +459,10 @@ export const useCreateUser = () => {
 
         if (roleError) {
           console.error('Role assignment error:', roleError);
-          throw new Error(`User created but role assignment failed: ${roleError.message}`);
+          throw new Error(`Role assignment failed: ${roleError.message}. User account was created successfully.`);
         }
+
+        console.log('Roles assigned successfully');
       }
 
       return authData.user;
