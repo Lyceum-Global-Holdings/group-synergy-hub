@@ -1,4 +1,3 @@
-import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -17,8 +16,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
 import { useFinishedGoodsMovements } from '@/hooks/useFinishedGoodsMovements';
-import { FinishedGoodsStockAdjustmentDialog } from './FinishedGoodsStockAdjustmentDialog';
-import { Loader2, Plus } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 
 interface FinishedGoodsMovementDialogProps {
   open: boolean;
@@ -61,22 +59,13 @@ export function FinishedGoodsMovementDialog({
   currentStock 
 }: FinishedGoodsMovementDialogProps) {
   const { movements, isLoading } = useFinishedGoodsMovements(finishedGoodId);
-  const [isAdjustmentDialogOpen, setIsAdjustmentDialogOpen] = useState(false);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl max-h-[80vh] overflow-hidden flex flex-col">
         <DialogHeader>
-          <DialogTitle className="flex items-center justify-between">
+          <DialogTitle>
             Stock Movement History - {productName}
-            <Button
-              onClick={() => setIsAdjustmentDialogOpen(true)}
-              size="sm"
-              className="ml-4"
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              New Adjustment
-            </Button>
           </DialogTitle>
         </DialogHeader>
 
@@ -148,14 +137,6 @@ export function FinishedGoodsMovementDialog({
             </Table>
           )}
         </div>
-
-        <FinishedGoodsStockAdjustmentDialog
-          open={isAdjustmentDialogOpen}
-          onOpenChange={setIsAdjustmentDialogOpen}
-          finishedGoodId={finishedGoodId}
-          productName={productName}
-          currentStock={currentStock || movements[0]?.quantity_after || 0}
-        />
       </DialogContent>
     </Dialog>
   );
