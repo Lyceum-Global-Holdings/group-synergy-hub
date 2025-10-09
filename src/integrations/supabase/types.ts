@@ -3645,6 +3645,213 @@ export type Database = {
         }
         Relationships: []
       }
+      stock_transfer_items: {
+        Row: {
+          created_at: string
+          from_bin_id: string | null
+          id: string
+          item_code: string | null
+          item_name: string
+          notes: string | null
+          quantity_requested: number
+          quantity_transferred: number | null
+          status: string
+          to_bin_id: string | null
+          transfer_id: string
+          unit_of_measure: string | null
+          updated_at: string
+          warehouse_item_id: string
+        }
+        Insert: {
+          created_at?: string
+          from_bin_id?: string | null
+          id?: string
+          item_code?: string | null
+          item_name: string
+          notes?: string | null
+          quantity_requested: number
+          quantity_transferred?: number | null
+          status?: string
+          to_bin_id?: string | null
+          transfer_id: string
+          unit_of_measure?: string | null
+          updated_at?: string
+          warehouse_item_id: string
+        }
+        Update: {
+          created_at?: string
+          from_bin_id?: string | null
+          id?: string
+          item_code?: string | null
+          item_name?: string
+          notes?: string | null
+          quantity_requested?: number
+          quantity_transferred?: number | null
+          status?: string
+          to_bin_id?: string | null
+          transfer_id?: string
+          unit_of_measure?: string | null
+          updated_at?: string
+          warehouse_item_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stock_transfer_items_from_bin_id_fkey"
+            columns: ["from_bin_id"]
+            isOneToOne: false
+            referencedRelation: "warehouse_bins"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_transfer_items_to_bin_id_fkey"
+            columns: ["to_bin_id"]
+            isOneToOne: false
+            referencedRelation: "warehouse_bins"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_transfer_items_transfer_id_fkey"
+            columns: ["transfer_id"]
+            isOneToOne: false
+            referencedRelation: "stock_transfer_requests"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_transfer_items_warehouse_item_id_fkey"
+            columns: ["warehouse_item_id"]
+            isOneToOne: false
+            referencedRelation: "warehouse_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      stock_transfer_requests: {
+        Row: {
+          approved_by: string | null
+          approved_date: string | null
+          company_id: string | null
+          completed_by: string | null
+          completed_date: string | null
+          created_at: string
+          created_by: string | null
+          expected_completion_date: string | null
+          from_department_id: string | null
+          from_location_id: string | null
+          from_sublocation_id: string | null
+          id: string
+          notes: string | null
+          priority: string
+          reason: string | null
+          requested_by: string | null
+          requested_date: string | null
+          status: string
+          to_department_id: string | null
+          to_location_id: string | null
+          to_sublocation_id: string | null
+          transfer_date: string
+          transfer_number: string
+          transfer_type: string
+          updated_at: string
+        }
+        Insert: {
+          approved_by?: string | null
+          approved_date?: string | null
+          company_id?: string | null
+          completed_by?: string | null
+          completed_date?: string | null
+          created_at?: string
+          created_by?: string | null
+          expected_completion_date?: string | null
+          from_department_id?: string | null
+          from_location_id?: string | null
+          from_sublocation_id?: string | null
+          id?: string
+          notes?: string | null
+          priority?: string
+          reason?: string | null
+          requested_by?: string | null
+          requested_date?: string | null
+          status?: string
+          to_department_id?: string | null
+          to_location_id?: string | null
+          to_sublocation_id?: string | null
+          transfer_date?: string
+          transfer_number: string
+          transfer_type?: string
+          updated_at?: string
+        }
+        Update: {
+          approved_by?: string | null
+          approved_date?: string | null
+          company_id?: string | null
+          completed_by?: string | null
+          completed_date?: string | null
+          created_at?: string
+          created_by?: string | null
+          expected_completion_date?: string | null
+          from_department_id?: string | null
+          from_location_id?: string | null
+          from_sublocation_id?: string | null
+          id?: string
+          notes?: string | null
+          priority?: string
+          reason?: string | null
+          requested_by?: string | null
+          requested_date?: string | null
+          status?: string
+          to_department_id?: string | null
+          to_location_id?: string | null
+          to_sublocation_id?: string | null
+          transfer_date?: string
+          transfer_number?: string
+          transfer_type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stock_transfer_requests_from_department_id_fkey"
+            columns: ["from_department_id"]
+            isOneToOne: false
+            referencedRelation: "warehouse_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_transfer_requests_from_location_id_fkey"
+            columns: ["from_location_id"]
+            isOneToOne: false
+            referencedRelation: "warehouse_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_transfer_requests_from_sublocation_id_fkey"
+            columns: ["from_sublocation_id"]
+            isOneToOne: false
+            referencedRelation: "warehouse_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_transfer_requests_to_department_id_fkey"
+            columns: ["to_department_id"]
+            isOneToOne: false
+            referencedRelation: "warehouse_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_transfer_requests_to_location_id_fkey"
+            columns: ["to_location_id"]
+            isOneToOne: false
+            referencedRelation: "warehouse_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_transfer_requests_to_sublocation_id_fkey"
+            columns: ["to_sublocation_id"]
+            isOneToOne: false
+            referencedRelation: "warehouse_locations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       supplier_action_items: {
         Row: {
           assigned_to: string | null
@@ -5078,6 +5285,10 @@ export type Database = {
         Returns: string
       }
       generate_supplier_code: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
+      generate_transfer_number: {
         Args: Record<PropertyKey, never>
         Returns: string
       }
