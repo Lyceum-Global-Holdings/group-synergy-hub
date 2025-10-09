@@ -84,7 +84,7 @@ export const useCreateGoodsReceiptNote = () => {
         return sum + (lineTotal || 0);
       }, 0);
 
-      // Create GRN header
+      // Create GRN header as draft first
       const { data: grn, error: grnError } = await supabase
         .from('goods_receipt_notes')
         .insert({
@@ -104,7 +104,7 @@ export const useCreateGoodsReceiptNote = () => {
           company_id: grnData.company_id,
           received_by: user.id,
           created_by: user.id,
-          status: 'submitted',
+          status: 'draft',
           total_value: totalValue
         })
         .select()
@@ -137,6 +137,14 @@ export const useCreateGoodsReceiptNote = () => {
         if (itemsError) throw itemsError;
       }
 
+      // Update GRN status to submitted after items are created
+      const { error: updateError } = await supabase
+        .from('goods_receipt_notes')
+        .update({ status: 'submitted' })
+        .eq('id', grn.id);
+
+      if (updateError) throw updateError;
+
       return grn;
     },
     onSuccess: () => {
@@ -151,7 +159,7 @@ export const useCreateGoodsReceiptNote = () => {
       console.error('Error creating GRN:', error);
       toast({
         title: "Error",
-        description: "Failed to create Goods Receipt Note",
+        description: (error as any)?.message || "Failed to create Goods Receipt Note",
         variant: "destructive",
       });
     }
