@@ -118,10 +118,7 @@ export function usePurchaseOrderApprovals(poId: string) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('po_approvals')
-        .select(`
-          *,
-          approver_profile:profiles!approver_id(full_name, email)
-        `)
+        .select(`*`)
         .eq('po_id', poId)
         .order('created_at', { ascending: false });
 

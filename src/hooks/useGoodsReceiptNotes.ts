@@ -15,11 +15,7 @@ export const useGoodsReceiptNotes = () => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('goods_receipt_notes')
-        .select(`
-          *,
-          supplier:suppliers(name, address),
-          purchase_order:purchase_orders(po_number)
-        `)
+        .select('*')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -42,9 +38,7 @@ export const useGoodsReceiptNote = (id: string) => {
         .from('goods_receipt_notes')
         .select(`
           *,
-          items:grn_items(*),
-          supplier:suppliers(name, address),
-          purchase_order:purchase_orders(po_number)
+          items:grn_items(*)
         `)
         .eq('id', id)
         .single();
@@ -151,6 +145,7 @@ export const useCreateGoodsReceiptNote = () => {
       queryClient.invalidateQueries({ queryKey: ['goods-receipt-notes'] });
       queryClient.invalidateQueries({ queryKey: ['warehouse-items'] });
       queryClient.invalidateQueries({ queryKey: ['purchase-orders'] });
+      queryClient.invalidateQueries({ queryKey: ['grns-for-po'] });
       toast({
         title: "Success",
         description: "Goods Receipt Note created successfully",
