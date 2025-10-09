@@ -113,12 +113,11 @@ export default function CreateCycleCountDialog({ open, onOpenChange }: CreateCyc
           <div className="grid gap-4 md:grid-cols-2">
             <div>
               <Label htmlFor="locationId">Location (Optional)</Label>
-              <Select value={locationId} onValueChange={setLocationId}>
+              <Select value={locationId || undefined} onValueChange={setLocationId}>
                 <SelectTrigger id="locationId">
-                  <SelectValue placeholder="Select location" />
+                  <SelectValue placeholder="All Locations" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All Locations</SelectItem>
                   {locations.map((location) => (
                     <SelectItem key={location.id} value={location.id}>
                       {location.name}
@@ -130,12 +129,11 @@ export default function CreateCycleCountDialog({ open, onOpenChange }: CreateCyc
 
             <div>
               <Label htmlFor="assignedTo">Assign To (Optional)</Label>
-              <Select value={assignedTo} onValueChange={setAssignedTo}>
+              <Select value={assignedTo || undefined} onValueChange={setAssignedTo}>
                 <SelectTrigger id="assignedTo">
-                  <SelectValue placeholder="Select user" />
+                  <SelectValue placeholder="Not Assigned" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Not Assigned</SelectItem>
                   {users.map((user) => (
                     <SelectItem key={user.id} value={user.id}>
                       {user.full_name || user.email}
