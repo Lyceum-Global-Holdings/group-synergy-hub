@@ -37,6 +37,7 @@ import StockTransfer from "./pages/warehouse/StockTransfer";
 import CycleCount from "./pages/warehouse/CycleCount";
 import DeliveryOrder from "./pages/warehouse/DeliveryOrder";
 import PublicAssetView from "./pages/PublicAssetView";
+import GeneralLedger from "./pages/finance/GeneralLedger";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 
@@ -256,6 +257,13 @@ function App() {
               <ProtectedRoute>
                 <AppLayout>
                   <DeliveryOrder />
+                </AppLayout>
+              </ProtectedRoute>
+            } />
+            <Route path="/finance/general-ledger" element={
+              <ProtectedRoute>
+                <AppLayout>
+                  <GeneralLedger />
                 </AppLayout>
               </ProtectedRoute>
             } />
