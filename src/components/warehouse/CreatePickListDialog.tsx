@@ -21,7 +21,7 @@ export function CreatePickListDialog({
   salesOrderId,
   onPickListCreated
 }: CreatePickListDialogProps) {
-  const { createPickList, isCreatingPickList } = usePickPack();
+  const { createPickListWithItems, isCreatingPickList } = usePickPack();
   const { data: users } = useUsers();
   const [formData, setFormData] = useState({
     sales_order_id: salesOrderId || '',
@@ -35,12 +35,20 @@ export function CreatePickListDialog({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
+    if (!formData.sales_order_id) {
+      return;
+    }
+
     const submitData = {
-      ...formData,
-      estimated_pick_time: formData.estimated_pick_time ? parseInt(formData.estimated_pick_time) : undefined
+      sales_order_id: formData.sales_order_id,
+      picker_id: formData.picker_id || undefined,
+      pick_zone: formData.pick_zone || undefined,
+      priority: formData.priority,
+      estimated_pick_time: formData.estimated_pick_time ? parseInt(formData.estimated_pick_time) : undefined,
+      notes: formData.notes || undefined,
     };
 
-    createPickList(submitData, {
+    createPickListWithItems(submitData, {
       onSuccess: (pickList) => {
         onOpenChange(false);
         onPickListCreated?.(pickList.id);

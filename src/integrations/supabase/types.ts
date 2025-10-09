@@ -2776,6 +2776,7 @@ export type Database = {
           picked_by: string | null
           quantity_picked: number
           quantity_to_pick: number
+          sales_order_item_id: string | null
           status: string
           updated_at: string
         }
@@ -2792,6 +2793,7 @@ export type Database = {
           picked_by?: string | null
           quantity_picked?: number
           quantity_to_pick: number
+          sales_order_item_id?: string | null
           status?: string
           updated_at?: string
         }
@@ -2808,6 +2810,7 @@ export type Database = {
           picked_by?: string | null
           quantity_picked?: number
           quantity_to_pick?: number
+          sales_order_item_id?: string | null
           status?: string
           updated_at?: string
         }
@@ -2838,6 +2841,13 @@ export type Database = {
             columns: ["pick_list_id"]
             isOneToOne: false
             referencedRelation: "pick_lists"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pick_list_items_sales_order_item_id_fkey"
+            columns: ["sales_order_item_id"]
+            isOneToOne: false
+            referencedRelation: "sales_order_items"
             referencedColumns: ["id"]
           },
         ]

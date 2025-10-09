@@ -62,6 +62,7 @@ export interface CreatePickListData {
 export interface PickListItem {
   id: string;
   pick_list_id: string;
+  sales_order_item_id: string | null;
   finished_good_id: string;
   location_id: string | null;
   bin_id: string | null;
@@ -78,6 +79,7 @@ export interface PickListItem {
 
 export interface CreatePickListItemData {
   pick_list_id: string;
+  sales_order_item_id?: string;
   finished_good_id: string;
   location_id?: string;
   bin_id?: string;
