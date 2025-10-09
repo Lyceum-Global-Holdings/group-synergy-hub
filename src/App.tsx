@@ -20,6 +20,7 @@ import CustomerPO from "./pages/tuh-modules/CustomerPO";
 import MaterialDemandPlanning from "./pages/procurement/MaterialDemandPlanning";
 import RfqRfp from "./pages/procurement/RfqRfp";
 import BlanketPurchaseOrder from "./pages/procurement/BlanketPurchaseOrder";
+import StockAdjustment from "./pages/warehouse/StockAdjustment";
 import { SupplierMaster } from "./pages/sourcing/SupplierMaster";
 import SupplierScorecard from "./pages/sourcing/SupplierScorecard";
 import SupplierEvaluation from "./pages/sourcing/SupplierEvaluation";
@@ -149,6 +150,13 @@ function App() {
                   <ProtectedRoute>
                     <AppLayout>
                       <BlanketPurchaseOrder />
+                    </AppLayout>
+                  </ProtectedRoute>
+                } />
+                <Route path="/warehouse/stock-adjustment" element={
+                  <ProtectedRoute>
+                    <AppLayout>
+                      <StockAdjustment />
                     </AppLayout>
                   </ProtectedRoute>
                 } />

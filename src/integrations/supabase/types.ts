@@ -350,6 +350,13 @@ export type Database = {
             foreignKeyName: "bill_of_materials_warehouse_item_id_fkey"
             columns: ["warehouse_item_id"]
             isOneToOne: false
+            referencedRelation: "v_adjustment_summary_by_item"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bill_of_materials_warehouse_item_id_fkey"
+            columns: ["warehouse_item_id"]
+            isOneToOne: false
             referencedRelation: "warehouse_items"
             referencedColumns: ["id"]
           },
@@ -523,6 +530,13 @@ export type Database = {
             columns: ["bpo_id"]
             isOneToOne: false
             referencedRelation: "blanket_purchase_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "blanket_po_items_warehouse_item_id_fkey"
+            columns: ["warehouse_item_id"]
+            isOneToOne: false
+            referencedRelation: "v_adjustment_summary_by_item"
             referencedColumns: ["id"]
           },
           {
@@ -898,6 +912,13 @@ export type Database = {
             columns: ["po_item_id"]
             isOneToOne: false
             referencedRelation: "po_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bom_items_warehouse_item_id_fkey"
+            columns: ["warehouse_item_id"]
+            isOneToOne: false
+            referencedRelation: "v_adjustment_summary_by_item"
             referencedColumns: ["id"]
           },
           {
@@ -2840,6 +2861,13 @@ export type Database = {
             foreignKeyName: "material_issue_items_item_id_fkey"
             columns: ["item_id"]
             isOneToOne: false
+            referencedRelation: "v_adjustment_summary_by_item"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "material_issue_items_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
             referencedRelation: "warehouse_items"
             referencedColumns: ["id"]
           },
@@ -3031,6 +3059,13 @@ export type Database = {
             foreignKeyName: "material_request_items_item_id_fkey"
             columns: ["item_id"]
             isOneToOne: false
+            referencedRelation: "v_adjustment_summary_by_item"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "material_request_items_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
             referencedRelation: "warehouse_items"
             referencedColumns: ["id"]
           },
@@ -3173,6 +3208,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "material_return_items_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "v_adjustment_summary_by_item"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "material_return_items_item_id_fkey"
             columns: ["item_id"]
@@ -3695,6 +3737,13 @@ export type Database = {
             foreignKeyName: "po_items_warehouse_item_id_fkey"
             columns: ["warehouse_item_id"]
             isOneToOne: false
+            referencedRelation: "v_adjustment_summary_by_item"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "po_items_warehouse_item_id_fkey"
+            columns: ["warehouse_item_id"]
+            isOneToOne: false
             referencedRelation: "warehouse_items"
             referencedColumns: ["id"]
           },
@@ -3892,6 +3941,13 @@ export type Database = {
             columns: ["pr_id"]
             isOneToOne: false
             referencedRelation: "purchase_requisitions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pr_items_warehouse_item_id_fkey"
+            columns: ["warehouse_item_id"]
+            isOneToOne: false
+            referencedRelation: "v_adjustment_summary_by_item"
             referencedColumns: ["id"]
           },
           {
@@ -4206,6 +4262,13 @@ export type Database = {
             foreignKeyName: "putaway_items_warehouse_item_id_fkey"
             columns: ["warehouse_item_id"]
             isOneToOne: false
+            referencedRelation: "v_adjustment_summary_by_item"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "putaway_items_warehouse_item_id_fkey"
+            columns: ["warehouse_item_id"]
+            isOneToOne: false
             referencedRelation: "warehouse_items"
             referencedColumns: ["id"]
           },
@@ -4479,6 +4542,13 @@ export type Database = {
             columns: ["request_id"]
             isOneToOne: false
             referencedRelation: "rfq_rfp_requests"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rfq_rfp_items_warehouse_item_id_fkey"
+            columns: ["warehouse_item_id"]
+            isOneToOne: false
+            referencedRelation: "v_adjustment_summary_by_item"
             referencedColumns: ["id"]
           },
           {
@@ -4854,8 +4924,87 @@ export type Database = {
           },
         ]
       }
+      stock_adjustment_batches: {
+        Row: {
+          adjustment_date: string
+          adjustment_type: string
+          approval_threshold_exceeded: boolean | null
+          approved_by: string | null
+          approved_date: string | null
+          attachments: Json | null
+          batch_number: string
+          company_id: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          location_id: string | null
+          notes: string | null
+          reason_category: string
+          rejection_reason: string | null
+          requires_approval: boolean | null
+          status: string
+          submitted_by: string | null
+          submitted_date: string | null
+          total_items: number | null
+          total_value_impact: number | null
+          updated_at: string
+        }
+        Insert: {
+          adjustment_date?: string
+          adjustment_type?: string
+          approval_threshold_exceeded?: boolean | null
+          approved_by?: string | null
+          approved_date?: string | null
+          attachments?: Json | null
+          batch_number: string
+          company_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          location_id?: string | null
+          notes?: string | null
+          reason_category?: string
+          rejection_reason?: string | null
+          requires_approval?: boolean | null
+          status?: string
+          submitted_by?: string | null
+          submitted_date?: string | null
+          total_items?: number | null
+          total_value_impact?: number | null
+          updated_at?: string
+        }
+        Update: {
+          adjustment_date?: string
+          adjustment_type?: string
+          approval_threshold_exceeded?: boolean | null
+          approved_by?: string | null
+          approved_date?: string | null
+          attachments?: Json | null
+          batch_number?: string
+          company_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          location_id?: string | null
+          notes?: string | null
+          reason_category?: string
+          rejection_reason?: string | null
+          requires_approval?: boolean | null
+          status?: string
+          submitted_by?: string | null
+          submitted_date?: string | null
+          total_items?: number | null
+          total_value_impact?: number | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       stock_transactions: {
         Row: {
+          adjustment_reason: string | null
+          approved_by: string | null
+          approved_date: string | null
+          batch_id: string | null
           company_id: string | null
           created_at: string
           created_by: string | null
@@ -4873,6 +5022,10 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          adjustment_reason?: string | null
+          approved_by?: string | null
+          approved_date?: string | null
+          batch_id?: string | null
           company_id?: string | null
           created_at?: string
           created_by?: string | null
@@ -4890,6 +5043,10 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          adjustment_reason?: string | null
+          approved_by?: string | null
+          approved_date?: string | null
+          batch_id?: string | null
           company_id?: string | null
           created_at?: string
           created_by?: string | null
@@ -4906,7 +5063,15 @@ export type Database = {
           unit_cost?: number | null
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "stock_transactions_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "stock_adjustment_batches"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       stock_transfer_items: {
         Row: {
@@ -4977,6 +5142,13 @@ export type Database = {
             columns: ["transfer_id"]
             isOneToOne: false
             referencedRelation: "stock_transfer_requests"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_transfer_items_warehouse_item_id_fkey"
+            columns: ["warehouse_item_id"]
+            isOneToOne: false
+            referencedRelation: "v_adjustment_summary_by_item"
             referencedColumns: ["id"]
           },
           {
@@ -5493,6 +5665,13 @@ export type Database = {
             foreignKeyName: "supplier_evaluation_entries_warehouse_item_id_fkey"
             columns: ["warehouse_item_id"]
             isOneToOne: false
+            referencedRelation: "v_adjustment_summary_by_item"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_evaluation_entries_warehouse_item_id_fkey"
+            columns: ["warehouse_item_id"]
+            isOneToOne: false
             referencedRelation: "warehouse_items"
             referencedColumns: ["id"]
           },
@@ -5578,6 +5757,13 @@ export type Database = {
             foreignKeyName: "supplier_evaluations_warehouse_item_id_fkey"
             columns: ["warehouse_item_id"]
             isOneToOne: false
+            referencedRelation: "v_adjustment_summary_by_item"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_evaluations_warehouse_item_id_fkey"
+            columns: ["warehouse_item_id"]
+            isOneToOne: false
             referencedRelation: "warehouse_items"
             referencedColumns: ["id"]
           },
@@ -5645,6 +5831,13 @@ export type Database = {
             columns: ["supplier_id"]
             isOneToOne: false
             referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_items_warehouse_item_id_fkey"
+            columns: ["warehouse_item_id"]
+            isOneToOne: false
+            referencedRelation: "v_adjustment_summary_by_item"
             referencedColumns: ["id"]
           },
           {
@@ -6427,7 +6620,33 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      v_adjustment_summary_by_item: {
+        Row: {
+          company_id: string | null
+          id: string | null
+          item_code: string | null
+          last_adjustment_date: string | null
+          name: string | null
+          total_adjustments: number | null
+          total_decreases: number | null
+          total_increases: number | null
+          value_decreases: number | null
+          value_increases: number | null
+        }
+        Relationships: []
+      }
+      v_adjustment_trends: {
+        Row: {
+          adjustment_count: number | null
+          company_id: string | null
+          decreases_count: number | null
+          increases_count: number | null
+          items_affected: number | null
+          month: string | null
+          total_value_impact: number | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       bootstrap_admin: {
@@ -6486,6 +6705,10 @@ export type Database = {
           _role_ids?: string[]
         }
         Returns: Json
+      }
+      generate_adjustment_batch_number: {
+        Args: Record<PropertyKey, never>
+        Returns: string
       }
       generate_asset_id: {
         Args: {
