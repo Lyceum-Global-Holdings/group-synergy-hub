@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Warehouse, MapPin, Users, Building, Search, Filter, Plus, Edit2, Trash2, Phone, MapPinned } from 'lucide-react';
+import { Warehouse, MapPin, Users, Building, Search, Filter, Plus, Edit2, Trash2, Phone, MapPinned, Eye, Download, FileText } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -25,15 +25,22 @@ import { LocationAnalytics } from '@/components/warehouse/LocationAnalytics';
 import { LocationUtilizationChart } from '@/components/warehouse/LocationUtilizationChart';
 import { ImportLocationsDialog } from '@/components/warehouse/ImportLocationsDialog';
 import { LocationTemplateDialog } from '@/components/warehouse/LocationTemplateDialog';
+import { BinMasterTab } from '@/components/warehouse/BinMasterTab';
+import { LocationDetailsDialog } from '@/components/warehouse/LocationDetailsDialog';
+import { LocationHierarchyTab } from '@/components/warehouse/LocationHierarchyTab';
+import { CapacityPlanningTab } from '@/components/warehouse/CapacityPlanningTab';
 import { useToast } from '@/hooks/use-toast';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Checkbox } from '@/components/ui/checkbox';
 
 export default function WarehouseManagement() {
   const [searchTerm, setSearchTerm] = useState('');
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [selectedLocations, setSelectedLocations] = useState<string[]>([]);
+  const [detailsLocationId, setDetailsLocationId] = useState<string | null>(null);
   
-  const { locations, isLoading, deleteLocation, isDeleting } = useWarehouseLocations();
+  const { locations, isLoading, deleteLocation, updateLocation, bulkDeleteLocations, bulkUpdateStatus, isDeleting } = useWarehouseLocations();
   const { toast } = useToast();
 
   // Calculate statistics
@@ -71,6 +78,58 @@ export default function WarehouseManagement() {
           variant: 'destructive',
         });
       }
+    }
+  };
+
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      setSelectedLocations(filteredLocations.map(l => l.id));
+    } else {
+      setSelectedLocations([]);
+    }
+  };
+
+  const handleSelectLocation = (id: string, checked: boolean) => {
+    if (checked) {
+      setSelectedLocations(prev => [...prev, id]);
+    } else {
+      setSelectedLocations(prev => prev.filter(locId => locId !== id));
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (window.confirm(`Are you sure you want to delete ${selectedLocations.length} location(s)? This action cannot be undone.`)) {
+      try {
+        await bulkDeleteLocations(selectedLocations);
+        setSelectedLocations([]);
+        toast({
+          title: 'Locations deleted',
+          description: `${selectedLocations.length} location(s) have been successfully deleted.`,
+        });
+      } catch (error) {
+        toast({
+          title: 'Error',
+          description: 'Failed to delete some locations. They may have associated items.',
+          variant: 'destructive',
+        });
+      }
+    }
+  };
+
+  const handleBulkStatusChange = async (status: string) => {
+    try {
+      await bulkUpdateStatus(selectedLocations, status);
+      setSelectedLocations([]);
+      toast({
+        title: 'Status updated',
+        description: `${selectedLocations.length} location(s) status updated to ${status}.`,
+      });
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to update status for some locations.',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -240,11 +299,41 @@ export default function WarehouseManagement() {
       <Tabs defaultValue="locations" className="space-y-4">
         <TabsList>
           <TabsTrigger value="locations">Locations</TabsTrigger>
+          <TabsTrigger value="bins">Bins</TabsTrigger>
+          <TabsTrigger value="hierarchy">Hierarchy</TabsTrigger>
+          <TabsTrigger value="capacity">Capacity Planning</TabsTrigger>
           <TabsTrigger value="analytics">Analytics</TabsTrigger>
           <TabsTrigger value="utilization">Utilization Chart</TabsTrigger>
         </TabsList>
 
         <TabsContent value="locations" className="space-y-4">
+          {/* Bulk Actions Toolbar */}
+          {selectedLocations.length > 0 && (
+            <div className="bg-blue-50 p-4 rounded-lg flex items-center gap-3">
+              <span className="text-sm font-medium">
+                {selectedLocations.length} location(s) selected
+              </span>
+              <Button size="sm" variant="destructive" onClick={handleBulkDelete}>
+                <Trash2 className="h-4 w-4 mr-2" />
+                Delete Selected
+              </Button>
+              <Select onValueChange={handleBulkStatusChange}>
+                <SelectTrigger className="w-40">
+                  <SelectValue placeholder="Change status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="active">Set Active</SelectItem>
+                  <SelectItem value="inactive">Set Inactive</SelectItem>
+                  <SelectItem value="maintenance">Set Maintenance</SelectItem>
+                  <SelectItem value="closed">Set Closed</SelectItem>
+                </SelectContent>
+              </Select>
+              <Button size="sm" variant="outline" onClick={() => setSelectedLocations([])}>
+                Clear Selection
+              </Button>
+            </div>
+          )}
+
           {/* Locations Table */}
           <Card>
         <CardHeader>
@@ -255,6 +344,12 @@ export default function WarehouseManagement() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-12">
+                    <Checkbox
+                      checked={selectedLocations.length === filteredLocations.length && filteredLocations.length > 0}
+                      onCheckedChange={handleSelectAll}
+                    />
+                  </TableHead>
                   <TableHead>Code</TableHead>
                   <TableHead>Name</TableHead>
                   <TableHead>Type</TableHead>
@@ -269,13 +364,19 @@ export default function WarehouseManagement() {
               <TableBody>
                 {filteredLocations.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
                       No locations found. Click "Manage Locations" to add one.
                     </TableCell>
                   </TableRow>
                 ) : (
                   filteredLocations.map((location) => (
                     <TableRow key={location.id}>
+                      <TableCell>
+                        <Checkbox
+                          checked={selectedLocations.includes(location.id)}
+                          onCheckedChange={(checked) => handleSelectLocation(location.id, checked as boolean)}
+                        />
+                      </TableCell>
                       <TableCell className="font-mono text-sm">
                         {location.location_code || '-'}
                       </TableCell>
@@ -338,6 +439,14 @@ export default function WarehouseManagement() {
                           <Button
                             size="sm"
                             variant="ghost"
+                            onClick={() => setDetailsLocationId(location.id)}
+                            title="View Details"
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
                             onClick={() => handleDelete(location.id, location.name)}
                             disabled={isDeleting}
                           >
@@ -355,6 +464,18 @@ export default function WarehouseManagement() {
       </Card>
         </TabsContent>
 
+        <TabsContent value="bins">
+          <BinMasterTab />
+        </TabsContent>
+
+        <TabsContent value="hierarchy">
+          <LocationHierarchyTab locations={locations} />
+        </TabsContent>
+
+        <TabsContent value="capacity">
+          <CapacityPlanningTab locations={locations} />
+        </TabsContent>
+
         <TabsContent value="analytics">
           <LocationAnalytics />
         </TabsContent>
@@ -363,6 +484,13 @@ export default function WarehouseManagement() {
           <LocationUtilizationChart />
         </TabsContent>
       </Tabs>
+
+      {/* Location Details Dialog */}
+      <LocationDetailsDialog
+        locationId={detailsLocationId}
+        open={detailsLocationId !== null}
+        onOpenChange={(open) => !open && setDetailsLocationId(null)}
+      />
     </div>
   );
 }

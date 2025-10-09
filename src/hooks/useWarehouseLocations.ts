@@ -120,6 +120,42 @@ export const useWarehouseLocations = () => {
     }
   });
 
+  const bulkDeleteLocationsMutation = useMutation({
+    mutationFn: async (ids: string[]) => {
+      const { error } = await supabase
+        .from('warehouse_locations')
+        .delete()
+        .in('id', ids);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['warehouse-locations'] });
+    },
+    onError: (error) => {
+      console.error('Error bulk deleting locations:', error);
+      throw error;
+    }
+  });
+
+  const bulkUpdateStatusMutation = useMutation({
+    mutationFn: async ({ ids, status }: { ids: string[]; status: string }) => {
+      const { error } = await supabase
+        .from('warehouse_locations')
+        .update({ status })
+        .in('id', ids);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['warehouse-locations'] });
+    },
+    onError: (error) => {
+      console.error('Error bulk updating status:', error);
+      throw error;
+    }
+  });
+
   return {
     locations,
     isLoading,
@@ -127,6 +163,8 @@ export const useWarehouseLocations = () => {
     createLocation: createLocationMutation.mutateAsync,
     updateLocation: updateLocationMutation.mutate,
     deleteLocation: deleteLocationMutation.mutate,
+    bulkDeleteLocations: bulkDeleteLocationsMutation.mutateAsync,
+    bulkUpdateStatus: (ids: string[], status: string) => bulkUpdateStatusMutation.mutateAsync({ ids, status }),
     isCreating: createLocationMutation.isPending,
     isUpdating: updateLocationMutation.isPending,
     isDeleting: deleteLocationMutation.isPending,
