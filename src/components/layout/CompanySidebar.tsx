@@ -4,7 +4,8 @@ import {
   BarChart3,
   Settings,
   ChevronDown,
-  Users
+  Users,
+  Package
 } from "lucide-react";
 import {
   Sidebar,
@@ -42,6 +43,7 @@ type ModuleWithCompanies = {
 const adminItems = [
   { title: "Company Management", url: "/admin/companies", icon: Building2 },
   { title: "User & Role Management", url: "/admin/users-roles", icon: Users },
+  { title: "Warehouse Management", url: "/admin/warehouse-management", icon: Package },
   { title: "Module Allocation", url: "/admin/modules", icon: Settings },
 ];
 
