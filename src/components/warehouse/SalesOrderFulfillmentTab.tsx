@@ -4,10 +4,11 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Plus, Package, Truck, CheckCircle, Clock, User, MapPin } from 'lucide-react';
+import { Plus, Package, Truck, CheckCircle, Clock, User, MapPin, List } from 'lucide-react';
 import { usePickPack } from '@/hooks/usePickPack';
 import { CreateSalesOrderDialog } from './CreateSalesOrderDialog';
 import { CreatePickListDialog } from './CreatePickListDialog';
+import { SalesOrderItemsView } from './SalesOrderItemsView';
 import { format } from 'date-fns';
 
 export function SalesOrderFulfillmentTab() {
@@ -25,6 +26,7 @@ export function SalesOrderFulfillmentTab() {
   const [showCreatePickList, setShowCreatePickList] = useState(false);
   const [selectedCPO, setSelectedCPO] = useState<any>(null);
   const [selectedSalesOrder, setSelectedSalesOrder] = useState<any>(null);
+  const [viewItemsForOrder, setViewItemsForOrder] = useState<string | null>(null);
 
   const handleCreateSalesOrderFromCPO = (cpo: any) => {
     setSelectedCPO(cpo);
@@ -170,15 +172,22 @@ export function SalesOrderFulfillmentTab() {
                             {order.picked_items}/{order.total_items} picked
                           </div>
                         </TableCell>
-                        <TableCell>
+                        <TableCell className="text-right space-x-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => setViewItemsForOrder(order.id)}
+                          >
+                            <List className="w-4 h-4 mr-1" />
+                            Items
+                          </Button>
                           {order.status === 'confirmed' && (
                             <Button 
-                              size="sm" 
-                              variant="outline"
+                              size="sm"
                               onClick={() => handleCreatePickList(order)}
                             >
                               <Package className="h-4 w-4 mr-1" />
-                              Create Pick List
+                              Pick List
                             </Button>
                           )}
                         </TableCell>
@@ -306,6 +315,18 @@ export function SalesOrderFulfillmentTab() {
         onOpenChange={setShowCreatePickList}
         salesOrderId={selectedSalesOrder?.id}
       />
+
+      {viewItemsForOrder && (
+        <Card className="mt-4 p-6">
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-lg font-semibold">Sales Order Items</h3>
+            <Button variant="outline" onClick={() => setViewItemsForOrder(null)}>
+              Close
+            </Button>
+          </div>
+          <SalesOrderItemsView salesOrderId={viewItemsForOrder} />
+        </Card>
+      )}
     </div>
   );
 }

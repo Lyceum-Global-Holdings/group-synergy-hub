@@ -344,16 +344,287 @@ export const usePickPack = () => {
     }
   });
 
+  // Fetch Sales Order Items
+  const useSalesOrderItems = (salesOrderId: string) => {
+    return useQuery({
+      queryKey: ['sales-order-items', salesOrderId],
+      queryFn: async () => {
+        const { data, error } = await supabase
+          .from('sales_order_items')
+          .select(`
+            *,
+            finished_goods (
+              id,
+              product_name,
+              product_code,
+              current_stock,
+              available_stock
+            ),
+            customer_po_items!cpo_item_id (
+              id,
+              item_name,
+              quantity_ordered
+            )
+          `)
+          .eq('sales_order_id', salesOrderId)
+          .order('created_at', { ascending: true });
+
+        if (error) throw error;
+        return data;
+      },
+      enabled: !!salesOrderId
+    });
+  };
+
+  // Fetch Finished Goods Issues
+  const useFinishedGoodsIssues = (salesOrderId?: string) => {
+    return useQuery({
+      queryKey: ['finished-goods-issues', salesOrderId],
+      queryFn: async () => {
+        let query = supabase
+          .from('finished_goods_issues')
+          .select(`
+            *,
+            sales_orders (
+              id,
+              order_number,
+              customer_id
+            )
+          `)
+          .order('created_at', { ascending: false });
+
+        if (salesOrderId) {
+          query = query.eq('sales_order_id', salesOrderId);
+        }
+
+        const { data, error } = await query;
+        if (error) throw error;
+        return data;
+      }
+    });
+  };
+
+  // Fetch Finished Goods Issue Items
+  const useFinishedGoodsIssueItems = (issueId: string) => {
+    return useQuery({
+      queryKey: ['finished-goods-issue-items', issueId],
+      queryFn: async () => {
+        const { data, error } = await supabase
+          .from('finished_goods_issue_items')
+          .select(`
+            *,
+            finished_goods (
+              id,
+              product_name,
+              product_code,
+              current_stock
+            ),
+            sales_order_items (
+              id,
+              item_name,
+              quantity_ordered,
+              quantity_issued
+            ),
+            warehouse_locations!from_location_id (
+              id,
+              name
+            ),
+            warehouse_bins!from_bin_id (
+              id,
+              bin_number
+            )
+          `)
+          .eq('issue_id', issueId)
+          .order('created_at', { ascending: true });
+
+        if (error) throw error;
+        return data;
+      },
+      enabled: !!issueId
+    });
+  };
+
+  // Create Sales Order WITH Items
+  const createSalesOrderWithItemsMutation = useMutation({
+    mutationFn: async ({ 
+      orderData, 
+      items 
+    }: { 
+      orderData: any; 
+      items: any[]
+    }) => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
+      // Create sales order
+      const { data: salesOrder, error: soError } = await supabase
+        .from('sales_orders')
+        .insert({
+          ...orderData,
+          total_items: items.length,
+          created_by: user.id
+        })
+        .select()
+        .single();
+
+      if (soError) throw soError;
+
+      // Create sales order items
+      const { error: itemsError } = await supabase
+        .from('sales_order_items')
+        .insert(
+          items.map(item => ({
+            sales_order_id: salesOrder.id,
+            cpo_item_id: item.cpo_item_id,
+            finished_good_id: item.finished_good_id,
+            item_name: item.item_name,
+            description: item.description,
+            quantity_ordered: item.quantity_ordered,
+            unit_price: item.unit_price,
+            total_price: item.total_price,
+            company_id: orderData.company_id
+          }))
+        );
+
+      if (itemsError) throw itemsError;
+
+      return salesOrder;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['sales-orders'] });
+      queryClient.invalidateQueries({ queryKey: ['confirmed-cpos'] });
+      toast({
+        title: "Success",
+        description: "Sales order created successfully"
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: `Failed to create sales order: ${error.message}`,
+        variant: "destructive"
+      });
+    }
+  });
+
+  // Create Finished Goods Issue
+  const createFinishedGoodsIssueMutation = useMutation({
+    mutationFn: async ({ 
+      issueData, 
+      items 
+    }: { 
+      issueData: any; 
+      items: any[]
+    }) => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
+      // Create issue header
+      const { data: issue, error: issueError } = await supabase
+        .from('finished_goods_issues')
+        .insert({
+          ...issueData,
+          total_items: items.length,
+          created_by: user.id
+        })
+        .select()
+        .single();
+
+      if (issueError) throw issueError;
+
+      // Create issue items
+      const { error: itemsError } = await supabase
+        .from('finished_goods_issue_items')
+        .insert(
+          items.map((item: any) => ({
+            issue_id: issue.id,
+            sales_order_item_id: item.sales_order_item_id,
+            finished_good_id: item.finished_good_id,
+            quantity_to_issue: item.quantity_to_issue,
+            quantity_issued: item.quantity_to_issue,
+            from_location_id: item.from_location_id,
+            from_bin_id: item.from_bin_id,
+            batch_number: item.batch_number,
+            notes: item.notes,
+            status: 'issued'
+          }))
+        );
+
+      if (itemsError) throw itemsError;
+
+      return issue;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['finished-goods-issues'] });
+      queryClient.invalidateQueries({ queryKey: ['sales-order-items'] });
+      toast({
+        title: "Success",
+        description: "Finished goods issue created successfully"
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: `Failed to create issue: ${error.message}`,
+        variant: "destructive"
+      });
+    }
+  });
+
+  // Update Issue Status
+  const updateIssueStatusMutation = useMutation({
+    mutationFn: async ({ issueId, status }: { issueId: string; status: string }) => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
+      const { error } = await supabase
+        .from('finished_goods_issues')
+        .update({ 
+          status,
+          issued_by: status === 'issued' ? user.id : undefined,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', issueId);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['finished-goods-issues'] });
+      queryClient.invalidateQueries({ queryKey: ['sales-order-items'] });
+      queryClient.invalidateQueries({ queryKey: ['finished-goods-movements'] });
+      toast({
+        title: "Success",
+        description: "Issue status updated successfully"
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: `Failed to update status: ${error.message}`,
+        variant: "destructive"
+      });
+    }
+  });
+
   return {
     // Queries
     useConfirmedCPOs,
     useSalesOrders,
     usePickLists,
     usePickListItems,
+    useSalesOrderItems,
+    useFinishedGoodsIssues,
+    useFinishedGoodsIssueItems,
     
     // Mutations
     createSalesOrder: createSalesOrderMutation.mutate,
     isCreatingSalesOrder: createSalesOrderMutation.isPending,
+    createSalesOrderWithItems: createSalesOrderWithItemsMutation.mutate,
+    isCreatingSalesOrderWithItems: createSalesOrderWithItemsMutation.isPending,
+    createFinishedGoodsIssue: createFinishedGoodsIssueMutation.mutate,
+    isCreatingFinishedGoodsIssue: createFinishedGoodsIssueMutation.isPending,
+    updateIssueStatus: updateIssueStatusMutation.mutate,
+    isUpdatingIssueStatus: updateIssueStatusMutation.isPending,
     
     createPickList: createPickListMutation.mutate,
     isCreatingPickList: createPickListMutation.isPending,

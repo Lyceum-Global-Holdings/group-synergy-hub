@@ -1445,6 +1445,156 @@ export type Database = {
           },
         ]
       }
+      finished_goods_issue_items: {
+        Row: {
+          batch_number: string | null
+          created_at: string | null
+          finished_good_id: string
+          from_bin_id: string | null
+          from_location_id: string | null
+          id: string
+          issue_id: string
+          notes: string | null
+          quantity_issued: number | null
+          quantity_to_issue: number
+          sales_order_item_id: string | null
+          serial_numbers: Json | null
+          status: string
+          updated_at: string | null
+        }
+        Insert: {
+          batch_number?: string | null
+          created_at?: string | null
+          finished_good_id: string
+          from_bin_id?: string | null
+          from_location_id?: string | null
+          id?: string
+          issue_id: string
+          notes?: string | null
+          quantity_issued?: number | null
+          quantity_to_issue: number
+          sales_order_item_id?: string | null
+          serial_numbers?: Json | null
+          status?: string
+          updated_at?: string | null
+        }
+        Update: {
+          batch_number?: string | null
+          created_at?: string | null
+          finished_good_id?: string
+          from_bin_id?: string | null
+          from_location_id?: string | null
+          id?: string
+          issue_id?: string
+          notes?: string | null
+          quantity_issued?: number | null
+          quantity_to_issue?: number
+          sales_order_item_id?: string | null
+          serial_numbers?: Json | null
+          status?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "finished_goods_issue_items_finished_good_id_fkey"
+            columns: ["finished_good_id"]
+            isOneToOne: false
+            referencedRelation: "finished_goods"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "finished_goods_issue_items_from_bin_id_fkey"
+            columns: ["from_bin_id"]
+            isOneToOne: false
+            referencedRelation: "warehouse_bins"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "finished_goods_issue_items_from_location_id_fkey"
+            columns: ["from_location_id"]
+            isOneToOne: false
+            referencedRelation: "warehouse_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "finished_goods_issue_items_issue_id_fkey"
+            columns: ["issue_id"]
+            isOneToOne: false
+            referencedRelation: "finished_goods_issues"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "finished_goods_issue_items_sales_order_item_id_fkey"
+            columns: ["sales_order_item_id"]
+            isOneToOne: false
+            referencedRelation: "sales_order_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      finished_goods_issues: {
+        Row: {
+          company_id: string | null
+          created_at: string | null
+          created_by: string | null
+          id: string
+          issue_date: string
+          issue_number: string
+          issued_by: string | null
+          issued_items: number | null
+          notes: string | null
+          sales_order_id: string | null
+          status: string
+          total_items: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          company_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          issue_date?: string
+          issue_number: string
+          issued_by?: string | null
+          issued_items?: number | null
+          notes?: string | null
+          sales_order_id?: string | null
+          status?: string
+          total_items?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          company_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          issue_date?: string
+          issue_number?: string
+          issued_by?: string | null
+          issued_items?: number | null
+          notes?: string | null
+          sales_order_id?: string | null
+          status?: string
+          total_items?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "finished_goods_issues_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "finished_goods_issues_sales_order_id_fkey"
+            columns: ["sales_order_id"]
+            isOneToOne: false
+            referencedRelation: "sales_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       finished_goods_movements: {
         Row: {
           batch_id: string | null
@@ -2441,6 +2591,77 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      packing_list_items: {
+        Row: {
+          created_at: string | null
+          finished_good_id: string
+          id: string
+          notes: string | null
+          package_number: string | null
+          packing_list_id: string
+          pick_list_item_id: string | null
+          quantity_packed: number
+          sales_order_item_id: string | null
+          serial_numbers: Json | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          finished_good_id: string
+          id?: string
+          notes?: string | null
+          package_number?: string | null
+          packing_list_id: string
+          pick_list_item_id?: string | null
+          quantity_packed: number
+          sales_order_item_id?: string | null
+          serial_numbers?: Json | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          finished_good_id?: string
+          id?: string
+          notes?: string | null
+          package_number?: string | null
+          packing_list_id?: string
+          pick_list_item_id?: string | null
+          quantity_packed?: number
+          sales_order_item_id?: string | null
+          serial_numbers?: Json | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "packing_list_items_finished_good_id_fkey"
+            columns: ["finished_good_id"]
+            isOneToOne: false
+            referencedRelation: "finished_goods"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "packing_list_items_packing_list_id_fkey"
+            columns: ["packing_list_id"]
+            isOneToOne: false
+            referencedRelation: "packing_lists"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "packing_list_items_pick_list_item_id_fkey"
+            columns: ["pick_list_item_id"]
+            isOneToOne: false
+            referencedRelation: "pick_list_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "packing_list_items_sales_order_item_id_fkey"
+            columns: ["sales_order_item_id"]
+            isOneToOne: false
+            referencedRelation: "sales_order_items"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       packing_lists: {
         Row: {
@@ -3798,6 +4019,98 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: []
+      }
+      sales_order_items: {
+        Row: {
+          company_id: string | null
+          cpo_item_id: string | null
+          created_at: string | null
+          description: string | null
+          finished_good_id: string | null
+          id: string
+          item_name: string
+          notes: string | null
+          quantity_dispatched: number
+          quantity_issued: number
+          quantity_ordered: number
+          quantity_packed: number
+          quantity_picked: number
+          sales_order_id: string
+          status: string
+          total_price: number | null
+          unit_price: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          company_id?: string | null
+          cpo_item_id?: string | null
+          created_at?: string | null
+          description?: string | null
+          finished_good_id?: string | null
+          id?: string
+          item_name: string
+          notes?: string | null
+          quantity_dispatched?: number
+          quantity_issued?: number
+          quantity_ordered?: number
+          quantity_packed?: number
+          quantity_picked?: number
+          sales_order_id: string
+          status?: string
+          total_price?: number | null
+          unit_price?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          company_id?: string | null
+          cpo_item_id?: string | null
+          created_at?: string | null
+          description?: string | null
+          finished_good_id?: string | null
+          id?: string
+          item_name?: string
+          notes?: string | null
+          quantity_dispatched?: number
+          quantity_issued?: number
+          quantity_ordered?: number
+          quantity_packed?: number
+          quantity_picked?: number
+          sales_order_id?: string
+          status?: string
+          total_price?: number | null
+          unit_price?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sales_order_items_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sales_order_items_cpo_item_id_fkey"
+            columns: ["cpo_item_id"]
+            isOneToOne: false
+            referencedRelation: "customer_po_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sales_order_items_finished_good_id_fkey"
+            columns: ["finished_good_id"]
+            isOneToOne: false
+            referencedRelation: "finished_goods"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sales_order_items_sales_order_id_fkey"
+            columns: ["sales_order_id"]
+            isOneToOne: false
+            referencedRelation: "sales_orders"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       sales_orders: {
         Row: {
@@ -5524,6 +5837,10 @@ export type Database = {
         Returns: string
       }
       generate_grn_number: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
+      generate_issue_number: {
         Args: Record<PropertyKey, never>
         Returns: string
       }

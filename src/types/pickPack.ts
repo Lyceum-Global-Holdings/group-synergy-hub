@@ -166,3 +166,139 @@ export interface PickListItemWithDetails extends PickListItem {
     bin_number: string;
   };
 }
+
+// Sales Order Items
+export interface SalesOrderItem {
+  id: string;
+  sales_order_id: string;
+  cpo_item_id: string | null;
+  finished_good_id: string | null;
+  item_name: string;
+  description: string | null;
+  quantity_ordered: number;
+  quantity_issued: number;
+  quantity_picked: number;
+  quantity_packed: number;
+  quantity_dispatched: number;
+  unit_price: number | null;
+  total_price: number | null;
+  status: 'pending' | 'partial' | 'issued' | 'picked' | 'packed' | 'dispatched';
+  notes: string | null;
+  company_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateSalesOrderItemData {
+  cpo_item_id: string;
+  finished_good_id: string;
+  item_name: string;
+  description?: string;
+  quantity_ordered: number;
+  unit_price?: number;
+  total_price?: number;
+}
+
+export interface SalesOrderItemWithDetails extends SalesOrderItem {
+  finished_good?: {
+    id: string;
+    product_name: string;
+    product_code: string;
+    current_stock: number;
+    available_stock: number;
+  };
+  cpo_item?: {
+    id: string;
+    item_name: string;
+    quantity_ordered: number;
+  };
+}
+
+// Finished Goods Issues
+export interface FinishedGoodsIssue {
+  id: string;
+  issue_number: string;
+  sales_order_id: string | null;
+  issue_date: string;
+  issued_by: string | null;
+  status: 'draft' | 'issued' | 'cancelled';
+  total_items: number;
+  issued_items: number;
+  notes: string | null;
+  company_id: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateFinishedGoodsIssueData {
+  sales_order_id: string;
+  issue_date?: string;
+  notes?: string;
+  company_id?: string;
+}
+
+export interface FinishedGoodsIssueItem {
+  id: string;
+  issue_id: string;
+  sales_order_item_id: string | null;
+  finished_good_id: string;
+  quantity_to_issue: number;
+  quantity_issued: number;
+  from_location_id: string | null;
+  from_bin_id: string | null;
+  batch_number: string | null;
+  serial_numbers: any | null;
+  status: 'pending' | 'issued' | 'short';
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateFinishedGoodsIssueItemData {
+  sales_order_item_id: string;
+  finished_good_id: string;
+  quantity_to_issue: number;
+  from_location_id?: string;
+  from_bin_id?: string;
+  batch_number?: string;
+  notes?: string;
+}
+
+export interface FinishedGoodsIssueWithDetails extends FinishedGoodsIssue {
+  sales_order?: SalesOrder;
+  items?: FinishedGoodsIssueItemWithDetails[];
+}
+
+export interface FinishedGoodsIssueItemWithDetails extends FinishedGoodsIssueItem {
+  finished_good?: {
+    id: string;
+    product_name: string;
+    product_code: string;
+    current_stock: number;
+  };
+  sales_order_item?: SalesOrderItem;
+  location?: {
+    id: string;
+    name: string;
+  };
+  bin?: {
+    id: string;
+    bin_number: string;
+  };
+}
+
+// Packing List Items
+export interface PackingListItem {
+  id: string;
+  packing_list_id: string;
+  pick_list_item_id: string | null;
+  sales_order_item_id: string | null;
+  finished_good_id: string;
+  quantity_packed: number;
+  package_number: string | null;
+  serial_numbers: any | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
