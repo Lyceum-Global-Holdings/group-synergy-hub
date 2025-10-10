@@ -5,7 +5,10 @@ import { toast } from "sonner";
 import { ContractDocument } from "@/types/contracts";
 
 export const useContractDocuments = (contractId: string) => {
-  return useQuery({
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+
+  const { data: documents, isLoading } = useQuery({
     queryKey: ["contract-documents", contractId],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -19,67 +22,55 @@ export const useContractDocuments = (contractId: string) => {
     },
     enabled: !!contractId,
   });
-};
-
-export const useContractDocumentMutations = () => {
-  const queryClient = useQueryClient();
-  const { user } = useAuth();
 
   const uploadDocument = useMutation({
     mutationFn: async ({
-      contractId,
       file,
       documentType,
-      documentName,
       description,
       versionNumber,
     }: {
-      contractId: string;
       file: File;
       documentType: string;
-      documentName: string;
       description?: string;
       versionNumber?: string;
     }) => {
-      // Upload file to storage
       const fileExt = file.name.split(".").pop();
       const fileName = `${contractId}/${Date.now()}.${fileExt}`;
-      const { data: uploadData, error: uploadError } = await supabase.storage
+      const filePath = `${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
         .from("contract-documents")
-        .upload(fileName, file);
+        .upload(filePath, file);
 
       if (uploadError) throw uploadError;
 
-      // Get public URL
       const { data: urlData } = supabase.storage
         .from("contract-documents")
-        .getPublicUrl(fileName);
+        .getPublicUrl(filePath);
 
-      // Create document record
       const { data, error } = await supabase
         .from("contract_documents")
-        .insert([
-          {
-            contract_id: contractId,
-            document_type: documentType as any,
-            document_name: documentName,
-            file_path: fileName,
-            file_url: urlData.publicUrl,
-            file_size: file.size,
-            mime_type: file.type,
-            version_number: versionNumber || "1.0",
-            description,
-            uploaded_by: user?.id,
-          },
-        ])
+        .insert({
+          contract_id: contractId,
+          document_type: documentType as any,
+          document_name: file.name,
+          file_path: filePath,
+          file_url: urlData.publicUrl,
+          file_size: file.size,
+          mime_type: file.type,
+          version_number: versionNumber || "1.0",
+          description,
+          uploaded_by: user?.id,
+        })
         .select()
         .single();
 
       if (error) throw error;
       return data;
     },
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ["contract-documents", variables.contractId] });
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["contract-documents", contractId] });
       toast.success("Document uploaded successfully");
     },
     onError: (error: Error) => {
@@ -88,25 +79,28 @@ export const useContractDocumentMutations = () => {
   });
 
   const deleteDocument = useMutation({
-    mutationFn: async ({ id, filePath, contractId }: { id: string; filePath: string; contractId: string }) => {
-      // Delete from storage
-      const { error: storageError } = await supabase.storage
-        .from("contract-documents")
-        .remove([filePath]);
+    mutationFn: async (documentId: string) => {
+      const { data: doc } = await supabase
+        .from("contract_documents")
+        .select("file_path")
+        .eq("id", documentId)
+        .single();
 
-      if (storageError) throw storageError;
+      if (doc?.file_path) {
+        await supabase.storage
+          .from("contract-documents")
+          .remove([doc.file_path]);
+      }
 
-      // Delete record
       const { error } = await supabase
         .from("contract_documents")
         .delete()
-        .eq("id", id);
+        .eq("id", documentId);
 
       if (error) throw error;
-      return { contractId };
     },
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["contract-documents", data.contractId] });
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["contract-documents", contractId] });
       toast.success("Document deleted successfully");
     },
     onError: (error: Error) => {
@@ -114,49 +108,64 @@ export const useContractDocumentMutations = () => {
     },
   });
 
-  const updateDocumentStatus = useMutation({
-    mutationFn: async ({
-      id,
-      contractId,
-      isSigned,
-      signatureStatus,
-      esignPlatform,
-      esignReferenceId,
-    }: {
-      id: string;
-      contractId: string;
-      isSigned?: boolean;
-      signatureStatus?: string;
-      esignPlatform?: string;
-      esignReferenceId?: string;
-    }) => {
-      const { data, error } = await supabase
-        .from("contract_documents")
-        .update({
-          is_signed: isSigned,
-          signature_status: signatureStatus as any,
-          esign_platform: esignPlatform,
-          esign_reference_id: esignReferenceId,
-        })
-        .eq("id", id)
-        .select()
-        .single();
+  const downloadDocument = async (filePath: string, fileName: string) => {
+    try {
+      const { data, error } = await supabase.storage
+        .from("contract-documents")
+        .download(filePath);
 
       if (error) throw error;
-      return { data, contractId };
+
+      const url = window.URL.createObjectURL(data);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+
+      toast.success("Document downloaded");
+    } catch (error: any) {
+      toast.error("Failed to download: " + error.message);
+    }
+  };
+
+  const updateDocumentStatus = useMutation({
+    mutationFn: async ({
+      documentId,
+      signatureStatus,
+      isSigned,
+    }: {
+      documentId: string;
+      signatureStatus?: string;
+      isSigned?: boolean;
+    }) => {
+      const { error } = await supabase
+        .from("contract_documents")
+        .update({
+          signature_status: signatureStatus as any,
+          is_signed: isSigned,
+        })
+        .eq("id", documentId);
+
+      if (error) throw error;
     },
-    onSuccess: (result) => {
-      queryClient.invalidateQueries({ queryKey: ["contract-documents", result.contractId] });
-      toast.success("Document status updated successfully");
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["contract-documents", contractId] });
+      toast.success("Document status updated");
     },
     onError: (error: Error) => {
-      toast.error("Failed to update document status: " + error.message);
+      toast.error("Failed to update status: " + error.message);
     },
   });
 
   return {
+    documents,
+    isLoading,
     uploadDocument,
     deleteDocument,
+    downloadDocument,
     updateDocumentStatus,
   };
 };

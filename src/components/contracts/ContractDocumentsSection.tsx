@@ -1,87 +1,61 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { useContractDocuments, useContractDocumentMutations } from "@/hooks/useContractDocuments";
+import { Card } from "@/components/ui/card";
+import { FileText, Download, Trash2, Upload, CheckCircle2, XCircle, Clock } from "lucide-react";
+import { useContractDocuments } from "@/hooks/useContractDocuments";
 import { UploadContractDocumentDialog } from "./UploadContractDocumentDialog";
-import { Upload, Download, MoreVertical, Trash2, FileCheck, FileX } from "lucide-react";
 import { format } from "date-fns";
-import { supabase } from "@/integrations/supabase/client";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface ContractDocumentsSectionProps {
   contractId: string;
 }
 
 export function ContractDocumentsSection({ contractId }: ContractDocumentsSectionProps) {
-  const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
-  const { data: documents, isLoading } = useContractDocuments(contractId);
-  const { deleteDocument, updateDocumentStatus } = useContractDocumentMutations();
+  const [uploadOpen, setUploadOpen] = useState(false);
+  const [deleteDocId, setDeleteDocId] = useState<string | null>(null);
+  
+  const { documents, isLoading, deleteDocument, downloadDocument, updateDocumentStatus } = 
+    useContractDocuments(contractId);
 
-  const handleDownload = async (filePath: string, fileName: string) => {
-    const { data, error } = await supabase.storage
-      .from("contract-documents")
-      .download(filePath);
-
-    if (error) {
-      console.error("Download error:", error);
-      return;
-    }
-
-    const url = window.URL.createObjectURL(data);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = fileName;
-    document.body.appendChild(a);
-    a.click();
-    window.URL.revokeObjectURL(url);
-    document.body.removeChild(a);
-  };
-
-  const handleDelete = async (id: string, filePath: string) => {
-    if (confirm("Are you sure you want to delete this document?")) {
-      await deleteDocument.mutateAsync({ id, filePath, contractId });
+  const getSignatureStatusIcon = (status: string) => {
+    switch (status) {
+      case "fully_signed":
+        return <CheckCircle2 className="h-4 w-4 text-green-600" />;
+      case "unsigned":
+        return <XCircle className="h-4 w-4 text-muted-foreground" />;
+      case "pending":
+      case "partially_signed":
+        return <Clock className="h-4 w-4 text-yellow-600" />;
+      default:
+        return null;
     }
   };
 
-  const handleMarkAsSigned = async (id: string) => {
-    await updateDocumentStatus.mutateAsync({
-      id,
-      contractId,
-      isSigned: true,
-      signatureStatus: "fully_signed",
-    });
+  const formatFileSize = (bytes: number) => {
+    if (bytes === 0) return "0 Bytes";
+    const k = 1024;
+    const sizes = ["Bytes", "KB", "MB", "GB"];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return Math.round(bytes / Math.pow(k, i) * 100) / 100 + " " + sizes[i];
   };
 
-  const getDocumentTypeLabel = (type: string) => {
-    return type.split("_").map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(" ");
-  };
-
-  const getSignatureStatusBadge = (status: string) => {
-    const variants: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
-      unsigned: "secondary",
-      pending: "outline",
-      partially_signed: "default",
-      fully_signed: "default",
-    };
-    return (
-      <Badge variant={variants[status] || "secondary"}>
-        {status.split("_").map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(" ")}
-      </Badge>
-    );
+  const handleDelete = async () => {
+    if (deleteDocId) {
+      await deleteDocument.mutateAsync(deleteDocId);
+      setDeleteDocId(null);
+    }
   };
 
   if (isLoading) {
@@ -89,91 +63,119 @@ export function ContractDocumentsSection({ contractId }: ContractDocumentsSectio
   }
 
   return (
-    <>
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle>Documents</CardTitle>
-          <Button onClick={() => setUploadDialogOpen(true)} size="sm">
-            <Upload className="h-4 w-4 mr-2" />
-            Upload Document
+    <div className="space-y-4">
+      <div className="flex justify-between items-center">
+        <h3 className="text-lg font-semibold">Contract Documents</h3>
+        <Button onClick={() => setUploadOpen(true)}>
+          <Upload className="mr-2 h-4 w-4" />
+          Upload Document
+        </Button>
+      </div>
+
+      {!documents || documents.length === 0 ? (
+        <Card className="p-8 text-center">
+          <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+          <p className="text-muted-foreground">No documents uploaded yet</p>
+          <Button variant="outline" className="mt-4" onClick={() => setUploadOpen(true)}>
+            Upload First Document
           </Button>
-        </CardHeader>
-        <CardContent>
-          {!documents || documents.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              No documents uploaded yet. Click "Upload Document" to add files.
-            </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Document Name</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Version</TableHead>
-                  <TableHead>Signature Status</TableHead>
-                  <TableHead>Uploaded</TableHead>
-                  <TableHead>Size</TableHead>
-                  <TableHead className="w-[50px]"></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {documents.map((doc) => (
-                  <TableRow key={doc.id}>
-                    <TableCell className="font-medium">{doc.document_name}</TableCell>
-                    <TableCell>{getDocumentTypeLabel(doc.document_type)}</TableCell>
-                    <TableCell>
-                      <Badge variant="outline">{doc.version_number}</Badge>
-                    </TableCell>
-                    <TableCell>{getSignatureStatusBadge(doc.signature_status)}</TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {format(new Date(doc.uploaded_at), "MMM dd, yyyy")}
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {doc.file_size ? `${(doc.file_size / 1024 / 1024).toFixed(2)} MB` : "-"}
-                    </TableCell>
-                    <TableCell>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="sm">
-                            <MoreVertical className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem
-                            onClick={() => handleDownload(doc.file_path, doc.document_name)}
-                          >
-                            <Download className="h-4 w-4 mr-2" />
-                            Download
-                          </DropdownMenuItem>
-                          {!doc.is_signed && (
-                            <DropdownMenuItem onClick={() => handleMarkAsSigned(doc.id)}>
-                              <FileCheck className="h-4 w-4 mr-2" />
-                              Mark as Signed
-                            </DropdownMenuItem>
-                          )}
-                          <DropdownMenuItem
-                            onClick={() => handleDelete(doc.id, doc.file_path)}
-                            className="text-destructive"
-                          >
-                            <Trash2 className="h-4 w-4 mr-2" />
-                            Delete
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
+        </Card>
+      ) : (
+        <div className="space-y-3">
+          {documents.map((doc) => (
+            <Card key={doc.id} className="p-4">
+              <div className="flex items-start justify-between">
+                <div className="flex-1 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <FileText className="h-5 w-5 text-primary" />
+                    <span className="font-medium">{doc.document_name}</span>
+                    {doc.is_latest_version && (
+                      <Badge variant="secondary">Latest</Badge>
+                    )}
+                  </div>
+
+                  <div className="text-sm text-muted-foreground space-y-1">
+                    <div className="flex items-center gap-4">
+                      <span>Type: {doc.document_type.replace(/_/g, " ")}</span>
+                      <span>Version: {doc.version_number}</span>
+                      {doc.file_size && <span>{formatFileSize(doc.file_size)}</span>}
+                    </div>
+                    <div>
+                      Uploaded: {format(new Date(doc.uploaded_at), "PPP")}
+                    </div>
+                    {doc.description && (
+                      <div className="text-xs">{doc.description}</div>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm">Signature Status:</span>
+                    <Select
+                      value={doc.signature_status}
+                      onValueChange={(value) =>
+                        updateDocumentStatus.mutate({
+                          documentId: doc.id,
+                          signatureStatus: value,
+                          isSigned: value === "fully_signed",
+                        })
+                      }
+                    >
+                      <SelectTrigger className="w-[180px] h-8">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="unsigned">Unsigned</SelectItem>
+                        <SelectItem value="pending">Pending</SelectItem>
+                        <SelectItem value="partially_signed">Partially Signed</SelectItem>
+                        <SelectItem value="fully_signed">Fully Signed</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    {getSignatureStatusIcon(doc.signature_status)}
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => downloadDocument(doc.file_path, doc.document_name)}
+                  >
+                    <Download className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setDeleteDocId(doc.id)}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            </Card>
+          ))}
+        </div>
+      )}
 
       <UploadContractDocumentDialog
-        open={uploadDialogOpen}
-        onOpenChange={setUploadDialogOpen}
+        open={uploadOpen}
+        onOpenChange={setUploadOpen}
         contractId={contractId}
       />
-    </>
+
+      <AlertDialog open={!!deleteDocId} onOpenChange={() => setDeleteDocId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Document</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this document? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete}>Delete</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
   );
 }
