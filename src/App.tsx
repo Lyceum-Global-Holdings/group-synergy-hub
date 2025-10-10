@@ -26,6 +26,7 @@ import SupplierScorecard from "./pages/sourcing/SupplierScorecard";
 import SupplierEvaluation from "./pages/sourcing/SupplierEvaluation";
 import SupplierRegistration from "./pages/sourcing/SupplierRegistration";
 import PublicSupplierRegistration from "./pages/PublicSupplierRegistration";
+import Contracts from "./pages/sourcing/Contracts";
 import AssetManagement from "./pages/warehouse/AssetManagement";
 import ItemBinMaster from "./pages/warehouse/ItemBinMaster";
 import MaterialIssueReturn from "./pages/warehouse/MaterialIssueReturn";
@@ -186,6 +187,13 @@ function App() {
                   <ProtectedRoute>
                     <AppLayout>
                       <SupplierRegistration />
+                    </AppLayout>
+                  </ProtectedRoute>
+                } />
+                <Route path="/sourcing/contracts" element={
+                  <ProtectedRoute>
+                    <AppLayout>
+                      <Contracts />
                     </AppLayout>
                   </ProtectedRoute>
                 } />

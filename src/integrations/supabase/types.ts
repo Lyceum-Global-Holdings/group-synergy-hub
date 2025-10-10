@@ -1095,6 +1095,500 @@ export type Database = {
         }
         Relationships: []
       }
+      contract_amendments: {
+        Row: {
+          amendment_date: string
+          amendment_number: string
+          amendment_type: Database["public"]["Enums"]["contract_amendment_type"]
+          approved_by: string | null
+          approved_date: string | null
+          contract_id: string
+          created_at: string
+          created_by: string | null
+          document_id: string | null
+          effective_date: string | null
+          financial_impact: number | null
+          id: string
+          new_value: Json | null
+          notes: string | null
+          previous_value: Json | null
+          reason: string
+        }
+        Insert: {
+          amendment_date?: string
+          amendment_number: string
+          amendment_type: Database["public"]["Enums"]["contract_amendment_type"]
+          approved_by?: string | null
+          approved_date?: string | null
+          contract_id: string
+          created_at?: string
+          created_by?: string | null
+          document_id?: string | null
+          effective_date?: string | null
+          financial_impact?: number | null
+          id?: string
+          new_value?: Json | null
+          notes?: string | null
+          previous_value?: Json | null
+          reason: string
+        }
+        Update: {
+          amendment_date?: string
+          amendment_number?: string
+          amendment_type?: Database["public"]["Enums"]["contract_amendment_type"]
+          approved_by?: string | null
+          approved_date?: string | null
+          contract_id?: string
+          created_at?: string
+          created_by?: string | null
+          document_id?: string | null
+          effective_date?: string | null
+          financial_impact?: number | null
+          id?: string
+          new_value?: Json | null
+          notes?: string | null
+          previous_value?: Json | null
+          reason?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contract_amendments_contract_id_fkey"
+            columns: ["contract_id"]
+            isOneToOne: false
+            referencedRelation: "contracts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contract_amendments_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "contract_documents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      contract_documents: {
+        Row: {
+          contract_id: string
+          description: string | null
+          document_date: string | null
+          document_name: string
+          document_type: Database["public"]["Enums"]["contract_document_type"]
+          esign_platform: string | null
+          esign_reference_id: string | null
+          file_path: string
+          file_size: number | null
+          file_url: string | null
+          id: string
+          is_latest_version: boolean | null
+          is_signed: boolean | null
+          mime_type: string | null
+          notes: string | null
+          signature_status:
+            | Database["public"]["Enums"]["signature_status"]
+            | null
+          uploaded_at: string
+          uploaded_by: string | null
+          version_number: string | null
+        }
+        Insert: {
+          contract_id: string
+          description?: string | null
+          document_date?: string | null
+          document_name: string
+          document_type: Database["public"]["Enums"]["contract_document_type"]
+          esign_platform?: string | null
+          esign_reference_id?: string | null
+          file_path: string
+          file_size?: number | null
+          file_url?: string | null
+          id?: string
+          is_latest_version?: boolean | null
+          is_signed?: boolean | null
+          mime_type?: string | null
+          notes?: string | null
+          signature_status?:
+            | Database["public"]["Enums"]["signature_status"]
+            | null
+          uploaded_at?: string
+          uploaded_by?: string | null
+          version_number?: string | null
+        }
+        Update: {
+          contract_id?: string
+          description?: string | null
+          document_date?: string | null
+          document_name?: string
+          document_type?: Database["public"]["Enums"]["contract_document_type"]
+          esign_platform?: string | null
+          esign_reference_id?: string | null
+          file_path?: string
+          file_size?: number | null
+          file_url?: string | null
+          id?: string
+          is_latest_version?: boolean | null
+          is_signed?: boolean | null
+          mime_type?: string | null
+          notes?: string | null
+          signature_status?:
+            | Database["public"]["Enums"]["signature_status"]
+            | null
+          uploaded_at?: string
+          uploaded_by?: string | null
+          version_number?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contract_documents_contract_id_fkey"
+            columns: ["contract_id"]
+            isOneToOne: false
+            referencedRelation: "contracts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      contract_obligations: {
+        Row: {
+          assigned_to: string | null
+          completed: boolean | null
+          completed_by: string | null
+          completed_date: string | null
+          contract_id: string
+          created_at: string
+          currency: string | null
+          description: string | null
+          due_date: string | null
+          evidence_notes: string | null
+          evidence_required: boolean | null
+          id: string
+          next_occurrence_date: string | null
+          notification_days_before: number | null
+          obligation_type: Database["public"]["Enums"]["obligation_type"]
+          penalty_for_delay: number | null
+          priority: Database["public"]["Enums"]["contract_priority"] | null
+          recurrence: string | null
+          responsible_party: string | null
+          status: Database["public"]["Enums"]["obligation_status"] | null
+          title: string
+          updated_at: string
+          value_amount: number | null
+        }
+        Insert: {
+          assigned_to?: string | null
+          completed?: boolean | null
+          completed_by?: string | null
+          completed_date?: string | null
+          contract_id: string
+          created_at?: string
+          currency?: string | null
+          description?: string | null
+          due_date?: string | null
+          evidence_notes?: string | null
+          evidence_required?: boolean | null
+          id?: string
+          next_occurrence_date?: string | null
+          notification_days_before?: number | null
+          obligation_type: Database["public"]["Enums"]["obligation_type"]
+          penalty_for_delay?: number | null
+          priority?: Database["public"]["Enums"]["contract_priority"] | null
+          recurrence?: string | null
+          responsible_party?: string | null
+          status?: Database["public"]["Enums"]["obligation_status"] | null
+          title: string
+          updated_at?: string
+          value_amount?: number | null
+        }
+        Update: {
+          assigned_to?: string | null
+          completed?: boolean | null
+          completed_by?: string | null
+          completed_date?: string | null
+          contract_id?: string
+          created_at?: string
+          currency?: string | null
+          description?: string | null
+          due_date?: string | null
+          evidence_notes?: string | null
+          evidence_required?: boolean | null
+          id?: string
+          next_occurrence_date?: string | null
+          notification_days_before?: number | null
+          obligation_type?: Database["public"]["Enums"]["obligation_type"]
+          penalty_for_delay?: number | null
+          priority?: Database["public"]["Enums"]["contract_priority"] | null
+          recurrence?: string | null
+          responsible_party?: string | null
+          status?: Database["public"]["Enums"]["obligation_status"] | null
+          title?: string
+          updated_at?: string
+          value_amount?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contract_obligations_contract_id_fkey"
+            columns: ["contract_id"]
+            isOneToOne: false
+            referencedRelation: "contracts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      contract_parties: {
+        Row: {
+          contract_id: string
+          created_at: string
+          id: string
+          party_contact_person: string | null
+          party_email: string | null
+          party_name: string
+          party_phone: string | null
+          party_reference_id: string | null
+          party_reference_type: string | null
+          party_role: string | null
+          party_type: Database["public"]["Enums"]["contract_party_type"]
+          signature_method:
+            | Database["public"]["Enums"]["signature_method"]
+            | null
+          signed: boolean | null
+          signed_date: string | null
+          signing_authority: string | null
+        }
+        Insert: {
+          contract_id: string
+          created_at?: string
+          id?: string
+          party_contact_person?: string | null
+          party_email?: string | null
+          party_name: string
+          party_phone?: string | null
+          party_reference_id?: string | null
+          party_reference_type?: string | null
+          party_role?: string | null
+          party_type: Database["public"]["Enums"]["contract_party_type"]
+          signature_method?:
+            | Database["public"]["Enums"]["signature_method"]
+            | null
+          signed?: boolean | null
+          signed_date?: string | null
+          signing_authority?: string | null
+        }
+        Update: {
+          contract_id?: string
+          created_at?: string
+          id?: string
+          party_contact_person?: string | null
+          party_email?: string | null
+          party_name?: string
+          party_phone?: string | null
+          party_reference_id?: string | null
+          party_reference_type?: string | null
+          party_role?: string | null
+          party_type?: Database["public"]["Enums"]["contract_party_type"]
+          signature_method?:
+            | Database["public"]["Enums"]["signature_method"]
+            | null
+          signed?: boolean | null
+          signed_date?: string | null
+          signing_authority?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contract_parties_contract_id_fkey"
+            columns: ["contract_id"]
+            isOneToOne: false
+            referencedRelation: "contracts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      contracts: {
+        Row: {
+          approval_workflow_required: boolean | null
+          approved_by: string | null
+          approved_date: string | null
+          auto_renew: boolean | null
+          billing_frequency:
+            | Database["public"]["Enums"]["billing_frequency"]
+            | null
+          company_id: string | null
+          compliance_requirements: Json | null
+          confidentiality_level:
+            | Database["public"]["Enums"]["confidentiality_level"]
+            | null
+          contract_category: string | null
+          contract_date: string
+          contract_number: string
+          contract_sub_type: string | null
+          contract_terms: string | null
+          contract_title: string
+          contract_type: Database["public"]["Enums"]["contract_type"]
+          contract_value: number | null
+          cost_center_id: string | null
+          counterparty_contact: string | null
+          counterparty_email: string | null
+          counterparty_name: string | null
+          created_at: string
+          created_by: string | null
+          currency: string | null
+          department_id: string | null
+          dispute_resolution: string | null
+          effective_date: string
+          expiry_date: string | null
+          governing_law: string | null
+          id: string
+          insurance_details: string | null
+          insurance_required: boolean | null
+          max_renewal_count: number | null
+          notes: string | null
+          notice_period_days: number | null
+          owner_id: string | null
+          payment_terms: string | null
+          penalty_clauses: Json | null
+          primary_party_id: string | null
+          primary_party_type: string | null
+          priority: Database["public"]["Enums"]["contract_priority"]
+          renewal_count: number | null
+          renewal_notice_days: number | null
+          renewal_terms: string | null
+          renewal_type: Database["public"]["Enums"]["renewal_type"] | null
+          risk_level: Database["public"]["Enums"]["contract_risk_level"] | null
+          signed_by_them: string | null
+          signed_by_us: string | null
+          signed_date: string | null
+          special_conditions: string | null
+          status: Database["public"]["Enums"]["contract_status"]
+          tags: Json | null
+          termination_terms: string | null
+          updated_at: string
+        }
+        Insert: {
+          approval_workflow_required?: boolean | null
+          approved_by?: string | null
+          approved_date?: string | null
+          auto_renew?: boolean | null
+          billing_frequency?:
+            | Database["public"]["Enums"]["billing_frequency"]
+            | null
+          company_id?: string | null
+          compliance_requirements?: Json | null
+          confidentiality_level?:
+            | Database["public"]["Enums"]["confidentiality_level"]
+            | null
+          contract_category?: string | null
+          contract_date?: string
+          contract_number: string
+          contract_sub_type?: string | null
+          contract_terms?: string | null
+          contract_title: string
+          contract_type: Database["public"]["Enums"]["contract_type"]
+          contract_value?: number | null
+          cost_center_id?: string | null
+          counterparty_contact?: string | null
+          counterparty_email?: string | null
+          counterparty_name?: string | null
+          created_at?: string
+          created_by?: string | null
+          currency?: string | null
+          department_id?: string | null
+          dispute_resolution?: string | null
+          effective_date: string
+          expiry_date?: string | null
+          governing_law?: string | null
+          id?: string
+          insurance_details?: string | null
+          insurance_required?: boolean | null
+          max_renewal_count?: number | null
+          notes?: string | null
+          notice_period_days?: number | null
+          owner_id?: string | null
+          payment_terms?: string | null
+          penalty_clauses?: Json | null
+          primary_party_id?: string | null
+          primary_party_type?: string | null
+          priority?: Database["public"]["Enums"]["contract_priority"]
+          renewal_count?: number | null
+          renewal_notice_days?: number | null
+          renewal_terms?: string | null
+          renewal_type?: Database["public"]["Enums"]["renewal_type"] | null
+          risk_level?: Database["public"]["Enums"]["contract_risk_level"] | null
+          signed_by_them?: string | null
+          signed_by_us?: string | null
+          signed_date?: string | null
+          special_conditions?: string | null
+          status?: Database["public"]["Enums"]["contract_status"]
+          tags?: Json | null
+          termination_terms?: string | null
+          updated_at?: string
+        }
+        Update: {
+          approval_workflow_required?: boolean | null
+          approved_by?: string | null
+          approved_date?: string | null
+          auto_renew?: boolean | null
+          billing_frequency?:
+            | Database["public"]["Enums"]["billing_frequency"]
+            | null
+          company_id?: string | null
+          compliance_requirements?: Json | null
+          confidentiality_level?:
+            | Database["public"]["Enums"]["confidentiality_level"]
+            | null
+          contract_category?: string | null
+          contract_date?: string
+          contract_number?: string
+          contract_sub_type?: string | null
+          contract_terms?: string | null
+          contract_title?: string
+          contract_type?: Database["public"]["Enums"]["contract_type"]
+          contract_value?: number | null
+          cost_center_id?: string | null
+          counterparty_contact?: string | null
+          counterparty_email?: string | null
+          counterparty_name?: string | null
+          created_at?: string
+          created_by?: string | null
+          currency?: string | null
+          department_id?: string | null
+          dispute_resolution?: string | null
+          effective_date?: string
+          expiry_date?: string | null
+          governing_law?: string | null
+          id?: string
+          insurance_details?: string | null
+          insurance_required?: boolean | null
+          max_renewal_count?: number | null
+          notes?: string | null
+          notice_period_days?: number | null
+          owner_id?: string | null
+          payment_terms?: string | null
+          penalty_clauses?: Json | null
+          primary_party_id?: string | null
+          primary_party_type?: string | null
+          priority?: Database["public"]["Enums"]["contract_priority"]
+          renewal_count?: number | null
+          renewal_notice_days?: number | null
+          renewal_terms?: string | null
+          renewal_type?: Database["public"]["Enums"]["renewal_type"] | null
+          risk_level?: Database["public"]["Enums"]["contract_risk_level"] | null
+          signed_by_them?: string | null
+          signed_by_us?: string | null
+          signed_date?: string | null
+          special_conditions?: string | null
+          status?: Database["public"]["Enums"]["contract_status"]
+          tags?: Json | null
+          termination_terms?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contracts_cost_center_id_fkey"
+            columns: ["cost_center_id"]
+            isOneToOne: false
+            referencedRelation: "cost_centers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cost_centers: {
         Row: {
           code: string
@@ -7393,6 +7887,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: string
       }
+      generate_contract_number: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
       generate_cpo_number: {
         Args: Record<PropertyKey, never>
         Returns: string
@@ -7546,6 +8044,12 @@ export type Database = {
         | "item_removal"
         | "other"
       app_role: "super_admin" | "admin" | "manager" | "user"
+      billing_frequency:
+        | "one_time"
+        | "monthly"
+        | "quarterly"
+        | "annually"
+        | "milestone_based"
       blanket_contract_status:
         | "draft"
         | "active"
@@ -7565,6 +8069,64 @@ export type Database = {
         | "received"
         | "completed"
         | "cancelled"
+      confidentiality_level:
+        | "public"
+        | "internal"
+        | "confidential"
+        | "highly_confidential"
+      contract_amendment_type:
+        | "price_change"
+        | "term_extension"
+        | "scope_change"
+        | "party_change"
+        | "termination_clause"
+        | "value_adjustment"
+        | "obligation_change"
+        | "payment_terms_change"
+        | "other"
+      contract_document_type:
+        | "main_contract"
+        | "amendment"
+        | "annex"
+        | "supporting_document"
+        | "signed_copy"
+        | "scan"
+        | "certificate"
+        | "insurance"
+        | "compliance_document"
+        | "correspondence"
+        | "other"
+      contract_party_type:
+        | "internal"
+        | "external"
+        | "supplier"
+        | "customer"
+        | "partner"
+        | "guarantor"
+      contract_priority: "low" | "medium" | "high" | "critical"
+      contract_risk_level: "low" | "medium" | "high" | "critical"
+      contract_status:
+        | "draft"
+        | "pending_approval"
+        | "approved"
+        | "active"
+        | "suspended"
+        | "expired"
+        | "terminated"
+        | "renewed"
+        | "closed"
+      contract_type:
+        | "supplier_contract"
+        | "customer_contract"
+        | "service_agreement"
+        | "employment_contract"
+        | "nda"
+        | "lease_agreement"
+        | "partnership_agreement"
+        | "framework_agreement"
+        | "software_license"
+        | "consulting_agreement"
+        | "other"
       evaluation_recommendation:
         | "strongly_recommend"
         | "recommend"
@@ -7582,6 +8144,22 @@ export type Database = {
         | "reversing"
         | "recurring"
       normal_balance: "debit" | "credit"
+      obligation_status:
+        | "pending"
+        | "in_progress"
+        | "completed"
+        | "overdue"
+        | "waived"
+        | "disputed"
+      obligation_type:
+        | "deliverable"
+        | "milestone"
+        | "payment"
+        | "service_level"
+        | "compliance_requirement"
+        | "reporting"
+        | "renewal_action"
+        | "inspection"
       period_status: "open" | "closed" | "locked"
       po_status:
         | "draft"
@@ -7608,6 +8186,7 @@ export type Database = {
         | "shortlisted"
         | "awarded"
         | "rejected"
+      renewal_type: "auto_renewal" | "manual_review" | "renegotiation_required"
       rfq_rfp_priority: "low" | "medium" | "high" | "urgent"
       rfq_rfp_publish_type: "public" | "invited" | "limited"
       rfq_rfp_status:
@@ -7619,6 +8198,12 @@ export type Database = {
         | "cancelled"
         | "closed"
       rfq_rfp_type: "rfq" | "rfp"
+      signature_method: "physical" | "electronic" | "esign_platform"
+      signature_status:
+        | "unsigned"
+        | "pending"
+        | "partially_signed"
+        | "fully_signed"
       stock_reference_type: "manual" | "grn" | "mrn" | "adjustment" | "transfer"
       stock_transaction_type:
         | "opening_stock"
@@ -7780,6 +8365,13 @@ export const Constants = {
         "other",
       ],
       app_role: ["super_admin", "admin", "manager", "user"],
+      billing_frequency: [
+        "one_time",
+        "monthly",
+        "quarterly",
+        "annually",
+        "milestone_based",
+      ],
       blanket_contract_status: [
         "draft",
         "active",
@@ -7802,6 +8394,70 @@ export const Constants = {
         "completed",
         "cancelled",
       ],
+      confidentiality_level: [
+        "public",
+        "internal",
+        "confidential",
+        "highly_confidential",
+      ],
+      contract_amendment_type: [
+        "price_change",
+        "term_extension",
+        "scope_change",
+        "party_change",
+        "termination_clause",
+        "value_adjustment",
+        "obligation_change",
+        "payment_terms_change",
+        "other",
+      ],
+      contract_document_type: [
+        "main_contract",
+        "amendment",
+        "annex",
+        "supporting_document",
+        "signed_copy",
+        "scan",
+        "certificate",
+        "insurance",
+        "compliance_document",
+        "correspondence",
+        "other",
+      ],
+      contract_party_type: [
+        "internal",
+        "external",
+        "supplier",
+        "customer",
+        "partner",
+        "guarantor",
+      ],
+      contract_priority: ["low", "medium", "high", "critical"],
+      contract_risk_level: ["low", "medium", "high", "critical"],
+      contract_status: [
+        "draft",
+        "pending_approval",
+        "approved",
+        "active",
+        "suspended",
+        "expired",
+        "terminated",
+        "renewed",
+        "closed",
+      ],
+      contract_type: [
+        "supplier_contract",
+        "customer_contract",
+        "service_agreement",
+        "employment_contract",
+        "nda",
+        "lease_agreement",
+        "partnership_agreement",
+        "framework_agreement",
+        "software_license",
+        "consulting_agreement",
+        "other",
+      ],
       evaluation_recommendation: [
         "strongly_recommend",
         "recommend",
@@ -7821,6 +8477,24 @@ export const Constants = {
         "recurring",
       ],
       normal_balance: ["debit", "credit"],
+      obligation_status: [
+        "pending",
+        "in_progress",
+        "completed",
+        "overdue",
+        "waived",
+        "disputed",
+      ],
+      obligation_type: [
+        "deliverable",
+        "milestone",
+        "payment",
+        "service_level",
+        "compliance_requirement",
+        "reporting",
+        "renewal_action",
+        "inspection",
+      ],
       period_status: ["open", "closed", "locked"],
       po_status: [
         "draft",
@@ -7850,6 +8524,7 @@ export const Constants = {
         "awarded",
         "rejected",
       ],
+      renewal_type: ["auto_renewal", "manual_review", "renegotiation_required"],
       rfq_rfp_priority: ["low", "medium", "high", "urgent"],
       rfq_rfp_publish_type: ["public", "invited", "limited"],
       rfq_rfp_status: [
@@ -7862,6 +8537,13 @@ export const Constants = {
         "closed",
       ],
       rfq_rfp_type: ["rfq", "rfp"],
+      signature_method: ["physical", "electronic", "esign_platform"],
+      signature_status: [
+        "unsigned",
+        "pending",
+        "partially_signed",
+        "fully_signed",
+      ],
       stock_reference_type: ["manual", "grn", "mrn", "adjustment", "transfer"],
       stock_transaction_type: [
         "opening_stock",
