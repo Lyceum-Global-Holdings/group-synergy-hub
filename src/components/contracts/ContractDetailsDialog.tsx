@@ -19,6 +19,7 @@ import {
   Clock,
 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ContractDocumentsSection } from "./ContractDocumentsSection";
 
 interface ContractDetailsDialogProps {
   contract: Contract;
@@ -312,43 +313,7 @@ export const ContractDetailsDialog = ({
           </TabsContent>
 
           <TabsContent value="documents" className="mt-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Contract Documents</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {contract.documents && contract.documents.length > 0 ? (
-                  <div className="space-y-3">
-                    {contract.documents.map((doc) => (
-                      <div key={doc.id} className="border-b pb-3 last:border-0">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <h4 className="font-medium">{doc.document_name}</h4>
-                            <p className="text-sm text-muted-foreground capitalize">
-                              {doc.document_type.replace("_", " ")} - Version{" "}
-                              {doc.version_number}
-                            </p>
-                          </div>
-                          <Badge
-                            variant={
-                              doc.signature_status === "fully_signed"
-                                ? "default"
-                                : "outline"
-                            }
-                          >
-                            {doc.signature_status.replace("_", " ")}
-                          </Badge>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-sm text-muted-foreground">
-                    No documents uploaded yet
-                  </p>
-                )}
-              </CardContent>
-            </Card>
+            <ContractDocumentsSection contractId={contract.id} />
           </TabsContent>
         </Tabs>
       </DialogContent>
