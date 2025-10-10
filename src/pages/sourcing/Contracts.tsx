@@ -200,12 +200,12 @@ const Contracts = () => {
                 onChange={(e) => setSearch(e.target.value)}
                 className="w-64"
               />
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <Select value={statusFilter || "all"} onValueChange={(value) => setStatusFilter(value === "all" ? "" : value)}>
                 <SelectTrigger className="w-40">
                   <SelectValue placeholder="All Statuses" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All Statuses</SelectItem>
+                  <SelectItem value="all">All Statuses</SelectItem>
                   <SelectItem value="draft">Draft</SelectItem>
                   <SelectItem value="pending_approval">Pending Approval</SelectItem>
                   <SelectItem value="approved">Approved</SelectItem>
@@ -217,12 +217,12 @@ const Contracts = () => {
                   <SelectItem value="closed">Closed</SelectItem>
                 </SelectContent>
               </Select>
-              <Select value={typeFilter} onValueChange={setTypeFilter}>
+              <Select value={typeFilter || "all"} onValueChange={(value) => setTypeFilter(value === "all" ? "" : value)}>
                 <SelectTrigger className="w-48">
                   <SelectValue placeholder="All Types" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All Types</SelectItem>
+                  <SelectItem value="all">All Types</SelectItem>
                   <SelectItem value="supplier_contract">Supplier Contract</SelectItem>
                   <SelectItem value="customer_contract">Customer Contract</SelectItem>
                   <SelectItem value="service_agreement">Service Agreement</SelectItem>
