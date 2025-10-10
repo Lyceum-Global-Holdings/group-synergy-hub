@@ -5,12 +5,13 @@ import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Users, UserPlus, Shield, Edit, Trash2, Crown, Loader2 } from 'lucide-react';
+import { Users, UserPlus, Shield, Edit, Trash2, Crown, Loader2, Key } from 'lucide-react';
 import { AddUserDialog } from '@/components/admin/AddUserDialog';
 import { AddRoleDialog } from '@/components/admin/AddRoleDialog';
 import { EditUserDialog } from '@/components/admin/EditUserDialog';
 import { EditRoleDialog } from '@/components/admin/EditRoleDialog';
 import { DeleteConfirmationDialog } from '@/components/admin/DeleteConfirmationDialog';
+import { ResetPasswordDialog } from '@/components/admin/ResetPasswordDialog';
 import { AdminBootstrap } from '@/components/admin/AdminBootstrap';
 import { useUsers, useRoles, useAssignRole, useRemoveRole, type User, type Role } from '@/hooks/useUsers';
 import { useDeleteUser, useDeleteRole } from '@/hooks/useUserMutations';
@@ -30,6 +31,7 @@ export default function UserRoleManagement() {
   const [editRoleOpen, setEditRoleOpen] = useState(false);
   const [deleteUserOpen, setDeleteUserOpen] = useState(false);
   const [deleteRoleOpen, setDeleteRoleOpen] = useState(false);
+  const [resetPasswordOpen, setResetPasswordOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [selectedRole, setSelectedRole] = useState<Role | null>(null);
   const [hasAnyAdmins, setHasAnyAdmins] = useState<boolean | null>(null);
@@ -156,6 +158,11 @@ export default function UserRoleManagement() {
       setDeleteRoleOpen(false);
       setSelectedRole(null);
     }
+  };
+
+  const handleResetPassword = (user: User) => {
+    setSelectedUser(user);
+    setResetPasswordOpen(true);
   };
 
   const hasAccess = isSuperAdmin || isAdmin;
@@ -380,6 +387,16 @@ export default function UserRoleManagement() {
                             </TableCell>
                             <TableCell className="text-right">
                               <div className="flex justify-end space-x-2">
+                                {isSuperAdmin && (
+                                  <Button 
+                                    variant="ghost" 
+                                    size="sm" 
+                                    onClick={() => handleResetPassword(user)}
+                                    title="Reset password"
+                                  >
+                                    <Key className="h-4 w-4" />
+                                  </Button>
+                                )}
                                 <Button variant="ghost" size="sm" onClick={() => handleEditUser(user)}>
                                   <Edit className="h-4 w-4" />
                                 </Button>
@@ -504,6 +521,14 @@ export default function UserRoleManagement() {
         onConfirm={handleConfirmDeleteRole}
         isLoading={deleteRole.isPending}
         destructiveText="Delete Role"
+      />
+
+      <ResetPasswordDialog
+        open={resetPasswordOpen}
+        onOpenChange={setResetPasswordOpen}
+        userId={selectedUser?.id || ''}
+        userEmail={selectedUser?.email || ''}
+        userName={selectedUser?.full_name}
       />
     </div>
   );
