@@ -364,10 +364,10 @@ export default function AssetManagement() {
   };
 
   const totalValue = assets.reduce((sum, asset) => sum + (asset.purchase_price || 0), 0);
-  // Calculate all counts from the current assets array for accuracy
-  const displayTotalAssets = assets.length;
-  const displayActiveAssets = assets.filter(asset => asset.status === "active").length;
-  const displayMaintenanceAssets = assets.filter(asset => asset.status === "maintenance").length;
+  // Use server-side counts for accurate totals, fallback to client-side calculation if not available
+  const displayTotalAssets = totalCount ?? assets.length;
+  const displayActiveAssets = activeCount ?? assets.filter(asset => asset.status === "active").length;
+  const displayMaintenanceAssets = maintenanceCount ?? assets.filter(asset => asset.status === "maintenance").length;
 
   return (
     <div className="space-y-6">
@@ -1085,6 +1085,9 @@ export default function AssetManagement() {
             assets={assets}
             locations={locations}
             categories={[...mainCategories, ...mainCategories.flatMap(cat => getSubcategories(cat.id))]}
+            totalCount={totalCount}
+            activeCount={activeCount}
+            maintenanceCount={maintenanceCount}
           />
         </TabsContent>
       </Tabs>

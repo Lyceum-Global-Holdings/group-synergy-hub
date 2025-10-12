@@ -9,6 +9,9 @@ interface AssetAnalyticsProps {
   assets: WarehouseAsset[];
   locations: WarehouseLocation[];
   categories: AssetCategory[];
+  totalCount?: number;
+  activeCount?: number;
+  maintenanceCount?: number;
 }
 
 const COLORS = [
@@ -20,7 +23,7 @@ const COLORS = [
   'hsl(240, 5%, 46%)', // Muted
 ];
 
-export function AssetAnalytics({ assets, locations, categories }: AssetAnalyticsProps) {
+export function AssetAnalytics({ assets, locations, categories, totalCount, activeCount, maintenanceCount }: AssetAnalyticsProps) {
   const analyticsData = useMemo(() => {
     // Category distribution
     const categoryData = categories.filter(cat => !cat.parent_id).map(category => {
@@ -107,12 +110,12 @@ export function AssetAnalytics({ assets, locations, categories }: AssetAnalytics
         depreciationRate,
       },
       kpis: {
-        totalAssets: assets.length,
-        activeAssets: assets.filter(a => a.status === 'active').length,
-        maintenanceAssets: assets.filter(a => a.status === 'maintenance').length,
+        totalAssets: totalCount ?? assets.length,
+        activeAssets: activeCount ?? assets.filter(a => a.status === 'active').length,
+        maintenanceAssets: maintenanceCount ?? assets.filter(a => a.status === 'maintenance').length,
         goodCondition: assets.filter(a => a.condition === 'good').length,
-        utilizationRate: assets.length > 0 ? (assets.filter(a => a.status === 'active').length / assets.length) * 100 : 0,
-        avgAssetValue: assets.length > 0 ? totalCurrentValue / assets.length : 0,
+        utilizationRate: (totalCount ?? assets.length) > 0 ? ((activeCount ?? assets.filter(a => a.status === 'active').length) / (totalCount ?? assets.length)) * 100 : 0,
+        avgAssetValue: (totalCount ?? assets.length) > 0 ? totalCurrentValue / (totalCount ?? assets.length) : 0,
       },
     };
   }, [assets, locations, categories]);
