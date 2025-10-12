@@ -144,12 +144,12 @@ export function IssueItemsDialog({ open, onOpenChange, issueId, onSuccess }: Iss
 
         if (updateStockError) throw updateStockError;
 
-        // Update material_issue_items with issued_at and default quantity_received
+        // Update material_issue_items with issued_at
         const { error: updateItemError } = await supabase
           .from('material_issue_items')
           .update({ 
             issued_at: currentTimestamp,
-            quantity_received: item.quantity_issued // Default qty_received to qty_issued
+            quantity_received: 0
           })
           .eq('id', item.id);
 

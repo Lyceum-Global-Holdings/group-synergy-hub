@@ -81,7 +81,7 @@ export function ReceiveItemsDialog({ open, onOpenChange, issueId, onSuccess }: R
     data?.forEach(item => {
       initialData[item.id] = {
         itemId: item.id,
-        receivedQty: item.quantity_issued || 0,
+        receivedQty: item.quantity_received ?? 0,
         condition: 'good',
         createReturn: false
       };
@@ -145,11 +145,7 @@ export function ReceiveItemsDialog({ open, onOpenChange, issueId, onSuccess }: R
           .from('material_issue_items')
           .update({
             quantity_received: data.receivedQty,
-            received_at: currentTimestamp,
-            variance_quantity: variance,
-            variance_reason: data.varianceReason,
-            variance_notes: data.varianceNotes,
-            condition: data.condition
+            received_at: currentTimestamp
           })
           .eq('id', item.id);
       });
