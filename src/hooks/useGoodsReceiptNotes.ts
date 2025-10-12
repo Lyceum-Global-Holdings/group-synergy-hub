@@ -59,87 +59,171 @@ export const useCreateGoodsReceiptNote = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User not authenticated');
 
-      // Generate GRN number with fallback
-      let grnNumberStr = '';
-      const { data: rpcNumber, error: numberError } = await supabase
-        .rpc('generate_grn_number');
-      if (!numberError && rpcNumber) {
-        grnNumberStr = rpcNumber as string;
-      } else {
-        const now = new Date();
-        const yyyymmdd = now.toISOString().slice(0,10).replace(/-/g,'');
-        const rand = Math.floor(1000 + Math.random() * 9000);
-        grnNumberStr = `GRN-${yyyymmdd}-${rand}`;
+      // If a GRN already exists for this PO (e.g., auto-generated on PO sent), reuse it
+      let existingGrn: { id: string } | null = null;
+      if (grnData.po_id) {
+        const { data: foundGrn, error: findErr } = await supabase
+          .from('goods_receipt_notes')
+          .select('id, status')
+          .eq('po_id', grnData.po_id)
+          .in('status', ['draft', 'submitted'])
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (!findErr && foundGrn) {
+          existingGrn = { id: foundGrn.id };
+        }
       }
 
-      // Compute total value
-      const totalValue = (grnData.items || []).reduce((sum, item) => {
+      // Generate GRN number only when creating a new header
+      let grnNumberStr = '';
+      if (!existingGrn) {
+        const { data: rpcNumber, error: numberError } = await supabase.rpc('generate_grn_number');
+        if (!numberError && rpcNumber) {
+          grnNumberStr = rpcNumber as string;
+        } else {
+          const now = new Date();
+          const yyyymmdd = now.toISOString().slice(0, 10).replace(/-/g, '');
+          const rand = Math.floor(1000 + Math.random() * 9000);
+          grnNumberStr = `GRN-${yyyymmdd}-${rand}`;
+        }
+      }
+
+      // Compute total value from incoming items (used as fallback; final total recalculated after item upserts)
+      const totalValueFromPayload = (grnData.items || []).reduce((sum, item) => {
         const lineTotal = item.total_cost ?? ((item.unit_price || 0) * (item.quantity_received || 0));
         return sum + (lineTotal || 0);
       }, 0);
 
-      // Create GRN header as draft first
-      const { data: grn, error: grnError } = await supabase
-        .from('goods_receipt_notes')
-        .insert({
-          grn_number: grnNumberStr,
-          grn_date: grnData.grn_date,
-          invoice_number: grnData.invoice_number,
-          invoice_date: grnData.invoice_date,
-          po_id: grnData.po_id,
-          po_number: grnData.po_number,
-          pr_number: grnData.pr_number,
-          mr_number: grnData.mr_number,
-          supplier_id: grnData.supplier_id,
-          supplier_name: grnData.supplier_name,
-          supplier_address: grnData.supplier_address,
-          branch: grnData.branch,
-          remarks: grnData.remarks,
-          company_id: grnData.company_id,
-          received_by: user.id,
-          created_by: user.id,
-          status: 'draft',
-          total_value: totalValue
-        })
-        .select()
-        .single();
-
-      if (grnError) throw grnError;
-
-      // Create GRN items
-      if (grnData.items.length > 0) {
-        const grnItems = grnData.items.map(item => ({
-          grn_id: grn.id,
-          item_code: item.item_code,
-          item_name: item.item_name,
-          description: item.description,
-          warehouse_item_id: item.warehouse_item_id,
-          po_item_id: item.po_item_id,
-          quantity_ordered: item.quantity_ordered,
-          quantity_received: item.quantity_received,
-          unit_of_measure: item.unit_of_measure,
-          unit_price: item.unit_price,
-          total_cost: item.total_cost || (item.unit_price || 0) * item.quantity_received,
-          quality_status: item.quality_status,
-          remarks: item.remarks
-        }));
-
-        const { error: itemsError } = await supabase
-          .from('grn_items')
-          .insert(grnItems);
-
-        if (itemsError) throw itemsError;
+      // Create or reuse GRN header as draft first
+      let targetGrnId: string;
+      if (existingGrn) {
+        targetGrnId = existingGrn.id;
+        // Optionally update header details based on the form (keep number/status intact)
+        const { error: headerUpdateErr } = await supabase
+          .from('goods_receipt_notes')
+          .update({
+            grn_date: grnData.grn_date,
+            invoice_number: grnData.invoice_number,
+            invoice_date: grnData.invoice_date,
+            pr_number: grnData.pr_number,
+            mr_number: grnData.mr_number,
+            supplier_id: grnData.supplier_id,
+            supplier_name: grnData.supplier_name,
+            supplier_address: grnData.supplier_address,
+            branch: grnData.branch,
+            remarks: grnData.remarks,
+            company_id: grnData.company_id,
+            received_by: user.id,
+          })
+          .eq('id', targetGrnId);
+        if (headerUpdateErr) throw headerUpdateErr;
+      } else {
+        const { data: grn, error: grnError } = await supabase
+          .from('goods_receipt_notes')
+          .insert({
+            grn_number: grnNumberStr,
+            grn_date: grnData.grn_date,
+            invoice_number: grnData.invoice_number,
+            invoice_date: grnData.invoice_date,
+            po_id: grnData.po_id,
+            po_number: grnData.po_number,
+            pr_number: grnData.pr_number,
+            mr_number: grnData.mr_number,
+            supplier_id: grnData.supplier_id,
+            supplier_name: grnData.supplier_name,
+            supplier_address: grnData.supplier_address,
+            branch: grnData.branch,
+            remarks: grnData.remarks,
+            company_id: grnData.company_id,
+            received_by: user.id,
+            created_by: user.id,
+            status: 'draft',
+            total_value: totalValueFromPayload,
+          })
+          .select()
+          .single();
+        if (grnError) throw grnError;
+        targetGrnId = grn.id as unknown as string;
       }
 
-      // Update GRN status to submitted after items are created
+      // Upsert item lines: update if matching by (grn_id, po_item_id), else insert
+      if (grnData.items.length > 0) {
+        for (const item of grnData.items) {
+          // Only process lines with a positive receipt quantity
+          const qty = item.quantity_received || 0;
+          const lineTotal = item.total_cost ?? ((item.unit_price || 0) * qty);
+
+          if ((item.po_item_id || null) !== null) {
+            // Check if an item exists for this PO item
+            const { data: existingItem, error: findItemErr } = await supabase
+              .from('grn_items')
+              .select('id')
+              .eq('grn_id', targetGrnId)
+              .eq('po_item_id', item.po_item_id as string)
+              .maybeSingle();
+            if (findItemErr) throw findItemErr;
+
+            if (existingItem) {
+              const { error: updErr } = await supabase
+                .from('grn_items')
+                .update({
+                  item_code: item.item_code,
+                  item_name: item.item_name,
+                  description: item.description,
+                  warehouse_item_id: item.warehouse_item_id,
+                  quantity_ordered: item.quantity_ordered,
+                  quantity_received: qty,
+                  unit_of_measure: item.unit_of_measure,
+                  unit_price: item.unit_price,
+                  total_cost: lineTotal,
+                  quality_status: item.quality_status,
+                  remarks: item.remarks,
+                })
+                .eq('id', existingItem.id);
+              if (updErr) throw updErr;
+              continue;
+            }
+          }
+
+          // Insert new item if no po_item_id match (or no po_item_id provided)
+          const { error: insErr } = await supabase
+            .from('grn_items')
+            .insert({
+              grn_id: targetGrnId,
+              item_code: item.item_code,
+              item_name: item.item_name,
+              description: item.description,
+              warehouse_item_id: item.warehouse_item_id,
+              po_item_id: item.po_item_id,
+              quantity_ordered: item.quantity_ordered,
+              quantity_received: qty,
+              unit_of_measure: item.unit_of_measure,
+              unit_price: item.unit_price,
+              total_cost: lineTotal,
+              quality_status: item.quality_status,
+              remarks: item.remarks,
+            });
+          if (insErr) throw insErr;
+        }
+      }
+
+      // Recalculate and persist total_value and move to submitted
+      const { data: sumRows, error: sumErr } = await supabase
+        .from('grn_items')
+        .select('total_cost')
+        .eq('grn_id', targetGrnId);
+      if (sumErr) throw sumErr;
+      const newTotal = (sumRows || []).reduce((s, r: any) => s + (r.total_cost || 0), 0);
+
       const { error: updateError } = await supabase
         .from('goods_receipt_notes')
-        .update({ status: 'submitted' })
-        .eq('id', grn.id);
-
+        .update({ status: 'submitted', total_value: newTotal })
+        .eq('id', targetGrnId);
       if (updateError) throw updateError;
 
-      return grn;
+      // Return the GRN header id to callers
+      return { id: targetGrnId } as any;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['goods-receipt-notes'] });
