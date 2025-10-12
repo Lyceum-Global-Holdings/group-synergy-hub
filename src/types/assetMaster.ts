@@ -13,6 +13,12 @@ export interface AssetMaster {
   created_by: string | null;
   created_at: string;
   updated_at: string;
+  depreciation_method?: string | null;
+  depreciation_rate?: number | null;
+  useful_life_years?: number | null;
+  salvage_value?: number | null;
+  purchase_date?: string | null;
+  accumulated_depreciation?: number | null;
 }
 
 export interface AssetMasterPurchaseHistory {
@@ -37,6 +43,11 @@ export interface CreateAssetMasterData {
   image_url?: string;
   description?: string;
   company_id?: string;
+  depreciation_method?: string;
+  depreciation_rate?: number;
+  useful_life_years?: number;
+  salvage_value?: number;
+  purchase_date?: string;
 }
 
 export interface CreatePurchaseHistoryData {

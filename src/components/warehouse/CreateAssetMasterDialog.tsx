@@ -12,8 +12,10 @@ import { useAssetMaster } from "@/hooks/useAssetMaster";
 import { useAssetCategories } from "@/hooks/useAssetCategories";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { Upload } from "lucide-react";
+import { Upload, Info } from "lucide-react";
 import { CreateAssetMasterData } from "@/types/assetMaster";
+import { calculateDepreciation } from "@/lib/depreciationCalculator";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 const formSchema = z.object({
   asset_name: z.string().min(1, "Asset name is required"),
@@ -23,6 +25,11 @@ const formSchema = z.object({
   purchase_price: z.coerce.number().optional(),
   current_value: z.coerce.number().optional(),
   description: z.string().optional(),
+  depreciation_method: z.enum(['straight_line', 'declining_balance']).optional(),
+  depreciation_rate: z.coerce.number().min(0).max(100).optional(),
+  useful_life_years: z.coerce.number().min(0).optional(),
+  salvage_value: z.coerce.number().min(0).optional(),
+  purchase_date: z.string().optional(),
 });
 
 interface CreateAssetMasterDialogProps {
@@ -49,11 +56,34 @@ export function CreateAssetMasterDialog({ open, onOpenChange }: CreateAssetMaste
       purchase_price: undefined,
       current_value: undefined,
       description: "",
+      depreciation_method: "straight_line",
+      depreciation_rate: undefined,
+      useful_life_years: undefined,
+      salvage_value: 0,
+      purchase_date: "",
     },
   });
 
   const selectedCategoryId = form.watch("category_id");
   const subcategories = selectedCategoryId ? getSubcategories(selectedCategoryId) : [];
+  
+  const purchasePrice = form.watch("purchase_price");
+  const purchaseDate = form.watch("purchase_date");
+  const depreciationMethod = form.watch("depreciation_method");
+  const depreciationRate = form.watch("depreciation_rate");
+  const usefulLifeYears = form.watch("useful_life_years");
+  const salvageValue = form.watch("salvage_value");
+
+  const estimatedCurrentValue = purchasePrice && purchaseDate && depreciationMethod
+    ? calculateDepreciation({
+        purchasePrice,
+        purchaseDate: new Date(purchaseDate),
+        depreciationMethod,
+        depreciationRate,
+        usefulLifeYears,
+        salvageValue,
+      }).currentValue
+    : null;
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -112,6 +142,11 @@ export function CreateAssetMasterDialog({ open, onOpenChange }: CreateAssetMaste
       current_value: values.current_value,
       description: values.description,
       image_url: imageUrl || undefined,
+      depreciation_method: values.depreciation_method,
+      depreciation_rate: values.depreciation_rate,
+      useful_life_years: values.useful_life_years,
+      salvage_value: values.salvage_value,
+      purchase_date: values.purchase_date,
     };
 
     createAssetMaster(assetData);
@@ -220,7 +255,7 @@ export function CreateAssetMasterDialog({ open, onOpenChange }: CreateAssetMaste
                 name="purchase_price"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Purchase Price</FormLabel>
+                    <FormLabel>Purchase Price *</FormLabel>
                     <FormControl>
                       <Input type="number" step="0.01" {...field} placeholder="0.00" />
                     </FormControl>
@@ -231,17 +266,99 @@ export function CreateAssetMasterDialog({ open, onOpenChange }: CreateAssetMaste
 
               <FormField
                 control={form.control}
-                name="current_value"
+                name="purchase_date"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Current Value</FormLabel>
+                    <FormLabel>Purchase Date *</FormLabel>
                     <FormControl>
-                      <Input type="number" step="0.01" {...field} placeholder="0.00" />
+                      <Input type="date" {...field} max={new Date().toISOString().split('T')[0]} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
+            </div>
+
+            <div className="space-y-4 p-4 border rounded-lg">
+              <h3 className="font-semibold">Depreciation Settings</h3>
+              
+              <FormField
+                control={form.control}
+                name="depreciation_method"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Depreciation Method</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select method" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="straight_line">Straight Line</SelectItem>
+                        <SelectItem value="declining_balance">Declining Balance</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {depreciationMethod === 'straight_line' && (
+                <FormField
+                  control={form.control}
+                  name="useful_life_years"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Useful Life (Years) *</FormLabel>
+                      <FormControl>
+                        <Input type="number" step="1" min="1" {...field} placeholder="e.g., 5" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
+
+              {depreciationMethod === 'declining_balance' && (
+                <FormField
+                  control={form.control}
+                  name="depreciation_rate"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Depreciation Rate (%) *</FormLabel>
+                      <FormControl>
+                        <Input type="number" step="0.01" min="0" max="100" {...field} placeholder="e.g., 20" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
+
+              <FormField
+                control={form.control}
+                name="salvage_value"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Salvage Value (Optional)</FormLabel>
+                    <FormControl>
+                      <Input type="number" step="0.01" min="0" {...field} placeholder="0.00" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {estimatedCurrentValue !== null && (
+                <Alert>
+                  <Info className="h-4 w-4" />
+                  <AlertDescription>
+                    <span className="font-semibold">Estimated Current Value: </span>
+                    LKR {estimatedCurrentValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </AlertDescription>
+                </Alert>
+              )}
             </div>
 
             <div>

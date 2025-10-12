@@ -102,6 +102,7 @@ export type Database = {
       }
       asset_master: {
         Row: {
+          accumulated_depreciation: number | null
           asset_name: string
           brand: string | null
           category_id: string | null
@@ -109,15 +110,21 @@ export type Database = {
           created_at: string
           created_by: string | null
           current_value: number | null
+          depreciation_method: string | null
+          depreciation_rate: number | null
           description: string | null
           id: string
           image_url: string | null
+          purchase_date: string | null
           purchase_price: number | null
+          salvage_value: number | null
           status: string | null
           subcategory_id: string | null
           updated_at: string
+          useful_life_years: number | null
         }
         Insert: {
+          accumulated_depreciation?: number | null
           asset_name: string
           brand?: string | null
           category_id?: string | null
@@ -125,15 +132,21 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           current_value?: number | null
+          depreciation_method?: string | null
+          depreciation_rate?: number | null
           description?: string | null
           id?: string
           image_url?: string | null
+          purchase_date?: string | null
           purchase_price?: number | null
+          salvage_value?: number | null
           status?: string | null
           subcategory_id?: string | null
           updated_at?: string
+          useful_life_years?: number | null
         }
         Update: {
+          accumulated_depreciation?: number | null
           asset_name?: string
           brand?: string | null
           category_id?: string | null
@@ -141,13 +154,18 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           current_value?: number | null
+          depreciation_method?: string | null
+          depreciation_rate?: number | null
           description?: string | null
           id?: string
           image_url?: string | null
+          purchase_date?: string | null
           purchase_price?: number | null
+          salvage_value?: number | null
           status?: string | null
           subcategory_id?: string | null
           updated_at?: string
+          useful_life_years?: number | null
         }
         Relationships: [
           {
@@ -7687,6 +7705,7 @@ export type Database = {
       }
       warehouse_assets: {
         Row: {
+          accumulated_depreciation: number | null
           asset_id: string | null
           asset_master_id: string | null
           asset_tag: string | null
@@ -7699,20 +7718,26 @@ export type Database = {
           created_by: string | null
           current_value: number | null
           department_id: string | null
+          depreciation_method: string | null
+          depreciation_rate: number | null
           description: string | null
           id: string
+          last_depreciation_date: string | null
           location_id: string | null
           name: string
           notes: string | null
           purchase_date: string | null
           purchase_price: number | null
+          salvage_value: number | null
           serial_number: string | null
           status: string
           subcategory_id: string | null
           sublocation_id: string | null
           updated_at: string
+          useful_life_years: number | null
         }
         Insert: {
+          accumulated_depreciation?: number | null
           asset_id?: string | null
           asset_master_id?: string | null
           asset_tag?: string | null
@@ -7725,20 +7750,26 @@ export type Database = {
           created_by?: string | null
           current_value?: number | null
           department_id?: string | null
+          depreciation_method?: string | null
+          depreciation_rate?: number | null
           description?: string | null
           id?: string
+          last_depreciation_date?: string | null
           location_id?: string | null
           name: string
           notes?: string | null
           purchase_date?: string | null
           purchase_price?: number | null
+          salvage_value?: number | null
           serial_number?: string | null
           status?: string
           subcategory_id?: string | null
           sublocation_id?: string | null
           updated_at?: string
+          useful_life_years?: number | null
         }
         Update: {
+          accumulated_depreciation?: number | null
           asset_id?: string | null
           asset_master_id?: string | null
           asset_tag?: string | null
@@ -7751,18 +7782,23 @@ export type Database = {
           created_by?: string | null
           current_value?: number | null
           department_id?: string | null
+          depreciation_method?: string | null
+          depreciation_rate?: number | null
           description?: string | null
           id?: string
+          last_depreciation_date?: string | null
           location_id?: string | null
           name?: string
           notes?: string | null
           purchase_date?: string | null
           purchase_price?: number | null
+          salvage_value?: number | null
           serial_number?: string | null
           status?: string
           subcategory_id?: string | null
           sublocation_id?: string | null
           updated_at?: string
+          useful_life_years?: number | null
         }
         Relationships: [
           {
@@ -8136,6 +8172,18 @@ export type Database = {
       }
       calculate_bpo_utilization: {
         Args: { p_bpo_id: string }
+        Returns: number
+      }
+      calculate_depreciation: {
+        Args: {
+          p_calculation_date?: string
+          p_depreciation_method: string
+          p_depreciation_rate: number
+          p_purchase_date: string
+          p_purchase_price: number
+          p_salvage_value: number
+          p_useful_life_years: number
+        }
         Returns: number
       }
       calculate_supplier_analytics: {

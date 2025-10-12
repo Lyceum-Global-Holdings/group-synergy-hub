@@ -10,6 +10,7 @@ import { Plus, Edit } from "lucide-react";
 import { AddPurchaseHistoryDialog } from "./AddPurchaseHistoryDialog";
 import { format } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
+import { calculateDepreciation } from "@/lib/depreciationCalculator";
 
 interface AssetMasterDetailsDialogProps {
   asset: AssetMaster;
@@ -119,25 +120,114 @@ export function AssetMasterDetailsDialog({ asset, open, onOpenChange }: AssetMas
             {/* Pricing Information */}
             <Card>
               <CardHeader>
-                <CardTitle className="text-lg">Pricing</CardTitle>
+                <CardTitle className="text-lg">Pricing & Valuation</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Current Purchase Price</p>
-                    <p className="text-xl font-bold">
-                      {asset.purchase_price ? `LKR ${asset.purchase_price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'N/A'}
-                    </p>
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Purchase Price</p>
+                      <p className="text-xl font-bold">
+                        {asset.purchase_price ? `LKR ${asset.purchase_price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'N/A'}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Current Value</p>
+                      <p className="text-xl font-bold">
+                        {asset.current_value ? `LKR ${asset.current_value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'N/A'}
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Current Value</p>
-                    <p className="text-xl font-bold">
-                      {asset.current_value ? `LKR ${asset.current_value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'N/A'}
-                    </p>
-                  </div>
+                  {asset.purchase_date && (
+                    <div>
+                      <p className="text-sm text-muted-foreground">Purchase Date</p>
+                      <p className="font-medium">{format(new Date(asset.purchase_date), 'MMM dd, yyyy')}</p>
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
+
+            {/* Depreciation Information */}
+            {asset.depreciation_method && asset.purchase_date && asset.purchase_price && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Depreciation Details</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {(() => {
+                    const depData = calculateDepreciation({
+                      purchasePrice: asset.purchase_price,
+                      purchaseDate: new Date(asset.purchase_date),
+                      depreciationMethod: asset.depreciation_method as 'straight_line' | 'declining_balance',
+                      depreciationRate: asset.depreciation_rate || undefined,
+                      usefulLifeYears: asset.useful_life_years || undefined,
+                      salvageValue: asset.salvage_value || 0,
+                    });
+                    return (
+                      <div className="space-y-4">
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <p className="text-sm text-muted-foreground">Depreciation Method</p>
+                            <p className="font-medium capitalize">{asset.depreciation_method.replace('_', ' ')}</p>
+                          </div>
+                          {asset.depreciation_method === 'straight_line' && asset.useful_life_years && (
+                            <div>
+                              <p className="text-sm text-muted-foreground">Useful Life</p>
+                              <p className="font-medium">{asset.useful_life_years} years</p>
+                            </div>
+                          )}
+                          {asset.depreciation_method === 'declining_balance' && asset.depreciation_rate && (
+                            <div>
+                              <p className="text-sm text-muted-foreground">Depreciation Rate</p>
+                              <p className="font-medium">{asset.depreciation_rate}%</p>
+                            </div>
+                          )}
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <p className="text-sm text-muted-foreground">Accumulated Depreciation</p>
+                            <p className="text-xl font-bold text-destructive">
+                              LKR {depData.accumulatedDepreciation.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-sm text-muted-foreground">Book Value</p>
+                            <p className="text-xl font-bold">
+                              LKR {depData.currentValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-3 gap-4">
+                          <div>
+                            <p className="text-sm text-muted-foreground">Annual Depreciation</p>
+                            <p className="font-medium">
+                              LKR {depData.annualDepreciation.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-sm text-muted-foreground">Years Elapsed</p>
+                            <p className="font-medium">{depData.yearsElapsed.toFixed(2)} years</p>
+                          </div>
+                          <div>
+                            <p className="text-sm text-muted-foreground">Remaining Life</p>
+                            <p className="font-medium">{depData.remainingLife.toFixed(2)} years</p>
+                          </div>
+                        </div>
+                        {asset.salvage_value && asset.salvage_value > 0 && (
+                          <div>
+                            <p className="text-sm text-muted-foreground">Salvage Value</p>
+                            <p className="font-medium">
+                              LKR {asset.salvage_value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
+                </CardContent>
+              </Card>
+            )}
 
             {/* Purchase Price History */}
             <Card>
