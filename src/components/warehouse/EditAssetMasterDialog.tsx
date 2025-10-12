@@ -145,9 +145,15 @@ export function EditAssetMasterDialog({ asset, open, onOpenChange }: EditAssetMa
       if (newImageUrl) imageUrl = newImageUrl;
     }
 
+    // Sanitize empty strings to undefined for date fields
+    const sanitizedValues = {
+      ...values,
+      purchase_date: values.purchase_date?.trim() || undefined,
+    };
+
     updateAssetMaster({
       id: asset.id,
-      ...values,
+      ...sanitizedValues,
       image_url: imageUrl || undefined,
     });
 

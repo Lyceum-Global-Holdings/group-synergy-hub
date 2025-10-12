@@ -146,7 +146,7 @@ export function CreateAssetMasterDialog({ open, onOpenChange }: CreateAssetMaste
       depreciation_rate: values.depreciation_rate,
       useful_life_years: values.useful_life_years,
       salvage_value: values.salvage_value,
-      purchase_date: values.purchase_date,
+      purchase_date: values.purchase_date?.trim() || undefined,
     };
 
     createAssetMaster(assetData);
