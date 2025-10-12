@@ -437,6 +437,50 @@ export type Database = {
         }
         Relationships: []
       }
+      blacklist_reviews: {
+        Row: {
+          blacklist_id: string
+          created_at: string | null
+          decision: string
+          id: string
+          next_review_date: string | null
+          recommendation: string | null
+          review_date: string
+          reviewed_by: string | null
+          supporting_evidence: Json | null
+        }
+        Insert: {
+          blacklist_id: string
+          created_at?: string | null
+          decision: string
+          id?: string
+          next_review_date?: string | null
+          recommendation?: string | null
+          review_date?: string
+          reviewed_by?: string | null
+          supporting_evidence?: Json | null
+        }
+        Update: {
+          blacklist_id?: string
+          created_at?: string | null
+          decision?: string
+          id?: string
+          next_review_date?: string | null
+          recommendation?: string | null
+          review_date?: string
+          reviewed_by?: string | null
+          supporting_evidence?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "blacklist_reviews_blacklist_id_fkey"
+            columns: ["blacklist_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_blacklist"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       blanket_po_amendments: {
         Row: {
           amendment_date: string
@@ -5691,6 +5735,112 @@ export type Database = {
           },
         ]
       }
+      risk_alert_rules: {
+        Row: {
+          alert_frequency_days: number | null
+          alert_on_creation: boolean | null
+          alert_on_escalation: boolean | null
+          alert_recipients: Json | null
+          company_id: string | null
+          created_at: string | null
+          id: string
+          is_active: boolean | null
+          min_severity: Database["public"]["Enums"]["risk_severity"]
+          risk_category: Database["public"]["Enums"]["risk_category"] | null
+          rule_name: string
+          updated_at: string | null
+        }
+        Insert: {
+          alert_frequency_days?: number | null
+          alert_on_creation?: boolean | null
+          alert_on_escalation?: boolean | null
+          alert_recipients?: Json | null
+          company_id?: string | null
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          min_severity: Database["public"]["Enums"]["risk_severity"]
+          risk_category?: Database["public"]["Enums"]["risk_category"] | null
+          rule_name: string
+          updated_at?: string | null
+        }
+        Update: {
+          alert_frequency_days?: number | null
+          alert_on_creation?: boolean | null
+          alert_on_escalation?: boolean | null
+          alert_recipients?: Json | null
+          company_id?: string | null
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          min_severity?: Database["public"]["Enums"]["risk_severity"]
+          risk_category?: Database["public"]["Enums"]["risk_category"] | null
+          rule_name?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "risk_alert_rules_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      risk_flag_history: {
+        Row: {
+          action_date: string | null
+          action_type: Database["public"]["Enums"]["action_type"]
+          created_at: string | null
+          id: string
+          metadata: Json | null
+          new_status: Database["public"]["Enums"]["risk_flag_status"] | null
+          notes: string | null
+          performed_by: string | null
+          previous_status:
+            | Database["public"]["Enums"]["risk_flag_status"]
+            | null
+          risk_flag_id: string
+        }
+        Insert: {
+          action_date?: string | null
+          action_type: Database["public"]["Enums"]["action_type"]
+          created_at?: string | null
+          id?: string
+          metadata?: Json | null
+          new_status?: Database["public"]["Enums"]["risk_flag_status"] | null
+          notes?: string | null
+          performed_by?: string | null
+          previous_status?:
+            | Database["public"]["Enums"]["risk_flag_status"]
+            | null
+          risk_flag_id: string
+        }
+        Update: {
+          action_date?: string | null
+          action_type?: Database["public"]["Enums"]["action_type"]
+          created_at?: string | null
+          id?: string
+          metadata?: Json | null
+          new_status?: Database["public"]["Enums"]["risk_flag_status"] | null
+          notes?: string | null
+          performed_by?: string | null
+          previous_status?:
+            | Database["public"]["Enums"]["risk_flag_status"]
+            | null
+          risk_flag_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "risk_flag_history_risk_flag_id_fkey"
+            columns: ["risk_flag_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_risk_flags"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       role_permissions: {
         Row: {
           created_at: string | null
@@ -6482,6 +6632,84 @@ export type Database = {
           },
         ]
       }
+      supplier_blacklist: {
+        Row: {
+          blacklist_reason: string
+          blacklisted_by: string | null
+          blacklisted_date: string
+          cleared_by: string | null
+          cleared_date: string | null
+          clearing_reason: string | null
+          company_id: string | null
+          created_at: string | null
+          id: string
+          next_review_date: string | null
+          permanent: boolean | null
+          related_risk_flags: Json | null
+          restrictions: Json | null
+          review_frequency_days: number | null
+          review_required: boolean | null
+          status: Database["public"]["Enums"]["blacklist_status"]
+          supplier_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          blacklist_reason: string
+          blacklisted_by?: string | null
+          blacklisted_date?: string
+          cleared_by?: string | null
+          cleared_date?: string | null
+          clearing_reason?: string | null
+          company_id?: string | null
+          created_at?: string | null
+          id?: string
+          next_review_date?: string | null
+          permanent?: boolean | null
+          related_risk_flags?: Json | null
+          restrictions?: Json | null
+          review_frequency_days?: number | null
+          review_required?: boolean | null
+          status?: Database["public"]["Enums"]["blacklist_status"]
+          supplier_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          blacklist_reason?: string
+          blacklisted_by?: string | null
+          blacklisted_date?: string
+          cleared_by?: string | null
+          cleared_date?: string | null
+          clearing_reason?: string | null
+          company_id?: string | null
+          created_at?: string | null
+          id?: string
+          next_review_date?: string | null
+          permanent?: boolean | null
+          related_risk_flags?: Json | null
+          restrictions?: Json | null
+          review_frequency_days?: number | null
+          review_required?: boolean | null
+          status?: Database["public"]["Enums"]["blacklist_status"]
+          supplier_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "supplier_blacklist_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_blacklist_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: true
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       supplier_contacts: {
         Row: {
           created_at: string
@@ -7120,6 +7348,90 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      supplier_risk_flags: {
+        Row: {
+          auto_alert_enabled: boolean | null
+          company_id: string | null
+          created_at: string | null
+          description: string | null
+          evidence_urls: Json | null
+          financial_impact: number | null
+          flagged_by: string | null
+          flagged_date: string
+          id: string
+          next_review_date: string | null
+          resolution_notes: string | null
+          resolved_by: string | null
+          resolved_date: string | null
+          review_date: string | null
+          risk_category: Database["public"]["Enums"]["risk_category"]
+          risk_severity: Database["public"]["Enums"]["risk_severity"]
+          status: Database["public"]["Enums"]["risk_flag_status"]
+          supplier_id: string
+          title: string
+          updated_at: string | null
+        }
+        Insert: {
+          auto_alert_enabled?: boolean | null
+          company_id?: string | null
+          created_at?: string | null
+          description?: string | null
+          evidence_urls?: Json | null
+          financial_impact?: number | null
+          flagged_by?: string | null
+          flagged_date?: string
+          id?: string
+          next_review_date?: string | null
+          resolution_notes?: string | null
+          resolved_by?: string | null
+          resolved_date?: string | null
+          review_date?: string | null
+          risk_category: Database["public"]["Enums"]["risk_category"]
+          risk_severity: Database["public"]["Enums"]["risk_severity"]
+          status?: Database["public"]["Enums"]["risk_flag_status"]
+          supplier_id: string
+          title: string
+          updated_at?: string | null
+        }
+        Update: {
+          auto_alert_enabled?: boolean | null
+          company_id?: string | null
+          created_at?: string | null
+          description?: string | null
+          evidence_urls?: Json | null
+          financial_impact?: number | null
+          flagged_by?: string | null
+          flagged_date?: string
+          id?: string
+          next_review_date?: string | null
+          resolution_notes?: string | null
+          resolved_by?: string | null
+          resolved_date?: string | null
+          review_date?: string | null
+          risk_category?: Database["public"]["Enums"]["risk_category"]
+          risk_severity?: Database["public"]["Enums"]["risk_severity"]
+          status?: Database["public"]["Enums"]["risk_flag_status"]
+          supplier_id?: string
+          title?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "supplier_risk_flags_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_risk_flags_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
             referencedColumns: ["id"]
           },
         ]
@@ -7841,6 +8153,10 @@ export type Database = {
           trend_direction: string
         }[]
       }
+      calculate_supplier_risk_score: {
+        Args: { p_supplier_id: string }
+        Returns: number
+      }
       check_duplicate_supplier: {
         Args: {
           p_email?: string
@@ -8036,6 +8352,14 @@ export type Database = {
         | "cogs"
         | "other_expense"
       account_type: "asset" | "liability" | "equity" | "revenue" | "expense"
+      action_type:
+        | "flagged"
+        | "blacklisted"
+        | "cleared"
+        | "escalated"
+        | "resolved"
+        | "updated"
+        | "reviewed"
       amendment_type:
         | "price_change"
         | "quantity_change"
@@ -8050,6 +8374,7 @@ export type Database = {
         | "quarterly"
         | "annually"
         | "milestone_based"
+      blacklist_status: "blacklisted" | "watchlist" | "cleared"
       blanket_contract_status:
         | "draft"
         | "active"
@@ -8198,6 +8523,17 @@ export type Database = {
         | "cancelled"
         | "closed"
       rfq_rfp_type: "rfq" | "rfp"
+      risk_category:
+        | "quality"
+        | "delivery"
+        | "financial"
+        | "compliance"
+        | "ethical"
+        | "legal"
+        | "operational"
+        | "other"
+      risk_flag_status: "active" | "resolved" | "under_review" | "escalated"
+      risk_severity: "low" | "medium" | "high" | "critical"
       signature_method: "physical" | "electronic" | "esign_platform"
       signature_status:
         | "unsigned"
@@ -8356,6 +8692,15 @@ export const Constants = {
         "other_expense",
       ],
       account_type: ["asset", "liability", "equity", "revenue", "expense"],
+      action_type: [
+        "flagged",
+        "blacklisted",
+        "cleared",
+        "escalated",
+        "resolved",
+        "updated",
+        "reviewed",
+      ],
       amendment_type: [
         "price_change",
         "quantity_change",
@@ -8372,6 +8717,7 @@ export const Constants = {
         "annually",
         "milestone_based",
       ],
+      blacklist_status: ["blacklisted", "watchlist", "cleared"],
       blanket_contract_status: [
         "draft",
         "active",
@@ -8537,6 +8883,18 @@ export const Constants = {
         "closed",
       ],
       rfq_rfp_type: ["rfq", "rfp"],
+      risk_category: [
+        "quality",
+        "delivery",
+        "financial",
+        "compliance",
+        "ethical",
+        "legal",
+        "operational",
+        "other",
+      ],
+      risk_flag_status: ["active", "resolved", "under_review", "escalated"],
+      risk_severity: ["low", "medium", "high", "critical"],
       signature_method: ["physical", "electronic", "esign_platform"],
       signature_status: [
         "unsigned",
