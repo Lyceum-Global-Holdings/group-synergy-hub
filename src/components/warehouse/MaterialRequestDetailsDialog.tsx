@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Separator } from "@/components/ui/separator";
-import { CheckCircle, XCircle, FileText, Send } from "lucide-react";
+import { CheckCircle, XCircle, FileText, Send, Package, RotateCcw } from "lucide-react";
 import { MaterialRequest, MaterialRequestStatus, MaterialRequestPriority } from "@/types/materialIssueReturn";
 import { useMaterialRequestItems } from "@/hooks/useMaterialRequestItems";
 import { format } from "date-fns";
@@ -11,9 +11,11 @@ import { useState } from "react";
 import { ConvertToIssueDialog } from "./ConvertToIssueDialog";
 import { MarkItemsReceivedDialog } from "./MarkItemsReceivedDialog";
 import { AdjustRequestQuantitiesDialog } from "./AdjustRequestQuantitiesDialog";
+import { CreateMaterialReturnDialog } from "./CreateMaterialReturnDialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { useMaterialRequests } from "@/hooks/useMaterialRequests";
+import { useQueryClient } from "@tanstack/react-query";
 
 interface MaterialRequestDetailsDialogProps {
   open: boolean;
@@ -50,6 +52,7 @@ export function MaterialRequestDetailsDialog({ open, onOpenChange, request }: Ma
   const [showConvertDialog, setShowConvertDialog] = useState(false);
   const [showReceiveDialog, setShowReceiveDialog] = useState(false);
   const [showAdjustDialog, setShowAdjustDialog] = useState(false);
+  const [showReturnDialog, setShowReturnDialog] = useState(false);
   const [comments, setComments] = useState("");
   const [rejectionReason, setRejectionReason] = useState("");
   const { requestItems } = useMaterialRequestItems(request?.id);

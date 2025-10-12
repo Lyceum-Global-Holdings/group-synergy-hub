@@ -12,7 +12,8 @@ import { useMaterialRequests } from "@/hooks/useMaterialRequests";
 import { MaterialIssueNote, MaterialReturnNote, MaterialRequest } from "@/types/materialIssueReturn";
 import { CreateMaterialIssueDialog } from "@/components/warehouse/CreateMaterialIssueDialog";
 import { MaterialIssueDetailsDialog } from "@/components/warehouse/MaterialIssueDetailsDialog";
-import { MaterialReturnDialog } from "@/components/warehouse/MaterialReturnDialog";
+import { CreateMaterialReturnDialog } from "@/components/warehouse/CreateMaterialReturnDialog";
+import { MaterialReturnDetailsDialog } from "@/components/warehouse/MaterialReturnDetailsDialog";
 import { CreateMaterialRequestDialog } from "@/components/warehouse/CreateMaterialRequestDialog";
 import { MaterialRequestDetailsDialog } from "@/components/warehouse/MaterialRequestDetailsDialog";
 import { format } from "date-fns";
@@ -39,8 +40,10 @@ export default function MaterialIssueReturn() {
   const [returnDialogOpen, setReturnDialogOpen] = useState(false);
   const [requestDialogOpen, setRequestDialogOpen] = useState(false);
   const [requestDetailsOpen, setRequestDetailsOpen] = useState(false);
+  const [returnDetailsOpen, setReturnDetailsOpen] = useState(false);
   const [selectedIssueId, setSelectedIssueId] = useState<string | null>(null);
   const [selectedRequest, setSelectedRequest] = useState<MaterialRequest | null>(null);
+  const [selectedReturn, setSelectedReturn] = useState<MaterialReturnNote | null>(null);
 
   const { materialIssues, isLoading: isLoadingIssues } = useMaterialIssues();
   const { materialReturns, isLoading: isLoadingReturns } = useMaterialReturns();
@@ -149,6 +152,21 @@ export default function MaterialIssueReturn() {
         </Badge>
       )
     },
+    {
+      id: "actions",
+      cell: ({ row }) => (
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => {
+            setSelectedReturn(row.original);
+            setReturnDetailsOpen(true);
+          }}
+        >
+          <Eye className="h-4 w-4" />
+        </Button>
+      ),
+    },
   ];
 
   return (
@@ -249,9 +267,14 @@ export default function MaterialIssueReturn() {
         onOpenChange={setDetailsDialogOpen}
         issueId={selectedIssueId}
       />
-      <MaterialReturnDialog
+      <CreateMaterialReturnDialog
         open={returnDialogOpen}
         onOpenChange={setReturnDialogOpen}
+      />
+      <MaterialReturnDetailsDialog
+        open={returnDetailsOpen}
+        onOpenChange={setReturnDetailsOpen}
+        returnNote={selectedReturn}
       />
     </div>
   );

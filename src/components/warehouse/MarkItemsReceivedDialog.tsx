@@ -36,7 +36,6 @@ export function MarkItemsReceivedDialog({
         quantity_to_receive: (item.quantity_issued || 0) - item.quantity_received,
       }))
   );
-  const [receiving, setReceiving] = useState(false);
 
   const handleQuantityChange = (itemId: string, value: string) => {
     const numValue = parseFloat(value) || 0;
@@ -56,54 +55,50 @@ export function MarkItemsReceivedDialog({
   };
 
   const handleReceive = async () => {
+    if (receiptItems.some(item => item.quantity_to_receive <= 0)) {
+      toast({
+        title: "Invalid Quantity",
+        description: "All quantities must be greater than 0",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const invalidItems = receiptItems.filter(item => 
+      (item.quantity_received || 0) + item.quantity_to_receive > (item.quantity_issued || 0)
+    );
+    
+    if (invalidItems.length > 0) {
+      toast({
+        title: "Invalid Quantity",
+        description: "Cannot receive more than issued quantity",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
-      setReceiving(true);
-
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("User not authenticated");
+      if (!user) throw new Error('User not authenticated');
 
-      // Validate quantities
       for (const item of receiptItems) {
-        const maxReceivable = (item.quantity_issued || 0) - item.quantity_received;
-        if (item.quantity_to_receive > maxReceivable) {
-          toast({
-            title: "Invalid Quantity",
-            description: `Cannot receive more than ${maxReceivable} for ${item.item_name}`,
-            variant: "destructive",
-          });
-          return;
-        }
-        if (item.quantity_to_receive < 0) {
-          toast({
-            title: "Invalid Quantity",
-            description: `Quantity must be positive for ${item.item_name}`,
-            variant: "destructive",
-          });
-          return;
-        }
-      }
+        if (item.quantity_to_receive <= 0) continue;
 
-      // Update all items
-      for (const item of receiptItems.filter(i => i.quantity_to_receive > 0)) {
-        const newQuantityReceived = item.quantity_received + item.quantity_to_receive;
-        const adjustmentReason = item.quantity_to_receive < ((item.quantity_issued || 0) - item.quantity_received)
-          ? `Partial receipt: ${item.notes || 'No reason provided'}`
-          : undefined;
-
-        const { error } = await supabase
+        const newQuantityReceived = (item.quantity_received || 0) + item.quantity_to_receive;
+        
+        const { error: updateError } = await supabase
           .from('material_request_items')
           .update({
             quantity_received: newQuantityReceived,
             received_at: new Date().toISOString(),
             received_by: user.id,
-            adjustment_reason: adjustmentReason || item.adjustment_reason,
+            adjustment_reason: item.notes || null
           })
           .eq('id', item.id);
 
-        if (error) throw error;
+        if (updateError) throw updateError;
       }
 
-      // Fetch all items for this request to determine final status
       const { data: allItems, error: fetchError } = await supabase
         .from('material_request_items')
         .select('quantity_issued, quantity_received')
@@ -111,14 +106,13 @@ export function MarkItemsReceivedDialog({
 
       if (fetchError) throw fetchError;
 
-      // Determine if request is fully completed or partially received
-      const allFullyReceived = allItems?.every(
-        item => item.quantity_received >= (item.quantity_issued || 0) && (item.quantity_issued || 0) > 0
+      const allFullyReceived = allItems?.every(item => 
+        (item.quantity_received || 0) >= (item.quantity_issued || 0) && (item.quantity_issued || 0) > 0
       );
+      const anyReceived = allItems?.some(item => (item.quantity_received || 0) > 0);
 
-      const newStatus = allFullyReceived ? 'completed' : 'partially_received';
-
-      // Update the material request status
+      const newStatus = allFullyReceived ? 'completed' : (anyReceived ? 'partially_received' : 'issued');
+      
       const { error: statusError } = await supabase
         .from('material_requests')
         .update({ status: newStatus })
@@ -128,20 +122,18 @@ export function MarkItemsReceivedDialog({
 
       toast({
         title: "Success",
-        description: "Items marked as received successfully",
+        description: `Items marked as received. Status: ${newStatus.replace(/_/g, ' ')}`,
       });
 
       onSuccess();
       onOpenChange(false);
-    } catch (error) {
-      console.error('Error marking items as received:', error);
+    } catch (error: any) {
+      console.error('Error receiving items:', error);
       toast({
         title: "Error",
-        description: "Failed to mark items as received",
+        description: error.message || "Failed to mark items as received",
         variant: "destructive",
       });
-    } finally {
-      setReceiving(false);
     }
   };
 
@@ -150,15 +142,13 @@ export function MarkItemsReceivedDialog({
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Mark Items as Received</DialogTitle>
+            <DialogTitle>Mark Items Received</DialogTitle>
           </DialogHeader>
           <div className="py-4 text-center text-muted-foreground">
             No items available to receive
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => onOpenChange(false)}>
-              Close
-            </Button>
+            <Button variant="outline" onClick={() => onOpenChange(false)}>Close</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -167,69 +157,53 @@ export function MarkItemsReceivedDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Mark Items as Received</DialogTitle>
+          <DialogTitle>Mark Items Received</DialogTitle>
         </DialogHeader>
-        
+
         <div className="space-y-4">
-          <div className="text-sm text-muted-foreground">
-            Confirm the quantities you received. Enter partial quantities if you received less than issued.
-          </div>
-
-          {receiptItems.map((item) => {
-            const maxReceivable = (item.quantity_issued || 0) - item.quantity_received;
-            return (
-              <div key={item.id} className="border rounded-lg p-4 space-y-3">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <div className="font-medium">{item.item_name}</div>
-                    <div className="text-sm text-muted-foreground">
-                      Issued: {item.quantity_issued} | Already Received: {item.quantity_received} | Pending: {maxReceivable}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor={`qty-${item.id}`}>Quantity Receiving Now *</Label>
-                    <Input
-                      id={`qty-${item.id}`}
-                      type="number"
-                      min="0"
-                      max={maxReceivable}
-                      step="0.01"
-                      value={item.quantity_to_receive}
-                      onChange={(e) => handleQuantityChange(item.id, e.target.value)}
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor={`notes-${item.id}`}>Notes (if partial or variance)</Label>
-                    <Textarea
-                      id={`notes-${item.id}`}
-                      value={item.notes || ''}
-                      onChange={(e) => handleNotesChange(item.id, e.target.value)}
-                      placeholder="Reason for partial receipt or variance..."
-                      className="h-20"
-                    />
+          {receiptItems.map((item) => (
+            <div key={item.id} className="border rounded-lg p-4 space-y-3">
+              <div className="flex justify-between items-start">
+                <div>
+                  <div className="font-medium">{item.item_name}</div>
+                  <div className="text-sm text-muted-foreground">Code: {item.item_code}</div>
+                  <div className="text-sm text-muted-foreground">
+                    Issued: {item.quantity_issued} | Already Received: {item.quantity_received}
                   </div>
                 </div>
               </div>
-            );
-          })}
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label>Quantity to Receive</Label>
+                  <Input
+                    type="number"
+                    value={item.quantity_to_receive}
+                    onChange={(e) => handleQuantityChange(item.id, e.target.value)}
+                    min="0"
+                    max={(item.quantity_issued || 0) - item.quantity_received}
+                    step="0.01"
+                  />
+                </div>
+                <div>
+                  <Label>Notes</Label>
+                  <Textarea
+                    value={item.notes || ''}
+                    onChange={(e) => handleNotesChange(item.id, e.target.value)}
+                    placeholder="Optional notes"
+                    rows={1}
+                  />
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
 
         <DialogFooter>
-          <Button
-            variant="outline"
-            onClick={() => onOpenChange(false)}
-            disabled={receiving}
-          >
-            Cancel
-          </Button>
-          <Button onClick={handleReceive} disabled={receiving}>
-            {receiving ? "Processing..." : "Confirm Receipt"}
-          </Button>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button onClick={handleReceive}>Confirm Receipt</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
