@@ -27,6 +27,7 @@ import SupplierEvaluation from "./pages/sourcing/SupplierEvaluation";
 import SupplierRegistration from "./pages/sourcing/SupplierRegistration";
 import PublicSupplierRegistration from "./pages/PublicSupplierRegistration";
 import Contracts from "./pages/sourcing/Contracts";
+import SupplierBlacklist from "./pages/sourcing/SupplierBlacklist";
 import AssetManagement from "./pages/warehouse/AssetManagement";
 import ItemBinMaster from "./pages/warehouse/ItemBinMaster";
 import MaterialIssueReturn from "./pages/warehouse/MaterialIssueReturn";
@@ -194,6 +195,13 @@ function App() {
                   <ProtectedRoute>
                     <AppLayout>
                       <Contracts />
+                    </AppLayout>
+                  </ProtectedRoute>
+                } />
+                <Route path="/sourcing/blacklist" element={
+                  <ProtectedRoute>
+                    <AppLayout>
+                      <SupplierBlacklist />
                     </AppLayout>
                   </ProtectedRoute>
                 } />
