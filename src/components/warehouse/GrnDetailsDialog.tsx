@@ -9,6 +9,7 @@ import { useGoodsReceiptNote, useUpdateGoodsReceiptNote } from '@/hooks/useGoods
 import { GrnStatus } from '@/types/grn';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
+import { supabase } from '@/integrations/supabase/client';
 
 const statusStyles: Record<GrnStatus, string> = {
   draft: 'bg-muted text-muted-foreground',
@@ -50,11 +51,16 @@ export function GrnDetailsDialog({ open, onOpenChange, grnId }: GrnDetailsDialog
     if (!grn) return;
     
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      
       await updateGrnMutation.mutateAsync({
         id: grn.id,
         updates: { 
           status: newStatus,
-          ...(newStatus === 'approved' && { approved_date: new Date().toISOString() })
+          ...(newStatus === 'approved' && { 
+            approved_date: new Date().toISOString(),
+            approved_by: user?.id
+          })
         }
       });
     } catch (error) {
