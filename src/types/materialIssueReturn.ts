@@ -92,6 +92,11 @@ export interface MaterialIssueItem {
   recipient_signature: string | null;
   issued_at: string | null;
   received_at: string | null;
+  variance_quantity?: number | null;
+  variance_reason?: 'shortage' | 'damaged' | 'expired' | 'other' | null;
+  variance_notes?: string | null;
+  condition?: 'good' | 'damaged' | 'expired' | null;
+  warehouse_item_id?: string;
 }
 
 export interface CreateMaterialIssueItemData {
