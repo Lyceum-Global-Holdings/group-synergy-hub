@@ -88,9 +88,27 @@ export function EditAssetMasterDialog({ asset, open, onOpenChange }: EditAssetMa
       }).currentValue
     : null;
 
+  // Reset form when asset changes or dialog opens
   useEffect(() => {
-    setImagePreview(asset.image_url);
-  }, [asset.image_url]);
+    if (open && asset) {
+      form.reset({
+        asset_name: asset.asset_name,
+        brand: asset.brand || "",
+        category_id: asset.category_id || "",
+        subcategory_id: asset.subcategory_id || "",
+        purchase_price: asset.purchase_price || undefined,
+        current_value: asset.current_value || undefined,
+        description: asset.description || "",
+        status: asset.status,
+        depreciation_method: (asset.depreciation_method as 'straight_line' | 'declining_balance') || "straight_line",
+        depreciation_rate: asset.depreciation_rate || undefined,
+        useful_life_years: asset.useful_life_years || undefined,
+        salvage_value: asset.salvage_value || 0,
+        purchase_date: asset.purchase_date || "",
+      });
+      setImagePreview(asset.image_url);
+    }
+  }, [open, asset, form]);
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -160,8 +178,17 @@ export function EditAssetMasterDialog({ asset, open, onOpenChange }: EditAssetMa
     onOpenChange(false);
   };
 
+  const handleOpenChange = (isOpen: boolean) => {
+    if (!isOpen) {
+      form.reset();
+      setImageFile(null);
+      setImagePreview(null);
+    }
+    onOpenChange(isOpen);
+  };
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Edit Asset Master Item</DialogTitle>

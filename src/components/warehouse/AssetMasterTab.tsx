@@ -208,6 +208,7 @@ export function AssetMasterTab() {
             onOpenChange={setIsDetailsDialogOpen}
           />
           <EditAssetMasterDialog
+            key={selectedAsset?.id}
             asset={selectedAsset}
             open={isEditDialogOpen}
             onOpenChange={setIsEditDialogOpen}
