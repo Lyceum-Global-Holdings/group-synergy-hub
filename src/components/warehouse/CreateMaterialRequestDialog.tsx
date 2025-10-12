@@ -71,7 +71,9 @@ export function CreateMaterialRequestDialog({ open, onOpenChange }: CreateMateri
     setItems(updatedItems);
   };
 
-  const handleSubmit = async (submitForApproval: boolean = false) => {
+  const { submitForApproval } = useMaterialRequests();
+
+  const handleSubmit = async (submitForApprovalFlag: boolean = false) => {
     try {
       // Create the request
       const newRequest = await createRequestAsync(requestData);
@@ -83,6 +85,11 @@ export function CreateMaterialRequestDialog({ open, onOpenChange }: CreateMateri
           ...item,
           line_number: index + 1,
         })));
+      }
+
+      // Submit for approval if requested
+      if (submitForApprovalFlag && newRequest) {
+        await submitForApproval(newRequest.id);
       }
 
       onOpenChange(false);

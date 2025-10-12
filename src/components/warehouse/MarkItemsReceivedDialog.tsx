@@ -103,6 +103,29 @@ export function MarkItemsReceivedDialog({
         if (error) throw error;
       }
 
+      // Fetch all items for this request to determine final status
+      const { data: allItems, error: fetchError } = await supabase
+        .from('material_request_items')
+        .select('quantity_issued, quantity_received')
+        .eq('request_id', requestId);
+
+      if (fetchError) throw fetchError;
+
+      // Determine if request is fully completed or partially received
+      const allFullyReceived = allItems?.every(
+        item => item.quantity_received >= (item.quantity_issued || 0) && (item.quantity_issued || 0) > 0
+      );
+
+      const newStatus = allFullyReceived ? 'completed' : 'partially_received';
+
+      // Update the material request status
+      const { error: statusError } = await supabase
+        .from('material_requests')
+        .update({ status: newStatus })
+        .eq('id', requestId);
+
+      if (statusError) throw statusError;
+
       toast({
         title: "Success",
         description: "Items marked as received successfully",

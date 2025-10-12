@@ -3,12 +3,14 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Separator } from "@/components/ui/separator";
-import { CheckCircle, XCircle, FileText } from "lucide-react";
+import { CheckCircle, XCircle, FileText, Send } from "lucide-react";
 import { MaterialRequest, MaterialRequestStatus, MaterialRequestPriority } from "@/types/materialIssueReturn";
 import { useMaterialRequestItems } from "@/hooks/useMaterialRequestItems";
 import { format } from "date-fns";
 import { useState } from "react";
 import { ConvertToIssueDialog } from "./ConvertToIssueDialog";
+import { MarkItemsReceivedDialog } from "./MarkItemsReceivedDialog";
+import { AdjustRequestQuantitiesDialog } from "./AdjustRequestQuantitiesDialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { useMaterialRequests } from "@/hooks/useMaterialRequests";
@@ -46,10 +48,12 @@ const getPriorityColor = (priority: MaterialRequestPriority): "default" | "destr
 
 export function MaterialRequestDetailsDialog({ open, onOpenChange, request }: MaterialRequestDetailsDialogProps) {
   const [showConvertDialog, setShowConvertDialog] = useState(false);
+  const [showReceiveDialog, setShowReceiveDialog] = useState(false);
+  const [showAdjustDialog, setShowAdjustDialog] = useState(false);
   const [comments, setComments] = useState("");
   const [rejectionReason, setRejectionReason] = useState("");
   const { requestItems } = useMaterialRequestItems(request?.id);
-  const { hodApprove, managementApprove, rejectRequest, isHodApproving, isManagementApproving, isRejecting } = useMaterialRequests();
+  const { hodApprove, managementApprove, rejectRequest, submitForApproval, isHodApproving, isManagementApproving, isRejecting, isSubmitting } = useMaterialRequests();
 
   if (!request) return null;
 
@@ -73,10 +77,12 @@ export function MaterialRequestDetailsDialog({ open, onOpenChange, request }: Ma
     setRejectionReason("");
   };
 
+  const canSubmit = request.status === 'draft';
   const canApproveHOD = request.status === 'pending_hod_approval';
   const canApproveManagement = request.status === 'pending_management_approval';
   const canConvertToIssue = request.status === 'approved';
   const canReject = request.status === 'pending_hod_approval' || request.status === 'pending_management_approval';
+  const canReceive = (request.status === 'issued' || request.status === 'partially_received') && request.min_id;
 
   return (
     <>
@@ -290,24 +296,38 @@ export function MaterialRequestDetailsDialog({ open, onOpenChange, request }: Ma
               </>
             )}
 
-            {/* Convert to Issue */}
-            {canConvertToIssue && !request.min_id && (
+            {/* Submit / Issue / Receive Actions */}
+            {(canSubmit || canConvertToIssue || canReceive) && (
               <>
                 <Separator />
-                <div className="flex justify-end">
-                  <Button onClick={() => setShowConvertDialog(true)}>
-                    <FileText className="mr-2 h-4 w-4" />
-                    Issue Materials
-                  </Button>
+                <div className="flex justify-end gap-2">
+                  {canSubmit && (
+                    <Button onClick={() => submitForApproval(request.id)} disabled={isSubmitting}>
+                      <Send className="mr-2 h-4 w-4" />
+                      Submit for Approval
+                    </Button>
+                  )}
+                  {canConvertToIssue && !request.min_id && (
+                    <Button onClick={() => setShowConvertDialog(true)}>
+                      <FileText className="mr-2 h-4 w-4" />
+                      Issue Materials
+                    </Button>
+                  )}
+                  {canReceive && (
+                    <Button onClick={() => setShowReceiveDialog(true)}>
+                      <CheckCircle className="mr-2 h-4 w-4" />
+                      Mark Items Received
+                    </Button>
+                  )}
                 </div>
               </>
             )}
 
-            {request.min_id && (
+            {request.min_id && request.status === 'completed' && (
               <div className="bg-muted p-4 rounded-lg text-sm">
                 <div className="flex items-center gap-2">
                   <CheckCircle className="h-4 w-4 text-green-500" />
-                  <span>Materials have been issued for this request</span>
+                  <span>Materials have been issued and received for this request</span>
                 </div>
               </div>
             )}
@@ -315,12 +335,34 @@ export function MaterialRequestDetailsDialog({ open, onOpenChange, request }: Ma
         </DialogContent>
       </Dialog>
 
-      <ConvertToIssueDialog
-        open={showConvertDialog}
-        onOpenChange={setShowConvertDialog}
-        request={request}
-        items={requestItems || []}
-      />
+      {requestItems && (
+        <>
+          <ConvertToIssueDialog
+            open={showConvertDialog}
+            onOpenChange={setShowConvertDialog}
+            request={request}
+            items={requestItems}
+          />
+          <MarkItemsReceivedDialog
+            open={showReceiveDialog}
+            onOpenChange={setShowReceiveDialog}
+            requestId={request.id}
+            items={requestItems}
+            onSuccess={() => {
+              setShowReceiveDialog(false);
+            }}
+          />
+          <AdjustRequestQuantitiesDialog
+            open={showAdjustDialog}
+            onOpenChange={setShowAdjustDialog}
+            request={request}
+            items={requestItems}
+            onSuccess={() => {
+              setShowAdjustDialog(false);
+            }}
+          />
+        </>
+      )}
     </>
   );
 }

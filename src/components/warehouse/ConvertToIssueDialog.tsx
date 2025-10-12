@@ -9,6 +9,9 @@ import { MaterialRequest, MaterialRequestItem } from "@/types/materialIssueRetur
 import { useMaterialIssues } from "@/hooks/useMaterialIssues";
 import { useMaterialIssueItems } from "@/hooks/useMaterialIssueItems";
 import { useMaterialRequests } from "@/hooks/useMaterialRequests";
+import { useMaterialRequestItems } from "@/hooks/useMaterialRequestItems";
+import { supabase } from "@/integrations/supabase/client";
+import { useQueryClient } from "@tanstack/react-query";
 
 interface ConvertToIssueDialogProps {
   open: boolean;
@@ -33,6 +36,7 @@ export function ConvertToIssueDialog({ open, onOpenChange, request, items }: Con
   const { createMaterialIssueAsync } = useMaterialIssues();
   const { createItems: createIssueItems } = useMaterialIssueItems();
   const { updateRequest } = useMaterialRequests();
+  const queryClient = useQueryClient();
 
   const handleQuantityChange = (index: number, value: number) => {
     const updatedItems = [...issueItems];
@@ -70,12 +74,27 @@ export function ConvertToIssueDialog({ open, onOpenChange, request, items }: Con
           notes: item.notes || undefined,
         })));
 
+        // Update material_request_items with quantity_issued and issued_at
+        for (const item of issueItems) {
+          await supabase
+            .from('material_request_items')
+            .update({
+              quantity_issued: item.quantity_to_issue,
+              issued_at: new Date().toISOString(),
+            })
+            .eq('id', item.id);
+        }
+
         // Update request to link to MIN and mark as issued
         updateRequest({
           id: request.id,
           min_id: newIssue.id,
           status: 'issued',
         });
+
+        // Invalidate queries
+        queryClient.invalidateQueries({ queryKey: ['material-requests'] });
+        queryClient.invalidateQueries({ queryKey: ['material-request-items', request.id] });
       }
 
       onOpenChange(false);
