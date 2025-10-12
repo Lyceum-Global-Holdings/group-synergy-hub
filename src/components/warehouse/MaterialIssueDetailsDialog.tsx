@@ -17,14 +17,13 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { CheckCircle, XCircle, FileCheck, Truck, Package } from 'lucide-react';
+import { CheckCircle, XCircle, FileCheck, Truck, Package, ArrowDown, ArrowUp } from 'lucide-react';
 import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { MaterialIssueNote, MaterialIssueItem } from '@/types/materialIssueReturn';
 import { useToast } from '@/hooks/use-toast';
 import { IssueItemsDialog } from './IssueItemsDialog';
 import { ReceiveItemsDialog } from './ReceiveItemsDialog';
-import { UpdateQuantitiesDialog } from './UpdateQuantitiesDialog';
 
 interface MaterialIssueDetailsDialogProps {
   open: boolean;
@@ -38,7 +37,6 @@ export function MaterialIssueDetailsDialog({ open, onOpenChange, issueId }: Mate
   const [loading, setLoading] = useState(false);
   const [issueDialogOpen, setIssueDialogOpen] = useState(false);
   const [receiveDialogOpen, setReceiveDialogOpen] = useState(false);
-  const [updateDialogOpen, setUpdateDialogOpen] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -242,7 +240,7 @@ export function MaterialIssueDetailsDialog({ open, onOpenChange, issueId }: Mate
                     <TableHead>UOM</TableHead>
                     <TableHead className="text-right">Required</TableHead>
                     <TableHead className="text-right">Received</TableHead>
-                    <TableHead className="text-right">Variance</TableHead>
+                    <TableHead className="text-right">Shortage/Excess</TableHead>
                     <TableHead>Issued At</TableHead>
                     <TableHead>Received At</TableHead>
                     <TableHead>Status</TableHead>
@@ -252,7 +250,7 @@ export function MaterialIssueDetailsDialog({ open, onOpenChange, issueId }: Mate
                   {items.map((item, index) => {
                     const qtyRequired = item.quantity_required || item.quantity_issued;
                     const qtyReceived = item.quantity_received || 0;
-                    const variance = qtyReceived - qtyRequired;
+                    const variance = qtyRequired - qtyReceived;
                     
                     const getStatusBadge = () => {
                       if (qtyReceived >= qtyRequired) {
@@ -273,9 +271,25 @@ export function MaterialIssueDetailsDialog({ open, onOpenChange, issueId }: Mate
                         <TableCell className="text-right">{qtyRequired}</TableCell>
                         <TableCell className="text-right font-medium">{qtyReceived}</TableCell>
                         <TableCell className={`text-right font-medium ${
-                          variance > 0 ? 'text-green-600' : variance < 0 ? 'text-red-600' : 'text-muted-foreground'
+                          variance > 0 ? 'text-destructive' : variance < 0 ? 'text-green-600' : 'text-muted-foreground'
                         }`}>
-                          {variance !== 0 && (variance > 0 ? '+' : '')}{variance}
+                          {variance === 0 ? (
+                            '—'
+                          ) : (
+                            <span className="inline-flex items-center gap-1">
+                              {variance > 0 ? (
+                                <>
+                                  <ArrowDown className="h-3 w-3" />
+                                  {Math.abs(variance).toFixed(2)}
+                                </>
+                              ) : (
+                                <>
+                                  <ArrowUp className="h-3 w-3" />
+                                  {Math.abs(variance).toFixed(2)}
+                                </>
+                              )}
+                            </span>
+                          )}
                         </TableCell>
                         <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
                           {item.issued_at ? new Date(item.issued_at).toLocaleString('en-US', { 
@@ -434,11 +448,6 @@ export function MaterialIssueDetailsDialog({ open, onOpenChange, issueId }: Mate
 
         {(issue.status === 'approved' || issue.status === 'issued' || issue.status === 'partially_received') && (
           <div className="flex justify-end gap-2 pt-4 border-t">
-            {(issue.status === 'approved' || issue.status === 'issued' || issue.status === 'partially_received') && (
-              <Button variant="outline" onClick={() => setUpdateDialogOpen(true)}>
-                Update Quantities
-              </Button>
-            )}
             {issue.status === 'approved' && !issue.issued_by && (
               <Button onClick={() => setIssueDialogOpen(true)}>
                 <Package className="h-4 w-4 mr-2" />
@@ -466,12 +475,6 @@ export function MaterialIssueDetailsDialog({ open, onOpenChange, issueId }: Mate
           <ReceiveItemsDialog
             open={receiveDialogOpen}
             onOpenChange={setReceiveDialogOpen}
-            issueId={issueId}
-            onSuccess={fetchIssueDetails}
-          />
-          <UpdateQuantitiesDialog
-            open={updateDialogOpen}
-            onOpenChange={setUpdateDialogOpen}
             issueId={issueId}
             onSuccess={fetchIssueDetails}
           />
