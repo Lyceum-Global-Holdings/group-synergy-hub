@@ -30,6 +30,7 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { MaterialIssueItem } from '@/types/materialIssueReturn';
 import { useMaterialReturnItems } from '@/hooks/useMaterialReturnItems';
+import { useQueryClient } from '@tanstack/react-query';
 
 interface ReceiveItemsDialogProps {
   open: boolean;
@@ -53,6 +54,7 @@ export function ReceiveItemsDialog({ open, onOpenChange, issueId, onSuccess }: R
   const [receiving, setReceiving] = useState(false);
   const { toast } = useToast();
   const { createItems: createReturnItems } = useMaterialReturnItems();
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     if (open && issueId) {
@@ -208,7 +210,8 @@ export function ReceiveItemsDialog({ open, onOpenChange, issueId, onSuccess }: R
               reference_type: 'material_issue',
               reference_id: issueId,
               status: 'draft',
-              company_id: profile?.company_id
+              company_id: profile?.company_id,
+              created_by: user.id
             })
             .select()
             .single();
@@ -227,6 +230,7 @@ export function ReceiveItemsDialog({ open, onOpenChange, issueId, onSuccess }: R
           }));
 
           await createReturnItems(returnItems);
+          await queryClient.invalidateQueries({ queryKey: ['material-returns'] });
           returnReference = returnNote.mrn_number;
         } catch (returnErr: any) {
           console.error('Error creating return:', returnErr);
