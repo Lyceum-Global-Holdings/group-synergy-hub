@@ -489,7 +489,7 @@ export function AssetDetailsDialog({
                   {costPerDay && (
                     <div>
                       <label className="text-sm font-medium text-muted-foreground">Cost per Day</label>
-                      <p className="text-lg font-semibold">${costPerDay.toFixed(2)}</p>
+                      <p className="text-lg font-semibold">Rs. {costPerDay.toFixed(2)}</p>
                     </div>
                   )}
                   
