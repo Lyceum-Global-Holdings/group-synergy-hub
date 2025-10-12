@@ -11,6 +11,8 @@ export type MaterialRequestStatus =
   | 'approved' 
   | 'rejected' 
   | 'issued' 
+  | 'partially_received'
+  | 'completed'
   | 'cancelled';
 
 export type MaterialRequestPriority = 'low' | 'medium' | 'high' | 'urgent';
@@ -203,12 +205,19 @@ export interface MaterialRequestItem {
   item_id: string;
   line_number: number | null;
   item_code: string | null;
+  item_name: string;
   description: string | null;
   unit_of_measure: string;
   quantity_requested: number;
   quantity_approved: number | null;
+  quantity_issued: number;
+  quantity_received: number;
   purpose: string | null;
   notes: string | null;
+  issued_at: string | null;
+  received_at: string | null;
+  received_by: string | null;
+  adjustment_reason: string | null;
   created_at: string;
   updated_at: string;
 }

@@ -27,6 +27,8 @@ const getStatusColor = (status: MaterialRequestStatus): "default" | "destructive
     approved: "default",
     rejected: "destructive",
     issued: "default",
+    partially_received: "secondary",
+    completed: "default",
     cancelled: "secondary",
   };
   return colors[status];

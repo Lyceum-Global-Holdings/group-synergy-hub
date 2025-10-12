@@ -4015,46 +4015,64 @@ export type Database = {
       }
       material_request_items: {
         Row: {
+          adjustment_reason: string | null
           created_at: string
           description: string | null
           id: string
+          issued_at: string | null
           item_code: string | null
           item_id: string
           line_number: number | null
           notes: string | null
           purpose: string | null
           quantity_approved: number | null
+          quantity_issued: number | null
+          quantity_received: number | null
           quantity_requested: number
+          received_at: string | null
+          received_by: string | null
           request_id: string
           unit_of_measure: string
           updated_at: string
         }
         Insert: {
+          adjustment_reason?: string | null
           created_at?: string
           description?: string | null
           id?: string
+          issued_at?: string | null
           item_code?: string | null
           item_id: string
           line_number?: number | null
           notes?: string | null
           purpose?: string | null
           quantity_approved?: number | null
+          quantity_issued?: number | null
+          quantity_received?: number | null
           quantity_requested: number
+          received_at?: string | null
+          received_by?: string | null
           request_id: string
           unit_of_measure?: string
           updated_at?: string
         }
         Update: {
+          adjustment_reason?: string | null
           created_at?: string
           description?: string | null
           id?: string
+          issued_at?: string | null
           item_code?: string | null
           item_id?: string
           line_number?: number | null
           notes?: string | null
           purpose?: string | null
           quantity_approved?: number | null
+          quantity_issued?: number | null
+          quantity_received?: number | null
           quantity_requested?: number
+          received_at?: string | null
+          received_by?: string | null
           request_id?: string
           unit_of_measure?: string
           updated_at?: string
@@ -4102,13 +4120,13 @@ export type Database = {
           management_comments: string | null
           min_id: string | null
           notes: string | null
-          priority: string
+          priority: Database["public"]["Enums"]["material_request_priority"]
           purpose: string
           rejection_reason: string | null
           request_date: string
           request_number: string
           requested_by: string
-          status: string
+          status: Database["public"]["Enums"]["material_request_status"]
           updated_at: string
         }
         Insert: {
@@ -4129,13 +4147,13 @@ export type Database = {
           management_comments?: string | null
           min_id?: string | null
           notes?: string | null
-          priority?: string
+          priority?: Database["public"]["Enums"]["material_request_priority"]
           purpose: string
           rejection_reason?: string | null
           request_date?: string
           request_number: string
           requested_by: string
-          status?: string
+          status?: Database["public"]["Enums"]["material_request_status"]
           updated_at?: string
         }
         Update: {
@@ -4156,13 +4174,13 @@ export type Database = {
           management_comments?: string | null
           min_id?: string | null
           notes?: string | null
-          priority?: string
+          priority?: Database["public"]["Enums"]["material_request_priority"]
           purpose?: string
           rejection_reason?: string | null
           request_date?: string
           request_number?: string
           requested_by?: string
-          status?: string
+          status?: Database["public"]["Enums"]["material_request_status"]
           updated_at?: string
         }
         Relationships: [
@@ -8516,6 +8534,17 @@ export type Database = {
         | "adjusting"
         | "reversing"
         | "recurring"
+      material_request_priority: "low" | "normal" | "medium" | "high" | "urgent"
+      material_request_status:
+        | "draft"
+        | "pending_hod_approval"
+        | "pending_management_approval"
+        | "approved"
+        | "rejected"
+        | "cancelled"
+        | "issued"
+        | "partially_received"
+        | "completed"
       normal_balance: "debit" | "credit"
       obligation_status:
         | "pending"
@@ -8869,6 +8898,18 @@ export const Constants = {
         "adjusting",
         "reversing",
         "recurring",
+      ],
+      material_request_priority: ["low", "normal", "medium", "high", "urgent"],
+      material_request_status: [
+        "draft",
+        "pending_hod_approval",
+        "pending_management_approval",
+        "approved",
+        "rejected",
+        "cancelled",
+        "issued",
+        "partially_received",
+        "completed",
       ],
       normal_balance: ["debit", "credit"],
       obligation_status: [
