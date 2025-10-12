@@ -218,24 +218,22 @@ export function ReceiveItemsDialog({ open, onOpenChange, issueId, onSuccess }: R
           // Create return items
           const returnItems = varianceItemsForReturn.map(v => ({
             mrn_id: returnNote.id,
-            item_id: v.item.warehouse_item_id,
-            item_code: v.item.item_code,
-            item_name: v.item.description,
+            item_id: v.item.item_id,
             quantity_returned: v.variance,
-            unit_of_measure: v.item.unit_of_measure,
             condition: v.condition || 'good',
             unit_cost: v.item.unit_cost || 0,
             total_cost: (v.item.unit_cost || 0) * v.variance,
-            notes: v.notes || `Variance from ${v.reason || 'receiving'}`
+            notes: v.notes || `Variance from ${v.reason || 'receiving'}: ${v.item.item_code} - ${v.item.description}`
           }));
 
           await createReturnItems(returnItems);
           returnReference = returnNote.mrn_number;
-        } catch (returnErr) {
+        } catch (returnErr: any) {
           console.error('Error creating return:', returnErr);
+          console.error('Return error details:', JSON.stringify(returnErr, null, 2));
           toast({
             title: 'Warning',
-            description: 'Items received but failed to create return note',
+            description: `Items received but failed to create return note: ${returnErr.message || 'Unknown error'}`,
             variant: 'destructive'
           });
         }
