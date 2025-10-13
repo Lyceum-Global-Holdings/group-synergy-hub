@@ -20,12 +20,13 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Plus, Search, Eye, Loader2, FileText, Clock, CheckCircle, XCircle, ExternalLink, Copy, Link2 } from "lucide-react";
 import { useAssetRequests } from "@/hooks/useAssetRequests";
-import { AssetRequestStatus } from "@/types/assetRequest";
+import { AssetRequestStatus, ApprovalLevel } from "@/types/assetRequest";
 import { format } from "date-fns";
 import { CreateAssetRequestDialog } from "./CreateAssetRequestDialog";
 import { AssetRequestDetailsDialog } from "./AssetRequestDetailsDialog";
 import { AssetRequestApprovalDialog } from "./AssetRequestApprovalDialog";
 import { toast } from "@/hooks/use-toast";
+import { useCurrentUserRoles } from "@/hooks/useCurrentUserRoles";
 
 export function AssetRequestsTab() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -34,10 +35,30 @@ export function AssetRequestsTab() {
   const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false);
   const [isApprovalDialogOpen, setIsApprovalDialogOpen] = useState(false);
   const [selectedRequest, setSelectedRequest] = useState<any>(null);
+  const [approvalLevel, setApprovalLevel] = useState<ApprovalLevel>("hod");
 
   const { assetRequests, isLoading } = useAssetRequests(
     statusFilter !== "all" ? { status: statusFilter } : undefined
   );
+  const { data: userRoles = [] } = useCurrentUserRoles();
+
+  // Determine user permissions
+  const isHOD = userRoles.some(r => r.role === 'admin' || r.role === 'hod');
+  const isProcurement = userRoles.some(r => r.role === 'admin' || r.role === 'procurement');
+  const isAdmin = userRoles.some(r => r.role === 'admin' || r.role === 'super_admin');
+
+  const canApproveRequest = (request: any) => {
+    if (isAdmin) return true;
+    if (request.status === 'pending_hod_approval' && isHOD) return true;
+    if (request.status === 'pending_procurement_approval' && isProcurement) return true;
+    return false;
+  };
+
+  const getApprovalLevel = (request: any): ApprovalLevel => {
+    if (request.status === 'pending_hod_approval') return 'hod';
+    if (request.status === 'pending_procurement_approval') return 'procurement';
+    return 'hod';
+  };
 
   const filteredRequests = assetRequests.filter((request) => {
     const matchesSearch =
@@ -340,15 +361,18 @@ export function AssetRequestsTab() {
         open={isDetailsDialogOpen}
         onOpenChange={setIsDetailsDialogOpen}
         onApprove={(requestId) => {
+          const level = getApprovalLevel(selectedRequest);
+          setApprovalLevel(level);
           setIsDetailsDialogOpen(false);
           setIsApprovalDialogOpen(true);
         }}
-        canApprove={false} // TODO: Implement role-based permissions
+        canApprove={selectedRequest ? canApproveRequest(selectedRequest) : false}
       />
 
       <AssetRequestApprovalDialog
         requestId={selectedRequest?.id}
-        approvalLevel="hod" // TODO: Determine based on user role
+        request={selectedRequest}
+        approvalLevel={approvalLevel}
         open={isApprovalDialogOpen}
         onOpenChange={setIsApprovalDialogOpen}
       />
