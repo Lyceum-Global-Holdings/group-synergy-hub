@@ -18,7 +18,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Plus, Search, Eye, Loader2, FileText, Clock, CheckCircle, XCircle } from "lucide-react";
+import { Plus, Search, Eye, Loader2, FileText, Clock, CheckCircle, XCircle, ExternalLink } from "lucide-react";
 import { useAssetRequests } from "@/hooks/useAssetRequests";
 import { AssetRequestStatus } from "@/types/assetRequest";
 import { format } from "date-fns";
@@ -169,10 +169,19 @@ export function AssetRequestsTab() {
           </Select>
         </div>
 
-        <Button onClick={() => setIsCreateDialogOpen(true)}>
-          <Plus className="mr-2 h-4 w-4" />
-          New Request
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            onClick={() => window.open('/request-asset', '_blank')}
+          >
+            <ExternalLink className="mr-2 h-4 w-4" />
+            Public Request Form
+          </Button>
+          <Button onClick={() => setIsCreateDialogOpen(true)}>
+            <Plus className="mr-2 h-4 w-4" />
+            New Request
+          </Button>
+        </div>
       </div>
 
       {/* Requests Table */}
