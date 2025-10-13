@@ -228,6 +228,263 @@ export type Database = {
           },
         ]
       }
+      asset_request_approvals: {
+        Row: {
+          action: Database["public"]["Enums"]["asset_approval_action"]
+          approval_level: Database["public"]["Enums"]["asset_approval_level"]
+          approver_id: string
+          comments: string | null
+          created_at: string
+          id: string
+          request_id: string
+        }
+        Insert: {
+          action: Database["public"]["Enums"]["asset_approval_action"]
+          approval_level: Database["public"]["Enums"]["asset_approval_level"]
+          approver_id: string
+          comments?: string | null
+          created_at?: string
+          id?: string
+          request_id: string
+        }
+        Update: {
+          action?: Database["public"]["Enums"]["asset_approval_action"]
+          approval_level?: Database["public"]["Enums"]["asset_approval_level"]
+          approver_id?: string
+          comments?: string | null
+          created_at?: string
+          id?: string
+          request_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "asset_request_approvals_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "asset_requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      asset_request_items: {
+        Row: {
+          asset_master_id: string | null
+          brand: string | null
+          category_id: string | null
+          created_at: string
+          fulfillment_method:
+            | Database["public"]["Enums"]["asset_fulfillment_method"]
+            | null
+          id: string
+          item_description: string | null
+          item_name: string
+          justification: string | null
+          line_number: number | null
+          notes: string | null
+          preferred_vendor: string | null
+          quantity_approved: number | null
+          quantity_fulfilled: number | null
+          quantity_requested: number
+          request_id: string
+          request_type: Database["public"]["Enums"]["asset_request_item_type"]
+          specifications: string | null
+          status:
+            | Database["public"]["Enums"]["asset_request_item_status"]
+            | null
+          subcategory_id: string | null
+          total_price_estimate: number | null
+          unit_price_estimate: number | null
+          updated_at: string
+          warehouse_asset_id: string | null
+        }
+        Insert: {
+          asset_master_id?: string | null
+          brand?: string | null
+          category_id?: string | null
+          created_at?: string
+          fulfillment_method?:
+            | Database["public"]["Enums"]["asset_fulfillment_method"]
+            | null
+          id?: string
+          item_description?: string | null
+          item_name: string
+          justification?: string | null
+          line_number?: number | null
+          notes?: string | null
+          preferred_vendor?: string | null
+          quantity_approved?: number | null
+          quantity_fulfilled?: number | null
+          quantity_requested: number
+          request_id: string
+          request_type: Database["public"]["Enums"]["asset_request_item_type"]
+          specifications?: string | null
+          status?:
+            | Database["public"]["Enums"]["asset_request_item_status"]
+            | null
+          subcategory_id?: string | null
+          total_price_estimate?: number | null
+          unit_price_estimate?: number | null
+          updated_at?: string
+          warehouse_asset_id?: string | null
+        }
+        Update: {
+          asset_master_id?: string | null
+          brand?: string | null
+          category_id?: string | null
+          created_at?: string
+          fulfillment_method?:
+            | Database["public"]["Enums"]["asset_fulfillment_method"]
+            | null
+          id?: string
+          item_description?: string | null
+          item_name?: string
+          justification?: string | null
+          line_number?: number | null
+          notes?: string | null
+          preferred_vendor?: string | null
+          quantity_approved?: number | null
+          quantity_fulfilled?: number | null
+          quantity_requested?: number
+          request_id?: string
+          request_type?: Database["public"]["Enums"]["asset_request_item_type"]
+          specifications?: string | null
+          status?:
+            | Database["public"]["Enums"]["asset_request_item_status"]
+            | null
+          subcategory_id?: string | null
+          total_price_estimate?: number | null
+          unit_price_estimate?: number | null
+          updated_at?: string
+          warehouse_asset_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "asset_request_items_asset_master_id_fkey"
+            columns: ["asset_master_id"]
+            isOneToOne: false
+            referencedRelation: "asset_master"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "asset_request_items_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "asset_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "asset_request_items_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "asset_requests"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "asset_request_items_subcategory_id_fkey"
+            columns: ["subcategory_id"]
+            isOneToOne: false
+            referencedRelation: "asset_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "asset_request_items_warehouse_asset_id_fkey"
+            columns: ["warehouse_asset_id"]
+            isOneToOne: false
+            referencedRelation: "warehouse_assets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      asset_requests: {
+        Row: {
+          company_id: string | null
+          contact_number: string | null
+          created_at: string
+          created_by: string | null
+          department: string | null
+          fulfilled_by: string | null
+          fulfilled_date: string | null
+          hod_approval_date: string | null
+          hod_approved_by: string | null
+          hod_comments: string | null
+          id: string
+          justification: string | null
+          notes: string | null
+          priority: Database["public"]["Enums"]["asset_request_priority"]
+          procurement_approval_date: string | null
+          procurement_approved_by: string | null
+          procurement_comments: string | null
+          purpose: string
+          rejection_reason: string | null
+          request_date: string
+          request_number: string
+          requested_by: string | null
+          requester_name: string
+          required_date: string
+          status: Database["public"]["Enums"]["asset_request_status"]
+          total_estimated_cost: number | null
+          updated_at: string
+        }
+        Insert: {
+          company_id?: string | null
+          contact_number?: string | null
+          created_at?: string
+          created_by?: string | null
+          department?: string | null
+          fulfilled_by?: string | null
+          fulfilled_date?: string | null
+          hod_approval_date?: string | null
+          hod_approved_by?: string | null
+          hod_comments?: string | null
+          id?: string
+          justification?: string | null
+          notes?: string | null
+          priority?: Database["public"]["Enums"]["asset_request_priority"]
+          procurement_approval_date?: string | null
+          procurement_approved_by?: string | null
+          procurement_comments?: string | null
+          purpose: string
+          rejection_reason?: string | null
+          request_date?: string
+          request_number: string
+          requested_by?: string | null
+          requester_name: string
+          required_date: string
+          status?: Database["public"]["Enums"]["asset_request_status"]
+          total_estimated_cost?: number | null
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string | null
+          contact_number?: string | null
+          created_at?: string
+          created_by?: string | null
+          department?: string | null
+          fulfilled_by?: string | null
+          fulfilled_date?: string | null
+          hod_approval_date?: string | null
+          hod_approved_by?: string | null
+          hod_comments?: string | null
+          id?: string
+          justification?: string | null
+          notes?: string | null
+          priority?: Database["public"]["Enums"]["asset_request_priority"]
+          procurement_approval_date?: string | null
+          procurement_approved_by?: string | null
+          procurement_comments?: string | null
+          purpose?: string
+          rejection_reason?: string | null
+          request_date?: string
+          request_number?: string
+          requested_by?: string | null
+          requester_name?: string
+          required_date?: string
+          status?: Database["public"]["Enums"]["asset_request_status"]
+          total_estimated_cost?: number | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       asset_transfers: {
         Row: {
           asset_id: string
@@ -8317,6 +8574,10 @@ export type Database = {
         }
         Returns: string
       }
+      generate_asset_request_number: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
       generate_bom_number: {
         Args: Record<PropertyKey, never>
         Returns: string
@@ -8494,6 +8755,26 @@ export type Database = {
         | "item_removal"
         | "other"
       app_role: "super_admin" | "admin" | "manager" | "user"
+      asset_approval_action: "approved" | "rejected" | "requested_changes"
+      asset_approval_level: "hod" | "procurement" | "management"
+      asset_fulfillment_method: "from_stock" | "purchase" | "transfer"
+      asset_request_item_status:
+        | "pending"
+        | "approved"
+        | "rejected"
+        | "fulfilled"
+        | "partially_fulfilled"
+      asset_request_item_type: "from_master" | "new_item"
+      asset_request_priority: "low" | "medium" | "high" | "urgent"
+      asset_request_status:
+        | "draft"
+        | "pending_hod_approval"
+        | "pending_procurement_approval"
+        | "approved"
+        | "rejected"
+        | "fulfilled"
+        | "partially_fulfilled"
+        | "cancelled"
       billing_frequency:
         | "one_time"
         | "monthly"
@@ -8855,6 +9136,28 @@ export const Constants = {
         "other",
       ],
       app_role: ["super_admin", "admin", "manager", "user"],
+      asset_approval_action: ["approved", "rejected", "requested_changes"],
+      asset_approval_level: ["hod", "procurement", "management"],
+      asset_fulfillment_method: ["from_stock", "purchase", "transfer"],
+      asset_request_item_status: [
+        "pending",
+        "approved",
+        "rejected",
+        "fulfilled",
+        "partially_fulfilled",
+      ],
+      asset_request_item_type: ["from_master", "new_item"],
+      asset_request_priority: ["low", "medium", "high", "urgent"],
+      asset_request_status: [
+        "draft",
+        "pending_hod_approval",
+        "pending_procurement_approval",
+        "approved",
+        "rejected",
+        "fulfilled",
+        "partially_fulfilled",
+        "cancelled",
+      ],
       billing_frequency: [
         "one_time",
         "monthly",
