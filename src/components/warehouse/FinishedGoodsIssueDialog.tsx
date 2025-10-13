@@ -39,18 +39,30 @@ export function FinishedGoodsIssueDialog({
     if (open && salesOrderItems?.length) {
       const pendingItems = salesOrderItems
         .filter(item => item.quantity_ordered > item.quantity_issued)
-        .map(item => ({
-          sales_order_item_id: item.id,
-          finished_good_id: item.finished_good_id,
-          item_name: item.item_name,
-          quantity_to_issue: item.quantity_ordered - item.quantity_issued,
-          max_quantity: Math.min(item.quantity_ordered - item.quantity_issued, item.finished_goods?.[0]?.available_stock || 0),
-          available_stock: item.finished_goods?.[0]?.available_stock || 0,
-          from_location_id: "",
-          from_bin_id: "",
-          batch_number: "",
-          notes: ""
-        }));
+        .map(item => {
+          // Calculate available stock from finished goods AND warehouse items
+          const finishedGoodsStock = item.finished_goods?.[0]?.available_stock || 0;
+          const warehouseItemStock = item.finished_goods?.[0]?.warehouse_items?.available_stock || 0;
+          
+          // Total available stock is the sum from both sources
+          const totalAvailableStock = finishedGoodsStock + warehouseItemStock;
+          
+          // CPO remaining quantity (what still needs to be issued)
+          const cpoRemaining = item.quantity_ordered - item.quantity_issued;
+          
+          return {
+            sales_order_item_id: item.id,
+            finished_good_id: item.finished_good_id,
+            item_name: item.item_name,
+            quantity_to_issue: Math.min(cpoRemaining, totalAvailableStock),
+            max_quantity: cpoRemaining, // MAX is the CPO requirement
+            available_stock: totalAvailableStock, // Available in warehouse
+            from_location_id: "",
+            from_bin_id: "",
+            batch_number: "",
+            notes: ""
+          };
+        });
       setIssueItems(pendingItems);
     }
   }, [open, salesOrderItems]);
@@ -75,10 +87,7 @@ export function FinishedGoodsIssueDialog({
         return { valid: false, message: `Invalid quantity for ${item.item_name}` };
       }
       if (item.quantity_to_issue > item.available_stock) {
-        return { valid: false, message: `Insufficient stock for ${item.item_name}` };
-      }
-      if (item.quantity_to_issue > item.max_quantity) {
-        return { valid: false, message: `Quantity exceeds remaining order for ${item.item_name}` };
+        return { valid: false, message: `Insufficient stock for ${item.item_name}. Available: ${item.available_stock}` };
       }
     }
 
@@ -151,7 +160,7 @@ export function FinishedGoodsIssueDialog({
                     <div>
                       <div className="font-medium">{item.item_name}</div>
                       <div className="text-sm text-muted-foreground">
-                        Available Stock: {item.available_stock} | Max to Issue: {item.max_quantity}
+                        Available in Warehouse: {item.available_stock} | CPO Remaining: {item.max_quantity}
                       </div>
                     </div>
                     <Button
@@ -169,7 +178,7 @@ export function FinishedGoodsIssueDialog({
                       <Input
                         type="number"
                         min="0"
-                        max={Math.min(item.max_quantity, item.available_stock)}
+                        max={item.available_stock}
                         value={item.quantity_to_issue}
                         onChange={(e) => updateIssueItem(index, 'quantity_to_issue', parseFloat(e.target.value) || 0)}
                       />
