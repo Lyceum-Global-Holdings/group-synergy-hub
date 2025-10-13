@@ -201,6 +201,52 @@ export const useWarehouseItems = () => {
     }
   });
 
+  const bulkCreateItemsMutation = useMutation({
+    mutationFn: async (itemsData: CreateWarehouseItemData[]) => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User not authenticated');
+
+      const itemsWithUser = itemsData.map(item => ({
+        ...item,
+        created_by: user.id
+      }));
+
+      const { data, error } = await supabase
+        .from('warehouse_items')
+        .insert(itemsWithUser)
+        .select();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['warehouse-items'] });
+      toast({
+        title: "Success",
+        description: `Successfully imported ${data.length} items`,
+      });
+    },
+    onError: (error: any) => {
+      console.error('Error bulk creating items:', error);
+      
+      let errorMessage = "Failed to import items";
+      
+      if (error?.message?.includes('warehouse_items_sku_company_id_key')) {
+        errorMessage = "One or more items have duplicate SKU for the company";
+      } else if (error?.message?.includes('warehouse_items_barcode_key')) {
+        errorMessage = "One or more items have duplicate barcode";
+      } else if (error?.message?.includes('warehouse_items_item_code_key')) {
+        errorMessage = "One or more items have duplicate item code";
+      }
+      
+      toast({
+        title: "Error",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    }
+  });
+
   return {
     items,
     isLoading,
@@ -215,5 +261,8 @@ export const useWarehouseItems = () => {
     isUpdating: updateItemMutation.isPending,
     isDeleting: deleteItemMutation.isPending,
     isMarkingInactive: markItemInactiveMutation.isPending,
+    bulkCreateItems: bulkCreateItemsMutation.mutate,
+    bulkCreateItemsAsync: bulkCreateItemsMutation.mutateAsync,
+    isBulkCreating: bulkCreateItemsMutation.isPending,
   };
 };

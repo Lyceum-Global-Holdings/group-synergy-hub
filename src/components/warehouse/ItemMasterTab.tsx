@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Plus, Search, Edit, Trash2, History, Settings } from 'lucide-react';
+import { BulkItemImportDialog } from '@/components/warehouse/BulkItemImportDialog';
 import {
   Table,
   TableBody,
@@ -70,10 +71,13 @@ export function ItemMasterTab() {
             />
           </div>
         </div>
-        <Button onClick={() => setIsCreateDialogOpen(true)}>
-          <Plus className="mr-2 h-4 w-4" />
-          Add Item
-        </Button>
+        <div className="flex items-center gap-2">
+          <BulkItemImportDialog />
+          <Button onClick={() => setIsCreateDialogOpen(true)}>
+            <Plus className="mr-2 h-4 w-4" />
+            Add Item
+          </Button>
+        </div>
       </div>
 
       <div className="border rounded-lg">
