@@ -116,7 +116,7 @@ export function CreateAssetRequestDialog({
       itemForm.setValue("item_name", asset.asset_name);
       itemForm.setValue("brand", asset.brand || "");
       itemForm.setValue("category_id", asset.category_id || "");
-      itemForm.setValue("unit_price_estimate", asset.purchase_price || 0);
+      itemForm.setValue("unit_price_estimate", 0);
       itemForm.setValue("item_description", asset.description || "");
     }
   };
@@ -130,9 +130,9 @@ export function CreateAssetRequestDialog({
       item_description: data.item_description,
       brand: data.brand,
       category_id: data.category_id,
-      quantity_requested: data.quantity_requested,
-      unit_price_estimate: data.unit_price_estimate,
-      total_price_estimate: (data.unit_price_estimate || 0) * data.quantity_requested,
+      quantity_requested: itemType === "from_master" ? 1 : data.quantity_requested,
+      unit_price_estimate: itemType === "from_master" ? 0 : data.unit_price_estimate,
+      total_price_estimate: itemType === "from_master" ? 0 : (data.unit_price_estimate || 0) * data.quantity_requested,
       specifications: data.specifications,
       justification: data.justification,
       preferred_vendor: data.preferred_vendor,
@@ -370,36 +370,21 @@ export function CreateAssetRequestDialog({
                             )}
                             <div className="flex-1">
                               <p className="font-medium">{selectedAssetMaster.asset_name}</p>
-                              <p className="text-sm text-muted-foreground">
-                                {selectedAssetMaster.brand} •{" "}
-                                {selectedAssetMaster.purchase_price?.toLocaleString()}
-                              </p>
+                              {selectedAssetMaster.brand && (
+                                <p className="text-sm text-muted-foreground">
+                                  Brand: {selectedAssetMaster.brand}
+                                </p>
+                              )}
                             </div>
                           </div>
                         </CardContent>
                       </Card>
                     )}
 
-                    <div className="grid grid-cols-2 gap-4">
-                      <FormField
-                        control={itemForm.control}
-                        name="quantity_requested"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Quantity *</FormLabel>
-                            <FormControl>
-                              <Input
-                                type="number"
-                                {...field}
-                                onChange={(e) =>
-                                  field.onChange(parseInt(e.target.value))
-                                }
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
+                    <div className="space-y-4">
+                      <div className="text-sm text-muted-foreground p-3 bg-muted/50 rounded-md">
+                        Quantity and pricing will be determined during the approval process
+                      </div>
 
                       <FormField
                         control={itemForm.control}
@@ -408,7 +393,7 @@ export function CreateAssetRequestDialog({
                           <FormItem>
                             <FormLabel>Justification</FormLabel>
                             <FormControl>
-                              <Input {...field} placeholder="Why this item?" />
+                              <Textarea {...field} placeholder="Why do you need this asset?" rows={2} />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -585,16 +570,20 @@ export function CreateAssetRequestDialog({
                         className="flex items-center justify-between p-3 bg-muted rounded-lg"
                       >
                         <div className="flex-1">
-                          <p className="font-medium">{item.item_name}</p>
-                          <p className="text-sm text-muted-foreground">
-                            Qty: {item.quantity_requested} • Est: LKR{" "}
-                            {item.total_price_estimate?.toLocaleString()}
-                          </p>
-                          <Badge variant="outline" className="mt-1">
-                            {item.request_type === "from_master"
-                              ? "From Master"
-                              : "New Item"}
-                          </Badge>
+                          <div className="flex items-center gap-2">
+                            <p className="font-medium">{item.item_name}</p>
+                            <Badge variant="outline">
+                              {item.request_type === "from_master"
+                                ? "From Master"
+                                : "New Item"}
+                            </Badge>
+                          </div>
+                          {item.request_type === "new_item" && (
+                            <p className="text-sm text-muted-foreground mt-1">
+                              Qty: {item.quantity_requested} • Est: LKR{" "}
+                              {item.total_price_estimate?.toLocaleString()}
+                            </p>
+                          )}
                         </div>
                         <Button
                           variant="ghost"
@@ -606,12 +595,14 @@ export function CreateAssetRequestDialog({
                       </div>
                     ))}
                   </div>
-                  <div className="mt-4 pt-4 border-t">
-                    <div className="flex justify-between text-lg font-semibold">
-                      <span>Total Estimated Cost:</span>
-                      <span>LKR {totalEstimate.toLocaleString()}</span>
+                  {items.some(item => item.request_type === "new_item") && (
+                    <div className="mt-4 pt-4 border-t">
+                      <div className="flex justify-between text-lg font-semibold">
+                        <span>Total Estimated Cost (New Items):</span>
+                        <span>LKR {totalEstimate.toLocaleString()}</span>
+                      </div>
                     </div>
-                  </div>
+                  )}
                 </CardContent>
               </Card>
             )}
