@@ -44,8 +44,8 @@ export function FinishedGoodsIssueDialog({
           finished_good_id: item.finished_good_id,
           item_name: item.item_name,
           quantity_to_issue: item.quantity_ordered - item.quantity_issued,
-          max_quantity: item.quantity_ordered - item.quantity_issued,
-          available_stock: item.finished_goods?.[0]?.current_stock || 0,
+          max_quantity: Math.min(item.quantity_ordered - item.quantity_issued, item.finished_goods?.[0]?.available_stock || 0),
+          available_stock: item.finished_goods?.[0]?.available_stock || 0,
           from_location_id: "",
           from_bin_id: "",
           batch_number: "",
@@ -151,7 +151,7 @@ export function FinishedGoodsIssueDialog({
                     <div>
                       <div className="font-medium">{item.item_name}</div>
                       <div className="text-sm text-muted-foreground">
-                        Available: {item.available_stock} | Max to issue: {item.max_quantity}
+                        Available Stock: {item.available_stock} | Max to Issue: {item.max_quantity}
                       </div>
                     </div>
                     <Button
