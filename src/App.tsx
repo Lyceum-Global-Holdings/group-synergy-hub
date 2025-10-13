@@ -39,6 +39,7 @@ import StockTransfer from "./pages/warehouse/StockTransfer";
 import CycleCount from "./pages/warehouse/CycleCount";
 import DeliveryOrder from "./pages/warehouse/DeliveryOrder";
 import PublicAssetView from "./pages/PublicAssetView";
+import PublicAssetRequest from "./pages/PublicAssetRequest";
 import GeneralLedger from "./pages/finance/GeneralLedger";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
@@ -57,6 +58,7 @@ function App() {
               <Routes>
                 <Route path="/auth" element={<Auth />} />
                 <Route path="/asset/:assetId" element={<PublicAssetView />} />
+                <Route path="/request-asset" element={<PublicAssetRequest />} />
                 <Route path="/" element={
                   <ProtectedRoute>
                     <AppLayout>
