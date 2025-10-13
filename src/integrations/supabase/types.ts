@@ -4645,6 +4645,62 @@ export type Database = {
           },
         ]
       }
+      po_amendments: {
+        Row: {
+          amendment_date: string
+          amendment_number: string
+          amendment_type: Database["public"]["Enums"]["po_amendment_type"]
+          approved_by: string | null
+          approved_date: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          new_value: Json | null
+          notes: string | null
+          po_id: string
+          previous_value: Json | null
+          reason: string
+        }
+        Insert: {
+          amendment_date?: string
+          amendment_number: string
+          amendment_type: Database["public"]["Enums"]["po_amendment_type"]
+          approved_by?: string | null
+          approved_date?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          new_value?: Json | null
+          notes?: string | null
+          po_id: string
+          previous_value?: Json | null
+          reason: string
+        }
+        Update: {
+          amendment_date?: string
+          amendment_number?: string
+          amendment_type?: Database["public"]["Enums"]["po_amendment_type"]
+          approved_by?: string | null
+          approved_date?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          new_value?: Json | null
+          notes?: string | null
+          po_id?: string
+          previous_value?: Json | null
+          reason?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "po_amendments_po_id_fkey"
+            columns: ["po_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       po_approvals: {
         Row: {
           action: Database["public"]["Enums"]["po_status"]
@@ -8321,6 +8377,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: string
       }
+      generate_po_amendment_number: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
       generate_po_number: {
         Args: Record<PropertyKey, never>
         Returns: string
@@ -8563,6 +8623,14 @@ export type Database = {
         | "renewal_action"
         | "inspection"
       period_status: "open" | "closed" | "locked"
+      po_amendment_type:
+        | "price_change"
+        | "quantity_change"
+        | "delivery_date_change"
+        | "terms_change"
+        | "item_addition"
+        | "item_removal"
+        | "other"
       po_status:
         | "draft"
         | "pending_approval"
@@ -8931,6 +8999,15 @@ export const Constants = {
         "inspection",
       ],
       period_status: ["open", "closed", "locked"],
+      po_amendment_type: [
+        "price_change",
+        "quantity_change",
+        "delivery_date_change",
+        "terms_change",
+        "item_addition",
+        "item_removal",
+        "other",
+      ],
       po_status: [
         "draft",
         "pending_approval",

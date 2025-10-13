@@ -8,12 +8,15 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { PurchaseOrder, PoStatus } from "@/types/purchaseOrder";
 import { format } from "date-fns";
-import { Send, Package, Edit, FileText, Check, X, Clock } from "lucide-react";
+import { Send, Package, Edit, FileText, Check, X, Clock, FilePlus } from "lucide-react";
 import { useSendPurchaseOrder } from "@/hooks/usePurchaseOrders";
 import { useSubmitPurchaseOrder, useApprovePurchaseOrder, usePurchaseOrderApprovals } from "@/hooks/usePurchaseOrderApprovals";
 import { useState } from "react";
 import { CreateGrnDialog } from "@/components/warehouse/CreateGrnDialog";
 import { GrnListForPo } from "@/components/procurement/GrnListForPo";
+import { CreatePoAmendmentDialog } from "@/components/procurement/CreatePoAmendmentDialog";
+import { PoAmendmentsTab } from "@/components/procurement/PoAmendmentsTab";
+import { useCurrentUserRoles } from "@/hooks/useCurrentUserRoles";
 
 interface PoDetailsDialogProps {
   open: boolean;
@@ -48,16 +51,21 @@ const statusLabels: Record<PoStatus, string> = {
 export function PoDetailsDialog({ open, onOpenChange, purchaseOrder }: PoDetailsDialogProps) {
   const [comments, setComments] = useState("");
   const [showGrnDialog, setShowGrnDialog] = useState(false);
+  const [showAmendmentDialog, setShowAmendmentDialog] = useState(false);
   
   const sendMutation = useSendPurchaseOrder();
   const submitMutation = useSubmitPurchaseOrder();
   const approveMutation = useApprovePurchaseOrder();
   const { data: approvals = [] } = usePurchaseOrderApprovals(purchaseOrder.id);
+  const { data: userRoles = [] } = useCurrentUserRoles();
+  
+  const isAdmin = userRoles.some(role => role.role === 'admin' || role.role === 'super_admin');
 
   const canSubmit = purchaseOrder.status === 'draft';
   const canApprove = purchaseOrder.status === 'pending_approval';
   const canSend = purchaseOrder.status === 'approved';
   const canReceive = ['sent', 'acknowledged', 'partially_received'].includes(purchaseOrder.status);
+  const canAmend = !['cancelled', 'completed'].includes(purchaseOrder.status);
 
   const handleSubmit = () => {
     submitMutation.mutate(purchaseOrder.id);
@@ -130,15 +138,22 @@ export function PoDetailsDialog({ open, onOpenChange, purchaseOrder }: PoDetails
                   Create GRN
                 </Button>
               )}
+              {canAmend && (
+                <Button size="sm" variant="outline" onClick={() => setShowAmendmentDialog(true)}>
+                  <FilePlus className="h-4 w-4 mr-2" />
+                  Create Amendment
+                </Button>
+              )}
             </div>
           </div>
         </DialogHeader>
 
         <Tabs defaultValue="details" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="details">Details</TabsTrigger>
             <TabsTrigger value="items">Items</TabsTrigger>
             <TabsTrigger value="grns">GRNs</TabsTrigger>
+            <TabsTrigger value="amendments">Amendments</TabsTrigger>
             <TabsTrigger value="approvals">Approvals</TabsTrigger>
           </TabsList>
 
@@ -375,6 +390,10 @@ export function PoDetailsDialog({ open, onOpenChange, purchaseOrder }: PoDetails
             </Card>
           </TabsContent>
 
+          <TabsContent value="amendments" className="space-y-6">
+            <PoAmendmentsTab poId={purchaseOrder.id} isAdmin={isAdmin} />
+          </TabsContent>
+
           <TabsContent value="approvals" className="space-y-6">
             {/* Approval Actions */}
             {canApprove && (
@@ -452,6 +471,13 @@ export function PoDetailsDialog({ open, onOpenChange, purchaseOrder }: PoDetails
           open={showGrnDialog}
           onOpenChange={setShowGrnDialog}
           preselectedPo={purchaseOrder}
+        />
+
+        {/* PO Amendment Creation Dialog */}
+        <CreatePoAmendmentDialog
+          open={showAmendmentDialog}
+          onOpenChange={setShowAmendmentDialog}
+          poId={purchaseOrder.id}
         />
       </DialogContent>
     </Dialog>

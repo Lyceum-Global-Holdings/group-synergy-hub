@@ -166,3 +166,41 @@ export interface PoSummary {
   pending_deliveries: number;
   total_value: number;
 }
+
+export type PoAmendmentType = 
+  | 'price_change'
+  | 'quantity_change'
+  | 'delivery_date_change'
+  | 'terms_change'
+  | 'item_addition'
+  | 'item_removal'
+  | 'other';
+
+export interface PoAmendment {
+  id: string;
+  amendment_number: string;
+  po_id: string;
+  amendment_type: PoAmendmentType;
+  amendment_date: string;
+  reason: string;
+  notes?: string;
+  previous_value?: any;
+  new_value?: any;
+  created_by?: string;
+  created_at: string;
+  approved_by?: string;
+  approved_date?: string;
+  approver_profile?: {
+    full_name?: string;
+    email?: string;
+  };
+}
+
+export interface CreatePoAmendmentData {
+  po_id: string;
+  amendment_type: PoAmendmentType;
+  reason: string;
+  notes?: string;
+  previous_value?: any;
+  new_value?: any;
+}
