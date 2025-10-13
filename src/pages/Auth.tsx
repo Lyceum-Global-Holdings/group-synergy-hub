@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Users, AlertCircle, CheckCircle } from 'lucide-react';
+import { Loader2, Users, AlertCircle, CheckCircle, ExternalLink } from 'lucide-react';
 
 export default function Auth() {
   const [email, setEmail] = useState('');
@@ -253,6 +253,30 @@ export default function Auth() {
         </div>
 
         <div className="mb-4 space-y-3">
+          <div className="bg-accent/50 rounded-lg p-4 border border-primary/20">
+            <p className="text-sm font-medium mb-3">No account? Submit via our public forms:</p>
+            <div className="flex flex-col gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => navigate("/register-supplier")}
+                className="w-full justify-start"
+              >
+                <ExternalLink className="w-4 h-4 mr-2" />
+                Supplier Registration
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => navigate("/request-asset")}
+                className="w-full justify-start"
+              >
+                <ExternalLink className="w-4 h-4 mr-2" />
+                Asset Request
+              </Button>
+            </div>
+          </div>
+
           <Alert>
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>

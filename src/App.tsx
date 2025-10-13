@@ -43,6 +43,7 @@ import PublicAssetRequest from "./pages/PublicAssetRequest";
 import GeneralLedger from "./pages/finance/GeneralLedger";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
+import PublicForms from "./pages/PublicForms";
 
 const queryClient = new QueryClient();
 
@@ -57,6 +58,7 @@ function App() {
             <BrowserRouter>
               <Routes>
                 <Route path="/auth" element={<Auth />} />
+                <Route path="/public" element={<PublicForms />} />
                 <Route path="/asset/:assetId" element={<PublicAssetView />} />
                 <Route path="/request-asset" element={<PublicAssetRequest />} />
                 <Route path="/" element={
