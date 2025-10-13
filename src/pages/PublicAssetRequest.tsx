@@ -31,7 +31,6 @@ const formSchema = z.object({
   justification: z.string().optional(),
   required_date: z.string().min(1, "Required date is required"),
   priority: z.enum(["low", "medium", "high", "urgent"]),
-  items: z.array(itemSchema).min(1, "At least one item is required"),
 });
 
 type FormData = z.infer<typeof formSchema>;
@@ -54,6 +53,8 @@ export default function PublicAssetRequest() {
   ]);
   const { toast } = useToast();
 
+  const [itemsError, setItemsError] = useState("");
+
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -65,7 +66,6 @@ export default function PublicAssetRequest() {
       justification: "",
       required_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
       priority: "medium",
-      items: [{ item_name: "", quantity_requested: 1 }],
     },
   });
 
@@ -86,10 +86,13 @@ export default function PublicAssetRequest() {
   const onSubmit = async (data: FormData) => {
     try {
       setIsSubmitting(true);
+      setItemsError("");
 
       // Validate items
       const validItems = items.filter(item => item.item_name.trim() !== "");
       if (validItems.length === 0) {
+        setItemsError("Please add at least one item to your request");
+        setIsSubmitting(false);
         toast({
           title: "Validation Error",
           description: "Please add at least one item to your request",
@@ -327,6 +330,9 @@ export default function PublicAssetRequest() {
                     Add Item
                   </Button>
                 </div>
+                {itemsError && (
+                  <p className="text-sm text-destructive">{itemsError}</p>
+                )}
 
                 <div className="space-y-4">
                   {items.map((item, index) => (
