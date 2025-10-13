@@ -18,13 +18,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Plus, Search, Eye, Loader2, FileText, Clock, CheckCircle, XCircle, ExternalLink } from "lucide-react";
+import { Plus, Search, Eye, Loader2, FileText, Clock, CheckCircle, XCircle, ExternalLink, Copy, Link2 } from "lucide-react";
 import { useAssetRequests } from "@/hooks/useAssetRequests";
 import { AssetRequestStatus } from "@/types/assetRequest";
 import { format } from "date-fns";
 import { CreateAssetRequestDialog } from "./CreateAssetRequestDialog";
 import { AssetRequestDetailsDialog } from "./AssetRequestDetailsDialog";
 import { AssetRequestApprovalDialog } from "./AssetRequestApprovalDialog";
+import { toast } from "@/hooks/use-toast";
 
 export function AssetRequestsTab() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -82,8 +83,58 @@ export function AssetRequestsTab() {
     0
   );
 
+  const publicFormUrl = `${window.location.origin}/request-asset`;
+
+  const copyPublicLink = () => {
+    navigator.clipboard.writeText(publicFormUrl);
+    toast({
+      title: "Link Copied",
+      description: "Public asset request form link copied to clipboard",
+    });
+  };
+
   return (
     <div className="space-y-6">
+      {/* Public Form Link */}
+      <Card className="border-primary/20 bg-primary/5">
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Link2 className="h-5 w-5 text-primary" />
+              <CardTitle className="text-lg">Public Asset Request Form</CardTitle>
+            </div>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={copyPublicLink}
+              >
+                <Copy className="mr-2 h-4 w-4" />
+                Copy Link
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => window.open(publicFormUrl, '_blank')}
+              >
+                <ExternalLink className="mr-2 h-4 w-4" />
+                Open Form
+              </Button>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground mb-2">
+            Share this link with anyone to allow them to submit asset requests without logging in:
+          </p>
+          <div className="flex items-center gap-2 p-3 bg-background rounded-md border">
+            <code className="text-sm flex-1 text-primary font-mono">
+              {publicFormUrl}
+            </code>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Overview Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
@@ -169,19 +220,10 @@ export function AssetRequestsTab() {
           </Select>
         </div>
 
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            onClick={() => window.open('/request-asset', '_blank')}
-          >
-            <ExternalLink className="mr-2 h-4 w-4" />
-            Public Request Form
-          </Button>
-          <Button onClick={() => setIsCreateDialogOpen(true)}>
-            <Plus className="mr-2 h-4 w-4" />
-            New Request
-          </Button>
-        </div>
+        <Button onClick={() => setIsCreateDialogOpen(true)}>
+          <Plus className="mr-2 h-4 w-4" />
+          New Request
+        </Button>
       </div>
 
       {/* Requests Table */}
