@@ -50,247 +50,309 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <CompanyProvider>
-          <TooltipProvider>
-            <Toaster />
-            <Sonner />
-            <BrowserRouter>
-              <Routes>
-                <Route path="/auth" element={<Auth />} />
-                <Route path="/asset/:assetId" element={<PublicAssetView />} />
-                <Route path="/request-asset" element={<PublicAssetRequest />} />
-                <Route path="/" element={
-                  <ProtectedRoute>
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          <BrowserRouter>
+            <Routes>
+              <Route path="/auth" element={<Auth />} />
+              <Route path="/asset/:assetId" element={<PublicAssetView />} />
+              <Route path="/request-asset" element={<PublicAssetRequest />} />
+              <Route path="/register-supplier" element={<PublicSupplierRegistration />} />
+              <Route path="/" element={
+                <ProtectedRoute>
+                  <CompanyProvider>
                     <AppLayout>
                       <Dashboard />
                     </AppLayout>
-                  </ProtectedRoute>
-                } />
-                <Route path="/admin/companies" element={
-                  <ProtectedRoute>
+                  </CompanyProvider>
+                </ProtectedRoute>
+              } />
+              <Route path="/admin/companies" element={
+                <ProtectedRoute>
+                  <CompanyProvider>
                     <AppLayout>
                       <CompanyManagement />
                     </AppLayout>
-                  </ProtectedRoute>
-                } />
-                <Route path="/admin/users-roles" element={
-                  <ProtectedRoute>
+                  </CompanyProvider>
+                </ProtectedRoute>
+              } />
+              <Route path="/admin/users-roles" element={
+                <ProtectedRoute>
+                  <CompanyProvider>
                     <AppLayout>
                       <UserRoleManagement />
                     </AppLayout>
-                  </ProtectedRoute>
-                } />
-                <Route path="/admin/modules" element={
-                  <ProtectedRoute>
+                  </CompanyProvider>
+                </ProtectedRoute>
+              } />
+              <Route path="/admin/modules" element={
+                <ProtectedRoute>
+                  <CompanyProvider>
                     <AppLayout>
                       <ModuleAllocation />
                     </AppLayout>
-                  </ProtectedRoute>
-                } />
-                <Route path="/admin/warehouse-management" element={
-                  <ProtectedRoute>
+                  </CompanyProvider>
+                </ProtectedRoute>
+              } />
+              <Route path="/admin/warehouse-management" element={
+                <ProtectedRoute>
+                  <CompanyProvider>
                     <AppLayout>
                       <WarehouseManagement />
                     </AppLayout>
-                  </ProtectedRoute>
-                } />
-                <Route path="/procurement/purchase-requisition" element={
-                  <ProtectedRoute>
+                  </CompanyProvider>
+                </ProtectedRoute>
+              } />
+              <Route path="/procurement/purchase-requisition" element={
+                <ProtectedRoute>
+                  <CompanyProvider>
                     <AppLayout>
                       <PurchaseRequisition />
                     </AppLayout>
-                  </ProtectedRoute>
-                } />
-                <Route path="/procurement/purchase-order" element={
-                  <ProtectedRoute>
+                  </CompanyProvider>
+                </ProtectedRoute>
+              } />
+              <Route path="/procurement/purchase-order" element={
+                <ProtectedRoute>
+                  <CompanyProvider>
                     <AppLayout>
                       <PurchaseOrder />
                     </AppLayout>
-                  </ProtectedRoute>
-                } />
-                <Route path="/tuh-modules/bill-of-materials" element={
-                  <ProtectedRoute>
+                  </CompanyProvider>
+                </ProtectedRoute>
+              } />
+              <Route path="/tuh-modules/bill-of-materials" element={
+                <ProtectedRoute>
+                  <CompanyProvider>
                     <AppLayout>
                       <BillOfMaterials />
                     </AppLayout>
-                  </ProtectedRoute>
-                } />
-                <Route path="/tuh-modules/customer-master" element={
-                  <ProtectedRoute>
+                  </CompanyProvider>
+                </ProtectedRoute>
+              } />
+              <Route path="/tuh-modules/customer-master" element={
+                <ProtectedRoute>
+                  <CompanyProvider>
                     <AppLayout>
                       <CustomerMaster />
                     </AppLayout>
-                  </ProtectedRoute>
-                } />
-                <Route path="/tuh-modules/customer-po" element={
-                  <ProtectedRoute>
+                  </CompanyProvider>
+                </ProtectedRoute>
+              } />
+              <Route path="/tuh-modules/customer-po" element={
+                <ProtectedRoute>
+                  <CompanyProvider>
                     <AppLayout>
                       <CustomerPO />
                     </AppLayout>
-                  </ProtectedRoute>
-                } />
-                {/* Legacy route redirect */}
-                <Route path="/procurement/bill-of-materials" element={
-                  <ProtectedRoute>
+                  </CompanyProvider>
+                </ProtectedRoute>
+              } />
+              {/* Legacy route redirect */}
+              <Route path="/procurement/bill-of-materials" element={
+                <ProtectedRoute>
+                  <CompanyProvider>
                     <AppLayout>
                       <BillOfMaterials />
                     </AppLayout>
-                  </ProtectedRoute>
-                } />
-                <Route path="/procurement/material-demand" element={
-                  <ProtectedRoute>
+                  </CompanyProvider>
+                </ProtectedRoute>
+              } />
+              <Route path="/procurement/material-demand" element={
+                <ProtectedRoute>
+                  <CompanyProvider>
                     <AppLayout>
                       <MaterialDemandPlanning />
                     </AppLayout>
-                  </ProtectedRoute>
-                } />
-                <Route path="/procurement/rfq-rfp" element={
-                  <ProtectedRoute>
+                  </CompanyProvider>
+                </ProtectedRoute>
+              } />
+              <Route path="/procurement/rfq-rfp" element={
+                <ProtectedRoute>
+                  <CompanyProvider>
                     <AppLayout>
                       <RfqRfp />
                     </AppLayout>
-                  </ProtectedRoute>
-                } />
-                <Route path="/procurement/blanket-po" element={
-                  <ProtectedRoute>
+                  </CompanyProvider>
+                </ProtectedRoute>
+              } />
+              <Route path="/procurement/blanket-po" element={
+                <ProtectedRoute>
+                  <CompanyProvider>
                     <AppLayout>
                       <BlanketPurchaseOrder />
                     </AppLayout>
-                  </ProtectedRoute>
-                } />
-                <Route path="/warehouse/stock-adjustment" element={
-                  <ProtectedRoute>
+                  </CompanyProvider>
+                </ProtectedRoute>
+              } />
+              <Route path="/warehouse/stock-adjustment" element={
+                <ProtectedRoute>
+                  <CompanyProvider>
                     <AppLayout>
                       <StockAdjustment />
                     </AppLayout>
-                  </ProtectedRoute>
-                } />
-                <Route path="/sourcing/supplier-master" element={
-                  <ProtectedRoute>
+                  </CompanyProvider>
+                </ProtectedRoute>
+              } />
+              <Route path="/sourcing/supplier-master" element={
+                <ProtectedRoute>
+                  <CompanyProvider>
                     <AppLayout>
                       <SupplierMaster />
                     </AppLayout>
-                  </ProtectedRoute>
-                } />
-                <Route path="/sourcing/supplier-scorecard" element={
-                  <ProtectedRoute>
+                  </CompanyProvider>
+                </ProtectedRoute>
+              } />
+              <Route path="/sourcing/supplier-scorecard" element={
+                <ProtectedRoute>
+                  <CompanyProvider>
                     <AppLayout>
                       <SupplierScorecard />
                     </AppLayout>
-                  </ProtectedRoute>
-                } />
-                <Route path="/sourcing/supplier-evaluation" element={
-                  <ProtectedRoute>
+                  </CompanyProvider>
+                </ProtectedRoute>
+              } />
+              <Route path="/sourcing/supplier-evaluation" element={
+                <ProtectedRoute>
+                  <CompanyProvider>
                     <AppLayout>
                       <SupplierEvaluation />
                     </AppLayout>
-                  </ProtectedRoute>
-                } />
-                <Route path="/sourcing/supplier-registration" element={
-                  <ProtectedRoute>
+                  </CompanyProvider>
+                </ProtectedRoute>
+              } />
+              <Route path="/sourcing/supplier-registration" element={
+                <ProtectedRoute>
+                  <CompanyProvider>
                     <AppLayout>
                       <SupplierRegistration />
                     </AppLayout>
-                  </ProtectedRoute>
-                } />
-                <Route path="/sourcing/contracts" element={
-                  <ProtectedRoute>
+                  </CompanyProvider>
+                </ProtectedRoute>
+              } />
+              <Route path="/sourcing/contracts" element={
+                <ProtectedRoute>
+                  <CompanyProvider>
                     <AppLayout>
                       <Contracts />
                     </AppLayout>
-                  </ProtectedRoute>
-                } />
-                <Route path="/sourcing/blacklist" element={
-                  <ProtectedRoute>
+                  </CompanyProvider>
+                </ProtectedRoute>
+              } />
+              <Route path="/sourcing/blacklist" element={
+                <ProtectedRoute>
+                  <CompanyProvider>
                     <AppLayout>
                       <SupplierBlacklist />
                     </AppLayout>
-                  </ProtectedRoute>
-                } />
-                <Route path="/register-supplier" element={<PublicSupplierRegistration />} />
-                <Route path="/warehouse/asset-management" element={
-                  <ProtectedRoute>
+                  </CompanyProvider>
+                </ProtectedRoute>
+              } />
+              <Route path="/warehouse/asset-management" element={
+                <ProtectedRoute>
+                  <CompanyProvider>
                     <AppLayout>
                       <AssetManagement />
                     </AppLayout>
-                  </ProtectedRoute>
-                } />
-                <Route path="/warehouse/item-bin-master" element={
-                  <ProtectedRoute>
+                  </CompanyProvider>
+                </ProtectedRoute>
+              } />
+              <Route path="/warehouse/item-bin-master" element={
+                <ProtectedRoute>
+                  <CompanyProvider>
                     <AppLayout>
                       <ItemBinMaster />
                     </AppLayout>
-                  </ProtectedRoute>
-                } />
-                <Route path="/warehouse/material-issue" element={
-                  <ProtectedRoute>
+                  </CompanyProvider>
+                </ProtectedRoute>
+              } />
+              <Route path="/warehouse/material-issue" element={
+                <ProtectedRoute>
+                  <CompanyProvider>
                     <AppLayout>
                       <MaterialIssueReturn />
                     </AppLayout>
-                  </ProtectedRoute>
-                } />
-                <Route path="/warehouse/grn" element={
-                  <ProtectedRoute>
+                  </CompanyProvider>
+                </ProtectedRoute>
+              } />
+              <Route path="/warehouse/grn" element={
+                <ProtectedRoute>
+                  <CompanyProvider>
                     <AppLayout>
                       <GoodsReceiptNote />
                     </AppLayout>
-                  </ProtectedRoute>
-                } />
-                <Route path="/tuh-modules/finished-goods" element={
-                  <ProtectedRoute>
+                  </CompanyProvider>
+                </ProtectedRoute>
+              } />
+              <Route path="/tuh-modules/finished-goods" element={
+                <ProtectedRoute>
+                  <CompanyProvider>
                     <AppLayout>
                       <FinishedGoods />
                     </AppLayout>
-                  </ProtectedRoute>
-                } />
-                <Route path="/warehouse/pick-pack" element={
-                  <ProtectedRoute>
+                  </CompanyProvider>
+                </ProtectedRoute>
+              } />
+              <Route path="/warehouse/pick-pack" element={
+                <ProtectedRoute>
+                  <CompanyProvider>
                     <AppLayout>
                       <PickPackDispatch />
                     </AppLayout>
-                  </ProtectedRoute>
-                } />
-                <Route path="/warehouse/putaway" element={
-                  <ProtectedRoute>
+                  </CompanyProvider>
+                </ProtectedRoute>
+              } />
+              <Route path="/warehouse/putaway" element={
+                <ProtectedRoute>
+                  <CompanyProvider>
                     <AppLayout>
                       <Putaway />
                     </AppLayout>
-                  </ProtectedRoute>
-                } />
-                <Route path="/warehouse/stock-transfer" element={
-                  <ProtectedRoute>
+                  </CompanyProvider>
+                </ProtectedRoute>
+              } />
+              <Route path="/warehouse/stock-transfer" element={
+                <ProtectedRoute>
+                  <CompanyProvider>
                     <AppLayout>
                       <StockTransfer />
                     </AppLayout>
-                  </ProtectedRoute>
-                } />
-            <Route path="/warehouse/cycle-count" element={
-              <ProtectedRoute>
-                <AppLayout>
-                  <CycleCount />
-                </AppLayout>
-              </ProtectedRoute>
-            } />
-            <Route path="/warehouse/delivery-order" element={
-              <ProtectedRoute>
-                <AppLayout>
-                  <DeliveryOrder />
-                </AppLayout>
-              </ProtectedRoute>
-            } />
-            <Route path="/finance/general-ledger" element={
-              <ProtectedRoute>
-                <AppLayout>
-                  <GeneralLedger />
-                </AppLayout>
-              </ProtectedRoute>
-            } />
-                {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-                <Route path="*" element={<NotFound />} />
-              </Routes>
-            </BrowserRouter>
-          </TooltipProvider>
-        </CompanyProvider>
+                  </CompanyProvider>
+                </ProtectedRoute>
+              } />
+              <Route path="/warehouse/cycle-count" element={
+                <ProtectedRoute>
+                  <CompanyProvider>
+                    <AppLayout>
+                      <CycleCount />
+                    </AppLayout>
+                  </CompanyProvider>
+                </ProtectedRoute>
+              } />
+              <Route path="/warehouse/delivery-order" element={
+                <ProtectedRoute>
+                  <CompanyProvider>
+                    <AppLayout>
+                      <DeliveryOrder />
+                    </AppLayout>
+                  </CompanyProvider>
+                </ProtectedRoute>
+              } />
+              <Route path="/finance/general-ledger" element={
+                <ProtectedRoute>
+                  <CompanyProvider>
+                    <AppLayout>
+                      <GeneralLedger />
+                    </AppLayout>
+                  </CompanyProvider>
+                </ProtectedRoute>
+              } />
+              {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </BrowserRouter>
+        </TooltipProvider>
       </AuthProvider>
     </QueryClientProvider>
   );
