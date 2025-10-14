@@ -753,6 +753,44 @@ export const usePickPack = () => {
     }
   });
 
+  // Accept Issue Mutation
+  const acceptIssueMutation = useMutation({
+    mutationFn: async ({ issueId }: { issueId: string }) => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
+      const { data, error } = await supabase
+        .from('finished_goods_issues')
+        .update({
+          status: 'accepted',
+          accepted_at: new Date().toISOString(),
+          accepted_by: user.id,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', issueId)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['finished-goods-issues'] });
+      queryClient.invalidateQueries({ queryKey: ['finished-goods-issue-items'] });
+      toast({
+        title: "Success",
+        description: "Issue accepted successfully. Delivery note is ready."
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: `Failed to accept issue: ${error.message}`,
+        variant: "destructive"
+      });
+    }
+  });
+
   // Reset Sales Orders Module
   const resetSalesOrdersModuleMutation = useMutation({
     mutationFn: async () => {
@@ -862,6 +900,8 @@ export const usePickPack = () => {
     isCreatingFinishedGoodsIssue: createFinishedGoodsIssueMutation.isPending,
     updateIssueStatus: updateIssueStatusMutation.mutate,
     isUpdatingIssueStatus: updateIssueStatusMutation.isPending,
+    acceptIssue: acceptIssueMutation.mutate,
+    isAcceptingIssue: acceptIssueMutation.isPending,
     
     // Pick List mutations
     createPickList: createPickListMutation.mutate,

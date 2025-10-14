@@ -62,6 +62,25 @@ export function CreateDeliveryOrderDialog({
   const [priority, setPriority] = useState<'low' | 'medium' | 'high' | 'urgent'>('medium');
   const [specialInstructions, setSpecialInstructions] = useState('');
   const [deliveryInstructions, setDeliveryInstructions] = useState('');
+  const [selectedIssueId, setSelectedIssueId] = useState<string | null>(null);
+
+  // Fetch accepted issues for the sales order
+  const { data: acceptedIssues } = useQuery({
+    queryKey: ['accepted-issues', salesOrderId],
+    queryFn: async () => {
+      if (!salesOrderId) return [];
+      const { data, error } = await supabase
+        .from('finished_goods_issues')
+        .select('*')
+        .eq('sales_order_id', salesOrderId)
+        .eq('status', 'accepted')
+        .order('issue_date', { ascending: false });
+      
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!salesOrderId
+  });
 
   useEffect(() => {
     if (salesOrder) {
@@ -97,6 +116,8 @@ export function CreateDeliveryOrderDialog({
       deliveryOrderData: {
         sales_order_id: salesOrderId,
         customer_id: salesOrder.customer_id,
+        packing_list_id: null,
+        finished_goods_issue_id: selectedIssueId,
         delivery_address: deliveryAddress,
         delivery_contact: deliveryContact || undefined,
         delivery_phone: deliveryPhone || undefined,

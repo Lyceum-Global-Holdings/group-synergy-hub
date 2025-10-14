@@ -135,6 +135,7 @@ export interface DeliveryOrder {
   do_number: string;
   sales_order_id: string;
   packing_list_id: string | null;
+  finished_goods_issue_id: string | null;
   customer_id: string;
   delivery_address: string;
   delivery_contact: string | null;
@@ -309,10 +310,12 @@ export interface FinishedGoodsIssue {
   sales_order_id: string | null;
   issue_date: string;
   issued_by: string | null;
-  status: 'draft' | 'issued' | 'cancelled';
+  status: 'draft' | 'issued' | 'accepted' | 'cancelled';
   total_items: number;
   issued_items: number;
   notes: string | null;
+  accepted_at: string | null;
+  accepted_by: string | null;
   company_id: string | null;
   created_by: string | null;
   created_at: string;

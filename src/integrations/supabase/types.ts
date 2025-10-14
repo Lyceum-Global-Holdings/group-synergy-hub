@@ -2647,6 +2647,7 @@ export type Database = {
           do_number: string
           driver_name: string | null
           driver_phone: string | null
+          finished_goods_issue_id: string | null
           id: string
           internal_notes: string | null
           packing_list_id: string | null
@@ -2678,6 +2679,7 @@ export type Database = {
           do_number: string
           driver_name?: string | null
           driver_phone?: string | null
+          finished_goods_issue_id?: string | null
           id?: string
           internal_notes?: string | null
           packing_list_id?: string | null
@@ -2709,6 +2711,7 @@ export type Database = {
           do_number?: string
           driver_name?: string | null
           driver_phone?: string | null
+          finished_goods_issue_id?: string | null
           id?: string
           internal_notes?: string | null
           packing_list_id?: string | null
@@ -2736,6 +2739,13 @@ export type Database = {
             columns: ["customer_id"]
             isOneToOne: false
             referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "delivery_orders_finished_goods_issue_id_fkey"
+            columns: ["finished_goods_issue_id"]
+            isOneToOne: false
+            referencedRelation: "finished_goods_issues"
             referencedColumns: ["id"]
           },
           {
@@ -3219,6 +3229,8 @@ export type Database = {
       }
       finished_goods_issues: {
         Row: {
+          accepted_at: string | null
+          accepted_by: string | null
           company_id: string | null
           created_at: string | null
           created_by: string | null
@@ -3234,6 +3246,8 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          accepted_at?: string | null
+          accepted_by?: string | null
           company_id?: string | null
           created_at?: string | null
           created_by?: string | null
@@ -3249,6 +3263,8 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          accepted_at?: string | null
+          accepted_by?: string | null
           company_id?: string | null
           created_at?: string | null
           created_by?: string | null

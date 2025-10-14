@@ -4,7 +4,8 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Plus, Package, Truck, CheckCircle, Clock, User, MapPin, List, FileText, Eye, AlertCircle } from 'lucide-react';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Plus, Package, Truck, CheckCircle, Clock, User, MapPin, List, FileText, Eye, AlertCircle, MoreVertical, Printer, CheckCircle2 } from 'lucide-react';
 import { usePickPack } from '@/hooks/usePickPack';
 import { useDeliveryOrders } from '@/hooks/useDeliveryOrders';
 import { useCompany } from '@/contexts/CompanyContext';
@@ -23,7 +24,8 @@ export function SalesOrderFulfillmentTab() {
     useConfirmedCPOs, 
     useSalesOrders, 
     usePickLists,
-    useFinishedGoodsIssues
+    useFinishedGoodsIssues,
+    acceptIssue
   } = usePickPack();
   const { useDeliveryOrdersQuery } = useDeliveryOrders();
   
@@ -74,6 +76,22 @@ export function SalesOrderFulfillmentTab() {
   const handleViewIssue = (issueId: string) => {
     setSelectedIssueId(issueId);
     setShowIssueDetails(true);
+  };
+
+  const handleAcceptIssue = (issueId: string) => {
+    acceptIssue({ issueId });
+  };
+
+  const handleViewDeliveryNote = (issueId: string) => {
+    setSelectedIssueId(issueId);
+    setShowIssueDetails(true);
+  };
+
+  const handlePrintDeliveryNote = (issueId: string) => {
+    // First set the issue to view, then trigger print
+    setSelectedIssueId(issueId);
+    setShowIssueDetails(true);
+    setTimeout(() => window.print(), 500);
   };
 
   const getStatusBadge = (status: string) => {
@@ -364,14 +382,39 @@ export function SalesOrderFulfillmentTab() {
                           )}
                         </TableCell>
                         <TableCell>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleViewIssue(issue.id)}
-                          >
-                            <Eye className="w-4 h-4 mr-1" />
-                            View
-                          </Button>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="sm">
+                                <MoreVertical className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => handleViewIssue(issue.id)}>
+                                <Eye className="h-4 w-4 mr-2" />
+                                View Details
+                              </DropdownMenuItem>
+                              
+                              {issue.status === 'issued' && (
+                                <DropdownMenuItem onClick={() => handleAcceptIssue(issue.id)}>
+                                  <CheckCircle2 className="h-4 w-4 mr-2" />
+                                  Accept Issue
+                                </DropdownMenuItem>
+                              )}
+                              
+                              {issue.status === 'accepted' && (
+                                <>
+                                  <DropdownMenuItem onClick={() => handleViewDeliveryNote(issue.id)}>
+                                    <FileText className="h-4 w-4 mr-2" />
+                                    View Delivery Note
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => handlePrintDeliveryNote(issue.id)}>
+                                    <Printer className="h-4 w-4 mr-2" />
+                                    Print Delivery Note
+                                  </DropdownMenuItem>
+                                </>
+                              )}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </TableCell>
                       </TableRow>
                     ))}

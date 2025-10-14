@@ -4,9 +4,13 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Package, FileText, User, Calendar, AlertCircle } from "lucide-react";
+import { Package, FileText, User, Calendar, AlertCircle, CheckCircle2, Printer } from "lucide-react";
 import { format } from "date-fns";
+import { useState } from "react";
+import { DeliveryNoteDocument } from "./DeliveryNoteDocument";
+import { usePickPack } from "@/hooks/usePickPack";
 
 interface FinishedGoodsIssueDetailsDialogProps {
   open: boolean;
@@ -79,11 +83,21 @@ export function FinishedGoodsIssueDetailsDialog({
   });
 
   const getStatusBadge = (status: string) => {
-    const variants: Record<string, "default" | "secondary" | "outline"> = {
-      draft: "outline",
-      issued: "default",
+    const badges = {
+      draft: <Badge variant="outline">Draft</Badge>,
+      issued: <Badge className="bg-blue-500">Issued</Badge>,
+      accepted: <Badge className="bg-green-500">Accepted</Badge>,
+      cancelled: <Badge variant="destructive">Cancelled</Badge>
     };
-    return <Badge variant={variants[status] || "outline"}>{status}</Badge>;
+    return badges[status as keyof typeof badges] || <Badge>{status}</Badge>;
+  };
+
+  const [showDeliveryNote, setShowDeliveryNote] = useState(false);
+  const { acceptIssue, isAcceptingIssue } = usePickPack();
+
+  const handleAcceptIssue = () => {
+    if (!issueId) return;
+    acceptIssue({ issueId });
   };
 
   if (isLoading || !issue) {
@@ -205,6 +219,40 @@ export function FinishedGoodsIssueDetailsDialog({
                 )}
               </CardContent>
             </Card>
+
+            {/* Action Buttons */}
+            <div className="flex gap-2 mt-4">
+              {issue.status === 'issued' && (
+                <Button 
+                  onClick={handleAcceptIssue}
+                  disabled={isAcceptingIssue}
+                  className="flex-1"
+                >
+                  <CheckCircle2 className="h-4 w-4 mr-2" />
+                  {isAcceptingIssue ? 'Accepting...' : 'Accept Issue'}
+                </Button>
+              )}
+              
+              {issue.status === 'accepted' && (
+                <>
+                  <Button 
+                    onClick={() => setShowDeliveryNote(true)}
+                    variant="outline"
+                    className="flex-1"
+                  >
+                    <FileText className="h-4 w-4 mr-2" />
+                    View Delivery Note
+                  </Button>
+                  <Button 
+                    onClick={() => window.print()}
+                    className="flex-1"
+                  >
+                    <Printer className="h-4 w-4 mr-2" />
+                    Print Delivery Note
+                  </Button>
+                </>
+              )}
+            </div>
           </TabsContent>
 
           <TabsContent value="items">
@@ -252,6 +300,17 @@ export function FinishedGoodsIssueDetailsDialog({
           </TabsContent>
         </Tabs>
       </DialogContent>
+
+      {/* Delivery Note Dialog */}
+      <Dialog open={showDeliveryNote} onOpenChange={setShowDeliveryNote}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-auto">
+          <DeliveryNoteDocument 
+            issueId={issueId}
+            issueDetails={issue}
+            issueItems={issueItems || []}
+          />
+        </DialogContent>
+      </Dialog>
     </Dialog>
   );
 }
