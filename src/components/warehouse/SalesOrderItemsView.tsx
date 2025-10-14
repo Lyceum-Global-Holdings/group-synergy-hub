@@ -16,7 +16,11 @@ export function SalesOrderItemsView({ salesOrderId }: SalesOrderItemsViewProps) 
   const { data: items, isLoading } = useSalesOrderItems(salesOrderId);
   const [showIssueDialog, setShowIssueDialog] = useState(false);
 
-  const getStatusBadge = (status: string) => {
+  const getStatusBadge = (status: string | undefined) => {
+    if (!status) {
+      return <Badge variant="secondary">pending</Badge>;
+    }
+    
     const variants: Record<string, "default" | "secondary" | "outline" | "destructive"> = {
       pending: "secondary",
       partial: "outline",
