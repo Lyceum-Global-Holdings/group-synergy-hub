@@ -34,8 +34,7 @@ interface PoDetailsDialogProps {
 const statusColors: Record<PoStatus, string> = {
   draft: "bg-gray-100 text-gray-800",
   pending_approval: "bg-amber-100 text-amber-800",
-  pending_merchandiser_approval: "bg-amber-100 text-amber-800",
-  pending_dept_head_approval: "bg-amber-100 text-amber-800",
+  pending_dept_head_approval: "bg-blue-100 text-blue-800",
   approved: "bg-green-100 text-green-800",
   rejected: "bg-red-100 text-red-800",
   sent: "bg-blue-100 text-blue-800",
@@ -47,9 +46,8 @@ const statusColors: Record<PoStatus, string> = {
 
 const statusLabels: Record<PoStatus, string> = {
   draft: "Draft",
-  pending_approval: "Pending Approval",
-  pending_merchandiser_approval: "Pending Merchandiser Approval",
-  pending_dept_head_approval: "Pending Dept Head Approval",
+  pending_approval: "Pending Merchandiser",
+  pending_dept_head_approval: "Pending Dept Head",
   approved: "Approved",
   rejected: "Rejected",
   sent: "Sent",
@@ -63,7 +61,6 @@ export function PoDetailsDialog({ open, onOpenChange, purchaseOrder }: PoDetails
   const [comments, setComments] = useState("");
   const [showGrnDialog, setShowGrnDialog] = useState(false);
   const [showAmendmentDialog, setShowAmendmentDialog] = useState(false);
-  const [merchandiserEmail, setMerchandiserEmail] = useState("");
   const [deptHeadEmail, setDeptHeadEmail] = useState("");
   
   const sendMutation = useSendPurchaseOrder();
@@ -79,28 +76,15 @@ export function PoDetailsDialog({ open, onOpenChange, purchaseOrder }: PoDetails
   const isDeptHead = userRoles.some(role => role.role_name === 'Department Head');
 
   const canSubmitForApproval = purchaseOrder.status === 'draft';
-  const canMerchandiserApprove = purchaseOrder.status === 'pending_merchandiser_approval' && (isMerchandiser || isAdmin);
+  const canMerchandiserApprove = purchaseOrder.status === 'pending_approval' && (isMerchandiser || isAdmin);
   const canDeptHeadApprove = purchaseOrder.status === 'pending_dept_head_approval' && (isDeptHead || isAdmin);
   const canSend = purchaseOrder.status === 'approved';
   const canReceive = ['sent', 'acknowledged', 'partially_received'].includes(purchaseOrder.status);
   const canAmend = !['cancelled', 'completed'].includes(purchaseOrder.status);
 
   const handleSubmitForApproval = () => {
-    if (!merchandiserEmail) {
-      toast({
-        title: "Email Required",
-        description: "Please provide merchandiser email",
-        variant: "destructive",
-      });
-      return;
-    }
-    
-    // In real scenario, you'd select merchandiser from a list
-    // For now, we'll use a hardcoded merchandiser ID
     submitMerchandiserMutation.mutate({
-      poId: purchaseOrder.id,
-      merchandiserEmail,
-      merchandiserId: purchaseOrder.created_by // This should be actual merchandiser ID
+      poId: purchaseOrder.id
     });
   };
 
@@ -474,20 +458,12 @@ export function PoDetailsDialog({ open, onOpenChange, purchaseOrder }: PoDetails
                   <CardTitle className="text-lg">Submit for Merchandiser Approval</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div>
-                    <Label htmlFor="merchandiser-email">Merchandiser Email</Label>
-                    <input
-                      id="merchandiser-email"
-                      type="email"
-                      placeholder="merchandiser@company.com"
-                      value={merchandiserEmail}
-                      onChange={(e) => setMerchandiserEmail(e.target.value)}
-                      className="w-full mt-2 px-3 py-2 border rounded-md"
-                    />
-                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    This will submit the PO for merchandiser approval. The merchandiser will be able to approve via the Purchase Orders page.
+                  </p>
                   <Button onClick={handleSubmitForApproval} disabled={submitMerchandiserMutation.isPending}>
                     <Clock className="h-4 w-4 mr-2" />
-                    Submit for Approval
+                    Submit for Merchandiser Approval
                   </Button>
                 </CardContent>
               </Card>

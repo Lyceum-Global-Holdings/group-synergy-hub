@@ -3,12 +3,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { useCurrentUserRoles } from "./useCurrentUserRoles";
 
-interface SubmitForMerchandiserApprovalParams {
-  poId: string;
-  merchandiserEmail: string;
-  merchandiserId: string;
-}
-
 interface ApproveAsMerchandiserParams {
   poId: string;
   comments?: string;
@@ -31,38 +25,24 @@ export const useSubmitForMerchandiserApproval = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ poId, merchandiserEmail, merchandiserId }: SubmitForMerchandiserApprovalParams) => {
-      // Update PO status
+    mutationFn: async ({ poId }: { poId: string }) => {
+      // Update PO status to pending_approval (merchandiser level)
       const { error: updateError } = await supabase
         .from('purchase_orders')
         .update({ 
-          status: 'pending_merchandiser_approval' as any,
+          status: 'pending_approval' as any,
           approval_level: 1,
           updated_at: new Date().toISOString()
         })
         .eq('id', poId);
 
       if (updateError) throw updateError;
-
-      // Send approval email via edge function
-      const { data, error } = await supabase.functions.invoke('po-email-approval', {
-        body: {
-          action: 'send_email',
-          po_id: poId,
-          approver_email: merchandiserEmail,
-          approver_id: merchandiserId,
-          approval_level: 'merchandiser'
-        }
-      });
-
-      if (error) throw error;
-      return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['purchase-orders'] });
       toast({
         title: "Success",
-        description: "PO submitted for merchandiser approval. Email sent.",
+        description: "PO submitted for merchandiser approval.",
       });
     },
     onError: (error: Error) => {

@@ -9206,6 +9206,7 @@ export type Database = {
         | "partially_received"
         | "completed"
         | "cancelled"
+        | "pending_dept_head_approval"
       pr_priority: "low" | "medium" | "high" | "urgent"
       pr_status:
         | "draft"
@@ -9605,6 +9606,7 @@ export const Constants = {
         "partially_received",
         "completed",
         "cancelled",
+        "pending_dept_head_approval",
       ],
       pr_priority: ["low", "medium", "high", "urgent"],
       pr_status: [

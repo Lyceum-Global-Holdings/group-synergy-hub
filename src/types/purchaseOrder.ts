@@ -1,4 +1,4 @@
-export type PoStatus = 'draft' | 'pending_approval' | 'pending_merchandiser_approval' | 'pending_dept_head_approval' | 'approved' | 'rejected' | 'sent' | 'acknowledged' | 'partially_received' | 'completed' | 'cancelled';
+export type PoStatus = 'draft' | 'pending_approval' | 'pending_dept_head_approval' | 'approved' | 'rejected' | 'sent' | 'acknowledged' | 'partially_received' | 'completed' | 'cancelled';
 export type ReceiptStatus = 'partial' | 'complete';
 export type QualityStatus = 'good' | 'damaged' | 'rejected';
 
