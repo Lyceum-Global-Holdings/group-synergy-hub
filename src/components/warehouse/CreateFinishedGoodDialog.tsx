@@ -9,6 +9,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Select,
   SelectContent,
@@ -16,8 +17,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Badge } from '@/components/ui/badge';
 import { useFinishedGoods } from '@/hooks/useFinishedGoods';
+import { useProductMaster, ProductMaster } from '@/hooks/useProductMaster';
+import { ProductMasterSelector } from '@/components/common/ProductMasterSelector';
 import { useCompany } from '@/contexts/CompanyContext';
+import { useToast } from '@/hooks/use-toast';
 import { STANDARD_SIZES } from '@/constants/standardSizes';
 
 interface CreateFinishedGoodDialogProps {
@@ -27,6 +32,10 @@ interface CreateFinishedGoodDialogProps {
 
 export function CreateFinishedGoodDialog({ open, onOpenChange }: CreateFinishedGoodDialogProps) {
   const { selectedCompany } = useCompany();
+  const { toast } = useToast();
+  const [useProductMaster, setUseProductMaster] = useState(true);
+  const [selectedProductMaster, setSelectedProductMaster] = useState<ProductMaster | null>(null);
+  
   const [formData, setFormData] = useState({
     product_name: '',
     product_code: '',
@@ -45,24 +54,79 @@ export function CreateFinishedGoodDialog({ open, onOpenChange }: CreateFinishedG
     lead_time_days: '',
     quality_status: 'approved',
     status: 'active',
-    
   });
 
   const { createProduct, isCreating } = useFinishedGoods();
 
+  // Auto-populate fields when product master is selected
+  const handleProductMasterSelect = (product: ProductMaster | null) => {
+    setSelectedProductMaster(product);
+    if (product) {
+      setFormData({
+        ...formData,
+        product_name: product.product_name,
+        product_code: product.product_code,
+        style_no: product.style_no || '',
+        description: product.description || '',
+        unit_of_measure: product.unit_of_measure || 'pcs',
+        // Clear size and color for user selection
+        size: '',
+        color: '',
+      });
+    }
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Validation: ensure a size is selected
-    if (!formData.size) {
-      alert('Please select a size.');
+    // Validation
+    if (useProductMaster && !selectedProductMaster) {
+      toast({
+        variant: "destructive",
+        title: "Validation Error",
+        description: "Please select a product template",
+      });
       return;
+    }
+
+    if (!formData.size) {
+      toast({
+        variant: "destructive",
+        title: "Validation Error",
+        description: "Please select a size",
+      });
+      return;
+    }
+
+    if (useProductMaster && selectedProductMaster) {
+      // Validate size selection
+      const availableSizes = selectedProductMaster.available_sizes as string[];
+      if (availableSizes && availableSizes.length > 0 && !availableSizes.includes(formData.size)) {
+        toast({
+          variant: "destructive",
+          title: "Validation Error",
+          description: "Selected size is not available for this product",
+        });
+        return;
+      }
+
+      // Validate color selection
+      const availableColors = selectedProductMaster.available_colors as string[];
+      if (formData.color && availableColors && availableColors.length > 0 && !availableColors.includes(formData.color)) {
+        toast({
+          variant: "destructive",
+          title: "Validation Error",
+          description: "Selected color is not available for this product",
+        });
+        return;
+      }
     }
     
     const data = {
       ...formData,
       available_sizes: formData.size ? [formData.size] : [],
       company_id: selectedCompany?.id,
+      product_master_id: selectedProductMaster?.id || undefined,
       selling_price: formData.selling_price ? parseFloat(formData.selling_price) : undefined,
       standard_cost: formData.standard_cost ? parseFloat(formData.standard_cost) : undefined,
       minimum_stock: formData.minimum_stock ? parseFloat(formData.minimum_stock) : undefined,
@@ -73,6 +137,10 @@ export function CreateFinishedGoodDialog({ open, onOpenChange }: CreateFinishedG
 
     createProduct(data);
     onOpenChange(false);
+    
+    // Reset form
+    setUseProductMaster(true);
+    setSelectedProductMaster(null);
     setFormData({
       product_name: '',
       product_code: '',
@@ -91,9 +159,10 @@ export function CreateFinishedGoodDialog({ open, onOpenChange }: CreateFinishedG
       lead_time_days: '',
       quality_status: 'approved',
       status: 'active',
-      
     });
   };
+
+  const isFieldDisabled = useProductMaster && !!selectedProductMaster;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -103,6 +172,43 @@ export function CreateFinishedGoodDialog({ open, onOpenChange }: CreateFinishedG
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Mode Selection */}
+          <div className="flex items-center space-x-2 p-3 border rounded-md bg-muted/50">
+            <Checkbox
+              id="useProductMaster"
+              checked={useProductMaster}
+              onCheckedChange={(checked) => {
+                setUseProductMaster(checked as boolean);
+                if (!checked) {
+                  setSelectedProductMaster(null);
+                }
+              }}
+            />
+            <label
+              htmlFor="useProductMaster"
+              className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+            >
+              Create from Product Master Template (Recommended)
+            </label>
+          </div>
+
+          {/* Product Master Selector */}
+          {useProductMaster && (
+            <div className="space-y-2">
+              <Label>Product Template *</Label>
+              <ProductMasterSelector
+                value={selectedProductMaster?.id}
+                onSelect={handleProductMasterSelect}
+                placeholder="Select a product template..."
+              />
+              {selectedProductMaster && (
+                <div className="text-sm text-muted-foreground">
+                  Product details auto-populated. Select size and color variant below.
+                </div>
+              )}
+            </div>
+          )}
+
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="product_name">Product Name *</Label>
@@ -110,6 +216,7 @@ export function CreateFinishedGoodDialog({ open, onOpenChange }: CreateFinishedG
                 id="product_name"
                 value={formData.product_name}
                 onChange={(e) => setFormData({ ...formData, product_name: e.target.value })}
+                disabled={isFieldDisabled}
                 required
               />
             </div>
@@ -119,6 +226,7 @@ export function CreateFinishedGoodDialog({ open, onOpenChange }: CreateFinishedG
                 id="product_code"
                 value={formData.product_code}
                 onChange={(e) => setFormData({ ...formData, product_code: e.target.value })}
+                disabled={isFieldDisabled}
                 required
               />
             </div>
@@ -131,32 +239,81 @@ export function CreateFinishedGoodDialog({ open, onOpenChange }: CreateFinishedG
                 id="style_no"
                 value={formData.style_no}
                 onChange={(e) => setFormData({ ...formData, style_no: e.target.value })}
+                disabled={isFieldDisabled}
               />
             </div>
             <div className="space-y-2">
               <Label htmlFor="color">Color</Label>
-              <Input
-                id="color"
-                value={formData.color}
-                onChange={(e) => setFormData({ ...formData, color: e.target.value })}
-              />
+              {useProductMaster && selectedProductMaster && (selectedProductMaster.available_colors as string[])?.length > 0 ? (
+                <div className="space-y-2">
+                  <Select value={formData.color} onValueChange={(value) => setFormData({ ...formData, color: value })}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select from available colors" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(selectedProductMaster.available_colors as string[]).map((c) => (
+                        <SelectItem key={c} value={c}>
+                          {c}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <div className="flex flex-wrap gap-1">
+                    {(selectedProductMaster.available_colors as string[]).map((c) => (
+                      <Badge key={c} variant="outline" className="text-xs">
+                        {c}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <Input
+                  id="color"
+                  value={formData.color}
+                  onChange={(e) => setFormData({ ...formData, color: e.target.value })}
+                />
+              )}
             </div>
           </div>
 
           <div className="space-y-2">
             <Label htmlFor="size">Size *</Label>
-            <Select value={formData.size} onValueChange={(value) => setFormData({ ...formData, size: value })}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select a size" />
-              </SelectTrigger>
-              <SelectContent>
-                {STANDARD_SIZES.map((size) => (
-                  <SelectItem key={size.value} value={size.value}>
-                    {size.label} ({size.category})
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            {useProductMaster && selectedProductMaster && (selectedProductMaster.available_sizes as string[])?.length > 0 ? (
+              <div className="space-y-2">
+                <Select value={formData.size} onValueChange={(value) => setFormData({ ...formData, size: value })} required>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select from available sizes" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(selectedProductMaster.available_sizes as string[]).map((s) => (
+                      <SelectItem key={s} value={s}>
+                        {s}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <div className="flex flex-wrap gap-1">
+                  {(selectedProductMaster.available_sizes as string[]).map((s) => (
+                    <Badge key={s} variant="outline" className="text-xs">
+                      {s}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <Select value={formData.size} onValueChange={(value) => setFormData({ ...formData, size: value })} required>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a size" />
+                </SelectTrigger>
+                <SelectContent>
+                  {STANDARD_SIZES.map((size) => (
+                    <SelectItem key={size.value} value={size.value}>
+                      {size.label} ({size.category})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-4">
@@ -170,7 +327,11 @@ export function CreateFinishedGoodDialog({ open, onOpenChange }: CreateFinishedG
             </div>
             <div className="space-y-2">
               <Label htmlFor="unit_of_measure">Unit of Measure</Label>
-              <Select value={formData.unit_of_measure} onValueChange={(value) => setFormData({ ...formData, unit_of_measure: value })}>
+              <Select 
+                value={formData.unit_of_measure} 
+                onValueChange={(value) => setFormData({ ...formData, unit_of_measure: value })}
+                disabled={isFieldDisabled}
+              >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -247,6 +408,7 @@ export function CreateFinishedGoodDialog({ open, onOpenChange }: CreateFinishedG
               id="description"
               value={formData.description}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              disabled={isFieldDisabled}
               rows={3}
             />
           </div>

@@ -30,6 +30,7 @@ export interface FinishedGood {
   bin_id?: string;
   bom_id?: string;
   warehouse_item_id?: string;
+  product_master_id?: string;
   company_id?: string;
   created_by?: string;
   created_at: string;
@@ -59,6 +60,7 @@ export interface CreateFinishedGoodData {
   bin_id?: string;
   bom_id?: string;
   warehouse_item_id?: string;
+  product_master_id?: string;
   company_id?: string;
 }
 
