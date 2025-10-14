@@ -484,12 +484,9 @@ export const usePickPack = () => {
               product_code,
               current_stock,
               available_stock,
-              warehouse_item_id,
-              warehouse_items (
-                id,
-                current_stock,
-                available_stock
-              )
+              size,
+              available_sizes,
+              unit_of_measure
             ),
             customer_po_items!cpo_item_id (
               id,

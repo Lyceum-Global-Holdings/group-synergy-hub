@@ -44,12 +44,8 @@ export function FinishedGoodsIssueDialog({
       const pendingItems = salesOrderItems
         .filter(item => item.quantity_ordered > item.quantity_issued)
         .map(item => {
-          // Calculate available stock from finished goods AND warehouse items
-          const finishedGoodsStock = item.finished_goods?.[0]?.available_stock || 0;
-          const warehouseItemStock = item.finished_goods?.[0]?.warehouse_items?.available_stock || 0;
-          
-          // Total available stock is the sum from both sources
-          const totalAvailableStock = finishedGoodsStock + warehouseItemStock;
+          // Get available stock from finished goods (single source of truth)
+          const availableStock = item.finished_goods?.available_stock || 0;
           
           // CPO remaining quantity (what still needs to be issued)
           const cpoRemaining = item.quantity_ordered - item.quantity_issued;
@@ -58,9 +54,9 @@ export function FinishedGoodsIssueDialog({
             sales_order_item_id: item.id,
             finished_good_id: item.finished_good_id,
             item_name: item.item_name,
-            quantity_to_issue: Math.min(cpoRemaining, totalAvailableStock),
+            quantity_to_issue: Math.min(cpoRemaining, availableStock),
             max_quantity: cpoRemaining, // MAX is the CPO requirement
-            available_stock: totalAvailableStock, // Available in warehouse
+            available_stock: availableStock, // Available in finished goods
             from_location_id: "",
             from_bin_id: "",
             batch_number: "",
