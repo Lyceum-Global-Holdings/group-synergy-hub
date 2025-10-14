@@ -150,6 +150,11 @@ export function CreateGrnDialog({ open, onOpenChange, preselectedPo }: CreateGrn
 
       const grnData: CreateGrnData = {
         ...data,
+        po_id: data.po_id || undefined,
+        po_number: data.po_number || undefined,
+        pr_number: data.pr_number || undefined,
+        mr_number: data.mr_number || undefined,
+        supplier_id: data.supplier_id || undefined,
         supplier_name: data.supplier_name || '',
         grn_date: format(data.grn_date, 'yyyy-MM-dd'),
         invoice_date: data.invoice_date ? format(data.invoice_date, 'yyyy-MM-dd') : undefined,
@@ -161,10 +166,11 @@ export function CreateGrnDialog({ open, onOpenChange, preselectedPo }: CreateGrn
           quantity_ordered: item.quantity_ordered || 0,
           quantity_received: item.quantity_received || 0,
           quality_status: item.quality_status || 'good',
-          total_cost: item.total_cost || ((item.unit_price || 0) * item.quantity_received),
+          total_cost: item.total_cost ?? ((item.unit_price || 0) * (item.quantity_received || 0)),
         })),
       };
 
+      console.info('Submitting GRN payload:', grnData);
       await createGrnMutation.mutateAsync(grnData);
       form.reset();
       onOpenChange(false);
@@ -257,6 +263,7 @@ export function CreateGrnDialog({ open, onOpenChange, preselectedPo }: CreateGrn
                           mode="single"
                           selected={field.value}
                           onSelect={field.onChange}
+                          className="p-3 pointer-events-auto"
                         />
                       </PopoverContent>
                     </Popover>
@@ -325,6 +332,7 @@ export function CreateGrnDialog({ open, onOpenChange, preselectedPo }: CreateGrn
                           mode="single"
                           selected={field.value}
                           onSelect={field.onChange}
+                          className="p-3 pointer-events-auto"
                         />
                       </PopoverContent>
                     </Popover>
@@ -518,6 +526,12 @@ export function CreateGrnDialog({ open, onOpenChange, preselectedPo }: CreateGrn
                   Add Item
                 </Button>
               </div>
+              
+              {form.formState.errors.items && (
+                <p className="text-sm text-destructive">
+                  {(form.formState.errors.items as any)?.message || 'Please fix items and try again.'}
+                </p>
+              )}
 
               <div className="overflow-x-auto">
                 <Table>
