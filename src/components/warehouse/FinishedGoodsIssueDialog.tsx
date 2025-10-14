@@ -9,8 +9,6 @@ import { Badge } from "@/components/ui/badge";
 import { AlertCircle, Package, Trash2 } from "lucide-react";
 import { usePickPack } from "@/hooks/usePickPack";
 import { useCompany } from "@/contexts/CompanyContext";
-import { useWarehouseLocations } from "@/hooks/useWarehouseLocations";
-import { useWarehouseBins } from "@/hooks/useWarehouseBins";
 
 interface FinishedGoodsIssueDialogProps {
   open: boolean;
@@ -27,12 +25,6 @@ export function FinishedGoodsIssueDialog({
 }: FinishedGoodsIssueDialogProps) {
   const { createFinishedGoodsIssue, isCreatingFinishedGoodsIssue, updateIssueStatus } = usePickPack();
   const { selectedCompany } = useCompany();
-  const { locations, getLocationsByCategory } = useWarehouseLocations();
-  
-  // Filter for finished goods warehouses
-  const finishedGoodsLocations = getLocationsByCategory(['finished_goods', 'general'])
-    .filter(loc => loc.type === 'location' && loc.status === 'active');
-  const { bins } = useWarehouseBins();
 
   const [issueDate, setIssueDate] = useState(new Date().toISOString().split('T')[0]);
   const [notes, setNotes] = useState("");
@@ -57,8 +49,6 @@ export function FinishedGoodsIssueDialog({
             quantity_to_issue: Math.min(cpoRemaining, availableStock),
             max_quantity: cpoRemaining, // MAX is the CPO requirement
             available_stock: availableStock, // Available in finished goods
-            from_location_id: "",
-            from_bin_id: "",
             batch_number: "",
             notes: ""
           };
@@ -172,7 +162,7 @@ export function FinishedGoodsIssueDialog({
                     </Button>
                   </div>
 
-                  <div className="grid grid-cols-4 gap-3">
+                  <div className="grid grid-cols-2 gap-3">
                     <div>
                       <Label className="text-xs">Quantity to Issue</Label>
                       <Input
@@ -182,49 +172,6 @@ export function FinishedGoodsIssueDialog({
                         value={item.quantity_to_issue}
                         onChange={(e) => updateIssueItem(index, 'quantity_to_issue', parseFloat(e.target.value) || 0)}
                       />
-                    </div>
-
-                    <div>
-                      <Label className="text-xs">From Location</Label>
-                      <Select
-                        value={item.from_location_id}
-                        onValueChange={(value) => updateIssueItem(index, 'from_location_id', value)}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select location" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {finishedGoodsLocations?.map((loc: any) => (
-                            <SelectItem key={loc.id} value={loc.id}>
-                              {loc.name}
-                              {loc.warehouse_category && (
-                                <span className="ml-2 text-xs text-muted-foreground">
-                                  ({loc.warehouse_category})
-                                </span>
-                              )}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div>
-                      <Label className="text-xs">From Bin</Label>
-                      <Select
-                        value={item.from_bin_id}
-                        onValueChange={(value) => updateIssueItem(index, 'from_bin_id', value)}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select bin" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {bins?.filter((b: any) => b.location_id === item.from_location_id).map((bin: any) => (
-                            <SelectItem key={bin.id} value={bin.id}>
-                              {bin.bin_number}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
                     </div>
 
                     <div>
