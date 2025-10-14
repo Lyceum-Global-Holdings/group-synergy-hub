@@ -158,134 +158,136 @@ export function GenerateVariantsDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>Generate Product Variants</DialogTitle>
-        </DialogHeader>
+      {open && (
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Generate Product Variants</DialogTitle>
+          </DialogHeader>
 
-        <div className="space-y-4">
-          <div className="grid grid-cols-4 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="initial_stock">Initial Stock</Label>
-              <Input
-                id="initial_stock"
-                type="number"
-                step="0.01"
-                value={initialStock}
-                onChange={(e) => setInitialStock(e.target.value)}
-                placeholder="0"
-              />
+          <div className="space-y-4">
+            <div className="grid grid-cols-4 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="initial_stock">Initial Stock</Label>
+                <Input
+                  id="initial_stock"
+                  type="number"
+                  step="0.01"
+                  value={initialStock}
+                  onChange={(e) => setInitialStock(e.target.value)}
+                  placeholder="0"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="min_stock">Min Stock</Label>
+                <Input
+                  id="min_stock"
+                  type="number"
+                  step="0.01"
+                  value={minStock}
+                  onChange={(e) => setMinStock(e.target.value)}
+                  placeholder="0"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="max_stock">Max Stock</Label>
+                <Input
+                  id="max_stock"
+                  type="number"
+                  step="0.01"
+                  value={maxStock}
+                  onChange={(e) => setMaxStock(e.target.value)}
+                  placeholder="0"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="reorder_point">Reorder Point</Label>
+                <Input
+                  id="reorder_point"
+                  type="number"
+                  step="0.01"
+                  value={reorderPoint}
+                  onChange={(e) => setReorderPoint(e.target.value)}
+                  placeholder="0"
+                />
+              </div>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="min_stock">Min Stock</Label>
-              <Input
-                id="min_stock"
-                type="number"
-                step="0.01"
-                value={minStock}
-                onChange={(e) => setMinStock(e.target.value)}
-                placeholder="0"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="max_stock">Max Stock</Label>
-              <Input
-                id="max_stock"
-                type="number"
-                step="0.01"
-                value={maxStock}
-                onChange={(e) => setMaxStock(e.target.value)}
-                placeholder="0"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="reorder_point">Reorder Point</Label>
-              <Input
-                id="reorder_point"
-                type="number"
-                step="0.01"
-                value={reorderPoint}
-                onChange={(e) => setReorderPoint(e.target.value)}
-                placeholder="0"
-              />
-            </div>
-          </div>
 
-          <div className="flex justify-between items-center">
-            <p className="text-sm text-muted-foreground">
-              {selectedVariants.size} of {allCombinations.filter((c) => !isVariantExists(c)).length} variants selected
-            </p>
-            <div className="space-x-2">
-              <Button variant="outline" size="sm" onClick={handleSelectAll}>
-                Select All
-              </Button>
-              <Button variant="outline" size="sm" onClick={handleDeselectAll}>
-                Deselect All
-              </Button>
+            <div className="flex justify-between items-center">
+              <p className="text-sm text-muted-foreground">
+                {selectedVariants.size} of {allCombinations.filter((c) => !isVariantExists(c)).length} variants selected
+              </p>
+              <div className="space-x-2">
+                <Button variant="outline" size="sm" onClick={handleSelectAll}>
+                  Select All
+                </Button>
+                <Button variant="outline" size="sm" onClick={handleDeselectAll}>
+                  Deselect All
+                </Button>
+              </div>
             </div>
-          </div>
 
-          <div className="border rounded-lg">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-12"></TableHead>
-                  <TableHead>Variant Code</TableHead>
-                  <TableHead>Color</TableHead>
-                  <TableHead>Size</TableHead>
-                  <TableHead>Status</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {allCombinations.length === 0 ? (
+            <div className="border rounded-lg">
+              <Table>
+                <TableHeader>
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center text-muted-foreground">
-                      No color/size combinations available
-                    </TableCell>
+                    <TableHead className="w-12"></TableHead>
+                    <TableHead>Variant Code</TableHead>
+                    <TableHead>Color</TableHead>
+                    <TableHead>Size</TableHead>
+                    <TableHead>Status</TableHead>
                   </TableRow>
-                ) : (
-                  allCombinations.map((combo) => {
-                    const key = getVariantKey(combo);
-                    const exists = isVariantExists(combo);
-                    return (
-                      <TableRow key={key} className={exists ? "opacity-50" : ""}>
-                        <TableCell>
-                          <Checkbox
-                            checked={selectedVariants.has(key)}
-                            onCheckedChange={() => handleToggleVariant(key)}
-                            disabled={exists}
-                          />
-                        </TableCell>
-                        <TableCell className="font-medium">
-                          {`${productMaster.product_code}-${getVariantCode(combo)}`}
-                        </TableCell>
-                        <TableCell>{combo.color || '-'}</TableCell>
-                        <TableCell>{combo.size || '-'}</TableCell>
-                        <TableCell>
-                          {exists ? (
-                            <span className="text-xs text-muted-foreground">Already exists</span>
-                          ) : (
-                            <span className="text-xs text-green-600">New</span>
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })
-                )}
-              </TableBody>
-            </Table>
-          </div>
+                </TableHeader>
+                <TableBody>
+                  {allCombinations.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center text-muted-foreground">
+                        No color/size combinations available
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    allCombinations.map((combo) => {
+                      const key = getVariantKey(combo);
+                      const exists = isVariantExists(combo);
+                      return (
+                        <TableRow key={key} className={exists ? "opacity-50" : ""}>
+                          <TableCell>
+                            <Checkbox
+                              checked={selectedVariants.has(key)}
+                              onCheckedChange={() => handleToggleVariant(key)}
+                              disabled={exists}
+                            />
+                          </TableCell>
+                          <TableCell className="font-medium">
+                            {`${productMaster.product_code}-${getVariantCode(combo)}`}
+                          </TableCell>
+                          <TableCell>{combo.color || '-'}</TableCell>
+                          <TableCell>{combo.size || '-'}</TableCell>
+                          <TableCell>
+                            {exists ? (
+                              <span className="text-xs text-muted-foreground">Already exists</span>
+                            ) : (
+                              <span className="text-xs text-green-600">New</span>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })
+                  )}
+                </TableBody>
+              </Table>
+            </div>
 
-          <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={() => onOpenChange(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleGenerate} disabled={selectedVariants.size === 0}>
-              Generate Selected Variants
-            </Button>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => onOpenChange(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleGenerate} disabled={selectedVariants.size === 0}>
+                Generate Selected Variants
+              </Button>
+            </div>
           </div>
-        </div>
-      </DialogContent>
+        </DialogContent>
+      )}
     </Dialog>
   );
 }
