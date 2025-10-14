@@ -68,7 +68,11 @@ function App() {
         <BrowserRouter>
           <Routes>
             {/* Public routes - no auth required */}
-            <Route path="/auth" element={<Auth />} />
+            <Route path="/auth" element={
+              <AuthProvider>
+                <Auth />
+              </AuthProvider>
+            } />
             <Route path="/asset/:assetId" element={<PublicAssetView />} />
             <Route path="/request-asset" element={<PublicAssetRequest />} />
             <Route path="/register-supplier" element={<PublicSupplierRegistration />} />
