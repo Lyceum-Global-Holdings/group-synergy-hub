@@ -15,7 +15,8 @@ import {
   useSubmitForMerchandiserApproval, 
   useApprovePOAsMerchandiser, 
   useApprovePOAsDeptHead,
-  useRejectPO 
+  useRejectPO,
+  useSendDeptHeadApprovalEmail
 } from "@/hooks/useTwoLevelPoApprovals";
 import { useState } from "react";
 import { toast } from "@/hooks/use-toast";
@@ -61,12 +62,14 @@ export function PoDetailsDialog({ open, onOpenChange, purchaseOrder }: PoDetails
   const [comments, setComments] = useState("");
   const [showGrnDialog, setShowGrnDialog] = useState(false);
   const [showAmendmentDialog, setShowAmendmentDialog] = useState(false);
+  const [deptHeadEmail, setDeptHeadEmail] = useState("");
   
   const sendMutation = useSendPurchaseOrder();
   const submitMerchandiserMutation = useSubmitForMerchandiserApproval();
   const approveMerchandiserMutation = useApprovePOAsMerchandiser();
   const approveDeptHeadMutation = useApprovePOAsDeptHead();
   const rejectMutation = useRejectPO();
+  const sendDeptHeadEmailMutation = useSendDeptHeadApprovalEmail();
   const { data: approvals = [] } = usePurchaseOrderApprovals(purchaseOrder.id);
   const { data: userRoles = [] } = useCurrentUserRoles();
   
@@ -93,6 +96,24 @@ export function PoDetailsDialog({ open, onOpenChange, purchaseOrder }: PoDetails
       comments: comments || undefined
     });
     setComments("");
+  };
+
+  const handleSendDeptHeadEmail = () => {
+    if (!deptHeadEmail) {
+      toast({
+        title: "Email Required",
+        description: "Please provide department head email",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    sendDeptHeadEmailMutation.mutate({
+      poId: purchaseOrder.id,
+      poNumber: purchaseOrder.po_number,
+      deptHeadEmail
+    });
+    setDeptHeadEmail("");
   };
 
   const handleDeptHeadApprove = () => {
@@ -483,6 +504,38 @@ export function PoDetailsDialog({ open, onOpenChange, purchaseOrder }: PoDetails
                       Reject
                     </Button>
                   </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Send Department Head Email Section */}
+            {purchaseOrder.status === 'pending_dept_head_approval' && isMerchandiser && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Send Approval Email to Department Head</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <p className="text-sm text-muted-foreground">
+                    Enter the department head's email to send them an approval request.
+                  </p>
+                  <div>
+                    <Label htmlFor="dept-head-email">Department Head Email</Label>
+                    <input
+                      id="dept-head-email"
+                      type="email"
+                      placeholder="depthead@company.com"
+                      value={deptHeadEmail}
+                      onChange={(e) => setDeptHeadEmail(e.target.value)}
+                      className="w-full mt-2 px-3 py-2 border rounded-md"
+                    />
+                  </div>
+                  <Button 
+                    onClick={handleSendDeptHeadEmail}
+                    disabled={sendDeptHeadEmailMutation.isPending}
+                  >
+                    <Send className="mr-2 h-4 w-4" />
+                    Send Approval Email
+                  </Button>
                 </CardContent>
               </Card>
             )}
