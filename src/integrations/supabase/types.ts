@@ -2998,7 +2998,22 @@ export type Database = {
           variant?: string | null
           warehouse_item_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "fk_finished_goods_warehouse_item"
+            columns: ["warehouse_item_id"]
+            isOneToOne: false
+            referencedRelation: "v_adjustment_summary_by_item"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_finished_goods_warehouse_item"
+            columns: ["warehouse_item_id"]
+            isOneToOne: false
+            referencedRelation: "warehouse_items"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       finished_goods_batch_approvals: {
         Row: {
@@ -4893,6 +4908,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "fk_pick_lists_picker"
+            columns: ["picker_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "pick_lists_sales_order_id_fkey"
             columns: ["sales_order_id"]
