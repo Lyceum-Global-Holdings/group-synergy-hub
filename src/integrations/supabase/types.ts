@@ -2007,6 +2007,7 @@ export type Database = {
           finished_good_id: string | null
           id: string
           item_name: string
+          product_master_id: string | null
           quantity_ordered: number
           size: string | null
           status: string
@@ -2023,6 +2024,7 @@ export type Database = {
           finished_good_id?: string | null
           id?: string
           item_name: string
+          product_master_id?: string | null
           quantity_ordered?: number
           size?: string | null
           status?: string
@@ -2039,6 +2041,7 @@ export type Database = {
           finished_good_id?: string | null
           id?: string
           item_name?: string
+          product_master_id?: string | null
           quantity_ordered?: number
           size?: string | null
           status?: string
@@ -2059,6 +2062,13 @@ export type Database = {
             columns: ["finished_good_id"]
             isOneToOne: false
             referencedRelation: "finished_goods"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_po_items_product_master_id_fkey"
+            columns: ["product_master_id"]
+            isOneToOne: false
+            referencedRelation: "product_master"
             referencedColumns: ["id"]
           },
         ]

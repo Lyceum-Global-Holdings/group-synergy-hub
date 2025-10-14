@@ -97,6 +97,7 @@ export interface CustomerPoItem {
   id: string;
   cpo_id: string;
   finished_good_id?: string;
+  product_master_id?: string;
   item_name: string;
   description?: string;
   quantity_ordered: number;
@@ -119,6 +120,7 @@ export interface CreateCustomerPoData {
   notes?: string;
   items: {
     finished_good_id?: string | null;
+    product_master_id?: string | null;
     item_name: string;
     description?: string;
     quantity_ordered: number;
