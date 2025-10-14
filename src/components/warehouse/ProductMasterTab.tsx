@@ -40,9 +40,9 @@ export function ProductMasterTab() {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
-  const { productMasters, isLoading, deleteProductMaster } = useProductMaster();
-  const { products } = useFinishedGoods();
-  const { apparelCategories } = useApparelCategories();
+  const { productMasters = [], isLoading, deleteProductMaster } = useProductMaster();
+  const { products = [] } = useFinishedGoods();
+  const { apparelCategories = [] } = useApparelCategories();
 
   const getCategoryName = (categoryId: string | null) => {
     if (!categoryId) return 'N/A';
@@ -51,10 +51,10 @@ export function ProductMasterTab() {
   };
 
   const getVariantCount = (productMasterId: string) => {
-    return products.filter(p => p.product_master_id === productMasterId).length;
+    return (products || []).filter(p => p.product_master_id === productMasterId).length;
   };
 
-  const filteredProducts = productMasters.filter(product =>
+  const filteredProducts = (productMasters || []).filter(product =>
     product.product_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     product.product_code.toLowerCase().includes(searchTerm.toLowerCase()) ||
     product.style_no?.toLowerCase().includes(searchTerm.toLowerCase())
@@ -120,7 +120,7 @@ export function ProductMasterTab() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {products.filter(p => p.is_variant).length}
+              {(products || []).filter(p => p.is_variant).length}
             </div>
           </CardContent>
         </Card>

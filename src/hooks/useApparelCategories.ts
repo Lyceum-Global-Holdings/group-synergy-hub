@@ -1,10 +1,10 @@
 import { useItemCategories } from "./useItemCategories";
 
 export function useApparelCategories() {
-  const { categories, isLoading, error } = useItemCategories();
+  const { categories = [], isLoading, error } = useItemCategories();
   
   const isApparelParent = (parentId: string | null): boolean => {
-    if (!parentId) return false;
+    if (!parentId || !categories) return false;
     const parent = categories.find(c => c.id === parentId);
     if (!parent) return false;
     
@@ -17,7 +17,7 @@ export function useApparelCategories() {
            name.includes('accessories');
   };
   
-  const apparelCategories = categories.filter(cat => {
+  const apparelCategories = (categories || []).filter(cat => {
     const name = cat.name.toLowerCase();
     return name.includes('apparel') || 
            name.includes('clothing') || 
