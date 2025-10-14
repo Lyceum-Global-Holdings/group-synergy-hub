@@ -2,6 +2,8 @@ import React from 'react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { X, ChevronDown } from 'lucide-react';
 import { getSizesByCategory, SIZE_CATEGORIES } from '@/constants/standardSizes';
 
 interface MultiSizeSelectorProps {
@@ -75,90 +77,98 @@ export function MultiSizeSelector({
     : { 'All Sizes': sizeOptions };
 
   return (
-    <div className={`space-y-4 ${className}`}>
-      {/* Selected sizes display */}
-      {selectedSizes.length > 0 && (
-        <div className="space-y-2">
-          <div className="text-sm font-medium">Selected Sizes ({selectedSizes.length})</div>
-          <div className="flex flex-wrap gap-1">
-            {selectedSizes.map(size => (
-              <Badge 
-                key={size} 
-                variant="default" 
-                className="cursor-pointer hover:bg-destructive"
-                onClick={() => handleSizeToggle(size)}
-              >
-                {size} ×
-              </Badge>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Control buttons */}
-      {showSelectAll && (
-        <div className="flex gap-2">
+    <div className={`space-y-3 ${className}`}>
+      {/* Popover trigger button */}
+      <Popover>
+        <PopoverTrigger asChild>
           <Button
             type="button"
             variant="outline"
-            size="sm"
-            onClick={handleSelectAll}
+            className="w-full justify-between"
           >
-            {selectedSizes.length === sizeOptions.length ? 'Clear All' : 'Select All'}
+            <span>
+              {selectedSizes.length === 0 
+                ? 'Select Sizes' 
+                : `${selectedSizes.length} Size${selectedSizes.length !== 1 ? 's' : ''} Selected`
+              }
+            </span>
+            <ChevronDown className="h-4 w-4 opacity-50" />
           </Button>
-        </div>
-      )}
-
-      {/* Size selection grid */}
-      <div className="space-y-4">
-        {Object.entries(groupedSizes).map(([category, sizes]) => (
-          <div key={category} className="space-y-3">
-            {groupByCategory && (
-              <div className="flex items-center justify-between">
-                <h4 className="text-sm font-medium text-muted-foreground">{category}</h4>
+        </PopoverTrigger>
+        
+        <PopoverContent className="w-96 p-4 max-h-[500px] overflow-y-auto" align="start">
+          <div className="space-y-4">
+            {/* Select All button */}
+            {showSelectAll && (
+              <div className="flex justify-between items-center pb-2 border-b">
+                <span className="text-sm font-medium">Available Sizes</span>
                 <Button
                   type="button"
                   variant="ghost"
                   size="sm"
-                  onClick={() => handleSelectCategory(category)}
-                  className="h-6 px-2 text-xs"
+                  onClick={handleSelectAll}
+                  className="h-8 px-2 text-xs"
                 >
-                  {sizes.every(size => selectedSizes.includes(size.value)) ? 'Unselect' : 'Select'} All
+                  {selectedSizes.length === sizeOptions.length ? 'Clear All' : 'Select All'}
                 </Button>
               </div>
             )}
-            
-            <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-2">
-              {sizes.map(size => (
-                <div
-                  key={size.value}
-                  className={`
-                    flex items-center justify-center p-2 border rounded-md cursor-pointer transition-colors
-                    ${selectedSizes.includes(size.value) 
-                      ? 'bg-primary text-primary-foreground border-primary' 
-                      : 'hover:bg-muted border-border'
-                    }
-                  `}
-                  onClick={() => handleSizeToggle(size.value)}
-                >
-                  <div className="flex items-center space-x-1">
-                    <Checkbox
-                      checked={selectedSizes.includes(size.value)}
-                      className="sr-only pointer-events-none"
-                    />
-                    <span className="text-sm font-medium">{size.label}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        ))}
-      </div>
 
-      {/* Empty state */}
-      {selectedSizes.length === 0 && (
-        <div className="text-center py-4 text-muted-foreground text-sm">
-          No sizes selected. Choose from the options above.
+            {/* Size selection by category */}
+            {Object.entries(groupedSizes).map(([category, sizes]) => (
+              <div key={category} className="space-y-2">
+                {groupByCategory && (
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-sm font-medium text-muted-foreground">{category}</h4>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleSelectCategory(category)}
+                      className="h-6 px-2 text-xs"
+                    >
+                      {sizes.every(size => selectedSizes.includes(size.value)) ? 'Unselect' : 'Select'} All
+                    </Button>
+                  </div>
+                )}
+                
+                <div className="grid grid-cols-6 gap-2">
+                  {sizes.map(size => (
+                    <div
+                      key={size.value}
+                      className={`
+                        flex items-center justify-center p-2 border rounded-md cursor-pointer transition-colors
+                        ${selectedSizes.includes(size.value) 
+                          ? 'bg-primary text-primary-foreground border-primary' 
+                          : 'hover:bg-muted border-border'
+                        }
+                      `}
+                      onClick={() => handleSizeToggle(size.value)}
+                    >
+                      <span className="text-sm font-medium">{size.label}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </PopoverContent>
+      </Popover>
+
+      {/* Selected sizes badges */}
+      {selectedSizes.length > 0 && (
+        <div className="flex flex-wrap gap-1">
+          {selectedSizes.map(size => (
+            <Badge 
+              key={size} 
+              variant="secondary"
+              className="cursor-pointer hover:bg-destructive hover:text-destructive-foreground transition-colors"
+              onClick={() => handleSizeToggle(size)}
+            >
+              {size}
+              <X className="ml-1 h-3 w-3" />
+            </Badge>
+          ))}
         </div>
       )}
     </div>
