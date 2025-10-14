@@ -96,18 +96,14 @@ export function FinishedGoodsIssueDialog({
         issueData: {
           sales_order_id: salesOrderId,
           issue_date: issueDate,
-          status: postImmediately ? 'issued' : 'draft',
           notes,
           company_id: selectedCompany?.id
         },
-        items: issueItems
+        items: issueItems,
+        postImmediately
       },
       {
-        onSuccess: (issue: any) => {
-          if (postImmediately) {
-            // If posting immediately, trigger the status update which will run the stock movement trigger
-            updateIssueStatus({ issueId: issue.id, status: 'issued' });
-          }
+        onSuccess: () => {
           onOpenChange(false);
           resetForm();
         }

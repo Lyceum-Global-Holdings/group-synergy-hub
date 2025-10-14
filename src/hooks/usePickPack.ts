@@ -639,19 +639,22 @@ export const usePickPack = () => {
   const createFinishedGoodsIssueMutation = useMutation({
     mutationFn: async ({ 
       issueData, 
-      items 
+      items,
+      postImmediately = false
     }: { 
       issueData: any; 
-      items: any[]
+      items: any[];
+      postImmediately?: boolean;
     }) => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
-      // Create issue header
+      // Always create as draft first to ensure trigger fires on UPDATE
       const { data: issue, error: issueError } = await supabase
         .from('finished_goods_issues')
         .insert({
           ...issueData,
+          status: 'draft',
           total_items: items.length,
           created_by: user.id
         })
@@ -680,11 +683,27 @@ export const usePickPack = () => {
 
       if (itemsError) throw itemsError;
 
+      // If posting immediately, update status to trigger stock movement
+      if (postImmediately) {
+        const { error: updateError } = await supabase
+          .from('finished_goods_issues')
+          .update({ 
+            status: 'issued',
+            issued_by: user.id,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', issue.id);
+
+        if (updateError) throw updateError;
+      }
+
       return issue;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['finished-goods-issues'] });
       queryClient.invalidateQueries({ queryKey: ['sales-order-items'] });
+      queryClient.invalidateQueries({ queryKey: ['finished-goods-movements'] });
+      queryClient.invalidateQueries({ queryKey: ['finished-goods'] });
       toast({
         title: "Success",
         description: "Finished goods issue created successfully"
