@@ -41,90 +41,92 @@ export function ColorMasterDialog({ open, onOpenChange }: ColorMasterDialogProps
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Palette className="h-5 w-5" />
-            Color Master
-          </DialogTitle>
-        </DialogHeader>
+      {open && (
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Palette className="h-5 w-5" />
+              Color Master
+            </DialogTitle>
+          </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="color_name">Color Name *</Label>
-              <Input
-                id="color_name"
-                value={colorName}
-                onChange={(e) => setColorName(e.target.value)}
-                placeholder="e.g., Navy Blue"
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="hex_value">Color Preview</Label>
-              <div className="flex gap-2">
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="color_name">Color Name *</Label>
                 <Input
-                  id="hex_value"
-                  type="color"
-                  value={hexValue}
-                  onChange={(e) => setHexValue(e.target.value)}
-                  className="w-20 h-10"
-                />
-                <Input
-                  value={hexValue}
-                  onChange={(e) => setHexValue(e.target.value)}
-                  placeholder="#000000"
+                  id="color_name"
+                  value={colorName}
+                  onChange={(e) => setColorName(e.target.value)}
+                  placeholder="e.g., Navy Blue"
+                  required
                 />
               </div>
+              <div className="space-y-2">
+                <Label htmlFor="hex_value">Color Preview</Label>
+                <div className="flex gap-2">
+                  <Input
+                    id="hex_value"
+                    type="color"
+                    value={hexValue}
+                    onChange={(e) => setHexValue(e.target.value)}
+                    className="w-20 h-10"
+                  />
+                  <Input
+                    value={hexValue}
+                    onChange={(e) => setHexValue(e.target.value)}
+                    placeholder="#000000"
+                  />
+                </div>
+              </div>
             </div>
-          </div>
-          <Button type="submit" disabled={isCreating} className="w-full">
-            <Plus className="h-4 w-4 mr-2" />
-            Add Color
-          </Button>
-        </form>
+            <Button type="submit" disabled={isCreating} className="w-full">
+              <Plus className="h-4 w-4 mr-2" />
+              Add Color
+            </Button>
+          </form>
 
-        <div className="border rounded-lg mt-4">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Preview</TableHead>
-                <TableHead>Color Name</TableHead>
-                <TableHead>Status</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {colors.length === 0 ? (
+          <div className="border rounded-lg mt-4">
+            <Table>
+              <TableHeader>
                 <TableRow>
-                  <TableCell colSpan={3} className="text-center text-muted-foreground">
-                    No colors yet. Add your first color above.
-                  </TableCell>
+                  <TableHead>Preview</TableHead>
+                  <TableHead>Color Name</TableHead>
+                  <TableHead>Status</TableHead>
                 </TableRow>
-              ) : (
-                colors.map((color) => (
-                  <TableRow key={color.id}>
-                    <TableCell>
-                      <div
-                        className="w-8 h-8 rounded border"
-                        style={{
-                          backgroundColor: color.hex_value || '#cccccc',
-                        }}
-                      />
-                    </TableCell>
-                    <TableCell className="font-medium">{color.color_name}</TableCell>
-                    <TableCell>
-                      <Badge variant={color.is_active ? "default" : "secondary"}>
-                        {color.is_active ? "Active" : "Inactive"}
-                      </Badge>
+              </TableHeader>
+              <TableBody>
+                {colors.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={3} className="text-center text-muted-foreground">
+                      No colors yet. Add your first color above.
                     </TableCell>
                   </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </div>
-      </DialogContent>
+                ) : (
+                  colors.map((color) => (
+                    <TableRow key={color.id}>
+                      <TableCell>
+                        <div
+                          className="w-8 h-8 rounded border"
+                          style={{
+                            backgroundColor: color.hex_value || '#cccccc',
+                          }}
+                        />
+                      </TableCell>
+                      <TableCell className="font-medium">{color.color_name}</TableCell>
+                      <TableCell>
+                        <Badge variant={color.is_active ? "default" : "secondary"}>
+                          {color.is_active ? "Active" : "Inactive"}
+                        </Badge>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </DialogContent>
+      )}
     </Dialog>
   );
 }
