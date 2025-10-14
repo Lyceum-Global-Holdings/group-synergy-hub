@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Plus, Package, Truck, CheckCircle, Clock, User, MapPin, List, FileText } from 'lucide-react';
+import { Plus, Package, Truck, CheckCircle, Clock, User, MapPin, List, FileText, Eye } from 'lucide-react';
 import { usePickPack } from '@/hooks/usePickPack';
 import { useDeliveryOrders } from '@/hooks/useDeliveryOrders';
 import { useCompany } from '@/contexts/CompanyContext';
@@ -12,6 +12,7 @@ import { CreateSalesOrderDialog } from './CreateSalesOrderDialog';
 import { CreatePickListDialog } from './CreatePickListDialog';
 import { CreateDeliveryOrderDialog } from './CreateDeliveryOrderDialog';
 import { DeliveryOrderDetailsDialog } from './DeliveryOrderDetailsDialog';
+import { SalesOrderDetailsDialog } from './SalesOrderDetailsDialog';
 import { SalesOrderItemsView } from './SalesOrderItemsView';
 import { format } from 'date-fns';
 
@@ -33,9 +34,11 @@ export function SalesOrderFulfillmentTab() {
   const [showCreatePickList, setShowCreatePickList] = useState(false);
   const [showCreateDeliveryOrder, setShowCreateDeliveryOrder] = useState(false);
   const [showDeliveryOrderDetails, setShowDeliveryOrderDetails] = useState(false);
+  const [showSalesOrderDetails, setShowSalesOrderDetails] = useState(false);
   const [selectedCPO, setSelectedCPO] = useState<any>(null);
   const [selectedSalesOrder, setSelectedSalesOrder] = useState<any>(null);
   const [selectedDeliveryOrder, setSelectedDeliveryOrder] = useState<string | null>(null);
+  const [selectedSalesOrderId, setSelectedSalesOrderId] = useState<string | null>(null);
   const [viewItemsForOrder, setViewItemsForOrder] = useState<string | null>(null);
 
   const handleCreateSalesOrderFromCPO = (cpo: any) => {
@@ -56,6 +59,11 @@ export function SalesOrderFulfillmentTab() {
   const handleViewDeliveryOrder = (doId: string) => {
     setSelectedDeliveryOrder(doId);
     setShowDeliveryOrderDetails(true);
+  };
+
+  const handleViewSalesOrder = (orderId: string) => {
+    setSelectedSalesOrderId(orderId);
+    setShowSalesOrderDetails(true);
   };
 
   const getStatusBadge = (status: string) => {
@@ -194,6 +202,14 @@ export function SalesOrderFulfillmentTab() {
                           </div>
                         </TableCell>
                         <TableCell className="text-right space-x-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleViewSalesOrder(order.id)}
+                          >
+                            <Eye className="w-4 h-4 mr-1" />
+                            View
+                          </Button>
                           <Button
                             size="sm"
                             variant="outline"
@@ -411,6 +427,14 @@ export function SalesOrderFulfillmentTab() {
         onOpenChange={setShowDeliveryOrderDetails}
         deliveryOrderId={selectedDeliveryOrder || undefined}
       />
+
+      {selectedSalesOrderId && (
+        <SalesOrderDetailsDialog
+          open={showSalesOrderDetails}
+          onOpenChange={setShowSalesOrderDetails}
+          salesOrderId={selectedSalesOrderId}
+        />
+      )}
 
       {viewItemsForOrder && (
         <Card className="mt-4 p-6">
