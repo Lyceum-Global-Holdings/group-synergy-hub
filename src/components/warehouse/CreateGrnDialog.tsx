@@ -191,20 +191,25 @@ export function CreateGrnDialog({ open, onOpenChange, preselectedPo }: CreateGrn
     
     // Auto-populate items from PO
     if (po.items && po.items.length > 0) {
-      const poItems = po.items.map((item: any) => ({
-        item_code: item.item_code || '',
-        item_name: item.item_name || '',
-        description: item.description || '',
-        warehouse_item_id: item.warehouse_item_id,
-        po_item_id: item.id,
-        quantity_ordered: item.quantity_ordered || 0,
-        quantity_received: 0, // Start from 0 for "Receiving Now"
-        unit_of_measure: item.unit_of_measure || 'pcs',
-        unit_price: item.unit_price || 0,
-        total_cost: 0,
-        quality_status: 'good' as QualityStatus,
-        remarks: '',
-      }));
+      const poItems = po.items.map((item: any) => {
+        const quantityPending = item.quantity_pending || ((item.quantity_ordered || 0) - (item.quantity_received || 0));
+        const receivingQty = quantityPending > 0 ? quantityPending : 0;
+        
+        return {
+          item_code: item.item_code || '',
+          item_name: item.item_name || '',
+          description: item.description || '',
+          warehouse_item_id: item.warehouse_item_id,
+          po_item_id: item.id,
+          quantity_ordered: item.quantity_ordered || 0,
+          quantity_received: receivingQty, // Default to pending quantity
+          unit_of_measure: item.unit_of_measure || 'pcs',
+          unit_price: item.unit_price || 0,
+          total_cost: (item.unit_price || 0) * receivingQty,
+          quality_status: 'good' as QualityStatus,
+          remarks: '',
+        };
+      });
       form.setValue('items', poItems);
     }
     
@@ -484,10 +489,30 @@ export function CreateGrnDialog({ open, onOpenChange, preselectedPo }: CreateGrn
                     <TableRow>
                       <TableHead>Item Code</TableHead>
                       <TableHead>Description</TableHead>
-                      <TableHead>Qty Ordered</TableHead>
-                      <TableHead>Already Received</TableHead>
-                      <TableHead>Pending</TableHead>
-                      <TableHead>Receiving Now *</TableHead>
+                      <TableHead className="text-center">
+                        <div className="flex flex-col items-center">
+                          <span>Qty Ordered</span>
+                          <span className="text-xs font-normal text-muted-foreground">(From PO)</span>
+                        </div>
+                      </TableHead>
+                      <TableHead className="text-center">
+                        <div className="flex flex-col items-center">
+                          <span>Already Received</span>
+                          <span className="text-xs font-normal text-muted-foreground">(Previous GRNs)</span>
+                        </div>
+                      </TableHead>
+                      <TableHead className="text-center">
+                        <div className="flex flex-col items-center">
+                          <span className="text-orange-600">Pending</span>
+                          <span className="text-xs font-normal text-muted-foreground">(To Receive)</span>
+                        </div>
+                      </TableHead>
+                      <TableHead className="text-center">
+                        <div className="flex flex-col items-center">
+                          <span>Receiving Now *</span>
+                          <span className="text-xs font-normal text-muted-foreground">(This GRN)</span>
+                        </div>
+                      </TableHead>
                       <TableHead>Quality Status</TableHead>
                       <TableHead>UOM</TableHead>
                       <TableHead>Unit Price</TableHead>
@@ -733,23 +758,46 @@ export function CreateGrnDialog({ open, onOpenChange, preselectedPo }: CreateGrn
             <div className="bg-white p-6 rounded-lg max-w-md w-full mx-4">
               <h3 className="text-lg font-semibold mb-4">Select Purchase Order</h3>
               <div className="space-y-2 max-h-60 overflow-y-auto">
-                {purchaseOrders.filter(po => 
-                  ['approved', 'sent', 'acknowledged', 'partially_received'].includes(po.status)
-                ).map((po) => (
-                  <div
-                    key={po.id}
-                    className="p-2 hover:bg-gray-100 cursor-pointer rounded flex items-center justify-between"
-                    onClick={() => handleSelectPo(po)}
-                  >
-                    <div>
-                      <div className="font-medium">{po.po_number}</div>
-                      <div className="text-sm text-gray-500">
-                        {po.supplier?.name} - LKR {po.final_amount?.toLocaleString()}
+                {purchaseOrders
+                  .filter(po => 
+                    ['approved', 'sent', 'acknowledged', 'partially_received'].includes(po.status)
+                  )
+                  .filter(po => {
+                    // Only show POs with pending items
+                    const hasPendingItems = po.items?.some(item => {
+                      const pending = (item.quantity_ordered || 0) - (item.quantity_received || 0);
+                      return pending > 0;
+                    });
+                    return hasPendingItems;
+                  })
+                  .map((po) => {
+                    // Calculate pending items count
+                    const pendingItemsCount = po.items?.filter(item => {
+                      const pending = (item.quantity_ordered || 0) - (item.quantity_received || 0);
+                      return pending > 0;
+                    }).length || 0;
+                    
+                    return (
+                      <div
+                        key={po.id}
+                        className="p-3 hover:bg-gray-100 cursor-pointer rounded border border-gray-200"
+                        onClick={() => handleSelectPo(po)}
+                      >
+                        <div className="flex items-start justify-between mb-1">
+                          <div className="font-medium">{po.po_number}</div>
+                          <div className="flex gap-1">
+                            <Badge variant="outline" className="text-xs">{po.status}</Badge>
+                            <Badge variant="secondary" className="text-xs bg-orange-100 text-orange-700">
+                              {pendingItemsCount} {pendingItemsCount === 1 ? 'item' : 'items'} pending
+                            </Badge>
+                          </div>
+                        </div>
+                        <div className="text-sm text-gray-500">
+                          {po.supplier?.name} - LKR {po.final_amount?.toLocaleString()}
+                        </div>
                       </div>
-                    </div>
-                    <Badge variant="outline">{po.status}</Badge>
-                  </div>
-                ))}
+                    );
+                  })}
               </div>
               <div className="flex justify-end mt-4">
                 <Button 

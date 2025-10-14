@@ -34,7 +34,17 @@ export function usePurchaseOrders() {
         console.error('Purchase orders error:', error);
         throw error;
       }
-      return data as PurchaseOrder[];
+      
+      // Calculate quantity_pending for each item
+      const posWithPending = data?.map(po => ({
+        ...po,
+        items: po.items?.map(item => ({
+          ...item,
+          quantity_pending: (item.quantity_ordered || 0) - (item.quantity_received || 0)
+        }))
+      }));
+      
+      return posWithPending as PurchaseOrder[];
     },
   });
 }
@@ -63,7 +73,17 @@ export function usePurchaseOrder(id: string) {
         .single();
 
       if (error) throw error;
-      return data as PurchaseOrder;
+      
+      // Calculate quantity_pending for items
+      const poWithPending = {
+        ...data,
+        items: data.items?.map(item => ({
+          ...item,
+          quantity_pending: (item.quantity_ordered || 0) - (item.quantity_received || 0)
+        }))
+      };
+      
+      return poWithPending as PurchaseOrder;
     },
     enabled: !!id,
   });
