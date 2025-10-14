@@ -26,6 +26,16 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
     }
   }, [companies, selectedCompany, isViewingAllCompanies]);
 
+  // Update selectedCompany when companies data changes (e.g., after module allocation update)
+  useEffect(() => {
+    if (selectedCompany && companies.length > 0) {
+      const updatedCompany = companies.find(c => c.id === selectedCompany.id);
+      if (updatedCompany && JSON.stringify(updatedCompany.modules) !== JSON.stringify(selectedCompany.modules)) {
+        setSelectedCompany(updatedCompany);
+      }
+    }
+  }, [companies]);
+
   const handleSetSelectedCompany = (company: Company | null) => {
     if (company === null) {
       setIsViewingAllCompanies(true);
