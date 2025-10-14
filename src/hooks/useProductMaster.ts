@@ -11,7 +11,7 @@ export interface ProductMaster {
   description?: string | null;
   available_colors: any;
   available_sizes: any;
-  default_unit_of_measure: string;
+  unit_of_measure: string;
   image_url?: string | null;
   status: string;
   created_by?: string | null;
@@ -28,7 +28,7 @@ export interface CreateProductMasterData {
   description?: string;
   available_colors?: any[];
   available_sizes?: string[];
-  default_unit_of_measure?: string;
+  unit_of_measure?: string;
   image_url?: string;
   status?: string;
   company_id?: string;

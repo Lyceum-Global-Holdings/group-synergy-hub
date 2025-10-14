@@ -54,7 +54,7 @@ export function CreateProductMasterDialog({ open, onOpenChange }: CreateProductM
         description: description.trim() || undefined,
         available_colors: selectedColors,
         available_sizes: selectedSizes,
-        default_unit_of_measure: unitOfMeasure,
+        unit_of_measure: unitOfMeasure,
         status,
         company_id: selectedCompany?.id,
       },
