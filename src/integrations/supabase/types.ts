@@ -596,6 +596,7 @@ export type Database = {
           finished_good_id: string | null
           id: string
           po_id: string | null
+          product_master_id: string | null
           product_name: string
           size: string | null
           size_specific: boolean | null
@@ -615,6 +616,7 @@ export type Database = {
           finished_good_id?: string | null
           id?: string
           po_id?: string | null
+          product_master_id?: string | null
           product_name: string
           size?: string | null
           size_specific?: boolean | null
@@ -634,6 +636,7 @@ export type Database = {
           finished_good_id?: string | null
           id?: string
           po_id?: string | null
+          product_master_id?: string | null
           product_name?: string
           size?: string | null
           size_specific?: boolean | null
@@ -664,6 +667,13 @@ export type Database = {
             columns: ["po_id"]
             isOneToOne: false
             referencedRelation: "purchase_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bill_of_materials_product_master_id_fkey"
+            columns: ["product_master_id"]
+            isOneToOne: false
+            referencedRelation: "product_master"
             referencedColumns: ["id"]
           },
           {

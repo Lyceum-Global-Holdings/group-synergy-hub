@@ -37,11 +37,12 @@ import { BOM_CATEGORIES, BomCategoryKey } from '@/constants/bomCategories';
 import { STANDARD_SIZES, SIZE_CATEGORIES, getSizesByCategory } from '@/constants/standardSizes';
 import { CreateBomItemData } from '@/types/bom';
 import { ItemSelector } from '@/components/common/ItemSelector';
-import { FinishedGoodsItemSelector } from '@/components/common/FinishedGoodsItemSelector';
+import { ProductMasterSelector } from '@/components/common/ProductMasterSelector';
 import { WarehouseItem } from '@/types/itemBin';
 
 const bomSchema = z.object({
   product_name: z.string().min(1, 'Product name is required'),
+  product_master_id: z.string().optional(),
   warehouse_item_id: z.string().optional(),
   finished_good_id: z.string().optional(),
   style_no: z.string().optional(),
@@ -49,18 +50,7 @@ const bomSchema = z.object({
   size: z.string().optional(),
   description: z.string().optional(),
   status: z.enum(['active', 'inactive', 'draft']).default('draft'),
-}).refine(
-  (data) => {
-    // Ensure only one of warehouse_item_id or finished_good_id is set
-    const hasWarehouseItem = Boolean(data.warehouse_item_id);
-    const hasFinishedGood = Boolean(data.finished_good_id);
-    return !hasWarehouseItem || !hasFinishedGood;
-  },
-  {
-    message: "Cannot link to both warehouse item and finished good",
-    path: ["finished_good_id"],
-  }
-);
+});
 
 type BomFormData = z.infer<typeof bomSchema>;
 
@@ -85,6 +75,7 @@ export function CreateBomDialog({ children }: CreateBomDialogProps) {
     resolver: zodResolver(bomSchema),
     defaultValues: {
       product_name: '',
+      product_master_id: '',
       warehouse_item_id: '',
       finished_good_id: '',
       version: '1.0',
@@ -186,6 +177,7 @@ export function CreateBomDialog({ children }: CreateBomDialogProps) {
 
       await createBom({
         product_name: data.product_name,
+        product_master_id: data.product_master_id || undefined,
         warehouse_item_id: data.warehouse_item_id || undefined,
         finished_good_id: data.finished_good_id || undefined,
         style_no: data.style_no,
@@ -416,31 +408,38 @@ export function CreateBomDialog({ children }: CreateBomDialogProps) {
                 />
 
                 <div className="space-y-2">
-                  <FormLabel>Link to Product Master (Recommended)</FormLabel>
-                  <FinishedGoodsItemSelector
+                  <FormLabel>Product Template</FormLabel>
+                  <ProductMasterSelector
+                    value={form.watch('product_master_id')}
                     onSelect={(product) => {
                       if (product) {
-                        form.setValue('finished_good_id', product.id);
-                        form.setValue('warehouse_item_id', ''); // Clear warehouse item
+                        form.setValue('product_master_id', product.id);
+                        form.setValue('finished_good_id', '');
+                        form.setValue('warehouse_item_id', '');
+                        
                         if (!form.getValues('product_name')) {
                           form.setValue('product_name', product.product_name);
                         }
                         if (!form.getValues('style_no')) {
                           form.setValue('style_no', product.style_no || '');
                         }
-                        if (!form.getValues('size')) {
-                          form.setValue('size', product.size || '');
+                        
+                        const availableSizes = (product.available_sizes || [])
+                          .map((s: any) => typeof s === 'string' ? s : s.size_name)
+                          .filter(Boolean);
+                        
+                        if (availableSizes.length > 0 && !form.getValues('size')) {
+                          form.setValue('size', availableSizes[0]);
                         }
                       } else {
-                        form.setValue('finished_good_id', '');
+                        form.setValue('product_master_id', '');
                       }
                     }}
-                    value={form.watch('finished_good_id')}
-                    placeholder="Select from finished goods..."
-                    disabled={!!form.watch('warehouse_item_id')}
+                    placeholder="Select product template..."
+                    disabled={!!form.watch('warehouse_item_id') || !!form.watch('finished_good_id')}
                   />
                   <p className="text-xs text-muted-foreground">
-                    Link this BOM to a finished goods product master
+                    Select from Product Master templates to create a BOM
                   </p>
                 </div>
 
