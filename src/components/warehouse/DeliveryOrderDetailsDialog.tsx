@@ -18,7 +18,13 @@ export function DeliveryOrderDetailsDialog({
   onOpenChange,
   deliveryOrderId,
 }: DeliveryOrderDetailsDialogProps) {
-  const { useDeliveryOrder, updateDeliveryOrderStatus, isUpdatingStatus } = useDeliveryOrders();
+  const { 
+    useDeliveryOrder, 
+    updateDeliveryOrderStatus, 
+    isUpdatingStatus,
+    cancelDeliveryOrder,
+    isCancelling
+  } = useDeliveryOrders();
   const { data: deliveryOrder } = useDeliveryOrder(deliveryOrderId || '');
 
   const getStatusBadge = (status: string) => {
@@ -69,6 +75,16 @@ export function DeliveryOrderDetailsDialog({
     }
   };
 
+  const handleCancel = () => {
+    if (!deliveryOrderId) return;
+    if (window.confirm('Are you sure you want to cancel this delivery order?')) {
+      cancelDeliveryOrder({
+        doId: deliveryOrderId,
+        notes: 'Order cancelled by user'
+      });
+    }
+  };
+
   if (!deliveryOrder) {
     return null;
   }
@@ -113,6 +129,16 @@ export function DeliveryOrderDetailsDialog({
                   Approve
                 </Button>
               </div>
+            )}
+            {['approved', 'ready_for_dispatch', 'dispatched'].includes(deliveryOrder.status) && (
+              <Button
+                variant="destructive"
+                onClick={handleCancel}
+                disabled={isCancelling}
+              >
+                <XCircle className="h-4 w-4 mr-1" />
+                {isCancelling ? 'Cancelling...' : 'Cancel Order'}
+              </Button>
             )}
           </div>
 

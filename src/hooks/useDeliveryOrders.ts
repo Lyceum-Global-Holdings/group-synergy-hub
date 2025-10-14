@@ -240,6 +240,43 @@ export const useDeliveryOrders = () => {
     },
   });
 
+  // Cancel delivery order
+  const cancelDeliveryOrder = useMutation({
+    mutationFn: async ({ doId, notes }: { doId: string; notes?: string }) => {
+      const updateData: any = { 
+        status: 'cancelled', 
+        updated_at: new Date().toISOString() 
+      };
+      
+      if (notes) updateData.notes = notes;
+
+      const { data, error } = await supabase
+        .from('delivery_orders')
+        .update(updateData)
+        .eq('id', doId)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['delivery-orders'] });
+      queryClient.invalidateQueries({ queryKey: ['sales-orders'] });
+      toast({
+        title: "Success",
+        description: "Delivery order cancelled successfully",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to cancel delivery order",
+        variant: "destructive",
+      });
+    },
+  });
+
   // Delete delivery order
   const deleteDeliveryOrder = useMutation({
     mutationFn: async (doId: string) => {
@@ -276,6 +313,8 @@ export const useDeliveryOrders = () => {
     isUpdatingStatus: updateDeliveryOrderStatus.isPending,
     updateDeliveryOrder: updateDeliveryOrder.mutate,
     isUpdating: updateDeliveryOrder.isPending,
+    cancelDeliveryOrder: cancelDeliveryOrder.mutate,
+    isCancelling: cancelDeliveryOrder.isPending,
     deleteDeliveryOrder: deleteDeliveryOrder.mutate,
     isDeleting: deleteDeliveryOrder.isPending,
   };
