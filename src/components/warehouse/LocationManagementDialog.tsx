@@ -25,6 +25,7 @@ export const LocationManagementDialog = () => {
     contact_phone: string;
     physical_address: string;
     status: 'active' | 'inactive' | 'maintenance' | 'closed';
+    warehouse_category: string;
   }>({
     name: '',
     type: 'location',
@@ -35,7 +36,8 @@ export const LocationManagementDialog = () => {
     contact_person: '',
     contact_phone: '',
     physical_address: '',
-    status: 'active'
+    status: 'active',
+    warehouse_category: 'general'
   });
 
   const { 
@@ -63,7 +65,8 @@ export const LocationManagementDialog = () => {
       contact_person: formData.contact_person || undefined,
       contact_phone: formData.contact_phone || undefined,
       physical_address: formData.physical_address || undefined,
-      status: formData.status
+      status: formData.status,
+      warehouse_category: formData.warehouse_category as any
     };
 
     if (editingLocation) {
@@ -86,7 +89,8 @@ export const LocationManagementDialog = () => {
       contact_person: '',
       contact_phone: '',
       physical_address: '',
-      status: 'active'
+      status: 'active',
+      warehouse_category: 'general'
     });
     setEditingLocation(null);
   };
@@ -102,7 +106,8 @@ export const LocationManagementDialog = () => {
       contact_person: location.contact_person || '',
       contact_phone: location.contact_phone || '',
       physical_address: location.physical_address || '',
-      status: location.status || 'active'
+      status: location.status || 'active',
+      warehouse_category: location.warehouse_category || 'general'
     });
     setEditingLocation(location.id);
   };
@@ -252,6 +257,28 @@ export const LocationManagementDialog = () => {
                   </Select>
                 </div>
               </div>
+
+              {formData.type === 'location' && (
+                <div>
+                  <Label htmlFor="warehouse_category">Warehouse Category</Label>
+                  <Select
+                    value={formData.warehouse_category}
+                    onValueChange={(value) => setFormData({ ...formData, warehouse_category: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select category" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="general">General</SelectItem>
+                      <SelectItem value="raw_materials">Raw Materials</SelectItem>
+                      <SelectItem value="finished_goods">Finished Goods</SelectItem>
+                      <SelectItem value="wip">Work In Progress</SelectItem>
+                      <SelectItem value="returns">Returns</SelectItem>
+                      <SelectItem value="quarantine">Quarantine</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
 
               <div className="grid grid-cols-2 gap-4">
                 <div>

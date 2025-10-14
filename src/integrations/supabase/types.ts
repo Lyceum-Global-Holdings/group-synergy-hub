@@ -8388,6 +8388,7 @@ export type Database = {
           status: string | null
           type: string
           updated_at: string
+          warehouse_category: string | null
         }
         Insert: {
           capacity?: number | null
@@ -8406,6 +8407,7 @@ export type Database = {
           status?: string | null
           type: string
           updated_at?: string
+          warehouse_category?: string | null
         }
         Update: {
           capacity?: number | null
@@ -8424,6 +8426,7 @@ export type Database = {
           status?: string | null
           type?: string
           updated_at?: string
+          warehouse_category?: string | null
         }
         Relationships: [
           {

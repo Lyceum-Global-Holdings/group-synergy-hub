@@ -1,3 +1,5 @@
+export type WarehouseCategory = 'raw_materials' | 'finished_goods' | 'general' | 'wip' | 'returns' | 'quarantine';
+
 export interface WarehouseLocation {
   id: string;
   name: string;
@@ -15,6 +17,7 @@ export interface WarehouseLocation {
   physical_address?: string | null;
   location_code?: string | null;
   status?: 'active' | 'inactive' | 'maintenance' | 'closed';
+  warehouse_category?: WarehouseCategory | null;
 }
 
 export interface AssetCategory {
@@ -66,6 +69,7 @@ export interface CreateWarehouseLocationData {
   contact_phone?: string;
   physical_address?: string;
   status?: 'active' | 'inactive' | 'maintenance' | 'closed';
+  warehouse_category?: WarehouseCategory;
 }
 
 export interface CreateAssetCategoryData {

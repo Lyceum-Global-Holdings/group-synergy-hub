@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { WarehouseLocation, CreateWarehouseLocationData } from '@/types/warehouse';
+import { WarehouseLocation, CreateWarehouseLocationData, WarehouseCategory } from '@/types/warehouse';
 import { useToast } from '@/hooks/use-toast';
 
 export const useWarehouseLocations = () => {
@@ -156,6 +156,12 @@ export const useWarehouseLocations = () => {
     }
   });
 
+  const getLocationsByCategory = (categories: WarehouseCategory[]) => {
+    return locations?.filter(loc => 
+      loc.warehouse_category && categories.includes(loc.warehouse_category)
+    ) || [];
+  };
+
   return {
     locations,
     isLoading,
@@ -165,6 +171,7 @@ export const useWarehouseLocations = () => {
     deleteLocation: deleteLocationMutation.mutate,
     bulkDeleteLocations: bulkDeleteLocationsMutation.mutateAsync,
     bulkUpdateStatus: (ids: string[], status: string) => bulkUpdateStatusMutation.mutateAsync({ ids, status }),
+    getLocationsByCategory,
     isCreating: createLocationMutation.isPending,
     isUpdating: updateLocationMutation.isPending,
     isDeleting: deleteLocationMutation.isPending,

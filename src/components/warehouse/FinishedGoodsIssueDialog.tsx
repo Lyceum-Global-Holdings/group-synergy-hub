@@ -27,7 +27,11 @@ export function FinishedGoodsIssueDialog({
 }: FinishedGoodsIssueDialogProps) {
   const { createFinishedGoodsIssue, isCreatingFinishedGoodsIssue, updateIssueStatus } = usePickPack();
   const { selectedCompany } = useCompany();
-  const { locations } = useWarehouseLocations();
+  const { locations, getLocationsByCategory } = useWarehouseLocations();
+  
+  // Filter for finished goods warehouses
+  const finishedGoodsLocations = getLocationsByCategory(['finished_goods', 'general'])
+    .filter(loc => loc.type === 'location' && loc.status === 'active');
   const { bins } = useWarehouseBins();
 
   const [issueDate, setIssueDate] = useState(new Date().toISOString().split('T')[0]);
@@ -194,9 +198,14 @@ export function FinishedGoodsIssueDialog({
                           <SelectValue placeholder="Select location" />
                         </SelectTrigger>
                         <SelectContent>
-                          {locations?.map((loc: any) => (
+                          {finishedGoodsLocations?.map((loc: any) => (
                             <SelectItem key={loc.id} value={loc.id}>
                               {loc.name}
+                              {loc.warehouse_category && (
+                                <span className="ml-2 text-xs text-muted-foreground">
+                                  ({loc.warehouse_category})
+                                </span>
+                              )}
                             </SelectItem>
                           ))}
                         </SelectContent>
