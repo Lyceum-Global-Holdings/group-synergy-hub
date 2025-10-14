@@ -734,6 +734,95 @@ export const usePickPack = () => {
     }
   });
 
+  // Reset Sales Orders Module
+  const resetSalesOrdersModuleMutation = useMutation({
+    mutationFn: async () => {
+      console.log('Starting sales orders module reset...');
+      
+      // Step 1: Restore stock for all issued finished goods
+      const { data: issueItems, error: issueItemsError } = await supabase
+        .from('finished_goods_issue_items')
+        .select('finished_good_id, quantity_issued');
+      
+      if (issueItemsError) throw issueItemsError;
+      
+      if (issueItems && issueItems.length > 0) {
+        console.log(`Restoring stock for ${issueItems.length} issued items...`);
+        
+        // Group by finished_good_id and sum quantities
+        const stockRestoration = issueItems.reduce((acc, item) => {
+          if (!acc[item.finished_good_id]) {
+            acc[item.finished_good_id] = 0;
+          }
+          acc[item.finished_good_id] += item.quantity_issued;
+          return acc;
+        }, {} as Record<string, number>);
+        
+        // Restore stock for each finished good
+        for (const [finishedGoodId, quantity] of Object.entries(stockRestoration)) {
+          const { data: currentStock } = await supabase
+            .from('finished_goods')
+            .select('current_stock')
+            .eq('id', finishedGoodId)
+            .single();
+          
+          if (currentStock) {
+            await supabase
+              .from('finished_goods')
+              .update({ 
+                current_stock: currentStock.current_stock + quantity,
+                updated_at: new Date().toISOString()
+              })
+              .eq('id', finishedGoodId);
+            
+            console.log(`Restored ${quantity} units to finished good ${finishedGoodId}`);
+          }
+        }
+      }
+      
+      // Step 2: Delete all records in correct order (respecting foreign keys)
+      console.log('Deleting delivery orders...');
+      await supabase.from('delivery_order_items').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+      await supabase.from('delivery_orders').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+      
+      console.log('Deleting pick lists...');
+      await supabase.from('pick_list_items').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+      await supabase.from('pick_lists').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+      
+      console.log('Deleting finished goods issues...');
+      await supabase.from('finished_goods_issue_items').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+      await supabase.from('finished_goods_issues').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+      
+      console.log('Deleting sales orders...');
+      await supabase.from('sales_order_items').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+      await supabase.from('sales_orders').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+      
+      console.log('Sales orders module reset completed successfully');
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['sales-orders'] });
+      queryClient.invalidateQueries({ queryKey: ['sales-order-items'] });
+      queryClient.invalidateQueries({ queryKey: ['pick-lists'] });
+      queryClient.invalidateQueries({ queryKey: ['pick-list-items'] });
+      queryClient.invalidateQueries({ queryKey: ['finished-goods-issues'] });
+      queryClient.invalidateQueries({ queryKey: ['finished-goods-issue-items'] });
+      queryClient.invalidateQueries({ queryKey: ['delivery-orders'] });
+      queryClient.invalidateQueries({ queryKey: ['finished-goods'] });
+      toast({
+        title: "Success",
+        description: "Sales Orders module reset successfully. Stock has been restored.",
+      });
+    },
+    onError: (error) => {
+      console.error('Error resetting sales orders module:', error);
+      toast({
+        title: "Error",
+        description: "Failed to reset Sales Orders module: " + error.message,
+        variant: "destructive",
+      });
+    }
+  });
+
   // Return all queries and mutations
   const hookReturn = {
     // Queries
@@ -768,6 +857,10 @@ export const usePickPack = () => {
     
     updatePickListItem: updatePickListItemMutation.mutate,
     isUpdatingPickListItem: updatePickListItemMutation.isPending,
+    
+    // Reset module
+    resetSalesOrdersModule: resetSalesOrdersModuleMutation.mutate,
+    isResettingModule: resetSalesOrdersModuleMutation.isPending,
   };
   
   return hookReturn;
