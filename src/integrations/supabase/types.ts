@@ -2925,11 +2925,13 @@ export type Database = {
           current_stock: number
           description: string | null
           id: string
+          is_variant: boolean | null
           lead_time_days: number | null
           location_id: string | null
           maximum_stock: number | null
           minimum_stock: number | null
           product_code: string
+          product_master_id: string | null
           product_name: string
           quality_status: string | null
           reorder_point: number | null
@@ -2944,6 +2946,7 @@ export type Database = {
           unit_of_measure: string
           updated_at: string | null
           variant: string | null
+          variant_code: string | null
           warehouse_item_id: string | null
         }
         Insert: {
@@ -2959,11 +2962,13 @@ export type Database = {
           current_stock?: number
           description?: string | null
           id?: string
+          is_variant?: boolean | null
           lead_time_days?: number | null
           location_id?: string | null
           maximum_stock?: number | null
           minimum_stock?: number | null
           product_code: string
+          product_master_id?: string | null
           product_name: string
           quality_status?: string | null
           reorder_point?: number | null
@@ -2978,6 +2983,7 @@ export type Database = {
           unit_of_measure?: string
           updated_at?: string | null
           variant?: string | null
+          variant_code?: string | null
           warehouse_item_id?: string | null
         }
         Update: {
@@ -2993,11 +2999,13 @@ export type Database = {
           current_stock?: number
           description?: string | null
           id?: string
+          is_variant?: boolean | null
           lead_time_days?: number | null
           location_id?: string | null
           maximum_stock?: number | null
           minimum_stock?: number | null
           product_code?: string
+          product_master_id?: string | null
           product_name?: string
           quality_status?: string | null
           reorder_point?: number | null
@@ -3012,9 +3020,17 @@ export type Database = {
           unit_of_measure?: string
           updated_at?: string | null
           variant?: string | null
+          variant_code?: string | null
           warehouse_item_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "finished_goods_product_master_id_fkey"
+            columns: ["product_master_id"]
+            isOneToOne: false
+            referencedRelation: "product_master"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "fk_finished_goods_warehouse_item"
             columns: ["warehouse_item_id"]
@@ -5335,6 +5351,132 @@ export type Database = {
             columns: ["warehouse_item_id"]
             isOneToOne: false
             referencedRelation: "warehouse_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      product_colors: {
+        Row: {
+          color_code: string | null
+          color_name: string
+          company_id: string | null
+          created_at: string | null
+          created_by: string | null
+          hex_value: string | null
+          id: string
+          is_active: boolean | null
+          updated_at: string | null
+        }
+        Insert: {
+          color_code?: string | null
+          color_name: string
+          company_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          hex_value?: string | null
+          id?: string
+          is_active?: boolean | null
+          updated_at?: string | null
+        }
+        Update: {
+          color_code?: string | null
+          color_name?: string
+          company_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          hex_value?: string | null
+          id?: string
+          is_active?: boolean | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_colors_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      product_master: {
+        Row: {
+          available_colors: Json | null
+          available_sizes: Json | null
+          base_price: number | null
+          category_id: string | null
+          company_id: string | null
+          created_at: string | null
+          created_by: string | null
+          description: string | null
+          id: string
+          image_url: string | null
+          product_code: string
+          product_name: string
+          status: string | null
+          style_no: string | null
+          subcategory_id: string | null
+          unit_of_measure: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          available_colors?: Json | null
+          available_sizes?: Json | null
+          base_price?: number | null
+          category_id?: string | null
+          company_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          image_url?: string | null
+          product_code: string
+          product_name: string
+          status?: string | null
+          style_no?: string | null
+          subcategory_id?: string | null
+          unit_of_measure?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          available_colors?: Json | null
+          available_sizes?: Json | null
+          base_price?: number | null
+          category_id?: string | null
+          company_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          image_url?: string | null
+          product_code?: string
+          product_name?: string
+          status?: string | null
+          style_no?: string | null
+          subcategory_id?: string | null
+          unit_of_measure?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_master_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "item_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_master_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_master_subcategory_id_fkey"
+            columns: ["subcategory_id"]
+            isOneToOne: false
+            referencedRelation: "item_categories"
             referencedColumns: ["id"]
           },
         ]
