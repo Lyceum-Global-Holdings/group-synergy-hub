@@ -1,21 +1,30 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Package, Factory, TrendingUp, BarChart3, Archive } from 'lucide-react';
+import { Package, Factory, TrendingUp, BarChart3, Archive, ArrowRight } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { FinishedGoodsMasterTab } from '@/components/warehouse/FinishedGoodsMasterTab';
 import { ProductionReceiptTab } from '@/components/warehouse/ProductionReceiptTab';
-import { SalesOrderFulfillmentTab } from '@/components/warehouse/SalesOrderFulfillmentTab';
+import { DemandOverviewTab } from '@/components/warehouse/DemandOverviewTab';
 import { FinishedGoodsValuationTab } from '@/components/warehouse/FinishedGoodsValuationTab';
 import { FinishedGoodsBatchTab } from '@/components/warehouse/FinishedGoodsBatchTab';
+import { useNavigate } from 'react-router-dom';
 
 export default function FinishedGoods() {
+  const navigate = useNavigate();
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold">Finished Goods Management</h1>
           <p className="text-muted-foreground">
-            Manage finished goods inventory, production receipts, and sales fulfillment
+            Manage finished goods inventory, production receipts, and sales demand
           </p>
         </div>
+        <Button onClick={() => navigate('/warehouse/pick-pack')} variant="outline">
+          <Package className="h-4 w-4 mr-2" />
+          Fulfill Orders
+          <ArrowRight className="h-4 w-4 ml-2" />
+        </Button>
       </div>
 
       <Tabs defaultValue="products" className="space-y-4">
@@ -34,7 +43,7 @@ export default function FinishedGoods() {
           </TabsTrigger>
           <TabsTrigger value="fulfillment" className="flex items-center gap-2">
             <TrendingUp className="h-4 w-4" />
-            Sales Fulfillment
+            Demand Overview
           </TabsTrigger>
           <TabsTrigger value="valuation" className="flex items-center gap-2">
             <BarChart3 className="h-4 w-4" />
@@ -55,7 +64,7 @@ export default function FinishedGoods() {
         </TabsContent>
 
         <TabsContent value="fulfillment">
-          <SalesOrderFulfillmentTab />
+          <DemandOverviewTab />
         </TabsContent>
 
         <TabsContent value="valuation">
