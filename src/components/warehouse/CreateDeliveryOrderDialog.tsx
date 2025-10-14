@@ -77,14 +77,14 @@ export function CreateDeliveryOrderDialog({
       return;
     }
 
-    // Create items from sales order items with picked quantities
+    // Create items from sales order items with picked or issued quantities
     const items: CreateDeliveryOrderItemData[] = (salesOrderItems || [])
-      .filter(item => item.quantity_picked > 0)
+      .filter(item => item.quantity_picked > 0 || item.quantity_issued > 0)
       .map(item => ({
         sales_order_item_id: item.id,
         finished_good_id: item.finished_good_id || '',
         quantity_ordered: item.quantity_ordered,
-        quantity_to_deliver: item.quantity_picked,
+        quantity_to_deliver: Math.max(item.quantity_picked, item.quantity_issued),
         item_condition: 'good' as const,
         quality_checked: false,
       }));
@@ -307,7 +307,7 @@ export function CreateDeliveryOrderDialog({
           <div className="space-y-2">
             <h3 className="font-semibold">Items to Deliver</h3>
             <div className="text-sm text-muted-foreground">
-              {salesOrderItems?.filter(item => item.quantity_picked > 0).length || 0} items ready for delivery
+              {salesOrderItems?.filter(item => item.quantity_picked > 0 || item.quantity_issued > 0).length || 0} items ready for delivery
             </div>
           </div>
 

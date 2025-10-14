@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -6,8 +8,9 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { SalesOrderItemsView } from "./SalesOrderItemsView";
+import { CreateDeliveryOrderDialog } from "./CreateDeliveryOrderDialog";
 import { usePickPack } from "@/hooks/usePickPack";
-import { FileText, Package, List, Clock, User, MapPin, Calendar, Eye } from "lucide-react";
+import { FileText, Package, List, Clock, User, MapPin, Calendar, Eye, Truck } from "lucide-react";
 import { format } from "date-fns";
 
 interface SalesOrderDetailsDialogProps {
@@ -24,9 +27,27 @@ export function SalesOrderDetailsDialog({
   const { useSalesOrders, usePickLists } = usePickPack();
   const { data: salesOrders, isLoading: loadingOrders } = useSalesOrders();
   const { data: allPickLists, isLoading: loadingPickLists } = usePickLists();
+  const [showCreateDeliveryOrder, setShowCreateDeliveryOrder] = useState(false);
 
   const salesOrder = salesOrders?.find((order) => order.id === salesOrderId);
   const relatedPickLists = allPickLists?.filter((pl) => pl.sales_order_id === salesOrderId) || [];
+
+  // Fetch sales order items to check issued quantities
+  const { data: salesOrderItems } = useQuery({
+    queryKey: ['sales-order-items', salesOrderId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('sales_order_items')
+        .select('id, quantity_ordered, quantity_issued, quantity_picked')
+        .eq('sales_order_id', salesOrderId);
+      
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!salesOrderId,
+  });
+
+  const hasIssuedItems = salesOrderItems?.some(item => item.quantity_issued > 0);
 
   const getStatusBadge = (status: string) => {
     const variants: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
@@ -210,6 +231,21 @@ export function SalesOrderDetailsDialog({
                     <span className="text-sm text-muted-foreground">Pick Lists:</span>
                     <span className="font-medium">{relatedPickLists.length}</span>
                   </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm text-muted-foreground">Issued Items:</span>
+                    <span className="font-medium">
+                      {salesOrderItems?.filter(item => item.quantity_issued > 0).length || 0} / {salesOrderItems?.length || 0}
+                    </span>
+                  </div>
+                  {hasIssuedItems && salesOrder.status !== 'delivered' && salesOrder.status !== 'cancelled' && (
+                    <Button 
+                      onClick={() => setShowCreateDeliveryOrder(true)}
+                      className="w-full mt-2"
+                    >
+                      <Truck className="w-4 h-4 mr-2" />
+                      Create Delivery Note
+                    </Button>
+                  )}
                 </CardContent>
               </Card>
             </div>
@@ -229,6 +265,17 @@ export function SalesOrderDetailsDialog({
           <TabsContent value="items">
             <Card>
               <CardContent className="pt-6">
+                {hasIssuedItems && salesOrder.status !== 'delivered' && salesOrder.status !== 'cancelled' && (
+                  <div className="mb-4 flex justify-end">
+                    <Button 
+                      onClick={() => setShowCreateDeliveryOrder(true)}
+                      variant="outline"
+                    >
+                      <Truck className="w-4 h-4 mr-2" />
+                      Create Delivery Note
+                    </Button>
+                  </div>
+                )}
                 <SalesOrderItemsView salesOrderId={salesOrderId} />
               </CardContent>
             </Card>
@@ -310,6 +357,12 @@ export function SalesOrderDetailsDialog({
             </Card>
           </TabsContent>
         </Tabs>
+
+        <CreateDeliveryOrderDialog
+          open={showCreateDeliveryOrder}
+          onOpenChange={setShowCreateDeliveryOrder}
+          salesOrderId={salesOrderId}
+        />
       </DialogContent>
     </Dialog>
   );
