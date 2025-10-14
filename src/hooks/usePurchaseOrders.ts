@@ -154,7 +154,7 @@ export function useUpdatePurchaseOrder() {
     mutationFn: async ({ id, data }: { id: string; data: Partial<PurchaseOrder> }) => {
       const { data: po, error } = await supabase
         .from('purchase_orders')
-        .update(data)
+        .update(data as any)
         .eq('id', id)
         .select()
         .single();

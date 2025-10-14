@@ -11,7 +11,14 @@ import { format } from "date-fns";
 import { Send, Package, Edit, FileText, Check, X, Clock, FilePlus } from "lucide-react";
 import { useSendPurchaseOrder } from "@/hooks/usePurchaseOrders";
 import { useSubmitPurchaseOrder, useApprovePurchaseOrder, usePurchaseOrderApprovals } from "@/hooks/usePurchaseOrderApprovals";
+import { 
+  useSubmitForMerchandiserApproval, 
+  useApprovePOAsMerchandiser, 
+  useApprovePOAsDeptHead,
+  useRejectPO 
+} from "@/hooks/useTwoLevelPoApprovals";
 import { useState } from "react";
+import { toast } from "@/hooks/use-toast";
 import { CreateGrnDialog } from "@/components/warehouse/CreateGrnDialog";
 import { GrnListForPo } from "@/components/procurement/GrnListForPo";
 import { CreatePoAmendmentDialog } from "@/components/procurement/CreatePoAmendmentDialog";
@@ -27,6 +34,8 @@ interface PoDetailsDialogProps {
 const statusColors: Record<PoStatus, string> = {
   draft: "bg-gray-100 text-gray-800",
   pending_approval: "bg-amber-100 text-amber-800",
+  pending_merchandiser_approval: "bg-amber-100 text-amber-800",
+  pending_dept_head_approval: "bg-amber-100 text-amber-800",
   approved: "bg-green-100 text-green-800",
   rejected: "bg-red-100 text-red-800",
   sent: "bg-blue-100 text-blue-800",
@@ -39,6 +48,8 @@ const statusColors: Record<PoStatus, string> = {
 const statusLabels: Record<PoStatus, string> = {
   draft: "Draft",
   pending_approval: "Pending Approval",
+  pending_merchandiser_approval: "Pending Merchandiser Approval",
+  pending_dept_head_approval: "Pending Dept Head Approval",
   approved: "Approved",
   rejected: "Rejected",
   sent: "Sent",
@@ -52,39 +63,88 @@ export function PoDetailsDialog({ open, onOpenChange, purchaseOrder }: PoDetails
   const [comments, setComments] = useState("");
   const [showGrnDialog, setShowGrnDialog] = useState(false);
   const [showAmendmentDialog, setShowAmendmentDialog] = useState(false);
+  const [merchandiserEmail, setMerchandiserEmail] = useState("");
+  const [deptHeadEmail, setDeptHeadEmail] = useState("");
   
   const sendMutation = useSendPurchaseOrder();
-  const submitMutation = useSubmitPurchaseOrder();
-  const approveMutation = useApprovePurchaseOrder();
+  const submitMerchandiserMutation = useSubmitForMerchandiserApproval();
+  const approveMerchandiserMutation = useApprovePOAsMerchandiser();
+  const approveDeptHeadMutation = useApprovePOAsDeptHead();
+  const rejectMutation = useRejectPO();
   const { data: approvals = [] } = usePurchaseOrderApprovals(purchaseOrder.id);
   const { data: userRoles = [] } = useCurrentUserRoles();
   
   const isAdmin = userRoles.some(role => role.role === 'admin' || role.role === 'super_admin');
+  const isMerchandiser = userRoles.some(role => role.role_name === 'Merchandiser');
+  const isDeptHead = userRoles.some(role => role.role_name === 'Department Head');
 
-  const canSubmit = purchaseOrder.status === 'draft';
-  const canApprove = purchaseOrder.status === 'pending_approval';
+  const canSubmitForApproval = purchaseOrder.status === 'draft';
+  const canMerchandiserApprove = purchaseOrder.status === 'pending_merchandiser_approval' && (isMerchandiser || isAdmin);
+  const canDeptHeadApprove = purchaseOrder.status === 'pending_dept_head_approval' && (isDeptHead || isAdmin);
   const canSend = purchaseOrder.status === 'approved';
   const canReceive = ['sent', 'acknowledged', 'partially_received'].includes(purchaseOrder.status);
   const canAmend = !['cancelled', 'completed'].includes(purchaseOrder.status);
 
-  const handleSubmit = () => {
-    submitMutation.mutate(purchaseOrder.id);
+  const handleSubmitForApproval = () => {
+    if (!merchandiserEmail) {
+      toast({
+        title: "Email Required",
+        description: "Please provide merchandiser email",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    // In real scenario, you'd select merchandiser from a list
+    // For now, we'll use a hardcoded merchandiser ID
+    submitMerchandiserMutation.mutate({
+      poId: purchaseOrder.id,
+      merchandiserEmail,
+      merchandiserId: purchaseOrder.created_by // This should be actual merchandiser ID
+    });
   };
 
-  const handleApprove = () => {
-    approveMutation.mutate({ 
-      id: purchaseOrder.id, 
-      action: 'approved', 
-      comments: comments || undefined 
+  const handleMerchandiserApprove = () => {
+    if (!deptHeadEmail) {
+      toast({
+        title: "Email Required",
+        description: "Please provide department head email",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    approveMerchandiserMutation.mutate({
+      poId: purchaseOrder.id,
+      comments: comments || undefined,
+      deptHeadEmail,
+      deptHeadId: purchaseOrder.created_by // This should be actual dept head ID
     });
     setComments("");
   };
 
-  const handleReject = () => {
-    approveMutation.mutate({ 
-      id: purchaseOrder.id, 
-      action: 'rejected', 
-      comments: comments || undefined 
+  const handleDeptHeadApprove = () => {
+    approveDeptHeadMutation.mutate({
+      poId: purchaseOrder.id,
+      comments: comments || undefined
+    });
+    setComments("");
+  };
+
+  const handleReject = (level: 'merchandiser' | 'department_head') => {
+    if (!comments) {
+      toast({
+        title: "Reason Required",
+        description: "Please provide a reason for rejection",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    rejectMutation.mutate({
+      poId: purchaseOrder.id,
+      reason: comments,
+      approvalLevel: level
     });
     setComments("");
   };
@@ -108,19 +168,31 @@ export function PoDetailsDialog({ open, onOpenChange, purchaseOrder }: PoDetails
               <Badge className={statusColors[purchaseOrder.status]}>
                 {statusLabels[purchaseOrder.status]}
               </Badge>
-              {canSubmit && (
-                <Button size="sm" onClick={handleSubmit} disabled={submitMutation.isPending}>
+              {canSubmitForApproval && (
+                <Button size="sm" onClick={handleSubmitForApproval} disabled={submitMerchandiserMutation.isPending}>
                   <Clock className="h-4 w-4 mr-2" />
                   Submit for Approval
                 </Button>
               )}
-              {canApprove && (
+              {canMerchandiserApprove && (
                 <>
-                  <Button size="sm" onClick={handleApprove} disabled={approveMutation.isPending}>
+                  <Button size="sm" onClick={handleMerchandiserApprove} disabled={approveMerchandiserMutation.isPending}>
                     <Check className="h-4 w-4 mr-2" />
-                    Approve
+                    Approve (Merchandiser)
                   </Button>
-                  <Button size="sm" variant="destructive" onClick={handleReject} disabled={approveMutation.isPending}>
+                  <Button size="sm" variant="destructive" onClick={() => handleReject('merchandiser')} disabled={rejectMutation.isPending}>
+                    <X className="h-4 w-4 mr-2" />
+                    Reject
+                  </Button>
+                </>
+              )}
+              {canDeptHeadApprove && (
+                <>
+                  <Button size="sm" onClick={handleDeptHeadApprove} disabled={approveDeptHeadMutation.isPending}>
+                    <Check className="h-4 w-4 mr-2" />
+                    Approve (Dept Head)
+                  </Button>
+                  <Button size="sm" variant="destructive" onClick={() => handleReject('department_head')} disabled={rejectMutation.isPending}>
                     <X className="h-4 w-4 mr-2" />
                     Reject
                   </Button>
@@ -395,28 +467,65 @@ export function PoDetailsDialog({ open, onOpenChange, purchaseOrder }: PoDetails
           </TabsContent>
 
           <TabsContent value="approvals" className="space-y-6">
-            {/* Approval Actions */}
-            {canApprove && (
+            {/* Submit for Approval */}
+            {canSubmitForApproval && (
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-lg">Approval Actions</CardTitle>
+                  <CardTitle className="text-lg">Submit for Merchandiser Approval</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div>
-                    <Label htmlFor="comments">Comments</Label>
+                    <Label htmlFor="merchandiser-email">Merchandiser Email</Label>
+                    <input
+                      id="merchandiser-email"
+                      type="email"
+                      placeholder="merchandiser@company.com"
+                      value={merchandiserEmail}
+                      onChange={(e) => setMerchandiserEmail(e.target.value)}
+                      className="w-full mt-2 px-3 py-2 border rounded-md"
+                    />
+                  </div>
+                  <Button onClick={handleSubmitForApproval} disabled={submitMerchandiserMutation.isPending}>
+                    <Clock className="h-4 w-4 mr-2" />
+                    Submit for Approval
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Merchandiser Approval */}
+            {canMerchandiserApprove && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Merchandiser Approval</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div>
+                    <Label htmlFor="dept-head-email">Department Head Email</Label>
+                    <input
+                      id="dept-head-email"
+                      type="email"
+                      placeholder="depthead@company.com"
+                      value={deptHeadEmail}
+                      onChange={(e) => setDeptHeadEmail(e.target.value)}
+                      className="w-full mt-2 px-3 py-2 border rounded-md"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="merch-comments">Comments</Label>
                     <Textarea
-                      id="comments"
+                      id="merch-comments"
                       placeholder="Add approval comments (optional)"
                       value={comments}
                       onChange={(e) => setComments(e.target.value)}
                     />
                   </div>
                   <div className="flex gap-2">
-                    <Button onClick={handleApprove} disabled={approveMutation.isPending}>
+                    <Button onClick={handleMerchandiserApprove} disabled={approveMerchandiserMutation.isPending}>
                       <Check className="h-4 w-4 mr-2" />
-                      Approve
+                      Approve (Merchandiser)
                     </Button>
-                    <Button variant="destructive" onClick={handleReject} disabled={approveMutation.isPending}>
+                    <Button variant="destructive" onClick={() => handleReject('merchandiser')} disabled={rejectMutation.isPending}>
                       <X className="h-4 w-4 mr-2" />
                       Reject
                     </Button>
@@ -424,6 +533,77 @@ export function PoDetailsDialog({ open, onOpenChange, purchaseOrder }: PoDetails
                 </CardContent>
               </Card>
             )}
+
+            {/* Department Head Approval */}
+            {canDeptHeadApprove && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Department Head Approval</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div>
+                    <Label htmlFor="dh-comments">Comments</Label>
+                    <Textarea
+                      id="dh-comments"
+                      placeholder="Add approval comments (optional)"
+                      value={comments}
+                      onChange={(e) => setComments(e.target.value)}
+                    />
+                  </div>
+                  <div className="flex gap-2">
+                    <Button onClick={handleDeptHeadApprove} disabled={approveDeptHeadMutation.isPending}>
+                      <Check className="h-4 w-4 mr-2" />
+                      Final Approve
+                    </Button>
+                    <Button variant="destructive" onClick={() => handleReject('department_head')} disabled={rejectMutation.isPending}>
+                      <X className="h-4 w-4 mr-2" />
+                      Reject
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Approval Progress */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Approval Progress</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="flex items-center gap-3">
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                      purchaseOrder.approval_level >= 1 ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-400'
+                    }`}>
+                      {purchaseOrder.approval_level >= 1 ? <Check className="h-4 w-4" /> : '1'}
+                    </div>
+                    <div className="flex-1">
+                      <p className="font-medium">Merchandiser Approval</p>
+                      {purchaseOrder.merchandiser_approved_by && (
+                        <p className="text-sm text-muted-foreground">
+                          Approved on {purchaseOrder.merchandiser_approved_date ? new Date(purchaseOrder.merchandiser_approved_date).toLocaleDateString() : 'N/A'}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                      purchaseOrder.approval_level >= 2 ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-400'
+                    }`}>
+                      {purchaseOrder.approval_level >= 2 ? <Check className="h-4 w-4" /> : '2'}
+                    </div>
+                    <div className="flex-1">
+                      <p className="font-medium">Department Head Approval</p>
+                      {purchaseOrder.department_head_approved_by && (
+                        <p className="text-sm text-muted-foreground">
+                          Approved on {purchaseOrder.department_head_approved_date ? new Date(purchaseOrder.department_head_approved_date).toLocaleDateString() : 'N/A'}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
 
             {/* Approval History */}
             <Card>
@@ -440,9 +620,19 @@ export function PoDetailsDialog({ open, onOpenChange, purchaseOrder }: PoDetails
                     {approvals.map((approval) => (
                       <div key={approval.id} className="flex items-start gap-4 p-4 border rounded-lg">
                         <div className="flex-shrink-0">
-                          <Badge className={statusColors[approval.action]}>
-                            {statusLabels[approval.action]}
+                          <Badge className={approval.action === 'approved' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}>
+                            {approval.action}
                           </Badge>
+                          {approval.approval_level && (
+                            <Badge variant="outline" className="ml-2">
+                              {approval.approval_level}
+                            </Badge>
+                          )}
+                          {approval.approval_method && (
+                            <Badge variant="outline" className="ml-2">
+                              {approval.approval_method}
+                            </Badge>
+                          )}
                         </div>
                         <div className="flex-1">
                           <div className="flex justify-between items-start mb-2">

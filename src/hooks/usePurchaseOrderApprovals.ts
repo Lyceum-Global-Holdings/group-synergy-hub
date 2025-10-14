@@ -84,12 +84,12 @@ export function useApprovePurchaseOrder() {
       // Create approval record
       const { error: approvalError } = await supabase
         .from('po_approvals')
-        .insert({
+        .insert([{
           po_id: id,
           approver_id: currentUser.data.user?.id!,
-          action: action as PoStatus,
+          action: action as any,
           comments: comments
-        });
+        }]);
 
       if (approvalError) throw approvalError;
     },

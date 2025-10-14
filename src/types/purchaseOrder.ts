@@ -1,4 +1,4 @@
-export type PoStatus = 'draft' | 'pending_approval' | 'approved' | 'rejected' | 'sent' | 'acknowledged' | 'partially_received' | 'completed' | 'cancelled';
+export type PoStatus = 'draft' | 'pending_approval' | 'pending_merchandiser_approval' | 'pending_dept_head_approval' | 'approved' | 'rejected' | 'sent' | 'acknowledged' | 'partially_received' | 'completed' | 'cancelled';
 export type ReceiptStatus = 'partial' | 'complete';
 export type QualityStatus = 'good' | 'damaged' | 'rejected';
 
@@ -25,6 +25,13 @@ export interface PurchaseOrder {
   notes?: string;
   created_at: string;
   updated_at: string;
+  approval_level: number;
+  merchandiser_approved_by?: string;
+  merchandiser_approved_date?: string;
+  merchandiser_comments?: string;
+  department_head_approved_by?: string;
+  department_head_approved_date?: string;
+  department_head_comments?: string;
   items?: PoItem[];
   receipts?: PoReceipt[];
   approvals?: PoApproval[];
@@ -46,6 +53,14 @@ export interface PurchaseOrder {
     email?: string;
   };
   approved_by_profile?: {
+    full_name?: string;
+    email?: string;
+  };
+  merchandiser_profile?: {
+    full_name?: string;
+    email?: string;
+  };
+  dept_head_profile?: {
     full_name?: string;
     email?: string;
   };
@@ -149,6 +164,8 @@ export interface PoApproval {
   action: PoStatus;
   comments?: string;
   created_at: string;
+  approval_level?: 'merchandiser' | 'department_head';
+  approval_method?: 'manual' | 'email';
   approver_profile?: {
     full_name?: string;
     email?: string;

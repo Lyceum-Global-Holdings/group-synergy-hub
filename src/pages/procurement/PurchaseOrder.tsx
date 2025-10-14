@@ -17,6 +17,8 @@ import { format } from "date-fns";
 const statusColors: Record<PoStatus, string> = {
   draft: "bg-gray-100 text-gray-800",
   pending_approval: "bg-amber-100 text-amber-800",
+  pending_merchandiser_approval: "bg-amber-100 text-amber-800",
+  pending_dept_head_approval: "bg-amber-100 text-amber-800",
   approved: "bg-green-100 text-green-800",
   rejected: "bg-red-100 text-red-800",
   sent: "bg-blue-100 text-blue-800",
@@ -29,6 +31,8 @@ const statusColors: Record<PoStatus, string> = {
 const statusLabels: Record<PoStatus, string> = {
   draft: "Draft",
   pending_approval: "Pending Approval",
+  pending_merchandiser_approval: "Pending Merchandiser",
+  pending_dept_head_approval: "Pending Dept Head",
   approved: "Approved",
   rejected: "Rejected",
   sent: "Sent",
