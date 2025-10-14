@@ -125,11 +125,10 @@ export const useSendDeptHeadApprovalEmail = () => {
       // Send email to department head
       const { error } = await supabase.functions.invoke('po-email-approval', {
         body: {
-          type: 'send_email',
-          poId,
-          poNumber,
-          approverEmail: deptHeadEmail,
-          approvalLevel: 'dept_head'
+          action: 'send_email',
+          po_id: poId,
+          approver_email: deptHeadEmail,
+          approval_level: 'department_head'
         }
       });
 

@@ -16,7 +16,7 @@ interface SendApprovalEmailRequest {
   action: 'send_email';
   po_id: string;
   approver_email: string;
-  approver_id: string;
+  approver_id?: string;
   approval_level: 'merchandiser' | 'department_head';
 }
 
@@ -56,7 +56,23 @@ serve(async (req) => {
 });
 
 async function handleSendEmail(data: SendApprovalEmailRequest, supabase: any) {
-  const { po_id, approver_email, approver_id, approval_level } = data;
+  let { approver_id } = data;
+  const { po_id, approver_email, approval_level } = data;
+
+  // If approver_id not provided, look up user by email
+  if (!approver_id) {
+    const { data: userData } = await supabase
+      .from('profiles')
+      .select('user_id')
+      .eq('email', approver_email)
+      .maybeSingle();
+
+    if (userData) {
+      approver_id = userData.user_id;
+    }
+    // If no user found, continue without approver_id
+    // Token will be created but approval requires authentication
+  }
 
   // Fetch PO details
   const { data: po, error: poError } = await supabase
@@ -84,7 +100,8 @@ async function handleSendEmail(data: SendApprovalEmailRequest, supabase: any) {
     .insert({
       po_id,
       token,
-      approver_id,
+      approver_id: approver_id || null,
+      approver_email,
       approval_level,
       expires_at: expiresAt.toISOString(),
     });
