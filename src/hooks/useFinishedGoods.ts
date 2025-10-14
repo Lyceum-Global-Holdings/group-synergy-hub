@@ -34,6 +34,9 @@ export interface FinishedGood {
   created_by?: string;
   created_at: string;
   updated_at: string;
+  product_master_id?: string;
+  variant_code?: string;
+  is_variant?: boolean;
 }
 
 export interface CreateFinishedGoodData {

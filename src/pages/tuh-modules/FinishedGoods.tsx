@@ -1,6 +1,7 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Package, Factory, TrendingUp, BarChart3, Archive, ArrowRight, Workflow } from 'lucide-react';
+import { Package, Factory, TrendingUp, BarChart3, Archive, ArrowRight, Workflow, Boxes } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { ProductMasterTab } from '@/components/warehouse/ProductMasterTab';
 import { FinishedGoodsMasterTab } from '@/components/warehouse/FinishedGoodsMasterTab';
 import { ProductionReceiptTab } from '@/components/warehouse/ProductionReceiptTab';
 import { DemandOverviewTab } from '@/components/warehouse/DemandOverviewTab';
@@ -31,11 +32,15 @@ export default function FinishedGoods() {
       {/* Workflow Integration */}
       <ProductionToFulfillmentFlow />
 
-      <Tabs defaultValue="products" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-5">
+      <Tabs defaultValue="master" className="space-y-4">
+        <TabsList className="grid w-full grid-cols-6">
+          <TabsTrigger value="master" className="flex items-center gap-2">
+            <Boxes className="h-4 w-4" />
+            Product Master
+          </TabsTrigger>
           <TabsTrigger value="products" className="flex items-center gap-2">
             <Package className="h-4 w-4" />
-            Product Master
+            Product List
           </TabsTrigger>
           <TabsTrigger value="production" className="flex items-center gap-2">
             <Factory className="h-4 w-4" />
@@ -54,6 +59,10 @@ export default function FinishedGoods() {
             Valuation
           </TabsTrigger>
         </TabsList>
+
+        <TabsContent value="master">
+          <ProductMasterTab />
+        </TabsContent>
 
         <TabsContent value="products">
           <FinishedGoodsMasterTab />
