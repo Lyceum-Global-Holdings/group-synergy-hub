@@ -166,6 +166,7 @@ export interface DeliveryOrder {
 export interface CreateDeliveryOrderData {
   sales_order_id: string;
   packing_list_id?: string;
+  finished_goods_issue_id?: string | null;
   customer_id: string;
   delivery_address: string;
   delivery_contact?: string;
