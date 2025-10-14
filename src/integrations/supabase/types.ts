@@ -5041,7 +5041,8 @@ export type Database = {
       po_approval_tokens: {
         Row: {
           approval_level: string
-          approver_id: string
+          approver_email: string | null
+          approver_id: string | null
           created_at: string | null
           expires_at: string
           id: string
@@ -5052,7 +5053,8 @@ export type Database = {
         }
         Insert: {
           approval_level: string
-          approver_id: string
+          approver_email?: string | null
+          approver_id?: string | null
           created_at?: string | null
           expires_at: string
           id?: string
@@ -5063,7 +5065,8 @@ export type Database = {
         }
         Update: {
           approval_level?: string
-          approver_id?: string
+          approver_email?: string | null
+          approver_id?: string | null
           created_at?: string | null
           expires_at?: string
           id?: string
