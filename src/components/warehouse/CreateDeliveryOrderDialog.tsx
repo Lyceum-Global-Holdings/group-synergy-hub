@@ -242,12 +242,15 @@ export function CreateDeliveryOrderDialog({
             {/* Linked Issue Selector */}
             <div className="space-y-2">
               <Label>Linked Finished Goods Issue (Optional)</Label>
-              <Select value={selectedIssueId || ''} onValueChange={setSelectedIssueId}>
+              <Select 
+                value={selectedIssueId || 'none'} 
+                onValueChange={(value) => setSelectedIssueId(value === 'none' ? null : value)}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Select an accepted issue" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">None</SelectItem>
+                  <SelectItem value="none">None</SelectItem>
                   {acceptedIssues?.map((issue) => (
                     <SelectItem key={issue.id} value={issue.id}>
                       {issue.issue_number} - {new Date(issue.issue_date).toLocaleDateString()}
