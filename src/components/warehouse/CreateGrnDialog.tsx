@@ -44,7 +44,7 @@ const createGrnSchema = z.object({
     warehouse_item_id: z.string().optional(),
     po_item_id: z.string().optional(),
     quantity_ordered: z.number().min(0),
-    quantity_received: z.number().min(0, 'Quantity received must be positive'),
+    quantity_received: z.number().min(0, 'Quantity received cannot be negative'),
     unit_of_measure: z.string().min(1, 'Unit of measure is required'),
     unit_price: z.number().min(0).optional(),
     total_cost: z.number().min(0).optional(),
@@ -530,6 +530,12 @@ export function CreateGrnDialog({ open, onOpenChange, preselectedPo }: CreateGrn
                 </Button>
               </div>
               
+              {!form.watch('po_id') && (
+                <p className="text-xs text-muted-foreground">
+                  Manual entry: you can enter "Receiving Now" directly — Quantity Ordered will auto-adjust if it's lower.
+                </p>
+              )}
+
               {form.formState.isSubmitted && !hasReceivingNow && (
                 <p className="text-sm text-destructive">
                   Enter a 'Receiving Now' quantity greater than 0 for at least one item.
@@ -641,16 +647,29 @@ export function CreateGrnDialog({ open, onOpenChange, preselectedPo }: CreateGrn
                                     <Input 
                                       type="number" 
                                       className="w-24"
-                                      max={pending}
+                                      max={selectedPoData ? pending : undefined}
                                       {...field}
                                       onChange={(e) => {
-                                        const parsed = parseFloat(e.target.value) || 0;
-                                        // Clamp to [0, pending]
-                                        const clamped = Math.max(0, Math.min(pending, parsed));
-                                        field.onChange(clamped);
+                                        const raw = parseFloat(e.target.value);
+                                        const parsed = Number.isFinite(raw) ? raw : 0;
+                                        let nextQty = Math.max(0, parsed);
+
+                                        if (selectedPoData) {
+                                          // Only clamp to pending when a PO is selected
+                                          nextQty = Math.max(0, Math.min(pending, parsed));
+                                        } else {
+                                          // Manual mode: auto-sync Quantity Ordered if too low
+                                          const ordered = form.getValues(`items.${index}.quantity_ordered`) || 0;
+                                          if (nextQty > ordered) {
+                                            form.setValue(`items.${index}.quantity_ordered`, nextQty);
+                                          }
+                                        }
+
+                                        field.onChange(nextQty);
+
                                         // Recalculate total_cost
                                         const unitPrice = form.getValues(`items.${index}.unit_price`) || 0;
-                                        form.setValue(`items.${index}.total_cost`, unitPrice * clamped);
+                                        form.setValue(`items.${index}.total_cost`, unitPrice * nextQty);
                                       }}
                                     />
                                   </FormControl>
