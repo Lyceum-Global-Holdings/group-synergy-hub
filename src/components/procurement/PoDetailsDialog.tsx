@@ -61,7 +61,6 @@ export function PoDetailsDialog({ open, onOpenChange, purchaseOrder }: PoDetails
   const [comments, setComments] = useState("");
   const [showGrnDialog, setShowGrnDialog] = useState(false);
   const [showAmendmentDialog, setShowAmendmentDialog] = useState(false);
-  const [deptHeadEmail, setDeptHeadEmail] = useState("");
   
   const sendMutation = useSendPurchaseOrder();
   const submitMerchandiserMutation = useSubmitForMerchandiserApproval();
@@ -89,20 +88,9 @@ export function PoDetailsDialog({ open, onOpenChange, purchaseOrder }: PoDetails
   };
 
   const handleMerchandiserApprove = () => {
-    if (!deptHeadEmail) {
-      toast({
-        title: "Email Required",
-        description: "Please provide department head email",
-        variant: "destructive",
-      });
-      return;
-    }
-
     approveMerchandiserMutation.mutate({
       poId: purchaseOrder.id,
-      comments: comments || undefined,
-      deptHeadEmail,
-      deptHeadId: purchaseOrder.created_by // This should be actual dept head ID
+      comments: comments || undefined
     });
     setComments("");
   };
@@ -476,17 +464,6 @@ export function PoDetailsDialog({ open, onOpenChange, purchaseOrder }: PoDetails
                   <CardTitle className="text-lg">Merchandiser Approval</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div>
-                    <Label htmlFor="dept-head-email">Department Head Email</Label>
-                    <input
-                      id="dept-head-email"
-                      type="email"
-                      placeholder="depthead@company.com"
-                      value={deptHeadEmail}
-                      onChange={(e) => setDeptHeadEmail(e.target.value)}
-                      className="w-full mt-2 px-3 py-2 border rounded-md"
-                    />
-                  </div>
                   <div>
                     <Label htmlFor="merch-comments">Comments</Label>
                     <Textarea

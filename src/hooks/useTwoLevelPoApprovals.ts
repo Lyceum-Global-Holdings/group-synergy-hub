@@ -3,11 +3,54 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { useCurrentUserRoles } from "./useCurrentUserRoles";
 
+// Helper function to find department head
+async function findDepartmentHead() {
+  // First get the role ID for Department Head
+  const rolesQuery = await supabase
+    .from('roles')
+    .select('id')
+    .eq('name', 'Department Head')
+    .maybeSingle();
+  
+  if (!rolesQuery.data) {
+    throw new Error("Department Head role not found");
+  }
+
+  const roleId = rolesQuery.data.id;
+
+  // Then get users with that role
+  const userRolesQuery = await supabase
+    .from('user_roles')
+    .select('user_id')
+    .eq('role_id', roleId)
+    .limit(1);
+
+  if (!userRolesQuery.data || userRolesQuery.data.length === 0) {
+    throw new Error("No department head found in the system");
+  }
+
+  const deptHeadUserId = userRolesQuery.data[0].user_id;
+
+  // Get profile details
+  const profileQuery = await supabase
+    .from('profiles')
+    .select('email')
+    .eq('user_id', deptHeadUserId)
+    .maybeSingle();
+
+  if (!profileQuery.data?.email) {
+    throw new Error("Department head email not found");
+  }
+
+  return {
+    email: profileQuery.data.email,
+    userId: deptHeadUserId
+  };
+}
+
 interface ApproveAsMerchandiserParams {
   poId: string;
   comments?: string;
-  deptHeadEmail: string;
-  deptHeadId: string;
 }
 
 interface ApproveAsDeptHeadParams {
@@ -59,7 +102,7 @@ export const useApprovePOAsMerchandiser = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ poId, comments, deptHeadEmail, deptHeadId }: ApproveAsMerchandiserParams) => {
+    mutationFn: async ({ poId, comments }: ApproveAsMerchandiserParams) => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("User not authenticated");
 
@@ -91,6 +134,15 @@ export const useApprovePOAsMerchandiser = () => {
           approval_level: 'merchandiser',
           approval_method: 'manual'
         });
+
+      // Query for Department Head users
+      const deptHead = await findDepartmentHead();
+      const deptHeadEmail = deptHead.email;
+      const deptHeadId = deptHead.userId;
+
+      if (!deptHeadEmail || !deptHeadId) {
+        throw new Error("Department head email not found");
+      }
 
       // Send email to department head
       const { data, error } = await supabase.functions.invoke('po-email-approval', {
