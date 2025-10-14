@@ -5038,9 +5038,55 @@ export type Database = {
           },
         ]
       }
+      po_approval_tokens: {
+        Row: {
+          approval_level: string
+          approver_id: string
+          created_at: string | null
+          expires_at: string
+          id: string
+          po_id: string
+          token: string
+          used: boolean | null
+          used_at: string | null
+        }
+        Insert: {
+          approval_level: string
+          approver_id: string
+          created_at?: string | null
+          expires_at: string
+          id?: string
+          po_id: string
+          token: string
+          used?: boolean | null
+          used_at?: string | null
+        }
+        Update: {
+          approval_level?: string
+          approver_id?: string
+          created_at?: string | null
+          expires_at?: string
+          id?: string
+          po_id?: string
+          token?: string
+          used?: boolean | null
+          used_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "po_approval_tokens_po_id_fkey"
+            columns: ["po_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       po_approvals: {
         Row: {
           action: Database["public"]["Enums"]["po_status"]
+          approval_level: string | null
+          approval_method: string | null
           approver_id: string
           comments: string | null
           created_at: string
@@ -5049,6 +5095,8 @@ export type Database = {
         }
         Insert: {
           action: Database["public"]["Enums"]["po_status"]
+          approval_level?: string | null
+          approval_method?: string | null
           approver_id: string
           comments?: string | null
           created_at?: string
@@ -5057,6 +5105,8 @@ export type Database = {
         }
         Update: {
           action?: Database["public"]["Enums"]["po_status"]
+          approval_level?: string | null
+          approval_method?: string | null
           approver_id?: string
           comments?: string | null
           created_at?: string
@@ -5551,6 +5601,7 @@ export type Database = {
       purchase_orders: {
         Row: {
           actual_delivery_date: string | null
+          approval_level: number | null
           approved_by: string | null
           approved_date: string | null
           buyer_id: string | null
@@ -5559,10 +5610,16 @@ export type Database = {
           created_by: string
           currency: string | null
           delivery_terms: string | null
+          department_head_approved_by: string | null
+          department_head_approved_date: string | null
+          department_head_comments: string | null
           discount_amount: number | null
           expected_delivery_date: string | null
           final_amount: number | null
           id: string
+          merchandiser_approved_by: string | null
+          merchandiser_approved_date: string | null
+          merchandiser_comments: string | null
           notes: string | null
           payment_terms: string | null
           po_date: string
@@ -5576,6 +5633,7 @@ export type Database = {
         }
         Insert: {
           actual_delivery_date?: string | null
+          approval_level?: number | null
           approved_by?: string | null
           approved_date?: string | null
           buyer_id?: string | null
@@ -5584,10 +5642,16 @@ export type Database = {
           created_by: string
           currency?: string | null
           delivery_terms?: string | null
+          department_head_approved_by?: string | null
+          department_head_approved_date?: string | null
+          department_head_comments?: string | null
           discount_amount?: number | null
           expected_delivery_date?: string | null
           final_amount?: number | null
           id?: string
+          merchandiser_approved_by?: string | null
+          merchandiser_approved_date?: string | null
+          merchandiser_comments?: string | null
           notes?: string | null
           payment_terms?: string | null
           po_date?: string
@@ -5601,6 +5665,7 @@ export type Database = {
         }
         Update: {
           actual_delivery_date?: string | null
+          approval_level?: number | null
           approved_by?: string | null
           approved_date?: string | null
           buyer_id?: string | null
@@ -5609,10 +5674,16 @@ export type Database = {
           created_by?: string
           currency?: string | null
           delivery_terms?: string | null
+          department_head_approved_by?: string | null
+          department_head_approved_date?: string | null
+          department_head_comments?: string | null
           discount_amount?: number | null
           expected_delivery_date?: string | null
           final_amount?: number | null
           id?: string
+          merchandiser_approved_by?: string | null
+          merchandiser_approved_date?: string | null
+          merchandiser_comments?: string | null
           notes?: string | null
           payment_terms?: string | null
           po_date?: string
@@ -8908,6 +8979,10 @@ export type Database = {
       get_user_company_ids: {
         Args: { _user_id: string }
         Returns: string[]
+      }
+      has_po_approval_role: {
+        Args: { _role_name: string; _user_id: string }
+        Returns: boolean
       }
       has_role: {
         Args: {
