@@ -74,8 +74,15 @@ export function PoDetailsDialog({ open, onOpenChange, purchaseOrder }: PoDetails
   const { data: userRoles = [] } = useCurrentUserRoles();
   
   const isAdmin = userRoles.some(role => role.role === 'admin' || role.role === 'super_admin');
-  const isMerchandiser = userRoles.some(role => role.role_name === 'Merchandiser');
-  const isDeptHead = userRoles.some(role => role.role_name === 'Department Head');
+  const isMerchandiser = userRoles.some(role => 
+    role.role_name === 'Merchandiser' || 
+    role.role?.toLowerCase().includes('merchand')
+  );
+  const isDeptHead = userRoles.some(role => 
+    role.role_name === 'Department Head' || 
+    role.role?.toLowerCase().includes('dept') ||
+    role.role?.toLowerCase().includes('department')
+  );
 
   const canSubmitForApproval = purchaseOrder.status === 'draft';
   const canMerchandiserApprove = purchaseOrder.status === 'pending_approval' && (isMerchandiser || isAdmin);
@@ -509,7 +516,7 @@ export function PoDetailsDialog({ open, onOpenChange, purchaseOrder }: PoDetails
             )}
 
             {/* Send Department Head Email Section */}
-            {purchaseOrder.status === 'pending_dept_head_approval' && isMerchandiser && (
+            {purchaseOrder.status === 'pending_dept_head_approval' && (isMerchandiser || isAdmin || purchaseOrder.merchandiser_approved_by) && (
               <Card>
                 <CardHeader>
                   <CardTitle className="text-lg">Send Approval Email to Department Head</CardTitle>
