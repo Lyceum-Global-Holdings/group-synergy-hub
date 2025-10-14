@@ -103,6 +103,8 @@ export interface CustomerPoItem {
   unit_price: number;
   total_price: number;
   delivery_date?: string;
+  color?: string;
+  size?: string;
   status: 'pending' | 'confirmed' | 'in_production' | 'delivered';
   created_at: string;
   updated_at: string;
@@ -123,5 +125,7 @@ export interface CreateCustomerPoData {
     unit_price: number;
     total_price: number;
     delivery_date?: string;
+    color?: string;
+    size?: string;
   }[];
 }

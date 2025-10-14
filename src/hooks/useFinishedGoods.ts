@@ -9,6 +9,7 @@ export interface FinishedGood {
   style_no?: string;
   size?: string;
   color?: string;
+  available_sizes?: string[];
   variant?: string;
   description?: string;
   category?: string;

@@ -1999,6 +1999,7 @@ export type Database = {
       }
       customer_po_items: {
         Row: {
+          color: string | null
           cpo_id: string
           created_at: string
           delivery_date: string | null
@@ -2007,12 +2008,14 @@ export type Database = {
           id: string
           item_name: string
           quantity_ordered: number
+          size: string | null
           status: string
           total_price: number | null
           unit_price: number | null
           updated_at: string
         }
         Insert: {
+          color?: string | null
           cpo_id: string
           created_at?: string
           delivery_date?: string | null
@@ -2021,12 +2024,14 @@ export type Database = {
           id?: string
           item_name: string
           quantity_ordered?: number
+          size?: string | null
           status?: string
           total_price?: number | null
           unit_price?: number | null
           updated_at?: string
         }
         Update: {
+          color?: string | null
           cpo_id?: string
           created_at?: string
           delivery_date?: string | null
@@ -2035,6 +2040,7 @@ export type Database = {
           id?: string
           item_name?: string
           quantity_ordered?: number
+          size?: string | null
           status?: string
           total_price?: number | null
           unit_price?: number | null

@@ -65,7 +65,9 @@ export function useCustomerPurchaseOrders(companyId?: string) {
               quantity_ordered: item.quantity_ordered,
               unit_price: item.unit_price,
               total_price: item.total_price,
-              delivery_date: item.delivery_date
+              delivery_date: item.delivery_date,
+              color: item.color,
+              size: item.size
             }))
           );
         

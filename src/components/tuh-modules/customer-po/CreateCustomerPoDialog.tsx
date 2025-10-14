@@ -52,6 +52,8 @@ const createCpoSchema = z.object({
     unit_price: z.number().min(0, "Unit price must be positive"),
     total_price: z.number().min(0, "Total price must be positive"),
     delivery_date: z.string().optional(),
+    color: z.string().optional(),
+    size: z.string().optional(),
   })).min(1, "At least one item is required"),
 });
 
@@ -70,6 +72,10 @@ export default function CreateCustomerPoDialog({
   const { customers } = useCustomers();
   const { createCustomerPO } = useCustomerPurchaseOrders();
   const [manualCpoNumber, setManualCpoNumber] = useState(false);
+  const [itemOptions, setItemOptions] = useState<Record<number, {
+    colors: string[];
+    sizes: string[];
+  }>>({});
 
   const form = useForm<CreateCpoFormData>({
     resolver: zodResolver(createCpoSchema),
@@ -120,6 +126,22 @@ export default function CreateCustomerPoDialog({
       form.setValue(`items.${index}.item_name`, finishedGood.product_name);
       form.setValue(`items.${index}.description`, finishedGood.description || "");
       form.setValue(`items.${index}.unit_price`, finishedGood.selling_price || 0);
+      
+      // Extract available colors and sizes
+      const colors = finishedGood.color ? [finishedGood.color] : [];
+      const sizes = finishedGood.available_sizes && Array.isArray(finishedGood.available_sizes) 
+        ? finishedGood.available_sizes as string[]
+        : (finishedGood.size ? [finishedGood.size] : []);
+      
+      setItemOptions(prev => ({
+        ...prev,
+        [index]: { colors, sizes }
+      }));
+      
+      // Auto-select if only one option
+      if (colors.length === 1) form.setValue(`items.${index}.color`, colors[0]);
+      if (sizes.length === 1) form.setValue(`items.${index}.size`, sizes[0]);
+      
       // Recalculate total price
       setTimeout(() => calculateTotalPrice(index), 0);
     } else {
@@ -128,6 +150,15 @@ export default function CreateCustomerPoDialog({
       form.setValue(`items.${index}.description`, "");
       form.setValue(`items.${index}.unit_price`, 0);
       form.setValue(`items.${index}.total_price`, 0);
+      form.setValue(`items.${index}.color`, "");
+      form.setValue(`items.${index}.size`, "");
+      
+      // Clear options
+      setItemOptions(prev => {
+        const newOptions = { ...prev };
+        delete newOptions[index];
+        return newOptions;
+      });
     }
   };
 
@@ -148,6 +179,8 @@ export default function CreateCustomerPoDialog({
           unit_price: item.unit_price,
           total_price: item.total_price,
           delivery_date: item.delivery_date,
+          color: item.color,
+          size: item.size,
         }))
       };
       
@@ -405,6 +438,67 @@ export default function CreateCustomerPoDialog({
                           )}
                         />
                       </div>
+
+                      {/* Color and Size Selection */}
+                      {itemOptions[index] && (itemOptions[index].colors.length > 0 || itemOptions[index].sizes.length > 0) && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {/* Color Selector */}
+                          {itemOptions[index].colors.length > 0 && (
+                            <FormField
+                              control={form.control}
+                              name={`items.${index}.color`}
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Color</FormLabel>
+                                  <Select onValueChange={field.onChange} value={field.value}>
+                                    <FormControl>
+                                      <SelectTrigger>
+                                        <SelectValue placeholder="Select color" />
+                                      </SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent>
+                                      {itemOptions[index].colors.map((color) => (
+                                        <SelectItem key={color} value={color}>
+                                          {color}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                          )}
+
+                          {/* Size Selector */}
+                          {itemOptions[index].sizes.length > 0 && (
+                            <FormField
+                              control={form.control}
+                              name={`items.${index}.size`}
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Size</FormLabel>
+                                  <Select onValueChange={field.onChange} value={field.value}>
+                                    <FormControl>
+                                      <SelectTrigger>
+                                        <SelectValue placeholder="Select size" />
+                                      </SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent>
+                                      {itemOptions[index].sizes.map((size) => (
+                                        <SelectItem key={size} value={size}>
+                                          {size}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                          )}
+                        </div>
+                      )}
 
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <FormField

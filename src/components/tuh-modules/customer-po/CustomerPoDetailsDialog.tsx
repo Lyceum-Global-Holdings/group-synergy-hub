@@ -428,6 +428,16 @@ export default function CustomerPoDetailsDialog({
                         {item.description && (
                           <p className="text-sm text-muted-foreground mt-1">{item.description}</p>
                         )}
+                        {(item.color || item.size) && (
+                          <div className="flex gap-2 mt-2">
+                            {item.color && (
+                              <Badge variant="outline">Color: {item.color}</Badge>
+                            )}
+                            {item.size && (
+                              <Badge variant="outline">Size: {item.size}</Badge>
+                            )}
+                          </div>
+                        )}
                       </div>
                       <div>
                         <p className="text-sm text-muted-foreground">Quantity</p>
