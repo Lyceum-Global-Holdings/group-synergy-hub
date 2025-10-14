@@ -64,14 +64,16 @@ export const useCreateGoodsReceiptNote = () => {
       if (grnData.po_id) {
         const { data: foundGrn, error: findErr } = await supabase
           .from('goods_receipt_notes')
-          .select('id, status')
+          .select('id, status, created_by')
           .eq('po_id', grnData.po_id)
           .in('status', ['draft', 'submitted'])
           .order('created_at', { ascending: false })
           .limit(1)
           .maybeSingle();
-        if (!findErr && foundGrn) {
+        if (!findErr && foundGrn && foundGrn.created_by === user.id) {
           existingGrn = { id: foundGrn.id };
+        } else {
+          existingGrn = null;
         }
       }
 
@@ -98,8 +100,7 @@ export const useCreateGoodsReceiptNote = () => {
       // Create or reuse GRN header as draft first
       let targetGrnId: string;
       if (existingGrn) {
-        targetGrnId = existingGrn.id;
-        // Optionally update header details based on the form (keep number/status intact)
+        console.info('[GRN] Reusing existing draft GRN:', existingGrn.id);
         const { error: headerUpdateErr } = await supabase
           .from('goods_receipt_notes')
           .update({
@@ -116,9 +117,40 @@ export const useCreateGoodsReceiptNote = () => {
             company_id: grnData.company_id,
             received_by: user.id,
           })
-          .eq('id', targetGrnId);
-        if (headerUpdateErr) throw headerUpdateErr;
+          .eq('id', existingGrn.id);
+        if (!headerUpdateErr) {
+          targetGrnId = existingGrn.id;
+        } else {
+          console.warn('[GRN] Failed to update existing GRN (likely RLS). Creating new header.', headerUpdateErr);
+          const { data: grn, error: grnError } = await supabase
+            .from('goods_receipt_notes')
+            .insert({
+              grn_number: grnNumberStr,
+              grn_date: grnData.grn_date,
+              invoice_number: grnData.invoice_number,
+              invoice_date: grnData.invoice_date,
+              po_id: grnData.po_id,
+              po_number: grnData.po_number,
+              pr_number: grnData.pr_number,
+              mr_number: grnData.mr_number,
+              supplier_id: grnData.supplier_id,
+              supplier_name: grnData.supplier_name,
+              supplier_address: grnData.supplier_address,
+              branch: grnData.branch,
+              remarks: grnData.remarks,
+              company_id: grnData.company_id,
+              received_by: user.id,
+              created_by: user.id,
+              status: 'draft',
+              total_value: totalValueFromPayload,
+            })
+            .select()
+            .single();
+          if (grnError) throw grnError;
+          targetGrnId = grn.id as unknown as string;
+        }
       } else {
+        console.info('[GRN] Creating new GRN header');
         const { data: grn, error: grnError } = await supabase
           .from('goods_receipt_notes')
           .insert({
