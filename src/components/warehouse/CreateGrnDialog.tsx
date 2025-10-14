@@ -94,7 +94,6 @@ const qualityStatusOptions: { value: QualityStatus; label: string }[] = [
 
 export function CreateGrnDialog({ open, onOpenChange, preselectedPo }: CreateGrnDialogProps) {
   const [showSupplierSearch, setShowSupplierSearch] = useState(false);
-  const [showPoSearch, setShowPoSearch] = useState(false);
   const [selectedPoData, setSelectedPoData] = useState<PurchaseOrder | null>(null);
   
   const { selectedCompany } = useCompany();
@@ -212,8 +211,6 @@ export function CreateGrnDialog({ open, onOpenChange, preselectedPo }: CreateGrn
       });
       form.setValue('items', poItems);
     }
-    
-    setShowPoSearch(false);
   };
 
   return (
@@ -338,23 +335,61 @@ export function CreateGrnDialog({ open, onOpenChange, preselectedPo }: CreateGrn
 
               <FormField
                 control={form.control}
-                name="po_number"
+                name="po_id"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>P.O. Number</FormLabel>
-                    <div className="flex gap-2">
+                    <FormLabel>Purchase Order</FormLabel>
+                    <Select 
+                      onValueChange={(value) => {
+                        const selectedPo = purchaseOrders?.find(po => po.id === value);
+                        if (selectedPo) {
+                          handleSelectPo(selectedPo);
+                        }
+                      }} 
+                      value={field.value}
+                    >
                       <FormControl>
-                        <Input placeholder="P.O. number" {...field} />
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select a purchase order" />
+                        </SelectTrigger>
                       </FormControl>
-                      <Button 
-                        type="button" 
-                        variant="outline" 
-                        size="icon"
-                        onClick={() => setShowPoSearch(true)}
-                      >
-                        <Search className="w-4 h-4" />
-                      </Button>
-                    </div>
+                      <SelectContent>
+                        {purchaseOrders
+                          ?.filter(po => 
+                            ['approved', 'sent', 'acknowledged', 'partially_received'].includes(po.status)
+                          )
+                          .filter(po => {
+                            // Only show POs with pending items
+                            const hasPendingItems = po.items?.some(item => {
+                              const pending = (item.quantity_ordered || 0) - (item.quantity_received || 0);
+                              return pending > 0;
+                            });
+                            return hasPendingItems;
+                          })
+                          .map((po) => {
+                            // Calculate pending items count
+                            const pendingItemsCount = po.items?.filter(item => {
+                              const pending = (item.quantity_ordered || 0) - (item.quantity_received || 0);
+                              return pending > 0;
+                            }).length || 0;
+                            
+                            return (
+                              <SelectItem key={po.id} value={po.id}>
+                                <div className="flex flex-col gap-1">
+                                  <div className="font-medium">{po.po_number}</div>
+                                  <div className="text-xs text-muted-foreground flex items-center gap-2">
+                                    <span>{po.supplier?.name}</span>
+                                    <span>•</span>
+                                    <Badge variant="secondary" className="text-xs h-4 px-1">
+                                      {pendingItemsCount} pending
+                                    </Badge>
+                                  </div>
+                                </div>
+                              </SelectItem>
+                            );
+                          })}
+                      </SelectContent>
+                    </Select>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -753,63 +788,6 @@ export function CreateGrnDialog({ open, onOpenChange, preselectedPo }: CreateGrn
           </div>
         )}
 
-        {showPoSearch && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-            <div className="bg-white p-6 rounded-lg max-w-md w-full mx-4">
-              <h3 className="text-lg font-semibold mb-4">Select Purchase Order</h3>
-              <div className="space-y-2 max-h-60 overflow-y-auto">
-                {purchaseOrders
-                  .filter(po => 
-                    ['approved', 'sent', 'acknowledged', 'partially_received'].includes(po.status)
-                  )
-                  .filter(po => {
-                    // Only show POs with pending items
-                    const hasPendingItems = po.items?.some(item => {
-                      const pending = (item.quantity_ordered || 0) - (item.quantity_received || 0);
-                      return pending > 0;
-                    });
-                    return hasPendingItems;
-                  })
-                  .map((po) => {
-                    // Calculate pending items count
-                    const pendingItemsCount = po.items?.filter(item => {
-                      const pending = (item.quantity_ordered || 0) - (item.quantity_received || 0);
-                      return pending > 0;
-                    }).length || 0;
-                    
-                    return (
-                      <div
-                        key={po.id}
-                        className="p-3 hover:bg-gray-100 cursor-pointer rounded border border-gray-200"
-                        onClick={() => handleSelectPo(po)}
-                      >
-                        <div className="flex items-start justify-between mb-1">
-                          <div className="font-medium">{po.po_number}</div>
-                          <div className="flex gap-1">
-                            <Badge variant="outline" className="text-xs">{po.status}</Badge>
-                            <Badge variant="secondary" className="text-xs bg-orange-100 text-orange-700">
-                              {pendingItemsCount} {pendingItemsCount === 1 ? 'item' : 'items'} pending
-                            </Badge>
-                          </div>
-                        </div>
-                        <div className="text-sm text-gray-500">
-                          {po.supplier?.name} - LKR {po.final_amount?.toLocaleString()}
-                        </div>
-                      </div>
-                    );
-                  })}
-              </div>
-              <div className="flex justify-end mt-4">
-                <Button 
-                  variant="outline" 
-                  onClick={() => setShowPoSearch(false)}
-                >
-                  Cancel
-                </Button>
-              </div>
-            </div>
-          </div>
-        )}
       </DialogContent>
     </Dialog>
   );
