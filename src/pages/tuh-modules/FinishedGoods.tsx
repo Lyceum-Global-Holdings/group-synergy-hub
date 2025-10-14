@@ -1,11 +1,12 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Package, Factory, TrendingUp, BarChart3, Archive, ArrowRight } from 'lucide-react';
+import { Package, Factory, TrendingUp, BarChart3, Archive, ArrowRight, Workflow } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { FinishedGoodsMasterTab } from '@/components/warehouse/FinishedGoodsMasterTab';
 import { ProductionReceiptTab } from '@/components/warehouse/ProductionReceiptTab';
 import { DemandOverviewTab } from '@/components/warehouse/DemandOverviewTab';
 import { FinishedGoodsValuationTab } from '@/components/warehouse/FinishedGoodsValuationTab';
 import { FinishedGoodsBatchTab } from '@/components/warehouse/FinishedGoodsBatchTab';
+import { ProductionToFulfillmentFlow } from '@/components/warehouse/ProductionToFulfillmentFlow';
 import { useNavigate } from 'react-router-dom';
 
 export default function FinishedGoods() {
@@ -26,6 +27,9 @@ export default function FinishedGoods() {
           <ArrowRight className="h-4 w-4 ml-2" />
         </Button>
       </div>
+
+      {/* Workflow Integration */}
+      <ProductionToFulfillmentFlow />
 
       <Tabs defaultValue="products" className="space-y-4">
         <TabsList className="grid w-full grid-cols-5">

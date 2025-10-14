@@ -4,15 +4,22 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useFinishedGoodsBatches } from "@/hooks/useFinishedGoodsBatches";
 import { useIsAdmin } from "@/hooks/useSuperAdmin";
 import { CreateProductionReceiptDialog } from "./CreateProductionReceiptDialog";
 import { ProductionReceiptApprovalDialog } from "./ProductionReceiptApprovalDialog";
-import { Plus, Search, CheckCircle2, XCircle, Clock, Eye, Factory } from "lucide-react";
+import { Plus, Search, CheckCircle2, XCircle, Clock, Eye, Factory, ShoppingCart, AlertTriangle } from "lucide-react";
 import { format } from "date-fns";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { useCompany } from "@/contexts/CompanyContext";
+import { useNavigate } from "react-router-dom";
 
 export function ProductionReceiptTab() {
+  const navigate = useNavigate();
+  const { selectedCompany } = useCompany();
   const [searchTerm, setSearchTerm] = useState("");
   const [approvalFilter, setApprovalFilter] = useState("all");
   const [showCreateDialog, setShowCreateDialog] = useState(false);
@@ -20,6 +27,67 @@ export function ProductionReceiptTab() {
   const [showApprovalDialog, setShowApprovalDialog] = useState(false);
   const { batches, isLoading, error } = useFinishedGoodsBatches();
   const { data: isAdmin } = useIsAdmin();
+
+  // Fetch pending sales orders that need production
+  const { data: pendingDemand } = useQuery({
+    queryKey: ['pending-demand-production', selectedCompany?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('sales_order_items')
+        .select(`
+          *,
+          finished_goods (
+            id,
+            product_name,
+            product_code,
+            current_stock
+          ),
+          sales_orders!inner (
+            id,
+            order_number,
+            status,
+            required_date,
+            customer:customers (
+              customer_name
+            )
+          )
+        `)
+        .in('sales_orders.status', ['confirmed', 'picking'])
+        .eq('sales_orders.company_id', selectedCompany?.id);
+
+      if (error) throw error;
+
+      // Filter for items with insufficient stock
+      const insufficientItems = data?.filter((item: any) => {
+        const needed = item.quantity_ordered - (item.quantity_picked || 0);
+        const available = item.finished_goods?.current_stock || 0;
+        return needed > available && needed > 0;
+      });
+
+      // Group by finished good
+      const demandMap = new Map();
+      insufficientItems?.forEach((item: any) => {
+        const fgId = item.finished_good_id;
+        if (!fgId) return;
+
+        if (!demandMap.has(fgId)) {
+          demandMap.set(fgId, {
+            finishedGood: item.finished_goods,
+            totalShortfall: 0,
+            orders: []
+          });
+        }
+
+        const demand = demandMap.get(fgId);
+        const shortfall = (item.quantity_ordered - (item.quantity_picked || 0)) - (item.finished_goods?.current_stock || 0);
+        demand.totalShortfall += Math.max(0, shortfall);
+        demand.orders.push(item.sales_orders);
+      });
+
+      return Array.from(demandMap.values());
+    },
+    enabled: !!selectedCompany?.id
+  });
 
   const filteredBatches = batches?.filter(batch => {
     const matchesSearch = batch.batch_number.toLowerCase().includes(searchTerm.toLowerCase());
@@ -88,6 +156,33 @@ export function ProductionReceiptTab() {
 
   return (
     <>
+      {/* Pending Demand Alert */}
+      {pendingDemand && pendingDemand.length > 0 && (
+        <Alert className="mb-4 border-yellow-500 bg-yellow-50">
+          <AlertTriangle className="h-4 w-4 text-yellow-600" />
+          <AlertDescription>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="font-semibold text-yellow-900">
+                  {pendingDemand.length} products have pending orders with insufficient stock
+                </p>
+                <p className="text-sm text-yellow-700 mt-1">
+                  Total shortfall: {pendingDemand.reduce((sum, item) => sum + item.totalShortfall, 0)} units across {pendingDemand.reduce((sum, item) => sum + item.orders.length, 0)} orders
+                </p>
+              </div>
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => navigate('/warehouse/pick-pack')}
+              >
+                <ShoppingCart className="h-4 w-4 mr-2" />
+                View Orders
+              </Button>
+            </div>
+          </AlertDescription>
+        </Alert>
+      )}
+
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">

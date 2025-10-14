@@ -7,10 +7,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { usePickPack } from "@/hooks/usePickPack";
 import { useCompany } from "@/contexts/CompanyContext";
 import { supabase } from "@/integrations/supabase/client";
-import { Package, AlertCircle } from "lucide-react";
+import { Package, AlertCircle, ChevronDown, Calendar, CheckCircle, Sparkles } from "lucide-react";
+import { format } from "date-fns";
 
 interface CreateSalesOrderDialogProps {
   open: boolean;
@@ -36,6 +38,7 @@ export function CreateSalesOrderDialog({
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
   const [itemQuantities, setItemQuantities] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(false);
+  const [batchDetails, setBatchDetails] = useState<Record<string, any[]>>({});
 
   // Fetch CPO items when dialog opens
   useEffect(() => {
@@ -64,6 +67,29 @@ export function CreateSalesOrderDialog({
       if (error) throw error;
       
       setCpoItems(data || []);
+      
+      // Fetch batch details for each finished good
+      const finishedGoodIds = data?.map(item => item.finished_good_id).filter(Boolean) || [];
+      if (finishedGoodIds.length > 0) {
+        const { data: batches, error: batchError } = await supabase
+          .from('finished_goods_batches')
+          .select('*')
+          .in('finished_good_id', finishedGoodIds)
+          .eq('approval_status', 'approved')
+          .gt('quantity', 0)
+          .order('production_date', { ascending: false });
+
+        if (!batchError && batches) {
+          const batchMap: Record<string, any[]> = {};
+          batches.forEach(batch => {
+            if (!batchMap[batch.finished_good_id]) {
+              batchMap[batch.finished_good_id] = [];
+            }
+            batchMap[batch.finished_good_id].push(batch);
+          });
+          setBatchDetails(batchMap);
+        }
+      }
       
       // Initialize all items as selected with their full quantity
       const allItemIds = new Set(data?.map(item => item.id) || []);
@@ -259,6 +285,60 @@ export function CreateSalesOrderDialog({
                           <div className="mt-2 flex items-center gap-2 text-sm text-warning">
                             <AlertCircle className="w-4 h-4" />
                             <span>Insufficient stock - will need to issue later</span>
+                          </div>
+                        )}
+
+                        {/* Batch Details & Suggestions */}
+                        {selectedItems.has(item.id) && batchDetails[item.finished_good_id] && (
+                          <Collapsible className="mt-2">
+                            <CollapsibleTrigger className="flex items-center gap-2 text-sm text-primary hover:underline">
+                              <ChevronDown className="h-4 w-4" />
+                              View Available Batches ({batchDetails[item.finished_good_id].length})
+                            </CollapsibleTrigger>
+                            <CollapsibleContent className="mt-2 space-y-2">
+                              {batchDetails[item.finished_good_id].slice(0, 3).map((batch: any) => (
+                                <div key={batch.id} className="bg-muted p-2 rounded text-xs space-y-1">
+                                  <div className="flex items-center justify-between">
+                                    <span className="font-medium">Batch: {batch.batch_number}</span>
+                                    <Badge variant="outline" className="text-xs">
+                                      {batch.quantity} units
+                                    </Badge>
+                                  </div>
+                                  <div className="flex items-center gap-3 text-muted-foreground">
+                                    <span className="flex items-center gap-1">
+                                      <Calendar className="h-3 w-3" />
+                                      {format(new Date(batch.production_date), 'MMM dd, yyyy')}
+                                    </span>
+                                    <span className="flex items-center gap-1">
+                                      <CheckCircle className="h-3 w-3" />
+                                      {batch.quality_status}
+                                    </span>
+                                  </div>
+                                </div>
+                              ))}
+                              {batchDetails[item.finished_good_id].length > 3 && (
+                                <p className="text-xs text-muted-foreground">
+                                  +{batchDetails[item.finished_good_id].length - 3} more batches available
+                                </p>
+                              )}
+                            </CollapsibleContent>
+                          </Collapsible>
+                        )}
+
+                        {/* Auto-allocation Suggestion */}
+                        {selectedItems.has(item.id) && 
+                         batchDetails[item.finished_good_id] && 
+                         batchDetails[item.finished_good_id].length > 0 && (
+                          <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded text-xs">
+                            <div className="flex items-start gap-2">
+                              <Sparkles className="h-4 w-4 text-blue-600 mt-0.5" />
+                              <div>
+                                <p className="font-medium text-blue-900">Allocation Suggestion</p>
+                                <p className="text-blue-700 mt-1">
+                                  Use FIFO method: Allocate from oldest batch first ({batchDetails[item.finished_good_id][0].batch_number})
+                                </p>
+                              </div>
+                            </div>
                           </div>
                         )}
                       </div>
