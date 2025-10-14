@@ -341,12 +341,13 @@ export function CreateGrnDialog({ open, onOpenChange, preselectedPo }: CreateGrn
                     <FormLabel>Purchase Order</FormLabel>
                     <Select 
                       onValueChange={(value) => {
+                        field.onChange(value);
                         const selectedPo = purchaseOrders?.find(po => po.id === value);
                         if (selectedPo) {
                           handleSelectPo(selectedPo);
                         }
                       }} 
-                      value={field.value}
+                      value={field.value || ""}
                     >
                       <FormControl>
                         <SelectTrigger>
