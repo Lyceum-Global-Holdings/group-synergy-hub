@@ -1,4 +1,5 @@
 import { Building2 } from "lucide-react";
+import { useNavigate, useLocation } from "react-router-dom";
 import {
   Select,
   SelectContent,
@@ -11,6 +12,8 @@ import { useCompany } from "@/contexts/CompanyContext";
 
 export function CompanySelector() {
   const { selectedCompany, setSelectedCompany, companies, isViewingAllCompanies } = useCompany();
+  const navigate = useNavigate();
+  const location = useLocation();
 
   return (
     <div className="flex items-center gap-2">
@@ -21,6 +24,11 @@ export function CompanySelector() {
         } else {
           const company = companies.find(c => c.id === value);
           setSelectedCompany(company || null);
+        }
+        
+        // Navigate to dashboard to refresh with new company context
+        if (location.pathname !== '/') {
+          navigate('/');
         }
       }}>
         <SelectTrigger className="w-[200px]">
