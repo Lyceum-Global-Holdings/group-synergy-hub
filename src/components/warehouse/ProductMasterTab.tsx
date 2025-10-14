@@ -5,14 +5,19 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Plus, Search, Edit, Trash2, Eye } from "lucide-react";
-import { useProductMaster } from "@/hooks/useProductMaster";
+import { useProductMaster, ProductMaster } from "@/hooks/useProductMaster";
 import { useCompany } from "@/contexts/CompanyContext";
 import { CreateProductMasterDialog } from "./CreateProductMasterDialog";
+import { ProductMasterDetailsDialog } from "./ProductMasterDetailsDialog";
+import { EditProductMasterDialog } from "./EditProductMasterDialog";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export function ProductMasterTab() {
   const [searchTerm, setSearchTerm] = useState("");
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState<ProductMaster | null>(null);
+  const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
   const { selectedCompany } = useCompany();
   const { products, isLoading, deleteProduct } = useProductMaster(selectedCompany?.id);
 
@@ -21,6 +26,16 @@ export function ProductMasterTab() {
     product.product_code.toLowerCase().includes(searchTerm.toLowerCase()) ||
     product.style_no?.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  const handleView = (product: ProductMaster) => {
+    setSelectedProduct(product);
+    setDetailsDialogOpen(true);
+  };
+
+  const handleEdit = (product: ProductMaster) => {
+    setSelectedProduct(product);
+    setEditDialogOpen(true);
+  };
 
   const handleDelete = (id: string, productName: string) => {
     if (window.confirm(`Are you sure you want to delete "${productName}"? This will not affect existing finished goods.`)) {
@@ -125,6 +140,7 @@ export function ProductMasterTab() {
                             variant="ghost"
                             size="icon"
                             title="View Details"
+                            onClick={() => handleView(product)}
                           >
                             <Eye className="h-4 w-4" />
                           </Button>
@@ -132,6 +148,7 @@ export function ProductMasterTab() {
                             variant="ghost"
                             size="icon"
                             title="Edit"
+                            onClick={() => handleEdit(product)}
                           >
                             <Edit className="h-4 w-4" />
                           </Button>
@@ -164,6 +181,22 @@ export function ProductMasterTab() {
         open={createDialogOpen}
         onOpenChange={setCreateDialogOpen}
       />
+
+      {selectedProduct && (
+        <>
+          <ProductMasterDetailsDialog
+            product={selectedProduct}
+            open={detailsDialogOpen}
+            onOpenChange={setDetailsDialogOpen}
+          />
+          
+          <EditProductMasterDialog
+            product={selectedProduct}
+            open={editDialogOpen}
+            onOpenChange={setEditDialogOpen}
+          />
+        </>
+      )}
     </Card>
   );
 }
