@@ -123,6 +123,9 @@ export function CreateGrnDialog({ open, onOpenChange, preselectedPo }: CreateGrn
     name: 'items',
   });
 
+  const watchedItems = form.watch('items');
+  const hasReceivingNow = (watchedItems || []).some((it) => (it?.quantity_received || 0) > 0);
+
   // Handle preselected PO
   useEffect(() => {
     if (preselectedPo && open) {
@@ -527,9 +530,9 @@ export function CreateGrnDialog({ open, onOpenChange, preselectedPo }: CreateGrn
                 </Button>
               </div>
               
-              {form.formState.errors.items && (
+              {form.formState.isSubmitted && !hasReceivingNow && (
                 <p className="text-sm text-destructive">
-                  {(form.formState.errors.items as any)?.message || 'Please fix items and try again.'}
+                  Enter a 'Receiving Now' quantity greater than 0 for at least one item.
                 </p>
               )}
 
@@ -594,7 +597,12 @@ export function CreateGrnDialog({ open, onOpenChange, preselectedPo }: CreateGrn
                               control={form.control}
                               name={`items.${index}.item_name`}
                               render={({ field }) => (
-                                <Input placeholder="Item name" className="w-40" {...field} />
+                                <FormItem>
+                                  <FormControl>
+                                    <Input placeholder="Item name" className="w-40" {...field} />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
                               )}
                             />
                           </TableCell>
@@ -628,21 +636,26 @@ export function CreateGrnDialog({ open, onOpenChange, preselectedPo }: CreateGrn
                               control={form.control}
                               name={`items.${index}.quantity_received`}
                               render={({ field }) => (
-                                <Input 
-                                  type="number" 
-                                  className="w-24"
-                                  max={pending}
-                                  {...field}
-                                  onChange={(e) => {
-                                    const parsed = parseFloat(e.target.value) || 0;
-                                    // Clamp to [0, pending]
-                                    const clamped = Math.max(0, Math.min(pending, parsed));
-                                    field.onChange(clamped);
-                                    // Recalculate total_cost
-                                    const unitPrice = form.getValues(`items.${index}.unit_price`) || 0;
-                                    form.setValue(`items.${index}.total_cost`, unitPrice * clamped);
-                                  }}
-                                />
+                                <FormItem>
+                                  <FormControl>
+                                    <Input 
+                                      type="number" 
+                                      className="w-24"
+                                      max={pending}
+                                      {...field}
+                                      onChange={(e) => {
+                                        const parsed = parseFloat(e.target.value) || 0;
+                                        // Clamp to [0, pending]
+                                        const clamped = Math.max(0, Math.min(pending, parsed));
+                                        field.onChange(clamped);
+                                        // Recalculate total_cost
+                                        const unitPrice = form.getValues(`items.${index}.unit_price`) || 0;
+                                        form.setValue(`items.${index}.total_cost`, unitPrice * clamped);
+                                      }}
+                                    />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
                               )}
                             />
                           </TableCell>
@@ -671,7 +684,12 @@ export function CreateGrnDialog({ open, onOpenChange, preselectedPo }: CreateGrn
                               control={form.control}
                               name={`items.${index}.unit_of_measure`}
                               render={({ field }) => (
-                                <Input placeholder="UOM" className="w-20" {...field} />
+                                <FormItem>
+                                  <FormControl>
+                                    <Input placeholder="UOM" className="w-20" {...field} />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
                               )}
                             />
                           </TableCell>
@@ -680,16 +698,21 @@ export function CreateGrnDialog({ open, onOpenChange, preselectedPo }: CreateGrn
                               control={form.control}
                               name={`items.${index}.unit_price`}
                               render={({ field }) => (
-                                <Input 
-                                  type="number" 
-                                  step="0.01"
-                                  className="w-28"
-                                  {...field}
-                                  onChange={(e) => {
-                                    field.onChange(parseFloat(e.target.value) || 0);
-                                    calculateItemTotal(index);
-                                  }}
-                                />
+                                <FormItem>
+                                  <FormControl>
+                                    <Input 
+                                      type="number" 
+                                      step="0.01"
+                                      className="w-28"
+                                      {...field}
+                                      onChange={(e) => {
+                                        field.onChange(parseFloat(e.target.value) || 0);
+                                        calculateItemTotal(index);
+                                      }}
+                                    />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
                               )}
                             />
                           </TableCell>
