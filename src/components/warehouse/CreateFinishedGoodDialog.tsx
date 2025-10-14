@@ -100,25 +100,31 @@ export function CreateFinishedGoodDialog({ open, onOpenChange }: CreateFinishedG
 
     if (useProductMaster && selectedProductMaster) {
       // Validate size selection
-      const availableSizes = selectedProductMaster.available_sizes as string[];
-      if (availableSizes && availableSizes.length > 0 && !availableSizes.includes(formData.size)) {
-        toast({
-          variant: "destructive",
-          title: "Validation Error",
-          description: "Selected size is not available for this product",
-        });
-        return;
+      const availableSizes = selectedProductMaster.available_sizes as any[];
+      if (availableSizes && availableSizes.length > 0) {
+        const sizeNames = availableSizes.map(s => typeof s === 'string' ? s : s.size_name || s);
+        if (!sizeNames.includes(formData.size)) {
+          toast({
+            variant: "destructive",
+            title: "Validation Error",
+            description: "Selected size is not available for this product",
+          });
+          return;
+        }
       }
 
       // Validate color selection
-      const availableColors = selectedProductMaster.available_colors as string[];
-      if (formData.color && availableColors && availableColors.length > 0 && !availableColors.includes(formData.color)) {
-        toast({
-          variant: "destructive",
-          title: "Validation Error",
-          description: "Selected color is not available for this product",
-        });
-        return;
+      const availableColors = selectedProductMaster.available_colors as any[];
+      if (formData.color && availableColors && availableColors.length > 0) {
+        const colorNames = availableColors.map(c => typeof c === 'string' ? c : c.color_name);
+        if (!colorNames.includes(formData.color)) {
+          toast({
+            variant: "destructive",
+            title: "Validation Error",
+            description: "Selected color is not available for this product",
+          });
+          return;
+        }
       }
     }
     
@@ -244,26 +250,32 @@ export function CreateFinishedGoodDialog({ open, onOpenChange }: CreateFinishedG
             </div>
             <div className="space-y-2">
               <Label htmlFor="color">Color</Label>
-              {useProductMaster && selectedProductMaster && (selectedProductMaster.available_colors as string[])?.length > 0 ? (
+              {useProductMaster && selectedProductMaster && (selectedProductMaster.available_colors as any[])?.length > 0 ? (
                 <div className="space-y-2">
                   <Select value={formData.color} onValueChange={(value) => setFormData({ ...formData, color: value })}>
                     <SelectTrigger>
                       <SelectValue placeholder="Select from available colors" />
                     </SelectTrigger>
                     <SelectContent>
-                      {(selectedProductMaster.available_colors as string[]).map((c) => (
-                        <SelectItem key={c} value={c}>
-                          {c}
-                        </SelectItem>
-                      ))}
+                      {(selectedProductMaster.available_colors as any[]).map((c) => {
+                        const colorName = typeof c === 'string' ? c : c.color_name;
+                        return (
+                          <SelectItem key={colorName} value={colorName}>
+                            {colorName}
+                          </SelectItem>
+                        );
+                      })}
                     </SelectContent>
                   </Select>
                   <div className="flex flex-wrap gap-1">
-                    {(selectedProductMaster.available_colors as string[]).map((c) => (
-                      <Badge key={c} variant="outline" className="text-xs">
-                        {c}
-                      </Badge>
-                    ))}
+                    {(selectedProductMaster.available_colors as any[]).map((c) => {
+                      const colorName = typeof c === 'string' ? c : c.color_name;
+                      return (
+                        <Badge key={colorName} variant="outline" className="text-xs">
+                          {colorName}
+                        </Badge>
+                      );
+                    })}
                   </div>
                 </div>
               ) : (
@@ -278,26 +290,32 @@ export function CreateFinishedGoodDialog({ open, onOpenChange }: CreateFinishedG
 
           <div className="space-y-2">
             <Label htmlFor="size">Size *</Label>
-            {useProductMaster && selectedProductMaster && (selectedProductMaster.available_sizes as string[])?.length > 0 ? (
+            {useProductMaster && selectedProductMaster && (selectedProductMaster.available_sizes as any[])?.length > 0 ? (
               <div className="space-y-2">
                 <Select value={formData.size} onValueChange={(value) => setFormData({ ...formData, size: value })} required>
                   <SelectTrigger>
                     <SelectValue placeholder="Select from available sizes" />
                   </SelectTrigger>
                   <SelectContent>
-                    {(selectedProductMaster.available_sizes as string[]).map((s) => (
-                      <SelectItem key={s} value={s}>
-                        {s}
-                      </SelectItem>
-                    ))}
+                    {(selectedProductMaster.available_sizes as any[]).map((s) => {
+                      const sizeName = typeof s === 'string' ? s : s.size_name || s;
+                      return (
+                        <SelectItem key={sizeName} value={sizeName}>
+                          {sizeName}
+                        </SelectItem>
+                      );
+                    })}
                   </SelectContent>
                 </Select>
                 <div className="flex flex-wrap gap-1">
-                  {(selectedProductMaster.available_sizes as string[]).map((s) => (
-                    <Badge key={s} variant="outline" className="text-xs">
-                      {s}
-                    </Badge>
-                  ))}
+                  {(selectedProductMaster.available_sizes as any[]).map((s) => {
+                    const sizeName = typeof s === 'string' ? s : s.size_name || s;
+                    return (
+                      <Badge key={sizeName} variant="outline" className="text-xs">
+                        {sizeName}
+                      </Badge>
+                    );
+                  })}
                 </div>
               </div>
             ) : (
