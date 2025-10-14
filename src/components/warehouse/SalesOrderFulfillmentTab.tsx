@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Plus, Package, Truck, CheckCircle, Clock, User, MapPin, List, FileText, Eye } from 'lucide-react';
+import { Plus, Package, Truck, CheckCircle, Clock, User, MapPin, List, FileText, Eye, AlertCircle } from 'lucide-react';
 import { usePickPack } from '@/hooks/usePickPack';
 import { useDeliveryOrders } from '@/hooks/useDeliveryOrders';
 import { useCompany } from '@/contexts/CompanyContext';
@@ -14,6 +14,7 @@ import { CreateDeliveryOrderDialog } from './CreateDeliveryOrderDialog';
 import { DeliveryOrderDetailsDialog } from './DeliveryOrderDetailsDialog';
 import { SalesOrderDetailsDialog } from './SalesOrderDetailsDialog';
 import { SalesOrderItemsView } from './SalesOrderItemsView';
+import { FinishedGoodsIssueDetailsDialog } from './FinishedGoodsIssueDetailsDialog';
 import { format } from 'date-fns';
 
 export function SalesOrderFulfillmentTab() {
@@ -21,13 +22,15 @@ export function SalesOrderFulfillmentTab() {
   const { 
     useConfirmedCPOs, 
     useSalesOrders, 
-    usePickLists 
+    usePickLists,
+    useFinishedGoodsIssues
   } = usePickPack();
   const { useDeliveryOrdersQuery } = useDeliveryOrders();
   
   const { data: confirmedCPOs, isLoading: loadingCPOs } = useConfirmedCPOs();
   const { data: salesOrders, isLoading: loadingSalesOrders } = useSalesOrders();
   const { data: pickLists, isLoading: loadingPickLists } = usePickLists();
+  const { data: finishedGoodsIssues, isLoading: loadingIssues } = useFinishedGoodsIssues();
   const { data: deliveryOrders, isLoading: loadingDeliveryOrders } = useDeliveryOrdersQuery(selectedCompany?.id);
   
   const [showCreateSalesOrder, setShowCreateSalesOrder] = useState(false);
@@ -35,10 +38,12 @@ export function SalesOrderFulfillmentTab() {
   const [showCreateDeliveryOrder, setShowCreateDeliveryOrder] = useState(false);
   const [showDeliveryOrderDetails, setShowDeliveryOrderDetails] = useState(false);
   const [showSalesOrderDetails, setShowSalesOrderDetails] = useState(false);
+  const [showIssueDetails, setShowIssueDetails] = useState(false);
   const [selectedCPO, setSelectedCPO] = useState<any>(null);
   const [selectedSalesOrder, setSelectedSalesOrder] = useState<any>(null);
   const [selectedDeliveryOrder, setSelectedDeliveryOrder] = useState<string | null>(null);
   const [selectedSalesOrderId, setSelectedSalesOrderId] = useState<string | null>(null);
+  const [selectedIssueId, setSelectedIssueId] = useState<string | null>(null);
   const [viewItemsForOrder, setViewItemsForOrder] = useState<string | null>(null);
 
   const handleCreateSalesOrderFromCPO = (cpo: any) => {
@@ -64,6 +69,11 @@ export function SalesOrderFulfillmentTab() {
   const handleViewSalesOrder = (orderId: string) => {
     setSelectedSalesOrderId(orderId);
     setShowSalesOrderDetails(true);
+  };
+
+  const handleViewIssue = (issueId: string) => {
+    setSelectedIssueId(issueId);
+    setShowIssueDetails(true);
   };
 
   const getStatusBadge = (status: string) => {
@@ -104,10 +114,11 @@ export function SalesOrderFulfillmentTab() {
         </CardHeader>
         <CardContent>
           <Tabs defaultValue="ready-orders" className="w-full">
-            <TabsList className="grid w-full grid-cols-5">
+            <TabsList className="grid w-full grid-cols-6">
               <TabsTrigger value="ready-orders">Ready Orders</TabsTrigger>
               <TabsTrigger value="sales-orders">Sales Orders</TabsTrigger>
               <TabsTrigger value="pick-lists">Pick Lists</TabsTrigger>
+              <TabsTrigger value="issues">Issues</TabsTrigger>
               <TabsTrigger value="delivery-orders">Delivery Orders</TabsTrigger>
               <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
             </TabsList>
@@ -305,6 +316,74 @@ export function SalesOrderFulfillmentTab() {
               )}
             </TabsContent>
 
+            <TabsContent value="issues" className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-semibold">Finished Goods Issues</h3>
+              </div>
+
+              {loadingIssues ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="text-muted-foreground">Loading issues...</div>
+                </div>
+              ) : finishedGoodsIssues && finishedGoodsIssues.length > 0 ? (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Issue Number</TableHead>
+                      <TableHead>Sales Order</TableHead>
+                      <TableHead>Issue Date</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Items</TableHead>
+                      <TableHead>Notes</TableHead>
+                      <TableHead>Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {finishedGoodsIssues.map((issue) => (
+                      <TableRow key={issue.id}>
+                        <TableCell className="font-medium">{issue.issue_number}</TableCell>
+                        <TableCell>{issue.sales_orders?.order_number || '-'}</TableCell>
+                        <TableCell>{format(new Date(issue.issue_date), 'MMM dd, yyyy')}</TableCell>
+                        <TableCell>{getStatusBadge(issue.status)}</TableCell>
+                        <TableCell>
+                          <div className="text-sm">
+                            {issue.issued_items}/{issue.total_items}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          {issue.notes ? (
+                            <div className="flex items-center gap-2 max-w-xs">
+                              <AlertCircle className="w-4 h-4 flex-shrink-0 text-muted-foreground" />
+                              <span className="text-sm text-muted-foreground truncate">
+                                {issue.notes.substring(0, 50)}
+                                {issue.notes.length > 50 && '...'}
+                              </span>
+                            </div>
+                          ) : (
+                            <span className="text-sm text-muted-foreground">-</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleViewIssue(issue.id)}
+                          >
+                            <Eye className="w-4 h-4 mr-1" />
+                            View
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              ) : (
+                <div className="text-center py-8 text-muted-foreground">
+                  No finished goods issues found
+                </div>
+              )}
+            </TabsContent>
+
             <TabsContent value="delivery-orders" className="space-y-4">
               <div className="flex items-center justify-between">
                 <h3 className="text-lg font-semibold">Delivery Orders</h3>
@@ -433,6 +512,14 @@ export function SalesOrderFulfillmentTab() {
           open={showSalesOrderDetails}
           onOpenChange={setShowSalesOrderDetails}
           salesOrderId={selectedSalesOrderId}
+        />
+      )}
+
+      {selectedIssueId && (
+        <FinishedGoodsIssueDetailsDialog
+          open={showIssueDetails}
+          onOpenChange={setShowIssueDetails}
+          issueId={selectedIssueId}
         />
       )}
 

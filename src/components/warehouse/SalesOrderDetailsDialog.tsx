@@ -9,8 +9,9 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { SalesOrderItemsView } from "./SalesOrderItemsView";
 import { CreateDeliveryOrderDialog } from "./CreateDeliveryOrderDialog";
+import { FinishedGoodsIssueDetailsDialog } from "./FinishedGoodsIssueDetailsDialog";
 import { usePickPack } from "@/hooks/usePickPack";
-import { FileText, Package, List, Clock, User, MapPin, Calendar, Eye, Truck } from "lucide-react";
+import { FileText, Package, List, Clock, User, MapPin, Calendar, Eye, Truck, AlertCircle } from "lucide-react";
 import { format } from "date-fns";
 
 interface SalesOrderDetailsDialogProps {
@@ -28,9 +29,26 @@ export function SalesOrderDetailsDialog({
   const { data: salesOrders, isLoading: loadingOrders } = useSalesOrders();
   const { data: allPickLists, isLoading: loadingPickLists } = usePickLists();
   const [showCreateDeliveryOrder, setShowCreateDeliveryOrder] = useState(false);
+  const [showIssueDetails, setShowIssueDetails] = useState(false);
+  const [selectedIssueId, setSelectedIssueId] = useState<string | null>(null);
 
   const salesOrder = salesOrders?.find((order) => order.id === salesOrderId);
   const relatedPickLists = allPickLists?.filter((pl) => pl.sales_order_id === salesOrderId) || [];
+
+  // Fetch finished goods issues for this sales order
+  const { data: relatedIssues } = useQuery({
+    queryKey: ['finished-goods-issues', salesOrderId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('finished_goods_issues')
+        .select('*')
+        .eq('sales_order_id', salesOrderId)
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!salesOrderId,
+  });
 
   // Fetch sales order items to check issued quantities
   const { data: salesOrderItems } = useQuery({
@@ -48,6 +66,11 @@ export function SalesOrderDetailsDialog({
   });
 
   const hasIssuedItems = salesOrderItems?.some(item => item.quantity_issued > 0);
+
+  const handleViewIssue = (issueId: string) => {
+    setSelectedIssueId(issueId);
+    setShowIssueDetails(true);
+  };
 
   const getStatusBadge = (status: string) => {
     const variants: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
@@ -103,7 +126,7 @@ export function SalesOrderDetailsDialog({
         </DialogHeader>
 
         <Tabs defaultValue="overview" className="w-full">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="overview">
               <FileText className="w-4 h-4 mr-2" />
               Overview
@@ -111,6 +134,10 @@ export function SalesOrderDetailsDialog({
             <TabsTrigger value="items">
               <Package className="w-4 h-4 mr-2" />
               Items
+            </TabsTrigger>
+            <TabsTrigger value="issues">
+              <AlertCircle className="w-4 h-4 mr-2" />
+              Issues ({relatedIssues?.length || 0})
             </TabsTrigger>
             <TabsTrigger value="picklists">
               <List className="w-4 h-4 mr-2" />
@@ -232,6 +259,10 @@ export function SalesOrderDetailsDialog({
                     <span className="font-medium">{relatedPickLists.length}</span>
                   </div>
                   <div className="flex justify-between">
+                    <span className="text-sm text-muted-foreground">Goods Issues:</span>
+                    <span className="font-medium">{relatedIssues?.length || 0}</span>
+                  </div>
+                  <div className="flex justify-between">
                     <span className="text-sm text-muted-foreground">Issued Items:</span>
                     <span className="font-medium">
                       {salesOrderItems?.filter(item => item.quantity_issued > 0).length || 0} / {salesOrderItems?.length || 0}
@@ -279,6 +310,58 @@ export function SalesOrderDetailsDialog({
                 <SalesOrderItemsView salesOrderId={salesOrderId} />
               </CardContent>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="issues" className="space-y-4">
+            {!relatedIssues || relatedIssues.length === 0 ? (
+              <Card>
+                <CardContent className="pt-6 text-center text-muted-foreground">
+                  <AlertCircle className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                  <p>No finished goods issues created yet</p>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="space-y-3">
+                {relatedIssues.map((issue) => (
+                  <Card key={issue.id}>
+                    <CardContent className="pt-6">
+                      <div className="flex items-start justify-between">
+                        <div className="space-y-2 flex-1">
+                          <div className="flex items-center gap-2">
+                            <p className="font-semibold">{issue.issue_number}</p>
+                            <Badge variant={issue.status === 'issued' ? 'default' : 'outline'}>
+                              {issue.status}
+                            </Badge>
+                          </div>
+                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <Calendar className="w-4 h-4" />
+                            <span>{format(new Date(issue.issue_date), "PPP")}</span>
+                            <span>•</span>
+                            <span>{issue.issued_items}/{issue.total_items} items</span>
+                          </div>
+                          {issue.notes && (
+                            <div className="mt-2 pt-2 border-t">
+                              <p className="text-sm text-muted-foreground flex items-start gap-2">
+                                <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                                <span className="italic">{issue.notes}</span>
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleViewIssue(issue.id)}
+                        >
+                          <Eye className="w-4 h-4 mr-1" />
+                          View Details
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
           </TabsContent>
 
           <TabsContent value="picklists" className="space-y-4">
@@ -352,6 +435,23 @@ export function SalesOrderDetailsDialog({
                       </div>
                     </div>
                   ))}
+                  {relatedIssues?.map((issue) => (
+                    <div key={issue.id} className="flex gap-4">
+                      <div className="flex flex-col items-center">
+                        <Package className="w-4 h-4 text-primary" />
+                        <div className="w-0.5 h-full bg-border" />
+                      </div>
+                      <div className="pb-4">
+                        <p className="font-medium">Goods Issued: {issue.issue_number}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {format(new Date(issue.issue_date), "PPP")}
+                        </p>
+                        {issue.notes && (
+                          <p className="text-sm mt-1 italic text-muted-foreground">"{issue.notes}"</p>
+                        )}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </CardContent>
             </Card>
@@ -363,6 +463,14 @@ export function SalesOrderDetailsDialog({
           onOpenChange={setShowCreateDeliveryOrder}
           salesOrderId={salesOrderId}
         />
+
+        {showIssueDetails && selectedIssueId && (
+          <FinishedGoodsIssueDetailsDialog
+            open={showIssueDetails}
+            onOpenChange={setShowIssueDetails}
+            issueId={selectedIssueId}
+          />
+        )}
       </DialogContent>
     </Dialog>
   );
