@@ -39,8 +39,8 @@ export function SalesOrderItemsView({ salesOrderId }: SalesOrderItemsViewProps) 
   };
 
   const getStockStatus = (item: any) => {
-    if (!item.finished_goods?.[0]) return null;
-    const available = item.finished_goods[0].current_stock || 0;
+    if (!item.finished_goods) return null;
+    const available = item.finished_goods.current_stock || 0;
     const required = item.quantity_ordered - item.quantity_issued;
     
     if (available >= required) {
@@ -83,7 +83,7 @@ export function SalesOrderItemsView({ salesOrderId }: SalesOrderItemsViewProps) 
                 <div className="col-span-3">
                   <div className="font-medium">{item.item_name}</div>
                   <div className="text-sm text-muted-foreground">
-                    {item.finished_goods?.[0]?.product_code}
+                    {item.finished_goods?.product_code}
                   </div>
                 </div>
 
@@ -106,9 +106,9 @@ export function SalesOrderItemsView({ salesOrderId }: SalesOrderItemsViewProps) 
 
                 <div className="col-span-2">
                   {getStockStatus(item)}
-                  {item.finished_goods?.[0] && (
+                  {item.finished_goods && (
                     <div className="text-xs text-muted-foreground mt-1">
-                      Stock: {item.finished_goods[0].current_stock}
+                      Stock: {item.finished_goods.current_stock}
                     </div>
                   )}
                 </div>
@@ -127,7 +127,7 @@ export function SalesOrderItemsView({ salesOrderId }: SalesOrderItemsViewProps) 
               </div>
 
               {item.quantity_ordered - item.quantity_issued > 0 && 
-               (!item.finished_goods?.[0] || item.finished_goods[0].current_stock < (item.quantity_ordered - item.quantity_issued)) && (
+               (!item.finished_goods || item.finished_goods.current_stock < (item.quantity_ordered - item.quantity_issued)) && (
                 <div className="mt-2 flex items-center gap-2 text-sm text-warning">
                   <AlertCircle className="w-4 h-4" />
                   <span>Insufficient stock to fulfill remaining quantity</span>
