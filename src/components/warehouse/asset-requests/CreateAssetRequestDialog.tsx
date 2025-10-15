@@ -87,7 +87,7 @@ export function CreateAssetRequestDialog({
   const { locations } = useWarehouseLocations();
 
   // Filter departments from warehouse locations
-  const departments = locations.filter(loc => loc.warehouse_category && loc.warehouse_category.includes('department'));
+  const departments = locations.filter(loc => loc.type === 'department');
 
   const requestForm = useForm({
     resolver: zodResolver(requestFormSchema),
