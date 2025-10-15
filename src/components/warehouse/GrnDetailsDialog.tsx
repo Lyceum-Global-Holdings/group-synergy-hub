@@ -142,12 +142,12 @@ export function GrnDetailsDialog({ grnId, open, onOpenChange }: GrnDetailsDialog
               </div>
             </div>
 
-            {grn.remarks && (
-              <div>
-                <h3 className="font-semibold mb-2">Remarks</h3>
-                <p className="text-sm text-muted-foreground">{grn.remarks}</p>
-              </div>
-            )}
+            <div>
+              <h3 className="font-semibold mb-2">Remarks</h3>
+              <p className="text-sm text-muted-foreground">
+                {grn.remarks || 'No remarks added'}
+              </p>
+            </div>
           </TabsContent>
 
           <TabsContent value="items">
