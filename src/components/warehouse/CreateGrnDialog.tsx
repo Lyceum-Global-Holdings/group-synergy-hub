@@ -152,6 +152,18 @@ export function CreateGrnDialog({ open, onOpenChange, poId }: CreateGrnDialogPro
     value: any
   ) => {
     const newItems = [...items];
+    const item = newItems[index];
+
+    // Validation for quantity_received
+    if (field === 'quantity_received' && item.quantity_ordered) {
+      const qtyRemaining = item.quantity_ordered - (item.quantity_already_received || 0) - (item.quantity_pending_approval || 0);
+      
+      if (value > qtyRemaining) {
+        alert(`Cannot receive ${value} units. Only ${qtyRemaining} units remaining for this item.`);
+        return; // Don't update if validation fails
+      }
+    }
+
     newItems[index] = { ...newItems[index], [field]: value };
 
     // Auto-calculate total cost
@@ -162,6 +174,17 @@ export function CreateGrnDialog({ open, onOpenChange, poId }: CreateGrnDialogPro
     }
 
     setItems(newItems);
+  };
+
+  const getItemStatus = (item: CreateGrnItemData): { label: string; variant: 'default' | 'secondary' | 'destructive' } => {
+    if (!item.quantity_ordered) return { label: 'Manual', variant: 'secondary' };
+    
+    const totalReceived = (item.quantity_already_received || 0) + (item.quantity_pending_approval || 0);
+    const remaining = item.quantity_ordered - totalReceived;
+    
+    if (remaining === 0) return { label: 'Complete', variant: 'default' };
+    if (totalReceived > 0) return { label: 'Partial', variant: 'secondary' };
+    return { label: 'Pending', variant: 'secondary' };
   };
 
   const handleSubmit = async (status: 'draft' | 'submitted') => {
@@ -276,10 +299,12 @@ export function CreateGrnDialog({ open, onOpenChange, poId }: CreateGrnDialogPro
                   <TableHead>Qty Ordered</TableHead>
                   <TableHead>Qty Already Received</TableHead>
                   <TableHead>Qty Pending Approval</TableHead>
+                  <TableHead>Qty Remaining</TableHead>
                   <TableHead>Qty Receiving</TableHead>
                   <TableHead>Unit Price</TableHead>
                   <TableHead>Total</TableHead>
                   <TableHead>Quality</TableHead>
+                  <TableHead>Status</TableHead>
                   <TableHead></TableHead>
                 </TableRow>
               </TableHeader>
@@ -378,6 +403,11 @@ export function CreateGrnDialog({ open, onOpenChange, poId }: CreateGrnDialogPro
                           <SelectItem value="rejected">Rejected</SelectItem>
                         </SelectContent>
                       </Select>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={getItemStatus(item).variant}>
+                        {getItemStatus(item).label}
+                      </Badge>
                     </TableCell>
                     <TableCell>
                       <Button
