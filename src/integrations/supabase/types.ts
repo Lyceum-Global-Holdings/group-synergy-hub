@@ -9259,6 +9259,10 @@ export type Database = {
         }
         Returns: undefined
       }
+      transfer_assets_to_department: {
+        Args: { p_request_id: string }
+        Returns: undefined
+      }
       validate_bpo_release: {
         Args: { p_bpo_id: string; p_requested_amount: number }
         Returns: boolean
