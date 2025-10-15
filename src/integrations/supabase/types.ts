@@ -266,6 +266,107 @@ export type Database = {
           },
         ]
       }
+      asset_request_deliveries: {
+        Row: {
+          created_at: string
+          delivered_by: string | null
+          delivery_date: string
+          delivery_location: string | null
+          delivery_notes: string | null
+          id: string
+          request_id: string
+          status: Database["public"]["Enums"]["delivery_status"]
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          delivered_by?: string | null
+          delivery_date?: string
+          delivery_location?: string | null
+          delivery_notes?: string | null
+          id?: string
+          request_id: string
+          status?: Database["public"]["Enums"]["delivery_status"]
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          delivered_by?: string | null
+          delivery_date?: string
+          delivery_location?: string | null
+          delivery_notes?: string | null
+          id?: string
+          request_id?: string
+          status?: Database["public"]["Enums"]["delivery_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "asset_request_deliveries_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "asset_requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      asset_request_delivery_items: {
+        Row: {
+          created_at: string
+          delivery_id: string
+          delivery_notes: string | null
+          id: string
+          quantity_delivered: number
+          quantity_received: number | null
+          receipt_notes: string | null
+          received_at: string | null
+          received_by: string | null
+          request_item_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          delivery_id: string
+          delivery_notes?: string | null
+          id?: string
+          quantity_delivered?: number
+          quantity_received?: number | null
+          receipt_notes?: string | null
+          received_at?: string | null
+          received_by?: string | null
+          request_item_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          delivery_id?: string
+          delivery_notes?: string | null
+          id?: string
+          quantity_delivered?: number
+          quantity_received?: number | null
+          receipt_notes?: string | null
+          received_at?: string | null
+          received_by?: string | null
+          request_item_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "asset_request_delivery_items_delivery_id_fkey"
+            columns: ["delivery_id"]
+            isOneToOne: false
+            referencedRelation: "asset_request_deliveries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "asset_request_delivery_items_request_item_id_fkey"
+            columns: ["request_item_id"]
+            isOneToOne: false
+            referencedRelation: "asset_request_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       asset_request_items: {
         Row: {
           asset_master_id: string | null
@@ -391,6 +492,47 @@ export type Database = {
             columns: ["warehouse_asset_id"]
             isOneToOne: false
             referencedRelation: "warehouse_assets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      asset_request_workflow_history: {
+        Row: {
+          comments: string | null
+          created_at: string
+          id: string
+          metadata: Json | null
+          performed_at: string
+          performed_by: string | null
+          request_id: string
+          workflow_stage: Database["public"]["Enums"]["workflow_stage"]
+        }
+        Insert: {
+          comments?: string | null
+          created_at?: string
+          id?: string
+          metadata?: Json | null
+          performed_at?: string
+          performed_by?: string | null
+          request_id: string
+          workflow_stage: Database["public"]["Enums"]["workflow_stage"]
+        }
+        Update: {
+          comments?: string | null
+          created_at?: string
+          id?: string
+          metadata?: Json | null
+          performed_at?: string
+          performed_by?: string | null
+          request_id?: string
+          workflow_stage?: Database["public"]["Enums"]["workflow_stage"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "asset_request_workflow_history_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "asset_requests"
             referencedColumns: ["id"]
           },
         ]
@@ -8859,6 +9001,10 @@ export type Database = {
           tax_id: string
         }[]
       }
+      create_assets_from_request: {
+        Args: { p_request_id: string }
+        Returns: undefined
+      }
       create_user_with_roles: {
         Args: {
           _department?: string
@@ -9026,6 +9172,15 @@ export type Database = {
         Args: { _user_id: string }
         Returns: boolean
       }
+      record_workflow_action: {
+        Args: {
+          p_comments?: string
+          p_metadata?: Json
+          p_request_id: string
+          p_stage: string
+        }
+        Returns: undefined
+      }
       validate_bpo_release: {
         Args: { p_bpo_id: string; p_requested_amount: number }
         Returns: boolean
@@ -9075,6 +9230,8 @@ export type Database = {
         | "rejected"
         | "fulfilled"
         | "partially_fulfilled"
+        | "delivered"
+        | "received"
       asset_request_item_type: "from_master" | "new_item"
       asset_request_priority: "low" | "medium" | "high" | "urgent"
       asset_request_status:
@@ -9086,6 +9243,8 @@ export type Database = {
         | "fulfilled"
         | "partially_fulfilled"
         | "cancelled"
+        | "pending_delivery"
+        | "pending_receipt"
       billing_frequency:
         | "one_time"
         | "monthly"
@@ -9170,6 +9329,10 @@ export type Database = {
         | "software_license"
         | "consulting_agreement"
         | "other"
+      delivery_status:
+        | "pending_receipt"
+        | "partially_received"
+        | "fully_received"
       evaluation_recommendation:
         | "strongly_recommend"
         | "recommend"
@@ -9288,6 +9451,16 @@ export type Database = {
         | "transfer_in"
         | "transfer_out"
       urgency_level: "normal" | "urgent" | "emergency"
+      workflow_stage:
+        | "submitted"
+        | "hod_approved"
+        | "hod_rejected"
+        | "procurement_approved"
+        | "procurement_rejected"
+        | "delivered"
+        | "received"
+        | "fulfilled"
+        | "cancelled"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -9457,6 +9630,8 @@ export const Constants = {
         "rejected",
         "fulfilled",
         "partially_fulfilled",
+        "delivered",
+        "received",
       ],
       asset_request_item_type: ["from_master", "new_item"],
       asset_request_priority: ["low", "medium", "high", "urgent"],
@@ -9469,6 +9644,8 @@ export const Constants = {
         "fulfilled",
         "partially_fulfilled",
         "cancelled",
+        "pending_delivery",
+        "pending_receipt",
       ],
       billing_frequency: [
         "one_time",
@@ -9563,6 +9740,11 @@ export const Constants = {
         "software_license",
         "consulting_agreement",
         "other",
+      ],
+      delivery_status: [
+        "pending_receipt",
+        "partially_received",
+        "fully_received",
       ],
       evaluation_recommendation: [
         "strongly_recommend",
@@ -9695,6 +9877,17 @@ export const Constants = {
         "transfer_out",
       ],
       urgency_level: ["normal", "urgent", "emergency"],
+      workflow_stage: [
+        "submitted",
+        "hod_approved",
+        "hod_rejected",
+        "procurement_approved",
+        "procurement_rejected",
+        "delivered",
+        "received",
+        "fulfilled",
+        "cancelled",
+      ],
     },
   },
 } as const
