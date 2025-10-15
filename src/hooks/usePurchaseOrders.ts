@@ -67,6 +67,27 @@ export function usePurchaseOrder(id: string) {
               *,
               po_item:po_items(item_name, unit_of_measure)
             )
+          ),
+          grns:goods_receipt_notes(
+            id,
+            grn_number,
+            grn_date,
+            status,
+            invoice_number,
+            total_value,
+            received_by,
+            approved_by,
+            approved_date,
+            received_by_profile:profiles!goods_receipt_notes_received_by_fkey(full_name, email),
+            approved_by_profile:profiles!goods_receipt_notes_approved_by_fkey(full_name, email),
+            grn_items(
+              id,
+              item_name,
+              quantity_received,
+              unit_price,
+              total_cost,
+              quality_status
+            )
           )
         `)
         .eq('id', id)

@@ -211,9 +211,10 @@ export function PoDetailsDialog({ open, onOpenChange, purchaseOrder }: PoDetails
         </DialogHeader>
 
         <Tabs defaultValue="details" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="details">Details</TabsTrigger>
             <TabsTrigger value="items">Items</TabsTrigger>
+            <TabsTrigger value="grns">GRNs</TabsTrigger>
             <TabsTrigger value="amendments">Amendments</TabsTrigger>
             <TabsTrigger value="approvals">Approvals</TabsTrigger>
           </TabsList>
@@ -435,6 +436,111 @@ export function PoDetailsDialog({ open, onOpenChange, purchaseOrder }: PoDetails
                       </Card>
                     ))}
                   </div>
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
+
+          <TabsContent value="grns" className="space-y-6">
+            {purchaseOrder.grns && purchaseOrder.grns.length > 0 ? (
+              <div className="space-y-4">
+                {purchaseOrder.grns.map((grn) => (
+                  <Card key={grn.id}>
+                    <CardHeader>
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <CardTitle className="text-lg">{grn.grn_number}</CardTitle>
+                          <p className="text-sm text-muted-foreground mt-1">
+                            {format(new Date(grn.grn_date), 'MMM dd, yyyy')}
+                          </p>
+                        </div>
+                        <Badge className={
+                          grn.status === 'approved' ? 'bg-green-100 text-green-800' :
+                          grn.status === 'submitted' ? 'bg-amber-100 text-amber-800' :
+                          grn.status === 'completed' ? 'bg-blue-100 text-blue-800' :
+                          grn.status === 'cancelled' ? 'bg-red-100 text-red-800' :
+                          'bg-gray-100 text-gray-800'
+                        }>
+                          {grn.status.charAt(0).toUpperCase() + grn.status.slice(1)}
+                        </Badge>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <p className="text-sm font-medium text-muted-foreground">Invoice Number</p>
+                          <p className="font-medium">{grn.invoice_number || 'Not provided'}</p>
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-muted-foreground">Total Value</p>
+                          <p className="font-semibold text-lg">Rs. {grn.total_value.toLocaleString()}</p>
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-muted-foreground">Received By</p>
+                          <p>{grn.received_by_profile?.full_name || grn.received_by_profile?.email || 'N/A'}</p>
+                        </div>
+                        {grn.approved_by_profile && (
+                          <div>
+                            <p className="text-sm font-medium text-muted-foreground">Approved By</p>
+                            <p>{grn.approved_by_profile.full_name || grn.approved_by_profile.email}</p>
+                          </div>
+                        )}
+                        {grn.approved_date && (
+                          <div>
+                            <p className="text-sm font-medium text-muted-foreground">Approved Date</p>
+                            <p>{format(new Date(grn.approved_date), 'MMM dd, yyyy')}</p>
+                          </div>
+                        )}
+                        <div>
+                          <p className="text-sm font-medium text-muted-foreground">Items Received</p>
+                          <p>{grn.grn_items?.length || 0} items</p>
+                        </div>
+                      </div>
+                      
+                      {grn.grn_items && grn.grn_items.length > 0 && (
+                        <div className="mt-4">
+                          <p className="text-sm font-medium text-muted-foreground mb-2">Items:</p>
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead>Item Name</TableHead>
+                                <TableHead>Quantity</TableHead>
+                                <TableHead>Unit Price</TableHead>
+                                <TableHead>Total</TableHead>
+                                <TableHead>Quality</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {grn.grn_items.map((item) => (
+                                <TableRow key={item.id}>
+                                  <TableCell>{item.item_name}</TableCell>
+                                  <TableCell>{item.quantity_received}</TableCell>
+                                  <TableCell>Rs. {item.unit_price.toLocaleString()}</TableCell>
+                                  <TableCell>Rs. {item.total_cost.toLocaleString()}</TableCell>
+                                  <TableCell>
+                                    <Badge variant={
+                                      item.quality_status === 'good' ? 'default' :
+                                      item.quality_status === 'damaged' ? 'secondary' :
+                                      'destructive'
+                                    }>
+                                      {item.quality_status}
+                                    </Badge>
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            ) : (
+              <Card>
+                <CardContent className="py-8 text-center">
+                  <Package className="h-12 w-12 mx-auto text-muted-foreground mb-3" />
+                  <p className="text-muted-foreground">No GRNs created for this PO yet</p>
                 </CardContent>
               </Card>
             )}

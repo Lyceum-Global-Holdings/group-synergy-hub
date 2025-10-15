@@ -35,6 +35,33 @@ export interface PurchaseOrder {
   items?: PoItem[];
   receipts?: PoReceipt[];
   approvals?: PoApproval[];
+  grns?: Array<{
+    id: string;
+    grn_number: string;
+    grn_date: string;
+    status: string;
+    invoice_number?: string;
+    total_value: number;
+    received_by?: string;
+    approved_by?: string;
+    approved_date?: string;
+    received_by_profile?: {
+      full_name?: string;
+      email?: string;
+    };
+    approved_by_profile?: {
+      full_name?: string;
+      email?: string;
+    };
+    grn_items?: Array<{
+      id: string;
+      item_name: string;
+      quantity_received: number;
+      unit_price: number;
+      total_cost: number;
+      quality_status: string;
+    }>;
+  }>;
   supplier?: {
     name: string;
     email?: string;
