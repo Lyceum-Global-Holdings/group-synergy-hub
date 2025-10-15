@@ -12,9 +12,9 @@ export const useGoodsReceiptNotes = (companyId?: string) => {
         .select(`
           *,
           purchase_order:purchase_orders(po_number, supplier:suppliers(name)),
-          created_by_profile:profiles!goods_receipt_notes_created_by_fkey(full_name),
-          received_by_profile:profiles!goods_receipt_notes_received_by_fkey(full_name),
-          approved_by_profile:profiles!goods_receipt_notes_approved_by_fkey(full_name),
+        created_by_profile:profiles!created_by(full_name),
+        received_by_profile:profiles!received_by(full_name),
+        approved_by_profile:profiles!approved_by(full_name),
           grn_items(*)
         `)
         .order('created_at', { ascending: false });
@@ -41,9 +41,9 @@ export const useGrnById = (id: string) => {
         .select(`
           *,
           purchase_order:purchase_orders(po_number, supplier:suppliers(name)),
-          created_by_profile:profiles!goods_receipt_notes_created_by_fkey(full_name),
-          received_by_profile:profiles!goods_receipt_notes_received_by_fkey(full_name),
-          approved_by_profile:profiles!goods_receipt_notes_approved_by_fkey(full_name),
+        created_by_profile:profiles!created_by(full_name),
+        received_by_profile:profiles!received_by(full_name),
+        approved_by_profile:profiles!approved_by(full_name),
           grn_items(*)
         `)
         .eq('id', id)
