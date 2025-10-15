@@ -27,6 +27,7 @@ export function InvoiceUploadField({
     const file = event.target.files?.[0];
     if (!file) return;
 
+    // Validate file type
     const allowedTypes = ['application/pdf', 'image/jpeg', 'image/png', 'image/jpg'];
     if (!allowedTypes.includes(file.type)) {
       toast({
@@ -37,6 +38,7 @@ export function InvoiceUploadField({
       return;
     }
 
+    // Validate file size (3MB limit)
     if (file.size > 3 * 1024 * 1024) {
       toast({
         title: "File too large",
@@ -62,6 +64,7 @@ export function InvoiceUploadField({
       setDocumentUrl(data.path);
       onUpload(data.path);
 
+      // Update GRN record if grnId exists
       if (grnId) {
         const { error: updateError } = await supabase
           .from('goods_receipt_notes')
@@ -127,6 +130,7 @@ export function InvoiceUploadField({
 
       if (error) throw error;
 
+      // Update GRN record if grnId exists
       if (grnId) {
         const { error: updateError } = await supabase
           .from('goods_receipt_notes')
