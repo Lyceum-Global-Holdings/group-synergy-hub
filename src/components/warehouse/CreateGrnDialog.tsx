@@ -36,6 +36,7 @@ import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { Badge } from '@/components/ui/badge';
 import { AlertCircle } from 'lucide-react';
+import { InvoiceUploadField } from './InvoiceUploadField';
 
 const formSchema = z.object({
   grn_date: z.string(),
@@ -60,6 +61,7 @@ export function CreateGrnDialog({ open, onOpenChange, poId }: CreateGrnDialogPro
 
   const [items, setItems] = useState<CreateGrnItemData[]>([]);
   const [selectedPoId, setSelectedPoId] = useState<string>(poId || '');
+  const [invoiceDocumentUrl, setInvoiceDocumentUrl] = useState<string>('');
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -217,6 +219,7 @@ export function CreateGrnDialog({ open, onOpenChange, poId }: CreateGrnDialogPro
       supplier_address: values.supplier_address,
       invoice_number: values.invoice_number || undefined,
       invoice_date: values.invoice_date || undefined,
+      invoice_document_url: invoiceDocumentUrl || undefined,
       remarks: values.remarks || undefined,
       status,
       company_id: selectedCompany?.id,
@@ -227,6 +230,7 @@ export function CreateGrnDialog({ open, onOpenChange, poId }: CreateGrnDialogPro
     form.reset();
     setItems([]);
     setSelectedPoId('');
+    setInvoiceDocumentUrl('');
   };
 
   return (
@@ -285,6 +289,15 @@ export function CreateGrnDialog({ open, onOpenChange, poId }: CreateGrnDialogPro
               <Label>Invoice Date (Optional)</Label>
               <Input type="date" {...form.register('invoice_date')} />
             </div>
+          </div>
+
+          {/* Invoice Upload */}
+          <div>
+            <InvoiceUploadField
+              currentDocumentUrl={invoiceDocumentUrl}
+              onUpload={(url) => setInvoiceDocumentUrl(url)}
+              label="Upload Invoice Document (Optional)"
+            />
           </div>
 
           {/* Items Table */}

@@ -12,6 +12,7 @@ export interface GoodsReceiptNote {
   supplier_address?: string;
   invoice_number?: string;
   invoice_date?: string;
+  invoice_document_url?: string;
   status: GrnStatus;
   total_value: number;
   remarks?: string;
@@ -77,6 +78,7 @@ export interface CreateGrnData {
   supplier_address?: string;
   invoice_number?: string;
   invoice_date?: string;
+  invoice_document_url?: string;
   status: GrnStatus;
   remarks?: string;
   company_id?: string;

@@ -3539,6 +3539,7 @@ export type Database = {
           grn_number: string
           id: string
           invoice_date: string | null
+          invoice_document_url: string | null
           invoice_number: string | null
           mr_number: string | null
           po_id: string | null
@@ -3564,6 +3565,7 @@ export type Database = {
           grn_number: string
           id?: string
           invoice_date?: string | null
+          invoice_document_url?: string | null
           invoice_number?: string | null
           mr_number?: string | null
           po_id?: string | null
@@ -3589,6 +3591,7 @@ export type Database = {
           grn_number?: string
           id?: string
           invoice_date?: string | null
+          invoice_document_url?: string | null
           invoice_number?: string | null
           mr_number?: string | null
           po_id?: string | null

@@ -109,6 +109,7 @@ export const useCreateGoodsReceiptNote = () => {
           supplier_address: data.supplier_address || null,
           invoice_number: data.invoice_number,
           invoice_date: data.invoice_date,
+          invoice_document_url: data.invoice_document_url,
           remarks: data.remarks,
           status: data.status,
           company_id: data.company_id || null,
