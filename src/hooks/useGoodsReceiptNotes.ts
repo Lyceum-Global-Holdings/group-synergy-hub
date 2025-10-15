@@ -182,9 +182,16 @@ export const useCreateGoodsReceiptNote = () => {
       // Upsert item lines: update if matching by (grn_id, po_item_id), else insert
       if (grnData.items.length > 0) {
         for (const item of grnData.items) {
-          // Only process lines with a positive receipt quantity
           const qty = item.quantity_received || 0;
+          
+          // Skip zero-quantity lines
+          if (qty <= 0) {
+            console.info('[GRN] Skipping zero-qty line for', item.item_name);
+            continue;
+          }
+
           const lineTotal = item.total_cost ?? ((item.unit_price || 0) * qty);
+          console.info('[GRN] Processing item:', item.item_name, 'qty:', qty);
 
           if ((item.po_item_id || null) !== null) {
             // Check if an item exists for this PO item
@@ -197,6 +204,7 @@ export const useCreateGoodsReceiptNote = () => {
             if (findItemErr) throw findItemErr;
 
             if (existingItem) {
+              console.info('[GRN] Updating existing item:', existingItem.id);
               const { error: updErr } = await supabase
                 .from('grn_items')
                 .update({
@@ -219,6 +227,7 @@ export const useCreateGoodsReceiptNote = () => {
           }
 
           // Insert new item if no po_item_id match (or no po_item_id provided)
+          console.info('[GRN] Inserting new item:', item.item_name);
           const { error: insErr } = await supabase
             .from('grn_items')
             .insert({
@@ -241,19 +250,23 @@ export const useCreateGoodsReceiptNote = () => {
       }
 
       // Recalculate and persist total_value and move to submitted
+      console.info('[GRN] Recalculating total value');
       const { data: sumRows, error: sumErr } = await supabase
         .from('grn_items')
         .select('total_cost')
         .eq('grn_id', targetGrnId);
       if (sumErr) throw sumErr;
       const newTotal = (sumRows || []).reduce((s, r: any) => s + (r.total_cost || 0), 0);
+      console.info('[GRN] Total value:', newTotal);
 
+      console.info('[GRN] Moving to submitted status');
       const { error: updateError } = await supabase
         .from('goods_receipt_notes')
         .update({ status: 'submitted', total_value: newTotal })
         .eq('id', targetGrnId);
       if (updateError) throw updateError;
 
+      console.info('[GRN] GRN creation complete:', targetGrnId);
       // Return the GRN header id to callers
       return { id: targetGrnId } as any;
     },

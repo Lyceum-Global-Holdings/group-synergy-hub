@@ -43,11 +43,11 @@ const createGrnSchema = z.object({
     description: z.string().optional(),
     warehouse_item_id: z.string().optional(),
     po_item_id: z.string().optional(),
-    quantity_ordered: z.number().min(0),
-    quantity_received: z.number().min(0, 'Quantity received cannot be negative'),
+    quantity_ordered: z.coerce.number().min(0),
+    quantity_received: z.coerce.number().min(0, 'Quantity received cannot be negative'),
     unit_of_measure: z.string().min(1, 'Unit of measure is required'),
-    unit_price: z.number().min(0).optional(),
-    total_cost: z.number().min(0).optional(),
+    unit_price: z.coerce.number().min(0).optional(),
+    total_cost: z.coerce.number().min(0).optional(),
     quality_status: z.enum(['good', 'damaged', 'rejected'] as const),
     remarks: z.string().optional(),
   })).min(1, 'At least one item is required'),
@@ -95,6 +95,7 @@ const qualityStatusOptions: { value: QualityStatus; label: string }[] = [
 export function CreateGrnDialog({ open, onOpenChange, preselectedPo }: CreateGrnDialogProps) {
   const [showSupplierSearch, setShowSupplierSearch] = useState(false);
   const [selectedPoData, setSelectedPoData] = useState<PurchaseOrder | null>(null);
+  const [submitError, setSubmitError] = useState<string>('');
   
   const { selectedCompany } = useCompany();
   const { data: suppliers = [] } = useSuppliers();
@@ -141,12 +142,21 @@ export function CreateGrnDialog({ open, onOpenChange, preselectedPo }: CreateGrn
 
   const onSubmit = async (data: CreateGrnFormData) => {
     try {
-      // Validate that at least one item has quantity_received > 0
-      const hasReceivingQuantity = data.items.some(item => item.quantity_received > 0);
-      if (!hasReceivingQuantity) {
+      setSubmitError('');
+      console.info('[CreateGRN] Submit started');
+
+      // Filter items to only include those with quantity_received > 0
+      const filteredItems = data.items
+        .map(item => ({
+          ...item,
+          total_cost: item.total_cost ?? ((item.unit_price || 0) * (item.quantity_received || 0)),
+        }))
+        .filter(item => (item.quantity_received || 0) > 0);
+
+      if (filteredItems.length === 0) {
         form.setError('items', {
           type: 'manual',
-          message: 'Enter a received quantity for at least one item'
+          message: 'Enter a "Receiving Now" quantity greater than 0 for at least one item.'
         });
         return;
       }
@@ -162,23 +172,26 @@ export function CreateGrnDialog({ open, onOpenChange, preselectedPo }: CreateGrn
         grn_date: format(data.grn_date, 'yyyy-MM-dd'),
         invoice_date: data.invoice_date ? format(data.invoice_date, 'yyyy-MM-dd') : undefined,
         company_id: selectedCompany?.id,
-        items: data.items.map(item => ({
+        items: filteredItems.map(item => ({
           ...item,
           item_name: item.item_name || '',
           unit_of_measure: item.unit_of_measure || 'pcs',
           quantity_ordered: item.quantity_ordered || 0,
           quantity_received: item.quantity_received || 0,
           quality_status: item.quality_status || 'good',
-          total_cost: item.total_cost ?? ((item.unit_price || 0) * (item.quantity_received || 0)),
+          total_cost: item.total_cost,
         })),
       };
 
-      console.info('Submitting GRN payload:', grnData);
+      console.info('[CreateGRN] Submitting GRN payload:', grnData);
       await createGrnMutation.mutateAsync(grnData);
+      console.info('[CreateGRN] Submit successful');
       form.reset();
       onOpenChange(false);
     } catch (error) {
-      console.error('Error creating GRN:', error);
+      console.error('[CreateGRN] Submit failed:', error);
+      const errorMsg = (error as any)?.message || 'Failed to create GRN. Please try again.';
+      setSubmitError(errorMsg);
     }
   };
 
@@ -798,20 +811,25 @@ export function CreateGrnDialog({ open, onOpenChange, preselectedPo }: CreateGrn
               )}
             />
 
-            <DialogFooter>
-              <Button 
-                type="button" 
-                variant="outline" 
-                onClick={() => onOpenChange(false)}
-              >
-                Cancel
-              </Button>
-              <Button 
-                type="submit" 
-                disabled={createGrnMutation.isPending}
-              >
-                {createGrnMutation.isPending ? 'Creating...' : 'Create GRN'}
-              </Button>
+            <DialogFooter className="flex-col gap-2">
+              {submitError && (
+                <p className="text-sm text-destructive text-left w-full">{submitError}</p>
+              )}
+              <div className="flex gap-2 w-full justify-end">
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  onClick={() => onOpenChange(false)}
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  type="submit" 
+                  disabled={createGrnMutation.isPending}
+                >
+                  {createGrnMutation.isPending ? 'Creating...' : 'Create GRN'}
+                </Button>
+              </div>
             </DialogFooter>
           </form>
         </Form>
