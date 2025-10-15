@@ -454,7 +454,7 @@ export const useAssetRequests = (filters?: { status?: AssetRequestStatus }) => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User not authenticated');
 
-      // Update delivery items with received quantities
+      // Step 1: Update delivery items with received quantities
       for (const item of data.items) {
         await supabase
           .from('asset_request_delivery_items')
@@ -476,53 +476,74 @@ export const useAssetRequests = (filters?: { status?: AssetRequestStatus }) => {
           .eq('id', item.request_item_id);
       }
 
-      // Check if all items fulfilled
-      const { data: requestItems } = await supabase
-        .from('asset_request_items')
-        .select('quantity_approved, quantity_fulfilled')
-        .eq('request_id', data.request_id);
-
-      const allFulfilled = requestItems?.every(
-        item => item.quantity_fulfilled >= (item.quantity_approved || 0)
-      );
-
-      const partiallyFulfilled = requestItems?.some(
-        item => item.quantity_fulfilled > 0
-      );
-
-      // Update request status
-      const newStatus = allFulfilled
-        ? 'fulfilled'
-        : partiallyFulfilled
-        ? 'partially_fulfilled'
-        : 'pending_receipt';
-
-      await supabase
-        .from('asset_requests')
-        .update({
-          status: newStatus,
-          fulfilled_date: allFulfilled ? new Date().toISOString() : null,
-          fulfilled_by: allFulfilled ? user.id : null,
-        })
-        .eq('id', data.request_id);
-
-      // Update delivery status
+      // Step 2: Update delivery status
       await supabase
         .from('asset_request_deliveries')
         .update({
-          status: allFulfilled ? 'fully_received' : 'partially_received',
+          status: 'fully_received',
         })
         .eq('id', data.delivery_id);
+
+      // Step 3: Call create_assets_from_request to create assets in main warehouse
+      console.log('Creating assets from request:', data.request_id);
+      const { data: createResult, error: createError } = await supabase
+        .rpc('create_assets_from_request', {
+          p_request_id: data.request_id
+        });
+
+      if (createError) {
+        console.error('Error creating assets:', createError);
+        throw new Error(`Failed to create assets: ${createError.message}`);
+      }
+
+      const createResultData = createResult as any;
+      if (!createResultData || !createResultData.success) {
+        throw new Error(createResultData?.error || 'Failed to create assets');
+      }
+
+      console.log('Assets created:', createResultData);
+
+      // Step 4: Call transfer_assets_to_department to move assets to department
+      console.log('Transferring assets to department:', data.request_id);
+      const { data: transferResult, error: transferError } = await supabase
+        .rpc('transfer_assets_to_department', {
+          p_request_id: data.request_id
+        });
+
+      if (transferError) {
+        console.error('Error transferring assets:', transferError);
+        throw new Error(`Failed to transfer assets: ${transferError.message}`);
+      }
+
+      const transferResultData = transferResult as any;
+      if (!transferResultData || !transferResultData.success) {
+        throw new Error(transferResultData?.error || 'Failed to transfer assets to department');
+      }
+
+      console.log('Assets transferred:', transferResultData);
+
+      // Return success with details
+      return {
+        success: true,
+        assetsCreated: createResultData.assets_created || 0,
+        assetsTransferred: transferResultData.assets_transferred || 0,
+      };
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ['asset-requests'] });
       queryClient.invalidateQueries({ queryKey: ['asset-request-items'] });
       queryClient.invalidateQueries({ queryKey: ['asset-request-deliveries'] });
       queryClient.invalidateQueries({ queryKey: ['workflow-history'] });
       queryClient.invalidateQueries({ queryKey: ['warehouse-assets'] });
+      queryClient.invalidateQueries({ queryKey: ['asset-transfers'] });
+      
+      const message = result?.assetsCreated 
+        ? `Receipt confirmed. ${result.assetsCreated} assets created and ${result.assetsTransferred || 0} transferred to department.`
+        : "Receipt confirmed successfully";
+      
       toast({
         title: "Success",
-        description: "Receipt confirmed. Assets will be created automatically.",
+        description: message,
       });
     },
     onError: (error) => {

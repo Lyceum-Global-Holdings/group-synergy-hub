@@ -1,8 +1,8 @@
-import { useState } from "react";
+import { useState, useContext } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { Plus, Trash2, X } from "lucide-react";
+import { Plus, Trash2, X, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -33,14 +33,18 @@ import { AssetMasterSelector } from "@/components/common/AssetMasterSelector";
 import { useAssetRequests } from "@/hooks/useAssetRequests";
 import { useAssetMaster } from "@/hooks/useAssetMaster";
 import { useAssetCategories } from "@/hooks/useAssetCategories";
+import { useWarehouseLocations } from "@/hooks/useWarehouseLocations";
 import { AssetMaster } from "@/types/assetMaster";
 import { CreateAssetRequestItemData } from "@/types/assetRequest";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { useAuth } from "@/contexts/AuthContext";
 
 const requestFormSchema = z.object({
   requester_name: z.string().min(1, "Name is required"),
   department: z.string().optional(),
+  department_id: z.string().min(1, "Department location is required"),
   contact_number: z.string().optional(),
   purpose: z.string().min(10, "Purpose must be at least 10 characters"),
   justification: z.string().optional(),
@@ -76,15 +80,21 @@ export function CreateAssetRequestDialog({
   const [itemType, setItemType] = useState<"from_master" | "new_item">("from_master");
   const [selectedAssetMaster, setSelectedAssetMaster] = useState<AssetMaster | null>(null);
 
+  const { user } = useAuth();
   const { createAssetRequest, createAssetRequestItem, submitAssetRequest } = useAssetRequests();
   const { assetMasterItems } = useAssetMaster();
   const { mainCategories } = useAssetCategories();
+  const { locations } = useWarehouseLocations();
+
+  // Filter departments from warehouse locations
+  const departments = locations.filter(loc => loc.warehouse_category && loc.warehouse_category.includes('department'));
 
   const requestForm = useForm({
     resolver: zodResolver(requestFormSchema),
     defaultValues: {
       requester_name: "",
       department: "",
+      department_id: "",
       contact_number: "",
       purpose: "",
       justification: "",
@@ -196,6 +206,17 @@ export function CreateAssetRequestDialog({
         {step === 1 && (
           <Form {...requestForm}>
             <form className="space-y-4">
+              {departments.length === 0 && (
+                <Alert variant="destructive">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertTitle>No Departments Configured</AlertTitle>
+                  <AlertDescription>
+                    Please add departments in Location Management before creating asset requests.
+                    Assets will be delivered to the selected department after approval.
+                  </AlertDescription>
+                </Alert>
+              )}
+
               <div className="grid grid-cols-2 gap-4">
                 <FormField
                   control={requestForm.control}
@@ -213,13 +234,40 @@ export function CreateAssetRequestDialog({
 
                 <FormField
                   control={requestForm.control}
-                  name="department"
+                  name="department_id"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Department</FormLabel>
-                      <FormControl>
-                        <Input {...field} placeholder="Department name" />
-                      </FormControl>
+                      <FormLabel>Department Location *</FormLabel>
+                      <Select
+                        value={field.value}
+                        onValueChange={(value) => {
+                          field.onChange(value);
+                          // Auto-fill department name
+                          const dept = departments.find(d => d.id === value);
+                          if (dept) {
+                            requestForm.setValue("department", dept.name);
+                          }
+                        }}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select department" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {departments.length === 0 ? (
+                            <div className="p-2 text-sm text-muted-foreground text-center">
+                              No departments configured
+                            </div>
+                          ) : (
+                            departments.map((dept) => (
+                              <SelectItem key={dept.id} value={dept.id}>
+                                {dept.name}
+                              </SelectItem>
+                            ))
+                          )}
+                        </SelectContent>
+                      </Select>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -320,6 +368,7 @@ export function CreateAssetRequestDialog({
                   onClick={() => {
                     requestForm.handleSubmit(() => setStep(2))();
                   }}
+                  disabled={departments.length === 0}
                 >
                   Next: Add Items
                 </Button>
@@ -500,10 +549,9 @@ export function CreateAssetRequestDialog({
                             <FormControl>
                               <Input
                                 type="number"
+                                min="1"
                                 {...field}
-                                onChange={(e) =>
-                                  field.onChange(parseInt(e.target.value))
-                                }
+                                onChange={(e) => field.onChange(parseInt(e.target.value))}
                               />
                             </FormControl>
                             <FormMessage />
@@ -520,10 +568,11 @@ export function CreateAssetRequestDialog({
                             <FormControl>
                               <Input
                                 type="number"
+                                min="0"
+                                step="0.01"
                                 {...field}
-                                onChange={(e) =>
-                                  field.onChange(parseFloat(e.target.value))
-                                }
+                                onChange={(e) => field.onChange(parseFloat(e.target.value))}
+                                placeholder="Estimated price per unit"
                               />
                             </FormControl>
                             <FormMessage />
@@ -538,7 +587,7 @@ export function CreateAssetRequestDialog({
                           <FormItem>
                             <FormLabel>Preferred Vendor</FormLabel>
                             <FormControl>
-                              <Input {...field} placeholder="Vendor name" />
+                              <Input {...field} placeholder="Optional vendor name" />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -548,16 +597,40 @@ export function CreateAssetRequestDialog({
 
                     <FormField
                       control={itemForm.control}
+                      name="item_description"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Description</FormLabel>
+                          <FormControl>
+                            <Textarea {...field} placeholder="Brief description" rows={2} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={itemForm.control}
                       name="specifications"
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>Specifications</FormLabel>
                           <FormControl>
-                            <Textarea
-                              {...field}
-                              placeholder="Detailed specifications"
-                              rows={3}
-                            />
+                            <Textarea {...field} placeholder="Technical specifications" rows={2} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={itemForm.control}
+                      name="justification"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Justification</FormLabel>
+                          <FormControl>
+                            <Textarea {...field} placeholder="Why do you need this asset?" rows={2} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -578,36 +651,31 @@ export function CreateAssetRequestDialog({
               </TabsContent>
             </Tabs>
 
-            {/* Items List */}
+            {/* Added Items List */}
             {items.length > 0 && (
               <Card>
-                <CardContent className="pt-4">
-                  <h3 className="font-medium mb-3">Requested Items ({items.length})</h3>
+                <CardContent className="pt-6">
                   <div className="space-y-2">
+                    <div className="flex items-center justify-between mb-4">
+                      <p className="font-medium">Added Items ({items.length})</p>
+                      <Badge variant="outline">
+                        Total Est: LKR {totalEstimate.toLocaleString()}
+                      </Badge>
+                    </div>
                     {items.map((item, index) => (
                       <div
                         key={index}
                         className="flex items-center justify-between p-3 bg-muted rounded-lg"
                       >
                         <div className="flex-1">
-                          <div className="flex items-center gap-2">
-                            <p className="font-medium">{item.item_name}</p>
-                            <Badge variant="outline">
-                              {item.request_type === "from_master"
-                                ? "From Master"
-                                : "New Item"}
-                            </Badge>
-                          </div>
-                          <p className="text-sm text-muted-foreground mt-1">
-                            Qty: {item.quantity_requested}
-                            {item.request_type === "new_item" && item.total_price_estimate && (
-                              <> • Est: LKR {item.total_price_estimate.toLocaleString()}</>
-                            )}
+                          <p className="font-medium">{item.item_name}</p>
+                          <p className="text-sm text-muted-foreground">
+                            Qty: {item.quantity_requested} | Est: LKR {item.total_price_estimate?.toLocaleString() || 0}
                           </p>
                         </div>
                         <Button
                           variant="ghost"
-                          size="icon"
+                          size="sm"
                           onClick={() => handleRemoveItem(index)}
                         >
                           <Trash2 className="h-4 w-4" />
@@ -615,14 +683,6 @@ export function CreateAssetRequestDialog({
                       </div>
                     ))}
                   </div>
-                  {items.some(item => item.request_type === "new_item") && (
-                    <div className="mt-4 pt-4 border-t">
-                      <div className="flex justify-between text-lg font-semibold">
-                        <span>Total Estimated Cost (New Items):</span>
-                        <span>LKR {totalEstimate.toLocaleString()}</span>
-                      </div>
-                    </div>
-                  )}
                 </CardContent>
               </Card>
             )}
@@ -631,7 +691,84 @@ export function CreateAssetRequestDialog({
               <Button variant="outline" onClick={() => setStep(1)}>
                 Back
               </Button>
-              <Button onClick={handleSubmit} disabled={items.length === 0}>
+              <Button
+                onClick={() => setStep(3)}
+                disabled={items.length === 0}
+              >
+                Review & Submit
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {step === 3 && (
+          <div className="space-y-4">
+            <div className="rounded-lg border p-4 space-y-3">
+              <h3 className="font-medium">Request Summary</h3>
+              <div className="grid grid-cols-2 gap-2 text-sm">
+                <div>
+                  <span className="text-muted-foreground">Requester:</span>
+                  <span className="ml-2 font-medium">
+                    {requestForm.getValues("requester_name")}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Department:</span>
+                  <span className="ml-2 font-medium">
+                    {requestForm.getValues("department") || "—"}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Required Date:</span>
+                  <span className="ml-2 font-medium">
+                    {requestForm.getValues("required_date")}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Priority:</span>
+                  <Badge variant="outline" className="ml-2">
+                    {requestForm.getValues("priority")}
+                  </Badge>
+                </div>
+              </div>
+              <div>
+                <span className="text-sm text-muted-foreground">Purpose:</span>
+                <p className="text-sm mt-1">{requestForm.getValues("purpose")}</p>
+              </div>
+            </div>
+
+            <div className="rounded-lg border p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="font-medium">Items ({items.length})</h3>
+                <Badge variant="outline">
+                  Total: LKR {totalEstimate.toLocaleString()}
+                </Badge>
+              </div>
+              <div className="space-y-2">
+                {items.map((item, index) => (
+                  <div key={index} className="flex justify-between text-sm p-2 bg-muted rounded">
+                    <div>
+                      <p className="font-medium">{item.item_name}</p>
+                      <p className="text-muted-foreground">
+                        Qty: {item.quantity_requested}
+                        {item.brand && ` | ${item.brand}`}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-medium">
+                        LKR {item.total_price_estimate?.toLocaleString() || 0}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex justify-between gap-2">
+              <Button variant="outline" onClick={() => setStep(2)}>
+                Back
+              </Button>
+              <Button onClick={handleSubmit}>
                 Submit Request
               </Button>
             </div>

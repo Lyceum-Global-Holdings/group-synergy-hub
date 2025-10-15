@@ -185,16 +185,17 @@ export function AssetRequestDetailsDialog({
                 </div>
               )}
 
-              {/* Approval Status */}
+              {/* Workflow Progress */}
               {request.status !== "draft" && (
                 <div className="border-t pt-4">
-                  <h3 className="font-medium mb-3">Approval Timeline</h3>
+                  <h3 className="font-medium mb-3">Request Progress</h3>
                   <div className="space-y-3">
+                    {/* HOD Approval */}
                     {request.hod_approved_by && (
                       <div className="flex items-start gap-3">
                         <CheckCircle className="h-5 w-5 text-success mt-0.5" />
                         <div>
-                          <p className="font-medium">HOD Approved</p>
+                          <p className="font-medium">✓ HOD Approved</p>
                           <p className="text-sm text-muted-foreground">
                             {request.hod_approval_date &&
                               format(new Date(request.hod_approval_date), "PPp")}
@@ -206,11 +207,12 @@ export function AssetRequestDetailsDialog({
                       </div>
                     )}
 
+                    {/* Procurement Approval */}
                     {request.procurement_approved_by && (
                       <div className="flex items-start gap-3">
                         <CheckCircle className="h-5 w-5 text-success mt-0.5" />
                         <div>
-                          <p className="font-medium">Procurement Approved</p>
+                          <p className="font-medium">✓ Procurement Approved</p>
                           <p className="text-sm text-muted-foreground">
                             {request.procurement_approval_date &&
                               format(new Date(request.procurement_approval_date), "PPp")}
@@ -224,21 +226,51 @@ export function AssetRequestDetailsDialog({
                       </div>
                     )}
 
+                    {/* Delivery Status */}
+                    {(request.status === 'pending_delivery' || request.status === 'pending_receipt' || request.status === 'fulfilled') && deliveries.length > 0 && (
+                      <div className="flex items-start gap-3">
+                        <CheckCircle className="h-5 w-5 text-success mt-0.5" />
+                        <div>
+                          <p className="font-medium">✓ Items Delivered</p>
+                          <p className="text-sm text-muted-foreground">
+                            {deliveries[0].delivery_date && format(new Date(deliveries[0].delivery_date), "PPp")}
+                          </p>
+                          <p className="text-sm mt-1">Delivered to: {deliveries[0].delivery_location || 'Department'}</p>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Receipt Confirmation */}
+                    {request.status === 'fulfilled' && request.fulfilled_date && (
+                      <div className="flex items-start gap-3">
+                        <CheckCircle className="h-5 w-5 text-success mt-0.5" />
+                        <div>
+                          <p className="font-medium">✓ Receipt Confirmed & Assets Created</p>
+                          <p className="text-sm text-muted-foreground">
+                            {format(new Date(request.fulfilled_date), "PPp")}
+                          </p>
+                          <p className="text-sm mt-1 text-success">Assets have been created and transferred to department</p>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Rejected Status */}
                     {request.status === "rejected" && request.rejection_reason && (
                       <div className="flex items-start gap-3">
                         <XCircle className="h-5 w-5 text-destructive mt-0.5" />
                         <div>
-                          <p className="font-medium">Rejected</p>
+                          <p className="font-medium">✗ Rejected</p>
                           <p className="text-sm mt-1 italic">{request.rejection_reason}</p>
                         </div>
                       </div>
                     )}
 
+                    {/* Pending States */}
                     {request.status.includes("pending") && (
                       <div className="flex items-start gap-3">
-                        <Clock className="h-5 w-5 text-warning mt-0.5" />
+                        <Clock className="h-5 w-5 text-warning mt-0.5 animate-pulse" />
                         <div>
-                          <p className="font-medium">Pending Approval</p>
+                          <p className="font-medium">⏳ Pending</p>
                           <p className="text-sm text-muted-foreground">
                             Awaiting {request.status.replace("pending_", "").replace("_", " ")}
                           </p>

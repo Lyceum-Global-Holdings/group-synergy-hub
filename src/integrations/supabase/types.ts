@@ -611,6 +611,7 @@ export type Database = {
           created_at: string
           created_by: string | null
           department: string | null
+          department_id: string | null
           fulfilled_by: string | null
           fulfilled_date: string | null
           hod_approval_date: string | null
@@ -640,6 +641,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           department?: string | null
+          department_id?: string | null
           fulfilled_by?: string | null
           fulfilled_date?: string | null
           hod_approval_date?: string | null
@@ -669,6 +671,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           department?: string | null
+          department_id?: string | null
           fulfilled_by?: string | null
           fulfilled_date?: string | null
           hod_approval_date?: string | null
@@ -692,7 +695,15 @@ export type Database = {
           total_estimated_cost?: number | null
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "asset_requests_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "warehouse_locations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       asset_transfers: {
         Row: {
@@ -9261,7 +9272,7 @@ export type Database = {
       }
       transfer_assets_to_department: {
         Args: { p_request_id: string }
-        Returns: undefined
+        Returns: Json
       }
       validate_bpo_release: {
         Args: { p_bpo_id: string; p_requested_amount: number }
