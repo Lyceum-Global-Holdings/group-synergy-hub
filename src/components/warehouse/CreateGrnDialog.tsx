@@ -824,8 +824,13 @@ export function CreateGrnDialog({ open, onOpenChange, preselectedPo }: CreateGrn
                   Cancel
                 </Button>
                 <Button 
-                  type="submit" 
+                  type="button"
                   disabled={createGrnMutation.isPending}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    console.info('[CreateGRN] Submit button clicked');
+                    form.handleSubmit(onSubmit)();
+                  }}
                 >
                   {createGrnMutation.isPending ? 'Creating...' : 'Create GRN'}
                 </Button>
