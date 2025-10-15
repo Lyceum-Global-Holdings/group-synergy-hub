@@ -33,6 +33,7 @@ import { usePurchaseOrders } from '@/hooks/usePurchaseOrders';
 import { useCreateGoodsReceiptNote } from '@/hooks/useGoodsReceiptNotes';
 import { CreateGrnItemData, QualityStatus } from '@/types/grn';
 import { format } from 'date-fns';
+import { supabase } from '@/integrations/supabase/client';
 
 const formSchema = z.object({
   grn_date: z.string(),
@@ -73,31 +74,56 @@ export function CreateGrnDialog({ open, onOpenChange, poId }: CreateGrnDialogPro
 
   // Load PO items when PO is selected
   useEffect(() => {
-    if (selectedPoId) {
+    const loadPoWithPendingQuantities = async () => {
+      if (!selectedPoId) return;
+      
       const selectedPo = pos.find((po) => po.id === selectedPoId);
-      if (selectedPo) {
-        form.setValue('supplier_name', selectedPo.supplier?.name || '');
-        form.setValue('supplier_address', 'Address not available');
+      if (!selectedPo) return;
 
-        const poItems: CreateGrnItemData[] =
-          selectedPo.items?.map((item: any) => ({
-            po_item_id: item.id,
-            warehouse_item_id: item.warehouse_item_id,
-            item_code: item.item_code,
-            item_name: item.item_name,
-            description: item.description,
-            unit_of_measure: item.unit_of_measure,
-            quantity_ordered: item.quantity_ordered,
-            quantity_already_received: item.quantity_received || 0,
-            quantity_received: 0,
-            unit_price: item.unit_price,
-            total_cost: 0,
-            quality_status: 'good' as QualityStatus,
-          })) || [];
+      form.setValue('supplier_name', selectedPo.supplier?.name || '');
+      form.setValue('supplier_address', 'Address not available');
 
-        setItems(poItems);
-      }
-    }
+      // Fetch pending quantities from draft/submitted GRNs
+      const poItemIds = selectedPo.items?.map((item: any) => item.id) || [];
+      
+      const { data: pendingGrnItems } = await supabase
+        .from("grn_items")
+        .select(`
+          po_item_id,
+          quantity_received,
+          goods_receipt_notes!inner(status)
+        `)
+        .in("goods_receipt_notes.status", ["draft", "submitted"])
+        .in("po_item_id", poItemIds);
+
+      // Aggregate pending quantities by po_item_id
+      const pendingQuantities = pendingGrnItems?.reduce((acc, item) => {
+        if (!item.po_item_id) return acc;
+        acc[item.po_item_id] = (acc[item.po_item_id] || 0) + (item.quantity_received || 0);
+        return acc;
+      }, {} as Record<string, number>) || {};
+
+      const poItems: CreateGrnItemData[] =
+        selectedPo.items?.map((item: any) => ({
+          po_item_id: item.id,
+          warehouse_item_id: item.warehouse_item_id,
+          item_code: item.item_code,
+          item_name: item.item_name,
+          description: item.description,
+          unit_of_measure: item.unit_of_measure,
+          quantity_ordered: item.quantity_ordered,
+          quantity_already_received: item.quantity_received || 0,
+          quantity_pending_approval: pendingQuantities[item.id] || 0,
+          quantity_received: 0,
+          unit_price: item.unit_price,
+          total_cost: 0,
+          quality_status: 'good' as QualityStatus,
+        })) || [];
+
+      setItems(poItems);
+    };
+
+    loadPoWithPendingQuantities();
   }, [selectedPoId, pos, form]);
 
   const handleAddManualItem = () => {
@@ -247,6 +273,7 @@ export function CreateGrnDialog({ open, onOpenChange, poId }: CreateGrnDialogPro
                   <TableHead>UOM</TableHead>
                   <TableHead>Qty Ordered</TableHead>
                   <TableHead>Qty Already Received</TableHead>
+                  <TableHead>Qty Pending Approval</TableHead>
                   <TableHead>Qty Receiving</TableHead>
                   <TableHead>Unit Price</TableHead>
                   <TableHead>Total</TableHead>
@@ -276,6 +303,13 @@ export function CreateGrnDialog({ open, onOpenChange, poId }: CreateGrnDialogPro
                       {item.quantity_ordered ? (
                         <span className="text-muted-foreground">
                           {item.quantity_already_received || 0}
+                        </span>
+                      ) : '-'}
+                    </TableCell>
+                    <TableCell>
+                      {item.quantity_ordered ? (
+                        <span className="text-amber-600">
+                          {item.quantity_pending_approval || 0}
                         </span>
                       ) : '-'}
                     </TableCell>
