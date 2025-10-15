@@ -34,6 +34,8 @@ import { useCreateGoodsReceiptNote } from '@/hooks/useGoodsReceiptNotes';
 import { CreateGrnItemData, QualityStatus } from '@/types/grn';
 import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
+import { Badge } from '@/components/ui/badge';
+import { AlertCircle } from 'lucide-react';
 
 const formSchema = z.object({
   grn_date: z.string(),
@@ -311,6 +313,23 @@ export function CreateGrnDialog({ open, onOpenChange, poId }: CreateGrnDialogPro
                         <span className="text-amber-600">
                           {item.quantity_pending_approval || 0}
                         </span>
+                      ) : '-'}
+                    </TableCell>
+                    <TableCell>
+                      {item.quantity_ordered ? (
+                        (() => {
+                          const remaining = item.quantity_ordered - (item.quantity_already_received || 0) - (item.quantity_pending_approval || 0);
+                          return (
+                            <span className={
+                              remaining === 0 ? 'text-green-600 font-semibold' :
+                              remaining < 0 ? 'text-destructive font-semibold flex items-center gap-1' :
+                              'text-muted-foreground'
+                            }>
+                              {remaining < 0 && <AlertCircle className="h-4 w-4" />}
+                              {remaining}
+                            </span>
+                          );
+                        })()
                       ) : '-'}
                     </TableCell>
                     <TableCell>
