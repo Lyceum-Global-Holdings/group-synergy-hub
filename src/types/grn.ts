@@ -91,6 +91,7 @@ export interface CreateGrnItemData {
   description?: string;
   unit_of_measure: string;
   quantity_ordered?: number;
+  quantity_already_received?: number;
   quantity_received: number;
   unit_price: number;
   total_cost: number;

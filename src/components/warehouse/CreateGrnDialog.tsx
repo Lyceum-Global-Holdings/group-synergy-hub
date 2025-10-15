@@ -88,6 +88,7 @@ export function CreateGrnDialog({ open, onOpenChange, poId }: CreateGrnDialogPro
             description: item.description,
             unit_of_measure: item.unit_of_measure,
             quantity_ordered: item.quantity_ordered,
+            quantity_already_received: item.quantity_received || 0,
             quantity_received: 0,
             unit_price: item.unit_price,
             total_cost: 0,
@@ -245,6 +246,7 @@ export function CreateGrnDialog({ open, onOpenChange, poId }: CreateGrnDialogPro
                   <TableHead>Item Name</TableHead>
                   <TableHead>UOM</TableHead>
                   <TableHead>Qty Ordered</TableHead>
+                  <TableHead>Qty Already Received</TableHead>
                   <TableHead>Qty Receiving</TableHead>
                   <TableHead>Unit Price</TableHead>
                   <TableHead>Total</TableHead>
@@ -270,6 +272,13 @@ export function CreateGrnDialog({ open, onOpenChange, poId }: CreateGrnDialogPro
                     </TableCell>
                     <TableCell>{item.unit_of_measure}</TableCell>
                     <TableCell>{item.quantity_ordered || '-'}</TableCell>
+                    <TableCell>
+                      {item.quantity_ordered ? (
+                        <span className="text-muted-foreground">
+                          {item.quantity_already_received || 0}
+                        </span>
+                      ) : '-'}
+                    </TableCell>
                     <TableCell>
                       <Input
                         type="number"
