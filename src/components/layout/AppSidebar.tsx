@@ -51,7 +51,6 @@ const departments = [
     icon: Package,
     items: [
       { title: "Item & Bin Master", url: "/warehouse/item-bin-master" },
-      { title: "Goods Receipt Note", url: "/warehouse/grn" },
       { title: "Putaway / Bin Transfer", url: "/warehouse/putaway" },
       { title: "Pick / Pack / Dispatch", url: "/warehouse/pick-pack" },
       { title: "Material Issue / Return", url: "/warehouse/material-issue" },

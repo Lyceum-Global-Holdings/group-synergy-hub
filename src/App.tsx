@@ -31,7 +31,6 @@ import SupplierBlacklist from "./pages/sourcing/SupplierBlacklist";
 import AssetManagement from "./pages/warehouse/AssetManagement";
 import ItemBinMaster from "./pages/warehouse/ItemBinMaster";
 import MaterialIssueReturn from "./pages/warehouse/MaterialIssueReturn";
-import GoodsReceiptNote from "./pages/warehouse/GoodsReceiptNote";
 import FinishedGoods from "./pages/tuh-modules/FinishedGoods";
 import PickPackDispatch from "./pages/warehouse/PickPackDispatch";
 import Putaway from "./pages/warehouse/Putaway";
@@ -105,7 +104,6 @@ function App() {
               <Route path="/warehouse/asset-management" element={<AssetManagement />} />
               <Route path="/warehouse/item-bin-master" element={<ItemBinMaster />} />
               <Route path="/warehouse/material-issue" element={<MaterialIssueReturn />} />
-              <Route path="/warehouse/grn" element={<GoodsReceiptNote />} />
               <Route path="/tuh-modules/finished-goods" element={<FinishedGoods />} />
               <Route path="/warehouse/pick-pack" element={<PickPackDispatch />} />
               <Route path="/warehouse/putaway" element={<Putaway />} />

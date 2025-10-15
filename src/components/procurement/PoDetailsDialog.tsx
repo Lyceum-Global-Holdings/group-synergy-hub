@@ -20,8 +20,6 @@ import {
 } from "@/hooks/useTwoLevelPoApprovals";
 import { useState } from "react";
 import { toast } from "@/hooks/use-toast";
-import { CreateGrnDialog } from "@/components/warehouse/CreateGrnDialog";
-import { GrnListForPo } from "@/components/procurement/GrnListForPo";
 import { CreatePoAmendmentDialog } from "@/components/procurement/CreatePoAmendmentDialog";
 import { PoAmendmentsTab } from "@/components/procurement/PoAmendmentsTab";
 import { useCurrentUserRoles } from "@/hooks/useCurrentUserRoles";
@@ -60,7 +58,6 @@ const statusLabels: Record<PoStatus, string> = {
 
 export function PoDetailsDialog({ open, onOpenChange, purchaseOrder }: PoDetailsDialogProps) {
   const [comments, setComments] = useState("");
-  const [showGrnDialog, setShowGrnDialog] = useState(false);
   const [showAmendmentDialog, setShowAmendmentDialog] = useState(false);
   const [deptHeadEmail, setDeptHeadEmail] = useState("");
   
@@ -88,7 +85,6 @@ export function PoDetailsDialog({ open, onOpenChange, purchaseOrder }: PoDetails
   const canMerchandiserApprove = purchaseOrder.status === 'pending_approval' && (isMerchandiser || isAdmin);
   const canDeptHeadApprove = purchaseOrder.status === 'pending_dept_head_approval' && (isDeptHead || isAdmin);
   const canSend = purchaseOrder.status === 'approved';
-  const canReceive = ['sent', 'acknowledged', 'partially_received'].includes(purchaseOrder.status);
   const canAmend = !['cancelled', 'completed'].includes(purchaseOrder.status);
 
   const handleSubmitForApproval = () => {
@@ -204,12 +200,6 @@ export function PoDetailsDialog({ open, onOpenChange, purchaseOrder }: PoDetails
                   Send PO
                 </Button>
               )}
-              {canReceive && (
-                <Button size="sm" onClick={() => setShowGrnDialog(true)}>
-                  <Package className="h-4 w-4 mr-2" />
-                  Create GRN
-                </Button>
-              )}
               {canAmend && (
                 <Button size="sm" variant="outline" onClick={() => setShowAmendmentDialog(true)}>
                   <FilePlus className="h-4 w-4 mr-2" />
@@ -221,10 +211,9 @@ export function PoDetailsDialog({ open, onOpenChange, purchaseOrder }: PoDetails
         </DialogHeader>
 
         <Tabs defaultValue="details" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-5">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="details">Details</TabsTrigger>
             <TabsTrigger value="items">Items</TabsTrigger>
-            <TabsTrigger value="grns">GRNs</TabsTrigger>
             <TabsTrigger value="amendments">Amendments</TabsTrigger>
             <TabsTrigger value="approvals">Approvals</TabsTrigger>
           </TabsList>
@@ -451,17 +440,6 @@ export function PoDetailsDialog({ open, onOpenChange, purchaseOrder }: PoDetails
             )}
           </TabsContent>
 
-          <TabsContent value="grns" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Goods Receipt Notes</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <GrnListForPo poId={purchaseOrder.id} />
-              </CardContent>
-            </Card>
-          </TabsContent>
-
           <TabsContent value="amendments" className="space-y-6">
             <PoAmendmentsTab poId={purchaseOrder.id} isAdmin={isAdmin} />
           </TabsContent>
@@ -668,13 +646,6 @@ export function PoDetailsDialog({ open, onOpenChange, purchaseOrder }: PoDetails
             </Card>
           </TabsContent>
         </Tabs>
-
-        {/* GRN Creation Dialog */}
-        <CreateGrnDialog
-          open={showGrnDialog}
-          onOpenChange={setShowGrnDialog}
-          preselectedPo={purchaseOrder}
-        />
 
         {/* PO Amendment Creation Dialog */}
         <CreatePoAmendmentDialog

@@ -10,7 +10,6 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { usePurchaseOrders, useDeletePurchaseOrder, useSendPurchaseOrder, usePoSummaryStats } from "@/hooks/usePurchaseOrders";
 import { CreatePoDialog } from "@/components/procurement/CreatePoDialog";
 import { PoDetailsDialog } from "@/components/procurement/PoDetailsDialog";
-import { CreateGrnDialog } from "@/components/warehouse/CreateGrnDialog";
 import { PurchaseOrder, PoStatus } from "@/types/purchaseOrder";
 import { format } from "date-fns";
 
@@ -46,7 +45,6 @@ export default function PurchaseOrderPage() {
   const [selectedPo, setSelectedPo] = useState<PurchaseOrder | null>(null);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [showDetailsDialog, setShowDetailsDialog] = useState(false);
-  const [showGrnDialog, setShowGrnDialog] = useState(false);
 
   const { data: purchaseOrders = [], isLoading } = usePurchaseOrders();
   const { data: summaryStats } = usePoSummaryStats();
@@ -75,11 +73,6 @@ export default function PurchaseOrderPage() {
     setShowDetailsDialog(true);
   };
 
-  const handleReceiveGoods = (po: PurchaseOrder) => {
-    setSelectedPo(po);
-    setShowGrnDialog(true);
-  };
-
   const handleSend = (po: PurchaseOrder) => {
     sendMutation.mutate(po.id);
   };
@@ -92,7 +85,6 @@ export default function PurchaseOrderPage() {
   const canSubmit = (po: PurchaseOrder) => po.status === 'draft';
   const canApprove = (po: PurchaseOrder) => po.status === 'pending_approval';
   const canSend = (po: PurchaseOrder) => po.status === 'approved';
-  const canReceive = (po: PurchaseOrder) => ['sent', 'acknowledged', 'partially_received'].includes(po.status);
 
   return (
     <div className="space-y-6">
@@ -251,15 +243,6 @@ export default function PurchaseOrderPage() {
                             <Send className="h-4 w-4" />
                           </Button>
                         )}
-                        {canReceive(po) && (
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => handleReceiveGoods(po)}
-                          >
-                            <Package className="h-4 w-4" />
-                          </Button>
-                        )}
                         {canEdit(po) && (
                           <AlertDialog>
                             <AlertDialogTrigger asChild>
@@ -303,18 +286,11 @@ export default function PurchaseOrderPage() {
       />
       
       {selectedPo && (
-        <>
-          <PoDetailsDialog
-            open={showDetailsDialog}
-            onOpenChange={setShowDetailsDialog}
-            purchaseOrder={selectedPo}
-          />
-          <CreateGrnDialog
-            open={showGrnDialog}
-            onOpenChange={setShowGrnDialog}
-            preselectedPo={selectedPo}
-          />
-        </>
+        <PoDetailsDialog
+          open={showDetailsDialog}
+          onOpenChange={setShowDetailsDialog}
+          purchaseOrder={selectedPo}
+        />
       )}
     </div>
   );
