@@ -69,10 +69,21 @@ export function CreateGrnDialog({ open, onOpenChange, poId }: CreateGrnDialogPro
     },
   });
 
-  // Filter POs that are approved or sent and have pending quantities
-  const availablePOs = pos.filter(
-    (po) => (po.status === 'approved' || po.status === 'sent') && po.items?.length
-  );
+  // Filter POs that are approved, sent, or partially received with pending quantities
+  const availablePOs = pos.filter((po) => {
+    // Include POs that are approved, sent, or partially received
+    const validStatus = ['approved', 'sent', 'partially_received'].includes(po.status);
+    
+    // Check if PO has items
+    if (!validStatus || !po.items?.length) return false;
+    
+    // Check if any item has pending quantity
+    const hasPendingItems = po.items.some(
+      (item: any) => (item.quantity_received || 0) < item.quantity_ordered
+    );
+    
+    return hasPendingItems;
+  });
 
   // Load PO items when PO is selected
   useEffect(() => {
