@@ -320,11 +320,11 @@ export const AssetRequestDetailsDialog = ({ request, open, onOpenChange }: Asset
                   {request.status === "approved" && (
                     <Button onClick={handleMarkPurchased} disabled={isConfirmingPurchase}>
                       <ShoppingCart className="h-4 w-4 mr-2" />
-                      Mark as Purchased
+                      Mark as Purchased & Add to Warehouse
                     </Button>
                   )}
                   
-                  {request.status === "purchased" && (
+                  {request.status === "pending_delivery" && (
                     <Button onClick={handleMarkDelivered} disabled={isMarkingDelivered}>
                       <Truck className="h-4 w-4 mr-2" />
                       Mark as Delivered

@@ -228,10 +228,33 @@ export const useAssetRequests = () => {
     }) => {
       const user = (await supabase.auth.getUser()).data.user;
 
+      // Get request details
+      const { data: request, error: requestFetchError } = await supabase
+        .from("asset_requests")
+        .select("*, asset_request_items(*)")
+        .eq("id", values.id)
+        .single();
+
+      if (requestFetchError) throw requestFetchError;
+
+      // Get company's main warehouse location
+      const { data: company, error: companyError } = await supabase
+        .from("companies")
+        .select("main_warehouse_location_id")
+        .eq("id", request.company_id)
+        .single();
+
+      if (companyError) throw companyError;
+
+      if (!company.main_warehouse_location_id) {
+        throw new Error("Main warehouse not configured for this company");
+      }
+
+      // Update request status to purchased
       const { error: requestError } = await supabase
         .from("asset_requests")
         .update({
-          status: "purchased",
+          status: "pending_delivery",
           purchased_by: user?.id,
           purchased_date: values.purchased_date,
           purchase_notes: values.purchase_notes,
@@ -258,17 +281,64 @@ export const useAssetRequests = () => {
         if (itemError) throw itemError;
       }
 
-      // Create workflow history
+      // Create warehouse assets for each fulfilled item
+      for (const purchase of values.itemPurchases) {
+        if (purchase.quantity > 0) {
+          // Find the corresponding item from the request
+          const item = request.asset_request_items.find((i: any) => i.id === purchase.item_id);
+          
+          if (item) {
+            // Create individual asset records for each quantity
+            for (let i = 0; i < purchase.quantity; i++) {
+              const { error: assetError } = await supabase
+                .from("warehouse_assets")
+                .insert({
+                  name: item.item_name,
+                  category: item.item_name,
+                  brand: item.brand,
+                  description: item.item_description,
+                  specifications: item.specifications,
+                  category_id: item.category_id,
+                  subcategory_id: item.subcategory_id,
+                  location_id: company.main_warehouse_location_id,
+                  department_id: null, // Not assigned to department yet
+                  status: "active",
+                  condition: "good",
+                  purchase_price: purchase.unit_price || item.unit_price_estimate,
+                  current_value: purchase.unit_price || item.unit_price_estimate,
+                  purchase_date: values.purchased_date,
+                  company_id: request.company_id,
+                  asset_master_id: item.asset_master_id,
+                  notes: `From request ${request.request_number}${values.purchase_notes ? ' - ' + values.purchase_notes : ''}`,
+                  created_by: user?.id,
+                });
+
+              if (assetError) throw assetError;
+            }
+          }
+        }
+      }
+
+      // Create workflow history for purchase
       await supabase.from("asset_request_workflow_history").insert({
         request_id: values.id,
         workflow_stage: "items_purchased",
         performed_by: user?.id,
         comments: values.purchase_notes,
       });
+
+      // Create workflow history for adding to asset list
+      await supabase.from("asset_request_workflow_history").insert({
+        request_id: values.id,
+        workflow_stage: "added_to_asset_list",
+        performed_by: user?.id,
+        comments: "Assets automatically added to main warehouse",
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["asset-requests"] });
-      toast.success("Purchase confirmed");
+      queryClient.invalidateQueries({ queryKey: ["warehouse-assets"] });
+      toast.success("Purchase confirmed and assets added to warehouse");
     },
     onError: (error: Error) => {
       toast.error(`Failed to confirm purchase: ${error.message}`);
