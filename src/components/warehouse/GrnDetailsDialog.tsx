@@ -24,6 +24,9 @@ import {
 import { useCurrentUserRoles } from '@/hooks/useCurrentUserRoles';
 import { GrnStatus } from '@/types/grn';
 import { format } from 'date-fns';
+import { useState } from 'react';
+import { FileText } from 'lucide-react';
+import { GrnDocument } from './GrnDocument';
 
 const statusColors: Record<GrnStatus, string> = {
   draft: 'bg-gray-500',
@@ -54,6 +57,7 @@ export function GrnDetailsDialog({ grnId, open, onOpenChange }: GrnDetailsDialog
   const approveGrn = useApproveGoodsReceiptNote();
   const submitGrn = useSubmitGoodsReceiptNote();
   const deleteGrn = useDeleteGoodsReceiptNote();
+  const [showDocument, setShowDocument] = useState(false);
 
   if (!grn) return null;
 
@@ -75,14 +79,18 @@ export function GrnDetailsDialog({ grnId, open, onOpenChange }: GrnDetailsDialog
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center justify-between">
-            <span>GRN Details - {grn.grn_number}</span>
-            <Badge className={statusColors[grn.status]}>
-              {statusLabels[grn.status]}
-            </Badge>
-          </DialogTitle>
-        </DialogHeader>
+        {showDocument ? (
+          <GrnDocument grn={grn} onClose={() => setShowDocument(false)} />
+        ) : (
+          <>
+            <DialogHeader>
+              <DialogTitle className="flex items-center justify-between">
+                <span>GRN Details - {grn.grn_number}</span>
+                <Badge className={statusColors[grn.status]}>
+                  {statusLabels[grn.status]}
+                </Badge>
+              </DialogTitle>
+            </DialogHeader>
 
         <Tabs defaultValue="details" className="w-full">
           <TabsList className="grid w-full grid-cols-2">
@@ -194,23 +202,32 @@ export function GrnDetailsDialog({ grnId, open, onOpenChange }: GrnDetailsDialog
           </TabsContent>
         </Tabs>
 
-        <div className="flex justify-end gap-2">
-          {grn.status === 'draft' && (
-            <>
-              <Button variant="destructive" onClick={handleDelete}>
-                Delete
+        <div className="flex justify-between gap-2">
+          <Button variant="outline" onClick={() => setShowDocument(true)}>
+            <FileText className="h-4 w-4 mr-2" />
+            Generate Document
+          </Button>
+          
+          <div className="flex gap-2">
+            {grn.status === 'draft' && (
+              <>
+                <Button variant="destructive" onClick={handleDelete}>
+                  Delete
+                </Button>
+                <Button onClick={handleSubmit}>
+                  Submit for Approval
+                </Button>
+              </>
+            )}
+            {grn.status === 'submitted' && isAdmin && (
+              <Button onClick={handleApprove}>
+                Approve GRN
               </Button>
-              <Button onClick={handleSubmit}>
-                Submit for Approval
-              </Button>
-            </>
-          )}
-          {grn.status === 'submitted' && isAdmin && (
-            <Button onClick={handleApprove}>
-              Approve GRN
-            </Button>
-          )}
+            )}
+          </div>
         </div>
+          </>
+        )}
       </DialogContent>
     </Dialog>
   );
