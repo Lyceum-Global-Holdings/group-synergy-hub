@@ -39,7 +39,6 @@ import CycleCount from "./pages/warehouse/CycleCount";
 import DeliveryOrder from "./pages/warehouse/DeliveryOrder";
 import GoodsReceiptNote from "./pages/warehouse/GoodsReceiptNote";
 import PublicAssetView from "./pages/PublicAssetView";
-import PublicAssetRequest from "./pages/PublicAssetRequest";
 import PoEmailApproval from "./pages/procurement/PoEmailApproval";
 import GeneralLedger from "./pages/finance/GeneralLedger";
 import Auth from "./pages/Auth";
@@ -75,7 +74,6 @@ function App() {
               </AuthProvider>
             } />
             <Route path="/asset/:assetId" element={<PublicAssetView />} />
-            <Route path="/request-asset" element={<PublicAssetRequest />} />
             <Route path="/register-supplier" element={<PublicSupplierRegistration />} />
             <Route path="/procurement/po-email-approval" element={<PoEmailApproval />} />
             

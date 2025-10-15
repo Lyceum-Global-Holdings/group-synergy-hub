@@ -61,7 +61,6 @@ import { BulkAssetUpdateDialog } from "@/components/warehouse/BulkAssetUpdateDia
 import { AssetMasterTab } from "@/components/warehouse/AssetMasterTab";
 import { AssetMasterSelector } from "@/components/common/AssetMasterSelector";
 import { AssetMaster } from "@/types/assetMaster";
-import { AssetRequestsTab } from "@/components/warehouse/asset-requests/AssetRequestsTab";
 
 const assetFormSchema = z.object({
   asset_master_id: z.string().optional().transform(v => (v === "none" || v === "" ? undefined : v)),
@@ -804,7 +803,7 @@ export default function AssetManagement() {
 
       {/* Tabs for Assets List and Analytics */}
       <Tabs defaultValue="assets-list" className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="assets-list" className="flex items-center gap-2">
             <Package className="h-4 w-4" />
             Assets List
@@ -812,10 +811,6 @@ export default function AssetManagement() {
           <TabsTrigger value="asset-master" className="flex items-center gap-2">
             <Building className="h-4 w-4" />
             Asset Master
-          </TabsTrigger>
-          <TabsTrigger value="asset-requests" className="flex items-center gap-2">
-            <FileText className="h-4 w-4" />
-            Asset Requests
           </TabsTrigger>
           <TabsTrigger value="analytics" className="flex items-center gap-2">
             <BarChart3 className="h-4 w-4" />
@@ -1084,10 +1079,6 @@ export default function AssetManagement() {
 
         <TabsContent value="asset-master" className="space-y-6 mt-6">
           <AssetMasterTab />
-        </TabsContent>
-
-        <TabsContent value="asset-requests" className="space-y-6 mt-6">
-          <AssetRequestsTab />
         </TabsContent>
 
         <TabsContent value="analytics" className="mt-6">
