@@ -235,10 +235,26 @@ export function AssetRequestsTab() {
                 Pending Procurement
               </SelectItem>
               <SelectItem value="approved">Approved</SelectItem>
+              <SelectItem value="pending_receipt">Pending Receipt</SelectItem>
               <SelectItem value="rejected">Rejected</SelectItem>
               <SelectItem value="fulfilled">Fulfilled</SelectItem>
+              <SelectItem value="partially_fulfilled">Partially Fulfilled</SelectItem>
             </SelectContent>
           </Select>
+          
+          {statusFilter !== 'all' && (
+            <Badge variant="secondary" className="gap-1">
+              Filtered: {statusFilter.replace(/_/g, ' ')}
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-4 w-4 p-0 hover:bg-transparent"
+                onClick={() => setStatusFilter('all')}
+              >
+                <XCircle className="h-3 w-3" />
+              </Button>
+            </Badge>
+          )}
         </div>
 
         <Button onClick={() => setIsCreateDialogOpen(true)}>
@@ -375,6 +391,16 @@ export function AssetRequestsTab() {
         approvalLevel={approvalLevel}
         open={isApprovalDialogOpen}
         onOpenChange={setIsApprovalDialogOpen}
+        onApprovalComplete={(level, action) => {
+          // Auto-switch filter to approved after procurement approval
+          if (level === 'procurement' && action === 'approved') {
+            setStatusFilter('approved');
+            toast({
+              title: "Success!",
+              description: "Request approved and ready for delivery. Switched to 'Approved' view.",
+            });
+          }
+        }}
       />
     </div>
   );

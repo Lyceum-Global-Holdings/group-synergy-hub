@@ -31,6 +31,7 @@ interface AssetRequestApprovalDialogProps {
   approvalLevel: ApprovalLevel;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onApprovalComplete?: (level: ApprovalLevel, action: ApprovalAction) => void;
 }
 
 export function AssetRequestApprovalDialog({
@@ -39,6 +40,7 @@ export function AssetRequestApprovalDialog({
   approvalLevel,
   open,
   onOpenChange,
+  onApprovalComplete,
 }: AssetRequestApprovalDialogProps) {
   const [comments, setComments] = useState("");
   const [itemAdjustments, setItemAdjustments] = useState<Record<string, number>>({});
@@ -72,6 +74,7 @@ export function AssetRequestApprovalDialog({
           setComments("");
           setItemAdjustments({});
           onOpenChange(false);
+          onApprovalComplete?.(approvalLevel, selectedAction);
         },
       }
     );

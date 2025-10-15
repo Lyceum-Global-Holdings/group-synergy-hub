@@ -46,11 +46,27 @@ export function AssetRequestDetailsDialog({
   const [deliveryDialogOpen, setDeliveryDialogOpen] = useState(false);
   const [receiptDialogOpen, setReceiptDialogOpen] = useState(false);
   
-  const { useAssetRequestItems, useWorkflowHistory, useRequestDeliveries } = useAssetRequests();
-  const { data: items = [], isLoading: itemsLoading } = useAssetRequestItems(request?.id);
-  const { data: workflowHistory = [] } = useWorkflowHistory(request?.id);
-  const { data: deliveries = [] } = useRequestDeliveries(request?.id);
+  const { 
+    useAssetRequestItems, 
+    useWorkflowHistory, 
+    useRequestDeliveries,
+    markAsDelivered,
+    confirmReceipt
+  } = useAssetRequests();
+  
+  const { data: items = [], isLoading: itemsLoading, refetch: refetchItems } = useAssetRequestItems(request?.id);
+  const { data: workflowHistory = [], refetch: refetchHistory } = useWorkflowHistory(request?.id);
+  const { data: deliveries = [], refetch: refetchDeliveries } = useRequestDeliveries(request?.id);
   const { data: userRoles = [] } = useCurrentUserRoles();
+
+  // Refresh all data when dialog opens
+  if (open && request?.id) {
+    setTimeout(() => {
+      refetchItems();
+      refetchHistory();
+      refetchDeliveries();
+    }, 100);
+  }
 
   if (!request) return null;
 
@@ -365,7 +381,15 @@ export function AssetRequestDetailsDialog({
       <DeliveryDialog
         request={request}
         open={deliveryDialogOpen}
-        onOpenChange={setDeliveryDialogOpen}
+        onOpenChange={(open) => {
+          setDeliveryDialogOpen(open);
+          if (!open) {
+            // Refresh data after closing
+            refetchItems();
+            refetchHistory();
+            refetchDeliveries();
+          }
+        }}
       />
 
       {/* Receipt Confirmation Dialog */}
@@ -373,7 +397,15 @@ export function AssetRequestDetailsDialog({
         request={request}
         delivery={latestDelivery}
         open={receiptDialogOpen}
-        onOpenChange={setReceiptDialogOpen}
+        onOpenChange={(open) => {
+          setReceiptDialogOpen(open);
+          if (!open) {
+            // Refresh data after closing
+            refetchItems();
+            refetchHistory();
+            refetchDeliveries();
+          }
+        }}
       />
     </>
   );

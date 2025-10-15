@@ -327,11 +327,24 @@ export const useAssetRequests = (filters?: { status?: AssetRequestStatus }) => {
 
       if (updateError) throw updateError;
     },
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
+      // Invalidate all asset request queries regardless of filters
       queryClient.invalidateQueries({ queryKey: ['asset-requests'] });
+      queryClient.invalidateQueries({ queryKey: ['asset-request-items'] });
+      queryClient.invalidateQueries({ queryKey: ['workflow-history'] });
+      
+      const action = variables.action;
+      const level = variables.approval_level;
+      
       toast({
         title: "Success",
-        description: "Request approval action completed",
+        description: action === 'approved' 
+          ? level === 'procurement'
+            ? "Request approved and ready for delivery!"
+            : "Request approved. Forwarded to Procurement for final review."
+          : action === 'rejected' 
+          ? "Request rejected" 
+          : "Changes requested successfully",
       });
     },
     onError: (error) => {
@@ -356,9 +369,10 @@ export const useAssetRequests = (filters?: { status?: AssetRequestStatus }) => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['asset-requests'] });
+      queryClient.invalidateQueries({ queryKey: ['workflow-history'] });
       toast({
         title: "Success",
-        description: "Request submitted for approval",
+        description: "Request submitted for HOD approval",
       });
     },
     onError: (error) => {
