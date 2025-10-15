@@ -496,6 +496,73 @@ export type Database = {
           },
         ]
       }
+      asset_request_returns: {
+        Row: {
+          company_id: string | null
+          created_at: string
+          delivery_id: string
+          id: string
+          items: Json
+          request_id: string
+          return_date: string
+          return_notes: string | null
+          return_reason: string
+          returned_by: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          company_id?: string | null
+          created_at?: string
+          delivery_id: string
+          id?: string
+          items?: Json
+          request_id: string
+          return_date?: string
+          return_notes?: string | null
+          return_reason: string
+          returned_by?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string | null
+          created_at?: string
+          delivery_id?: string
+          id?: string
+          items?: Json
+          request_id?: string
+          return_date?: string
+          return_notes?: string | null
+          return_reason?: string
+          returned_by?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "asset_request_returns_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "asset_request_returns_delivery_id_fkey"
+            columns: ["delivery_id"]
+            isOneToOne: false
+            referencedRelation: "asset_request_deliveries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "asset_request_returns_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "asset_requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       asset_request_workflow_history: {
         Row: {
           comments: string | null
@@ -1539,6 +1606,7 @@ export type Database = {
           code: string
           created_at: string
           id: string
+          main_warehouse_location_id: string | null
           modules: Json | null
           name: string
           status: string
@@ -1549,6 +1617,7 @@ export type Database = {
           code: string
           created_at?: string
           id?: string
+          main_warehouse_location_id?: string | null
           modules?: Json | null
           name: string
           status?: string
@@ -1559,12 +1628,21 @@ export type Database = {
           code?: string
           created_at?: string
           id?: string
+          main_warehouse_location_id?: string | null
           modules?: Json | null
           name?: string
           status?: string
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "companies_main_warehouse_location_id_fkey"
+            columns: ["main_warehouse_location_id"]
+            isOneToOne: false
+            referencedRelation: "warehouse_locations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       contract_amendments: {
         Row: {
@@ -9232,6 +9310,8 @@ export type Database = {
         | "partially_fulfilled"
         | "delivered"
         | "received"
+        | "purchased"
+        | "returned"
       asset_request_item_type: "from_master" | "new_item"
       asset_request_priority: "low" | "medium" | "high" | "urgent"
       asset_request_status:
@@ -9245,6 +9325,9 @@ export type Database = {
         | "cancelled"
         | "pending_delivery"
         | "pending_receipt"
+        | "purchased"
+        | "returned"
+        | "partially_returned"
       billing_frequency:
         | "one_time"
         | "monthly"
@@ -9461,6 +9544,8 @@ export type Database = {
         | "received"
         | "fulfilled"
         | "cancelled"
+        | "purchased"
+        | "returned"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -9632,6 +9717,8 @@ export const Constants = {
         "partially_fulfilled",
         "delivered",
         "received",
+        "purchased",
+        "returned",
       ],
       asset_request_item_type: ["from_master", "new_item"],
       asset_request_priority: ["low", "medium", "high", "urgent"],
@@ -9646,6 +9733,9 @@ export const Constants = {
         "cancelled",
         "pending_delivery",
         "pending_receipt",
+        "purchased",
+        "returned",
+        "partially_returned",
       ],
       billing_frequency: [
         "one_time",
@@ -9887,6 +9977,8 @@ export const Constants = {
         "received",
         "fulfilled",
         "cancelled",
+        "purchased",
+        "returned",
       ],
     },
   },
