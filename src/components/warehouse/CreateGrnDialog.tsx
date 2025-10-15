@@ -87,7 +87,7 @@ export function CreateGrnDialog({ open, onOpenChange, poId }: CreateGrnDialogPro
             item_name: item.item_name,
             description: item.description,
             unit_of_measure: item.unit_of_measure,
-            quantity_ordered: item.quantity,
+            quantity_ordered: item.quantity_ordered,
             quantity_received: 0,
             unit_price: item.unit_price,
             total_cost: 0,
