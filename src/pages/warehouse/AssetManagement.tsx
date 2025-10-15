@@ -38,7 +38,7 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Plus, Search, Wrench, AlertTriangle, CheckCircle, Package, MapPin, Building, Users, Loader2, MoreHorizontal, Edit, ArrowRightLeft, Trash2, Eye, BarChart3 } from "lucide-react";
+import { Plus, Search, Wrench, AlertTriangle, CheckCircle, Package, MapPin, Building, Users, Loader2, MoreHorizontal, Edit, ArrowRightLeft, Trash2, Eye, BarChart3, Layers } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -62,6 +62,7 @@ import { AssetMasterTab } from "@/components/warehouse/AssetMasterTab";
 import { AssetMasterSelector } from "@/components/common/AssetMasterSelector";
 import { AssetMaster } from "@/types/assetMaster";
 import { AssetRequestsTab } from "@/components/warehouse/asset-requests/AssetRequestsTab";
+import { SubcategoryAnalytics } from "@/components/warehouse/SubcategoryAnalytics";
 
 const assetFormSchema = z.object({
   asset_master_id: z.string().optional().transform(v => (v === "none" || v === "" ? undefined : v)),
@@ -804,7 +805,7 @@ export default function AssetManagement() {
 
       {/* Tabs for Assets List and Analytics */}
       <Tabs defaultValue="assets-list" className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="assets-list" className="flex items-center gap-2">
             <Package className="h-4 w-4" />
             Assets List
@@ -820,6 +821,10 @@ export default function AssetManagement() {
           <TabsTrigger value="analytics" className="flex items-center gap-2">
             <BarChart3 className="h-4 w-4" />
             Analytics
+          </TabsTrigger>
+          <TabsTrigger value="subcategory-analytics" className="flex items-center gap-2">
+            <Layers className="h-4 w-4" />
+            Subcategory Analytics
           </TabsTrigger>
         </TabsList>
 
@@ -1098,6 +1103,13 @@ export default function AssetManagement() {
             totalCount={totalCount}
             activeCount={activeCount}
             maintenanceCount={maintenanceCount}
+          />
+        </TabsContent>
+
+        <TabsContent value="subcategory-analytics" className="mt-6">
+          <SubcategoryAnalytics 
+            assets={assets}
+            categories={[...mainCategories, ...mainCategories.flatMap(cat => getSubcategories(cat.id))]}
           />
         </TabsContent>
       </Tabs>
