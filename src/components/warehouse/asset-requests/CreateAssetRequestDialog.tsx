@@ -130,7 +130,7 @@ export function CreateAssetRequestDialog({
       item_description: data.item_description,
       brand: data.brand,
       category_id: data.category_id,
-      quantity_requested: itemType === "from_master" ? 1 : data.quantity_requested,
+      quantity_requested: data.quantity_requested,
       unit_price_estimate: itemType === "from_master" ? 0 : data.unit_price_estimate,
       total_price_estimate: itemType === "from_master" ? 0 : (data.unit_price_estimate || 0) * data.quantity_requested,
       specifications: data.specifications,
@@ -382,8 +382,28 @@ export function CreateAssetRequestDialog({
                     )}
 
                     <div className="space-y-4">
+                      <FormField
+                        control={itemForm.control}
+                        name="quantity_requested"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Quantity Requested *</FormLabel>
+                            <FormControl>
+                              <Input
+                                type="number"
+                                min="1"
+                                {...field}
+                                onChange={(e) => field.onChange(parseInt(e.target.value))}
+                                placeholder="Number of units needed"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
                       <div className="text-sm text-muted-foreground p-3 bg-muted/50 rounded-md">
-                        Quantity and pricing will be determined during the approval process
+                        Pricing will be determined during the approval process
                       </div>
 
                       <FormField
@@ -578,12 +598,12 @@ export function CreateAssetRequestDialog({
                                 : "New Item"}
                             </Badge>
                           </div>
-                          {item.request_type === "new_item" && (
-                            <p className="text-sm text-muted-foreground mt-1">
-                              Qty: {item.quantity_requested} • Est: LKR{" "}
-                              {item.total_price_estimate?.toLocaleString()}
-                            </p>
-                          )}
+                          <p className="text-sm text-muted-foreground mt-1">
+                            Qty: {item.quantity_requested}
+                            {item.request_type === "new_item" && item.total_price_estimate && (
+                              <> • Est: LKR {item.total_price_estimate.toLocaleString()}</>
+                            )}
+                          </p>
                         </div>
                         <Button
                           variant="ghost"
