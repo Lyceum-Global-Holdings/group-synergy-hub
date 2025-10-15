@@ -65,6 +65,7 @@ export function AssetRequestApprovalDialog({
         approval_level: approvalLevel,
         action: selectedAction,
         comments: comments || undefined,
+        item_adjustments: approvalLevel === 'procurement' ? itemAdjustments : undefined,
       },
       {
         onSuccess: () => {

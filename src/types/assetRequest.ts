@@ -6,7 +6,9 @@ export type AssetRequestStatus =
   | 'rejected' 
   | 'fulfilled'
   | 'partially_fulfilled'
-  | 'cancelled';
+  | 'cancelled'
+  | 'pending_delivery'
+  | 'pending_receipt';
 
 export type AssetRequestPriority = 'low' | 'medium' | 'high' | 'urgent';
 
@@ -14,7 +16,27 @@ export type AssetRequestItemType = 'from_master' | 'new_item';
 
 export type FulfillmentMethod = 'from_stock' | 'purchase' | 'transfer';
 
-export type AssetRequestItemStatus = 'pending' | 'approved' | 'rejected' | 'fulfilled' | 'partially_fulfilled';
+export type AssetRequestItemStatus = 
+  | 'pending' 
+  | 'approved' 
+  | 'rejected' 
+  | 'fulfilled' 
+  | 'partially_fulfilled'
+  | 'delivered'
+  | 'received';
+
+export type WorkflowStage = 
+  | 'submitted'
+  | 'hod_approved'
+  | 'hod_rejected'
+  | 'procurement_approved'
+  | 'procurement_rejected'
+  | 'delivered'
+  | 'received'
+  | 'fulfilled'
+  | 'cancelled';
+
+export type DeliveryStatus = 'pending_receipt' | 'partially_received' | 'fully_received';
 
 export type ApprovalLevel = 'hod' | 'procurement' | 'management';
 
@@ -126,4 +148,66 @@ export interface ApproveAssetRequestData {
   approval_level: ApprovalLevel;
   action: ApprovalAction;
   comments?: string;
+  item_adjustments?: Record<string, number>; // itemId -> approved quantity
+}
+
+// New interfaces for workflow
+export interface WorkflowHistoryEntry {
+  id: string;
+  request_id: string;
+  workflow_stage: WorkflowStage;
+  performed_by: string | null;
+  performed_at: string;
+  comments: string | null;
+  metadata: any;
+  created_at: string;
+}
+
+export interface AssetRequestDelivery {
+  id: string;
+  request_id: string;
+  delivered_by: string | null;
+  delivery_date: string;
+  delivery_location: string | null;
+  delivery_notes: string | null;
+  status: DeliveryStatus;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AssetRequestDeliveryItem {
+  id: string;
+  delivery_id: string;
+  request_item_id: string;
+  quantity_delivered: number;
+  quantity_received: number;
+  delivery_notes: string | null;
+  receipt_notes: string | null;
+  received_at: string | null;
+  received_by: string | null;
+  created_at: string;
+  updated_at: string;
+  request_item?: AssetRequestItem;
+}
+
+export interface MarkAsDeliveredData {
+  request_id: string;
+  delivery_location: string;
+  delivery_notes?: string;
+  items: Array<{
+    request_item_id: string;
+    quantity_delivered: number;
+    delivery_notes?: string;
+  }>;
+}
+
+export interface ConfirmReceiptData {
+  request_id: string;
+  delivery_id: string;
+  items: Array<{
+    delivery_item_id: string;
+    request_item_id: string;
+    quantity_received: number;
+    receipt_notes?: string;
+  }>;
 }

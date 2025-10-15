@@ -7,7 +7,11 @@ import {
   CreateAssetRequestData,
   CreateAssetRequestItemData,
   ApproveAssetRequestData,
-  AssetRequestStatus
+  AssetRequestStatus,
+  MarkAsDeliveredData,
+  ConfirmReceiptData,
+  WorkflowHistoryEntry,
+  AssetRequestDelivery
 } from '@/types/assetRequest';
 
 export const useAssetRequests = (filters?: { status?: AssetRequestStatus }) => {
@@ -263,6 +267,20 @@ export const useAssetRequests = (filters?: { status?: AssetRequestStatus }) => {
 
       if (approvalError) throw approvalError;
 
+      // If procurement approval and item adjustments provided, update quantities
+      if (approvalData.approval_level === 'procurement' && approvalData.item_adjustments) {
+        const adjustments = Object.entries(approvalData.item_adjustments);
+        for (const [itemId, approvedQty] of adjustments) {
+          await supabase
+            .from('asset_request_items')
+            .update({ 
+              quantity_approved: approvedQty,
+              status: approvalData.action === 'approved' ? 'approved' : 'rejected'
+            })
+            .eq('id', itemId);
+        }
+      }
+
       // Update request status
       let newStatus: AssetRequestStatus;
       let updateFields: any = {};
@@ -353,11 +371,207 @@ export const useAssetRequests = (filters?: { status?: AssetRequestStatus }) => {
     }
   });
 
+  // Mark as delivered
+  const markAsDeliveredMutation = useMutation({
+    mutationFn: async (data: MarkAsDeliveredData) => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User not authenticated');
+
+      // Create delivery record
+      const { data: delivery, error: deliveryError } = await supabase
+        .from('asset_request_deliveries')
+        .insert({
+          request_id: data.request_id,
+          delivered_by: user.id,
+          delivery_date: new Date().toISOString().split('T')[0],
+          delivery_location: data.delivery_location,
+          delivery_notes: data.delivery_notes,
+          status: 'pending_receipt',
+        })
+        .select()
+        .single();
+
+      if (deliveryError) throw deliveryError;
+
+      // Create delivery items
+      const deliveryItems = data.items.map(item => ({
+        delivery_id: delivery.id,
+        request_item_id: item.request_item_id,
+        quantity_delivered: item.quantity_delivered,
+        delivery_notes: item.delivery_notes,
+      }));
+
+      const { error: itemsError } = await supabase
+        .from('asset_request_delivery_items')
+        .insert(deliveryItems);
+
+      if (itemsError) throw itemsError;
+
+      // Update request status
+      const { error: statusError } = await supabase
+        .from('asset_requests')
+        .update({ status: 'pending_receipt' })
+        .eq('id', data.request_id);
+
+      if (statusError) throw statusError;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['asset-requests'] });
+      queryClient.invalidateQueries({ queryKey: ['asset-request-deliveries'] });
+      queryClient.invalidateQueries({ queryKey: ['workflow-history'] });
+      toast({
+        title: "Success",
+        description: "Items marked as delivered. Awaiting receipt confirmation.",
+      });
+    },
+    onError: (error) => {
+      console.error('Error marking as delivered:', error);
+      toast({
+        title: "Error",
+        description: "Failed to mark items as delivered",
+        variant: "destructive",
+      });
+    }
+  });
+
+  // Confirm receipt
+  const confirmReceiptMutation = useMutation({
+    mutationFn: async (data: ConfirmReceiptData) => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User not authenticated');
+
+      // Update delivery items with received quantities
+      for (const item of data.items) {
+        await supabase
+          .from('asset_request_delivery_items')
+          .update({
+            quantity_received: item.quantity_received,
+            receipt_notes: item.receipt_notes,
+            received_at: new Date().toISOString(),
+            received_by: user.id,
+          })
+          .eq('id', item.delivery_item_id);
+
+        // Update request items with fulfilled quantity
+        await supabase
+          .from('asset_request_items')
+          .update({
+            quantity_fulfilled: item.quantity_received,
+            status: item.quantity_received > 0 ? 'fulfilled' : 'pending',
+          })
+          .eq('id', item.request_item_id);
+      }
+
+      // Check if all items fulfilled
+      const { data: requestItems } = await supabase
+        .from('asset_request_items')
+        .select('quantity_approved, quantity_fulfilled')
+        .eq('request_id', data.request_id);
+
+      const allFulfilled = requestItems?.every(
+        item => item.quantity_fulfilled >= (item.quantity_approved || 0)
+      );
+
+      const partiallyFulfilled = requestItems?.some(
+        item => item.quantity_fulfilled > 0
+      );
+
+      // Update request status
+      const newStatus = allFulfilled
+        ? 'fulfilled'
+        : partiallyFulfilled
+        ? 'partially_fulfilled'
+        : 'pending_receipt';
+
+      await supabase
+        .from('asset_requests')
+        .update({
+          status: newStatus,
+          fulfilled_date: allFulfilled ? new Date().toISOString() : null,
+          fulfilled_by: allFulfilled ? user.id : null,
+        })
+        .eq('id', data.request_id);
+
+      // Update delivery status
+      await supabase
+        .from('asset_request_deliveries')
+        .update({
+          status: allFulfilled ? 'fully_received' : 'partially_received',
+        })
+        .eq('id', data.delivery_id);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['asset-requests'] });
+      queryClient.invalidateQueries({ queryKey: ['asset-request-items'] });
+      queryClient.invalidateQueries({ queryKey: ['asset-request-deliveries'] });
+      queryClient.invalidateQueries({ queryKey: ['workflow-history'] });
+      queryClient.invalidateQueries({ queryKey: ['warehouse-assets'] });
+      toast({
+        title: "Success",
+        description: "Receipt confirmed. Assets will be created automatically.",
+      });
+    },
+    onError: (error) => {
+      console.error('Error confirming receipt:', error);
+      toast({
+        title: "Error",
+        description: "Failed to confirm receipt",
+        variant: "destructive",
+      });
+    }
+  });
+
+  // Get workflow history
+  const useWorkflowHistory = (requestId: string | undefined) => {
+    return useQuery({
+      queryKey: ['workflow-history', requestId],
+      queryFn: async () => {
+        if (!requestId) return [];
+        const { data, error } = await supabase
+          .from('asset_request_workflow_history')
+          .select('*')
+          .eq('request_id', requestId)
+          .order('performed_at', { ascending: true });
+
+        if (error) throw error;
+        return data as WorkflowHistoryEntry[];
+      },
+      enabled: !!requestId,
+    });
+  };
+
+  // Get deliveries for request
+  const useRequestDeliveries = (requestId: string | undefined) => {
+    return useQuery({
+      queryKey: ['asset-request-deliveries', requestId],
+      queryFn: async () => {
+        if (!requestId) return [];
+        const { data, error } = await supabase
+          .from('asset_request_deliveries')
+          .select(`
+            *,
+            delivery_items:asset_request_delivery_items(
+              *,
+              request_item:asset_request_items(*)
+            )
+          `)
+          .eq('request_id', requestId)
+          .order('created_at', { ascending: false });
+
+        if (error) throw error;
+        return data as AssetRequestDelivery[];
+      },
+      enabled: !!requestId,
+    });
+  };
+
   return {
     assetRequests,
     isLoading,
     error,
     useAssetRequestItems,
+    useWorkflowHistory,
+    useRequestDeliveries,
     createAssetRequest: createAssetRequestMutation.mutate,
     updateAssetRequest: updateAssetRequestMutation.mutate,
     deleteAssetRequest: deleteAssetRequestMutation.mutate,
@@ -366,10 +580,14 @@ export const useAssetRequests = (filters?: { status?: AssetRequestStatus }) => {
     deleteAssetRequestItem: deleteAssetRequestItemMutation.mutate,
     approveAssetRequest: approveAssetRequestMutation.mutate,
     submitAssetRequest: submitAssetRequestMutation.mutate,
+    markAsDelivered: markAsDeliveredMutation.mutate,
+    confirmReceipt: confirmReceiptMutation.mutate,
     isCreating: createAssetRequestMutation.isPending,
     isUpdating: updateAssetRequestMutation.isPending,
     isDeleting: deleteAssetRequestMutation.isPending,
     isApproving: approveAssetRequestMutation.isPending,
     isSubmitting: submitAssetRequestMutation.isPending,
+    isMarkingAsDelivered: markAsDeliveredMutation.isPending,
+    isConfirmingReceipt: confirmReceiptMutation.isPending,
   };
 };
