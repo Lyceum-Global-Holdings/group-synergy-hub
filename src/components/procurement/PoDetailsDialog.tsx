@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { PurchaseOrder, PoStatus } from "@/types/purchaseOrder";
 import { format } from "date-fns";
 import { Send, Package, Edit, FileText, Check, X, Clock, FilePlus } from "lucide-react";
-import { useSendPurchaseOrder } from "@/hooks/usePurchaseOrders";
+import { useSendPurchaseOrder, usePurchaseOrder } from "@/hooks/usePurchaseOrders";
 import { useSubmitPurchaseOrder, useApprovePurchaseOrder, usePurchaseOrderApprovals } from "@/hooks/usePurchaseOrderApprovals";
 import { 
   useSubmitForMerchandiserApproval, 
@@ -61,6 +61,10 @@ export function PoDetailsDialog({ open, onOpenChange, purchaseOrder }: PoDetails
   const [showAmendmentDialog, setShowAmendmentDialog] = useState(false);
   const [deptHeadEmail, setDeptHeadEmail] = useState("");
   
+  // Fetch full PO details including GRNs
+  const { data: poDetails, isLoading: isPoLoading } = usePurchaseOrder(purchaseOrder.id);
+  const po = poDetails ?? purchaseOrder;
+  
   const sendMutation = useSendPurchaseOrder();
   const submitMerchandiserMutation = useSubmitForMerchandiserApproval();
   const approveMerchandiserMutation = useApprovePOAsMerchandiser();
@@ -81,11 +85,11 @@ export function PoDetailsDialog({ open, onOpenChange, purchaseOrder }: PoDetails
     role.role?.toLowerCase().includes('department')
   );
 
-  const canSubmitForApproval = purchaseOrder.status === 'draft';
-  const canMerchandiserApprove = purchaseOrder.status === 'pending_approval' && (isMerchandiser || isAdmin);
-  const canDeptHeadApprove = purchaseOrder.status === 'pending_dept_head_approval' && (isDeptHead || isAdmin);
-  const canSend = purchaseOrder.status === 'approved';
-  const canAmend = !['cancelled', 'completed'].includes(purchaseOrder.status);
+  const canSubmitForApproval = po.status === 'draft';
+  const canMerchandiserApprove = po.status === 'pending_approval' && (isMerchandiser || isAdmin);
+  const canDeptHeadApprove = po.status === 'pending_dept_head_approval' && (isDeptHead || isAdmin);
+  const canSend = po.status === 'approved';
+  const canAmend = !['cancelled', 'completed'].includes(po.status);
 
   const handleSubmitForApproval = () => {
     submitMerchandiserMutation.mutate({
@@ -157,12 +161,12 @@ export function PoDetailsDialog({ open, onOpenChange, purchaseOrder }: PoDetails
             <div>
               <DialogTitle className="text-xl">Purchase Order Details</DialogTitle>
               <DialogDescription>
-                PO Number: {purchaseOrder.po_number}
+                PO Number: {po.po_number}
               </DialogDescription>
             </div>
             <div className="flex items-center gap-2">
-              <Badge className={statusColors[purchaseOrder.status]}>
-                {statusLabels[purchaseOrder.status]}
+              <Badge className={statusColors[po.status]}>
+                {statusLabels[po.status]}
               </Badge>
               {canSubmitForApproval && (
                 <Button size="sm" onClick={handleSubmitForApproval} disabled={submitMerchandiserMutation.isPending}>
@@ -230,54 +234,54 @@ export function PoDetailsDialog({ open, onOpenChange, purchaseOrder }: PoDetails
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <p className="text-sm font-medium text-muted-foreground">PO Number</p>
-                      <p className="font-semibold">{purchaseOrder.po_number}</p>
+                      <p className="font-semibold">{po.po_number}</p>
                     </div>
                     <div>
                       <p className="text-sm font-medium text-muted-foreground">PO Date</p>
-                      <p>{format(new Date(purchaseOrder.po_date), 'MMM dd, yyyy')}</p>
+                      <p>{format(new Date(po.po_date), 'MMM dd, yyyy')}</p>
                     </div>
                     <div>
                       <p className="text-sm font-medium text-muted-foreground">Expected Delivery</p>
                       <p>
-                        {purchaseOrder.expected_delivery_date 
-                          ? format(new Date(purchaseOrder.expected_delivery_date), 'MMM dd, yyyy')
+                        {po.expected_delivery_date 
+                          ? format(new Date(po.expected_delivery_date), 'MMM dd, yyyy')
                           : 'Not specified'
                         }
                       </p>
                     </div>
                     <div>
                       <p className="text-sm font-medium text-muted-foreground">Currency</p>
-                      <p>{purchaseOrder.currency}</p>
+                      <p>{po.currency}</p>
                     </div>
                   </div>
-                  {purchaseOrder.pr && (
+                  {po.pr && (
                     <div>
                       <p className="text-sm font-medium text-muted-foreground">Source PR</p>
-                      <p>{purchaseOrder.pr.pr_number} - {purchaseOrder.pr.title}</p>
+                      <p>{po.pr.pr_number} - {po.pr.title}</p>
                     </div>
                   )}
-                  {purchaseOrder.payment_terms && (
+                  {po.payment_terms && (
                     <div>
                       <p className="text-sm font-medium text-muted-foreground">Payment Terms</p>
-                      <p>{purchaseOrder.payment_terms}</p>
+                      <p>{po.payment_terms}</p>
                     </div>
                   )}
-                  {purchaseOrder.delivery_terms && (
+                  {po.delivery_terms && (
                     <div>
                       <p className="text-sm font-medium text-muted-foreground">Delivery Terms</p>
-                      <p>{purchaseOrder.delivery_terms}</p>
+                      <p>{po.delivery_terms}</p>
                     </div>
                   )}
-                  {purchaseOrder.approved_by_profile && (
+                  {po.approved_by_profile && (
                     <div>
                       <p className="text-sm font-medium text-muted-foreground">Approved By</p>
-                      <p>{purchaseOrder.approved_by_profile.full_name || purchaseOrder.approved_by_profile.email}</p>
+                      <p>{po.approved_by_profile.full_name || po.approved_by_profile.email}</p>
                     </div>
                   )}
-                  {purchaseOrder.approved_date && (
+                  {po.approved_date && (
                     <div>
                       <p className="text-sm font-medium text-muted-foreground">Approved Date</p>
-                      <p>{format(new Date(purchaseOrder.approved_date), 'MMM dd, yyyy')}</p>
+                      <p>{format(new Date(po.approved_date), 'MMM dd, yyyy')}</p>
                     </div>
                   )}
                 </CardContent>
@@ -290,28 +294,28 @@ export function PoDetailsDialog({ open, onOpenChange, purchaseOrder }: PoDetails
                 <CardContent className="space-y-3">
                   <div>
                     <p className="text-sm font-medium text-muted-foreground">Supplier Name</p>
-                    <p className="font-semibold">{purchaseOrder.supplier?.name}</p>
+                    <p className="font-semibold">{po.supplier?.name}</p>
                   </div>
-                  {purchaseOrder.supplier?.email && (
+                  {po.supplier?.email && (
                     <div>
                       <p className="text-sm font-medium text-muted-foreground">Email</p>
-                      <p>{purchaseOrder.supplier.email}</p>
+                      <p>{po.supplier.email}</p>
                     </div>
                   )}
-                  {purchaseOrder.supplier?.phone && (
+                  {po.supplier?.phone && (
                     <div>
                       <p className="text-sm font-medium text-muted-foreground">Phone</p>
-                      <p>{purchaseOrder.supplier.phone}</p>
+                      <p>{po.supplier.phone}</p>
                     </div>
                   )}
                   <div>
                     <p className="text-sm font-medium text-muted-foreground">Created By</p>
-                    <p>{purchaseOrder.created_by_profile?.full_name || purchaseOrder.created_by_profile?.email}</p>
+                    <p>{po.created_by_profile?.full_name || po.created_by_profile?.email}</p>
                   </div>
-                  {purchaseOrder.buyer_profile && (
+                  {po.buyer_profile && (
                     <div>
                       <p className="text-sm font-medium text-muted-foreground">Buyer</p>
-                      <p>{purchaseOrder.buyer_profile.full_name || purchaseOrder.buyer_profile.email}</p>
+                      <p>{po.buyer_profile.full_name || po.buyer_profile.email}</p>
                     </div>
                   )}
                 </CardContent>
@@ -327,32 +331,32 @@ export function PoDetailsDialog({ open, onOpenChange, purchaseOrder }: PoDetails
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <div>
                     <p className="text-sm font-medium text-muted-foreground">Subtotal</p>
-                    <p className="text-lg font-semibold">Rs. {purchaseOrder.total_amount.toLocaleString()}</p>
+                    <p className="text-lg font-semibold">Rs. {po.total_amount.toLocaleString()}</p>
                   </div>
                   <div>
                     <p className="text-sm font-medium text-muted-foreground">Tax</p>
-                    <p className="text-lg font-semibold">Rs. {purchaseOrder.tax_amount.toLocaleString()}</p>
+                    <p className="text-lg font-semibold">Rs. {po.tax_amount.toLocaleString()}</p>
                   </div>
                   <div>
                     <p className="text-sm font-medium text-muted-foreground">Discount</p>
-                    <p className="text-lg font-semibold">-Rs. {purchaseOrder.discount_amount.toLocaleString()}</p>
+                    <p className="text-lg font-semibold">-Rs. {po.discount_amount.toLocaleString()}</p>
                   </div>
                   <div>
                     <p className="text-sm font-medium text-muted-foreground">Total</p>
-                    <p className="text-xl font-bold">Rs. {purchaseOrder.final_amount.toLocaleString()}</p>
+                    <p className="text-xl font-bold">Rs. {po.final_amount.toLocaleString()}</p>
                   </div>
                 </div>
               </CardContent>
             </Card>
 
             {/* Notes */}
-            {purchaseOrder.notes && (
+            {po.notes && (
               <Card>
                 <CardHeader>
                   <CardTitle className="text-lg">Notes</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <p className="whitespace-pre-wrap">{purchaseOrder.notes}</p>
+                  <p className="whitespace-pre-wrap">{po.notes}</p>
                 </CardContent>
               </Card>
             )}
@@ -380,7 +384,7 @@ export function PoDetailsDialog({ open, onOpenChange, purchaseOrder }: PoDetails
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {purchaseOrder.items?.map((item) => (
+                    {po.items?.map((item) => (
                       <TableRow key={item.id}>
                         <TableCell>
                           {item.item_code ? (
@@ -407,14 +411,14 @@ export function PoDetailsDialog({ open, onOpenChange, purchaseOrder }: PoDetails
             </Card>
 
             {/* Delivery History */}
-            {purchaseOrder.receipts && purchaseOrder.receipts.length > 0 && (
+            {po.receipts && po.receipts.length > 0 && (
               <Card>
                 <CardHeader>
                   <CardTitle className="text-lg">Delivery History</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-3">
-                    {purchaseOrder.receipts.map((receipt) => (
+                    {po.receipts.map((receipt) => (
                       <Card key={receipt.id}>
                         <CardContent className="pt-4">
                           <div className="flex justify-between items-start">
@@ -442,9 +446,15 @@ export function PoDetailsDialog({ open, onOpenChange, purchaseOrder }: PoDetails
           </TabsContent>
 
           <TabsContent value="grns" className="space-y-6">
-            {purchaseOrder.grns && purchaseOrder.grns.length > 0 ? (
+            {isPoLoading ? (
+              <Card>
+                <CardContent className="py-8 text-center">
+                  <p className="text-muted-foreground">Loading GRNs...</p>
+                </CardContent>
+              </Card>
+            ) : po.grns && po.grns.length > 0 ? (
               <div className="space-y-4">
-                {purchaseOrder.grns.map((grn) => (
+                {po.grns.map((grn) => (
                   <Card key={grn.id}>
                     <CardHeader>
                       <div className="flex items-center justify-between">
@@ -547,7 +557,7 @@ export function PoDetailsDialog({ open, onOpenChange, purchaseOrder }: PoDetails
           </TabsContent>
 
           <TabsContent value="amendments" className="space-y-6">
-            <PoAmendmentsTab poId={purchaseOrder.id} isAdmin={isAdmin} />
+            <PoAmendmentsTab poId={po.id} isAdmin={isAdmin} />
           </TabsContent>
 
           <TabsContent value="approvals" className="space-y-6">
@@ -600,7 +610,7 @@ export function PoDetailsDialog({ open, onOpenChange, purchaseOrder }: PoDetails
             )}
 
             {/* Send Department Head Email Section */}
-            {purchaseOrder.status === 'pending_dept_head_approval' && (isMerchandiser || isAdmin || purchaseOrder.merchandiser_approved_by) && (
+            {po.status === 'pending_dept_head_approval' && (isMerchandiser || isAdmin || po.merchandiser_approved_by) && (
               <Card>
                 <CardHeader>
                   <CardTitle className="text-lg">Send Approval Email to Department Head</CardTitle>
@@ -670,30 +680,30 @@ export function PoDetailsDialog({ open, onOpenChange, purchaseOrder }: PoDetails
                 <div className="space-y-4">
                   <div className="flex items-center gap-3">
                     <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                      purchaseOrder.approval_level >= 1 ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-400'
+                      po.approval_level >= 1 ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-400'
                     }`}>
-                      {purchaseOrder.approval_level >= 1 ? <Check className="h-4 w-4" /> : '1'}
+                      {po.approval_level >= 1 ? <Check className="h-4 w-4" /> : '1'}
                     </div>
                     <div className="flex-1">
                       <p className="font-medium">Merchandiser Approval</p>
-                      {purchaseOrder.merchandiser_approved_by && (
+                      {po.merchandiser_approved_by && (
                         <p className="text-sm text-muted-foreground">
-                          Approved on {purchaseOrder.merchandiser_approved_date ? new Date(purchaseOrder.merchandiser_approved_date).toLocaleDateString() : 'N/A'}
+                          Approved on {po.merchandiser_approved_date ? new Date(po.merchandiser_approved_date).toLocaleDateString() : 'N/A'}
                         </p>
                       )}
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
                     <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                      purchaseOrder.approval_level >= 2 ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-400'
+                      po.approval_level >= 2 ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-400'
                     }`}>
-                      {purchaseOrder.approval_level >= 2 ? <Check className="h-4 w-4" /> : '2'}
+                      {po.approval_level >= 2 ? <Check className="h-4 w-4" /> : '2'}
                     </div>
                     <div className="flex-1">
                       <p className="font-medium">Department Head Approval</p>
-                      {purchaseOrder.department_head_approved_by && (
+                      {po.department_head_approved_by && (
                         <p className="text-sm text-muted-foreground">
-                          Approved on {purchaseOrder.department_head_approved_date ? new Date(purchaseOrder.department_head_approved_date).toLocaleDateString() : 'N/A'}
+                          Approved on {po.department_head_approved_date ? new Date(po.department_head_approved_date).toLocaleDateString() : 'N/A'}
                         </p>
                       )}
                     </div>
@@ -757,7 +767,7 @@ export function PoDetailsDialog({ open, onOpenChange, purchaseOrder }: PoDetails
         <CreatePoAmendmentDialog
           open={showAmendmentDialog}
           onOpenChange={setShowAmendmentDialog}
-          poId={purchaseOrder.id}
+          poId={po.id}
         />
       </DialogContent>
     </Dialog>
