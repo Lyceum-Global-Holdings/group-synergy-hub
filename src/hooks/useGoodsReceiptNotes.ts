@@ -101,11 +101,15 @@ export const useCreateGoodsReceiptNote = () => {
       const { data: grn, error: grnError } = await supabase
         .from('goods_receipt_notes')
         .insert({
+          grn_date: data.grn_date,
           po_id: data.po_id || null,
           po_number: data.po_number || null,
           supplier_id: data.supplier_id || null,
           supplier_name: data.supplier_name || null,
           supplier_address: data.supplier_address || null,
+          invoice_number: data.invoice_number,
+          invoice_date: data.invoice_date,
+          remarks: data.remarks,
           status: data.status,
           company_id: data.company_id || null,
           created_by: user.id,
