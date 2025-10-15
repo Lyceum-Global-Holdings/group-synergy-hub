@@ -142,8 +142,6 @@ export const AssetRequestDetailsDialog = ({ request, open, onOpenChange }: Asset
     );
   };
 
-  const totalEstimatedCost = request.asset_request_items?.reduce((sum, item) => sum + (item.total_price_estimate || 0), 0) || 0;
-
   const status = statusConfig[request.status] || { variant: "outline", label: request.status };
 
   return (
@@ -222,8 +220,6 @@ export const AssetRequestDetailsDialog = ({ request, open, onOpenChange }: Asset
                     <TableHead>Brand</TableHead>
                     <TableHead className="text-right">Qty Requested</TableHead>
                     <TableHead className="text-right">Qty Approved</TableHead>
-                    <TableHead className="text-right">Unit Price</TableHead>
-                    <TableHead className="text-right">Total</TableHead>
                     <TableHead>Status</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -239,12 +235,6 @@ export const AssetRequestDetailsDialog = ({ request, open, onOpenChange }: Asset
                       <TableCell>{item.brand || "N/A"}</TableCell>
                       <TableCell className="text-right">{item.quantity_requested}</TableCell>
                       <TableCell className="text-right">{item.quantity_approved || "-"}</TableCell>
-                      <TableCell className="text-right">
-                        {item.unit_price_estimate ? `LKR ${item.unit_price_estimate.toFixed(2)}` : "-"}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {item.total_price_estimate ? `LKR ${item.total_price_estimate.toFixed(2)}` : "-"}
-                      </TableCell>
                       <TableCell>
                         <Badge variant="outline">{item.status}</Badge>
                       </TableCell>
@@ -252,13 +242,6 @@ export const AssetRequestDetailsDialog = ({ request, open, onOpenChange }: Asset
                   ))}
                 </TableBody>
               </Table>
-              
-              <div className="flex justify-end mt-4 pt-4 border-t">
-                <div className="text-right">
-                  <p className="text-sm text-muted-foreground">Total Estimated Cost</p>
-                  <p className="text-lg font-bold">LKR {totalEstimatedCost.toFixed(2)}</p>
-                </div>
-              </div>
             </CardContent>
           </Card>
 

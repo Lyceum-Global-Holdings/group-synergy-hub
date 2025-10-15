@@ -26,8 +26,6 @@ interface RequestItem {
   brand?: string;
   specifications?: string;
   quantity_requested: number;
-  unit_price_estimate?: number;
-  total_price_estimate?: number;
   justification?: string;
   preferred_vendor?: string;
 }
@@ -62,15 +60,6 @@ export const CreateAssetRequestDialog = ({ open, onOpenChange }: CreateAssetRequ
   const handleItemChange = (index: number, field: keyof RequestItem, value: any) => {
     const newItems = [...items];
     newItems[index] = { ...newItems[index], [field]: value };
-    
-    // Calculate total price if quantity or unit price changes
-    if (field === "quantity_requested" || field === "unit_price_estimate") {
-      const item = newItems[index];
-      if (item.quantity_requested && item.unit_price_estimate) {
-        item.total_price_estimate = item.quantity_requested * item.unit_price_estimate;
-      }
-    }
-    
     setItems(newItems);
   };
 
@@ -242,8 +231,6 @@ export const CreateAssetRequestDialog = ({ open, onOpenChange }: CreateAssetRequ
                     <TableHead className="w-[120px]">Type</TableHead>
                     <TableHead>Asset/Item</TableHead>
                     <TableHead className="w-[100px]">Quantity</TableHead>
-                    <TableHead className="w-[120px]">Unit Price</TableHead>
-                    <TableHead className="w-[120px]">Total</TableHead>
                     <TableHead className="w-[50px]"></TableHead>
                   </TableRow>
                 </TableHeader>
@@ -295,20 +282,6 @@ export const CreateAssetRequestDialog = ({ open, onOpenChange }: CreateAssetRequ
                           onChange={(e) => handleItemChange(index, "quantity_requested", parseInt(e.target.value) || 1)}
                           className="h-8"
                         />
-                      </TableCell>
-                      <TableCell>
-                        <Input
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          value={item.unit_price_estimate || ""}
-                          onChange={(e) => handleItemChange(index, "unit_price_estimate", parseFloat(e.target.value) || 0)}
-                          className="h-8"
-                          placeholder="0.00"
-                        />
-                      </TableCell>
-                      <TableCell>
-                        {item.total_price_estimate?.toFixed(2) || "0.00"}
                       </TableCell>
                       <TableCell>
                         <Button
