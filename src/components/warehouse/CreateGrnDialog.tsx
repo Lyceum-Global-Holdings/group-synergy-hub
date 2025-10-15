@@ -21,8 +21,49 @@ import { usePurchaseOrders } from '@/hooks/usePurchaseOrders';
 import { useWarehouseItems } from '@/hooks/useWarehouseItems';
 import { useCompany } from '@/contexts/CompanyContext';
 import { CreateGrnData, QualityStatus } from '@/types/grn';
+import { PoStatus } from '@/types/purchaseOrder';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
+
+const statusColors: Record<PoStatus, string> = {
+  draft: "bg-gray-100 text-gray-800",
+  pending_approval: "bg-amber-100 text-amber-800",
+  pending_dept_head_approval: "bg-blue-100 text-blue-800",
+  approved: "bg-green-100 text-green-800",
+  rejected: "bg-red-100 text-red-800",
+  sent: "bg-blue-100 text-blue-800",
+  acknowledged: "bg-yellow-100 text-yellow-800",
+  partially_received: "bg-orange-100 text-orange-800",
+  completed: "bg-green-100 text-green-800",
+  cancelled: "bg-red-100 text-red-800",
+};
+
+const statusLabels: Record<PoStatus, string> = {
+  draft: "Draft",
+  pending_approval: "Pending Merchandiser",
+  pending_dept_head_approval: "Pending Dept Head",
+  approved: "Approved",
+  rejected: "Rejected",
+  sent: "Sent",
+  acknowledged: "Acknowledged",
+  partially_received: "Partially Received",
+  completed: "Completed",
+  cancelled: "Cancelled",
+};
+
+// Sort priority for PO status (lower is higher priority)
+const statusSortPriority: Record<PoStatus, number> = {
+  approved: 1,
+  sent: 2,
+  partially_received: 3,
+  acknowledged: 4,
+  pending_dept_head_approval: 5,
+  pending_approval: 6,
+  draft: 7,
+  completed: 8,
+  rejected: 9,
+  cancelled: 10,
+};
 
 const createGrnSchema = z.object({
   grn_date: z.date(),
@@ -363,6 +404,9 @@ export function CreateGrnDialog({ open, onOpenChange, preselectedPo }: CreateGrn
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Purchase Order</FormLabel>
+                    <p className="text-xs text-muted-foreground mb-1">
+                      Showing POs with items to receive. Status shown next to PO number.
+                    </p>
                     <Select 
                       onValueChange={(value) => {
                         field.onChange(value);
@@ -391,6 +435,12 @@ export function CreateGrnDialog({ open, onOpenChange, preselectedPo }: CreateGrn
                             });
                             return hasPendingItems;
                           })
+                          .sort((a, b) => {
+                            // Sort by status priority (approved first, then sent, etc.)
+                            const priorityA = statusSortPriority[a.status as PoStatus] || 99;
+                            const priorityB = statusSortPriority[b.status as PoStatus] || 99;
+                            return priorityA - priorityB;
+                          })
                           .map((po) => {
                             // Calculate pending items count
                             const pendingItemsCount = po.items?.filter(item => {
@@ -401,13 +451,16 @@ export function CreateGrnDialog({ open, onOpenChange, preselectedPo }: CreateGrn
                             return (
                               <SelectItem key={po.id} value={po.id}>
                                 <div className="flex flex-col gap-1">
-                                  <div className="font-medium">{po.po_number}</div>
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-medium">{po.po_number}</span>
+                                    <Badge className={cn("text-xs h-5 px-2", statusColors[po.status as PoStatus])}>
+                                      {statusLabels[po.status as PoStatus]}
+                                    </Badge>
+                                  </div>
                                   <div className="text-xs text-muted-foreground flex items-center gap-2">
                                     <span>{po.supplier?.name}</span>
                                     <span>•</span>
-                                    <Badge variant="secondary" className="text-xs h-4 px-1">
-                                      {pendingItemsCount} pending
-                                    </Badge>
+                                    <span className="font-medium">{pendingItemsCount} to receive</span>
                                   </div>
                                 </div>
                               </SelectItem>
@@ -452,7 +505,9 @@ export function CreateGrnDialog({ open, onOpenChange, preselectedPo }: CreateGrn
                     </div>
                     <div>
                       <p className="text-sm text-muted-foreground">Status</p>
-                      <Badge>{selectedPoData.status}</Badge>
+                      <Badge className={statusColors[selectedPoData.status as PoStatus]}>
+                        {statusLabels[selectedPoData.status as PoStatus]}
+                      </Badge>
                     </div>
                     <div>
                       <p className="text-sm text-muted-foreground">PO Date</p>
