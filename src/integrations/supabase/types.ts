@@ -3605,11 +3605,32 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "goods_receipt_notes_approved_by_profile_fkey"
+            columns: ["approved_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "goods_receipt_notes_created_by_profile_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
             foreignKeyName: "goods_receipt_notes_po_id_fkey"
             columns: ["po_id"]
             isOneToOne: false
             referencedRelation: "purchase_orders"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "goods_receipt_notes_received_by_profile_fkey"
+            columns: ["received_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
           },
           {
             foreignKeyName: "goods_receipt_notes_supplier_id_fkey"
