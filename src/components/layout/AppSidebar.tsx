@@ -57,6 +57,7 @@ const departments = [
       { title: "Stock Transfer", url: "/warehouse/stock-transfer" },
       { title: "Cycle Count", url: "/warehouse/cycle-count" },
       { title: "Stock Adjustment", url: "/warehouse/stock-adjustment" },
+      { title: "Goods Receipt Note", url: "/warehouse/grn" },
       { title: "Delivery Order", url: "/warehouse/delivery-order" },
       { title: "Inventory Valuation", url: "/warehouse/inventory-valuation" },
       { title: "Asset Management", url: "/warehouse/asset-management" },

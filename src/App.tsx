@@ -37,6 +37,7 @@ import Putaway from "./pages/warehouse/Putaway";
 import StockTransfer from "./pages/warehouse/StockTransfer";
 import CycleCount from "./pages/warehouse/CycleCount";
 import DeliveryOrder from "./pages/warehouse/DeliveryOrder";
+import GoodsReceiptNote from "./pages/warehouse/GoodsReceiptNote";
 import PublicAssetView from "./pages/PublicAssetView";
 import PublicAssetRequest from "./pages/PublicAssetRequest";
 import PoEmailApproval from "./pages/procurement/PoEmailApproval";
@@ -95,6 +96,7 @@ function App() {
               <Route path="/procurement/rfq-rfp" element={<RfqRfp />} />
               <Route path="/procurement/blanket-po" element={<BlanketPurchaseOrder />} />
               <Route path="/warehouse/stock-adjustment" element={<StockAdjustment />} />
+              <Route path="/warehouse/grn" element={<GoodsReceiptNote />} />
               <Route path="/sourcing/supplier-master" element={<SupplierMaster />} />
               <Route path="/sourcing/supplier-scorecard" element={<SupplierScorecard />} />
               <Route path="/sourcing/supplier-evaluation" element={<SupplierEvaluation />} />
