@@ -43,7 +43,7 @@ const statusLabels: Record<GrnStatus, string> = {
   cancelled: 'Cancelled',
 };
 
-export default function GoodsReceiptNote() {
+function GoodsReceiptNote() {
   const { selectedCompany } = useCompany();
   const { data: grns = [], isLoading } = useGoodsReceiptNotes(selectedCompany?.id);
   const { data: summary } = useGrnSummary(selectedCompany?.id);
@@ -236,3 +236,5 @@ export default function GoodsReceiptNote() {
     </div>
   );
 }
+
+export default GoodsReceiptNote;
