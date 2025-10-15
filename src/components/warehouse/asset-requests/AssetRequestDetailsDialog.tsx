@@ -19,12 +19,14 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AssetRequest } from "@/types/assetRequest";
 import { useAssetRequests } from "@/hooks/useAssetRequests";
-import { Loader2, FileText, CheckCircle, XCircle, Clock, Package, History } from "lucide-react";
+import { Loader2, FileText, CheckCircle, XCircle, Clock, Package, History, ShoppingCart, ExternalLink } from "lucide-react";
 import { format } from "date-fns";
 import { WorkflowHistoryTimeline } from "./WorkflowHistoryTimeline";
 import { DeliveryDialog } from "./DeliveryDialog";
 import { ReceiptConfirmationDialog } from "./ReceiptConfirmationDialog";
+import { PurchaseConfirmationDialog } from "./PurchaseConfirmationDialog";
 import { useCurrentUserRoles } from "@/hooks/useCurrentUserRoles";
+import { useNavigate } from "react-router-dom";
 
 interface AssetRequestDetailsDialogProps {
   request: AssetRequest | null;
@@ -45,6 +47,8 @@ export function AssetRequestDetailsDialog({
 }: AssetRequestDetailsDialogProps) {
   const [deliveryDialogOpen, setDeliveryDialogOpen] = useState(false);
   const [receiptDialogOpen, setReceiptDialogOpen] = useState(false);
+  const [purchaseDialogOpen, setPurchaseDialogOpen] = useState(false);
+  const navigate = useNavigate();
   
   const { 
     useAssetRequestItems, 
@@ -74,7 +78,8 @@ export function AssetRequestDetailsDialog({
     return userRoles.some((ur: any) => roles.includes(ur.role));
   };
 
-  const canMarkAsDelivered = request.status === 'approved' && hasAnyRole(['procurement', 'admin']);
+  const canConfirmPurchase = request.status === 'approved' && hasAnyRole(['procurement', 'admin']);
+  const canMarkAsDelivered = request.status === 'purchased' && hasAnyRole(['procurement', 'admin']);
   const canConfirmReceipt = request.status === 'pending_receipt';
   const latestDelivery = deliveries[0];
 
@@ -83,7 +88,8 @@ export function AssetRequestDetailsDialog({
       draft: "bg-muted text-muted-foreground",
       pending_hod_approval: "bg-warning/10 text-warning border-warning/20",
       pending_procurement_approval: "bg-blue-500/10 text-blue-500 border-blue-500/20",
-      approved: "bg-success/10 text-success border-success/20",
+      approved: "bg-green-500/10 text-green-500 border-green-500/20",
+      purchased: "bg-purple-500/10 text-purple-500 border-purple-500/20",
       rejected: "bg-destructive/10 text-destructive border-destructive/20",
       fulfilled: "bg-success/20 text-success border-success/30",
       partially_fulfilled: "bg-warning/10 text-warning border-warning/20",
@@ -226,6 +232,23 @@ export function AssetRequestDetailsDialog({
                       </div>
                     )}
 
+                    {/* Purchase Confirmation */}
+                    {request.purchased_by && (
+                      <div className="flex items-start gap-3">
+                        <CheckCircle className="h-5 w-5 text-purple-500 mt-0.5" />
+                        <div>
+                          <p className="font-medium">✓ Items Purchased</p>
+                          <p className="text-sm text-muted-foreground">
+                            {request.purchased_date &&
+                              format(new Date(request.purchased_date), "PPp")}
+                          </p>
+                          {request.purchase_notes && (
+                            <p className="text-sm mt-1 italic">{request.purchase_notes}</p>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
                     {/* Delivery Status */}
                     {(request.status === 'pending_delivery' || request.status === 'pending_receipt' || request.status === 'fulfilled') && deliveries.length > 0 && (
                       <div className="flex items-start gap-3">
@@ -249,7 +272,18 @@ export function AssetRequestDetailsDialog({
                           <p className="text-sm text-muted-foreground">
                             {format(new Date(request.fulfilled_date), "PPp")}
                           </p>
-                          <p className="text-sm mt-1 text-success">Assets have been created and transferred to department</p>
+                          <Button
+                            variant="link"
+                            size="sm"
+                            className="h-auto p-0 text-blue-500"
+                            onClick={() => {
+                              navigate('/warehouse/asset-management');
+                              onOpenChange(false);
+                            }}
+                          >
+                            <ExternalLink className="h-3 w-3 mr-1" />
+                            View Created Assets
+                          </Button>
                         </div>
                       </div>
                     )}
@@ -391,6 +425,13 @@ export function AssetRequestDetailsDialog({
                 </>
               )}
 
+              {canConfirmPurchase && (
+                <Button onClick={() => setPurchaseDialogOpen(true)}>
+                  <ShoppingCart className="h-4 w-4 mr-2" />
+                  Confirm Purchase
+                </Button>
+              )}
+
               {canMarkAsDelivered && (
                 <Button onClick={() => setDeliveryDialogOpen(true)}>
                   <Package className="h-4 w-4 mr-2" />
@@ -408,6 +449,20 @@ export function AssetRequestDetailsDialog({
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Purchase Confirmation Dialog */}
+      <PurchaseConfirmationDialog
+        request={request}
+        open={purchaseDialogOpen}
+        onOpenChange={(open) => {
+          setPurchaseDialogOpen(open);
+          if (!open) {
+            refetchItems();
+            refetchHistory();
+            refetchDeliveries();
+          }
+        }}
+      />
 
       {/* Delivery Dialog */}
       <DeliveryDialog

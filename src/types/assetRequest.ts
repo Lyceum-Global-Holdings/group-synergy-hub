@@ -3,6 +3,7 @@ export type AssetRequestStatus =
   | 'pending_hod_approval' 
   | 'pending_procurement_approval'
   | 'approved' 
+  | 'purchased'
   | 'rejected' 
   | 'fulfilled'
   | 'partially_fulfilled'
@@ -31,6 +32,7 @@ export type WorkflowStage =
   | 'hod_rejected'
   | 'procurement_approved'
   | 'procurement_rejected'
+  | 'items_purchased'
   | 'delivered'
   | 'received'
   | 'fulfilled'
@@ -49,6 +51,7 @@ export interface AssetRequest {
   requested_by: string | null;
   requester_name: string;
   department: string | null;
+  department_id: string | null;
   contact_number: string | null;
   purpose: string;
   justification: string | null;
@@ -61,6 +64,9 @@ export interface AssetRequest {
   procurement_approved_by: string | null;
   procurement_approval_date: string | null;
   procurement_comments: string | null;
+  purchased_date: string | null;
+  purchased_by: string | null;
+  purchase_notes: string | null;
   rejection_reason: string | null;
   fulfilled_date: string | null;
   fulfilled_by: string | null;

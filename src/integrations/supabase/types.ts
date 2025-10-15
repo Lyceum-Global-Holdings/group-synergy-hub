@@ -624,6 +624,9 @@ export type Database = {
           procurement_approval_date: string | null
           procurement_approved_by: string | null
           procurement_comments: string | null
+          purchase_notes: string | null
+          purchased_by: string | null
+          purchased_date: string | null
           purpose: string
           rejection_reason: string | null
           request_date: string
@@ -654,6 +657,9 @@ export type Database = {
           procurement_approval_date?: string | null
           procurement_approved_by?: string | null
           procurement_comments?: string | null
+          purchase_notes?: string | null
+          purchased_by?: string | null
+          purchased_date?: string | null
           purpose: string
           rejection_reason?: string | null
           request_date?: string
@@ -684,6 +690,9 @@ export type Database = {
           procurement_approval_date?: string | null
           procurement_approved_by?: string | null
           procurement_comments?: string | null
+          purchase_notes?: string | null
+          purchased_by?: string | null
+          purchased_date?: string | null
           purpose?: string
           rejection_reason?: string | null
           request_date?: string
@@ -8596,6 +8605,8 @@ export type Database = {
           purchase_price: number | null
           salvage_value: number | null
           serial_number: string | null
+          source_request_id: string | null
+          source_request_number: string | null
           status: string
           subcategory_id: string | null
           sublocation_id: string | null
@@ -8628,6 +8639,8 @@ export type Database = {
           purchase_price?: number | null
           salvage_value?: number | null
           serial_number?: string | null
+          source_request_id?: string | null
+          source_request_number?: string | null
           status?: string
           subcategory_id?: string | null
           sublocation_id?: string | null
@@ -8660,6 +8673,8 @@ export type Database = {
           purchase_price?: number | null
           salvage_value?: number | null
           serial_number?: string | null
+          source_request_id?: string | null
+          source_request_number?: string | null
           status?: string
           subcategory_id?: string | null
           sublocation_id?: string | null
@@ -8693,6 +8708,13 @@ export type Database = {
             columns: ["location_id"]
             isOneToOne: false
             referencedRelation: "warehouse_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "warehouse_assets_source_request_id_fkey"
+            columns: ["source_request_id"]
+            isOneToOne: false
+            referencedRelation: "asset_requests"
             referencedColumns: ["id"]
           },
           {
@@ -9092,7 +9114,10 @@ export type Database = {
       }
       create_assets_from_request: {
         Args: { p_request_id: string }
-        Returns: undefined
+        Returns: {
+          asset_code: string
+          asset_id: string
+        }[]
       }
       create_user_with_roles: {
         Args: {
@@ -9561,6 +9586,7 @@ export type Database = {
         | "cancelled"
         | "purchased"
         | "returned"
+        | "items_purchased"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -9994,6 +10020,7 @@ export const Constants = {
         "cancelled",
         "purchased",
         "returned",
+        "items_purchased",
       ],
     },
   },

@@ -385,6 +385,64 @@ export const useAssetRequests = (filters?: { status?: AssetRequestStatus }) => {
     }
   });
 
+  // Confirm purchase (after procurement approval)
+  const confirmPurchaseMutation = useMutation({
+    mutationFn: async (data: { 
+      request_id: string; 
+      purchase_date: string; 
+      purchase_notes?: string;
+      item_details?: Array<{
+        item_id: string;
+        vendor: string | null;
+        po_reference: string | null;
+      }>;
+    }) => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User not authenticated');
+
+      // Update request status to purchased
+      const { error: updateError } = await supabase
+        .from('asset_requests')
+        .update({ 
+          status: 'purchased',
+          purchased_date: data.purchase_date,
+          purchased_by: user.id,
+          purchase_notes: data.purchase_notes
+        })
+        .eq('id', data.request_id);
+
+      if (updateError) throw updateError;
+
+      // Create workflow history entry
+      const { error: historyError } = await supabase
+        .from('asset_request_workflow_history')
+        .insert({
+          request_id: data.request_id,
+          workflow_stage: 'items_purchased',
+          performed_by: user.id,
+          comments: data.purchase_notes || 'Items purchased and ready for delivery'
+        });
+
+      if (historyError) throw historyError;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['asset-requests'] });
+      queryClient.invalidateQueries({ queryKey: ['workflow-history'] });
+      toast({
+        title: "Success",
+        description: "Purchase confirmed. Items are ready for delivery.",
+      });
+    },
+    onError: (error) => {
+      console.error('Error confirming purchase:', error);
+      toast({
+        title: "Error",
+        description: "Failed to confirm purchase",
+        variant: "destructive",
+      });
+    }
+  });
+
   // Mark as delivered
   const markAsDeliveredMutation = useMutation({
     mutationFn: async (data: MarkAsDeliveredData) => {
@@ -615,13 +673,18 @@ export const useAssetRequests = (filters?: { status?: AssetRequestStatus }) => {
     deleteAssetRequestItem: deleteAssetRequestItemMutation.mutate,
     approveAssetRequest: approveAssetRequestMutation.mutate,
     submitAssetRequest: submitAssetRequestMutation.mutate,
+    confirmPurchase: confirmPurchaseMutation.mutate,
     markAsDelivered: markAsDeliveredMutation.mutate,
     confirmReceipt: confirmReceiptMutation.mutate,
     isCreating: createAssetRequestMutation.isPending,
     isUpdating: updateAssetRequestMutation.isPending,
     isDeleting: deleteAssetRequestMutation.isPending,
+    isCreatingItem: createAssetRequestItemMutation.isPending,
+    isUpdatingItem: updateAssetRequestItemMutation.isPending,
+    isDeletingItem: deleteAssetRequestItemMutation.isPending,
     isApproving: approveAssetRequestMutation.isPending,
     isSubmitting: submitAssetRequestMutation.isPending,
+    isConfirmingPurchase: confirmPurchaseMutation.isPending,
     isMarkingAsDelivered: markAsDeliveredMutation.isPending,
     isConfirmingReceipt: confirmReceiptMutation.isPending,
   };
