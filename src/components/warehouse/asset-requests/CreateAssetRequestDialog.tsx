@@ -1,4 +1,4 @@
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -6,6 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useAssetRequests } from "@/hooks/useAssetRequests";
+import { useAssetMaster } from "@/hooks/useAssetMaster";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
@@ -33,6 +34,7 @@ interface RequestItem {
 export const CreateAssetRequestDialog = ({ open, onOpenChange }: CreateAssetRequestDialogProps) => {
   const { toast } = useToast();
   const { createRequest, isCreating } = useAssetRequests();
+  const { assetMasterItems } = useAssetMaster();
   
   const [requesterName, setRequesterName] = useState("");
   const [department, setDepartment] = useState("");
@@ -60,6 +62,12 @@ export const CreateAssetRequestDialog = ({ open, onOpenChange }: CreateAssetRequ
   const handleItemChange = (index: number, field: keyof RequestItem, value: any) => {
     const newItems = [...items];
     newItems[index] = { ...newItems[index], [field]: value };
+    
+    // Log for debugging
+    if (field === "asset_master_id") {
+      console.log("Row", index, "set asset_master_id", value);
+    }
+    
     setItems(newItems);
   };
 
@@ -73,10 +81,19 @@ export const CreateAssetRequestDialog = ({ open, onOpenChange }: CreateAssetRequ
       return;
     }
 
-    if (items.length === 0 || items.some(item => !item.item_name || item.quantity_requested <= 0)) {
+    // Improved validation: accept asset_master_id for "from_master" type
+    const hasInvalidItems = items.some(item => {
+      const hasValidQuantity = item.quantity_requested > 0;
+      if (item.request_type === "from_master") {
+        return !item.asset_master_id || !hasValidQuantity;
+      }
+      return !item.item_name || !hasValidQuantity;
+    });
+
+    if (items.length === 0 || hasInvalidItems) {
       toast({
         title: "Validation Error",
-        description: "Please add at least one valid item",
+        description: "Please add at least one valid item with quantity",
         variant: "destructive"
       });
       return;
@@ -94,10 +111,21 @@ export const CreateAssetRequestDialog = ({ open, onOpenChange }: CreateAssetRequ
       request_date: new Date().toISOString().split('T')[0]
     };
 
-    const itemsWithLineNumbers = items.map((item, index) => ({
-      ...item,
-      line_number: index + 1
-    }));
+    // Backfill item_name and brand from asset master if missing
+    const itemsWithLineNumbers = items.map((item, index) => {
+      const lineItem = { ...item, line_number: index + 1 };
+      
+      // If selecting from master but name is missing, look it up
+      if (item.request_type === "from_master" && item.asset_master_id && !item.item_name) {
+        const assetMaster = assetMasterItems.find(a => a.id === item.asset_master_id);
+        if (assetMaster) {
+          lineItem.item_name = assetMaster.asset_name;
+          lineItem.brand = assetMaster.brand || undefined;
+        }
+      }
+      
+      return lineItem;
+    });
 
     createRequest(
       { request, items: itemsWithLineNumbers },
@@ -127,6 +155,9 @@ export const CreateAssetRequestDialog = ({ open, onOpenChange }: CreateAssetRequ
       <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Create Asset Request</DialogTitle>
+          <DialogDescription className="sr-only">
+            Fill in request details and add assets to create a new asset request
+          </DialogDescription>
         </DialogHeader>
         
         <div className="space-y-6">

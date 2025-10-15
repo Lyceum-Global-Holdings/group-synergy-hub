@@ -35,6 +35,7 @@ export function AssetMasterSelector({
 
   const handleSelect = (assetId: string) => {
     const asset = assetMasterItems.find((item) => item.id === assetId);
+    console.log("Asset selected:", assetId, asset?.asset_name);
     onValueChange(assetId);
     onAssetSelected?.(asset || null);
     setOpen(false);
