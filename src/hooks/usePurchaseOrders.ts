@@ -68,7 +68,7 @@ export function usePurchaseOrder(id: string) {
               po_item:po_items(item_name, unit_of_measure)
             )
           ),
-          grns:goods_receipt_notes(
+          grns:goods_receipt_notes!goods_receipt_notes_po_id_fkey(
             id,
             grn_number,
             grn_date,
@@ -78,8 +78,8 @@ export function usePurchaseOrder(id: string) {
             received_by,
             approved_by,
             approved_date,
-          received_by_profile:profiles!goods_receipt_notes_received_by_fkey(full_name, email),
-          approved_by_profile:profiles!goods_receipt_notes_approved_by_fkey(full_name, email),
+            received_by_profile:profiles!goods_receipt_notes_received_by_profile_fkey(full_name, email),
+            approved_by_profile:profiles!goods_receipt_notes_approved_by_profile_fkey(full_name, email),
             grn_items(
               id,
               item_name,
@@ -96,13 +96,47 @@ export function usePurchaseOrder(id: string) {
       if (error) throw error;
       
       // Calculate quantity_pending for items
-      const poWithPending = {
+      let poWithPending = {
         ...data,
         items: data.items?.map(item => ({
           ...item,
           quantity_pending: (item.quantity_ordered || 0) - (item.quantity_received || 0)
         }))
       };
+
+      // Fallback: if no GRNs found via po_id, try fetching by po_number
+      if (!poWithPending.grns || poWithPending.grns.length === 0) {
+        const { data: legacyGrns } = await supabase
+          .from('goods_receipt_notes')
+          .select(`
+            id,
+            grn_number,
+            grn_date,
+            status,
+            invoice_number,
+            total_value,
+            received_by,
+            approved_by,
+            approved_date,
+            received_by_profile:profiles!goods_receipt_notes_received_by_profile_fkey(full_name, email),
+            approved_by_profile:profiles!goods_receipt_notes_approved_by_profile_fkey(full_name, email),
+            grn_items(
+              id,
+              item_name,
+              quantity_received,
+              unit_price,
+              total_cost,
+              quality_status
+            )
+          `)
+          .eq('po_number', data.po_number);
+
+        if (legacyGrns && legacyGrns.length > 0) {
+          poWithPending.grns = legacyGrns;
+        }
+      }
+
+      console.log('[usePurchaseOrder] GRNs count:', poWithPending.grns?.length, 'PO:', data.po_number);
       
       return poWithPending as PurchaseOrder;
     },
