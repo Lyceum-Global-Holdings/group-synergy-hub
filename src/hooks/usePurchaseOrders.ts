@@ -78,8 +78,8 @@ export function usePurchaseOrder(id: string) {
             received_by,
             approved_by,
             approved_date,
-            received_by_profile:profiles!goods_receipt_notes_received_by_fkey(full_name, email),
-            approved_by_profile:profiles!goods_receipt_notes_approved_by_fkey(full_name, email),
+          received_by_profile:profiles!received_by(full_name, email),
+          approved_by_profile:profiles!approved_by(full_name, email),
             grn_items(
               id,
               item_name,
