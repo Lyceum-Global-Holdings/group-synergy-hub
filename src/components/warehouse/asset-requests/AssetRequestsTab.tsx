@@ -40,9 +40,7 @@ export const AssetRequestsTab = () => {
       approved: { variant: "default", label: "Approved" },
       purchased: { variant: "default", label: "Purchased" },
       pending_delivery: { variant: "outline", label: "Pending Delivery" },
-      delivered: { variant: "outline", label: "Delivered" },
       pending_receipt: { variant: "outline", label: "Pending Receipt" },
-      received: { variant: "default", label: "Received" },
       fulfilled: { variant: "default", label: "Fulfilled" },
       partially_fulfilled: { variant: "secondary", label: "Partially Fulfilled" },
       rejected: { variant: "destructive", label: "Rejected" },
@@ -116,8 +114,8 @@ export const AssetRequestsTab = () => {
             <SelectItem value="pending_hod_approval">Pending HOD</SelectItem>
             <SelectItem value="approved">Approved</SelectItem>
             <SelectItem value="purchased">Purchased</SelectItem>
-            <SelectItem value="delivered">Delivered</SelectItem>
-            <SelectItem value="received">Received</SelectItem>
+            <SelectItem value="pending_delivery">Pending Delivery</SelectItem>
+            <SelectItem value="pending_receipt">Pending Receipt</SelectItem>
             <SelectItem value="fulfilled">Fulfilled</SelectItem>
             <SelectItem value="rejected">Rejected</SelectItem>
           </SelectContent>

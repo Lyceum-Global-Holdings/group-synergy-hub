@@ -1086,6 +1086,10 @@ export default function AssetManagement() {
           <AssetMasterTab />
         </TabsContent>
 
+        <TabsContent value="asset-requests" className="space-y-6 mt-6">
+          <AssetRequestsTab />
+        </TabsContent>
+
         <TabsContent value="analytics" className="mt-6">
           <AssetAnalytics 
             assets={assets}

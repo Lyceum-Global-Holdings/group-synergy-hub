@@ -31,7 +31,7 @@ export const useAssetRequests = () => {
     }) => {
       const { data: requestData, error: requestError } = await supabase
         .from("asset_requests")
-        .insert([values.request])
+        .insert([values.request as any])
         .select()
         .single();
 
@@ -46,7 +46,7 @@ export const useAssetRequests = () => {
 
         const { error: itemsError } = await supabase
           .from("asset_request_items")
-          .insert(itemsWithRequestId);
+          .insert(itemsWithRequestId as any);
 
         if (itemsError) throw itemsError;
       }
@@ -92,7 +92,7 @@ export const useAssetRequests = () => {
 
         const { error: itemsError } = await supabase
           .from("asset_request_items")
-          .insert(itemsWithRequestId);
+          .insert(itemsWithRequestId as any);
 
         if (itemsError) throw itemsError;
       }
@@ -363,7 +363,7 @@ export const useAssetRequests = () => {
 
       const { error } = await supabase
         .from("asset_requests")
-        .update({ status: "delivered" })
+        .update({ status: "pending_receipt" })
         .eq("id", values.id);
 
       if (error) throw error;
@@ -399,10 +399,10 @@ export const useAssetRequests = () => {
 
       if (requestError) throw requestError;
 
-      // Update request status
+      // Update request status to fulfilled (since we're accepting receipt)
       const { error: updateError } = await supabase
         .from("asset_requests")
-        .update({ status: "received" })
+        .update({ status: "fulfilled" })
         .eq("id", values.id);
 
       if (updateError) throw updateError;
