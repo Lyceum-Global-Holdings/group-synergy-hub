@@ -1,14 +1,23 @@
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Separator } from "@/components/ui/separator";
 import { Printer, Download } from "lucide-react";
 import { format } from "date-fns";
+import { useMemo } from "react";
 
 interface DeliveryNoteDocumentProps {
   issueId: string;
   issueDetails: any;
   issueItems: any[];
+}
+
+interface GroupedItem {
+  productName: string;
+  productCode: string;
+  color: string;
+  sizes: Array<{
+    size: string;
+    quantity: number;
+  }>;
+  subtotal: number;
 }
 
 export function DeliveryNoteDocument({ issueId, issueDetails, issueItems }: DeliveryNoteDocumentProps) {
@@ -19,6 +28,39 @@ export function DeliveryNoteDocument({ issueId, issueDetails, issueItems }: Deli
   const handleDownloadPDF = () => {
     window.print();
   };
+
+  // Group items by product and color
+  const groupedItems = useMemo(() => {
+    const groups: { [key: string]: GroupedItem } = {};
+    
+    issueItems?.forEach(item => {
+      const fg = item.finished_good || {};
+      const key = `${fg.product_name}_${fg.color || 'N/A'}`;
+      
+      if (!groups[key]) {
+        groups[key] = {
+          productName: fg.product_name || 'N/A',
+          productCode: fg.product_code || '',
+          color: fg.color || 'N/A',
+          sizes: [],
+          subtotal: 0
+        };
+      }
+      
+      groups[key].sizes.push({
+        size: fg.size || 'N/A',
+        quantity: item.quantity_issued || 0
+      });
+      groups[key].subtotal += item.quantity_issued || 0;
+    });
+    
+    return Object.values(groups);
+  }, [issueItems]);
+
+  const totalQuantity = useMemo(() => 
+    issueItems?.reduce((sum, item) => sum + (item.quantity_issued || 0), 0) || 0,
+    [issueItems]
+  );
 
   return (
     <div className="delivery-note-document">
@@ -34,188 +76,381 @@ export function DeliveryNoteDocument({ issueId, issueDetails, issueItems }: Deli
         </Button>
       </div>
 
-      {/* Document content - styled for printing */}
-      <div className="bg-background p-8 print:p-0">
-        <Card className="print:shadow-none print:border-0">
-          <CardHeader className="text-center space-y-4">
-            <div>
-              <h1 className="text-3xl font-bold">DELIVERY NOTE</h1>
-              <p className="text-muted-foreground mt-2">Goods Issue Document</p>
+      <div className="page">
+        {/* Top header */}
+        <div className="header">
+          <div>
+            <div className="brand">
+              <div className="logo">TUH</div>
+              <div>
+                <h1>THE UNIFORM HUB</h1>
+                <small>THE UNIFORM HUB</small>
+              </div>
             </div>
+            <div className="company">
+              <div><strong>THE UNIFORM HUB (PVT) LIMITED</strong></div>
+              <div>Lyceum Fulfilment Centre, Kurunegala, Sri Lanka</div>
+              <div>+94 76 5400 700</div>
+              <div>info@tuh.lk</div>
+            </div>
+          </div>
+
+          <div>
+            <h2 className="doc-title">DELIVERY NOTE</h2>
+            <table className="meta" aria-label="Document Meta">
+              <tbody>
+                <tr>
+                  <td className="key">Order Date</td>
+                  <td>{issueDetails?.sales_orders?.order_date ? format(new Date(issueDetails.sales_orders.order_date), 'MMMM dd, yyyy') : ''}</td>
+                </tr>
+                <tr>
+                  <td className="key">Order #</td>
+                  <td>{issueDetails?.sales_orders?.order_number || ''}</td>
+                </tr>
+                <tr>
+                  <td className="key">Delivery Note #</td>
+                  <td>{issueDetails?.issue_number || ''}</td>
+                </tr>
+                <tr>
+                  <td className="key">Gate pass NO</td>
+                  <td></td>
+                </tr>
+                <tr>
+                  <td className="key">Dispatch Date</td>
+                  <td>{issueDetails?.issue_date ? format(new Date(issueDetails.issue_date), 'MMMM dd, yyyy') : ''}</td>
+                </tr>
+                <tr>
+                  <td className="key">Delivery Method</td>
+                  <td></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* Addresses */}
+        <div className="addr-grid">
+          <div>
+            <div className="bar">SHIPPING ADDRESS</div>
+            <table className="addr-table">
+              <tbody>
+                {issueDetails?.sales_orders?.delivery_address ? (
+                  issueDetails.sales_orders.delivery_address.split(',').slice(0, 4).map((line: string, i: number) => (
+                    <tr key={i}>
+                      <td className="caps">{line.trim()}</td>
+                    </tr>
+                  ))
+                ) : (
+                  <>
+                    <tr><td className="caps">THE UNIFORM HUB (PVT) LIMITED</td></tr>
+                    <tr><td className="caps">IHALAGAMA,</td></tr>
+                    <tr><td className="caps">WILBAWA,</td></tr>
+                    <tr><td className="caps">KURUNEGALA.</td></tr>
+                  </>
+                )}
+              </tbody>
+            </table>
+          </div>
+          <div>
+            <div className="bar">INVOICE ADDRESS</div>
+            <table className="addr-table">
+              <tbody>
+                <tr><td className="right caps">{issueDetails?.sales_orders?.customers?.customer_name?.toUpperCase() || ''}</td></tr>
+                <tr><td className="right caps">{issueDetails?.sales_orders?.customers?.address?.toUpperCase() || ''}</td></tr>
+                <tr><td className="right caps">{issueDetails?.sales_orders?.customers?.phone || ''}</td></tr>
+                <tr><td className="right caps">{issueDetails?.sales_orders?.customers?.email || ''}</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* Items */}
+        <table className="items" aria-label="Items">
+          <thead>
+            <tr>
+              <th style={{width: '24%'}}>Item</th>
+              <th style={{width: '16%'}}>Colour</th>
+              <th>Description</th>
+              <th style={{width: '10%'}}>Size</th>
+              <th style={{width: '10%'}}>QTY</th>
+            </tr>
+          </thead>
+          <tbody>
+            {groupedItems.map((group, groupIndex) => (
+              <>
+                {group.sizes.map((sizeItem, sizeIndex) => (
+                  <tr key={`${groupIndex}-${sizeIndex}`}>
+                    <td className={sizeIndex === 0 ? "caps bold" : ""}>
+                      {sizeIndex === 0 ? group.productName : ''}
+                    </td>
+                    <td className={sizeIndex === 0 ? "caps" : ""}>
+                      {sizeIndex === 0 ? group.color : ''}
+                    </td>
+                    <td className={sizeIndex === 0 ? "caps bold" : ""}>
+                      {sizeIndex === 0 ? group.productName : ''}
+                    </td>
+                    <td className={sizeIndex === 0 ? "caps bold center" : "caps center"}>
+                      {sizeItem.size}
+                    </td>
+                    <td className={sizeIndex === 0 ? "right bold" : "right"}>
+                      {sizeItem.quantity}
+                    </td>
+                  </tr>
+                ))}
+              </>
+            ))}
             
-            <div className="grid grid-cols-2 gap-4 text-left text-sm">
-              <div>
-                <p className="font-semibold">Issue Number:</p>
-                <p className="text-lg">{issueDetails?.issue_number}</p>
-              </div>
-              <div>
-                <p className="font-semibold">Issue Date:</p>
-                <p>{issueDetails?.issue_date ? format(new Date(issueDetails.issue_date), 'PPP') : 'N/A'}</p>
-              </div>
-            </div>
-          </CardHeader>
+            <tr>
+              <td colSpan={4} className="right bold caps">TOTAL</td>
+              <td className="right bold">{totalQuantity}</td>
+            </tr>
+          </tbody>
+        </table>
 
-          <CardContent className="space-y-6">
-            {/* Customer & Order Information */}
-            <div className="grid grid-cols-2 gap-6">
-              <div className="space-y-2">
-                <h3 className="font-semibold text-sm uppercase text-muted-foreground">Customer Details</h3>
-                <div className="space-y-1">
-                  <p className="font-medium">{issueDetails?.sales_orders?.customers?.customer_name || 'N/A'}</p>
-                  <p className="text-sm text-muted-foreground">
-                    {issueDetails?.sales_orders?.customers?.email || ''}
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    {issueDetails?.sales_orders?.customers?.phone || ''}
-                  </p>
-                </div>
-              </div>
+        {/* Notes */}
+        <div className="notes">
+          <p>
+            Notice must be given to us of any goods not received within 10 days taken from the date of dispatch stated on invoice.
+            Any shortage or damage must be notified within 72 hours of receipt of goods. Complaints can only be accepted if made in
+            writing within 30 days of receipt of goods. No goods may be returned without prior authorisation from company.
+          </p>
+        </div>
 
-              <div className="space-y-2">
-                <h3 className="font-semibold text-sm uppercase text-muted-foreground">Sales Order</h3>
-                <div className="space-y-1">
-                  <p className="font-medium">{issueDetails?.sales_orders?.order_number || 'N/A'}</p>
-                  <p className="text-sm text-muted-foreground">
-                    Order Date: {issueDetails?.sales_orders?.order_date 
-                      ? format(new Date(issueDetails.sales_orders.order_date), 'PP') 
-                      : 'N/A'}
-                  </p>
-                </div>
-              </div>
-            </div>
+        {/* Thank you bar */}
+        <div className="thankyou">THANK YOU FOR YOUR BUSINESS!</div>
+        <div className="tiny">This is a computer generated statement and no signature is required</div>
 
-            <Separator />
-
-            {/* Delivery Address */}
-            <div className="space-y-2">
-              <h3 className="font-semibold text-sm uppercase text-muted-foreground">Delivery Address</h3>
-              <p className="text-sm">{issueDetails?.sales_orders?.delivery_address || 'N/A'}</p>
-            </div>
-
-            <Separator />
-
-            {/* Items Table */}
-            <div className="space-y-2">
-              <h3 className="font-semibold text-sm uppercase text-muted-foreground">Items Issued</h3>
-              <div className="border rounded-md">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-12">#</TableHead>
-                      <TableHead>Product Name</TableHead>
-                      <TableHead>Product Code</TableHead>
-                      <TableHead className="text-center">Quantity</TableHead>
-                      <TableHead>Batch Number</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {issueItems?.map((item, index) => (
-                      <TableRow key={item.id}>
-                        <TableCell>{index + 1}</TableCell>
-                        <TableCell className="font-medium">
-                          {item.finished_good?.product_name || 'N/A'}
-                        </TableCell>
-                        <TableCell>{item.finished_good?.product_code || 'N/A'}</TableCell>
-                        <TableCell className="text-center">{item.quantity_issued}</TableCell>
-                        <TableCell>{item.batch_number || '-'}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            </div>
-
-            {/* Notes */}
-            {issueDetails?.notes && (
-              <>
-                <Separator />
-                <div className="space-y-2">
-                  <h3 className="font-semibold text-sm uppercase text-muted-foreground">Notes</h3>
-                  <p className="text-sm whitespace-pre-wrap">{issueDetails.notes}</p>
-                </div>
-              </>
-            )}
-
-            {/* Acceptance Information */}
-            {issueDetails?.accepted_at && (
-              <>
-                <Separator />
-                <div className="space-y-2">
-                  <h3 className="font-semibold text-sm uppercase text-muted-foreground">Acceptance Details</h3>
-                  <div className="grid grid-cols-2 gap-4 text-sm">
-                    <div>
-                      <p className="text-muted-foreground">Accepted Date:</p>
-                      <p className="font-medium">
-                        {format(new Date(issueDetails.accepted_at), 'PPP p')}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </>
-            )}
-
-            <Separator />
-
-            {/* Vehicle & Driver Information */}
-            <div className="space-y-4">
-              <h3 className="font-semibold text-sm uppercase text-muted-foreground">Transport Details</h3>
-              <div className="grid grid-cols-2 gap-6">
-                <div className="space-y-1">
-                  <p className="text-sm text-muted-foreground">Vehicle Number:</p>
-                  <div className="border-b border-dashed border-muted-foreground/40 py-2">
-                    <span className="text-sm">_________________________________</span>
-                  </div>
-                </div>
-                <div className="space-y-1">
-                  <p className="text-sm text-muted-foreground">Driver Name:</p>
-                  <div className="border-b border-dashed border-muted-foreground/40 py-2">
-                    <span className="text-sm">_________________________________</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <Separator />
-
-            {/* Signature Section */}
-            <div className="grid grid-cols-3 gap-6 pt-8">
-              <div className="space-y-2">
-                <div className="border-b border-muted-foreground/40 pb-2 mb-2 h-16"></div>
-                <div className="space-y-1">
-                  <p className="text-sm font-medium">Issued By</p>
-                  <p className="text-xs text-muted-foreground">Name & Signature</p>
-                </div>
-              </div>
-              
-              <div className="space-y-2">
-                <div className="border-b border-muted-foreground/40 pb-2 mb-2 h-16"></div>
-                <div className="space-y-1">
-                  <p className="text-sm font-medium">Delivered By</p>
-                  <p className="text-xs text-muted-foreground">Driver Signature</p>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <div className="border-b border-muted-foreground/40 pb-2 mb-2 h-16"></div>
-                <div className="space-y-1">
-                  <p className="text-sm font-medium">Received By</p>
-                  <p className="text-xs text-muted-foreground">Customer Signature & Date</p>
-                </div>
-              </div>
-            </div>
-
-            {/* Footer */}
-            <Separator />
-            <div className="text-center text-xs text-muted-foreground pt-4">
-              <p>This is a computer-generated delivery note.</p>
-              <p className="mt-1">Please verify all items upon receipt and report any discrepancies immediately.</p>
-            </div>
-          </CardContent>
-        </Card>
+        {/* Acceptance */}
+        <table className="accept" aria-label="Acceptance">
+          <tbody>
+            <tr>
+              <td className="w-40">STOCK ACCEPTED BY</td>
+              <td>NIC NO.</td>
+              <td>VEHICLE NO</td>
+              <td>SIGNATURE</td>
+            </tr>
+            <tr>
+              <td style={{height: '56px'}}></td>
+              <td></td>
+              <td></td>
+              <td></td>
+            </tr>
+          </tbody>
+        </table>
       </div>
 
       {/* Print-specific styles */}
       <style>{`
+        :root {
+          --brand: #2b6dbb;
+          --ink: #0f172a;
+          --muted: #6b7280;
+          --line: #d1d5db;
+          --lite: #eef2f7;
+        }
+
+        .delivery-note-document .page {
+          width: 210mm;
+          min-height: 297mm;
+          padding: 18mm 16mm 16mm;
+          margin: 0 auto;
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
+        }
+
+        .delivery-note-document .header {
+          display: grid;
+          grid-template-columns: 1fr 52%;
+          align-items: start;
+          column-gap: 16px;
+        }
+
+        .delivery-note-document .brand {
+          display: flex;
+          gap: 14px;
+          align-items: flex-start;
+        }
+
+        .delivery-note-document .logo {
+          border: 2px solid var(--ink);
+          width: 64px;
+          height: 64px;
+          display: grid;
+          place-items: center;
+          font-weight: 800;
+          letter-spacing: 0.06em;
+        }
+
+        .delivery-note-document .brand h1 {
+          margin: 0;
+          font-size: 34px;
+          letter-spacing: 0.08em;
+          font-weight: 800;
+        }
+
+        .delivery-note-document .brand small {
+          display: block;
+          margin-top: 2px;
+          color: var(--muted);
+          letter-spacing: 0.18em;
+        }
+
+        .delivery-note-document .company {
+          margin-top: 8px;
+          font-size: 13px;
+          line-height: 1.45;
+        }
+
+        .delivery-note-document .doc-title {
+          text-align: right;
+          font-size: 32px;
+          letter-spacing: 0.06em;
+          color: var(--brand);
+          font-weight: 800;
+          margin: 0 0 8px;
+        }
+
+        .delivery-note-document .meta {
+          border: 1px solid var(--ink);
+          border-collapse: collapse;
+          width: 100%;
+          font-size: 12.5px;
+        }
+
+        .delivery-note-document .meta td {
+          border: 1px solid var(--ink);
+          padding: 6px 8px;
+        }
+
+        .delivery-note-document .meta td.key {
+          width: 36%;
+          background: #f7f7f7;
+          font-weight: 600;
+        }
+
+        .delivery-note-document .bar {
+          background: var(--brand);
+          color: #fff;
+          font-weight: 700;
+          font-size: 12.5px;
+          letter-spacing: 0.03em;
+          padding: 8px 10px;
+        }
+
+        .delivery-note-document .addr-grid {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 12px;
+        }
+
+        .delivery-note-document .addr-table {
+          width: 100%;
+          border: 1px solid var(--ink);
+          border-collapse: collapse;
+          font-size: 13px;
+        }
+
+        .delivery-note-document .addr-table td {
+          border: 1px solid var(--ink);
+          padding: 8px 10px;
+          height: 28px;
+          vertical-align: middle;
+        }
+
+        .delivery-note-document .addr-table .right {
+          text-align: right;
+          font-weight: 700;
+        }
+
+        .delivery-note-document .caps {
+          text-transform: uppercase;
+        }
+
+        .delivery-note-document .items {
+          width: 100%;
+          border-collapse: collapse;
+          font-size: 13px;
+        }
+
+        .delivery-note-document .items th,
+        .delivery-note-document .items td {
+          border: 1px solid var(--ink);
+          padding: 8px 10px;
+          vertical-align: middle;
+        }
+
+        .delivery-note-document .items thead th {
+          background: var(--brand);
+          color: #fff;
+          font-weight: 800;
+          letter-spacing: 0.02em;
+          text-transform: capitalize;
+          font-size: 12.5px;
+        }
+
+        .delivery-note-document .items tbody tr:nth-child(odd) {
+          background: var(--lite);
+        }
+
+        .delivery-note-document .items td.center {
+          text-align: center;
+        }
+
+        .delivery-note-document .items td.right {
+          text-align: right;
+        }
+
+        .delivery-note-document .items td.bold {
+          font-weight: 800;
+        }
+
+        .delivery-note-document .notes {
+          font-size: 12px;
+          line-height: 1.5;
+          margin-top: 8px;
+        }
+
+        .delivery-note-document .thankyou {
+          background: var(--brand);
+          color: #fff;
+          text-align: center;
+          font-weight: 800;
+          letter-spacing: 0.03em;
+          padding: 8px 10px;
+          margin-top: 8px;
+        }
+
+        .delivery-note-document .tiny {
+          text-align: center;
+          font-size: 11px;
+          color: #111;
+          margin-top: 2px;
+        }
+
+        .delivery-note-document .accept {
+          margin-top: 10px;
+          border: 1px solid var(--ink);
+          border-collapse: collapse;
+          width: 100%;
+          font-size: 12.5px;
+        }
+
+        .delivery-note-document .accept td {
+          border: 1px solid var(--ink);
+          padding: 8px 10px;
+          height: 36px;
+        }
+
+        .delivery-note-document .accept .w-40 {
+          width: 40%;
+        }
+
+        @page {
+          size: A4;
+          margin: 12mm;
+        }
+
         @media print {
           body * {
             visibility: hidden;
@@ -230,9 +465,9 @@ export function DeliveryNoteDocument({ issueId, issueDetails, issueItems }: Deli
             top: 0;
             width: 100%;
           }
-          @page {
-            size: A4;
-            margin: 1cm;
+          .delivery-note-document .page {
+            padding: 0;
+            min-height: auto;
           }
         }
       `}</style>
