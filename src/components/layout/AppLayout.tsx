@@ -5,10 +5,25 @@ import { UserProfile } from "@/components/common/UserProfile";
 import { Badge } from "@/components/ui/badge";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useSuperAdmin } from "@/hooks/useSuperAdmin";
+import { useCurrentUserProfile } from "@/hooks/useCurrentUserProfile";
+import { Loader2 } from "lucide-react";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
-  const { isViewingAllCompanies, companies = [] } = useCompany();
-  const { data: isSuperAdmin } = useSuperAdmin();
+  const { isViewingAllCompanies, companies, isLoading: isCompaniesLoading } = useCompany();
+  const { data: isSuperAdmin, isLoading: isSuperAdminLoading } = useSuperAdmin();
+  const { isLoading: isProfileLoading } = useCurrentUserProfile();
+  
+  // Wait for initial data to load
+  if (isProfileLoading || isCompaniesLoading || isSuperAdminLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="flex flex-col items-center space-y-4">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <p className="text-sm text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <SidebarProvider>

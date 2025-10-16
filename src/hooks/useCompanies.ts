@@ -18,6 +18,9 @@ export function useCompanies() {
   } = useQuery({
     queryKey: ['companies', isSuperAdmin, userProfile?.company_id],
     queryFn: async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return [];
+
       let query = supabase
         .from('companies')
         .select('*')
@@ -33,7 +36,6 @@ export function useCompanies() {
       if (error) throw error;
       return data as Company[];
     },
-    enabled: !!userProfile, // Only run when profile is loaded
   });
 
   const createCompanyMutation = useMutation({

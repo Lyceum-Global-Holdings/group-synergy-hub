@@ -15,34 +15,37 @@ const CompanyContext = createContext<CompanyContextType | undefined>(undefined);
 
 export function CompanyProvider({ children }: { children: ReactNode }) {
   const { companies = [], isLoading } = useCompanies();
-  const { data: isSuperAdmin } = useSuperAdmin();
+  const { data: isSuperAdmin, isLoading: isSuperAdminLoading } = useSuperAdmin();
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
   const [isViewingAllCompanies, setIsViewingAllCompanies] = useState(false);
+  
+  // Ensure companies is always an array
+  const safeCompanies = Array.isArray(companies) ? companies : [];
 
   // Auto-select company based on user's access
   useEffect(() => {
-    if (companies.length > 0 && !selectedCompany && !isViewingAllCompanies) {
+    if (safeCompanies.length > 0 && !selectedCompany && !isViewingAllCompanies && !isSuperAdminLoading) {
       // If user has only one company (not super admin), auto-select it
-      if (companies.length === 1) {
-        setSelectedCompany(companies[0]);
+      if (safeCompanies.length === 1) {
+        setSelectedCompany(safeCompanies[0]);
       } else if (isSuperAdmin) {
         // Super admin: default to TUH or first company
-        const uniformHub = companies.find(c => c.code === 'TUH');
-        const defaultCompany = uniformHub || companies[0];
+        const uniformHub = safeCompanies.find(c => c.code === 'TUH');
+        const defaultCompany = uniformHub || safeCompanies[0];
         setSelectedCompany(defaultCompany);
       }
     }
-  }, [companies, selectedCompany, isViewingAllCompanies, isSuperAdmin]);
+  }, [safeCompanies, selectedCompany, isViewingAllCompanies, isSuperAdmin, isSuperAdminLoading]);
 
   // Update selectedCompany when companies data changes (e.g., after module allocation update)
   useEffect(() => {
-    if (selectedCompany && companies.length > 0) {
-      const updatedCompany = companies.find(c => c.id === selectedCompany.id);
+    if (selectedCompany && safeCompanies.length > 0) {
+      const updatedCompany = safeCompanies.find(c => c.id === selectedCompany.id);
       if (updatedCompany && JSON.stringify(updatedCompany.modules) !== JSON.stringify(selectedCompany.modules)) {
         setSelectedCompany(updatedCompany);
       }
     }
-  }, [companies]);
+  }, [safeCompanies, selectedCompany]);
 
   const handleSetSelectedCompany = (company: Company | null) => {
     if (company === null) {
@@ -58,8 +61,8 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
     <CompanyContext.Provider value={{
       selectedCompany,
       setSelectedCompany: handleSetSelectedCompany,
-      companies: companies || [],
-      isLoading,
+      companies: safeCompanies,
+      isLoading: isLoading || isSuperAdminLoading,
       isViewingAllCompanies
     }}>
       {children}
