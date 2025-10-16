@@ -14,7 +14,7 @@ interface CompanyContextType {
 const CompanyContext = createContext<CompanyContextType | undefined>(undefined);
 
 export function CompanyProvider({ children }: { children: ReactNode }) {
-  const { companies, isLoading } = useCompanies();
+  const { companies = [], isLoading } = useCompanies();
   const { data: isSuperAdmin } = useSuperAdmin();
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
   const [isViewingAllCompanies, setIsViewingAllCompanies] = useState(false);
@@ -58,7 +58,7 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
     <CompanyContext.Provider value={{
       selectedCompany,
       setSelectedCompany: handleSetSelectedCompany,
-      companies,
+      companies: companies || [],
       isLoading,
       isViewingAllCompanies
     }}>

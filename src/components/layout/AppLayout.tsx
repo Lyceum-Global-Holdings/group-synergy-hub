@@ -7,7 +7,7 @@ import { useCompany } from "@/contexts/CompanyContext";
 import { useSuperAdmin } from "@/hooks/useSuperAdmin";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
-  const { isViewingAllCompanies, companies } = useCompany();
+  const { isViewingAllCompanies, companies = [] } = useCompany();
   const { data: isSuperAdmin } = useSuperAdmin();
 
   return (

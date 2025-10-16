@@ -33,7 +33,7 @@ export function useCompanies() {
       if (error) throw error;
       return data as Company[];
     },
-    enabled: userProfile !== undefined, // Wait for profile to load
+    enabled: !!userProfile, // Only run when profile is loaded
   });
 
   const createCompanyMutation = useMutation({
