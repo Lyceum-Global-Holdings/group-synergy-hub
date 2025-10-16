@@ -129,7 +129,7 @@ export default function ModuleAllocation() {
       <div>
         <h1 className="text-2xl font-bold">Module Allocation</h1>
         <p className="text-muted-foreground">
-          Assign modules to companies to control which features are available.
+          Assign modules to companies to control which features are available. When viewing a company in the sidebar, only allocated modules will be visible.
         </p>
       </div>
 

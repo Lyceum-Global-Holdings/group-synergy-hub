@@ -86,12 +86,13 @@ export function CompanySidebar() {
   };
 
   // Filter modules based on selected company or show all when viewing all companies
-  // Super admins always see all modules regardless of company selection
-  const availableModules = isSuperAdmin
-    ? Object.keys(moduleConfig)
-    : isViewingAllCompanies 
-      ? getAllUniqueModules()
-      : Object.keys(normalizeCompanyModules(selectedCompany?.modules));
+  // Super admins see all modules only when viewing "All Companies"
+  // When a specific company is selected, show only that company's modules
+  const availableModules = isViewingAllCompanies
+    ? (isSuperAdmin ? Object.keys(moduleConfig) : getAllUniqueModules())
+    : selectedCompany
+      ? Object.keys(normalizeCompanyModules(selectedCompany.modules))
+      : [];
     
   // Ensure availableModules is always an array
   const safeAvailableModules = Array.isArray(availableModules) ? availableModules : [];
@@ -108,8 +109,9 @@ export function CompanySidebar() {
         key: sub.key
       }));
 
-      // Super admins see all sub-modules, others see based on company settings
-      if (!isSuperAdmin && !isViewingAllCompanies && selectedCompany) {
+      // When viewing a specific company, filter sub-modules based on company settings
+      // When viewing all companies, show all sub-modules for each module
+      if (!isViewingAllCompanies && selectedCompany) {
         const companyModules = normalizeCompanyModules(selectedCompany.modules);
         const enabledSubModules = companyModules[moduleKey] || [];
         enabledItems = enabledItems.filter(item => 
@@ -149,11 +151,16 @@ export function CompanySidebar() {
                 <div className="text-sm font-medium truncate">
                   {isViewingAllCompanies ? "All Companies" : selectedCompany?.name}
                 </div>
-                <div className="text-xs text-muted-foreground">
+                <div className="text-xs text-muted-foreground flex items-center gap-2">
                   {isViewingAllCompanies 
                     ? `${companies.length} companies` 
                     : selectedCompany?.code
                   }
+                  {isSuperAdmin && !isViewingAllCompanies && (
+                    <Badge variant="outline" className="text-xs">
+                      Viewing as company
+                    </Badge>
+                  )}
                 </div>
               </div>
               <Badge variant="secondary" className="text-xs">
