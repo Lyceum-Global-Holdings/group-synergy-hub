@@ -1,10 +1,11 @@
 import { useState } from "react";
-import { Plus, Eye, Edit, Trash2 } from "lucide-react";
+import { Plus, Eye, Edit, Trash2, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAssetMaster } from "@/hooks/useAssetMaster";
 import { useAssetCategories } from "@/hooks/useAssetCategories";
+import { useToast } from "@/hooks/use-toast";
 import { CreateAssetMasterDialog } from "./CreateAssetMasterDialog";
 import { AssetMasterDetailsDialog } from "./AssetMasterDetailsDialog";
 import { EditAssetMasterDialog } from "./EditAssetMasterDialog";
@@ -29,6 +30,7 @@ export function AssetMasterTab() {
 
   const { assetMasterItems, isLoading, deleteAssetMaster } = useAssetMaster();
   const { categories } = useAssetCategories();
+  const { toast } = useToast();
 
   const getCategoryName = (categoryId: string | null) => {
     if (!categoryId) return 'N/A';
@@ -62,6 +64,85 @@ export function AssetMasterTab() {
       setIsDeleteDialogOpen(false);
       setSelectedAsset(null);
     }
+  };
+
+  const escapeCSV = (value: string | null | undefined): string => {
+    if (!value) return '';
+    const stringValue = String(value);
+    if (stringValue.includes(',') || stringValue.includes('"') || stringValue.includes('\n')) {
+      return `"${stringValue.replace(/"/g, '""')}"`;
+    }
+    return stringValue;
+  };
+
+  const handleDownloadCSV = () => {
+    const headers = [
+      'Asset Name',
+      'Brand',
+      'Category',
+      'Subcategory',
+      'Purchase Price (LKR)',
+      'Current Value (LKR)',
+      'Purchase Date',
+      'Depreciation Method',
+      'Depreciation Rate (%)',
+      'Useful Life (Years)',
+      'Salvage Value (LKR)',
+      'Accumulated Depreciation (LKR)',
+      'Status',
+      'Description',
+      'Created At',
+      'Updated At'
+    ];
+
+    const rows = filteredAssets.map(asset => {
+      const category = getCategoryName(asset.category_id);
+      const subcategory = asset.subcategory_id 
+        ? getCategoryName(asset.subcategory_id) 
+        : 'N/A';
+
+      return [
+        escapeCSV(asset.asset_name),
+        escapeCSV(asset.brand || 'N/A'),
+        escapeCSV(category),
+        escapeCSV(subcategory),
+        asset.purchase_price?.toFixed(2) || '0.00',
+        asset.current_value?.toFixed(2) || '0.00',
+        asset.purchase_date || 'N/A',
+        escapeCSV(asset.depreciation_method || 'N/A'),
+        asset.depreciation_rate?.toFixed(2) || 'N/A',
+        asset.useful_life_years?.toString() || 'N/A',
+        asset.salvage_value?.toFixed(2) || '0.00',
+        asset.accumulated_depreciation?.toFixed(2) || '0.00',
+        asset.status,
+        escapeCSV(asset.description || ''),
+        new Date(asset.created_at).toLocaleDateString('en-US'),
+        new Date(asset.updated_at).toLocaleDateString('en-US')
+      ];
+    });
+
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row => row.join(','))
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    
+    const timestamp = new Date().toISOString().split('T')[0];
+    link.download = `asset_master_export_${timestamp}.csv`;
+    
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+
+    toast({
+      title: "Export Successful",
+      description: `${filteredAssets.length} asset master items exported to CSV.`,
+    });
   };
 
   return (
@@ -102,10 +183,20 @@ export function AssetMasterTab() {
           onChange={(e) => setSearchTerm(e.target.value)}
           className="max-w-sm"
         />
-        <Button onClick={() => setIsCreateDialogOpen(true)}>
-          <Plus className="h-4 w-4 mr-2" />
-          Add Item
-        </Button>
+        <div className="flex gap-2">
+          <Button 
+            variant="outline" 
+            onClick={handleDownloadCSV}
+            disabled={filteredAssets.length === 0}
+          >
+            <Download className="h-4 w-4 mr-2" />
+            Download CSV
+          </Button>
+          <Button onClick={() => setIsCreateDialogOpen(true)}>
+            <Plus className="h-4 w-4 mr-2" />
+            Add Item
+          </Button>
+        </div>
       </div>
 
       <div className="border rounded-lg">
