@@ -2,6 +2,7 @@ import { Button } from "@/components/ui/button";
 import { Printer, Download } from "lucide-react";
 import { format } from "date-fns";
 import { useMemo } from "react";
+import tuhLogo from "@/assets/tuh-logo.png";
 
 interface DeliveryNoteDocumentProps {
   issueId: string;
@@ -81,11 +82,7 @@ export function DeliveryNoteDocument({ issueId, issueDetails, issueItems }: Deli
         <div className="header">
           <div>
             <div className="brand">
-              <div className="logo">TUH</div>
-              <div>
-                <h1>THE UNIFORM HUB</h1>
-                <small>THE UNIFORM HUB</small>
-              </div>
+              <img src={tuhLogo} alt="The Uniform Hub Logo" className="brand-logo" />
             </div>
             <div className="company">
               <div><strong>THE UNIFORM HUB (PVT) LIMITED</strong></div>
@@ -268,32 +265,13 @@ export function DeliveryNoteDocument({ issueId, issueDetails, issueItems }: Deli
 
         .delivery-note-document .brand {
           display: flex;
-          gap: 14px;
           align-items: flex-start;
         }
 
-        .delivery-note-document .logo {
-          border: 2px solid var(--ink);
-          width: 64px;
-          height: 64px;
-          display: grid;
-          place-items: center;
-          font-weight: 800;
-          letter-spacing: 0.06em;
-        }
-
-        .delivery-note-document .brand h1 {
-          margin: 0;
-          font-size: 34px;
-          letter-spacing: 0.08em;
-          font-weight: 800;
-        }
-
-        .delivery-note-document .brand small {
-          display: block;
-          margin-top: 2px;
-          color: var(--muted);
-          letter-spacing: 0.18em;
+        .delivery-note-document .brand-logo {
+          width: 180px;
+          height: auto;
+          object-fit: contain;
         }
 
         .delivery-note-document .company {
