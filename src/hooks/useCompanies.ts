@@ -2,26 +2,38 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Company, CreateCompanyData, UpdateCompanyData } from '@/types/company';
 import { useToast } from '@/hooks/use-toast';
+import { useSuperAdmin } from '@/hooks/useSuperAdmin';
+import { useCurrentUserProfile } from '@/hooks/useCurrentUserProfile';
 
 export function useCompanies() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { data: isSuperAdmin } = useSuperAdmin();
+  const { data: userProfile } = useCurrentUserProfile();
 
   const {
     data: companies = [],
     isLoading,
     error
   } = useQuery({
-    queryKey: ['companies'],
+    queryKey: ['companies', isSuperAdmin, userProfile?.company_id],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from('companies')
         .select('*')
         .order('created_at', { ascending: false });
 
+      // If not super admin and has company_id, filter to only their company
+      if (!isSuperAdmin && userProfile?.company_id) {
+        query = query.eq('id', userProfile.company_id);
+      }
+
+      const { data, error } = await query;
+
       if (error) throw error;
       return data as Company[];
-    }
+    },
+    enabled: userProfile !== undefined, // Wait for profile to load
   });
 
   const createCompanyMutation = useMutation({

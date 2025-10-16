@@ -7,7 +7,7 @@ import { useCompany } from "@/contexts/CompanyContext";
 import { useSuperAdmin } from "@/hooks/useSuperAdmin";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
-  const { isViewingAllCompanies } = useCompany();
+  const { isViewingAllCompanies, companies } = useCompany();
   const { data: isSuperAdmin } = useSuperAdmin();
 
   return (
@@ -32,7 +32,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             
             <div className="flex items-center gap-4">
               <CompanySelector />
-              {isSuperAdmin && !isViewingAllCompanies && (
+              {isSuperAdmin && !isViewingAllCompanies && companies.length > 1 && (
                 <Badge variant="outline" className="text-xs">
                   Viewing as company
                 </Badge>
