@@ -8487,6 +8487,66 @@ export type Database = {
           },
         ]
       }
+      training_manuals: {
+        Row: {
+          category: string
+          created_at: string
+          created_by: string | null
+          description: string | null
+          display_order: number | null
+          file_path: string
+          file_size: number | null
+          file_url: string | null
+          id: string
+          is_published: boolean | null
+          mime_type: string | null
+          page_count: number | null
+          tags: string[] | null
+          title: string
+          updated_at: string
+          updated_by: string | null
+          version: string | null
+        }
+        Insert: {
+          category?: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          display_order?: number | null
+          file_path: string
+          file_size?: number | null
+          file_url?: string | null
+          id?: string
+          is_published?: boolean | null
+          mime_type?: string | null
+          page_count?: number | null
+          tags?: string[] | null
+          title: string
+          updated_at?: string
+          updated_by?: string | null
+          version?: string | null
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          display_order?: number | null
+          file_path?: string
+          file_size?: number | null
+          file_url?: string | null
+          id?: string
+          is_published?: boolean | null
+          mime_type?: string | null
+          page_count?: number | null
+          tags?: string[] | null
+          title?: string
+          updated_at?: string
+          updated_by?: string | null
+          version?: string | null
+        }
+        Relationships: []
+      }
       transaction_to_gl_mapping: {
         Row: {
           company_id: string | null
