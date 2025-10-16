@@ -5,7 +5,8 @@ import {
   Users,
   BarChart3,
   Building2,
-  ClipboardList
+  ClipboardList,
+  GraduationCap
 } from "lucide-react";
 
 export interface ModuleConfig {
@@ -113,6 +114,18 @@ export const moduleConfig: Record<string, ModuleConfig> = {
       { key: 'audit-logs', name: 'Audit Logs', description: 'System activity tracking', url: '/management/audit-logs' },
       { key: 'budget-actual', name: 'Budget vs Actual', description: 'Budget variance analysis', url: '/management/budget-actual' },
       { key: 'exceptions', name: 'Exception Overrides', description: 'Handle system exceptions', url: '/management/exceptions' }
+    ]
+  },
+  training: {
+    key: 'training',
+    name: 'Training',
+    description: 'Module training and documentation',
+    icon: GraduationCap,
+    subModules: [
+      { key: 'module-trainings', name: 'Module Trainings', description: 'Training materials for each module', url: '/admin/training/module-trainings' },
+      { key: 'video-library', name: 'Video Library', description: 'Video tutorials and guides', url: '/admin/training/video-library' },
+      { key: 'documentation', name: 'Documentation', description: 'User guides and manuals', url: '/admin/training/documentation' },
+      { key: 'training-progress', name: 'Training Progress', description: 'Track user training completion', url: '/admin/training/training-progress' }
     ]
   }
 };

@@ -43,6 +43,11 @@ import PoEmailApproval from "./pages/procurement/PoEmailApproval";
 import GeneralLedger from "./pages/finance/GeneralLedger";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
+import Training from "./pages/admin/Training";
+import ModuleTrainings from "./pages/admin/training/ModuleTrainings";
+import VideoLibrary from "./pages/admin/training/VideoLibrary";
+import Documentation from "./pages/admin/training/Documentation";
+import TrainingProgress from "./pages/admin/training/TrainingProgress";
 
 const queryClient = new QueryClient();
 
@@ -84,6 +89,11 @@ function App() {
               <Route path="/admin/users-roles" element={<UserRoleManagement />} />
               <Route path="/admin/modules" element={<ModuleAllocation />} />
               <Route path="/admin/warehouse-management" element={<WarehouseManagement />} />
+              <Route path="/admin/training" element={<Training />} />
+              <Route path="/admin/training/module-trainings" element={<ModuleTrainings />} />
+              <Route path="/admin/training/video-library" element={<VideoLibrary />} />
+              <Route path="/admin/training/documentation" element={<Documentation />} />
+              <Route path="/admin/training/training-progress" element={<TrainingProgress />} />
               <Route path="/procurement/purchase-requisition" element={<PurchaseRequisition />} />
               <Route path="/procurement/purchase-order" element={<PurchaseOrder />} />
               <Route path="/tuh-modules/bill-of-materials" element={<BillOfMaterials />} />

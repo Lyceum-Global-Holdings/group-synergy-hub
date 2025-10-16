@@ -8,6 +8,7 @@ import {
   BarChart3,
   Settings,
   ChevronDown,
+  GraduationCap,
 } from "lucide-react";
 import {
   Sidebar,
@@ -108,6 +109,7 @@ const adminItems = [
   { title: "User & Role Management", url: "/admin/users-roles", icon: Users },
   { title: "Module Allocation", url: "/admin/modules", icon: Settings },
   { title: "Warehouse Management", url: "/admin/warehouse-management", icon: Package },
+  { title: "Training", url: "/admin/training", icon: GraduationCap },
 ];
 
 export function AppSidebar() {
