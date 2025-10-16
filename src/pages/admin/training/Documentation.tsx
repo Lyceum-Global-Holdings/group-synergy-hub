@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { FileText, Download, Plus, Edit, Trash2, Loader2 } from "lucide-react";
+import { FileText, Download, Plus, Edit, Trash2, Loader2, ExternalLink } from "lucide-react";
 import { useTrainingManuals } from "@/hooks/useTrainingManuals";
 import { useSuperAdmin } from "@/hooks/useSuperAdmin";
 import CreateManualDialog from "@/components/admin/training/CreateManualDialog";
@@ -45,8 +45,9 @@ export default function Documentation() {
   };
 
   const handleDownload = (manual: TrainingManual) => {
-    if (manual.file_url) {
-      window.open(manual.file_url, '_blank');
+    const url = manual.document_url || manual.file_url;
+    if (url) {
+      window.open(url, '_blank');
     }
   };
 
@@ -76,83 +77,84 @@ export default function Documentation() {
       ) : filteredManuals && filteredManuals.length > 0 ? (
         <div className="grid gap-4 md:grid-cols-2">
           {filteredManuals.map((manual) => (
-            <Card key={manual.id}>
-              <CardHeader>
-                <div className="flex items-start gap-4">
-                  <div className="p-3 rounded-lg bg-muted">
-                    <FileText className="h-6 w-6 text-primary" />
+            <Card key={manual.id} className="overflow-hidden hover:shadow-lg transition-shadow">
+              {(manual.thumbnail_url || manual.document_url) && (
+                <div className="relative h-48 w-full overflow-hidden bg-muted">
+                  <img 
+                    src={manual.thumbnail_url || `https://api.microlink.io/?url=${encodeURIComponent(manual.document_url || '')}&screenshot=true&meta=false&embed=screenshot.url`} 
+                    alt={manual.title}
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      e.currentTarget.style.display = 'none';
+                      e.currentTarget.parentElement?.classList.add('bg-muted');
+                    }}
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+                  <div className="absolute bottom-3 left-3 right-3">
+                    <h3 className="font-semibold text-lg text-white line-clamp-2">{manual.title}</h3>
                   </div>
+                </div>
+              )}
+              <CardContent className="p-6">
+                <div className="flex flex-col gap-4">
                   <div className="flex-1">
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <CardTitle className="text-lg">{manual.title}</CardTitle>
-                        <CardDescription className="mt-2">
-                          {manual.description}
-                        </CardDescription>
-                      </div>
-                      {isSuperAdmin && (
-                        <div className="flex gap-1">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleEdit(manual)}
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleDelete(manual)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      )}
-                    </div>
-                    <div className="flex gap-4 mt-3 text-sm text-muted-foreground flex-wrap">
-                      <span className="inline-flex items-center px-2 py-1 rounded-md bg-secondary text-secondary-foreground">
+                    {!manual.thumbnail_url && !manual.document_url && (
+                      <h3 className="font-semibold text-lg mb-2">{manual.title}</h3>
+                    )}
+                    {manual.description && (
+                      <p className="text-sm text-muted-foreground mb-3 line-clamp-2">
+                        {manual.description}
+                      </p>
+                    )}
+                    <div className="flex flex-wrap gap-2 mb-3">
+                      <span className="inline-flex items-center px-2 py-1 rounded-md bg-secondary text-secondary-foreground text-sm">
                         {getCategoryLabel(manual.category)}
                       </span>
-                      {manual.page_count && <span>{manual.page_count} pages</span>}
-                      <span>•</span>
-                      <span>{manual.mime_type === 'application/pdf' ? 'PDF' : 'Document'}</span>
-                      {manual.file_size && (
-                        <>
-                          <span>•</span>
-                          <span>{(manual.file_size / 1024 / 1024).toFixed(1)} MB</span>
-                        </>
-                      )}
-                      {manual.version && (
-                        <>
-                          <span>•</span>
-                          <span>v{manual.version}</span>
-                        </>
-                      )}
+                      {manual.page_count && <span className="text-sm">{manual.page_count} pages</span>}
+                      {manual.version && <span className="text-sm">v{manual.version}</span>}
                     </div>
                     {manual.tags && manual.tags.length > 0 && (
-                      <div className="flex gap-2 mt-2 flex-wrap">
+                      <div className="flex flex-wrap gap-1">
                         {manual.tags.map((tag, idx) => (
-                          <span
-                            key={idx}
-                            className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground"
-                          >
+                          <span key={idx} className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
                             {tag}
                           </span>
                         ))}
                       </div>
                     )}
                   </div>
+                  
+                  <div className="flex gap-2">
+                    <Button
+                      variant="default"
+                      size="sm"
+                      onClick={() => handleDownload(manual)}
+                      className="flex-1"
+                    >
+                      <ExternalLink className="h-4 w-4 mr-2" />
+                      View
+                    </Button>
+                    
+                    {isSuperAdmin && (
+                      <>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleEdit(manual)}
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleDelete(manual)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </>
+                    )}
+                  </div>
                 </div>
-              </CardHeader>
-              <CardContent className="flex gap-2">
-                <Button
-                  variant="default"
-                  className="flex-1"
-                  onClick={() => handleDownload(manual)}
-                >
-                  <Download className="h-4 w-4 mr-2" />
-                  Download
-                </Button>
               </CardContent>
             </Card>
           ))}

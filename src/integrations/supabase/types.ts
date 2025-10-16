@@ -8494,14 +8494,16 @@ export type Database = {
           created_by: string | null
           description: string | null
           display_order: number | null
-          file_path: string
+          document_url: string | null
           file_size: number | null
           file_url: string | null
           id: string
           is_published: boolean | null
+          legacy_file_path: string | null
           mime_type: string | null
           page_count: number | null
           tags: string[] | null
+          thumbnail_url: string | null
           title: string
           updated_at: string
           updated_by: string | null
@@ -8513,14 +8515,16 @@ export type Database = {
           created_by?: string | null
           description?: string | null
           display_order?: number | null
-          file_path: string
+          document_url?: string | null
           file_size?: number | null
           file_url?: string | null
           id?: string
           is_published?: boolean | null
+          legacy_file_path?: string | null
           mime_type?: string | null
           page_count?: number | null
           tags?: string[] | null
+          thumbnail_url?: string | null
           title: string
           updated_at?: string
           updated_by?: string | null
@@ -8532,14 +8536,16 @@ export type Database = {
           created_by?: string | null
           description?: string | null
           display_order?: number | null
-          file_path?: string
+          document_url?: string | null
           file_size?: number | null
           file_url?: string | null
           id?: string
           is_published?: boolean | null
+          legacy_file_path?: string | null
           mime_type?: string | null
           page_count?: number | null
           tags?: string[] | null
+          thumbnail_url?: string | null
           title?: string
           updated_at?: string
           updated_by?: string | null

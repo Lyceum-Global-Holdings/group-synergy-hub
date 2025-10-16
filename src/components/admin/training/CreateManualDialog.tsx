@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -8,13 +8,15 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useCreateManual, useUploadManualFile } from "@/hooks/useTrainingManuals";
-import { Loader2, Upload } from "lucide-react";
+import { useCreateManual, useFetchLinkPreview } from "@/hooks/useTrainingManuals";
+import { Loader2 } from "lucide-react";
 
 const formSchema = z.object({
   title: z.string().min(1, "Title is required").max(200),
   description: z.string().max(1000).optional(),
   category: z.string().min(1, "Category is required"),
+  document_url: z.string().url("Must be a valid URL"),
+  thumbnail_url: z.string().url("Must be a valid URL").optional().or(z.literal("")),
   page_count: z.coerce.number().min(1).optional(),
   version: z.string().default("1.0"),
   tags: z.string().optional(),
@@ -29,9 +31,9 @@ interface CreateManualDialogProps {
 }
 
 export default function CreateManualDialog({ open, onOpenChange }: CreateManualDialogProps) {
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [previewThumbnail, setPreviewThumbnail] = useState<string>("");
   const createManual = useCreateManual();
-  const uploadFile = useUploadManualFile();
+  const fetchPreview = useFetchLinkPreview();
 
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
@@ -39,30 +41,52 @@ export default function CreateManualDialog({ open, onOpenChange }: CreateManualD
       title: "",
       description: "",
       category: "user_guide",
+      document_url: "",
+      thumbnail_url: "",
       version: "1.0",
       display_order: 0,
     },
   });
 
+  const documentUrl = form.watch("document_url");
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (documentUrl && documentUrl.startsWith("http")) {
+        fetchPreview.mutate(documentUrl, {
+          onSuccess: (preview) => {
+            if (preview.thumbnail) {
+              setPreviewThumbnail(preview.thumbnail);
+              if (!form.getValues("thumbnail_url")) {
+                form.setValue("thumbnail_url", preview.thumbnail);
+              }
+              if (!form.getValues("title")) {
+                form.setValue("title", preview.title);
+              }
+              if (!form.getValues("description")) {
+                form.setValue("description", preview.description);
+              }
+            }
+          },
+        });
+      }
+    }, 800);
+
+    return () => clearTimeout(timer);
+  }, [documentUrl]);
+
   const onSubmit = async (data: FormData) => {
-    if (!selectedFile) {
-      alert("Please select a file");
-      return;
-    }
-
     try {
-      // Upload file first
-      const fileData = await uploadFile.mutateAsync(selectedFile);
-
-      // Create manual record
       await createManual.mutateAsync({
         title: data.title,
         description: data.description || null,
         category: data.category,
-        file_path: fileData.file_path,
-        file_url: fileData.file_url,
-        file_size: fileData.file_size,
-        mime_type: fileData.mime_type,
+        document_url: data.document_url,
+        thumbnail_url: data.thumbnail_url || null,
+        legacy_file_path: null,
+        file_url: null,
+        file_size: null,
+        mime_type: null,
         page_count: data.page_count || null,
         version: data.version,
         is_published: true,
@@ -72,15 +96,9 @@ export default function CreateManualDialog({ open, onOpenChange }: CreateManualD
 
       onOpenChange(false);
       form.reset();
-      setSelectedFile(null);
+      setPreviewThumbnail("");
     } catch (error) {
       console.error("Error creating manual:", error);
-    }
-  };
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      setSelectedFile(e.target.files[0]);
     }
   };
 
@@ -91,6 +109,39 @@ export default function CreateManualDialog({ open, onOpenChange }: CreateManualD
           <DialogTitle>Add Training Manual</DialogTitle>
         </DialogHeader>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+          <div>
+            <Label htmlFor="document_url">Document URL *</Label>
+            <Input id="document_url" placeholder="https://example.com/document.pdf" {...form.register("document_url")} />
+            {form.formState.errors.document_url && (
+              <p className="text-sm text-destructive mt-1">{form.formState.errors.document_url.message}</p>
+            )}
+            {fetchPreview.isPending && (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground mt-2">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Fetching preview...
+              </div>
+            )}
+          </div>
+
+          {previewThumbnail && (
+            <div className="rounded-lg border p-4">
+              <p className="text-sm font-medium mb-2">Preview Thumbnail</p>
+              <img 
+                src={previewThumbnail} 
+                alt="Preview" 
+                className="w-full h-48 object-cover rounded"
+              />
+            </div>
+          )}
+
+          <div>
+            <Label htmlFor="thumbnail_url">Custom Thumbnail URL (Optional)</Label>
+            <Input id="thumbnail_url" placeholder="https://example.com/thumbnail.jpg" {...form.register("thumbnail_url")} />
+            {form.formState.errors.thumbnail_url && (
+              <p className="text-sm text-destructive mt-1">{form.formState.errors.thumbnail_url.message}</p>
+            )}
+          </div>
+
           <div>
             <Label htmlFor="title">Title *</Label>
             <Input id="title" {...form.register("title")} />
@@ -111,31 +162,13 @@ export default function CreateManualDialog({ open, onOpenChange }: CreateManualD
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="user_guide">User Guide</SelectItem>
-                <SelectItem value="module_manual">Module Manual</SelectItem>
-                <SelectItem value="quick_reference">Quick Reference</SelectItem>
-                <SelectItem value="admin_guide">Admin Guide</SelectItem>
-                <SelectItem value="technical">Technical Documentation</SelectItem>
+                <SelectItem value="warehouse">Warehouse Management</SelectItem>
+                <SelectItem value="procurement">Procurement</SelectItem>
+                <SelectItem value="sourcing">Sourcing</SelectItem>
+                <SelectItem value="finance">Finance</SelectItem>
+                <SelectItem value="general">General</SelectItem>
               </SelectContent>
             </Select>
-          </div>
-
-          <div>
-            <Label htmlFor="file">File Upload *</Label>
-            <div className="flex items-center gap-2">
-              <Input
-                id="file"
-                type="file"
-                accept=".pdf,.doc,.docx"
-                onChange={handleFileChange}
-                className="cursor-pointer"
-              />
-              {selectedFile && (
-                <span className="text-sm text-muted-foreground">
-                  {selectedFile.name} ({(selectedFile.size / 1024 / 1024).toFixed(2)} MB)
-                </span>
-              )}
-            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
@@ -164,8 +197,8 @@ export default function CreateManualDialog({ open, onOpenChange }: CreateManualD
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button type="submit" disabled={createManual.isPending || uploadFile.isPending}>
-              {(createManual.isPending || uploadFile.isPending) && (
+            <Button type="submit" disabled={createManual.isPending}>
+              {createManual.isPending && (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               )}
               Create Manual

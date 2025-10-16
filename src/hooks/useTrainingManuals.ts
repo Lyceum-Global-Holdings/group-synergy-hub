@@ -7,7 +7,9 @@ export interface TrainingManual {
   title: string;
   description: string | null;
   category: string;
-  file_path: string;
+  document_url: string | null;
+  thumbnail_url: string | null;
+  legacy_file_path: string | null;
   file_url: string | null;
   file_size: number | null;
   mime_type: string | null;
@@ -20,6 +22,13 @@ export interface TrainingManual {
   updated_by: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface LinkPreview {
+  title: string;
+  description: string;
+  thumbnail: string;
+  favicon: string;
 }
 
 export const useTrainingManuals = () => {
@@ -148,50 +157,40 @@ export const useDeleteManual = () => {
   });
 };
 
-export const useUploadManualFile = () => {
+export const useFetchLinkPreview = () => {
   const { toast } = useToast();
 
   return useMutation({
-    mutationFn: async (file: File) => {
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${Math.random()}.${fileExt}`;
-      const filePath = `${fileName}`;
+    mutationFn: async (url: string): Promise<LinkPreview> => {
+      try {
+        // Using microlink.io API for link previews
+        const response = await fetch(
+          `https://api.microlink.io/?url=${encodeURIComponent(url)}`
+        );
+        
+        if (!response.ok) {
+          throw new Error("Failed to fetch link preview");
+        }
 
-      const { error: uploadError } = await supabase.storage
-        .from('training-manuals')
-        .upload(filePath, file);
-
-      if (uploadError) throw uploadError;
-
-      const { data: { publicUrl } } = supabase.storage
-        .from('training-manuals')
-        .getPublicUrl(filePath);
-
-      return {
-        file_path: filePath,
-        file_url: publicUrl,
-        file_size: file.size,
-        mime_type: file.type,
-      };
+        const data = await response.json();
+        
+        return {
+          title: data.data.title || "",
+          description: data.data.description || "",
+          thumbnail: data.data.image?.url || data.data.screenshot?.url || "",
+          favicon: data.data.logo?.url || "",
+        };
+      } catch (error) {
+        console.error("Link preview error:", error);
+        throw error;
+      }
     },
     onError: (error: Error) => {
       toast({
-        title: "Upload Error",
-        description: error.message,
+        title: "Preview Error",
+        description: "Could not fetch link preview. Please enter thumbnail URL manually.",
         variant: "destructive",
       });
-    },
-  });
-};
-
-export const useDeleteManualFile = () => {
-  return useMutation({
-    mutationFn: async (filePath: string) => {
-      const { error } = await supabase.storage
-        .from('training-manuals')
-        .remove([filePath]);
-
-      if (error) throw error;
     },
   });
 };
