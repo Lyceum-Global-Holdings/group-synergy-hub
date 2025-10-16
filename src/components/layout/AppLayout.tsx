@@ -2,8 +2,14 @@ import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { CompanySidebar } from "@/components/layout/CompanySidebar";
 import { CompanySelector } from "@/components/common/CompanySelector";
 import { UserProfile } from "@/components/common/UserProfile";
+import { Badge } from "@/components/ui/badge";
+import { useCompany } from "@/contexts/CompanyContext";
+import { useSuperAdmin } from "@/hooks/useSuperAdmin";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
+  const { isViewingAllCompanies } = useCompany();
+  const { data: isSuperAdmin } = useSuperAdmin();
+
   return (
     <SidebarProvider>
       <div className="min-h-screen flex w-full bg-background">
@@ -26,6 +32,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             
             <div className="flex items-center gap-4">
               <CompanySelector />
+              {isSuperAdmin && !isViewingAllCompanies && (
+                <Badge variant="outline" className="text-xs">
+                  Viewing as company
+                </Badge>
+              )}
               <UserProfile />
             </div>
           </header>

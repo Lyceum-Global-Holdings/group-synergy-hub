@@ -151,16 +151,11 @@ export function CompanySidebar() {
                 <div className="text-sm font-medium truncate">
                   {isViewingAllCompanies ? "All Companies" : selectedCompany?.name}
                 </div>
-                <div className="text-xs text-muted-foreground flex items-center gap-2">
+                <div className="text-xs text-muted-foreground">
                   {isViewingAllCompanies 
                     ? `${companies.length} companies` 
                     : selectedCompany?.code
                   }
-                  {isSuperAdmin && !isViewingAllCompanies && (
-                    <Badge variant="outline" className="text-xs">
-                      Viewing as company
-                    </Badge>
-                  )}
                 </div>
               </div>
               <Badge variant="secondary" className="text-xs">
