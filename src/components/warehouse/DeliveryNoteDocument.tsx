@@ -27,11 +27,15 @@ export function DeliveryNoteDocument({ issueId, issueDetails, issueItems }: Deli
   const { selectedCompany } = useCompany();
   
   const handlePrint = () => {
+    document.body.classList.add('printing');
     window.print();
+    setTimeout(() => document.body.classList.remove('printing'), 100);
   };
 
   const handleDownloadPDF = () => {
+    document.body.classList.add('printing');
     window.print();
+    setTimeout(() => document.body.classList.remove('printing'), 100);
   };
 
   // Group items by product and color
@@ -446,23 +450,74 @@ export function DeliveryNoteDocument({ issueId, issueDetails, issueItems }: Deli
           margin: 12mm;
         }
 
+        body.printing {
+          overflow: visible !important;
+        }
+
+        body.printing > *:not(.delivery-note-document) {
+          display: none !important;
+        }
+
+        body.printing .delivery-note-document {
+          display: block !important;
+          position: fixed !important;
+          top: 0 !important;
+          left: 0 !important;
+          width: 100% !important;
+          height: 100% !important;
+          z-index: 999999 !important;
+          background: white !important;
+        }
+
         @media print {
+          /* Hide everything except delivery note */
           body * {
             visibility: hidden;
           }
+          
+          /* Hide dialog-specific elements completely */
+          [role="dialog"],
+          [data-radix-dialog-overlay],
+          [data-radix-dialog-content] {
+            display: none !important;
+          }
+          
+          /* Make delivery note visible and properly positioned */
           .delivery-note-document,
           .delivery-note-document * {
             visibility: visible;
           }
+          
           .delivery-note-document {
             position: absolute;
             left: 0;
             top: 0;
             width: 100%;
+            background: white;
+            transform: none !important;
           }
+          
+          /* Ensure page renders correctly */
           .delivery-note-document .page {
             padding: 0;
             min-height: auto;
+            width: 210mm;
+            margin: 0 auto;
+            box-shadow: none;
+            border: none;
+          }
+          
+          /* Ensure all content is visible */
+          .delivery-note-document .page * {
+            visibility: visible !important;
+          }
+          
+          /* Reset any transforms or positioning from parent elements */
+          html, body {
+            width: 100%;
+            height: auto;
+            overflow: visible;
+            transform: none;
           }
         }
       `}</style>
