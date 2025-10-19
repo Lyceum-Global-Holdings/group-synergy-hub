@@ -70,7 +70,20 @@ export function FinishedGoodsIssueDetailsDialog({
           finished_goods (
             id,
             product_name,
-            product_code
+            product_code,
+            color,
+            size
+          ),
+          sales_order_items!sales_order_item_id (
+            id,
+            cpo_item_id,
+            customer_po_items!cpo_item_id (
+              id,
+              item_name,
+              description,
+              color,
+              size
+            )
           )
         `)
         .eq('issue_id', issueId)

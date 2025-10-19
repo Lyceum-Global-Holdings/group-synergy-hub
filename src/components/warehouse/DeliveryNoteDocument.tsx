@@ -15,6 +15,7 @@ interface GroupedItem {
   productName: string;
   productCode: string;
   color: string;
+  description: string;
   sizes: Array<{
     size: string;
     quantity: number;
@@ -38,21 +39,30 @@ export function DeliveryNoteDocument({ issueId, issueDetails, issueItems }: Deli
     const groups: { [key: string]: GroupedItem } = {};
     
     issueItems?.forEach(item => {
-      const fg = item.finished_good || {};
-      const key = `${fg.product_name}_${fg.color || 'N/A'}`;
+      const fg = item.finished_goods || {};
+      const cpoItem = item.sales_order_items?.customer_po_items || {};
+      
+      // Prioritize CPO data, fallback to finished goods
+      const itemName = cpoItem.item_name || fg.product_name || 'N/A';
+      const color = cpoItem.color || fg.color || 'N/A';
+      const description = cpoItem.description || cpoItem.item_name || fg.product_name || 'N/A';
+      const size = cpoItem.size || fg.size || 'N/A';
+      
+      const key = `${itemName}_${color}`;
       
       if (!groups[key]) {
         groups[key] = {
-          productName: fg.product_name || 'N/A',
+          productName: itemName,
           productCode: fg.product_code || '',
-          color: fg.color || 'N/A',
+          color: color,
+          description: description,
           sizes: [],
           subtotal: 0
         };
       }
       
       groups[key].sizes.push({
-        size: fg.size || 'N/A',
+        size: size,
         quantity: item.quantity_issued || 0
       });
       groups[key].subtotal += item.quantity_issued || 0;
@@ -191,7 +201,7 @@ export function DeliveryNoteDocument({ issueId, issueDetails, issueItems }: Deli
                       {sizeIndex === 0 ? group.color : ''}
                     </td>
                     <td className={sizeIndex === 0 ? "caps bold" : ""}>
-                      {sizeIndex === 0 ? group.productName : ''}
+                      {sizeIndex === 0 ? group.description : ''}
                     </td>
                     <td className={sizeIndex === 0 ? "caps bold center" : "caps center"}>
                       {sizeItem.size}
