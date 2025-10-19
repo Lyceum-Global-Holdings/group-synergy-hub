@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Printer, Download } from "lucide-react";
 import { format } from "date-fns";
-import { useMemo } from "react";
+import { useMemo, useRef } from "react";
 import tuhLogo from "@/assets/tuh-logo.png";
 import { useCompany } from "@/contexts/CompanyContext";
 
@@ -25,17 +25,78 @@ interface GroupedItem {
 
 export function DeliveryNoteDocument({ issueId, issueDetails, issueItems }: DeliveryNoteDocumentProps) {
   const { selectedCompany } = useCompany();
+  const containerRef = useRef<HTMLDivElement>(null);
   
+  const printInIframe = () => {
+    if (!containerRef.current) return;
+    
+    const content = containerRef.current.cloneNode(true) as HTMLElement;
+    
+    // Create hidden iframe
+    const iframe = document.createElement('iframe');
+    iframe.style.position = 'absolute';
+    iframe.style.width = '0';
+    iframe.style.height = '0';
+    iframe.style.border = 'none';
+    document.body.appendChild(iframe);
+    
+    const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
+    if (!iframeDoc) return;
+    
+    // Write full HTML document to iframe
+    iframeDoc.open();
+    iframeDoc.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="utf-8">
+          <title>Delivery Note</title>
+          <style>
+            @page {
+              size: A4;
+              margin: 12mm;
+            }
+            
+            @media print {
+              .print\\:hidden {
+                display: none !important;
+              }
+            }
+            
+            body {
+              margin: 0;
+              padding: 0;
+              background: white;
+            }
+            
+            ${content.querySelector('style')?.textContent || ''}
+          </style>
+        </head>
+        <body>
+          ${content.innerHTML}
+        </body>
+      </html>
+    `);
+    iframeDoc.close();
+    
+    // Wait for images to load, then print
+    setTimeout(() => {
+      iframe.contentWindow?.focus();
+      iframe.contentWindow?.print();
+      
+      // Cleanup after print
+      setTimeout(() => {
+        document.body.removeChild(iframe);
+      }, 1000);
+    }, 250);
+  };
+
   const handlePrint = () => {
-    document.body.classList.add('printing');
-    window.print();
-    setTimeout(() => document.body.classList.remove('printing'), 100);
+    printInIframe();
   };
 
   const handleDownloadPDF = () => {
-    document.body.classList.add('printing');
-    window.print();
-    setTimeout(() => document.body.classList.remove('printing'), 100);
+    printInIframe();
   };
 
   // Group items by product and color
@@ -81,7 +142,7 @@ export function DeliveryNoteDocument({ issueId, issueDetails, issueItems }: Deli
   );
 
   return (
-    <div className="delivery-note-document">
+    <div ref={containerRef} className="delivery-note-document">
       {/* Print buttons - hidden when printing */}
       <div className="print:hidden flex gap-2 mb-4">
         <Button onClick={handlePrint} className="flex-1">
@@ -448,77 +509,6 @@ export function DeliveryNoteDocument({ issueId, issueDetails, issueItems }: Deli
         @page {
           size: A4;
           margin: 12mm;
-        }
-
-        body.printing {
-          overflow: visible !important;
-        }
-
-        body.printing > *:not(.delivery-note-document) {
-          display: none !important;
-        }
-
-        body.printing .delivery-note-document {
-          display: block !important;
-          position: fixed !important;
-          top: 0 !important;
-          left: 0 !important;
-          width: 100% !important;
-          height: 100% !important;
-          z-index: 999999 !important;
-          background: white !important;
-        }
-
-        @media print {
-          /* Hide everything except delivery note */
-          body * {
-            visibility: hidden;
-          }
-          
-          /* Hide dialog-specific elements completely */
-          [role="dialog"],
-          [data-radix-dialog-overlay],
-          [data-radix-dialog-content] {
-            display: none !important;
-          }
-          
-          /* Make delivery note visible and properly positioned */
-          .delivery-note-document,
-          .delivery-note-document * {
-            visibility: visible;
-          }
-          
-          .delivery-note-document {
-            position: absolute;
-            left: 0;
-            top: 0;
-            width: 100%;
-            background: white;
-            transform: none !important;
-          }
-          
-          /* Ensure page renders correctly */
-          .delivery-note-document .page {
-            padding: 0;
-            min-height: auto;
-            width: 210mm;
-            margin: 0 auto;
-            box-shadow: none;
-            border: none;
-          }
-          
-          /* Ensure all content is visible */
-          .delivery-note-document .page * {
-            visibility: visible !important;
-          }
-          
-          /* Reset any transforms or positioning from parent elements */
-          html, body {
-            width: 100%;
-            height: auto;
-            overflow: visible;
-            transform: none;
-          }
         }
       `}</style>
     </div>

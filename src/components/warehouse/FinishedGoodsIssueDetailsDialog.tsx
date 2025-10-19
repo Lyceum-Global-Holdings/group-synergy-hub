@@ -307,6 +307,9 @@ export function FinishedGoodsIssueDetailsDialog({
       {/* Delivery Note Dialog */}
       <Dialog open={showDeliveryNote} onOpenChange={setShowDeliveryNote}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-auto">
+          <DialogHeader>
+            <DialogTitle className="sr-only">Delivery Note</DialogTitle>
+          </DialogHeader>
           <DeliveryNoteDocument 
             issueId={issueId}
             issueDetails={issue}
