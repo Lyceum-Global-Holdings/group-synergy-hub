@@ -33,9 +33,13 @@ export function FinishedGoodsIssueDetailsDialog({
           sales_orders (
             id,
             order_number,
+            order_date,
+            delivery_address,
             customer:customers (
               customer_name,
-              customer_code
+              customer_code,
+              address,
+              phone
             )
           )
         `)
