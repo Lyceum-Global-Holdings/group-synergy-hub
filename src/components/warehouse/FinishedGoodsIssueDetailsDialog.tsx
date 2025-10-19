@@ -247,23 +247,13 @@ export function FinishedGoodsIssueDetailsDialog({
               )}
               
               {issue.status === 'accepted' && (
-                <>
-                  <Button 
-                    onClick={() => setShowDeliveryNote(true)}
-                    variant="outline"
-                    className="flex-1"
-                  >
-                    <FileText className="h-4 w-4 mr-2" />
-                    View Delivery Note
-                  </Button>
-                  <Button 
-                    onClick={() => window.print()}
-                    className="flex-1"
-                  >
-                    <Printer className="h-4 w-4 mr-2" />
-                    Print Delivery Note
-                  </Button>
-                </>
+                <Button 
+                  onClick={() => setShowDeliveryNote(true)}
+                  className="w-full"
+                >
+                  <FileText className="h-4 w-4 mr-2" />
+                  View Delivery Note
+                </Button>
               )}
             </div>
           </TabsContent>
