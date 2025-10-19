@@ -23,11 +23,7 @@ export function useCompanies() {
 
       let query = supabase
         .from('companies')
-        .select(`
-          *,
-          hod:hod_user_id(full_name, email),
-          manager:manager_user_id(full_name, email)
-        `)
+        .select('*')
         .order('created_at', { ascending: false });
 
       // If not super admin and has company_id, filter to only their company
@@ -35,10 +31,39 @@ export function useCompanies() {
         query = query.eq('id', userProfile.company_id);
       }
 
-      const { data, error } = await query;
+      const { data: companiesData, error } = await query;
 
       if (error) throw error;
-      return data as Company[];
+      if (!companiesData || companiesData.length === 0) return [];
+
+      // Get all unique user IDs for HOD and Manager
+      const userIds = new Set<string>();
+      companiesData.forEach(company => {
+        if (company.hod_user_id) userIds.add(company.hod_user_id);
+        if (company.manager_user_id) userIds.add(company.manager_user_id);
+      });
+
+      // Fetch profiles for these users if there are any
+      let profileMap = new Map();
+      if (userIds.size > 0) {
+        const { data: profiles, error: profilesError } = await supabase
+          .from('profiles')
+          .select('user_id, full_name, email')
+          .in('user_id', Array.from(userIds));
+
+        if (profilesError) throw profilesError;
+
+        profileMap = new Map(
+          (profiles || []).map(p => [p.user_id, p])
+        );
+      }
+
+      // Merge profile data into companies
+      return companiesData.map(company => ({
+        ...company,
+        hod: company.hod_user_id ? profileMap.get(company.hod_user_id) : null,
+        manager: company.manager_user_id ? profileMap.get(company.manager_user_id) : null,
+      })) as Company[];
     },
   });
 
