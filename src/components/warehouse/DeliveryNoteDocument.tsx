@@ -259,7 +259,6 @@ export function DeliveryNoteDocument({ issueId, issueDetails, issueItems }: Deli
                 <tr><td className="right caps">{issueDetails?.sales_orders?.customers?.customer_name?.toUpperCase() || ''}</td></tr>
                 <tr><td className="right caps">{issueDetails?.sales_orders?.customers?.address?.toUpperCase() || ''}</td></tr>
                 <tr><td className="right caps">{issueDetails?.sales_orders?.customers?.phone || ''}</td></tr>
-                <tr><td className="right caps">{issueDetails?.sales_orders?.customers?.email || ''}</td></tr>
               </tbody>
             </table>
           </div>
