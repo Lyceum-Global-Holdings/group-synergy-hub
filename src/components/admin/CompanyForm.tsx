@@ -269,7 +269,6 @@ export function CompanyForm({ company, onSubmit, onCancel, isLoading }: CompanyF
                   </SelectTrigger>
                 </FormControl>
                 <SelectContent>
-                  <SelectItem value="">None</SelectItem>
                   {users?.map((user) => (
                     <SelectItem key={user.id} value={user.id}>
                       {user.full_name || user.email}
@@ -298,7 +297,6 @@ export function CompanyForm({ company, onSubmit, onCancel, isLoading }: CompanyF
                   </SelectTrigger>
                 </FormControl>
                 <SelectContent>
-                  <SelectItem value="">None</SelectItem>
                   {users?.map((user) => (
                     <SelectItem key={user.id} value={user.id}>
                       {user.full_name || user.email}
