@@ -27,10 +27,15 @@ export function DeliveryNoteDocument({ issueId, issueDetails, issueItems }: Deli
   const { selectedCompany } = useCompany();
   const containerRef = useRef<HTMLDivElement>(null);
   
-  const printInIframe = () => {
+  const printInIframe = async () => {
     if (!containerRef.current) return;
     
-    const content = containerRef.current.cloneNode(true) as HTMLElement;
+    const clone = containerRef.current.cloneNode(true) as HTMLElement;
+    
+    // Extract all inline style tags from the clone
+    const styleTags = Array.from(clone.querySelectorAll('style'));
+    const inlineStyles = styleTags.map(s => s.textContent || '').join('\n');
+    styleTags.forEach(s => s.parentNode?.removeChild(s));
     
     // Create hidden iframe
     const iframe = document.createElement('iframe');
@@ -43,7 +48,7 @@ export function DeliveryNoteDocument({ issueId, issueDetails, issueItems }: Deli
     const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
     if (!iframeDoc) return;
     
-    // Write full HTML document to iframe
+    // Write full HTML document to iframe with all styles in head
     iframeDoc.open();
     iframeDoc.write(`
       <!DOCTYPE html>
@@ -63,32 +68,49 @@ export function DeliveryNoteDocument({ issueId, issueDetails, issueItems }: Deli
               }
             }
             
-            body {
+            html, body {
+              -webkit-print-color-adjust: exact;
+              print-color-adjust: exact;
+              background: #fff;
               margin: 0;
               padding: 0;
-              background: white;
             }
             
-            ${content.querySelector('style')?.textContent || ''}
+            ${inlineStyles}
           </style>
         </head>
         <body>
-          ${content.innerHTML}
+          ${clone.outerHTML}
         </body>
       </html>
     `);
     iframeDoc.close();
     
-    // Wait for images to load, then print
+    // Wait for all images to load
+    const imgs = Array.from(iframeDoc.querySelectorAll('img'));
+    await Promise.all(imgs.map(img => 
+      img.complete ? Promise.resolve() : new Promise(resolve => {
+        img.onload = img.onerror = () => resolve(undefined);
+      })
+    ));
+    
+    // Small delay then print
     setTimeout(() => {
       iframe.contentWindow?.focus();
       iframe.contentWindow?.print();
       
       // Cleanup after print
-      setTimeout(() => {
-        document.body.removeChild(iframe);
-      }, 1000);
-    }, 250);
+      const cleanup = () => {
+        if (document.body.contains(iframe)) {
+          document.body.removeChild(iframe);
+        }
+      };
+      
+      if (iframe.contentWindow) {
+        iframe.contentWindow.onafterprint = cleanup;
+      }
+      setTimeout(cleanup, 1000);
+    }, 100);
   };
 
   const handlePrint = () => {
