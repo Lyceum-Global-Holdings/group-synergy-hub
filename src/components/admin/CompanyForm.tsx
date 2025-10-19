@@ -23,6 +23,8 @@ import {
 import { Upload, X } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { CreateCompanyData, Company } from '@/types/company';
+import { useUsers } from '@/hooks/useUsers';
+import { FormDescription } from '@/components/ui/form';
 
 const companyFormSchema = z.object({
   name: z.string().min(2, 'Company name must be at least 2 characters'),
@@ -30,6 +32,8 @@ const companyFormSchema = z.object({
   address: z.string().optional(),
   logo_url: z.string().optional(),
   status: z.enum(['active', 'inactive']),
+  hod_user_id: z.string().uuid().optional(),
+  manager_user_id: z.string().uuid().optional(),
 });
 
 type CompanyFormData = z.infer<typeof companyFormSchema>;
@@ -44,6 +48,7 @@ interface CompanyFormProps {
 export function CompanyForm({ company, onSubmit, onCancel, isLoading }: CompanyFormProps) {
   const [logoPreview, setLogoPreview] = useState<string | null>(company?.logo_url || null);
   const [isUploadingLogo, setIsUploadingLogo] = useState(false);
+  const { data: users } = useUsers();
 
   const form = useForm<CompanyFormData>({
     resolver: zodResolver(companyFormSchema),
@@ -53,6 +58,8 @@ export function CompanyForm({ company, onSubmit, onCancel, isLoading }: CompanyF
       address: company?.address || '',
       logo_url: company?.logo_url || '',
       status: company?.status || 'active',
+      hod_user_id: company?.hod_user_id || undefined,
+      manager_user_id: company?.manager_user_id || undefined,
     },
   });
 
@@ -248,6 +255,65 @@ export function CompanyForm({ company, onSubmit, onCancel, isLoading }: CompanyF
             </FormItem>
           )}
         />
+
+        <FormField
+          control={form.control}
+          name="hod_user_id"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Head of Department (HOD)</FormLabel>
+              <Select onValueChange={field.onChange} value={field.value || ""}>
+                <FormControl>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select HOD (optional)" />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  <SelectItem value="">None</SelectItem>
+                  {users?.map((user) => (
+                    <SelectItem key={user.id} value={user.id}>
+                      {user.full_name || user.email}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <FormDescription>
+                Primary approver for department-level requests
+              </FormDescription>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="manager_user_id"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Manager</FormLabel>
+              <Select onValueChange={field.onChange} value={field.value || ""}>
+                <FormControl>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select Manager (optional)" />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  <SelectItem value="">None</SelectItem>
+                  {users?.map((user) => (
+                    <SelectItem key={user.id} value={user.id}>
+                      {user.full_name || user.email}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <FormDescription>
+                Secondary approver for management-level requests
+              </FormDescription>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
         <div className="flex justify-end gap-2 pt-4">
           <Button type="button" variant="outline" onClick={onCancel} disabled={isLoading}>
             Cancel

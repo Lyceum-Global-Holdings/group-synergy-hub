@@ -1625,9 +1625,12 @@ export type Database = {
           address: string | null
           code: string
           created_at: string
+          created_by: string | null
+          hod_user_id: string | null
           id: string
           logo_url: string | null
           main_warehouse_location_id: string | null
+          manager_user_id: string | null
           modules: Json | null
           name: string
           status: string
@@ -1637,9 +1640,12 @@ export type Database = {
           address?: string | null
           code: string
           created_at?: string
+          created_by?: string | null
+          hod_user_id?: string | null
           id?: string
           logo_url?: string | null
           main_warehouse_location_id?: string | null
+          manager_user_id?: string | null
           modules?: Json | null
           name: string
           status?: string
@@ -1649,9 +1655,12 @@ export type Database = {
           address?: string | null
           code?: string
           created_at?: string
+          created_by?: string | null
+          hod_user_id?: string | null
           id?: string
           logo_url?: string | null
           main_warehouse_location_id?: string | null
+          manager_user_id?: string | null
           modules?: Json | null
           name?: string
           status?: string
@@ -1663,6 +1672,56 @@ export type Database = {
             columns: ["main_warehouse_location_id"]
             isOneToOne: false
             referencedRelation: "warehouse_locations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      company_approvers: {
+        Row: {
+          approval_level: Database["public"]["Enums"]["approval_level_type"]
+          can_approve_up_to_amount: number | null
+          company_id: string
+          created_at: string | null
+          created_by: string | null
+          department: string | null
+          id: string
+          is_primary: boolean | null
+          modules: Json | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          approval_level: Database["public"]["Enums"]["approval_level_type"]
+          can_approve_up_to_amount?: number | null
+          company_id: string
+          created_at?: string | null
+          created_by?: string | null
+          department?: string | null
+          id?: string
+          is_primary?: boolean | null
+          modules?: Json | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          approval_level?: Database["public"]["Enums"]["approval_level_type"]
+          can_approve_up_to_amount?: number | null
+          company_id?: string
+          created_at?: string | null
+          created_by?: string | null
+          department?: string | null
+          id?: string
+          is_primary?: boolean | null
+          modules?: Json | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "company_approvers_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
             referencedColumns: ["id"]
           },
         ]
@@ -9318,6 +9377,30 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: string
       }
+      get_company_approvers: {
+        Args: {
+          p_approval_level?: Database["public"]["Enums"]["approval_level_type"]
+          p_company_id: string
+          p_department?: string
+        }
+        Returns: {
+          approval_level: Database["public"]["Enums"]["approval_level_type"]
+          can_approve_up_to_amount: number
+          department: string
+          email: string
+          full_name: string
+          is_primary: boolean
+          user_id: string
+        }[]
+      }
+      get_company_hod: {
+        Args: { p_company_id: string }
+        Returns: string
+      }
+      get_company_manager: {
+        Args: { p_company_id: string }
+        Returns: string
+      }
       get_public_asset: {
         Args: { p_id: string }
         Returns: Json
@@ -9349,6 +9432,14 @@ export type Database = {
       }
       is_admin: {
         Args: { _user_id: string }
+        Returns: boolean
+      }
+      is_company_hod: {
+        Args: { p_company_id: string; p_user_id: string }
+        Returns: boolean
+      }
+      is_company_manager: {
+        Args: { p_company_id: string; p_user_id: string }
         Returns: boolean
       }
       is_super_admin: {
@@ -9408,6 +9499,12 @@ export type Database = {
         | "item_removal"
         | "other"
       app_role: "super_admin" | "admin" | "manager" | "user"
+      approval_level_type:
+        | "hod"
+        | "manager"
+        | "finance"
+        | "procurement"
+        | "custom"
       asset_approval_action: "approved" | "rejected" | "requested_changes"
       asset_approval_level: "hod" | "procurement" | "management"
       asset_fulfillment_method: "from_stock" | "purchase" | "transfer"
@@ -9817,6 +9914,13 @@ export const Constants = {
         "other",
       ],
       app_role: ["super_admin", "admin", "manager", "user"],
+      approval_level_type: [
+        "hod",
+        "manager",
+        "finance",
+        "procurement",
+        "custom",
+      ],
       asset_approval_action: ["approved", "rejected", "requested_changes"],
       asset_approval_level: ["hod", "procurement", "management"],
       asset_fulfillment_method: ["from_stock", "purchase", "transfer"],

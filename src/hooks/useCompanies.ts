@@ -23,7 +23,11 @@ export function useCompanies() {
 
       let query = supabase
         .from('companies')
-        .select('*')
+        .select(`
+          *,
+          hod:hod_user_id(full_name, email),
+          manager:manager_user_id(full_name, email)
+        `)
         .order('created_at', { ascending: false });
 
       // If not super admin and has company_id, filter to only their company
@@ -40,9 +44,14 @@ export function useCompanies() {
 
   const createCompanyMutation = useMutation({
     mutationFn: async (companyData: CreateCompanyData) => {
+      const { data: { user } } = await supabase.auth.getUser();
+      
       const { data, error } = await supabase
         .from('companies')
-        .insert(companyData)
+        .insert({
+          ...companyData,
+          created_by: user?.id,
+        })
         .select()
         .single();
 
