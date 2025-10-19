@@ -159,7 +159,7 @@ export function CompanyForm({ company, onSubmit, onCancel, isLoading }: CompanyF
                       <img
                         src={logoPreview}
                         alt="Company logo preview"
-                        className="w-full h-full object-contain bg-muted"
+                        className="w-full h-full object-contain"
                       />
                       <Button
                         type="button"

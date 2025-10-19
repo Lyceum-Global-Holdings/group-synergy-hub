@@ -5,7 +5,7 @@ export interface Company {
   address: string | null;
   logo_url: string | null;
   status: 'active' | 'inactive';
-  modules: Record<string, string[]> | string[]; // Support both old and new format
+  modules: Record<string, string[]> | string[];
   created_at: string;
   updated_at: string;
 }
