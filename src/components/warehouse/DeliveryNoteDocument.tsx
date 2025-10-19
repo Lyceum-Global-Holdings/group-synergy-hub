@@ -3,6 +3,7 @@ import { Printer, Download } from "lucide-react";
 import { format } from "date-fns";
 import { useMemo } from "react";
 import tuhLogo from "@/assets/tuh-logo.png";
+import { useCompany } from "@/contexts/CompanyContext";
 
 interface DeliveryNoteDocumentProps {
   issueId: string;
@@ -22,6 +23,8 @@ interface GroupedItem {
 }
 
 export function DeliveryNoteDocument({ issueId, issueDetails, issueItems }: DeliveryNoteDocumentProps) {
+  const { selectedCompany } = useCompany();
+  
   const handlePrint = () => {
     window.print();
   };
@@ -82,7 +85,11 @@ export function DeliveryNoteDocument({ issueId, issueDetails, issueItems }: Deli
         <div className="header">
           <div>
             <div className="brand">
-              <img src={tuhLogo} alt="The Uniform Hub Logo" className="brand-logo" />
+              <img 
+                src={selectedCompany?.logo_url || tuhLogo} 
+                alt={`${selectedCompany?.name || 'Company'} Logo`} 
+                className="brand-logo" 
+              />
             </div>
             <div className="company">
               <div><strong>THE UNIFORM HUB (PVT) LIMITED</strong></div>

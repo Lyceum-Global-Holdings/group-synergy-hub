@@ -282,9 +282,22 @@ export default function CompanyManagement() {
                   companies.map((company) => (
                     <TableRow key={company.id}>
                       <TableCell>
-                        <div>
-                          <div className="font-medium">{company.name}</div>
-                          <div className="text-sm text-muted-foreground">{company.address}</div>
+                        <div className="flex items-center gap-3">
+                          {company.logo_url ? (
+                            <img
+                              src={company.logo_url}
+                              alt={`${company.name} logo`}
+                              className="w-10 h-10 object-contain rounded border"
+                            />
+                          ) : (
+                            <div className="w-10 h-10 bg-muted rounded border flex items-center justify-center">
+                              <Building2 className="h-5 w-5 text-muted-foreground" />
+                            </div>
+                          )}
+                          <div>
+                            <div className="font-medium">{company.name}</div>
+                            <div className="text-sm text-muted-foreground">{company.address}</div>
+                          </div>
                         </div>
                       </TableCell>
                       <TableCell>

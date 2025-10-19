@@ -1626,6 +1626,7 @@ export type Database = {
           code: string
           created_at: string
           id: string
+          logo_url: string | null
           main_warehouse_location_id: string | null
           modules: Json | null
           name: string
@@ -1637,6 +1638,7 @@ export type Database = {
           code: string
           created_at?: string
           id?: string
+          logo_url?: string | null
           main_warehouse_location_id?: string | null
           modules?: Json | null
           name: string
@@ -1648,6 +1650,7 @@ export type Database = {
           code?: string
           created_at?: string
           id?: string
+          logo_url?: string | null
           main_warehouse_location_id?: string | null
           modules?: Json | null
           name?: string
