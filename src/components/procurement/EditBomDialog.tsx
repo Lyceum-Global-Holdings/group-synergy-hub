@@ -68,11 +68,13 @@ export function EditBomDialog({ bom, open, onOpenChange }: EditBomDialogProps) {
     packing_trims: [],
     embellishment: [],
   });
+  const [selectedFinishedGood, setSelectedFinishedGood] = useState<FinishedGood | null>(null);
 
   const { selectedCompany } = useCompany();
   const { updateBom, isUpdating } = useBillOfMaterials(selectedCompany?.id);
   const { items: existingItems, isLoading: itemsLoading } = useBomItems(bom?.id || '');
   const { units } = useItemUnits();
+  const { products: finishedGoods } = useFinishedGoods(selectedCompany?.id);
   const { products: finishedGoods } = useFinishedGoods(selectedCompany?.id);
 
   const form = useForm<BomFormData>({
