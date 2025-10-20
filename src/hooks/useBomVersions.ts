@@ -28,7 +28,15 @@ export function useBomVersions(bomId?: string) {
       const user = await supabase.auth.getUser();
       const { data, error } = await supabase
         .from('bom_versions')
-        .insert({ ...versionData, created_by: user.data.user?.id })
+        .insert({
+          bom_id: versionData.bom_id!,
+          version_number: versionData.version_number!,
+          version_notes: versionData.version_notes,
+          changes_summary: versionData.changes_summary,
+          previous_version_id: versionData.previous_version_id,
+          version_data: versionData.version_data,
+          created_by: user.data.user?.id
+        } as any)
         .select()
         .single();
       

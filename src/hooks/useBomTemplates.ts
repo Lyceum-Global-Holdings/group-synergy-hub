@@ -24,7 +24,15 @@ export function useBomTemplates(companyId?: string) {
       const user = await supabase.auth.getUser();
       const { data, error } = await supabase
         .from('bom_templates')
-        .insert({ ...templateData, created_by: user.data.user?.id })
+        .insert({
+          template_name: templateData.template_name!,
+          category: templateData.category,
+          description: templateData.description,
+          is_public: templateData.is_public || false,
+          company_id: templateData.company_id,
+          template_data: templateData.template_data || {},
+          created_by: user.data.user?.id
+        } as any)
         .select()
         .single();
       
