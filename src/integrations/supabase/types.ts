@@ -1441,6 +1441,115 @@ export type Database = {
           },
         ]
       }
+      bom_approvals: {
+        Row: {
+          approval_level: number
+          approval_status: string
+          approved_at: string | null
+          approver_id: string
+          bom_id: string
+          comments: string | null
+          created_at: string
+          id: string
+        }
+        Insert: {
+          approval_level?: number
+          approval_status?: string
+          approved_at?: string | null
+          approver_id: string
+          bom_id: string
+          comments?: string | null
+          created_at?: string
+          id?: string
+        }
+        Update: {
+          approval_level?: number
+          approval_status?: string
+          approved_at?: string | null
+          approver_id?: string
+          bom_id?: string
+          comments?: string | null
+          created_at?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bom_approvals_bom_id_fkey"
+            columns: ["bom_id"]
+            isOneToOne: false
+            referencedRelation: "bill_of_materials"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bom_approvals_bom_id_fkey"
+            columns: ["bom_id"]
+            isOneToOne: false
+            referencedRelation: "modern_boms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      bom_item_substitutions: {
+        Row: {
+          availability_status: string | null
+          bom_item_id: string
+          cost_difference: number | null
+          created_at: string
+          created_by: string | null
+          id: string
+          notes: string | null
+          priority: number | null
+          substitute_item_id: string
+          updated_at: string
+        }
+        Insert: {
+          availability_status?: string | null
+          bom_item_id: string
+          cost_difference?: number | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          priority?: number | null
+          substitute_item_id: string
+          updated_at?: string
+        }
+        Update: {
+          availability_status?: string | null
+          bom_item_id?: string
+          cost_difference?: number | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          priority?: number | null
+          substitute_item_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bom_item_substitutions_bom_item_id_fkey"
+            columns: ["bom_item_id"]
+            isOneToOne: false
+            referencedRelation: "bom_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bom_item_substitutions_substitute_item_id_fkey"
+            columns: ["substitute_item_id"]
+            isOneToOne: false
+            referencedRelation: "v_adjustment_summary_by_item"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bom_item_substitutions_substitute_item_id_fkey"
+            columns: ["substitute_item_id"]
+            isOneToOne: false
+            referencedRelation: "warehouse_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       bom_items: {
         Row: {
           bom_id: string
@@ -1539,6 +1648,114 @@ export type Database = {
             columns: ["warehouse_item_id"]
             isOneToOne: false
             referencedRelation: "warehouse_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      bom_templates: {
+        Row: {
+          category: string | null
+          company_id: string | null
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          is_public: boolean | null
+          template_data: Json
+          template_name: string
+          updated_at: string
+          usage_count: number | null
+        }
+        Insert: {
+          category?: string | null
+          company_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_public?: boolean | null
+          template_data?: Json
+          template_name: string
+          updated_at?: string
+          usage_count?: number | null
+        }
+        Update: {
+          category?: string | null
+          company_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_public?: boolean | null
+          template_data?: Json
+          template_name?: string
+          updated_at?: string
+          usage_count?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bom_templates_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      bom_versions: {
+        Row: {
+          bom_id: string
+          changes_summary: Json | null
+          created_at: string
+          created_by: string | null
+          id: string
+          previous_version_id: string | null
+          version_data: Json
+          version_notes: string | null
+          version_number: string
+        }
+        Insert: {
+          bom_id: string
+          changes_summary?: Json | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          previous_version_id?: string | null
+          version_data?: Json
+          version_notes?: string | null
+          version_number: string
+        }
+        Update: {
+          bom_id?: string
+          changes_summary?: Json | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          previous_version_id?: string | null
+          version_data?: Json
+          version_notes?: string | null
+          version_number?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bom_versions_bom_id_fkey"
+            columns: ["bom_id"]
+            isOneToOne: false
+            referencedRelation: "bill_of_materials"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bom_versions_bom_id_fkey"
+            columns: ["bom_id"]
+            isOneToOne: false
+            referencedRelation: "modern_boms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bom_versions_previous_version_id_fkey"
+            columns: ["previous_version_id"]
+            isOneToOne: false
+            referencedRelation: "bom_versions"
             referencedColumns: ["id"]
           },
         ]

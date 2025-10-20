@@ -76,3 +76,57 @@ export interface CreateBomItemData {
 export interface UpdateBomData extends Partial<CreateBomData> {
   id: string;
 }
+
+// BOM Version Types
+export interface BomVersion {
+  id: string;
+  bom_id: string;
+  version_number: string;
+  version_notes?: string;
+  changes_summary?: any[];
+  previous_version_id?: string;
+  created_by?: string;
+  created_at: string;
+  version_data: any;
+}
+
+// BOM Template Types
+export interface BomTemplate {
+  id: string;
+  template_name: string;
+  category?: string;
+  description?: string;
+  is_public: boolean;
+  company_id?: string;
+  created_by?: string;
+  created_at: string;
+  updated_at: string;
+  template_data: any;
+  usage_count: number;
+}
+
+// BOM Item Substitution Types
+export interface BomItemSubstitution {
+  id: string;
+  bom_item_id: string;
+  substitute_item_id: string;
+  priority: number;
+  notes?: string;
+  cost_difference?: number;
+  availability_status: string;
+  created_by?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+// BOM Approval Types
+export interface BomApproval {
+  id: string;
+  bom_id: string;
+  approver_id: string;
+  approval_level: number;
+  approval_status: string;
+  comments?: string;
+  approved_at?: string;
+  created_at: string;
+}
