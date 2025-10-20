@@ -26,6 +26,7 @@ interface FinishedGoodsItemSelectorProps {
   className?: string;
   disabled?: boolean;
   showAvailableSizes?: boolean;
+  filterByProductMaster?: string; // Filter by product master ID
 }
 
 export function FinishedGoodsItemSelector({
@@ -35,12 +36,21 @@ export function FinishedGoodsItemSelector({
   className,
   disabled = false,
   showAvailableSizes = false,
+  filterByProductMaster,
 }: FinishedGoodsItemSelectorProps) {
   const [open, setOpen] = useState(false);
   const { selectedCompany } = useCompany();
   const { products, isLoading, error } = useFinishedGoods(selectedCompany?.id);
 
-  const activeProducts = products?.filter(product => product.status === 'active') || [];
+  const activeProducts = products
+    ?.filter(product => product.status === 'active')
+    ?.filter(product => {
+      // If filterByProductMaster is set, only show finished goods linked to that product master
+      if (filterByProductMaster) {
+        return product.product_master_id === filterByProductMaster;
+      }
+      return true;
+    }) || [];
   const selectedProduct = activeProducts.find(product => product.id === value);
 
   const handleSelect = (product: FinishedGood) => {

@@ -3,6 +3,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Plus, Trash2, Link2, X } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 import {
   Dialog,
   DialogContent,
@@ -38,16 +39,17 @@ import { STANDARD_SIZES, SIZE_CATEGORIES, getSizesByCategory } from '@/constants
 import { CreateBomItemData } from '@/types/bom';
 import { ItemSelector } from '@/components/common/ItemSelector';
 import { ProductMasterSelector } from '@/components/common/ProductMasterSelector';
+import { FinishedGoodsItemSelector } from '@/components/common/FinishedGoodsItemSelector';
 import { WarehouseItem } from '@/types/itemBin';
 
 const bomSchema = z.object({
   product_name: z.string().min(1, 'Product name is required'),
-  product_master_id: z.string().optional(),
-  warehouse_item_id: z.string().optional(),
-  finished_good_id: z.string().optional(),
+  product_master_id: z.string().min(1, 'Product template is required'),
+  finished_good_id: z.string().min(1, 'Finished good variant is required'),
   style_no: z.string().optional(),
   version: z.string().optional(),
   size: z.string().optional(),
+  color: z.string().optional(),
   description: z.string().optional(),
   status: z.enum(['active', 'inactive', 'draft']).default('draft'),
 });
@@ -76,10 +78,10 @@ export function CreateBomDialog({ children }: CreateBomDialogProps) {
     defaultValues: {
       product_name: '',
       product_master_id: '',
-      warehouse_item_id: '',
       finished_good_id: '',
       version: '1.0',
       size: '',
+      color: '',
       description: '',
       status: 'draft',
     },
@@ -177,9 +179,9 @@ export function CreateBomDialog({ children }: CreateBomDialogProps) {
 
       await createBom({
         product_name: data.product_name,
-        product_master_id: data.product_master_id || undefined,
-        warehouse_item_id: data.warehouse_item_id || undefined,
-        finished_good_id: data.finished_good_id || undefined,
+        product_master_id: data.product_master_id,
+        finished_good_id: data.finished_good_id,
+        size: data.size,
         style_no: data.style_no,
         version: data.version,
         description: data.description,
@@ -408,14 +410,15 @@ export function CreateBomDialog({ children }: CreateBomDialogProps) {
                 />
 
                 <div className="space-y-2">
-                  <FormLabel>Product Template</FormLabel>
+                  <FormLabel>Product Template *</FormLabel>
                   <ProductMasterSelector
                     value={form.watch('product_master_id')}
                     onSelect={(product) => {
                       if (product) {
                         form.setValue('product_master_id', product.id);
                         form.setValue('finished_good_id', '');
-                        form.setValue('warehouse_item_id', '');
+                        form.setValue('size', '');
+                        form.setValue('color', '');
                         
                         if (!form.getValues('product_name')) {
                           form.setValue('product_name', product.product_name);
@@ -423,46 +426,54 @@ export function CreateBomDialog({ children }: CreateBomDialogProps) {
                         if (!form.getValues('style_no')) {
                           form.setValue('style_no', product.style_no || '');
                         }
-                        
-                        const availableSizes = (product.available_sizes || [])
-                          .map((s: any) => typeof s === 'string' ? s : s.size_name)
-                          .filter(Boolean);
-                        
-                        if (availableSizes.length > 0 && !form.getValues('size')) {
-                          form.setValue('size', availableSizes[0]);
-                        }
                       } else {
                         form.setValue('product_master_id', '');
+                        form.setValue('finished_good_id', '');
+                        form.setValue('size', '');
+                        form.setValue('color', '');
                       }
                     }}
                     placeholder="Select product template..."
-                    disabled={!!form.watch('warehouse_item_id') || !!form.watch('finished_good_id')}
                   />
                   <p className="text-xs text-muted-foreground">
-                    Select from Product Master templates to create a BOM
+                    Select the product template that defines available variants
                   </p>
                 </div>
 
                 <div className="space-y-2">
-                  <FormLabel>Or Link to Inventory Item</FormLabel>
-                  <ItemSelector
-                    onSelect={(item: WarehouseItem | null) => {
-                      if (item) {
-                        form.setValue('warehouse_item_id', item.id);
-                        form.setValue('finished_good_id', ''); // Clear finished good
+                  <FormLabel>Finished Good Variant *</FormLabel>
+                  <FinishedGoodsItemSelector
+                    value={form.watch('finished_good_id')}
+                    onSelect={(finishedGood) => {
+                      if (finishedGood) {
+                        form.setValue('finished_good_id', finishedGood.id);
+                        form.setValue('size', finishedGood.size || '');
+                        form.setValue('color', finishedGood.color || '');
                         if (!form.getValues('product_name')) {
-                          form.setValue('product_name', item.name);
+                          form.setValue('product_name', finishedGood.product_name);
                         }
                       } else {
-                        form.setValue('warehouse_item_id', '');
+                        form.setValue('finished_good_id', '');
+                        form.setValue('size', '');
+                        form.setValue('color', '');
                       }
                     }}
-                    value={form.watch('warehouse_item_id')}
-                    placeholder="Select from warehouse inventory..."
-                    disabled={!!form.watch('finished_good_id')}
+                    filterByProductMaster={form.watch('product_master_id')}
+                    placeholder="Select finished good variant..."
+                    disabled={!form.watch('product_master_id')}
                   />
+                  {form.watch('finished_good_id') && (
+                    <div className="flex gap-2 mt-2">
+                      {form.watch('size') && (
+                        <Badge variant="secondary">Size: {form.watch('size')}</Badge>
+                      )}
+                      {form.watch('color') && (
+                        <Badge variant="secondary">Color: {form.watch('color')}</Badge>
+                      )}
+                    </div>
+                  )}
                   <p className="text-xs text-muted-foreground">
-                    Alternative: Link to an existing warehouse inventory item
+                    Select the specific size/color variant for this BOM
                   </p>
                 </div>
 
@@ -500,28 +511,30 @@ export function CreateBomDialog({ children }: CreateBomDialogProps) {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Size</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select size" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent className="bg-background border z-50 max-h-60">
-                          {SIZE_CATEGORIES.map((cat) => (
-                            <div key={cat}>
-                              <div className="px-2 py-1 text-xs font-medium text-muted-foreground border-b">
-                                {cat}
-                              </div>
-                              {getSizesByCategory(cat).map((size) => (
-                                <SelectItem key={size.value} value={size.value}>
-                                  {size.label}
-                                </SelectItem>
-                              ))}
-                            </div>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <FormControl>
+                        <Input {...field} disabled placeholder="Auto-filled from finished good" />
+                      </FormControl>
                       <FormMessage />
+                      <p className="text-xs text-muted-foreground">
+                        Auto-populated from selected finished good variant
+                      </p>
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="color"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Color</FormLabel>
+                      <FormControl>
+                        <Input {...field} disabled placeholder="Auto-filled from finished good" />
+                      </FormControl>
+                      <FormMessage />
+                      <p className="text-xs text-muted-foreground">
+                        Auto-populated from selected finished good variant
+                      </p>
                     </FormItem>
                   )}
                 />
