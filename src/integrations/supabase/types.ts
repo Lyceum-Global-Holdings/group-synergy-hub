@@ -824,6 +824,7 @@ export type Database = {
           description: string | null
           finished_good_id: string | null
           id: string
+          is_legacy_bom: boolean | null
           po_id: string | null
           product_master_id: string | null
           product_name: string
@@ -844,6 +845,7 @@ export type Database = {
           description?: string | null
           finished_good_id?: string | null
           id?: string
+          is_legacy_bom?: boolean | null
           po_id?: string | null
           product_master_id?: string | null
           product_name: string
@@ -864,6 +866,7 @@ export type Database = {
           description?: string | null
           finished_good_id?: string | null
           id?: string
+          is_legacy_bom?: boolean | null
           po_id?: string | null
           product_master_id?: string | null
           product_name?: string
@@ -1508,6 +1511,13 @@ export type Database = {
             columns: ["bom_id"]
             isOneToOne: false
             referencedRelation: "bill_of_materials"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bom_items_bom_id_fkey"
+            columns: ["bom_id"]
+            isOneToOne: false
+            referencedRelation: "modern_boms"
             referencedColumns: ["id"]
           },
           {
@@ -6121,6 +6131,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "purchase_requisitions_bom_id_fkey"
+            columns: ["bom_id"]
+            isOneToOne: false
+            referencedRelation: "modern_boms"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "purchase_requisitions_company_id_fkey"
             columns: ["company_id"]
             isOneToOne: false
@@ -6672,6 +6689,13 @@ export type Database = {
             columns: ["bom_id"]
             isOneToOne: false
             referencedRelation: "bill_of_materials"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rfq_rfp_requests_bom_id_fkey"
+            columns: ["bom_id"]
+            isOneToOne: false
+            referencedRelation: "modern_boms"
             referencedColumns: ["id"]
           },
           {
@@ -9103,6 +9127,115 @@ export type Database = {
       }
     }
     Views: {
+      modern_boms: {
+        Row: {
+          bom_number: string | null
+          company_id: string | null
+          created_at: string | null
+          created_by: string | null
+          description: string | null
+          finished_good_id: string | null
+          id: string | null
+          is_legacy_bom: boolean | null
+          po_id: string | null
+          product_master_id: string | null
+          product_name: string | null
+          size: string | null
+          size_specific: boolean | null
+          status: string | null
+          style_no: string | null
+          target_sizes: Json | null
+          updated_at: string | null
+          version: string | null
+          warehouse_item_id: string | null
+        }
+        Insert: {
+          bom_number?: string | null
+          company_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          finished_good_id?: string | null
+          id?: string | null
+          is_legacy_bom?: boolean | null
+          po_id?: string | null
+          product_master_id?: string | null
+          product_name?: string | null
+          size?: string | null
+          size_specific?: boolean | null
+          status?: string | null
+          style_no?: string | null
+          target_sizes?: Json | null
+          updated_at?: string | null
+          version?: string | null
+          warehouse_item_id?: string | null
+        }
+        Update: {
+          bom_number?: string | null
+          company_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          finished_good_id?: string | null
+          id?: string | null
+          is_legacy_bom?: boolean | null
+          po_id?: string | null
+          product_master_id?: string | null
+          product_name?: string | null
+          size?: string | null
+          size_specific?: boolean | null
+          status?: string | null
+          style_no?: string | null
+          target_sizes?: Json | null
+          updated_at?: string | null
+          version?: string | null
+          warehouse_item_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bill_of_materials_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bill_of_materials_finished_good_id_fkey"
+            columns: ["finished_good_id"]
+            isOneToOne: false
+            referencedRelation: "finished_goods"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bill_of_materials_po_id_fkey"
+            columns: ["po_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bill_of_materials_product_master_id_fkey"
+            columns: ["product_master_id"]
+            isOneToOne: false
+            referencedRelation: "product_master"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bill_of_materials_warehouse_item_id_fkey"
+            columns: ["warehouse_item_id"]
+            isOneToOne: false
+            referencedRelation: "v_adjustment_summary_by_item"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bill_of_materials_warehouse_item_id_fkey"
+            columns: ["warehouse_item_id"]
+            isOneToOne: false
+            referencedRelation: "warehouse_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       v_active_accounts_with_balances: {
         Row: {
           account_category:
