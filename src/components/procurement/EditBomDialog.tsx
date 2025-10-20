@@ -76,10 +76,6 @@ export function EditBomDialog({ bom, open, onOpenChange }: EditBomDialogProps) {
   const { units } = useItemUnits();
   const { products: finishedGoodsList } = useFinishedGoods(selectedCompany?.id);
 
-  const selectedFinishedGood = finishedGoodsList?.find(
-    fg => fg.id === form.watch('finished_good_id')
-  );
-
   const form = useForm<BomFormData>({
     resolver: zodResolver(bomSchema),
     defaultValues: {
@@ -93,6 +89,10 @@ export function EditBomDialog({ bom, open, onOpenChange }: EditBomDialogProps) {
       status: 'draft',
     },
   });
+
+  const selectedFinishedGood = finishedGoodsList?.find(
+    fg => fg.id === form.watch('finished_good_id')
+  );
 
   // Load existing BOM data when dialog opens
   useEffect(() => {
