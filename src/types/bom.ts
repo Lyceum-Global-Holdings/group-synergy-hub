@@ -2,12 +2,13 @@ export interface BillOfMaterials {
   id: string;
   bom_number: string;
   product_name: string;
-  product_master_id?: string; // Link to product master template (primary)
-  warehouse_item_id?: string; // Link to warehouse item for the product
-  finished_good_id?: string; // Link to finished goods product master
+  product_master_id?: string;
+  warehouse_item_id?: string;
+  finished_good_id?: string;
   style_no?: string;
   version: string;
   size?: string;
+  color?: string;
   description?: string;
   status: 'active' | 'inactive' | 'draft';
   po_id?: string;
@@ -34,19 +35,20 @@ export interface BomItem {
   colour?: string;
   consumption?: number;
   category?: string;
-  warehouse_item_id?: string; // Link to warehouse item
+  warehouse_item_id?: string;
   created_at: string;
   updated_at: string;
 }
 
 export interface CreateBomData {
   product_name: string;
-  product_master_id?: string; // Link to product master template (primary)
-  warehouse_item_id?: string; // Link to warehouse item for the product
-  finished_good_id?: string; // Link to finished goods product master
+  product_master_id?: string;
+  warehouse_item_id?: string;
+  finished_good_id?: string;
   style_no?: string;
   version?: string;
   size?: string;
+  color?: string;
   description?: string;
   status?: 'active' | 'inactive' | 'draft';
   po_id?: string;
@@ -68,7 +70,7 @@ export interface CreateBomItemData {
   colour?: string;
   consumption?: number;
   category?: string;
-  warehouse_item_id?: string; // Link to warehouse item
+  warehouse_item_id?: string;
 }
 
 export interface UpdateBomData extends Partial<CreateBomData> {

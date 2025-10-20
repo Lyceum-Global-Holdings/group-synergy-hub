@@ -3,7 +3,6 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Plus, Trash2, Link2, X } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
 import {
   Dialog,
   DialogContent,
@@ -30,16 +29,17 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { useBillOfMaterials, useBomItems } from '@/hooks/useBillOfMaterials';
 import { useCompany } from '@/contexts/CompanyContext';
 import { useItemUnits } from '@/hooks/useItemUnits';
-import { BOM_CATEGORIES, BomCategoryKey } from '@/constants/bomCategories';
-import { STANDARD_SIZES, SIZE_CATEGORIES, getSizesByCategory } from '@/constants/standardSizes';
-import { CreateBomItemData, BillOfMaterials } from '@/types/bom';
-import { FinishedGoodsItemSelector } from '@/components/common/FinishedGoodsItemSelector';
-import { ProductMasterSelector } from '@/components/common/ProductMasterSelector';
-import { useProductMaster } from '@/hooks/useProductMaster';
 import { useFinishedGoods } from '@/hooks/useFinishedGoods';
+import { BOM_CATEGORIES, BomCategoryKey } from '@/constants/bomCategories';
+import { CreateBomItemData, BillOfMaterials } from '@/types/bom';
+import { ItemSelector } from '@/components/common/ItemSelector';
+import { ProductMasterSelector } from '@/components/common/ProductMasterSelector';
+import { FinishedGoodsItemSelector } from '@/components/common/FinishedGoodsItemSelector';
+import { WarehouseItem } from '@/types/itemBin';
 
 const bomSchema = z.object({
   product_name: z.string().min(1, 'Product name is required'),
@@ -68,14 +68,17 @@ export function EditBomDialog({ bom, open, onOpenChange }: EditBomDialogProps) {
     packing_trims: [],
     embellishment: [],
   });
-  const [selectedFinishedGood, setSelectedFinishedGood] = useState<FinishedGood | null>(null);
+  const [selectedProductMasterId, setSelectedProductMasterId] = useState<string>('');
 
   const { selectedCompany } = useCompany();
   const { updateBom, isUpdating } = useBillOfMaterials(selectedCompany?.id);
   const { items: existingItems, isLoading: itemsLoading } = useBomItems(bom?.id || '');
   const { units } = useItemUnits();
-  const { products: finishedGoods } = useFinishedGoods(selectedCompany?.id);
-  const { products: finishedGoods } = useFinishedGoods(selectedCompany?.id);
+  const { products: finishedGoodsList } = useFinishedGoods(selectedCompany?.id);
+
+  const selectedFinishedGood = finishedGoodsList?.find(
+    fg => fg.id === form.watch('finished_good_id')
+  );
 
   const form = useForm<BomFormData>({
     resolver: zodResolver(bomSchema),
@@ -91,14 +94,15 @@ export function EditBomDialog({ bom, open, onOpenChange }: EditBomDialogProps) {
     },
   });
 
-  const selectedFinishedGood = finishedGoods?.find(fg => fg.id === form.watch('finished_good_id'));
-
   // Load existing BOM data when dialog opens
   useEffect(() => {
     if (bom && open) {
+      const productMasterId = bom.product_master_id || '';
+      setSelectedProductMasterId(productMasterId);
+      
       form.reset({
         product_name: bom.product_name,
-        product_master_id: bom.product_master_id || '',
+        product_master_id: productMasterId,
         finished_good_id: bom.finished_good_id || '',
         style_no: bom.style_no || '',
         version: bom.version || '1.0',
@@ -179,7 +183,7 @@ export function EditBomDialog({ bom, open, onOpenChange }: EditBomDialogProps) {
     }));
   };
 
-  const linkItemToMaster = (category: BomCategoryKey, index: number, warehouseItem: any) => {
+  const linkItemToMaster = (category: BomCategoryKey, index: number, warehouseItem: WarehouseItem) => {
     const unitAbbreviation = units.find(unit => unit.id === warehouseItem.unit_id)?.abbreviation || 'pcs';
     
     setItems(prev => ({
@@ -319,7 +323,12 @@ export function EditBomDialog({ bom, open, onOpenChange }: EditBomDialogProps) {
                               </Button>
                             </div>
                           ) : (
-                            <div className="text-xs text-muted-foreground">Manual entry</div>
+                            <ItemSelector
+                              value={undefined}
+                              onSelect={(warehouseItem) => warehouseItem && linkItemToMaster(category, index, warehouseItem)}
+                              placeholder="Link to item master..."
+                              className="h-8 text-xs"
+                            />
                           )}
                         </div>
                       </td>
@@ -432,7 +441,7 @@ export function EditBomDialog({ bom, open, onOpenChange }: EditBomDialogProps) {
           <DialogTitle>Edit Bill of Materials - {bom.bom_number}</DialogTitle>
         </DialogHeader>
 
-        {itemsLoading || !bom ? (
+        {itemsLoading ? (
           <div className="text-center py-8">Loading BOM data...</div>
         ) : (
           <Form {...form}>
@@ -456,68 +465,77 @@ export function EditBomDialog({ bom, open, onOpenChange }: EditBomDialogProps) {
                   )}
                 />
 
-                <div className="space-y-2">
-                  <FormLabel>Product Template (Master) *</FormLabel>
-                  <ProductMasterSelector
-                    onSelect={(product) => {
-                      if (product) {
-                        form.setValue('product_master_id', product.id);
-                        form.setValue('finished_good_id', ''); // Reset finished good
-                        if (!form.getValues('product_name')) {
-                          form.setValue('product_name', product.product_name);
-                        }
-                        if (!form.getValues('style_no')) {
-                          form.setValue('style_no', product.style_no || '');
-                        }
-                      } else {
-                        form.setValue('product_master_id', '');
-                      }
-                    }}
-                    value={form.watch('product_master_id')}
-                    placeholder="Select product template..."
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Select the product template that defines available sizes and colors
-                  </p>
-                </div>
-
-                <div className="space-y-2">
-                  <FormLabel>Finished Good (Specific Variant) *</FormLabel>
-                  <FinishedGoodsItemSelector
-                    onSelect={(product) => {
-                      if (product) {
-                        form.setValue('finished_good_id', product.id);
-                        form.setValue('size', product.size || '');
-                        form.setValue('color', product.color || '');
-                        if (!form.getValues('product_name')) {
-                          form.setValue('product_name', product.product_name);
-                        }
-                        if (!form.getValues('style_no')) {
-                          form.setValue('style_no', product.style_no || '');
-                        }
-                      } else {
-                        form.setValue('finished_good_id', '');
-                        form.setValue('size', '');
-                        form.setValue('color', '');
-                      }
-                    }}
-                    value={form.watch('finished_good_id')}
-                    placeholder="Select finished good variant..."
-                    filterByProductMaster={form.watch('product_master_id')}
-                    disabled={!form.watch('product_master_id')}
-                  />
-                  {selectedFinishedGood && (
-                    <div className="flex gap-2 mt-2">
-                      {selectedFinishedGood.size && <Badge variant="outline">Size: {selectedFinishedGood.size}</Badge>}
-                      {selectedFinishedGood.color && <Badge variant="outline">Color: {selectedFinishedGood.color}</Badge>}
-                    </div>
+                <FormField
+                  control={form.control}
+                  name="product_master_id"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Product Master Template *</FormLabel>
+                      <FormControl>
+                        <ProductMasterSelector
+                          value={field.value}
+                          onSelect={(product) => {
+                            if (product) {
+                              field.onChange(product.id);
+                              setSelectedProductMasterId(product.id);
+                              form.setValue('finished_good_id', '');
+                              form.setValue('product_name', product.product_name);
+                              form.setValue('style_no', product.style_no || '');
+                            } else {
+                              field.onChange('');
+                              setSelectedProductMasterId('');
+                              form.setValue('finished_good_id', '');
+                            }
+                          }}
+                          placeholder="Select product master template..."
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
                   )}
-                  <p className="text-xs text-muted-foreground">
-                    Select the specific size and color combination for this BOM
-                  </p>
-                </div>
+                />
 
                 <FormField
+                  control={form.control}
+                  name="finished_good_id"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Finished Good (Size & Color Variant) *</FormLabel>
+                      <FormControl>
+                        <FinishedGoodsItemSelector
+                          value={field.value}
+                          onSelect={(finishedGood) => {
+                            if (finishedGood) {
+                              field.onChange(finishedGood.id);
+                              form.setValue('size', finishedGood.size || '');
+                              form.setValue('color', finishedGood.color || '');
+                            } else {
+                              field.onChange('');
+                              form.setValue('size', '');
+                              form.setValue('color', '');
+                            }
+                          }}
+                          filterByProductMaster={selectedProductMasterId}
+                          disabled={!selectedProductMasterId}
+                          placeholder="Select finished good variant..."
+                        />
+                      </FormControl>
+                      <FormMessage />
+                      {selectedFinishedGood && (
+                        <div className="flex gap-2 mt-2">
+                          {selectedFinishedGood.size && (
+                            <Badge variant="secondary">Size: {selectedFinishedGood.size}</Badge>
+                          )}
+                          {selectedFinishedGood.color && (
+                            <Badge variant="secondary">Color: {selectedFinishedGood.color}</Badge>
+                          )}
+                        </div>
+                      )}
+                    </FormItem>
+                  )}
+                />
+
+                  <FormField
                     control={form.control}
                     name="style_no"
                     render={({ field }) => (
@@ -552,10 +570,10 @@ export function EditBomDialog({ bom, open, onOpenChange }: EditBomDialogProps) {
                       <FormItem>
                         <FormLabel>Size</FormLabel>
                         <FormControl>
-                          <Input {...field} placeholder="Auto-filled from finished good" disabled className="bg-muted" />
+                          <Input {...field} disabled className="bg-muted" />
                         </FormControl>
+                        <p className="text-xs text-muted-foreground">Auto-filled from finished good</p>
                         <FormMessage />
-                        <p className="text-xs text-muted-foreground">Auto-filled from selected finished good</p>
                       </FormItem>
                     )}
                   />
@@ -567,10 +585,10 @@ export function EditBomDialog({ bom, open, onOpenChange }: EditBomDialogProps) {
                       <FormItem>
                         <FormLabel>Color</FormLabel>
                         <FormControl>
-                          <Input {...field} placeholder="Auto-filled from finished good" disabled className="bg-muted" />
+                          <Input {...field} disabled className="bg-muted" />
                         </FormControl>
+                        <p className="text-xs text-muted-foreground">Auto-filled from finished good</p>
                         <FormMessage />
-                        <p className="text-xs text-muted-foreground">Auto-filled from selected finished good</p>
                       </FormItem>
                     )}
                   />
