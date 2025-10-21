@@ -2,21 +2,21 @@ export const APPROVAL_ROLES = {
   USER: {
     app_role: 'user',
     permission: 'can_review_registrations',
-    stages: [1],
+    stages: [1] as number[],
     max_supplier_value: 50000,
     display_name: 'Procurement Officer',
   },
   MODERATOR: {
     app_role: 'moderator',
     permission: 'can_approve_suppliers',
-    stages: [2, 3],
+    stages: [2, 3] as number[],
     max_supplier_value: 500000,
     display_name: 'Procurement/Finance Manager',
   },
   ADMIN: {
     app_role: 'admin',
     permission: 'can_approve_all',
-    stages: [1, 2, 3, 4],
+    stages: [1, 2, 3, 4] as number[],
     max_supplier_value: null,
     display_name: 'Administrator',
   },
@@ -35,5 +35,5 @@ export function getRoleForStage(stageOrder: number): ApprovalRoleKey | null {
 
 export function canUserApproveStage(userRole: string, stageOrder: number): boolean {
   const roleConfig = Object.values(APPROVAL_ROLES).find(r => r.app_role === userRole);
-  return roleConfig ? (roleConfig.stages as readonly number[]).includes(stageOrder) : false;
+  return roleConfig ? roleConfig.stages.includes(stageOrder) : false;
 }

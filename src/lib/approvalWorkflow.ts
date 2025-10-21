@@ -140,7 +140,7 @@ export class ApprovalWorkflowEngine {
 
     if (!registration) throw new Error('Registration not found');
 
-    const requiredStages = await this.determineRequiredStages(registration, companyId);
+    const requiredStages = await this.determineRequiredStages(registration as any, companyId);
     const firstStage = requiredStages[0] || 1;
 
     // Get stage info
@@ -189,7 +189,7 @@ export class ApprovalWorkflowEngine {
 
     if (!registration) throw new Error('Registration not found');
 
-    const requiredStages = await this.determineRequiredStages(registration, companyId);
+    const requiredStages = await this.determineRequiredStages(registration as any, companyId);
     const currentIndex = requiredStages.indexOf(currentStageOrder);
     
     if (currentIndex === -1 || currentIndex === requiredStages.length - 1) {
@@ -247,20 +247,34 @@ export class ApprovalWorkflowEngine {
 
     // Create supplier record from registration data
     const supplierData = typeof registration.supplier_data === 'object' ? registration.supplier_data as any : {};
+    
+    // Generate supplier code
+    const { data: existingSuppliers } = await supabase
+      .from('suppliers')
+      .select('supplier_code')
+      .eq('company_id', companyId)
+      .order('created_at', { ascending: false })
+      .limit(1);
+    
+    const lastCode = existingSuppliers?.[0]?.supplier_code;
+    const nextNumber = lastCode ? parseInt(lastCode.replace(/\D/g, '')) + 1 : 1;
+    const supplierCode = `SUP${String(nextNumber).padStart(5, '0')}`;
+    
     const newSupplier = {
+      supplier_code: supplierCode,
       name: supplierData.name || '',
       email: supplierData.email || '',
       phone: supplierData.phone || '',
       tax_id: supplierData.tax_id || '',
       company_id: companyId,
-      status: 'active',
+      status: 'active' as const,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
 
     const { data: supplier, error: supplierError } = await supabase
       .from('suppliers')
-      .insert(newSupplier)
+      .insert([newSupplier])
       .select()
       .single();
 
