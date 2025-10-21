@@ -7,6 +7,7 @@ import {
   CreateSupplierEvaluationData,
   CreateSupplierEvaluationEntryData,
 } from "@/types/supplierEvaluation";
+import { useUpdateSupplierRating } from "./useSupplierRatings";
 
 // Fetch all supplier evaluations
 export const useSupplierEvaluations = () => {
@@ -57,6 +58,7 @@ export const useSupplierEvaluation = (id: string) => {
 // Create supplier evaluation
 export const useCreateSupplierEvaluation = () => {
   const queryClient = useQueryClient();
+  const updateRating = useUpdateSupplierRating();
 
   return useMutation({
     mutationFn: async (data: CreateSupplierEvaluationData): Promise<SupplierEvaluation> => {
@@ -84,8 +86,10 @@ export const useCreateSupplierEvaluation = () => {
       if (error) throw error;
       return evaluation;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["supplier-evaluations"] });
+      // Update supplier rating based on new evaluation
+      updateRating.mutate(data.supplier_id);
       toast({
         title: "Success",
         description: "Supplier evaluation created successfully",
@@ -104,6 +108,7 @@ export const useCreateSupplierEvaluation = () => {
 // Update supplier evaluation
 export const useUpdateSupplierEvaluation = () => {
   const queryClient = useQueryClient();
+  const updateRating = useUpdateSupplierRating();
 
   return useMutation({
     mutationFn: async ({ 
@@ -130,6 +135,8 @@ export const useUpdateSupplierEvaluation = () => {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["supplier-evaluations"] });
       queryClient.invalidateQueries({ queryKey: ["supplier-evaluation", data.id] });
+      // Update supplier rating based on updated evaluation
+      updateRating.mutate(data.supplier_id);
       toast({
         title: "Success",
         description: "Supplier evaluation updated successfully",
@@ -148,18 +155,22 @@ export const useUpdateSupplierEvaluation = () => {
 // Delete supplier evaluation
 export const useDeleteSupplierEvaluation = () => {
   const queryClient = useQueryClient();
+  const updateRating = useUpdateSupplierRating();
 
   return useMutation({
-    mutationFn: async (id: string): Promise<void> => {
+    mutationFn: async ({ id, supplierId }: { id: string; supplierId: string }): Promise<string> => {
       const { error } = await supabase
         .from("supplier_evaluations")
         .delete()
         .eq("id", id);
 
       if (error) throw error;
+      return supplierId;
     },
-    onSuccess: () => {
+    onSuccess: (supplierId) => {
       queryClient.invalidateQueries({ queryKey: ["supplier-evaluations"] });
+      // Update supplier rating after evaluation deletion
+      updateRating.mutate(supplierId);
       toast({
         title: "Success",
         description: "Supplier evaluation deleted successfully",
@@ -199,6 +210,7 @@ export const useSupplierEvaluationEntries = (evaluationId: string) => {
 // Create evaluation entry
 export const useCreateSupplierEvaluationEntry = () => {
   const queryClient = useQueryClient();
+  const updateRating = useUpdateSupplierRating();
 
   return useMutation({
     mutationFn: async (data: CreateSupplierEvaluationEntryData): Promise<SupplierEvaluationEntry> => {
@@ -211,10 +223,22 @@ export const useCreateSupplierEvaluationEntry = () => {
       if (error) throw error;
       return entry;
     },
-    onSuccess: (data) => {
+    onSuccess: async (data) => {
       queryClient.invalidateQueries({ queryKey: ["supplier-evaluation-entries", data.evaluation_id] });
       queryClient.invalidateQueries({ queryKey: ["supplier-evaluation", data.evaluation_id] });
       queryClient.invalidateQueries({ queryKey: ["supplier-evaluations"] });
+      
+      // Get supplier_id from evaluation to update rating
+      const { data: evaluation } = await supabase
+        .from("supplier_evaluations")
+        .select("supplier_id")
+        .eq("id", data.evaluation_id)
+        .single();
+      
+      if (evaluation) {
+        updateRating.mutate(evaluation.supplier_id);
+      }
+      
       toast({
         title: "Success",
         description: "Evaluation entry added successfully",
@@ -233,6 +257,7 @@ export const useCreateSupplierEvaluationEntry = () => {
 // Update evaluation entry
 export const useUpdateSupplierEvaluationEntry = () => {
   const queryClient = useQueryClient();
+  const updateRating = useUpdateSupplierRating();
 
   return useMutation({
     mutationFn: async ({ 
@@ -252,10 +277,22 @@ export const useUpdateSupplierEvaluationEntry = () => {
       if (error) throw error;
       return data;
     },
-    onSuccess: (data) => {
+    onSuccess: async (data) => {
       queryClient.invalidateQueries({ queryKey: ["supplier-evaluation-entries", data.evaluation_id] });
       queryClient.invalidateQueries({ queryKey: ["supplier-evaluation", data.evaluation_id] });
       queryClient.invalidateQueries({ queryKey: ["supplier-evaluations"] });
+      
+      // Get supplier_id from evaluation to update rating
+      const { data: evaluation } = await supabase
+        .from("supplier_evaluations")
+        .select("supplier_id")
+        .eq("id", data.evaluation_id)
+        .single();
+      
+      if (evaluation) {
+        updateRating.mutate(evaluation.supplier_id);
+      }
+      
       toast({
         title: "Success",
         description: "Evaluation entry updated successfully",

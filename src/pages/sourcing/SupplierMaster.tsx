@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, Search, Filter, Building2, Phone, Mail, Globe, Star, MoreHorizontal } from 'lucide-react';
+import { Plus, Search, Filter, Building2, Phone, Mail, Globe, Star, MoreHorizontal, TrendingUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,8 +10,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useSuppliers, useDeleteSupplier } from '@/hooks/useSuppliers';
+import { useSupplierAnalytics } from '@/hooks/useSupplierAnalytics';
 import { CreateSupplierDialog } from '@/components/sourcing/CreateSupplierDialog';
 import { SupplierDetailsDialog } from '@/components/sourcing/SupplierDetailsDialog';
+import { SupplierRatingTooltip } from '@/components/sourcing/SupplierRatingTooltip';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import type { Supplier } from '@/types/supplier';
 import { SUPPLIER_STATUSES, SUPPLIER_CATEGORIES } from '@/types/supplier';
@@ -25,6 +27,7 @@ export const SupplierMaster: React.FC = () => {
   const [supplierToDelete, setSupplierToDelete] = useState<Supplier | null>(null);
 
   const { data: suppliers, isLoading, error } = useSuppliers();
+  const { data: analytics } = useSupplierAnalytics();
   const deleteSupplierMutation = useDeleteSupplier();
 
   const filteredSuppliers = suppliers?.filter((supplier) => {
@@ -62,7 +65,10 @@ export const SupplierMaster: React.FC = () => {
   };
 
   const renderStars = (rating?: number) => {
-    if (!rating) return <span className="text-muted-foreground">No rating</span>;
+    if (!rating) return <span className="text-muted-foreground text-sm">No rating</span>;
+    
+    const fullStars = Math.floor(rating);
+    const hasHalfStar = rating % 1 >= 0.5;
     
     return (
       <div className="flex items-center gap-1">
@@ -70,14 +76,46 @@ export const SupplierMaster: React.FC = () => {
           <Star
             key={star}
             className={`w-4 h-4 ${
-              star <= rating
+              star <= fullStars
                 ? 'fill-yellow-400 text-yellow-400'
+                : star === fullStars + 1 && hasHalfStar
+                ? 'fill-yellow-200 text-yellow-400'
                 : 'text-gray-300'
             }`}
           />
         ))}
-        <span className="ml-1 text-sm text-muted-foreground">({rating})</span>
+        <span className="ml-1 text-sm font-medium">{rating.toFixed(1)}</span>
       </div>
+    );
+  };
+
+  const renderRatingWithPerformance = (supplier: Supplier) => {
+    const supplierAnalytics = analytics?.find(a => a.supplierId === supplier.id);
+    
+    if (!supplier.rating || !supplierAnalytics) {
+      return <span className="text-muted-foreground text-sm">No rating</span>;
+    }
+
+    return (
+      <SupplierRatingTooltip
+        rating={supplier.rating}
+        performanceRate={supplierAnalytics.avgPerformanceRate}
+        grade={supplierAnalytics.performanceGrade}
+        totalEvaluations={supplierAnalytics.totalEvaluations}
+        lastEvaluationDate={supplierAnalytics.totalEvaluations > 0 ? new Date().toISOString() : undefined}
+      >
+        <div className="cursor-help">
+          <div className="flex items-center gap-2">
+            {renderStars(supplier.rating)}
+            <Badge variant="outline" className="text-xs">
+              {supplierAnalytics.avgPerformanceRate.toFixed(0)}%
+            </Badge>
+          </div>
+          <div className="text-xs text-muted-foreground mt-1">
+            Grade {supplierAnalytics.performanceGrade} • {supplierAnalytics.totalEvaluations} eval{supplierAnalytics.totalEvaluations !== 1 ? 's' : ''}
+          </div>
+        </div>
+      </SupplierRatingTooltip>
     );
   };
 
@@ -345,7 +383,7 @@ export const SupplierMaster: React.FC = () => {
                       </TableCell>
                       
                       <TableCell>
-                        {renderStars(supplier.rating)}
+                        {renderRatingWithPerformance(supplier)}
                       </TableCell>
                       
                       <TableCell>

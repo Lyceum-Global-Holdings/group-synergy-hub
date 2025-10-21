@@ -81,7 +81,21 @@ const SupplierEvaluation = () => {
   const handleDeleteConfirm = async () => {
     if (deleteEvaluationId) {
       try {
-        await deleteEvaluationMutation.mutateAsync(deleteEvaluationId);
+        // Find the evaluation to get supplier_id
+        const evaluation = evaluations.find(e => e.id === deleteEvaluationId);
+        if (!evaluation) {
+          toast({
+            title: "Error",
+            description: "Evaluation not found",
+            variant: "destructive",
+          });
+          return;
+        }
+        
+        await deleteEvaluationMutation.mutateAsync({ 
+          id: deleteEvaluationId,
+          supplierId: evaluation.supplier_id 
+        });
         toast({
           title: "Success",
           description: "Evaluation deleted successfully",
