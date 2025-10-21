@@ -176,35 +176,71 @@ export function useApproveRegistration() {
       
       if (fetchError) throw fetchError;
 
-      // Create supplier from registration data
+      // Create supplier from registration data with correct column mapping
       const supplierData = registration.supplier_data as Record<string, any>;
+
+      // Generate supplier code (incremental based on last code)
+      const { data: existingSuppliers } = await supabase
+        .from('suppliers')
+        .select('supplier_code')
+        .eq('company_id', registration.company_id)
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      const lastCode = existingSuppliers?.[0]?.supplier_code as string | undefined;
+      const nextNumber = lastCode ? parseInt(lastCode.replace(/\D/g, '')) + 1 : 1;
+      const supplierCode = `SUP${String(nextNumber).padStart(5, '0')}`;
+
       const { data: supplier, error: supplierError } = await supabase
         .from('suppliers')
         .insert({
-          supplier_name: supplierData.supplier_name,
-          supplier_type: supplierData.supplier_type,
-          email: supplierData.email,
-          phone: supplierData.phone,
-          tax_id: supplierData.tax_id,
-          registration_number: supplierData.registration_number,
-          website: supplierData.website,
-          street_address: supplierData.street_address,
-          city: supplierData.city,
-          state_province: supplierData.state_province,
-          postal_code: supplierData.postal_code,
-          country: supplierData.country,
-          bank_name: supplierData.bank_name,
-          bank_account_number: supplierData.bank_account_number,
-          bank_branch: supplierData.bank_branch,
-          swift_code: supplierData.swift_code,
-          payment_terms: supplierData.payment_terms,
-          category: supplierData.category,
-          material_type: supplierData.material_type,
+          supplier_code: supplierCode,
+          name: supplierData.supplier_name || supplierData.name || '',
+          legal_name: supplierData.supplier_name || supplierData.name || null,
+          email: supplierData.email || null,
+          phone: supplierData.phone || null,
+          tax_id: supplierData.tax_id || null,
+          supplier_type: supplierData.supplier_type || undefined,
+          category: supplierData.category || null,
+          material_type: supplierData.material_type || null,
+          website: supplierData.website || null,
+          registration_number: supplierData.registration_number || null,
+          address_line1: supplierData.street_address || null,
+          address_line2: null,
+          city: supplierData.city || null,
+          state: supplierData.state_province || null,
+          postal_code: supplierData.postal_code || null,
+          country: supplierData.country || null,
+          payment_terms: supplierData.payment_terms || null,
           company_id: registration.company_id,
-          created_by: user.data.user?.id,
+          status: 'active',
+          created_by: user.data.user?.id || null,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
         } as any)
         .select()
         .single();
+
+      if (supplierError) throw supplierError;
+
+      // Create primary contact if provided
+      if (supplierData.primary_contact_name && supplierData.primary_contact_email) {
+        const { error: contactError } = await supabase
+          .from('supplier_contacts')
+          .insert([{
+            supplier_id: supplier.id,
+            name: supplierData.primary_contact_name,
+            email: supplierData.primary_contact_email,
+            phone: supplierData.primary_contact_phone || null,
+            is_primary: true,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          }]);
+
+        if (contactError) {
+          console.error('Error creating primary contact:', contactError);
+        }
+      }
       
       if (supplierError) throw supplierError;
 
