@@ -35,6 +35,7 @@ export function CreateFinishedGoodDialog({ open, onOpenChange }: CreateFinishedG
   const { toast } = useToast();
   const [useProductMaster, setUseProductMaster] = useState(true);
   const [selectedProductMaster, setSelectedProductMaster] = useState<ProductMaster | null>(null);
+  const [baseProductCode, setBaseProductCode] = useState('');
   
   const [formData, setFormData] = useState({
     product_name: '',
@@ -58,14 +59,35 @@ export function CreateFinishedGoodDialog({ open, onOpenChange }: CreateFinishedG
 
   const { createProduct, isCreating } = useFinishedGoods();
 
+  // Generate unique product code with size/color suffix
+  const generateProductCode = (baseCode: string, size: string, color?: string): string => {
+    if (!baseCode || !size) return baseCode;
+    
+    // Sanitize inputs: uppercase, remove spaces, remove special chars
+    const sanitizedBase = baseCode.toUpperCase().trim();
+    const sanitizedSize = size.toUpperCase().replace(/\s+/g, '');
+    const sanitizedColor = color ? color.toUpperCase().replace(/\s+/g, '') : '';
+    
+    // Build code: BASE-SIZE or BASE-SIZE-COLOR
+    let generatedCode = `${sanitizedBase}-${sanitizedSize}`;
+    if (sanitizedColor) {
+      generatedCode += `-${sanitizedColor}`;
+    }
+    
+    return generatedCode;
+  };
+
   // Auto-populate fields when product master is selected
   const handleProductMasterSelect = (product: ProductMaster | null) => {
     setSelectedProductMaster(product);
     if (product) {
+      const base = product.product_code;
+      setBaseProductCode(base);
+      
       setFormData({
         ...formData,
         product_name: product.product_name,
-        product_code: product.product_code,
+        product_code: base, // Will be updated when size/color selected
         style_no: product.style_no || '',
         description: product.description || '',
         unit_of_measure: product.unit_of_measure || 'pcs',
@@ -73,6 +95,31 @@ export function CreateFinishedGoodDialog({ open, onOpenChange }: CreateFinishedG
         size: '',
         color: '',
       });
+    } else {
+      setBaseProductCode('');
+    }
+  };
+
+  // Update product code when size or color changes (only if using product master)
+  const handleSizeChange = (size: string) => {
+    setFormData({ ...formData, size });
+    
+    if (useProductMaster && baseProductCode) {
+      const newCode = generateProductCode(baseProductCode, size, formData.color);
+      setFormData(prev => ({ ...prev, size, product_code: newCode }));
+    } else {
+      setFormData(prev => ({ ...prev, size }));
+    }
+  };
+
+  const handleColorChange = (color: string) => {
+    setFormData({ ...formData, color });
+    
+    if (useProductMaster && baseProductCode && formData.size) {
+      const newCode = generateProductCode(baseProductCode, formData.size, color);
+      setFormData(prev => ({ ...prev, color, product_code: newCode }));
+    } else {
+      setFormData(prev => ({ ...prev, color }));
     }
   };
 
@@ -127,9 +174,16 @@ export function CreateFinishedGoodDialog({ open, onOpenChange }: CreateFinishedG
         }
       }
     }
+
+    // Final product code generation (if using product master and not manually set)
+    let finalProductCode = formData.product_code;
+    if (useProductMaster && baseProductCode && formData.size) {
+      finalProductCode = generateProductCode(baseProductCode, formData.size, formData.color || undefined);
+    }
     
     const data = {
       ...formData,
+      product_code: finalProductCode,
       available_sizes: formData.size ? [formData.size] : [],
       company_id: selectedCompany?.id,
       product_master_id: selectedProductMaster?.id || undefined,
@@ -147,6 +201,7 @@ export function CreateFinishedGoodDialog({ open, onOpenChange }: CreateFinishedG
     // Reset form
     setUseProductMaster(true);
     setSelectedProductMaster(null);
+    setBaseProductCode('');
     setFormData({
       product_name: '',
       product_code: '',
@@ -231,10 +286,22 @@ export function CreateFinishedGoodDialog({ open, onOpenChange }: CreateFinishedG
               <Input
                 id="product_code"
                 value={formData.product_code}
-                onChange={(e) => setFormData({ ...formData, product_code: e.target.value })}
+                onChange={(e) => {
+                  setFormData({ ...formData, product_code: e.target.value });
+                  if (!useProductMaster) {
+                    setBaseProductCode(e.target.value);
+                  }
+                }}
                 disabled={isFieldDisabled}
                 required
               />
+              {useProductMaster && baseProductCode && formData.size && (
+                <p className="text-xs text-muted-foreground">
+                  Generated: <span className="font-mono font-semibold text-primary">
+                    {generateProductCode(baseProductCode, formData.size, formData.color || undefined)}
+                  </span>
+                </p>
+              )}
             </div>
           </div>
 
@@ -252,7 +319,7 @@ export function CreateFinishedGoodDialog({ open, onOpenChange }: CreateFinishedG
               <Label htmlFor="color">Color</Label>
               {useProductMaster && selectedProductMaster && (selectedProductMaster.available_colors as any[])?.length > 0 ? (
                 <div className="space-y-2">
-                  <Select value={formData.color} onValueChange={(value) => setFormData({ ...formData, color: value })}>
+                  <Select value={formData.color} onValueChange={handleColorChange}>
                     <SelectTrigger>
                       <SelectValue placeholder="Select from available colors" />
                     </SelectTrigger>
@@ -282,7 +349,7 @@ export function CreateFinishedGoodDialog({ open, onOpenChange }: CreateFinishedG
                 <Input
                   id="color"
                   value={formData.color}
-                  onChange={(e) => setFormData({ ...formData, color: e.target.value })}
+                  onChange={(e) => handleColorChange(e.target.value)}
                 />
               )}
             </div>
@@ -292,7 +359,7 @@ export function CreateFinishedGoodDialog({ open, onOpenChange }: CreateFinishedG
             <Label htmlFor="size">Size *</Label>
             {useProductMaster && selectedProductMaster && (selectedProductMaster.available_sizes as any[])?.length > 0 ? (
               <div className="space-y-2">
-                <Select value={formData.size} onValueChange={(value) => setFormData({ ...formData, size: value })} required>
+                <Select value={formData.size} onValueChange={handleSizeChange} required>
                   <SelectTrigger>
                     <SelectValue placeholder="Select from available sizes" />
                   </SelectTrigger>
@@ -319,7 +386,7 @@ export function CreateFinishedGoodDialog({ open, onOpenChange }: CreateFinishedG
                 </div>
               </div>
             ) : (
-              <Select value={formData.size} onValueChange={(value) => setFormData({ ...formData, size: value })} required>
+              <Select value={formData.size} onValueChange={handleSizeChange} required>
                 <SelectTrigger>
                   <SelectValue placeholder="Select a size" />
                 </SelectTrigger>

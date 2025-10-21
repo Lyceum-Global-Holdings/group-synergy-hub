@@ -89,10 +89,35 @@ export function useFinishedGoods(companyId?: string) {
     },
   });
 
+  // Check if product code exists for the company
+  const checkProductCodeExists = async (productCode: string, companyId: string): Promise<boolean> => {
+    const { data, error } = await supabase
+      .from('finished_goods')
+      .select('id')
+      .eq('product_code', productCode)
+      .eq('company_id', companyId)
+      .limit(1);
+
+    if (error) {
+      console.error('Error checking product code:', error);
+      return false;
+    }
+
+    return data && data.length > 0;
+  };
+
   // Create finished good
   const createProductMutation = useMutation({
     mutationFn: async (data: CreateFinishedGoodData) => {
       const { data: user } = await supabase.auth.getUser();
+      
+      // Check for duplicate product code if company_id is provided
+      if (data.company_id && data.product_code) {
+        const exists = await checkProductCodeExists(data.product_code, data.company_id);
+        if (exists) {
+          throw new Error(`Product code "${data.product_code}" already exists for this company. Please use a different code.`);
+        }
+      }
       
       const { data: result, error } = await supabase
         .from('finished_goods')
@@ -190,5 +215,6 @@ export function useFinishedGoods(companyId?: string) {
     isCreating: createProductMutation.isPending,
     isUpdating: updateProductMutation.isPending,
     isDeleting: deleteProductMutation.isPending,
+    checkProductCodeExists,
   };
 }
