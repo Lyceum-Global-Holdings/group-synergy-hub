@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Calendar, Calculator, FileText, AlertTriangle, CheckCircle, Clock, TrendingUp, Package, Box, ShoppingCart, Truck } from 'lucide-react';
+import { Calendar, Calculator, FileText, AlertTriangle, CheckCircle, Clock, TrendingUp, Package, Box, ShoppingCart, Truck, Ruler } from 'lucide-react';
 import { useMaterialDemand, useDemandCalculation } from '@/hooks/useMaterialDemand';
 import { useBillOfMaterials } from '@/hooks/useBillOfMaterials';
 import { useCustomerPurchaseOrders } from '@/hooks/useCustomerPurchaseOrders';
@@ -20,6 +20,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
 import { CreateDispatchNoteDialog } from '@/components/warehouse/CreateDispatchNoteDialog';
 import { CreatePrFromDemandDialog } from '@/components/procurement/CreatePrFromDemandDialog';
+import { supabase } from '@/integrations/supabase/client';
 
 const MaterialDemandPlanning = () => {
   const { selectedCompany } = useCompany();
@@ -47,13 +48,36 @@ const MaterialDemandPlanning = () => {
   const [selectedDispatchItem, setSelectedDispatchItem] = useState<DemandAnalysisResult | null>(null);
   const [prAdjustmentDialogOpen, setPrAdjustmentDialogOpen] = useState(false);
   const [selectedPrItem, setSelectedPrItem] = useState<DemandAnalysisResult | null>(null);
+  const [selectedBomDetails, setSelectedBomDetails] = useState<{ size?: string; sizeMultiplier?: number } | null>(null);
 
   // Filter confirmed CPOs for CPO-based demand calculation
   const confirmedCPOs = customerPOs?.filter(cpo => cpo.status === 'confirmed') || [];
 
-  const handleCalculateDemand = () => {
+  const handleCalculateDemand = async () => {
     if (demandSource === 'bom') {
       if (!selectedBomId) return;
+      
+      // Fetch BOM details to get size info
+      const { data: bomData } = await supabase
+        .from('bill_of_materials')
+        .select('size, bom_number, product_name')
+        .eq('id', selectedBomId)
+        .single();
+      
+      // Fetch size multiplier if BOM has size
+      let sizeMultiplier = 1.0;
+      if (bomData?.size) {
+        const { data: multiplierData } = await supabase
+          .from('bom_size_multipliers')
+          .select('multiplier')
+          .eq('bom_id', selectedBomId)
+          .eq('size', bomData.size)
+          .maybeSingle();
+        
+        sizeMultiplier = multiplierData?.multiplier || 1.0;
+      }
+      
+      setSelectedBomDetails(bomData ? { size: bomData.size, sizeMultiplier } : null);
       
       calculateBOMDemand({
         bom_id: selectedBomId,
@@ -63,6 +87,8 @@ const MaterialDemandPlanning = () => {
       });
     } else if (demandSource === 'customer_po') {
       if (selectedCPOs.length === 0) return;
+      
+      setSelectedBomDetails(null);
 
       calculateCPODemand({
         cpo_ids: selectedCPOs,
@@ -440,6 +466,16 @@ const MaterialDemandPlanning = () => {
                     </>
                   )}
                 </Button>
+                
+                {selectedBomDetails?.size && (
+                  <Badge variant="secondary" className="flex items-center gap-1 mt-2 w-fit">
+                    <Ruler className="h-3 w-3" />
+                    Size: {selectedBomDetails.size}
+                    {selectedBomDetails.sizeMultiplier && selectedBomDetails.sizeMultiplier !== 1.0 && (
+                      <span className="ml-1">({selectedBomDetails.sizeMultiplier}x multiplier)</span>
+                    )}
+                  </Badge>
+                )}
               </CardContent>
             </Card>
 

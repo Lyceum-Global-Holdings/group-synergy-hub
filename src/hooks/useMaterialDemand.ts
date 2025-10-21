@@ -322,6 +322,29 @@ export const useDemandCalculation = (companyId?: string) => {
       console.log('=== Multi-level BOM Demand Calculation Started ===');
       console.log('Input:', input);
 
+      // Get BOM details including size
+      const { data: bomDetails, error: bomDetailsError } = await supabase
+        .from('bill_of_materials')
+        .select('product_name, size')
+        .eq('id', input.bom_id)
+        .single();
+
+      if (bomDetailsError) throw bomDetailsError;
+
+      // Get size multiplier if BOM has a size
+      let sizeMultiplier = 1.0;
+      if (bomDetails?.size) {
+        const { data: multiplierData } = await supabase
+          .from('bom_size_multipliers')
+          .select('multiplier')
+          .eq('bom_id', input.bom_id)
+          .eq('size', bomDetails.size)
+          .maybeSingle();
+        
+        sizeMultiplier = multiplierData?.multiplier || 1.0;
+        console.log(`📏 BOM Size: ${bomDetails.size}, Multiplier: ${sizeMultiplier}x`);
+      }
+
       // Get BOM items
       const { data: bomItems, error: bomError } = await supabase
         .from('bom_items')
@@ -417,7 +440,10 @@ export const useDemandCalculation = (companyId?: string) => {
 
         const relatedPOItems = poItemsByCode[bomItem.item_code] || [];
         
-        const totalRequired = (bomItem.consumption || bomItem.quantity || 0) * input.production_quantity;
+        // Apply size multiplier to consumption
+        const baseConsumption = bomItem.consumption || bomItem.quantity || 0;
+        const adjustedConsumption = baseConsumption * sizeMultiplier;
+        const totalRequired = adjustedConsumption * input.production_quantity;
         const availableStock = warehouseItem?.current_stock || 0;
         const onOrder = relatedPOItems.reduce((sum, item) => sum + (item.quantity_pending || 0), 0);
         const shortage = Math.max(0, totalRequired - availableStock - onOrder);
@@ -501,6 +527,9 @@ export const useDemandCalculation = (companyId?: string) => {
       console.log(`=== Multi-level BOM Demand Calculation Complete ===`);
       console.log(`${matchedItems} matched, ${unmatchedItems} unmatched items`);
       console.log(`Analysis results: ${analysis.length} items`);
+      if (sizeMultiplier !== 1.0) {
+        console.log(`📏 Size multiplier ${sizeMultiplier}x applied to all materials`);
+      }
       return analysis;
     },
     onSuccess: () => {
