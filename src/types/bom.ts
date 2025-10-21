@@ -130,3 +130,37 @@ export interface BomApproval {
   approved_at?: string;
   created_at: string;
 }
+
+// BOM Size Multiplier Types
+export interface BomSizeMultiplier {
+  id: string;
+  bom_id: string;
+  size: string;
+  multiplier: number;
+  notes?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateSizeMultiplierData {
+  bom_id: string;
+  size: string;
+  multiplier: number;
+  notes?: string;
+}
+
+// Default size multipliers based on industry standards
+export const DEFAULT_SIZE_MULTIPLIERS: Record<string, number> = {
+  'XS': 0.85,
+  'S': 0.92,
+  'M': 1.0,
+  'L': 1.12,
+  'XL': 1.25,
+  '2XL': 1.40,
+  'XXL': 1.40,
+  '3XL': 1.55,
+  'XXXL': 1.55,
+  'KIDS': 0.60,
+  'KIDM': 0.70,
+  'KIDL': 0.80,
+};

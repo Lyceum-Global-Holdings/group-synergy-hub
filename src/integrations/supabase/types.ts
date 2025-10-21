@@ -1652,6 +1652,51 @@ export type Database = {
           },
         ]
       }
+      bom_size_multipliers: {
+        Row: {
+          bom_id: string
+          created_at: string | null
+          id: string
+          multiplier: number | null
+          notes: string | null
+          size: string
+          updated_at: string | null
+        }
+        Insert: {
+          bom_id: string
+          created_at?: string | null
+          id?: string
+          multiplier?: number | null
+          notes?: string | null
+          size: string
+          updated_at?: string | null
+        }
+        Update: {
+          bom_id?: string
+          created_at?: string | null
+          id?: string
+          multiplier?: number | null
+          notes?: string | null
+          size?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bom_size_multipliers_bom_id_fkey"
+            columns: ["bom_id"]
+            isOneToOne: false
+            referencedRelation: "bill_of_materials"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bom_size_multipliers_bom_id_fkey"
+            columns: ["bom_id"]
+            isOneToOne: false
+            referencedRelation: "modern_boms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       bom_templates: {
         Row: {
           category: string | null

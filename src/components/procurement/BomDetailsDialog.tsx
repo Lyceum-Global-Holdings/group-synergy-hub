@@ -1,6 +1,6 @@
 import React from 'react';
 import { format } from 'date-fns';
-import { FileText, Calendar, User, Package, Edit2 } from 'lucide-react';
+import { FileText, Calendar, User, Package, Edit2, Ruler } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -22,6 +22,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { useBomItems } from '@/hooks/useBillOfMaterials';
+import { useBomSizeMultipliers } from '@/hooks/useBomSizeMultipliers';
 import type { BillOfMaterials } from '@/types/bom';
 
 interface BomDetailsDialogProps {
@@ -45,6 +46,7 @@ const statusLabels = {
 
 export function BomDetailsDialog({ bom, open, onOpenChange, onEdit }: BomDetailsDialogProps) {
   const { items, isLoading: itemsLoading } = useBomItems(bom?.id || '');
+  const { multipliers, getMultiplierForSize } = useBomSizeMultipliers(bom?.id || '');
 
   if (!bom) return null;
 
@@ -93,9 +95,10 @@ export function BomDetailsDialog({ bom, open, onOpenChange, onEdit }: BomDetails
         </DialogHeader>
 
         <Tabs defaultValue="details" className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="details">Details</TabsTrigger>
             <TabsTrigger value="items">Items ({items?.length || 0})</TabsTrigger>
+            {bom.size && <TabsTrigger value="size-analysis">Size Analysis</TabsTrigger>}
           </TabsList>
 
           <TabsContent value="details" className="space-y-4">
@@ -257,6 +260,88 @@ export function BomDetailsDialog({ bom, open, onOpenChange, onEdit }: BomDetails
               </CardContent>
             </Card>
           </TabsContent>
+
+          {bom.size && (
+            <TabsContent value="size-analysis" className="space-y-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Ruler className="h-5 w-5" />
+                    Size-Based Consumption Analysis
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {multipliers.length > 0 ? (
+                    <div className="space-y-6">
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        {multipliers.map(multiplier => (
+                          <Card key={multiplier.id}>
+                            <CardHeader>
+                              <CardTitle className="text-base">
+                                Size {multiplier.size}
+                              </CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-2">
+                              <div>
+                                <Label className="text-sm text-muted-foreground">Multiplier</Label>
+                                <p className="text-2xl font-bold">{multiplier.multiplier}x</p>
+                              </div>
+                              <div>
+                                <Label className="text-sm text-muted-foreground">Adjustment</Label>
+                                <p className="text-sm">
+                                  {multiplier.multiplier < 1
+                                    ? `${((1 - multiplier.multiplier) * 100).toFixed(0)}% less material`
+                                    : multiplier.multiplier > 1
+                                    ? `${((multiplier.multiplier - 1) * 100).toFixed(0)}% more material`
+                                    : 'Baseline'}
+                                </p>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        ))}
+                      </div>
+
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Item Name</TableHead>
+                            <TableHead>Base Consumption</TableHead>
+                            {multipliers.map(m => (
+                              <TableHead key={m.id}>Size {m.size}</TableHead>
+                            ))}
+                            <TableHead>Unit</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {items.filter(item => item.consumption).map((item) => (
+                            <TableRow key={item.id}>
+                              <TableCell className="font-medium">{item.item_name}</TableCell>
+                              <TableCell>{item.consumption || 0}</TableCell>
+                              {multipliers.map(m => (
+                                <TableCell key={m.id} className="font-medium text-primary">
+                                  {((item.consumption || 0) * m.multiplier).toFixed(2)}
+                                </TableCell>
+                              ))}
+                              <TableCell>{item.unit_of_measure}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  ) : (
+                    <div className="text-center py-8 space-y-4">
+                      <p className="text-muted-foreground">
+                        No size multipliers configured for this BOM.
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        Click "Edit" to configure size-based consumption multipliers.
+                      </p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+          )}
         </Tabs>
       </DialogContent>
     </Dialog>

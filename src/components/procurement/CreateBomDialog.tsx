@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { Plus, Trash2, Link2, X } from 'lucide-react';
+import { Plus, Trash2, Link2, X, Ruler } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import {
   Dialog,
@@ -40,6 +40,7 @@ import { CreateBomItemData } from '@/types/bom';
 import { ItemSelector } from '@/components/common/ItemSelector';
 import { ProductMasterSelector } from '@/components/common/ProductMasterSelector';
 import { FinishedGoodsItemSelector } from '@/components/common/FinishedGoodsItemSelector';
+import { BomSizeMultiplierDialog } from '@/components/procurement/BomSizeMultiplierDialog';
 import { WarehouseItem } from '@/types/itemBin';
 
 const bomSchema = z.object({
@@ -62,6 +63,8 @@ interface CreateBomDialogProps {
 
 export function CreateBomDialog({ children }: CreateBomDialogProps) {
   const [open, setOpen] = useState(false);
+  const [multiplierDialogOpen, setMultiplierDialogOpen] = useState(false);
+  const [createdBomId, setCreatedBomId] = useState<string | null>(null);
   const [items, setItems] = useState<Record<BomCategoryKey, CreateBomItemData[]>>({
     fabric: [],
     sewing_trims: [],
@@ -177,7 +180,7 @@ export function CreateBomDialog({ children }: CreateBomDialogProps) {
         item.item_name.trim() !== '' && item.quantity > 0
       );
 
-      await createBom({
+      const createdBom = await createBom({
         product_name: data.product_name,
         product_master_id: data.product_master_id,
         finished_good_id: data.finished_good_id,
@@ -190,14 +193,19 @@ export function CreateBomDialog({ children }: CreateBomDialogProps) {
         items: allItems,
       });
 
-      setOpen(false);
-      form.reset();
-      setItems({
-        fabric: [],
-        sewing_trims: [],
-        packing_trims: [],
-        embellishment: [],
-      });
+      setCreatedBomId(createdBom.id);
+      
+      // Don't close the dialog immediately if size is specified - allow configuring multipliers
+      if (!data.size) {
+        setOpen(false);
+        form.reset();
+        setItems({
+          fabric: [],
+          sewing_trims: [],
+          packing_trims: [],
+          embellishment: [],
+        });
+      }
     } catch (error) {
       console.error('Error creating BOM:', error);
     }
@@ -385,7 +393,21 @@ export function CreateBomDialog({ children }: CreateBomDialogProps) {
       </DialogTrigger>
       <DialogContent className="max-w-7xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Create Bill of Materials</DialogTitle>
+          <div className="flex items-center justify-between">
+            <DialogTitle>Create Bill of Materials</DialogTitle>
+            {createdBomId && form.watch('size') && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setMultiplierDialogOpen(true)}
+                className="gap-2"
+              >
+                <Ruler className="h-4 w-4" />
+                Configure Size Multipliers
+              </Button>
+            )}
+          </div>
         </DialogHeader>
 
         <Form {...form}>
@@ -605,7 +627,17 @@ export function CreateBomDialog({ children }: CreateBomDialogProps) {
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => setOpen(false)}
+                onClick={() => {
+                  setOpen(false);
+                  setCreatedBomId(null);
+                  form.reset();
+                  setItems({
+                    fabric: [],
+                    sewing_trims: [],
+                    packing_trims: [],
+                    embellishment: [],
+                  });
+                }}
               >
                 Cancel
               </Button>
@@ -615,6 +647,29 @@ export function CreateBomDialog({ children }: CreateBomDialogProps) {
             </div>
           </form>
         </Form>
+
+        {createdBomId && form.watch('size') && (
+          <BomSizeMultiplierDialog
+            bomId={createdBomId}
+            availableSizes={form.watch('size') ? [form.watch('size')] : []}
+            open={multiplierDialogOpen}
+            onOpenChange={(open) => {
+              setMultiplierDialogOpen(open);
+              if (!open) {
+                // Close main dialog after configuring multipliers
+                setOpen(false);
+                setCreatedBomId(null);
+                form.reset();
+                setItems({
+                  fabric: [],
+                  sewing_trims: [],
+                  packing_trims: [],
+                  embellishment: [],
+                });
+              }
+            }}
+          />
+        )}
       </DialogContent>
     </Dialog>
   );
