@@ -260,12 +260,26 @@ export class ApprovalWorkflowEngine {
     const nextNumber = lastCode ? parseInt(lastCode.replace(/\D/g, '')) + 1 : 1;
     const supplierCode = `SUP${String(nextNumber).padStart(5, '0')}`;
     
+    // Map all registration fields to supplier record
     const newSupplier = {
       supplier_code: supplierCode,
-      name: supplierData.name || '',
+      name: supplierData.supplier_name || supplierData.name || '',
+      legal_name: supplierData.supplier_name || supplierData.name || '',
       email: supplierData.email || '',
       phone: supplierData.phone || '',
       tax_id: supplierData.tax_id || '',
+      supplier_type: supplierData.supplier_type || null,
+      category: supplierData.category || null,
+      material_type: supplierData.material_type || null,
+      website: supplierData.website || null,
+      registration_number: supplierData.registration_number || null,
+      address_line1: supplierData.street_address || null,
+      address_line2: null,
+      city: supplierData.city || null,
+      state: supplierData.state_province || null,
+      postal_code: supplierData.postal_code || null,
+      country: supplierData.country || null,
+      payment_terms: supplierData.payment_terms || null,
       company_id: companyId,
       status: 'active' as const,
       created_at: new Date().toISOString(),
@@ -279,6 +293,26 @@ export class ApprovalWorkflowEngine {
       .single();
 
     if (supplierError) throw supplierError;
+
+    // Create primary contact if provided
+    if (supplierData.primary_contact_name && supplierData.primary_contact_email) {
+      const { error: contactError } = await supabase
+        .from('supplier_contacts')
+        .insert([{
+          supplier_id: supplier.id,
+          name: supplierData.primary_contact_name,
+          email: supplierData.primary_contact_email,
+          phone: supplierData.primary_contact_phone || null,
+          is_primary: true,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        }]);
+
+      if (contactError) {
+        console.error('Error creating primary contact:', contactError);
+        // Don't throw - supplier is created, contact creation is secondary
+      }
+    }
 
     // Update registration status
     await supabase
