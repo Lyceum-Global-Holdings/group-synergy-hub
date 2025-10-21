@@ -59,6 +59,144 @@ export type Database = {
         }
         Relationships: []
       }
+      approval_routing_rules: {
+        Row: {
+          company_id: string | null
+          condition_field: string | null
+          condition_operator: string | null
+          condition_value: string | null
+          created_at: string | null
+          id: string
+          required_stages: number[] | null
+          rule_name: string
+          updated_at: string | null
+        }
+        Insert: {
+          company_id?: string | null
+          condition_field?: string | null
+          condition_operator?: string | null
+          condition_value?: string | null
+          created_at?: string | null
+          id?: string
+          required_stages?: number[] | null
+          rule_name: string
+          updated_at?: string | null
+        }
+        Update: {
+          company_id?: string | null
+          condition_field?: string | null
+          condition_operator?: string | null
+          condition_value?: string | null
+          created_at?: string | null
+          id?: string
+          required_stages?: number[] | null
+          rule_name?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "approval_routing_rules_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      approval_stages: {
+        Row: {
+          approval_type: string | null
+          company_id: string | null
+          created_at: string | null
+          escalation_days: number | null
+          id: string
+          required: boolean | null
+          required_role: string | null
+          stage_description: string | null
+          stage_name: string
+          stage_order: number
+          updated_at: string | null
+        }
+        Insert: {
+          approval_type?: string | null
+          company_id?: string | null
+          created_at?: string | null
+          escalation_days?: number | null
+          id?: string
+          required?: boolean | null
+          required_role?: string | null
+          stage_description?: string | null
+          stage_name: string
+          stage_order: number
+          updated_at?: string | null
+        }
+        Update: {
+          approval_type?: string | null
+          company_id?: string | null
+          created_at?: string | null
+          escalation_days?: number | null
+          id?: string
+          required?: boolean | null
+          required_role?: string | null
+          stage_description?: string | null
+          stage_name?: string
+          stage_order?: number
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "approval_stages_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      approver_assignments: {
+        Row: {
+          company_id: string | null
+          created_at: string | null
+          id: string
+          is_backup: boolean | null
+          notification_enabled: boolean | null
+          role_required: string | null
+          stage_order: number
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          company_id?: string | null
+          created_at?: string | null
+          id?: string
+          is_backup?: boolean | null
+          notification_enabled?: boolean | null
+          role_required?: string | null
+          stage_order: number
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          company_id?: string | null
+          created_at?: string | null
+          id?: string
+          is_backup?: boolean | null
+          notification_enabled?: boolean | null
+          role_required?: string | null
+          stage_order?: number
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "approver_assignments_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       asset_categories: {
         Row: {
           company_id: string | null
@@ -7884,37 +8022,58 @@ export type Database = {
       }
       supplier_approval_workflow: {
         Row: {
+          approval_action: string | null
+          approval_comments: string | null
           assigned_to: string | null
           completed_at: string | null
           completed_by: string | null
           created_at: string
+          documents_verified: boolean | null
+          escalated_to: string | null
           id: string
           notes: string | null
+          notified_at: string | null
           registration_request_id: string
           stage: string
+          stage_order: number | null
           status: string
+          time_spent_hours: number | null
         }
         Insert: {
+          approval_action?: string | null
+          approval_comments?: string | null
           assigned_to?: string | null
           completed_at?: string | null
           completed_by?: string | null
           created_at?: string
+          documents_verified?: boolean | null
+          escalated_to?: string | null
           id?: string
           notes?: string | null
+          notified_at?: string | null
           registration_request_id: string
           stage: string
+          stage_order?: number | null
           status?: string
+          time_spent_hours?: number | null
         }
         Update: {
+          approval_action?: string | null
+          approval_comments?: string | null
           assigned_to?: string | null
           completed_at?: string | null
           completed_by?: string | null
           created_at?: string
+          documents_verified?: boolean | null
+          escalated_to?: string | null
           id?: string
           notes?: string | null
+          notified_at?: string | null
           registration_request_id?: string
           stage?: string
+          stage_order?: number | null
           status?: string
+          time_spent_hours?: number | null
         }
         Relationships: [
           {
@@ -9704,6 +9863,10 @@ export type Database = {
           _role_ids?: string[]
         }
         Returns: Json
+      }
+      escalate_pending_approvals: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
       }
       generate_adjustment_batch_number: {
         Args: Record<PropertyKey, never>
