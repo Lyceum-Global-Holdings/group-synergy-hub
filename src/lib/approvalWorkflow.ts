@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import type { Database } from "@/integrations/supabase/types";
 import { SupplierRegistrationRequest } from "@/types/supplierRegistration";
 
 export class ApprovalWorkflowEngine {
@@ -261,14 +262,14 @@ export class ApprovalWorkflowEngine {
     const supplierCode = `SUP${String(nextNumber).padStart(5, '0')}`;
     
     // Map all registration fields to supplier record
-    const newSupplier = {
+    const newSupplier: Database['public']['Tables']['suppliers']['Insert'] = {
       supplier_code: supplierCode,
       name: supplierData.supplier_name || supplierData.name || '',
-      legal_name: supplierData.supplier_name || supplierData.name || '',
-      email: supplierData.email || '',
-      phone: supplierData.phone || '',
-      tax_id: supplierData.tax_id || '',
-      supplier_type: supplierData.supplier_type || null,
+      legal_name: supplierData.supplier_name || supplierData.name || null,
+      email: supplierData.email || null,
+      phone: supplierData.phone || null,
+      tax_id: supplierData.tax_id || null,
+      supplier_type: supplierData.supplier_type || undefined,
       category: supplierData.category || null,
       material_type: supplierData.material_type || null,
       website: supplierData.website || null,
