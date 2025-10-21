@@ -11,6 +11,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useSuppliers, useDeleteSupplier } from '@/hooks/useSuppliers';
 import { useSupplierAnalytics } from '@/hooks/useSupplierAnalytics';
+import { useBulkUpdateSupplierRatings } from '@/hooks/useSupplierRatings';
 import { CreateSupplierDialog } from '@/components/sourcing/CreateSupplierDialog';
 import { SupplierDetailsDialog } from '@/components/sourcing/SupplierDetailsDialog';
 import { SupplierRatingTooltip } from '@/components/sourcing/SupplierRatingTooltip';
@@ -29,6 +30,7 @@ export const SupplierMaster: React.FC = () => {
   const { data: suppliers, isLoading, error } = useSuppliers();
   const { data: analytics } = useSupplierAnalytics();
   const deleteSupplierMutation = useDeleteSupplier();
+  const bulkUpdateRatings = useBulkUpdateSupplierRatings();
 
   const filteredSuppliers = suppliers?.filter((supplier) => {
     const matchesSearch = supplier.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -139,10 +141,20 @@ export const SupplierMaster: React.FC = () => {
             Manage your supplier database and vendor relationships
           </p>
         </div>
-        <Button onClick={() => setIsCreateDialogOpen(true)}>
-          <Plus className="w-4 h-4 mr-2" />
-          Add Supplier
-        </Button>
+        <div className="flex gap-2">
+          <Button 
+            variant="outline" 
+            onClick={() => bulkUpdateRatings.mutate()}
+            disabled={bulkUpdateRatings.isPending}
+          >
+            <Star className="w-4 h-4 mr-2" />
+            {bulkUpdateRatings.isPending ? 'Recalculating...' : 'Recalculate Ratings'}
+          </Button>
+          <Button onClick={() => setIsCreateDialogOpen(true)}>
+            <Plus className="w-4 h-4 mr-2" />
+            Add Supplier
+          </Button>
+        </div>
       </div>
 
       {/* Stats Cards */}

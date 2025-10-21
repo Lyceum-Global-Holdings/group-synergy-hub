@@ -1,6 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { useSupplierAnalytics } from './useSupplierAnalytics';
 import { toast } from '@/hooks/use-toast';
 
 /**
@@ -16,15 +15,19 @@ export const calculateRatingFromPerformance = (performanceRate: number): number 
  */
 export const useUpdateSupplierRating = () => {
   const queryClient = useQueryClient();
-  const { data: analytics } = useSupplierAnalytics();
 
   return useMutation({
     mutationFn: async (supplierId: string) => {
-      // Find analytics for this supplier
-      const supplierAnalytics = analytics?.find(a => a.supplierId === supplierId);
+      // Fetch evaluations for this supplier directly from database
+      const { data: evaluations, error: evalError } = await supabase
+        .from('supplier_evaluations')
+        .select('performance_rate')
+        .eq('supplier_id', supplierId);
       
-      if (!supplierAnalytics) {
-        // No evaluations yet, set rating to null
+      if (evalError) throw evalError;
+      
+      // If no evaluations, set rating to null
+      if (!evaluations || evaluations.length === 0) {
         const { error } = await supabase
           .from('suppliers')
           .update({ rating: null })
@@ -33,9 +36,12 @@ export const useUpdateSupplierRating = () => {
         if (error) throw error;
         return { supplierId, rating: null };
       }
-
+      
+      // Calculate average performance rate
+      const avgPerformanceRate = evaluations.reduce((sum, e) => sum + e.performance_rate, 0) / evaluations.length;
+      
       // Calculate rating from average performance rate
-      const rating = calculateRatingFromPerformance(supplierAnalytics.avgPerformanceRate);
+      const rating = calculateRatingFromPerformance(avgPerformanceRate);
 
       // Update supplier rating
       const { error } = await supabase
@@ -45,7 +51,7 @@ export const useUpdateSupplierRating = () => {
 
       if (error) throw error;
 
-      return { supplierId, rating, performanceRate: supplierAnalytics.avgPerformanceRate };
+      return { supplierId, rating, performanceRate: avgPerformanceRate };
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['suppliers'] });
@@ -73,24 +79,42 @@ export const useUpdateSupplierRating = () => {
  */
 export const useBulkUpdateSupplierRatings = () => {
   const queryClient = useQueryClient();
-  const { data: analytics } = useSupplierAnalytics();
 
   return useMutation({
     mutationFn: async () => {
-      if (!analytics || analytics.length === 0) {
-        throw new Error('No analytics data available');
+      // Fetch all evaluations grouped by supplier
+      const { data: evaluations, error: evalError } = await supabase
+        .from('supplier_evaluations')
+        .select('supplier_id, performance_rate');
+      
+      if (evalError) throw evalError;
+      
+      if (!evaluations || evaluations.length === 0) {
+        throw new Error('No evaluation data available');
       }
 
-      const updates = analytics.map(async (supplierAnalytics) => {
-        const rating = calculateRatingFromPerformance(supplierAnalytics.avgPerformanceRate);
+      // Group evaluations by supplier_id and calculate average performance rate
+      const supplierPerformance = evaluations.reduce((acc, evaluation) => {
+        if (!acc[evaluation.supplier_id]) {
+          acc[evaluation.supplier_id] = { total: 0, count: 0 };
+        }
+        acc[evaluation.supplier_id].total += evaluation.performance_rate;
+        acc[evaluation.supplier_id].count += 1;
+        return acc;
+      }, {} as Record<string, { total: number; count: number }>);
+
+      // Update ratings for all suppliers with evaluations
+      const updates = Object.entries(supplierPerformance).map(async ([supplierId, data]) => {
+        const avgPerformanceRate = data.total / data.count;
+        const rating = calculateRatingFromPerformance(avgPerformanceRate);
         
         const { error } = await supabase
           .from('suppliers')
           .update({ rating })
-          .eq('id', supplierAnalytics.supplierId);
+          .eq('id', supplierId);
 
         if (error) throw error;
-        return { supplierId: supplierAnalytics.supplierId, rating };
+        return { supplierId, rating, performanceRate: avgPerformanceRate };
       });
 
       const results = await Promise.all(updates);
