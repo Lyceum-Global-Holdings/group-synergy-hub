@@ -1,7 +1,11 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Company } from '@/types/company';
+import { GLSettings } from '@/types/generalLedger';
 import { useCompanies } from '@/hooks/useCompanies';
 import { useSuperAdmin } from '@/hooks/useSuperAdmin';
+import { supabase } from '@/integrations/supabase/client';
+import { formatCurrency as baseFormatCurrency } from '@/lib/utils';
 
 interface CompanyContextType {
   selectedCompany: Company | null;
@@ -9,6 +13,11 @@ interface CompanyContextType {
   companies: Company[];
   isLoading: boolean;
   isViewingAllCompanies: boolean;
+  glSettings: GLSettings | null;
+  baseCurrency: string;
+  currencySymbol: string;
+  decimalPlaces: number;
+  formatCurrency: (amount: number) => string;
 }
 
 const CompanyContext = createContext<CompanyContextType | undefined>(undefined);
@@ -21,6 +30,24 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
   
   // Ensure companies is always an array
   const safeCompanies = Array.isArray(companies) ? companies : [];
+
+  // Fetch GL settings for selected company
+  const { data: glSettings } = useQuery({
+    queryKey: ['gl-settings', selectedCompany?.id],
+    queryFn: async () => {
+      if (!selectedCompany?.id) return null;
+      
+      const { data, error } = await supabase
+        .from('gl_settings')
+        .select('*')
+        .eq('company_id', selectedCompany.id)
+        .single();
+
+      if (error) return null;
+      return data as GLSettings;
+    },
+    enabled: !!selectedCompany?.id,
+  });
 
   // Auto-select company based on user's access
   useEffect(() => {
@@ -57,13 +84,28 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // Currency formatting helper
+  const formatCurrency = (amount: number) => {
+    return baseFormatCurrency(
+      amount,
+      glSettings?.base_currency || 'LKR',
+      glSettings?.currency_symbol || 'Rs.',
+      glSettings?.decimal_places || 2
+    );
+  };
+
   return (
     <CompanyContext.Provider value={{
       selectedCompany,
       setSelectedCompany: handleSetSelectedCompany,
       companies: safeCompanies,
       isLoading: isLoading || isSuperAdminLoading,
-      isViewingAllCompanies
+      isViewingAllCompanies,
+      glSettings: glSettings || null,
+      baseCurrency: glSettings?.base_currency || 'LKR',
+      currencySymbol: glSettings?.currency_symbol || 'Rs.',
+      decimalPlaces: glSettings?.decimal_places || 2,
+      formatCurrency
     }}>
       {children}
     </CompanyContext.Provider>

@@ -205,3 +205,29 @@ export interface CreateJournalEntryData {
   tags?: string[];
   company_id?: string;
 }
+
+export interface GLSettings {
+  id: string;
+  company_id: string;
+  base_currency: string;
+  currency_symbol: string;
+  decimal_places: number;
+  date_format: string | null;
+  je_number_format: string | null;
+  require_je_approval: boolean;
+  approval_threshold_amount: number | null;
+  allow_posting_to_closed_periods: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface UpdateGLSettingsData {
+  base_currency?: string;
+  currency_symbol?: string;
+  decimal_places?: number;
+  date_format?: string;
+  je_number_format?: string;
+  require_je_approval?: boolean;
+  approval_threshold_amount?: number;
+  allow_posting_to_closed_periods?: boolean;
+}

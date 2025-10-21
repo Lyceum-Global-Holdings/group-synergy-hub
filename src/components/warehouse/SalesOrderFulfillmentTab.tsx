@@ -19,8 +19,8 @@ import { FinishedGoodsIssueDetailsDialog } from './FinishedGoodsIssueDetailsDial
 import { format } from 'date-fns';
 
 export function SalesOrderFulfillmentTab() {
-  const { selectedCompany } = useCompany();
-  const { 
+  const { selectedCompany, formatCurrency } = useCompany();
+  const {
     useConfirmedCPOs, 
     useSalesOrders, 
     usePickLists,
@@ -171,7 +171,7 @@ export function SalesOrderFulfillmentTab() {
                         <TableCell className="font-medium">{cpo.cpo_number}</TableCell>
                         <TableCell>{cpo.customers?.customer_name}</TableCell>
                         <TableCell>{cpo.customer_po_items?.length || 0}</TableCell>
-                        <TableCell>${cpo.total_amount?.toFixed(2) || '0.00'}</TableCell>
+                        <TableCell>{formatCurrency(cpo.total_amount || 0)}</TableCell>
                         <TableCell>{format(new Date(cpo.po_date), 'MMM dd, yyyy')}</TableCell>
                         <TableCell>
                           <Button 

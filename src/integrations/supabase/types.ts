@@ -4101,6 +4101,59 @@ export type Database = {
         }
         Relationships: []
       }
+      gl_settings: {
+        Row: {
+          allow_posting_to_closed_periods: boolean | null
+          approval_threshold_amount: number | null
+          base_currency: string
+          company_id: string
+          created_at: string
+          currency_symbol: string
+          date_format: string | null
+          decimal_places: number
+          id: string
+          je_number_format: string | null
+          require_je_approval: boolean | null
+          updated_at: string
+        }
+        Insert: {
+          allow_posting_to_closed_periods?: boolean | null
+          approval_threshold_amount?: number | null
+          base_currency?: string
+          company_id: string
+          created_at?: string
+          currency_symbol?: string
+          date_format?: string | null
+          decimal_places?: number
+          id?: string
+          je_number_format?: string | null
+          require_je_approval?: boolean | null
+          updated_at?: string
+        }
+        Update: {
+          allow_posting_to_closed_periods?: boolean | null
+          approval_threshold_amount?: number | null
+          base_currency?: string
+          company_id?: string
+          created_at?: string
+          currency_symbol?: string
+          date_format?: string | null
+          decimal_places?: number
+          id?: string
+          je_number_format?: string | null
+          require_je_approval?: boolean | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gl_settings_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: true
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       goods_receipt_notes: {
         Row: {
           approved_by: string | null
