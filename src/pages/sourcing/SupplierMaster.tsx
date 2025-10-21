@@ -93,33 +93,44 @@ export const SupplierMaster: React.FC = () => {
 
   const renderRatingWithPerformance = (supplier: Supplier) => {
     const supplierAnalytics = analytics?.find(a => a.supplierId === supplier.id);
-    
-    if (!supplier.rating || !supplierAnalytics) {
+
+    if (supplier.rating == null) {
       return <span className="text-muted-foreground text-sm">No rating</span>;
     }
 
+    // If analytics are available, show rich tooltip + performance badge
+    if (supplierAnalytics) {
+      return (
+        <SupplierRatingTooltip
+          rating={supplier.rating}
+          performanceRate={supplierAnalytics.avgPerformanceRate}
+          grade={supplierAnalytics.performanceGrade}
+          totalEvaluations={supplierAnalytics.totalEvaluations}
+          lastEvaluationDate={supplierAnalytics.totalEvaluations > 0 ? new Date().toISOString() : undefined}
+        >
+          <div className="cursor-help">
+            <div className="flex items-center gap-2">
+              {renderStars(supplier.rating)}
+              <Badge variant="outline" className="text-xs">
+                {supplierAnalytics.avgPerformanceRate.toFixed(0)}%
+              </Badge>
+            </div>
+            <div className="text-xs text-muted-foreground mt-1">
+              Grade {supplierAnalytics.performanceGrade} • {supplierAnalytics.totalEvaluations} eval{supplierAnalytics.totalEvaluations !== 1 ? 's' : ''}
+            </div>
+          </div>
+        </SupplierRatingTooltip>
+      );
+    }
+
+    // Fallback: show just stars when analytics aren't loaded/available
     return (
-      <SupplierRatingTooltip
-        rating={supplier.rating}
-        performanceRate={supplierAnalytics.avgPerformanceRate}
-        grade={supplierAnalytics.performanceGrade}
-        totalEvaluations={supplierAnalytics.totalEvaluations}
-        lastEvaluationDate={supplierAnalytics.totalEvaluations > 0 ? new Date().toISOString() : undefined}
-      >
-        <div className="cursor-help">
-          <div className="flex items-center gap-2">
-            {renderStars(supplier.rating)}
-            <Badge variant="outline" className="text-xs">
-              {supplierAnalytics.avgPerformanceRate.toFixed(0)}%
-            </Badge>
-          </div>
-          <div className="text-xs text-muted-foreground mt-1">
-            Grade {supplierAnalytics.performanceGrade} • {supplierAnalytics.totalEvaluations} eval{supplierAnalytics.totalEvaluations !== 1 ? 's' : ''}
-          </div>
-        </div>
-      </SupplierRatingTooltip>
+      <div className="flex items-center gap-2">
+        {renderStars(supplier.rating)}
+      </div>
     );
   };
+
 
   if (error) {
     return (
