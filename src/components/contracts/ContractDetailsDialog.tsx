@@ -1,3 +1,4 @@
+import { useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -5,6 +6,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Contract } from "@/types/contracts";
@@ -17,9 +19,15 @@ import {
   AlertCircle,
   CheckCircle,
   Clock,
+  Pencil,
+  Trash2,
+  RefreshCw,
 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ContractDocumentsSection } from "./ContractDocumentsSection";
+import { EditContractDialog } from "./EditContractDialog";
+import { DeleteContractDialog } from "./DeleteContractDialog";
+import { ChangeContractStatusDialog } from "./ChangeContractStatusDialog";
 
 interface ContractDetailsDialogProps {
   contract: Contract;
@@ -32,6 +40,9 @@ export const ContractDetailsDialog = ({
   open,
   onOpenChange,
 }: ContractDetailsDialogProps) => {
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+  const [isStatusChangeOpen, setIsStatusChangeOpen] = useState(false);
   const getStatusBadge = (status: string) => {
     const variants: Record<string, { variant: any; icon: any }> = {
       draft: { variant: "secondary", icon: Clock },
@@ -69,7 +80,34 @@ export const ContractDetailsDialog = ({
                 {contract.contract_number}
               </p>
             </div>
-            {getStatusBadge(contract.status)}
+            <div className="flex items-center gap-2">
+              {getStatusBadge(contract.status)}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsEditOpen(true)}
+              >
+                <Pencil className="mr-2 h-4 w-4" />
+                Edit
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsStatusChangeOpen(true)}
+              >
+                <RefreshCw className="mr-2 h-4 w-4" />
+                Change Status
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsDeleteOpen(true)}
+                className="text-destructive hover:text-destructive"
+              >
+                <Trash2 className="mr-2 h-4 w-4" />
+                Delete
+              </Button>
+            </div>
           </div>
         </DialogHeader>
 
@@ -316,6 +354,25 @@ export const ContractDetailsDialog = ({
             <ContractDocumentsSection contractId={contract.id} />
           </TabsContent>
         </Tabs>
+
+        <EditContractDialog
+          open={isEditOpen}
+          onOpenChange={setIsEditOpen}
+          contract={contract}
+        />
+
+        <DeleteContractDialog
+          open={isDeleteOpen}
+          onOpenChange={setIsDeleteOpen}
+          contract={contract}
+          onSuccess={() => onOpenChange(false)}
+        />
+
+        <ChangeContractStatusDialog
+          open={isStatusChangeOpen}
+          onOpenChange={setIsStatusChangeOpen}
+          contract={contract}
+        />
       </DialogContent>
     </Dialog>
   );

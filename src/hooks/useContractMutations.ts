@@ -76,9 +76,44 @@ export const useContractMutations = () => {
     },
   });
 
+  const updateContractStatus = useMutation({
+    mutationFn: async ({
+      id,
+      status,
+      notes,
+    }: {
+      id: string;
+      status: string;
+      notes?: string;
+    }) => {
+      const updateData: any = { status };
+      if (notes) {
+        updateData.notes = notes;
+      }
+
+      const { data: contract, error } = await supabase
+        .from("contracts")
+        .update(updateData)
+        .eq("id", id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return contract;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["contracts"] });
+      toast.success("Contract status updated successfully");
+    },
+    onError: (error: Error) => {
+      toast.error("Failed to update status: " + error.message);
+    },
+  });
+
   return {
     createContract,
     updateContract,
     deleteContract,
+    updateContractStatus,
   };
 };

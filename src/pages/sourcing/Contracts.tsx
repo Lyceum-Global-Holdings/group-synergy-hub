@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus, FileText, AlertCircle, CheckCircle, Clock } from "lucide-react";
+import { Plus, FileText, AlertCircle, CheckCircle, Clock, MoreVertical, Pencil, Trash2, RefreshCw, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -9,11 +9,22 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DataTable } from "@/components/ui/data-table";
 import { useContracts } from "@/hooks/useContracts";
 import { CreateContractDialog } from "@/components/contracts/CreateContractDialog";
 import { ContractDetailsDialog } from "@/components/contracts/ContractDetailsDialog";
+import { EditContractDialog } from "@/components/contracts/EditContractDialog";
+import { DeleteContractDialog } from "@/components/contracts/DeleteContractDialog";
+import { ChangeContractStatusDialog } from "@/components/contracts/ChangeContractStatusDialog";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { Contract } from "@/types/contracts";
@@ -25,6 +36,9 @@ const Contracts = () => {
   const [typeFilter, setTypeFilter] = useState<string>("");
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [selectedContract, setSelectedContract] = useState<Contract | null>(null);
+  const [editContract, setEditContract] = useState<Contract | null>(null);
+  const [deleteContract, setDeleteContract] = useState<Contract | null>(null);
+  const [statusChangeContract, setStatusChangeContract] = useState<Contract | null>(null);
 
   const { data: contracts, isLoading } = useContracts({
     status: statusFilter,
@@ -113,6 +127,47 @@ const Contracts = () => {
       accessorKey: "status",
       header: "Status",
       cell: ({ row }) => getStatusBadge(row.original.status),
+    },
+    {
+      id: "actions",
+      header: "Actions",
+      cell: ({ row }) => {
+        const contract = row.original;
+        return (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" className="h-8 w-8 p-0">
+                <span className="sr-only">Open menu</span>
+                <MoreVertical className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuLabel>Actions</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => setSelectedContract(contract)}>
+                <Eye className="mr-2 h-4 w-4" />
+                View Details
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setEditContract(contract)}>
+                <Pencil className="mr-2 h-4 w-4" />
+                Edit
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setStatusChangeContract(contract)}>
+                <RefreshCw className="mr-2 h-4 w-4" />
+                Change Status
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={() => setDeleteContract(contract)}
+                className="text-destructive focus:text-destructive"
+              >
+                <Trash2 className="mr-2 h-4 w-4" />
+                Delete
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        );
+      },
     },
   ];
 
@@ -253,6 +308,25 @@ const Contracts = () => {
           onOpenChange={(open) => !open && setSelectedContract(null)}
         />
       )}
+
+      <EditContractDialog
+        open={!!editContract}
+        onOpenChange={(open) => !open && setEditContract(null)}
+        contract={editContract}
+      />
+
+      <DeleteContractDialog
+        open={!!deleteContract}
+        onOpenChange={(open) => !open && setDeleteContract(null)}
+        contract={deleteContract}
+        onSuccess={() => setSelectedContract(null)}
+      />
+
+      <ChangeContractStatusDialog
+        open={!!statusChangeContract}
+        onOpenChange={(open) => !open && setStatusChangeContract(null)}
+        contract={statusChangeContract}
+      />
     </div>
   );
 };
