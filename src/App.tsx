@@ -49,6 +49,8 @@ import VideoLibrary from "./pages/admin/training/VideoLibrary";
 import Documentation from "./pages/admin/training/Documentation";
 import TrainingProgress from "./pages/admin/training/TrainingProgress";
 import DashboardsKPIs from "./pages/management/DashboardsKPIs";
+import DashboardView from "./pages/management/DashboardView";
+import DashboardEdit from "./pages/management/DashboardEdit";
 
 const queryClient = new QueryClient();
 
@@ -123,6 +125,8 @@ function App() {
               <Route path="/warehouse/delivery-order" element={<DeliveryOrder />} />
               <Route path="/finance/general-ledger" element={<GeneralLedger />} />
               <Route path="/management/dashboards" element={<DashboardsKPIs />} />
+              <Route path="/management/dashboards/:id/edit" element={<DashboardEdit />} />
+              <Route path="/management/dashboards/:id" element={<DashboardView />} />
             </Route>
             
             {/* Catch-all 404 route */}

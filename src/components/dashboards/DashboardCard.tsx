@@ -4,16 +4,24 @@ import { Badge } from "@/components/ui/badge";
 import { LayoutDashboard, Eye, Edit, Trash2, Share2 } from "lucide-react";
 import { Dashboard } from "@/types/dashboard";
 import { formatDistanceToNow } from "date-fns";
+import { useNavigate } from "react-router-dom";
 
 interface DashboardCardProps {
   dashboard: Dashboard;
-  onView: () => void;
-  onEdit: () => void;
   onDelete: () => void;
   onShare: () => void;
 }
 
-export function DashboardCard({ dashboard, onView, onEdit, onDelete, onShare }: DashboardCardProps) {
+export function DashboardCard({ dashboard, onDelete, onShare }: DashboardCardProps) {
+  const navigate = useNavigate();
+
+  const handleView = () => {
+    navigate(`/management/dashboards/${dashboard.id}`);
+  };
+
+  const handleEdit = () => {
+    navigate(`/management/dashboards/${dashboard.id}/edit`);
+  };
   const getVisibilityBadge = () => {
     switch (dashboard.visibility) {
       case "company_wide":
@@ -52,11 +60,11 @@ export function DashboardCard({ dashboard, onView, onEdit, onDelete, onShare }: 
         </div>
       </CardContent>
       <CardFooter className="flex gap-2">
-        <Button size="sm" onClick={onView}>
+        <Button size="sm" onClick={handleView}>
           <Eye className="h-4 w-4 mr-1" />
           View
         </Button>
-        <Button size="sm" variant="outline" onClick={onEdit}>
+        <Button size="sm" variant="outline" onClick={handleEdit}>
           <Edit className="h-4 w-4 mr-1" />
           Edit
         </Button>

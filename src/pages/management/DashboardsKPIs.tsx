@@ -48,8 +48,6 @@ export default function DashboardsKPIs() {
                 <DashboardCard
                   key={dashboard.id}
                   dashboard={dashboard}
-                  onView={() => navigate(`/management/dashboards/${dashboard.id}`)}
-                  onEdit={() => navigate(`/management/dashboards/${dashboard.id}/edit`)}
                   onDelete={() => {
                     if (confirm("Are you sure you want to delete this dashboard?")) {
                       deleteDashboard.mutate(dashboard.id);
