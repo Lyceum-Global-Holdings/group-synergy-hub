@@ -463,7 +463,7 @@ export default function CreateCustomerPoDialog({
                         )}
                       />
 
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <FormField
                           control={form.control}
                           name={`items.${index}.item_name`}
@@ -489,6 +489,25 @@ export default function CreateCustomerPoDialog({
                           render={({ field }) => (
                             <FormItem>
                               <FormLabel>Description</FormLabel>
+                              <FormControl>
+                                <Input 
+                                  placeholder="Auto-filled from product template" 
+                                  {...field} 
+                                  readOnly
+                                  className="bg-muted"
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        <FormField
+                          control={form.control}
+                          name={`items.${index}.style_no`}
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Style No.</FormLabel>
                               <FormControl>
                                 <Input 
                                   placeholder="Auto-filled from product template" 
