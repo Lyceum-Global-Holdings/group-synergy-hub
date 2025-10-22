@@ -186,6 +186,21 @@ export function EditRoleDialog({ open, onOpenChange, role, onRoleUpdated }: Edit
     form.setValue('modules', newModules);
   };
 
+  const handleSelectAllInCategory = (category: string, categoryPermissions: any[]) => {
+    const categoryIds = categoryPermissions.map(p => p.id);
+    const allSelected = categoryIds.every(id => selectedPermissions.includes(id));
+    
+    if (allSelected) {
+      const newPermissions = selectedPermissions.filter(id => !categoryIds.includes(id));
+      setSelectedPermissions(newPermissions);
+      form.setValue("permissions", newPermissions);
+    } else {
+      const newPermissions = [...new Set([...selectedPermissions, ...categoryIds])];
+      setSelectedPermissions(newPermissions);
+      form.setValue("permissions", newPermissions);
+    }
+  };
+
   const isSubmitting = updateRole.isPending;
 
   // Group permissions by category for better organization
@@ -361,19 +376,39 @@ export function EditRoleDialog({ open, onOpenChange, role, onRoleUpdated }: Edit
               name="permissions"
               render={() => (
                 <FormItem>
-                  <FormLabel>Permissions</FormLabel>
+                  <FormLabel className="flex items-center justify-between">
+                    <span>Permissions</span>
+                    <Badge variant="secondary">
+                      {selectedPermissions.length} / {permissions.length}
+                    </Badge>
+                  </FormLabel>
                   <FormDescription>
                     Select the permissions for this role
                   </FormDescription>
                   {permissionsLoading ? (
-                    <div className="flex items-center justify-center p-4">
-                      <Loader2 className="h-4 w-4 animate-spin" />
+                    <div className="flex flex-col items-center justify-center p-8 space-y-2">
+                      <Loader2 className="h-6 w-6 animate-spin" />
+                      <p className="text-sm text-muted-foreground">Loading permissions...</p>
+                    </div>
+                  ) : permissions.length === 0 ? (
+                    <div className="p-4 text-center text-sm text-muted-foreground border rounded-lg">
+                      No permissions found. Please contact administrator.
                     </div>
                   ) : (
-                    <div className="max-h-64 overflow-y-auto space-y-4">
+                    <div className="max-h-[500px] overflow-y-auto space-y-4 border rounded-lg p-4">
                       {Object.entries(groupedPermissions).map(([category, categoryPermissions]: [string, any[]]) => (
                         <div key={category} className="space-y-2">
-                          <h4 className="text-sm font-medium capitalize">{category.replace('_', ' ')}</h4>
+                          <div className="flex items-center justify-between">
+                            <h4 className="text-sm font-medium capitalize">{category.replace('_', ' ')}</h4>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleSelectAllInCategory(category, categoryPermissions)}
+                            >
+                              {categoryPermissions.every(p => selectedPermissions.includes(p.id)) ? "Deselect All" : "Select All"}
+                            </Button>
+                          </div>
                           <div className="grid grid-cols-2 gap-2 ml-4">
                             {categoryPermissions.map((permission) => (
                               <div key={permission.id} className="flex items-center space-x-2">
