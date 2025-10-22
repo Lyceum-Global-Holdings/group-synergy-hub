@@ -947,9 +947,9 @@ export const useDemandCalculation = (companyId?: string) => {
         }
         
         // Strategy 2: Style + Size + Color match (fallback)
-        const cpoStyleNo = cpoItem.style_no || extractStyleFromItemName(cpoItem.item_name);
-        const cpoSize = cpoItem.size;
-        const cpoColor = cpoItem.color;
+        const cpoStyleNo = (cpoItem as any).style_no || extractStyleFromItemName(cpoItem.item_name);
+        const cpoSize = (cpoItem as any).size;
+        const cpoColor = (cpoItem as any).color;
         
         if (cpoStyleNo && cpoSize && cpoColor) {
           const compositeKey = `${cpoStyleNo}|${cpoSize}|${cpoColor}`.toLowerCase();
@@ -976,7 +976,7 @@ export const useDemandCalculation = (companyId?: string) => {
         
         for (const cpoItem of cpo.items || []) {
           console.log(`\nProcessing CPO Item: ${cpoItem.item_name}`);
-          console.log(`  Style: ${cpoItem.style_no || 'N/A'}, Size: ${cpoItem.size || 'N/A'}, Color: ${cpoItem.color || 'N/A'}`);
+          console.log(`  Style: ${(cpoItem as any).style_no || 'N/A'}, Size: ${(cpoItem as any).size || 'N/A'}, Color: ${(cpoItem as any).color || 'N/A'}`);
           console.log(`  Quantity: ${cpoItem.quantity_ordered}`);
           
           // NEW: Use smart matching function (tries ID first, then style+size+color)
@@ -1199,7 +1199,7 @@ export const useDemandCalculation = (companyId?: string) => {
               on_order: 0,
               shortage: Number(cpoItem.quantity_ordered) * (input.multiplier || 1),
               suggested_order: Number(cpoItem.quantity_ordered) * (input.multiplier || 1),
-              unit_of_measure: cpoItem.unit_of_measure || 'pcs',
+              unit_of_measure: (cpoItem as any).unit_of_measure || 'pcs',
               category: 'No Matching Product',
               priority: 'urgent',
               lead_time_days: 14,

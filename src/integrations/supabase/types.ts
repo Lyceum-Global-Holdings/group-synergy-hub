@@ -2786,7 +2786,9 @@ export type Database = {
           quantity_ordered: number
           size: string | null
           status: string
+          style_no: string | null
           total_price: number | null
+          unit_of_measure: string | null
           unit_price: number | null
           updated_at: string
         }
@@ -2803,7 +2805,9 @@ export type Database = {
           quantity_ordered?: number
           size?: string | null
           status?: string
+          style_no?: string | null
           total_price?: number | null
+          unit_of_measure?: string | null
           unit_price?: number | null
           updated_at?: string
         }
@@ -2820,7 +2824,9 @@ export type Database = {
           quantity_ordered?: number
           size?: string | null
           status?: string
+          style_no?: string | null
           total_price?: number | null
+          unit_of_measure?: string | null
           unit_price?: number | null
           updated_at?: string
         }
