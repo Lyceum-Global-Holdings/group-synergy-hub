@@ -40,12 +40,6 @@ type ModuleWithCompanies = {
   companiesUsing?: Company[];
 };
 
-const adminItems = [
-  { title: "Company Management", url: "/admin/companies", icon: Building2 },
-  { title: "User & Role Management", url: "/admin/users-roles", icon: Users },
-  { title: "Warehouse Management", url: "/admin/warehouse-management", icon: Package },
-  { title: "Module Allocation", url: "/admin/modules", icon: Settings },
-];
 
 export function CompanySidebar() {
   const { state } = useSidebar();
@@ -250,24 +244,58 @@ export function CompanySidebar() {
           </SidebarGroup>
         )}
 
-        {/* Administration */}
-        <SidebarGroup>
-          <SidebarGroupLabel>Administration</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {adminItems.map((item) => (
-                <SidebarMenuItem key={item.url}>
-                  <SidebarMenuButton asChild isActive={isActive(item.url)}>
-                    <NavLink to={item.url} className="flex items-center gap-2">
-                      <item.icon className="h-4 w-4" />
-                      <span>{item.title}</span>
-                    </NavLink>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+        {/* Administration - Module-based */}
+        {isSubModuleEnabled(
+          isViewingAllCompanies 
+            ? (isSuperAdmin ? Object.keys(moduleConfig) : getAllUniqueModules()) 
+            : selectedCompany?.modules,
+          'administration'
+        ) && (
+          <SidebarGroup>
+            <SidebarGroupLabel>Administration</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                <Collapsible
+                  defaultOpen={isGroupActive(moduleConfig.administration.subModules.map(s => ({url: s.url})))}
+                  className="group/collapsible"
+                >
+                  <SidebarMenuItem>
+                    <CollapsibleTrigger asChild>
+                      <SidebarMenuButton
+                        isActive={isGroupActive(moduleConfig.administration.subModules.map(s => ({url: s.url})))}
+                        className="w-full"
+                      >
+                        <Settings className="h-4 w-4" />
+                        <span>Administration</span>
+                        <ChevronDown className="ml-auto h-4 w-4 transition-transform group-data-[state=open]/collapsible:rotate-180" />
+                      </SidebarMenuButton>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent>
+                      <SidebarMenuSub>
+                        {moduleConfig.administration.subModules
+                          .filter(subModule => 
+                            isViewingAllCompanies 
+                              ? isSuperAdmin 
+                              : isSubModuleEnabled(selectedCompany?.modules, 'administration', subModule.key)
+                          )
+                          .map((item) => (
+                            <SidebarMenuSubItem key={item.url}>
+                              <SidebarMenuSubButton
+                                asChild
+                                isActive={isActive(item.url)}
+                              >
+                                <NavLink to={item.url}>{item.name}</NavLink>
+                              </SidebarMenuSubButton>
+                            </SidebarMenuSubItem>
+                          ))}
+                      </SidebarMenuSub>
+                    </CollapsibleContent>
+                  </SidebarMenuItem>
+                </Collapsible>
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
       </SidebarContent>
     </Sidebar>
   );

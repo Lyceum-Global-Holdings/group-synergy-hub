@@ -334,6 +334,11 @@ export function EditRoleDialog({ open, onOpenChange, role, onRoleUpdated }: Edit
                               />
                               <config.icon className="h-4 w-4" />
                               <span>{config.name}</span>
+                              {key === 'administration' && (
+                                <Badge variant="destructive" className="text-xs">
+                                  System Access
+                                </Badge>
+                              )}
                               {isModuleSelected && (
                                 <Badge variant="secondary" className="ml-2">
                                   {selectedSubModules.length} sub-modules

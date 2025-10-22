@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route, Outlet } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { CompanyProvider } from "@/contexts/CompanyContext";
 import ProtectedRoute from "./components/common/ProtectedRoute";
+import { AdminRoute } from "./components/auth/AdminRoute";
 import AppLayout from "./components/layout/AppLayout";
 import Dashboard from "./pages/Dashboard";
 import CompanyManagement from "./pages/admin/CompanyManagement";
@@ -90,10 +91,12 @@ function App() {
             {/* Protected routes - all wrapped with auth/company context */}
             <Route element={<ProtectedLayout />}>
               <Route path="/" element={<Dashboard />} />
-              <Route path="/admin/companies" element={<CompanyManagement />} />
-              <Route path="/admin/users-roles" element={<UserRoleManagement />} />
-              <Route path="/admin/modules" element={<ModuleAllocation />} />
-              <Route path="/admin/warehouse-management" element={<WarehouseManagement />} />
+              
+              {/* Admin routes - protected by AdminRoute */}
+              <Route path="/admin/companies" element={<AdminRoute><CompanyManagement /></AdminRoute>} />
+              <Route path="/admin/users-roles" element={<AdminRoute><UserRoleManagement /></AdminRoute>} />
+              <Route path="/admin/modules" element={<AdminRoute><ModuleAllocation /></AdminRoute>} />
+              <Route path="/admin/warehouse-management" element={<AdminRoute><WarehouseManagement /></AdminRoute>} />
               <Route path="/admin/training" element={<Training />} />
               <Route path="/admin/training/module-trainings" element={<ModuleTrainings />} />
               <Route path="/admin/training/video-library" element={<VideoLibrary />} />
