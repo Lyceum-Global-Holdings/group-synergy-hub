@@ -10296,6 +10296,10 @@ export type Database = {
         Args: { _user_id: string }
         Returns: string[]
       }
+      has_dashboard_access: {
+        Args: { _dashboard_id: string; _user_id: string }
+        Returns: boolean
+      }
       has_po_approval_role: {
         Args: { _role_name: string; _user_id: string }
         Returns: boolean
