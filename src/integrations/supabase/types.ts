@@ -7732,6 +7732,41 @@ export type Database = {
           },
         ]
       }
+      role_modules: {
+        Row: {
+          created_at: string | null
+          id: string
+          module_key: string
+          role_id: string
+          submodules: string[] | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          module_key: string
+          role_id: string
+          submodules?: string[] | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          module_key?: string
+          role_id?: string
+          submodules?: string[] | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "role_modules_role_id_fkey"
+            columns: ["role_id"]
+            isOneToOne: false
+            referencedRelation: "roles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       role_permissions: {
         Row: {
           created_at: string | null
@@ -9633,6 +9668,36 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      user_modules: {
+        Row: {
+          access_type: string
+          created_at: string | null
+          id: string
+          module_key: string
+          submodules: string[] | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          access_type: string
+          created_at?: string | null
+          id?: string
+          module_key: string
+          submodules?: string[] | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          access_type?: string
+          created_at?: string | null
+          id?: string
+          module_key?: string
+          submodules?: string[] | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
       }
       user_roles: {
         Row: {
