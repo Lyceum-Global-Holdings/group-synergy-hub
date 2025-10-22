@@ -10254,6 +10254,27 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: string
       }
+      get_approval_console: {
+        Args: { user_id?: string }
+        Returns: {
+          amount: number
+          assigned_to: string
+          assigned_to_name: string
+          created_at: string
+          currency: string
+          description: string
+          entity_data: Json
+          entity_id: string
+          id: string
+          priority_text: string
+          stage: string
+          stage_order: number
+          status_text: string
+          title: string
+          type: string
+          view_url: string
+        }[]
+      }
       get_company_approvers: {
         Args: {
           p_approval_level?: Database["public"]["Enums"]["approval_level_type"]

@@ -14,14 +14,16 @@ import { useApprovalConsole } from "@/hooks/useApprovalConsole";
 import { ApprovalCard } from "@/components/approvals/ApprovalCard";
 import { ApprovalStats } from "@/components/approvals/ApprovalStats";
 import { ApprovalFilters, ApprovalType, ApprovalPriority } from "@/types/approval";
-import { Search, Filter, RefreshCw, Bell } from "lucide-react";
+import { Search, Filter, RefreshCw, Bell, CheckCircle } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useIsAdmin } from "@/hooks/useSuperAdmin";
 
 export default function ApprovalConsole() {
   const [filters, setFilters] = useState<ApprovalFilters>({});
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState<ApprovalType | "all">("all");
-
+  
+  const { data: isAdmin } = useIsAdmin();
   const { data: approvals, isLoading, refetch, isRefetching } = useApprovalConsole(filters);
 
   const handleFilterChange = (key: keyof ApprovalFilters, value: any) => {
@@ -50,7 +52,10 @@ export default function ApprovalConsole() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Approval Console</h1>
           <p className="text-muted-foreground mt-1">
-            Centralized view of all pending approvals requiring your attention
+            {isAdmin 
+              ? "Centralized view of all pending approvals across the system"
+              : "View and manage approvals assigned to you"
+            }
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -155,9 +160,15 @@ export default function ApprovalConsole() {
           ) : filteredApprovals.length === 0 ? (
             <Card>
               <CardContent className="py-12 text-center">
-                <p className="text-muted-foreground">No approvals found</p>
+                <CheckCircle className="h-16 w-16 mx-auto text-muted-foreground/50 mb-4" />
+                <p className="text-lg font-medium">
+                  {isAdmin ? "No pending approvals found" : "No approvals assigned to you"}
+                </p>
                 <p className="text-sm text-muted-foreground mt-2">
-                  Try adjusting your filters or check back later
+                  {isAdmin 
+                    ? "All approvals across the system are up to date"
+                    : "You don't have any pending approvals at the moment"
+                  }
                 </p>
               </CardContent>
             </Card>
