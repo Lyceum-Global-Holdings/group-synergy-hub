@@ -131,5 +131,6 @@ export interface CreateCustomerPoData {
     delivery_date?: string;
     color?: string;
     size?: string;
+    style_no?: string;
   }[];
 }

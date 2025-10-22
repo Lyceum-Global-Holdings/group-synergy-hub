@@ -36,6 +36,7 @@ import { CreateCustomerPoData } from "@/types/customer";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ProductMasterSelector } from "@/components/common/ProductMasterSelector";
 import { ProductMaster } from "@/hooks/useProductMaster";
+import { useFinishedGoods } from "@/hooks/useFinishedGoods";
 
 const createCpoSchema = z.object({
   customer_id: z.string().min(1, "Customer is required"),
@@ -46,6 +47,7 @@ const createCpoSchema = z.object({
   notes: z.string().optional(),
   items: z.array(z.object({
     product_master_id: z.string().optional(),
+    finished_good_id: z.string().optional(),
     item_name: z.string().min(1, "Item name is required"),
     description: z.string().optional(),
     quantity_ordered: z.number().min(1, "Quantity must be at least 1"),
@@ -54,6 +56,7 @@ const createCpoSchema = z.object({
     delivery_date: z.string().optional(),
     color: z.string().optional(),
     size: z.string().optional(),
+    style_no: z.string().optional(),
   })).min(1, "At least one item is required"),
 });
 
@@ -71,6 +74,7 @@ export default function CreateCustomerPoDialog({
   const { selectedCompany, isViewingAllCompanies, companies } = useCompany();
   const { customers } = useCustomers();
   const { createCustomerPO } = useCustomerPurchaseOrders();
+  const { products: finishedGoods } = useFinishedGoods(selectedCompany?.id);
   const [manualCpoNumber, setManualCpoNumber] = useState(false);
   const [itemOptions, setItemOptions] = useState<Record<number, {
     colors: string[];
@@ -87,10 +91,12 @@ export default function CreateCustomerPoDialog({
       items: [
         {
           product_master_id: "",
+          finished_good_id: "",
           item_name: "",
           quantity_ordered: 1,
           unit_price: 0,
           total_price: 0,
+          style_no: "",
         }
       ],
     },
@@ -103,6 +109,37 @@ export default function CreateCustomerPoDialog({
 
   const watchedItems = form.watch("items");
 
+  // Helper function to find matching finished good based on style, size, and color
+  const findMatchingFinishedGood = (index: number) => {
+    const item = form.getValues(`items.${index}`);
+    const styleNo = item.style_no;
+    const size = item.size;
+    const color = item.color;
+    
+    if (!styleNo || !size || !color || !finishedGoods) return null;
+    
+    // Find matching finished good with normalized comparison (trim, case-insensitive)
+    const match = finishedGoods.find(fg => 
+      fg.style_no?.trim().toLowerCase() === styleNo.trim().toLowerCase() &&
+      fg.size?.trim().toLowerCase() === size.trim().toLowerCase() &&
+      fg.color?.trim().toLowerCase() === color.trim().toLowerCase()
+    );
+    
+    return match || null;
+  };
+  
+  // Auto-link finished good when attributes are complete
+  const autoLinkFinishedGood = (index: number) => {
+    const matchedFg = findMatchingFinishedGood(index);
+    if (matchedFg) {
+      form.setValue(`items.${index}.finished_good_id`, matchedFg.id);
+      console.log(`✓ Auto-linked finished good: ${matchedFg.product_code} (${matchedFg.product_name})`);
+    } else {
+      form.setValue(`items.${index}.finished_good_id`, "");
+      console.log(`⚠ No matching finished good found for style/size/color combination`);
+    }
+  };
+
   const calculateTotalPrice = (index: number) => {
     const quantity = form.getValues(`items.${index}.quantity_ordered`);
     const unitPrice = form.getValues(`items.${index}.unit_price`);
@@ -113,10 +150,12 @@ export default function CreateCustomerPoDialog({
   const addItem = () => {
     append({
       product_master_id: "",
+      finished_good_id: "",
       item_name: "",
       quantity_ordered: 1,
       unit_price: 0,
       total_price: 0,
+      style_no: "",
     });
   };
 
@@ -159,6 +198,11 @@ export default function CreateCustomerPoDialog({
       if (colors.length === 1) form.setValue(`items.${index}.color`, colors[0]);
       if (sizes.length === 1) form.setValue(`items.${index}.size`, sizes[0]);
       
+      // NEW: Capture style_no from product master for better matching
+      if (productMaster.style_no) {
+        form.setValue(`items.${index}.style_no`, productMaster.style_no);
+      }
+      
       // Recalculate total price
       setTimeout(() => calculateTotalPrice(index), 0);
     } else {
@@ -169,6 +213,7 @@ export default function CreateCustomerPoDialog({
       form.setValue(`items.${index}.total_price`, 0);
       form.setValue(`items.${index}.color`, "");
       form.setValue(`items.${index}.size`, "");
+      form.setValue(`items.${index}.style_no`, "");
       
       // Clear options
       setItemOptions(prev => {
@@ -190,6 +235,7 @@ export default function CreateCustomerPoDialog({
         notes: data.notes,
         items: data.items.map(item => ({
           product_master_id: item.product_master_id || null,
+          finished_good_id: item.finished_good_id || null,
           item_name: item.item_name,
           description: item.description,
           quantity_ordered: item.quantity_ordered,
@@ -198,6 +244,7 @@ export default function CreateCustomerPoDialog({
           delivery_date: item.delivery_date,
           color: item.color,
           size: item.size,
+          style_no: item.style_no,
         }))
       };
       
@@ -460,14 +507,21 @@ export default function CreateCustomerPoDialog({
                       {itemOptions[index] && (itemOptions[index].colors.length > 0 || itemOptions[index].sizes.length > 0) && (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           {/* Color Selector */}
-                          {itemOptions[index].colors.length > 0 && (
+                           {itemOptions[index].colors.length > 0 && (
                             <FormField
                               control={form.control}
                               name={`items.${index}.color`}
                               render={({ field }) => (
                                 <FormItem>
                                   <FormLabel>Color</FormLabel>
-                                  <Select onValueChange={field.onChange} value={field.value}>
+                                  <Select 
+                                    onValueChange={(value) => {
+                                      field.onChange(value);
+                                      // Auto-link finished good after color selection
+                                      setTimeout(() => autoLinkFinishedGood(index), 100);
+                                    }} 
+                                    value={field.value}
+                                  >
                                     <FormControl>
                                       <SelectTrigger>
                                         <SelectValue placeholder="Select color" />
@@ -487,7 +541,6 @@ export default function CreateCustomerPoDialog({
                             />
                           )}
 
-                          {/* Size Selector */}
                           {itemOptions[index].sizes.length > 0 && (
                             <FormField
                               control={form.control}
@@ -495,7 +548,14 @@ export default function CreateCustomerPoDialog({
                               render={({ field }) => (
                                 <FormItem>
                                   <FormLabel>Size</FormLabel>
-                                  <Select onValueChange={field.onChange} value={field.value}>
+                                  <Select 
+                                    onValueChange={(value) => {
+                                      field.onChange(value);
+                                      // Auto-link finished good after size selection
+                                      setTimeout(() => autoLinkFinishedGood(index), 100);
+                                    }} 
+                                    value={field.value}
+                                  >
                                     <FormControl>
                                       <SelectTrigger>
                                         <SelectValue placeholder="Select size" />

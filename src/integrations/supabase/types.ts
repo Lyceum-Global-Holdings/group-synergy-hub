@@ -10326,10 +10326,7 @@ export type Database = {
         Args: { p_bpo_id: string }
         Returns: number
       }
-      calculate_bpo_utilization: {
-        Args: { p_bpo_id: string }
-        Returns: number
-      }
+      calculate_bpo_utilization: { Args: { p_bpo_id: string }; Returns: number }
       calculate_depreciation: {
         Args: {
           p_calculation_date?: string
@@ -10366,10 +10363,7 @@ export type Database = {
           valuation_method: string
         }[]
       }
-      calculate_kpi_value: {
-        Args: { p_kpi_id: string }
-        Returns: number
-      }
+      calculate_kpi_value: { Args: { p_kpi_id: string }; Returns: number }
       calculate_supplier_analytics: {
         Args: { p_period_months?: number; p_supplier_id: string }
         Returns: {
@@ -10422,14 +10416,8 @@ export type Database = {
         }
         Returns: Json
       }
-      escalate_pending_approvals: {
-        Args: Record<PropertyKey, never>
-        Returns: undefined
-      }
-      generate_adjustment_batch_number: {
-        Args: Record<PropertyKey, never>
-        Returns: string
-      }
+      escalate_pending_approvals: { Args: never; Returns: undefined }
+      generate_adjustment_batch_number: { Args: never; Returns: string }
       generate_asset_id: {
         Args: {
           _brand?: string
@@ -10438,114 +10426,33 @@ export type Database = {
         }
         Returns: string
       }
-      generate_asset_request_number: {
-        Args: Record<PropertyKey, never>
-        Returns: string
-      }
-      generate_bom_number: {
-        Args: Record<PropertyKey, never>
-        Returns: string
-      }
-      generate_bpo_number: {
-        Args: Record<PropertyKey, never>
-        Returns: string
-      }
-      generate_contract_number: {
-        Args: Record<PropertyKey, never>
-        Returns: string
-      }
-      generate_cpo_number: {
-        Args: Record<PropertyKey, never>
-        Returns: string
-      }
-      generate_customer_code: {
-        Args: Record<PropertyKey, never>
-        Returns: string
-      }
-      generate_cycle_count_number: {
-        Args: Record<PropertyKey, never>
-        Returns: string
-      }
-      generate_do_number: {
-        Args: Record<PropertyKey, never>
-        Returns: string
-      }
-      generate_evaluation_number: {
-        Args: Record<PropertyKey, never>
-        Returns: string
-      }
-      generate_grn_number: {
-        Args: Record<PropertyKey, never>
-        Returns: string
-      }
-      generate_issue_number: {
-        Args: Record<PropertyKey, never>
-        Returns: string
-      }
-      generate_journal_entry_number: {
-        Args: Record<PropertyKey, never>
-        Returns: string
-      }
-      generate_min_number: {
-        Args: Record<PropertyKey, never>
-        Returns: string
-      }
-      generate_mr_number: {
-        Args: Record<PropertyKey, never>
-        Returns: string
-      }
-      generate_mrn_number: {
-        Args: Record<PropertyKey, never>
-        Returns: string
-      }
-      generate_pick_list_number: {
-        Args: Record<PropertyKey, never>
-        Returns: string
-      }
-      generate_po_amendment_number: {
-        Args: Record<PropertyKey, never>
-        Returns: string
-      }
-      generate_po_number: {
-        Args: Record<PropertyKey, never>
-        Returns: string
-      }
-      generate_pr_number: {
-        Args: Record<PropertyKey, never>
-        Returns: string
-      }
-      generate_putaway_number: {
-        Args: Record<PropertyKey, never>
-        Returns: string
-      }
-      generate_quote_number: {
-        Args: Record<PropertyKey, never>
-        Returns: string
-      }
-      generate_release_number: {
-        Args: Record<PropertyKey, never>
-        Returns: string
-      }
-      generate_rfp_number: {
-        Args: Record<PropertyKey, never>
-        Returns: string
-      }
-      generate_rfq_number: {
-        Args: Record<PropertyKey, never>
-        Returns: string
-      }
-      generate_sales_order_number: {
-        Args: Record<PropertyKey, never>
-        Returns: string
-      }
-      generate_supplier_code: {
-        Args: Record<PropertyKey, never>
-        Returns: string
-      }
-      generate_transfer_number: {
-        Args: Record<PropertyKey, never>
-        Returns: string
-      }
+      generate_asset_request_number: { Args: never; Returns: string }
+      generate_bom_number: { Args: never; Returns: string }
+      generate_bpo_number: { Args: never; Returns: string }
+      generate_contract_number: { Args: never; Returns: string }
+      generate_cpo_number: { Args: never; Returns: string }
+      generate_customer_code: { Args: never; Returns: string }
+      generate_cycle_count_number: { Args: never; Returns: string }
+      generate_do_number: { Args: never; Returns: string }
+      generate_evaluation_number: { Args: never; Returns: string }
+      generate_grn_number: { Args: never; Returns: string }
+      generate_issue_number: { Args: never; Returns: string }
+      generate_journal_entry_number: { Args: never; Returns: string }
+      generate_min_number: { Args: never; Returns: string }
+      generate_mr_number: { Args: never; Returns: string }
+      generate_mrn_number: { Args: never; Returns: string }
+      generate_pick_list_number: { Args: never; Returns: string }
+      generate_po_amendment_number: { Args: never; Returns: string }
+      generate_po_number: { Args: never; Returns: string }
+      generate_pr_number: { Args: never; Returns: string }
+      generate_putaway_number: { Args: never; Returns: string }
+      generate_quote_number: { Args: never; Returns: string }
+      generate_release_number: { Args: never; Returns: string }
+      generate_rfp_number: { Args: never; Returns: string }
+      generate_rfq_number: { Args: never; Returns: string }
+      generate_sales_order_number: { Args: never; Returns: string }
+      generate_supplier_code: { Args: never; Returns: string }
+      generate_transfer_number: { Args: never; Returns: string }
       get_approval_console: {
         Args: { user_id?: string }
         Returns: {
@@ -10583,18 +10490,9 @@ export type Database = {
           user_id: string
         }[]
       }
-      get_company_hod: {
-        Args: { p_company_id: string }
-        Returns: string
-      }
-      get_company_manager: {
-        Args: { p_company_id: string }
-        Returns: string
-      }
-      get_public_asset: {
-        Args: { p_id: string }
-        Returns: Json
-      }
+      get_company_hod: { Args: { p_company_id: string }; Returns: string }
+      get_company_manager: { Args: { p_company_id: string }; Returns: string }
+      get_public_asset: { Args: { p_id: string }; Returns: Json }
       get_trial_balance: {
         Args: { p_as_of_date: string; p_company_id: string }
         Returns: {
@@ -10605,10 +10503,7 @@ export type Database = {
           debit_balance: number
         }[]
       }
-      get_user_company_ids: {
-        Args: { _user_id: string }
-        Returns: string[]
-      }
+      get_user_company_ids: { Args: { _user_id: string }; Returns: string[] }
       has_dashboard_access: {
         Args: { _dashboard_id: string; _user_id: string }
         Returns: boolean
@@ -10624,10 +10519,7 @@ export type Database = {
         }
         Returns: boolean
       }
-      is_admin: {
-        Args: { _user_id: string }
-        Returns: boolean
-      }
+      is_admin: { Args: { _user_id: string }; Returns: boolean }
       is_company_hod: {
         Args: { p_company_id: string; p_user_id: string }
         Returns: boolean
@@ -10636,10 +10528,7 @@ export type Database = {
         Args: { p_company_id: string; p_user_id: string }
         Returns: boolean
       }
-      is_super_admin: {
-        Args: { _user_id: string }
-        Returns: boolean
-      }
+      is_super_admin: { Args: { _user_id: string }; Returns: boolean }
       record_workflow_action: {
         Args: {
           p_comments?: string
@@ -10657,10 +10546,7 @@ export type Database = {
         Args: { p_bpo_id: string; p_requested_amount: number }
         Returns: boolean
       }
-      validate_po_for_grn: {
-        Args: { p_po_id: string }
-        Returns: boolean
-      }
+      validate_po_for_grn: { Args: { p_po_id: string }; Returns: boolean }
     }
     Enums: {
       account_category:
