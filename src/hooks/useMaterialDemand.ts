@@ -8,6 +8,14 @@ import { Database } from '@/integrations/supabase/types';
 type ExtendedCPOItem = Database['public']['Tables']['customer_po_items']['Row'] & {
   style_no?: string;
   unit_of_measure?: string;
+  linked_fg?: {
+    style_no?: string;
+    size?: string;
+    color?: string;
+    product_code?: string;
+    product_name?: string;
+    current_stock?: number;
+  };
 };
 
 export const useMaterialDemand = (companyId?: string) => {
@@ -860,13 +868,23 @@ export const useDemandCalculation = (companyId?: string) => {
 
       const analysisResults: DemandAnalysisResult[] = [];
       
-      // Fetch customer purchase orders and their items
+      // Fetch customer purchase orders and their items WITH linked finished goods
       const { data: customerPOs, error: cpoError } = await supabase
         .from('customer_purchase_orders')
         .select(`
           *,
           customer:customers(customer_name, customer_code),
-          items:customer_po_items(*)
+          items:customer_po_items(
+            *,
+            linked_fg:finished_goods!customer_po_items_finished_good_id_fkey(
+              style_no,
+              size,
+              color,
+              product_code,
+              product_name,
+              current_stock
+            )
+          )
         `)
         .in('id', input.cpo_ids);
 
@@ -914,9 +932,10 @@ export const useDemandCalculation = (companyId?: string) => {
           remainingFgStock.set(fg.id, Number(fg.current_stock) || 0);
         }
         
-        // NEW: Style + Size + Color composite key mapping
+        // NEW: Style + Size + Color composite key mapping with NORMALIZATION
         if (fg.style_no && fg.size && fg.color) {
-          const compositeKey = `${fg.style_no}|${fg.size}|${fg.color}`.toLowerCase();
+          // Normalize: trim whitespace and lowercase for consistent matching
+          const compositeKey = `${fg.style_no.trim()}|${fg.size.trim()}|${fg.color.trim()}`.toLowerCase();
           
           // Support multiple FGs with same style/size/color (different batches/locations)
           if (!finishedGoodsByStyleSizeColor.has(compositeKey)) {
@@ -942,34 +961,98 @@ export const useDemandCalculation = (companyId?: string) => {
         return styleMatch ? styleMatch[1] : null;
       };
 
-      // Helper function to find matching finished goods
+      // Helper function to find matching finished goods with ENHANCED MULTI-STRATEGY MATCHING
       const findMatchingFinishedGoods = (cpoItem: ExtendedCPOItem) => {
         // Strategy 1: Direct ID match (highest priority)
         if (cpoItem.finished_good_id) {
           const directMatch = finishedGoodsMap.get(cpoItem.finished_good_id);
           if (directMatch) {
             console.log(`✓ Direct ID match found for ${cpoItem.item_name}`);
-            return [directMatch];
+            return { matches: [directMatch], strategy: 'direct_id', confidence: 'high' };
           }
         }
         
-        // Strategy 2: Style + Size + Color match (fallback)
-        const cpoStyleNo = cpoItem.style_no || extractStyleFromItemName(cpoItem.item_name);
-        const cpoSize = cpoItem.size;
-        const cpoColor = cpoItem.color;
+        // Strategy 2: Extract attributes from linked finished good (from query join)
+        const linkedFg = cpoItem.linked_fg;
+        let cpoStyleNo = cpoItem.style_no;
+        let cpoSize = cpoItem.size;
+        let cpoColor = cpoItem.color;
         
+        // If CPO item doesn't have attributes, try to get from linked FG
+        if (!cpoStyleNo && linkedFg?.style_no) {
+          cpoStyleNo = linkedFg.style_no;
+          console.log(`  📋 Extracted style_no from linked FG: ${cpoStyleNo}`);
+        }
+        if (!cpoSize && linkedFg?.size) {
+          cpoSize = linkedFg.size;
+          console.log(`  📋 Extracted size from linked FG: ${cpoSize}`);
+        }
+        if (!cpoColor && linkedFg?.color) {
+          cpoColor = linkedFg.color;
+          console.log(`  📋 Extracted color from linked FG: ${cpoColor}`);
+        }
+        
+        // Strategy 3: Style + Size + Color composite match
         if (cpoStyleNo && cpoSize && cpoColor) {
-          const compositeKey = `${cpoStyleNo}|${cpoSize}|${cpoColor}`.toLowerCase();
+          // Normalize: trim and lowercase for consistent matching
+          const compositeKey = `${cpoStyleNo.trim()}|${cpoSize.trim()}|${cpoColor.trim()}`.toLowerCase();
           const matches = finishedGoodsByStyleSizeColor.get(compositeKey);
           
           if (matches && matches.length > 0) {
-            console.log(`✓ Found ${matches.length} finished good(s) matching style/size/color: ${cpoStyleNo}|${cpoSize}|${cpoColor}`);
-            return matches;
+            console.log(`✓ Composite match (style/size/color): Found ${matches.length} finished good(s)`);
+            return { matches, strategy: 'composite_match', confidence: 'high' };
+          }
+        }
+        
+        // Strategy 4: Partial match (style + size only)
+        if (cpoStyleNo && cpoSize) {
+          const normalizedStyle = cpoStyleNo.trim().toLowerCase();
+          const normalizedSize = cpoSize.trim().toLowerCase();
+          
+          const partialMatches = Array.from(finishedGoodsByStyleSizeColor.entries())
+            .filter(([key]) => {
+              const [style, size] = key.split('|');
+              return style === normalizedStyle && size === normalizedSize;
+            })
+            .flatMap(([_, fgs]) => fgs);
+          
+          if (partialMatches.length > 0) {
+            console.log(`⚠ Partial match (style+size): Found ${partialMatches.length} finished good(s)`);
+            return { matches: partialMatches, strategy: 'partial_match', confidence: 'medium' };
+          }
+        }
+        
+        // Strategy 5: Style-only match (lowest confidence)
+        if (cpoStyleNo) {
+          const normalizedStyle = cpoStyleNo.trim().toLowerCase();
+          
+          const styleMatches = Array.from(finishedGoodsByStyleSizeColor.entries())
+            .filter(([key]) => key.startsWith(normalizedStyle + '|'))
+            .flatMap(([_, fgs]) => fgs);
+          
+          if (styleMatches.length > 0) {
+            console.log(`⚠ Style-only match: Found ${styleMatches.length} finished good(s)`);
+            return { matches: styleMatches, strategy: 'style_only', confidence: 'low' };
+          }
+        }
+        
+        // Strategy 6: Fallback to style extraction from item name
+        const extractedStyle = extractStyleFromItemName(cpoItem.item_name);
+        if (extractedStyle && extractedStyle !== cpoStyleNo) {
+          const normalizedStyle = extractedStyle.trim().toLowerCase();
+          const extractedMatches = Array.from(finishedGoodsByStyleSizeColor.entries())
+            .filter(([key]) => key.startsWith(normalizedStyle + '|'))
+            .flatMap(([_, fgs]) => fgs);
+          
+          if (extractedMatches.length > 0) {
+            console.log(`⚠ Extracted style match: Found ${extractedMatches.length} finished good(s)`);
+            return { matches: extractedMatches, strategy: 'extracted_style', confidence: 'low' };
           }
         }
         
         console.log(`❌ No finished good match found for ${cpoItem.item_name}`);
-        return [];
+        console.log(`   Attempted with: style=${cpoStyleNo || 'N/A'}, size=${cpoSize || 'N/A'}, color=${cpoColor || 'N/A'}`);
+        return { matches: [], strategy: 'no_match', confidence: 'none' };
       };
 
       // Process each customer purchase order in deterministic order (by delivery/PO date)
@@ -984,11 +1067,16 @@ export const useDemandCalculation = (companyId?: string) => {
         for (const cpoItem of cpo.items || []) {
           const extendedCpoItem = cpoItem as ExtendedCPOItem;
           console.log(`\nProcessing CPO Item: ${extendedCpoItem.item_name}`);
-          console.log(`  Style: ${extendedCpoItem.style_no || 'N/A'}, Size: ${extendedCpoItem.size || 'N/A'}, Color: ${extendedCpoItem.color || 'N/A'}`);
+          console.log(`  CPO Attributes - Style: ${extendedCpoItem.style_no || 'N/A'}, Size: ${extendedCpoItem.size || 'N/A'}, Color: ${extendedCpoItem.color || 'N/A'}`);
+          if (extendedCpoItem.linked_fg) {
+            console.log(`  Linked FG Attributes - Style: ${extendedCpoItem.linked_fg.style_no || 'N/A'}, Size: ${extendedCpoItem.linked_fg.size || 'N/A'}, Color: ${extendedCpoItem.linked_fg.color || 'N/A'}`);
+          }
           console.log(`  Quantity: ${extendedCpoItem.quantity_ordered}`);
           
-          // NEW: Use smart matching function (tries ID first, then style+size+color)
-          const matchedFinishedGoods = findMatchingFinishedGoods(extendedCpoItem);
+          // NEW: Use smart matching function with multi-strategy approach
+          const matchResult = findMatchingFinishedGoods(extendedCpoItem);
+          const matchedFinishedGoods = matchResult.matches;
+          console.log(`  Match Strategy: ${matchResult.strategy}, Confidence: ${matchResult.confidence}`);
           
           if (matchedFinishedGoods.length > 0) {
             // Calculate total available stock across all matching finished goods
