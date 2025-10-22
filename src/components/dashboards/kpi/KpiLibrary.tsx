@@ -7,6 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useKpiDefinitions } from "@/hooks/useKpiDefinitions";
 import { KpiCategory } from "@/types/kpi";
 import { Search, Plus, TrendingUp, Package, DollarSign, Users } from "lucide-react";
+import { CreateCustomKpiDialog } from "./CreateCustomKpiDialog";
 
 const categoryIcons: Record<KpiCategory, any> = {
   procurement: Package,
@@ -19,6 +20,7 @@ const categoryIcons: Record<KpiCategory, any> = {
 export function KpiLibrary() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<KpiCategory | "all">("all");
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
   
   const { data: kpis, isLoading } = useKpiDefinitions(
     selectedCategory === "all" ? undefined : selectedCategory
@@ -41,7 +43,7 @@ export function KpiLibrary() {
             className="pl-8"
           />
         </div>
-        <Button>
+        <Button onClick={() => setCreateDialogOpen(true)}>
           <Plus className="h-4 w-4 mr-1" />
           Create Custom KPI
         </Button>
@@ -100,6 +102,11 @@ export function KpiLibrary() {
           )}
         </TabsContent>
       </Tabs>
+
+      <CreateCustomKpiDialog
+        open={createDialogOpen}
+        onOpenChange={setCreateDialogOpen}
+      />
     </div>
   );
 }
