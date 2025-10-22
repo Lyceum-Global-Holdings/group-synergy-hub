@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import AppLayout from '@/components/layout/AppLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { BarChart3, Package, TrendingUp, FileText, Camera, Settings, Clock } from 'lucide-react';
@@ -16,8 +15,7 @@ export default function InventoryValuation() {
   const [filters, setFilters] = useState<ValuationFilters>({});
 
   return (
-    <AppLayout>
-      <div className="space-y-6">
+    <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Inventory Valuation</h1>
@@ -88,6 +86,5 @@ export default function InventoryValuation() {
           </TabsContent>
         </Tabs>
       </div>
-    </AppLayout>
   );
 }
