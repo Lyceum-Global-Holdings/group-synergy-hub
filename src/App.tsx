@@ -51,6 +51,7 @@ import TrainingProgress from "./pages/admin/training/TrainingProgress";
 import DashboardsKPIs from "./pages/management/DashboardsKPIs";
 import DashboardView from "./pages/management/DashboardView";
 import DashboardEdit from "./pages/management/DashboardEdit";
+import ApprovalConsole from "./pages/management/ApprovalConsole";
 
 const queryClient = new QueryClient();
 
@@ -127,6 +128,7 @@ function App() {
               <Route path="/management/dashboards" element={<DashboardsKPIs />} />
               <Route path="/management/dashboards/:id/edit" element={<DashboardEdit />} />
               <Route path="/management/dashboards/:id" element={<DashboardView />} />
+              <Route path="/management/approvals" element={<ApprovalConsole />} />
             </Route>
             
             {/* Catch-all 404 route */}
