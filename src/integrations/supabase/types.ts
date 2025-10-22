@@ -2677,6 +2677,59 @@ export type Database = {
           },
         ]
       }
+      cost_layers: {
+        Row: {
+          company_id: string | null
+          created_at: string | null
+          id: string
+          item_id: string
+          item_type: string
+          layer_status: string | null
+          quantity_received: number
+          quantity_remaining: number
+          receipt_date: string
+          total_cost: number
+          transaction_id: string | null
+          unit_cost: number
+        }
+        Insert: {
+          company_id?: string | null
+          created_at?: string | null
+          id?: string
+          item_id: string
+          item_type: string
+          layer_status?: string | null
+          quantity_received: number
+          quantity_remaining: number
+          receipt_date?: string
+          total_cost: number
+          transaction_id?: string | null
+          unit_cost: number
+        }
+        Update: {
+          company_id?: string | null
+          created_at?: string | null
+          id?: string
+          item_id?: string
+          item_type?: string
+          layer_status?: string | null
+          quantity_received?: number
+          quantity_remaining?: number
+          receipt_date?: string
+          total_cost?: number
+          transaction_id?: string | null
+          unit_cost?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cost_layers_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       customer_po_approvals: {
         Row: {
           action: string
@@ -4632,6 +4685,150 @@ export type Database = {
             columns: ["grn_id"]
             isOneToOne: false
             referencedRelation: "goods_receipt_notes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inventory_snapshots: {
+        Row: {
+          assets_value: number | null
+          company_id: string | null
+          created_at: string | null
+          created_by: string | null
+          finished_goods_value: number | null
+          id: string
+          item_count: number | null
+          raw_materials_value: number | null
+          snapshot_data: Json | null
+          snapshot_date: string
+          snapshot_type: string
+          total_inventory_value: number | null
+        }
+        Insert: {
+          assets_value?: number | null
+          company_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          finished_goods_value?: number | null
+          id?: string
+          item_count?: number | null
+          raw_materials_value?: number | null
+          snapshot_data?: Json | null
+          snapshot_date: string
+          snapshot_type: string
+          total_inventory_value?: number | null
+        }
+        Update: {
+          assets_value?: number | null
+          company_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          finished_goods_value?: number | null
+          id?: string
+          item_count?: number | null
+          raw_materials_value?: number | null
+          snapshot_data?: Json | null
+          snapshot_date?: string
+          snapshot_type?: string
+          total_inventory_value?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_snapshots_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inventory_valuation_methods: {
+        Row: {
+          company_id: string | null
+          created_at: string | null
+          created_by: string | null
+          effective_from: string
+          id: string
+          is_default: boolean | null
+          item_id: string | null
+          item_type: string
+          updated_at: string | null
+          valuation_method: string
+        }
+        Insert: {
+          company_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          effective_from?: string
+          id?: string
+          is_default?: boolean | null
+          item_id?: string | null
+          item_type: string
+          updated_at?: string | null
+          valuation_method: string
+        }
+        Update: {
+          company_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          effective_from?: string
+          id?: string
+          is_default?: boolean | null
+          item_id?: string | null
+          item_type?: string
+          updated_at?: string | null
+          valuation_method?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_valuation_methods_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inventory_valuation_reports: {
+        Row: {
+          company_id: string | null
+          filters: Json | null
+          generated_at: string | null
+          generated_by: string | null
+          id: string
+          is_pinned: boolean | null
+          report_data: Json | null
+          report_name: string
+          report_type: string
+        }
+        Insert: {
+          company_id?: string | null
+          filters?: Json | null
+          generated_at?: string | null
+          generated_by?: string | null
+          id?: string
+          is_pinned?: boolean | null
+          report_data?: Json | null
+          report_name: string
+          report_type: string
+        }
+        Update: {
+          company_id?: string | null
+          filters?: Json | null
+          generated_at?: string | null
+          generated_by?: string | null
+          id?: string
+          is_pinned?: boolean | null
+          report_data?: Json | null
+          report_name?: string
+          report_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_valuation_reports_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
             referencedColumns: ["id"]
           },
         ]
@@ -10073,6 +10270,30 @@ export type Database = {
           p_useful_life_years: number
         }
         Returns: number
+      }
+      calculate_inventory_valuation: {
+        Args: {
+          p_category_ids?: string[]
+          p_company_id: string
+          p_item_types?: string[]
+          p_location_ids?: string[]
+          p_valuation_date?: string
+        }
+        Returns: {
+          aging_bucket: string
+          category: string
+          days_in_stock: number
+          item_code: string
+          item_id: string
+          item_name: string
+          item_type: string
+          last_movement_date: string
+          location: string
+          quantity_on_hand: number
+          total_value: number
+          unit_cost: number
+          valuation_method: string
+        }[]
       }
       calculate_kpi_value: {
         Args: { p_kpi_id: string }
