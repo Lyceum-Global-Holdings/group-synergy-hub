@@ -892,6 +892,7 @@ export const useDemandCalculation = (companyId?: string) => {
 
       // Create lookup maps for efficient matching
       const finishedGoodsMap = new Map();
+      const finishedGoodsByStyleSizeColor = new Map(); // NEW: Composite key matching
       const warehouseItemsMap = new Map();
       // Track remaining FG stock across all CPO items during this calculation
       const remainingFgStock = new Map();
@@ -901,8 +902,20 @@ export const useDemandCalculation = (companyId?: string) => {
       
       finishedGoods?.forEach(fg => {
         if (fg.id) {
+          // Existing ID-based mapping
           finishedGoodsMap.set(fg.id, fg);
           remainingFgStock.set(fg.id, Number(fg.current_stock) || 0);
+        }
+        
+        // NEW: Style + Size + Color composite key mapping
+        if (fg.style_no && fg.size && fg.color) {
+          const compositeKey = `${fg.style_no}|${fg.size}|${fg.color}`.toLowerCase();
+          
+          // Support multiple FGs with same style/size/color (different batches/locations)
+          if (!finishedGoodsByStyleSizeColor.has(compositeKey)) {
+            finishedGoodsByStyleSizeColor.set(compositeKey, []);
+          }
+          finishedGoodsByStyleSizeColor.get(compositeKey).push(fg);
         }
       });
       
@@ -911,6 +924,46 @@ export const useDemandCalculation = (companyId?: string) => {
           warehouseItemsMap.set(wi.item_code, wi);
         }
       });
+
+      console.log(`Finished goods indexed: ${finishedGoodsMap.size} by ID, ${finishedGoodsByStyleSizeColor.size} by style/size/color`);
+
+      // Helper function to extract style number from item name (e.g., "T-Shirt STY-001 Blue XL" -> "STY-001")
+      const extractStyleFromItemName = (itemName: string) => {
+        if (!itemName) return null;
+        // Common patterns: STY-001, STYLE001, etc.
+        const styleMatch = itemName.match(/\b(STY[-_]?\w+|\w+[-_]?STYLE\w*)\b/i);
+        return styleMatch ? styleMatch[1] : null;
+      };
+
+      // Helper function to find matching finished goods
+      const findMatchingFinishedGoods = (cpoItem: any) => {
+        // Strategy 1: Direct ID match (highest priority)
+        if (cpoItem.finished_good_id) {
+          const directMatch = finishedGoodsMap.get(cpoItem.finished_good_id);
+          if (directMatch) {
+            console.log(`✓ Direct ID match found for ${cpoItem.item_name}`);
+            return [directMatch];
+          }
+        }
+        
+        // Strategy 2: Style + Size + Color match (fallback)
+        const cpoStyleNo = cpoItem.style_no || extractStyleFromItemName(cpoItem.item_name);
+        const cpoSize = cpoItem.size;
+        const cpoColor = cpoItem.color;
+        
+        if (cpoStyleNo && cpoSize && cpoColor) {
+          const compositeKey = `${cpoStyleNo}|${cpoSize}|${cpoColor}`.toLowerCase();
+          const matches = finishedGoodsByStyleSizeColor.get(compositeKey);
+          
+          if (matches && matches.length > 0) {
+            console.log(`✓ Found ${matches.length} finished good(s) matching style/size/color: ${cpoStyleNo}|${cpoSize}|${cpoColor}`);
+            return matches;
+          }
+        }
+        
+        console.log(`❌ No finished good match found for ${cpoItem.item_name}`);
+        return [];
+      };
 
       // Process each customer purchase order in deterministic order (by delivery/PO date)
       const sortedCPOs = [...(customerPOs || [])].sort((a, b) => {
@@ -923,29 +976,54 @@ export const useDemandCalculation = (companyId?: string) => {
         
         for (const cpoItem of cpo.items || []) {
           console.log(`\nProcessing CPO Item: ${cpoItem.item_name}`);
-          console.log(`CPO Quantity: ${cpoItem.quantity_ordered}`);
+          console.log(`  Style: ${cpoItem.style_no || 'N/A'}, Size: ${cpoItem.size || 'N/A'}, Color: ${cpoItem.color || 'N/A'}`);
+          console.log(`  Quantity: ${cpoItem.quantity_ordered}`);
           
-          // Step 1: Check if CPO item matches a finished good by finished_good_id
-          const matchedFinishedGood = finishedGoodsMap.get(cpoItem.finished_good_id);
+          // NEW: Use smart matching function (tries ID first, then style+size+color)
+          const matchedFinishedGoods = findMatchingFinishedGoods(cpoItem);
           
-          if (matchedFinishedGood) {
-            console.log(`✓ Matched with finished good: ${matchedFinishedGood.product_name}`);
-            const fgId = matchedFinishedGood.id;
-            const currentRemaining = Number(remainingFgStock.get(fgId)) || 0;
+          if (matchedFinishedGoods.length > 0) {
+            // Calculate total available stock across all matching finished goods
+            const totalAvailableStock = matchedFinishedGoods.reduce((sum, fg) => {
+              return sum + (Number(remainingFgStock.get(fg.id)) || 0);
+            }, 0);
+            
+            console.log(`✓ Matched ${matchedFinishedGoods.length} finished good(s)`);
+            console.log(`  Total available stock: ${totalAvailableStock}`);
+            
             const cpoQuantity = Number(cpoItem.quantity_ordered) * (input.multiplier || 1);
-            const usedFromStock = Math.min(currentRemaining, cpoQuantity);
-            const requiredProduction = Math.max(0, cpoQuantity - usedFromStock);
-            remainingFgStock.set(fgId, currentRemaining - usedFromStock);
+            let remainingToFulfill = cpoQuantity;
+            let totalUsedFromStock = 0;
             
-            console.log(`FG stock consumption -> requested: ${cpoQuantity}, usedFromStock: ${usedFromStock}, remaining: ${remainingFgStock.get(fgId)}, requiredProduction: ${requiredProduction}`);
+            // Consume stock from matched finished goods (FIFO - first match gets priority)
+            for (const matchedFg of matchedFinishedGoods) {
+              if (remainingToFulfill <= 0) break;
+              
+              const fgId = matchedFg.id;
+              const currentRemaining = Number(remainingFgStock.get(fgId)) || 0;
+              const usedFromThis = Math.min(currentRemaining, remainingToFulfill);
+              
+              if (usedFromThis > 0) {
+                totalUsedFromStock += usedFromThis;
+                remainingToFulfill -= usedFromThis;
+                remainingFgStock.set(fgId, currentRemaining - usedFromThis);
+                
+                console.log(`  Used ${usedFromThis} from ${matchedFg.product_name} (${matchedFg.product_code})`);
+              }
+            }
             
-            // If any part is fulfilled from stock, record it
-            if (usedFromStock > 0) {
+            const requiredProduction = Math.max(0, remainingToFulfill);
+            
+            console.log(`  Stock fulfillment: ${totalUsedFromStock}/${cpoQuantity}`);
+            console.log(`  Production required: ${requiredProduction}`);
+            
+            // Record stock fulfillment (if any)
+            if (totalUsedFromStock > 0) {
               analysisResults.push({
-                item_code: matchedFinishedGood.product_code || 'N/A',
+                item_code: matchedFinishedGoods[0].product_code || 'N/A',
                 item_name: cpoItem.item_name,
-                total_required: usedFromStock,
-                available_stock: currentRemaining,
+                total_required: totalUsedFromStock,
+                available_stock: totalAvailableStock,
                 on_order: 0,
                 shortage: 0,
                 suggested_order: 0,
@@ -954,21 +1032,23 @@ export const useDemandCalculation = (companyId?: string) => {
                 priority: 'low',
                 lead_time_days: 0,
                 finished_good_info: {
-                  product_code: matchedFinishedGood.product_code,
-                  product_name: matchedFinishedGood.product_name,
-                  current_stock: currentRemaining
+                  product_code: matchedFinishedGoods[0].product_code,
+                  product_name: matchedFinishedGoods[0].product_name,
+                  current_stock: totalAvailableStock
                 }
               });
             }
             
             if (requiredProduction > 0) {
+              // Use the first matched finished good for BOM lookup
               console.log(`⚡ Production required: ${requiredProduction} units`);
+              const primaryFg = matchedFinishedGoods[0];
               
               // Fetch BOM by finished_good_id (new relationship)
-              const bomMeta = await fetchBomByFinishedGoodId(matchedFinishedGood.id);
+              const bomMeta = await fetchBomByFinishedGoodId(primaryFg.id);
               if (bomMeta) {
                 const bomId = bomMeta.bom_id;
-                console.log(`📋 Found BOM: ${bomMeta.bom_number} for finished good: ${matchedFinishedGood.product_name}`);
+                console.log(`📋 Found BOM: ${bomMeta.bom_number} for finished good: ${primaryFg.product_name}`);
                 
                 // Fetch BOM items (with caching)
                 let bomItems = bomItemsCache.get(bomId);
@@ -1056,9 +1136,9 @@ export const useDemandCalculation = (companyId?: string) => {
                           product_name: bomMeta.product_name
                         },
                         finished_good_info: {
-                          product_code: matchedFinishedGood.product_code,
-                          product_name: matchedFinishedGood.product_name,
-                          current_stock: currentRemaining
+                          product_code: primaryFg.product_code,
+                          product_name: primaryFg.product_name,
+                          current_stock: totalAvailableStock
                         }
                       });
                     }
@@ -1066,10 +1146,10 @@ export const useDemandCalculation = (companyId?: string) => {
                 } else {
                   // No BOM items found
                   analysisResults.push({
-                    item_code: matchedFinishedGood.product_code || 'N/A',
+                    item_code: primaryFg.product_code || 'N/A',
                     item_name: cpoItem.item_name,
                     total_required: requiredProduction,
-                    available_stock: currentRemaining,
+                    available_stock: totalAvailableStock,
                     on_order: 0,
                     shortage: requiredProduction,
                     suggested_order: requiredProduction,
@@ -1078,20 +1158,20 @@ export const useDemandCalculation = (companyId?: string) => {
                     priority: 'urgent',
                     lead_time_days: 14,
                     finished_good_info: {
-                      product_code: matchedFinishedGood.product_code,
-                      product_name: matchedFinishedGood.product_name,
-                      current_stock: currentRemaining
+                      product_code: primaryFg.product_code,
+                      product_name: primaryFg.product_name,
+                      current_stock: totalAvailableStock
                     }
                   });
                 }
               } else {
                 // No BOM found for this finished good
-                console.log(`⚠️ No BOM found for finished good: ${matchedFinishedGood.product_name}`);
+                console.log(`⚠️ No BOM found for finished good: ${primaryFg.product_name}`);
                 analysisResults.push({
-                  item_code: matchedFinishedGood.product_code || 'N/A',
+                  item_code: primaryFg.product_code || 'N/A',
                   item_name: cpoItem.item_name,
                   total_required: requiredProduction,
-                  available_stock: currentRemaining,
+                  available_stock: totalAvailableStock,
                   on_order: 0,
                   shortage: requiredProduction,
                   suggested_order: requiredProduction,
@@ -1100,17 +1180,17 @@ export const useDemandCalculation = (companyId?: string) => {
                   priority: 'urgent',
                   lead_time_days: 14,
                   finished_good_info: {
-                    product_code: matchedFinishedGood.product_code,
-                    product_name: matchedFinishedGood.product_name,
-                    current_stock: currentRemaining
+                    product_code: primaryFg.product_code,
+                    product_name: primaryFg.product_name,
+                    current_stock: totalAvailableStock
                   }
                 });
               }
             }
           } else {
-            console.log('❌ No finished good found for CPO item');
+            // No matching finished goods found
+            console.log('❌ No finished good match - item cannot be fulfilled');
             
-            // Add entry for unmatched item
             analysisResults.push({
               item_code: 'UNMATCHED',
               item_name: cpoItem.item_name,
@@ -1119,10 +1199,15 @@ export const useDemandCalculation = (companyId?: string) => {
               on_order: 0,
               shortage: Number(cpoItem.quantity_ordered) * (input.multiplier || 1),
               suggested_order: Number(cpoItem.quantity_ordered) * (input.multiplier || 1),
-              unit_of_measure: 'pcs',
-              category: 'No BOM Found',
+              unit_of_measure: cpoItem.unit_of_measure || 'pcs',
+              category: 'No Matching Product',
               priority: 'urgent',
-              lead_time_days: 14
+              lead_time_days: 14,
+              supplier_info: {
+                supplier_id: cpo.customer_id || '',
+                supplier_name: cpo.customer?.customer_name || 'Unknown Customer',
+                last_unit_cost: cpoItem.unit_price
+              }
             });
           }
         }
@@ -1133,7 +1218,7 @@ export const useDemandCalculation = (companyId?: string) => {
       console.log(`Items requiring production: ${analysisResults.filter(r => r.category === 'BOM Material' && r.shortage > 0).length}`);
       console.log(`Items fulfilled from stock: ${analysisResults.filter(r => r.category === 'Fulfilled from Stock').length}`);
       console.log(`Items needing BOM creation: ${analysisResults.filter(r => r.category === 'Production Required (No BOM)').length}`);
-      console.log(`Unmatched items: ${analysisResults.filter(r => r.category === 'No BOM Found').length}`);
+      console.log(`Unmatched items: ${analysisResults.filter(r => r.category === 'No Matching Product').length}`);
 
       return analysisResults;
     },

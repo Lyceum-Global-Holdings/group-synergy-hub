@@ -106,6 +106,8 @@ export interface CustomerPoItem {
   delivery_date?: string;
   color?: string;
   size?: string;
+  style_no?: string; // NEW: Style number for matching
+  unit_of_measure?: string; // NEW: Unit of measure
   status: 'pending' | 'confirmed' | 'in_production' | 'delivered';
   created_at: string;
   updated_at: string;
