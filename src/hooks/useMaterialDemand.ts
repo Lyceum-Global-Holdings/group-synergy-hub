@@ -2,6 +2,13 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { MaterialDemand, MaterialDemandItem, CreateMaterialDemandData, DemandCalculationInput, PODemandCalculationInput, CPODemandCalculationInput, DemandAnalysisResult, MRPReport } from '@/types/materialDemand';
 import { useToast } from '@/hooks/use-toast';
+import { Database } from '@/integrations/supabase/types';
+
+// Extended type for CPO items with new fields
+type ExtendedCPOItem = Database['public']['Tables']['customer_po_items']['Row'] & {
+  style_no?: string;
+  unit_of_measure?: string;
+};
 
 export const useMaterialDemand = (companyId?: string) => {
   const { toast } = useToast();
@@ -936,7 +943,7 @@ export const useDemandCalculation = (companyId?: string) => {
       };
 
       // Helper function to find matching finished goods
-      const findMatchingFinishedGoods = (cpoItem: any) => {
+      const findMatchingFinishedGoods = (cpoItem: ExtendedCPOItem) => {
         // Strategy 1: Direct ID match (highest priority)
         if (cpoItem.finished_good_id) {
           const directMatch = finishedGoodsMap.get(cpoItem.finished_good_id);
@@ -947,9 +954,9 @@ export const useDemandCalculation = (companyId?: string) => {
         }
         
         // Strategy 2: Style + Size + Color match (fallback)
-        const cpoStyleNo = (cpoItem as any).style_no || extractStyleFromItemName(cpoItem.item_name);
-        const cpoSize = (cpoItem as any).size;
-        const cpoColor = (cpoItem as any).color;
+        const cpoStyleNo = cpoItem.style_no || extractStyleFromItemName(cpoItem.item_name);
+        const cpoSize = cpoItem.size;
+        const cpoColor = cpoItem.color;
         
         if (cpoStyleNo && cpoSize && cpoColor) {
           const compositeKey = `${cpoStyleNo}|${cpoSize}|${cpoColor}`.toLowerCase();
@@ -975,12 +982,13 @@ export const useDemandCalculation = (companyId?: string) => {
         console.log(`\n--- Processing CPO: ${cpo.cpo_number} ---`);
         
         for (const cpoItem of cpo.items || []) {
-          console.log(`\nProcessing CPO Item: ${cpoItem.item_name}`);
-          console.log(`  Style: ${(cpoItem as any).style_no || 'N/A'}, Size: ${(cpoItem as any).size || 'N/A'}, Color: ${(cpoItem as any).color || 'N/A'}`);
-          console.log(`  Quantity: ${cpoItem.quantity_ordered}`);
+          const extendedCpoItem = cpoItem as ExtendedCPOItem;
+          console.log(`\nProcessing CPO Item: ${extendedCpoItem.item_name}`);
+          console.log(`  Style: ${extendedCpoItem.style_no || 'N/A'}, Size: ${extendedCpoItem.size || 'N/A'}, Color: ${extendedCpoItem.color || 'N/A'}`);
+          console.log(`  Quantity: ${extendedCpoItem.quantity_ordered}`);
           
           // NEW: Use smart matching function (tries ID first, then style+size+color)
-          const matchedFinishedGoods = findMatchingFinishedGoods(cpoItem);
+          const matchedFinishedGoods = findMatchingFinishedGoods(extendedCpoItem);
           
           if (matchedFinishedGoods.length > 0) {
             // Calculate total available stock across all matching finished goods
@@ -991,7 +999,7 @@ export const useDemandCalculation = (companyId?: string) => {
             console.log(`✓ Matched ${matchedFinishedGoods.length} finished good(s)`);
             console.log(`  Total available stock: ${totalAvailableStock}`);
             
-            const cpoQuantity = Number(cpoItem.quantity_ordered) * (input.multiplier || 1);
+            const cpoQuantity = Number(extendedCpoItem.quantity_ordered) * (input.multiplier || 1);
             let remainingToFulfill = cpoQuantity;
             let totalUsedFromStock = 0;
             
@@ -1021,7 +1029,7 @@ export const useDemandCalculation = (companyId?: string) => {
             if (totalUsedFromStock > 0) {
               analysisResults.push({
                 item_code: matchedFinishedGoods[0].product_code || 'N/A',
-                item_name: cpoItem.item_name,
+                item_name: extendedCpoItem.item_name,
                 total_required: totalUsedFromStock,
                 available_stock: totalAvailableStock,
                 on_order: 0,
@@ -1147,7 +1155,7 @@ export const useDemandCalculation = (companyId?: string) => {
                   // No BOM items found
                   analysisResults.push({
                     item_code: primaryFg.product_code || 'N/A',
-                    item_name: cpoItem.item_name,
+                    item_name: extendedCpoItem.item_name,
                     total_required: requiredProduction,
                     available_stock: totalAvailableStock,
                     on_order: 0,
@@ -1169,7 +1177,7 @@ export const useDemandCalculation = (companyId?: string) => {
                 console.log(`⚠️ No BOM found for finished good: ${primaryFg.product_name}`);
                 analysisResults.push({
                   item_code: primaryFg.product_code || 'N/A',
-                  item_name: cpoItem.item_name,
+                  item_name: extendedCpoItem.item_name,
                   total_required: requiredProduction,
                   available_stock: totalAvailableStock,
                   on_order: 0,
@@ -1193,20 +1201,20 @@ export const useDemandCalculation = (companyId?: string) => {
             
             analysisResults.push({
               item_code: 'UNMATCHED',
-              item_name: cpoItem.item_name,
-              total_required: Number(cpoItem.quantity_ordered) * (input.multiplier || 1),
+              item_name: extendedCpoItem.item_name,
+              total_required: Number(extendedCpoItem.quantity_ordered) * (input.multiplier || 1),
               available_stock: 0,
               on_order: 0,
-              shortage: Number(cpoItem.quantity_ordered) * (input.multiplier || 1),
-              suggested_order: Number(cpoItem.quantity_ordered) * (input.multiplier || 1),
-              unit_of_measure: (cpoItem as any).unit_of_measure || 'pcs',
+              shortage: Number(extendedCpoItem.quantity_ordered) * (input.multiplier || 1),
+              suggested_order: Number(extendedCpoItem.quantity_ordered) * (input.multiplier || 1),
+              unit_of_measure: extendedCpoItem.unit_of_measure || 'pcs',
               category: 'No Matching Product',
               priority: 'urgent',
               lead_time_days: 14,
               supplier_info: {
                 supplier_id: cpo.customer_id || '',
                 supplier_name: cpo.customer?.customer_name || 'Unknown Customer',
-                last_unit_cost: cpoItem.unit_price
+                last_unit_cost: extendedCpoItem.unit_price
               }
             });
           }
