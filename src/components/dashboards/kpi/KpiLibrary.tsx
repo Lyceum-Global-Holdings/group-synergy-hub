@@ -8,6 +8,7 @@ import { useKpiDefinitions } from "@/hooks/useKpiDefinitions";
 import { KpiCategory } from "@/types/kpi";
 import { Search, Plus, TrendingUp, Package, DollarSign, Users } from "lucide-react";
 import { CreateCustomKpiDialog } from "./CreateCustomKpiDialog";
+import { AddToDashboardDialog } from "./AddToDashboardDialog";
 
 const categoryIcons: Record<KpiCategory, any> = {
   procurement: Package,
@@ -21,6 +22,7 @@ export function KpiLibrary() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<KpiCategory | "all">("all");
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [addToDashboardKpi, setAddToDashboardKpi] = useState<{id: string, name: string} | null>(null);
   
   const { data: kpis, isLoading } = useKpiDefinitions(
     selectedCategory === "all" ? undefined : selectedCategory
@@ -85,7 +87,11 @@ export function KpiLibrary() {
                     <CardContent>
                       <div className="flex items-center justify-between text-sm">
                         <span className="text-muted-foreground">Unit: {kpi.unit}</span>
-                        <Button size="sm" variant="outline">
+                        <Button 
+                          size="sm" 
+                          variant="outline"
+                          onClick={() => setAddToDashboardKpi({id: kpi.id, name: kpi.name})}
+                        >
                           <Plus className="h-3 w-3 mr-1" />
                           Add to Dashboard
                         </Button>
@@ -106,6 +112,13 @@ export function KpiLibrary() {
       <CreateCustomKpiDialog
         open={createDialogOpen}
         onOpenChange={setCreateDialogOpen}
+      />
+
+      <AddToDashboardDialog
+        open={!!addToDashboardKpi}
+        onOpenChange={(open) => !open && setAddToDashboardKpi(null)}
+        kpiId={addToDashboardKpi?.id || ""}
+        kpiName={addToDashboardKpi?.name || ""}
       />
     </div>
   );
