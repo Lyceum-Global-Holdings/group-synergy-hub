@@ -16,10 +16,12 @@ import { usePurchaseRequisitions, useCreatePurchaseRequisition } from '@/hooks/u
 import { useCompany } from '@/contexts/CompanyContext';
 import { format } from 'date-fns';
 import { DemandPriority, DemandSource, DemandAnalysisResult } from '@/types/materialDemand';
+import { PrPriority } from '@/types/procurement';
 import { useToast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
 import { CreateDispatchNoteDialog } from '@/components/warehouse/CreateDispatchNoteDialog';
 import { CreatePrFromDemandDialog } from '@/components/procurement/CreatePrFromDemandDialog';
+import { BulkPrPreviewDialog } from '@/components/procurement/BulkPrPreviewDialog';
 import { supabase } from '@/integrations/supabase/client';
 
 const MaterialDemandPlanning = () => {
@@ -49,6 +51,8 @@ const MaterialDemandPlanning = () => {
   const [prAdjustmentDialogOpen, setPrAdjustmentDialogOpen] = useState(false);
   const [selectedPrItem, setSelectedPrItem] = useState<DemandAnalysisResult | null>(null);
   const [selectedBomDetails, setSelectedBomDetails] = useState<{ size?: string; sizeMultiplier?: number } | null>(null);
+  const [bulkPrDialogOpen, setBulkPrDialogOpen] = useState(false);
+  const [bulkPrPreviewData, setBulkPrPreviewData] = useState<any>(null);
 
   // Filter confirmed CPOs for CPO-based demand calculation
   const confirmedCPOs = customerPOs?.filter(cpo => cpo.status === 'confirmed') || [];
@@ -135,14 +139,91 @@ const MaterialDemandPlanning = () => {
     });
   };
 
-  // Generate PR from BOM materials with shortage
-  const handleGeneratePR = () => {
-    if (!calculationResult || calculationResult.length === 0) return;
+  // Prepare bulk PR preview data
+  const prepareBulkPrData = () => {
+    if (!calculationResult || calculationResult.length === 0) return null;
 
-    // Filter BOM materials with shortage
     const bomMaterialsWithShortage = calculationResult.filter(
       item => item.category === 'BOM Material' && item.shortage > 0
     );
+
+    if (bomMaterialsWithShortage.length === 0) return null;
+
+    // Calculate totals and groupings
+    const totalEstimatedCost = bomMaterialsWithShortage.reduce(
+      (sum, item) => sum + (item.suggested_order * (item.supplier_info?.last_unit_cost || 0)),
+      0
+    );
+
+    const maxLeadTime = Math.max(
+      ...bomMaterialsWithShortage.map(item => item.lead_time_days)
+    );
+
+    // Group by supplier
+    const supplierGroups: Record<string, DemandAnalysisResult[]> = {};
+    bomMaterialsWithShortage.forEach(item => {
+      const supplierName = item.supplier_info?.supplier_name || 'Unknown Supplier';
+      if (!supplierGroups[supplierName]) {
+        supplierGroups[supplierName] = [];
+      }
+      supplierGroups[supplierName].push(item);
+    });
+
+    const selectedBom = boms?.find(bom => bom.id === selectedBomId);
+
+    return {
+      items: bomMaterialsWithShortage,
+      summary: {
+        totalItems: bomMaterialsWithShortage.length,
+        totalCost: totalEstimatedCost,
+        maxLeadTime,
+        supplierCount: Object.keys(supplierGroups).length,
+      },
+      supplierGroups,
+      suggestedRequiredDate: demandSource === 'bom' ? productionDate : analysisDate,
+      bomInfo: selectedBom ? {
+        bom_number: selectedBom.bom_number,
+        product_name: selectedBom.product_name,
+        size: selectedBomDetails?.size,
+        sizeMultiplier: selectedBomDetails?.sizeMultiplier,
+      } : undefined,
+    };
+  };
+
+  // Open bulk PR preview dialog
+  const handleOpenBulkPrPreview = () => {
+    const previewData = prepareBulkPrData();
+    if (!previewData) {
+      toast({
+        title: "No items to requisition",
+        description: "All BOM materials are sufficiently stocked.",
+        variant: "default",
+      });
+      return;
+    }
+    setBulkPrPreviewData(previewData);
+    setBulkPrDialogOpen(true);
+  };
+
+  // Generate PR from BOM materials with adjustments
+  const handleGeneratePR = (adjustments?: {
+    selectedItems?: string[];
+    customPriority?: PrPriority;
+    additionalNotes?: string;
+  }) => {
+    if (!calculationResult || calculationResult.length === 0) return;
+
+    // Filter BOM materials with shortage
+    let bomMaterialsWithShortage = calculationResult.filter(
+      item => item.category === 'BOM Material' && item.shortage > 0
+    );
+
+    // Apply item selection filter if adjustments provided
+    if (adjustments?.selectedItems) {
+      bomMaterialsWithShortage = bomMaterialsWithShortage.filter(item => 
+        adjustments.selectedItems!.includes(item.item_code)
+      );
+    }
 
     if (bomMaterialsWithShortage.length === 0) {
       toast({
@@ -153,11 +234,16 @@ const MaterialDemandPlanning = () => {
       return;
     }
 
-    // Determine highest priority
-    const priorities: DemandPriority[] = ['urgent', 'high', 'medium', 'low'];
-    const highestPriority = priorities.find(p => 
-      bomMaterialsWithShortage.some(item => item.priority === p)
-    ) || 'medium';
+    // Determine priority - use custom or calculate from items
+    let priority: PrPriority;
+    if (adjustments?.customPriority) {
+      priority = adjustments.customPriority;
+    } else {
+      const priorities: DemandPriority[] = ['urgent', 'high', 'medium', 'low'];
+      priority = (priorities.find(p => 
+        bomMaterialsWithShortage.some(item => item.priority === p)
+      ) || 'medium') as PrPriority;
+    }
 
     // Prepare PR title and description
     const selectedBom = boms?.find(bom => bom.id === selectedBomId);
@@ -165,7 +251,23 @@ const MaterialDemandPlanning = () => {
       ? `Material Requisition for BOM ${selectedBom.bom_number}`
       : `Material Requisition for CPO Analysis ${format(new Date(), 'MMM dd, yyyy')}`;
     
-    const prDescription = `Auto-generated from Material Demand Planning. ${bomMaterialsWithShortage.length} BOM materials with shortage. Total required materials: ${calculationResult.length}.`;
+    let prDescription = `Auto-generated from Material Demand Planning. ${bomMaterialsWithShortage.length} BOM materials with shortage.`;
+    
+    // Add BOM and size info
+    if (selectedBom) {
+      prDescription += `\nBOM: ${selectedBom.bom_number} - ${selectedBom.product_name}`;
+    }
+    if (selectedBomDetails?.size) {
+      prDescription += `\nSize: ${selectedBomDetails.size}`;
+      if (selectedBomDetails.sizeMultiplier && selectedBomDetails.sizeMultiplier !== 1.0) {
+        prDescription += ` (${selectedBomDetails.sizeMultiplier}x multiplier)`;
+      }
+    }
+    
+    // Add additional notes if provided
+    if (adjustments?.additionalNotes) {
+      prDescription += `\n\n${adjustments.additionalNotes}`;
+    }
 
     // Map to PR items format
     const prItems = bomMaterialsWithShortage.map(item => ({
@@ -179,7 +281,7 @@ const MaterialDemandPlanning = () => {
       estimated_unit_price: item.supplier_info?.last_unit_cost || 0,
       estimated_total_price: item.suggested_order * (item.supplier_info?.last_unit_cost || 0),
       specifications: `Required: ${item.total_required}, Available: ${item.available_stock}, Shortage: ${item.shortage}`,
-      notes: `Lead time: ${item.lead_time_days} days. Priority: ${item.priority}.`,
+      notes: `Lead time: ${item.lead_time_days} days. Supplier: ${item.supplier_info?.supplier_name || 'N/A'}.`,
     }));
 
     // Create PR data
@@ -187,7 +289,7 @@ const MaterialDemandPlanning = () => {
       title: prTitle,
       description: prDescription,
       department: 'Production',
-      priority: highestPriority,
+      priority: priority,
       required_date: demandSource === 'bom' ? productionDate : analysisDate,
       justification: 'Auto-generated from Material Demand Planning calculation to fulfill material shortages.',
       bom_id: demandSource === 'bom' && selectedBomId ? selectedBomId : undefined,
@@ -197,6 +299,7 @@ const MaterialDemandPlanning = () => {
 
     createPrMutation.mutate(prData, {
       onSuccess: (data) => {
+        setBulkPrDialogOpen(false);
         toast({
           title: "Purchase Requisition Created",
           description: `PR ${data.pr_number} has been created with ${prItems.length} items.`,
@@ -526,21 +629,12 @@ const MaterialDemandPlanning = () => {
                   </div>
                   {bomMaterialsWithShortage.length > 0 && (
                     <Button 
-                      onClick={handleGeneratePR} 
+                      onClick={handleOpenBulkPrPreview} 
                       disabled={createPrMutation.isPending}
                       variant="default"
                     >
-                      {createPrMutation.isPending ? (
-                        <>
-                          <Clock className="h-4 w-4 mr-2 animate-spin" />
-                          Creating PR...
-                        </>
-                      ) : (
-                        <>
-                          <FileText className="h-4 w-4 mr-2" />
-                          Generate PR ({bomMaterialsWithShortage.length} items)
-                        </>
-                      )}
+                      <FileText className="h-4 w-4 mr-2" />
+                      Generate Consolidated PR ({bomMaterialsWithShortage.length} items)
                     </Button>
                   )}
                 </CardHeader>
@@ -825,6 +919,14 @@ const MaterialDemandPlanning = () => {
           }
         />
       )}
+
+      <BulkPrPreviewDialog
+        open={bulkPrDialogOpen}
+        onOpenChange={setBulkPrDialogOpen}
+        previewData={bulkPrPreviewData}
+        onConfirm={handleGeneratePR}
+        isCreating={createPrMutation.isPending}
+      />
     </div>
   );
 };
