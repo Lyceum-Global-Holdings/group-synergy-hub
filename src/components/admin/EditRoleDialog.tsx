@@ -6,12 +6,16 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import { Badge } from '@/components/ui/badge';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useToast } from '@/hooks/use-toast';
 import { usePermissions, type Role } from '@/hooks/useUsers';
 import { useUpdateRole } from '@/hooks/useUserMutations';
+import { useRoleModules, useAssignModulesToRole } from '@/hooks/useModuleAccess';
+import { moduleConfig } from '@/constants/moduleConfig';
 import { Loader2 } from 'lucide-react';
 
 // Available departments
@@ -44,6 +48,7 @@ const editRoleSchema = z.object({
   app_role: z.string().min(1, 'Please select an app role level'),
   description: z.string().min(10, 'Description must be at least 10 characters'),
   permissions: z.array(z.string()).min(1, 'At least one permission must be selected'),
+  modules: z.record(z.array(z.string())).optional(),
 });
 
 type EditRoleFormData = z.infer<typeof editRoleSchema>;
@@ -57,10 +62,13 @@ interface EditRoleDialogProps {
 
 export function EditRoleDialog({ open, onOpenChange, role, onRoleUpdated }: EditRoleDialogProps) {
   const [selectedPermissions, setSelectedPermissions] = useState<string[]>([]);
+  const [selectedModules, setSelectedModules] = useState<Record<string, string[]>>({});
   const { toast } = useToast();
   
   const { data: permissions = [], isLoading: permissionsLoading } = usePermissions();
+  const { data: roleModules = [] } = useRoleModules(role?.id);
   const updateRole = useUpdateRole();
+  const assignModulesToRole = useAssignModulesToRole();
 
   const form = useForm<EditRoleFormData>({
     resolver: zodResolver(editRoleSchema),
@@ -70,6 +78,7 @@ export function EditRoleDialog({ open, onOpenChange, role, onRoleUpdated }: Edit
       app_role: '',
       description: '',
       permissions: [],
+      modules: {},
     },
   });
 
@@ -82,10 +91,23 @@ export function EditRoleDialog({ open, onOpenChange, role, onRoleUpdated }: Edit
         app_role: role.app_role,
         description: role.description || '',
         permissions: role.permissions.map(p => p.id),
+        modules: {},
       });
       setSelectedPermissions(role.permissions.map(p => p.id));
     }
   }, [role, form]);
+
+  // Update selected modules when roleModules changes
+  useEffect(() => {
+    if (roleModules.length > 0) {
+      const modulesMap: Record<string, string[]> = {};
+      roleModules.forEach(rm => {
+        modulesMap[rm.module_key] = rm.submodules;
+      });
+      setSelectedModules(modulesMap);
+      form.setValue('modules', modulesMap);
+    }
+  }, [roleModules, form]);
 
   const onSubmit = async (data: EditRoleFormData) => {
     if (!role) return;
@@ -100,6 +122,12 @@ export function EditRoleDialog({ open, onOpenChange, role, onRoleUpdated }: Edit
           description: data.description,
           permissions: data.permissions,
         },
+      });
+
+      // Update role modules
+      await assignModulesToRole.mutateAsync({
+        roleId: role.id,
+        modules: selectedModules,
       });
 
       // Call callback and reset form
@@ -123,6 +151,39 @@ export function EditRoleDialog({ open, onOpenChange, role, onRoleUpdated }: Edit
     }
     setSelectedPermissions(newPermissions);
     form.setValue('permissions', newPermissions);
+  };
+
+  const handleModuleToggle = (moduleKey: string, checked: boolean) => {
+    const newModules = { ...selectedModules };
+    if (checked) {
+      const config = moduleConfig[moduleKey];
+      newModules[moduleKey] = config?.subModules.map(sub => sub.key) || [];
+    } else {
+      delete newModules[moduleKey];
+    }
+    setSelectedModules(newModules);
+    form.setValue('modules', newModules);
+  };
+
+  const handleSubModuleToggle = (moduleKey: string, subModuleKey: string, checked: boolean) => {
+    const newModules = { ...selectedModules };
+    if (!newModules[moduleKey]) {
+      newModules[moduleKey] = [];
+    }
+    
+    if (checked) {
+      if (!newModules[moduleKey].includes(subModuleKey)) {
+        newModules[moduleKey] = [...newModules[moduleKey], subModuleKey];
+      }
+    } else {
+      newModules[moduleKey] = newModules[moduleKey].filter(key => key !== subModuleKey);
+      if (newModules[moduleKey].length === 0) {
+        delete newModules[moduleKey];
+      }
+    }
+    
+    setSelectedModules(newModules);
+    form.setValue('modules', newModules);
   };
 
   const isSubmitting = updateRole.isPending;
@@ -228,6 +289,68 @@ export function EditRoleDialog({ open, onOpenChange, role, onRoleUpdated }: Edit
                       {...field} 
                     />
                   </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="modules"
+              render={() => (
+                <FormItem>
+                  <FormLabel>Module Access</FormLabel>
+                  <FormDescription>
+                    Select which modules users with this role can access
+                  </FormDescription>
+                  <Accordion type="multiple" className="w-full">
+                    {Object.entries(moduleConfig).map(([key, config]) => {
+                      const isModuleSelected = !!selectedModules[key];
+                      const selectedSubModules = selectedModules[key] || [];
+                      
+                      return (
+                        <AccordionItem key={key} value={key}>
+                          <AccordionTrigger>
+                            <div className="flex items-center gap-2">
+                              <Checkbox
+                                checked={isModuleSelected}
+                                onCheckedChange={(checked) => handleModuleToggle(key, !!checked)}
+                                onClick={(e) => e.stopPropagation()}
+                              />
+                              <config.icon className="h-4 w-4" />
+                              <span>{config.name}</span>
+                              {isModuleSelected && (
+                                <Badge variant="secondary" className="ml-2">
+                                  {selectedSubModules.length} sub-modules
+                                </Badge>
+                              )}
+                            </div>
+                          </AccordionTrigger>
+                          <AccordionContent>
+                            <div className="pl-6 space-y-2 mt-2">
+                              {config.subModules.map(sub => (
+                                <div key={sub.key} className="flex items-center space-x-2">
+                                  <Checkbox
+                                    id={`edit-${key}-${sub.key}`}
+                                    checked={selectedSubModules.includes(sub.key)}
+                                    onCheckedChange={(checked) => 
+                                      handleSubModuleToggle(key, sub.key, !!checked)
+                                    }
+                                  />
+                                  <label
+                                    htmlFor={`edit-${key}-${sub.key}`}
+                                    className="text-sm leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                                  >
+                                    {sub.name}
+                                  </label>
+                                </div>
+                              ))}
+                            </div>
+                          </AccordionContent>
+                        </AccordionItem>
+                      );
+                    })}
+                  </Accordion>
                   <FormMessage />
                 </FormItem>
               )}

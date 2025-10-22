@@ -17,6 +17,7 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
+  FormDescription,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import {
@@ -28,10 +29,12 @@ import {
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { X } from "lucide-react";
+import { X, Info } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useCompanies } from "@/hooks/useCompanies";
 import { useRoles, useUpdateProfile, useAssignRole, useRemoveRole, type User } from "@/hooks/useUsers";
+import { useUserModules, useAssignModulesToUser, useRemoveUserModule } from "@/hooks/useModuleAccess";
+import { moduleConfig } from "@/constants/moduleConfig";
 
 const editUserSchema = z.object({
   firstName: z.string().min(1, "First name is required"),
@@ -39,6 +42,8 @@ const editUserSchema = z.object({
   department: z.string().optional(),
   company: z.string().min(1, "Company is required"),
   roles: z.array(z.string()),
+  grantedModules: z.array(z.string()).optional(),
+  deniedModules: z.array(z.string()).optional(),
 });
 
 type EditUserFormData = z.infer<typeof editUserSchema>;
@@ -57,13 +62,19 @@ export const EditUserDialog: React.FC<EditUserDialogProps> = ({
   onUserUpdated,
 }) => {
   const [selectedRoles, setSelectedRoles] = useState<string[]>([]);
+  const [grantedModules, setGrantedModules] = useState<string[]>([]);
+  const [deniedModules, setDeniedModules] = useState<string[]>([]);
+  const [inheritedModules, setInheritedModules] = useState<string[]>([]);
   const { toast } = useToast();
   
   const { companies } = useCompanies();
   const { data: roles } = useRoles();
+  const { data: userModules = [] } = useUserModules(user?.id);
   const updateProfile = useUpdateProfile();
   const assignRole = useAssignRole();
   const removeRole = useRemoveRole();
+  const assignModulesToUser = useAssignModulesToUser();
+  const removeUserModule = useRemoveUserModule();
 
   const form = useForm<EditUserFormData>({
     resolver: zodResolver(editUserSchema),
@@ -73,6 +84,8 @@ export const EditUserDialog: React.FC<EditUserDialogProps> = ({
       department: "",
       company: "",
       roles: [],
+      grantedModules: [],
+      deniedModules: [],
     },
   });
 
@@ -86,10 +99,36 @@ export const EditUserDialog: React.FC<EditUserDialogProps> = ({
         department: user.department || "",
         company: user.company_id || "",
         roles: user.roles.map(r => r.id),
+        grantedModules: [],
+        deniedModules: [],
       });
       setSelectedRoles(user.roles.map(r => r.id));
     }
   }, [user, form]);
+
+  // Load user's module overrides
+  useEffect(() => {
+    if (userModules.length > 0) {
+      const granted = userModules.filter(um => um.access_type === 'grant').map(um => um.module_key);
+      const denied = userModules.filter(um => um.access_type === 'deny').map(um => um.module_key);
+      setGrantedModules(granted);
+      setDeniedModules(denied);
+      form.setValue('grantedModules', granted);
+      form.setValue('deniedModules', denied);
+    }
+  }, [userModules, form]);
+
+  // Calculate inherited modules from selected roles
+  useEffect(() => {
+    const selectedRoleObjects = roles?.filter(r => selectedRoles.includes(r.id)) || [];
+    const moduleSet = new Set<string>();
+    
+    selectedRoleObjects.forEach(() => {
+      Object.keys(moduleConfig).forEach(key => moduleSet.add(key));
+    });
+    
+    setInheritedModules(Array.from(moduleSet));
+  }, [selectedRoles, roles]);
 
   const onSubmit = async (data: EditUserFormData) => {
     if (!user) return;
@@ -109,14 +148,54 @@ export const EditUserDialog: React.FC<EditUserDialogProps> = ({
       const rolesToAdd = selectedRoles.filter(roleId => !currentRoleIds.includes(roleId));
       const rolesToRemove = currentRoleIds.filter(roleId => !selectedRoles.includes(roleId));
 
-      // Add new roles
       for (const roleId of rolesToAdd) {
         await assignRole.mutateAsync({ userId: user.id, roleId });
       }
 
-      // Remove old roles
       for (const roleId of rolesToRemove) {
         await removeRole.mutateAsync({ userId: user.id, roleId });
+      }
+
+      // Handle module overrides
+      const originalGranted = userModules.filter(um => um.access_type === 'grant').map(um => um.module_key);
+      const originalDenied = userModules.filter(um => um.access_type === 'deny').map(um => um.module_key);
+
+      // Remove modules that are no longer in the lists
+      for (const moduleKey of originalGranted) {
+        if (!grantedModules.includes(moduleKey)) {
+          await removeUserModule.mutateAsync({ userId: user.id, moduleKey });
+        }
+      }
+      for (const moduleKey of originalDenied) {
+        if (!deniedModules.includes(moduleKey)) {
+          await removeUserModule.mutateAsync({ userId: user.id, moduleKey });
+        }
+      }
+
+      // Add new granted modules
+      for (const moduleKey of grantedModules) {
+        if (!originalGranted.includes(moduleKey)) {
+          const config = moduleConfig[moduleKey];
+          await assignModulesToUser.mutateAsync({
+            userId: user.id,
+            moduleKey,
+            submodules: config?.subModules.map(sub => sub.key) || [],
+            accessType: 'grant',
+          });
+        }
+      }
+
+      // Add new denied modules
+      for (const moduleKey of deniedModules) {
+        if (!originalDenied.includes(moduleKey)) {
+          const config = moduleConfig[moduleKey];
+          await assignModulesToUser.mutateAsync({
+            userId: user.id,
+            moduleKey,
+            submodules: config?.subModules.map(sub => sub.key) || [],
+            accessType: 'deny',
+          });
+        }
       }
 
       toast({
@@ -144,6 +223,32 @@ export const EditUserDialog: React.FC<EditUserDialogProps> = ({
     }
     setSelectedRoles(updatedRoles);
     form.setValue("roles", updatedRoles);
+  };
+
+  const handleModuleGrant = (moduleKey: string, checked: boolean) => {
+    let updated = checked 
+      ? [...grantedModules, moduleKey]
+      : grantedModules.filter(k => k !== moduleKey);
+    
+    if (checked) {
+      setDeniedModules(deniedModules.filter(k => k !== moduleKey));
+    }
+    
+    setGrantedModules(updated);
+    form.setValue("grantedModules", updated);
+  };
+
+  const handleModuleDeny = (moduleKey: string, checked: boolean) => {
+    let updated = checked 
+      ? [...deniedModules, moduleKey]
+      : deniedModules.filter(k => k !== moduleKey);
+    
+    if (checked) {
+      setGrantedModules(grantedModules.filter(k => k !== moduleKey));
+    }
+    
+    setDeniedModules(updated);
+    form.setValue("deniedModules", updated);
   };
 
   if (!user) return null;
@@ -264,6 +369,73 @@ export const EditUserDialog: React.FC<EditUserDialogProps> = ({
                     })}
                   </div>
                 )}
+              </div>
+
+              <div className="space-y-3">
+                <div>
+                  <FormLabel>Module Access Overrides</FormLabel>
+                  <FormDescription>
+                    Manage user-specific module access beyond their role permissions.
+                  </FormDescription>
+                </div>
+
+                {inheritedModules.length > 0 && (
+                  <div className="border rounded-lg p-3 bg-muted/30">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Info className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-xs font-medium">From Selected Roles:</span>
+                    </div>
+                    <div className="flex flex-wrap gap-1">
+                      {inheritedModules.map(moduleKey => {
+                        const config = moduleConfig[moduleKey];
+                        return config ? (
+                          <Badge key={moduleKey} variant="outline" className="text-xs">
+                            {config.name}
+                          </Badge>
+                        ) : null;
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <FormLabel className="text-xs text-muted-foreground">Grant Additional</FormLabel>
+                    <div className="mt-2 space-y-2">
+                      {Object.entries(moduleConfig).map(([key, config]) => (
+                        <div key={key} className="flex items-center space-x-2">
+                          <Checkbox
+                            id={`edit-grant-${key}`}
+                            checked={grantedModules.includes(key)}
+                            onCheckedChange={(checked) => handleModuleGrant(key, !!checked)}
+                            disabled={inheritedModules.includes(key)}
+                          />
+                          <label htmlFor={`edit-grant-${key}`} className="text-xs">
+                            {config.name}
+                          </label>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div>
+                    <FormLabel className="text-xs text-muted-foreground">Deny Access</FormLabel>
+                    <div className="mt-2 space-y-2">
+                      {Object.entries(moduleConfig).map(([key, config]) => (
+                        <div key={key} className="flex items-center space-x-2">
+                          <Checkbox
+                            id={`edit-deny-${key}`}
+                            checked={deniedModules.includes(key)}
+                            onCheckedChange={(checked) => handleModuleDeny(key, !!checked)}
+                          />
+                          <label htmlFor={`edit-deny-${key}`} className="text-xs">
+                            {config.name}
+                          </label>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
 
