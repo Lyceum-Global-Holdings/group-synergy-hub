@@ -13,7 +13,16 @@ interface ChartWidgetProps {
   };
 }
 
-const DEFAULT_COLORS = ["hsl(var(--chart-1))", "hsl(var(--chart-2))", "hsl(var(--chart-3))", "hsl(var(--chart-4))", "hsl(var(--chart-5))"];
+const DEFAULT_COLORS = [
+  "hsl(var(--chart-1))", 
+  "hsl(var(--chart-2))", 
+  "hsl(var(--chart-3))", 
+  "hsl(var(--chart-4))", 
+  "hsl(var(--chart-5))",
+  "hsl(var(--chart-6))",
+  "hsl(var(--chart-7))",
+  "hsl(var(--chart-8))"
+];
 
 export function ChartWidget({ title, chartType, data, config = {} }: ChartWidgetProps) {
   const { colors = DEFAULT_COLORS, showLegend = true, showGrid = true } = config;
@@ -52,7 +61,11 @@ export function ChartWidget({ title, chartType, data, config = {} }: ChartWidget
               <YAxis className="text-xs" />
               <Tooltip contentStyle={{ backgroundColor: "hsl(var(--background))", border: "1px solid hsl(var(--border))" }} />
               {showLegend && <Legend />}
-              <Bar dataKey="value" fill={colors[0]} />
+              <Bar dataKey="value">
+                {data.map((_, index) => (
+                  <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />
+                ))}
+              </Bar>
             </BarChart>
           </ResponsiveContainer>
         );
@@ -72,6 +85,7 @@ export function ChartWidget({ title, chartType, data, config = {} }: ChartWidget
         );
 
       case "pie_chart":
+        const totalValue = data.reduce((sum, entry) => sum + entry.value, 0);
         return (
           <ResponsiveContainer width="100%" height={250}>
             <PieChart>
@@ -79,8 +93,8 @@ export function ChartWidget({ title, chartType, data, config = {} }: ChartWidget
                 data={data}
                 cx="50%"
                 cy="50%"
-                labelLine={false}
-                label={(entry) => entry.name}
+                labelLine={true}
+                label={(entry) => `${entry.name} (${((entry.value / totalValue) * 100).toFixed(1)}%)`}
                 outerRadius={80}
                 fill={colors[0]}
                 dataKey="value"
@@ -89,7 +103,13 @@ export function ChartWidget({ title, chartType, data, config = {} }: ChartWidget
                   <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />
                 ))}
               </Pie>
-              <Tooltip contentStyle={{ backgroundColor: "hsl(var(--background))", border: "1px solid hsl(var(--border))" }} />
+              <Tooltip 
+                contentStyle={{ backgroundColor: "hsl(var(--background))", border: "1px solid hsl(var(--border))" }}
+                formatter={(value: number) => [
+                  `${value.toLocaleString()} (${((value / totalValue) * 100).toFixed(1)}%)`,
+                  "Value"
+                ]}
+              />
               {showLegend && <Legend />}
             </PieChart>
           </ResponsiveContainer>

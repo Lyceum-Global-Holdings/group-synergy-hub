@@ -72,6 +72,7 @@ export default function DashboardView() {
                   { name: "Apr", value: 800 },
                   { name: "May", value: 500 },
                 ]}
+                config={widget.config || {}}
               />
             </CardContent>
           </Card>
