@@ -48,6 +48,7 @@ import ModuleTrainings from "./pages/admin/training/ModuleTrainings";
 import VideoLibrary from "./pages/admin/training/VideoLibrary";
 import Documentation from "./pages/admin/training/Documentation";
 import TrainingProgress from "./pages/admin/training/TrainingProgress";
+import DashboardsKPIs from "./pages/management/DashboardsKPIs";
 
 const queryClient = new QueryClient();
 
@@ -121,6 +122,7 @@ function App() {
               <Route path="/warehouse/cycle-count" element={<CycleCount />} />
               <Route path="/warehouse/delivery-order" element={<DeliveryOrder />} />
               <Route path="/finance/general-ledger" element={<GeneralLedger />} />
+              <Route path="/management/dashboards" element={<DashboardsKPIs />} />
             </Route>
             
             {/* Catch-all 404 route */}
