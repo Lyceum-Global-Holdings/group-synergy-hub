@@ -10,11 +10,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useApprovalConsole } from "@/hooks/useApprovalConsole";
 import { ApprovalCard } from "@/components/approvals/ApprovalCard";
 import { ApprovalStats } from "@/components/approvals/ApprovalStats";
 import { ApprovalFilters, ApprovalType, ApprovalPriority } from "@/types/approval";
-import { Search, Filter, RefreshCw, Bell, CheckCircle } from "lucide-react";
+import { Search, Filter, RefreshCw, Bell } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useIsAdmin } from "@/hooks/useSuperAdmin";
 
@@ -22,9 +23,10 @@ export default function ApprovalConsole() {
   const [filters, setFilters] = useState<ApprovalFilters>({});
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState<ApprovalType | "all">("all");
-  
-  const { data: isAdmin } = useIsAdmin();
+  const [viewScope, setViewScope] = useState<"my_queue" | "all_approvals">("my_queue");
+
   const { data: approvals, isLoading, refetch, isRefetching } = useApprovalConsole(filters);
+  const { data: isAdmin, isLoading: isAdminLoading } = useIsAdmin();
 
   const handleFilterChange = (key: keyof ApprovalFilters, value: any) => {
     setFilters(prev => ({ ...prev, [key]: value }));
@@ -48,17 +50,29 @@ export default function ApprovalConsole() {
   return (
     <div className="space-y-6 p-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Approval Console</h1>
           <p className="text-muted-foreground mt-1">
-            {isAdmin 
-              ? "Centralized view of all pending approvals across the system"
-              : "View and manage approvals assigned to you"
-            }
+            Centralized view of all pending approvals requiring your attention
           </p>
         </div>
         <div className="flex items-center gap-2">
+          {!isAdminLoading && isAdmin && (
+            <ToggleGroup 
+              type="single" 
+              value={viewScope} 
+              onValueChange={(value) => value && setViewScope(value as "my_queue" | "all_approvals")}
+              className="border rounded-md"
+            >
+              <ToggleGroupItem value="my_queue" aria-label="My queue" className="data-[state=on]:bg-primary data-[state=on]:text-primary-foreground">
+                My Queue
+              </ToggleGroupItem>
+              <ToggleGroupItem value="all_approvals" aria-label="All approvals" className="data-[state=on]:bg-primary data-[state=on]:text-primary-foreground">
+                All Approvals
+              </ToggleGroupItem>
+            </ToggleGroup>
+          )}
           <Button variant="outline" size="icon" onClick={() => refetch()}>
             <RefreshCw className={`h-4 w-4 ${isRefetching ? 'animate-spin' : ''}`} />
           </Button>
@@ -160,15 +174,15 @@ export default function ApprovalConsole() {
           ) : filteredApprovals.length === 0 ? (
             <Card>
               <CardContent className="py-12 text-center">
-                <CheckCircle className="h-16 w-16 mx-auto text-muted-foreground/50 mb-4" />
-                <p className="text-lg font-medium">
-                  {isAdmin ? "No pending approvals found" : "No approvals assigned to you"}
+                <p className="text-muted-foreground">
+                  {isAdmin && viewScope === "all_approvals" 
+                    ? "No pending approvals found system-wide" 
+                    : "No approvals assigned to you right now"}
                 </p>
                 <p className="text-sm text-muted-foreground mt-2">
-                  {isAdmin 
-                    ? "All approvals across the system are up to date"
-                    : "You don't have any pending approvals at the moment"
-                  }
+                  {isAdmin && viewScope === "my_queue"
+                    ? "Switch to 'All Approvals' to see all pending items"
+                    : "Try adjusting your filters or check back later"}
                 </p>
               </CardContent>
             </Card>
