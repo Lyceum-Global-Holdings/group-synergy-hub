@@ -38,6 +38,7 @@ import StockTransfer from "./pages/warehouse/StockTransfer";
 import CycleCount from "./pages/warehouse/CycleCount";
 import DeliveryOrder from "./pages/warehouse/DeliveryOrder";
 import GoodsReceiptNote from "./pages/warehouse/GoodsReceiptNote";
+import InventoryValuation from "./pages/warehouse/InventoryValuation";
 import PublicAssetView from "./pages/PublicAssetView";
 import PoEmailApproval from "./pages/procurement/PoEmailApproval";
 import GeneralLedger from "./pages/finance/GeneralLedger";
@@ -124,6 +125,7 @@ function App() {
               <Route path="/warehouse/stock-transfer" element={<StockTransfer />} />
               <Route path="/warehouse/cycle-count" element={<CycleCount />} />
               <Route path="/warehouse/delivery-order" element={<DeliveryOrder />} />
+              <Route path="/warehouse/inventory-valuation" element={<InventoryValuation />} />
               <Route path="/finance/general-ledger" element={<GeneralLedger />} />
               <Route path="/management/dashboards" element={<DashboardsKPIs />} />
               <Route path="/management/dashboards/:id/edit" element={<DashboardEdit />} />
