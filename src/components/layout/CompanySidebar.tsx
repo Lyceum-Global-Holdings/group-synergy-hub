@@ -29,7 +29,7 @@ import {
 import { useCompany } from "@/contexts/CompanyContext";
 import { Badge } from "@/components/ui/badge";
 import { Company } from "@/types/company";
-import { moduleConfig, normalizeCompanyModules, isSubModuleEnabled } from "@/constants/moduleConfig";
+import { moduleConfig, normalizeCompanyModules, isModuleEnabled, isSubModuleEnabled } from "@/constants/moduleConfig";
 import { useSuperAdmin } from "@/hooks/useSuperAdmin";
 
 type ModuleWithCompanies = {
@@ -245,7 +245,7 @@ export function CompanySidebar() {
         )}
 
         {/* Administration - Module-based */}
-        {isSubModuleEnabled(
+        {isModuleEnabled(
           isViewingAllCompanies 
             ? (isSuperAdmin ? Object.keys(moduleConfig) : getAllUniqueModules()) 
             : selectedCompany?.modules,
