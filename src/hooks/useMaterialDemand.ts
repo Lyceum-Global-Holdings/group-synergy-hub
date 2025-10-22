@@ -1022,6 +1022,44 @@ export const useDemandCalculation = (companyId?: string) => {
           }
         }
         
+        // Strategy 4.5: Size + Color match (when no style but has size and color)
+        if (!cpoStyleNo && cpoSize && cpoColor) {
+          const normalizedSize = cpoSize.trim().toLowerCase();
+          const normalizedColor = cpoColor.trim().toLowerCase();
+          
+          const sizeColorMatches = Array.from(finishedGoodsByStyleSizeColor.entries())
+            .filter(([key]) => {
+              const parts = key.split('|');
+              if (parts.length < 3) return false;
+              const [style, size, color] = parts;
+              return size === normalizedSize && color === normalizedColor;
+            })
+            .flatMap(([_, fgs]) => fgs);
+          
+          if (sizeColorMatches.length > 0) {
+            console.log(`⚠ Size+Color match (no style): Found ${sizeColorMatches.length} finished good(s)`);
+            
+            // Optional: Further filter by item name similarity for higher confidence
+            const itemNameLower = cpoItem.item_name?.toLowerCase() || '';
+            const nameFilteredMatches = sizeColorMatches.filter(fg => {
+              const fgNameLower = fg.product_name?.toLowerCase() || '';
+              // Check if names share significant words
+              const cpoWords = itemNameLower.split(/\s+/).filter(w => w.length > 3);
+              const fgWords = fgNameLower.split(/\s+/).filter(w => w.length > 3);
+              const commonWords = cpoWords.filter(w => fgWords.includes(w));
+              return commonWords.length > 0; // At least one word in common
+            });
+            
+            const finalMatches = nameFilteredMatches.length > 0 ? nameFilteredMatches : sizeColorMatches;
+            
+            return {
+              matches: finalMatches,
+              strategy: 'size_color_match',
+              confidence: nameFilteredMatches.length > 0 ? 'medium' : 'low'
+            };
+          }
+        }
+        
         // Strategy 5: Style-only match (lowest confidence)
         if (cpoStyleNo) {
           const normalizedStyle = cpoStyleNo.trim().toLowerCase();
