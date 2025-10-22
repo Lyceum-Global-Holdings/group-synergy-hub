@@ -3281,6 +3281,168 @@ export type Database = {
           },
         ]
       }
+      dashboard_permissions: {
+        Row: {
+          created_at: string | null
+          dashboard_id: string
+          id: string
+          permission_level:
+            | Database["public"]["Enums"]["permission_level"]
+            | null
+          role_id: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          dashboard_id: string
+          id?: string
+          permission_level?:
+            | Database["public"]["Enums"]["permission_level"]
+            | null
+          role_id?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          dashboard_id?: string
+          id?: string
+          permission_level?:
+            | Database["public"]["Enums"]["permission_level"]
+            | null
+          role_id?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dashboard_permissions_dashboard_id_fkey"
+            columns: ["dashboard_id"]
+            isOneToOne: false
+            referencedRelation: "dashboards"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dashboard_permissions_role_id_fkey"
+            columns: ["role_id"]
+            isOneToOne: false
+            referencedRelation: "roles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      dashboard_widgets: {
+        Row: {
+          config: Json | null
+          created_at: string | null
+          dashboard_id: string
+          filter_config: Json | null
+          height: number | null
+          id: string
+          kpi_id: string | null
+          position_x: number | null
+          position_y: number | null
+          title: string
+          updated_at: string | null
+          widget_type: Database["public"]["Enums"]["widget_type"]
+          width: number | null
+        }
+        Insert: {
+          config?: Json | null
+          created_at?: string | null
+          dashboard_id: string
+          filter_config?: Json | null
+          height?: number | null
+          id?: string
+          kpi_id?: string | null
+          position_x?: number | null
+          position_y?: number | null
+          title: string
+          updated_at?: string | null
+          widget_type: Database["public"]["Enums"]["widget_type"]
+          width?: number | null
+        }
+        Update: {
+          config?: Json | null
+          created_at?: string | null
+          dashboard_id?: string
+          filter_config?: Json | null
+          height?: number | null
+          id?: string
+          kpi_id?: string | null
+          position_x?: number | null
+          position_y?: number | null
+          title?: string
+          updated_at?: string | null
+          widget_type?: Database["public"]["Enums"]["widget_type"]
+          width?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dashboard_widgets_dashboard_id_fkey"
+            columns: ["dashboard_id"]
+            isOneToOne: false
+            referencedRelation: "dashboards"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dashboard_widgets_kpi_id_fkey"
+            columns: ["kpi_id"]
+            isOneToOne: false
+            referencedRelation: "kpi_definitions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      dashboards: {
+        Row: {
+          company_id: string | null
+          created_at: string | null
+          created_by: string | null
+          description: string | null
+          id: string
+          is_default: boolean | null
+          layout_config: Json | null
+          name: string
+          updated_at: string | null
+          visibility: Database["public"]["Enums"]["dashboard_visibility"] | null
+        }
+        Insert: {
+          company_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_default?: boolean | null
+          layout_config?: Json | null
+          name: string
+          updated_at?: string | null
+          visibility?:
+            | Database["public"]["Enums"]["dashboard_visibility"]
+            | null
+        }
+        Update: {
+          company_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_default?: boolean | null
+          layout_config?: Json | null
+          name?: string
+          updated_at?: string | null
+          visibility?:
+            | Database["public"]["Enums"]["dashboard_visibility"]
+            | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dashboards_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       delivery_order_items: {
         Row: {
           batch_number: string | null
@@ -4778,6 +4940,106 @@ export type Database = {
             columns: ["tax_code_id"]
             isOneToOne: false
             referencedRelation: "tax_codes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      kpi_definitions: {
+        Row: {
+          calculation_type:
+            | Database["public"]["Enums"]["calculation_type"]
+            | null
+          category: Database["public"]["Enums"]["kpi_category"] | null
+          company_id: string | null
+          created_at: string | null
+          created_by: string | null
+          data_source: string | null
+          description: string | null
+          id: string
+          is_system: boolean | null
+          name: string
+          refresh_interval: number | null
+          sql_query: string | null
+          target_value: number | null
+          unit: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          calculation_type?:
+            | Database["public"]["Enums"]["calculation_type"]
+            | null
+          category?: Database["public"]["Enums"]["kpi_category"] | null
+          company_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          data_source?: string | null
+          description?: string | null
+          id?: string
+          is_system?: boolean | null
+          name: string
+          refresh_interval?: number | null
+          sql_query?: string | null
+          target_value?: number | null
+          unit?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          calculation_type?:
+            | Database["public"]["Enums"]["calculation_type"]
+            | null
+          category?: Database["public"]["Enums"]["kpi_category"] | null
+          company_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          data_source?: string | null
+          description?: string | null
+          id?: string
+          is_system?: boolean | null
+          name?: string
+          refresh_interval?: number | null
+          sql_query?: string | null
+          target_value?: number | null
+          unit?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "kpi_definitions_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      kpi_history: {
+        Row: {
+          calculated_at: string | null
+          id: string
+          kpi_id: string
+          metadata: Json | null
+          value: number
+        }
+        Insert: {
+          calculated_at?: string | null
+          id?: string
+          kpi_id: string
+          metadata?: Json | null
+          value: number
+        }
+        Update: {
+          calculated_at?: string | null
+          id?: string
+          kpi_id?: string
+          metadata?: Json | null
+          value?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "kpi_history_kpi_id_fkey"
+            columns: ["kpi_id"]
+            isOneToOne: false
+            referencedRelation: "kpi_definitions"
             referencedColumns: ["id"]
           },
         ]
@@ -9812,6 +10074,10 @@ export type Database = {
         }
         Returns: number
       }
+      calculate_kpi_value: {
+        Args: { p_kpi_id: string }
+        Returns: number
+      }
       calculate_supplier_analytics: {
         Args: { p_period_months?: number; p_supplier_id: string }
         Returns: {
@@ -10171,6 +10437,12 @@ export type Database = {
         | "received"
         | "completed"
         | "cancelled"
+      calculation_type:
+        | "count"
+        | "sum"
+        | "average"
+        | "percentage"
+        | "custom_sql"
       confidentiality_level:
         | "public"
         | "internal"
@@ -10229,6 +10501,7 @@ export type Database = {
         | "software_license"
         | "consulting_agreement"
         | "other"
+      dashboard_visibility: "private" | "role_based" | "company_wide"
       delivery_status:
         | "pending_receipt"
         | "partially_received"
@@ -10249,6 +10522,12 @@ export type Database = {
         | "adjusting"
         | "reversing"
         | "recurring"
+      kpi_category:
+        | "procurement"
+        | "warehouse"
+        | "finance"
+        | "sourcing"
+        | "custom"
       material_request_priority: "low" | "normal" | "medium" | "high" | "urgent"
       material_request_status:
         | "draft"
@@ -10278,6 +10557,7 @@ export type Database = {
         | "renewal_action"
         | "inspection"
       period_status: "open" | "closed" | "locked"
+      permission_level: "view" | "edit" | "admin"
       po_amendment_type:
         | "price_change"
         | "quantity_change"
@@ -10351,6 +10631,14 @@ export type Database = {
         | "transfer_in"
         | "transfer_out"
       urgency_level: "normal" | "urgent" | "emergency"
+      widget_type:
+        | "kpi_card"
+        | "line_chart"
+        | "bar_chart"
+        | "pie_chart"
+        | "table"
+        | "gauge"
+        | "area_chart"
       workflow_stage:
         | "submitted"
         | "hod_approved"
@@ -10593,6 +10881,7 @@ export const Constants = {
         "completed",
         "cancelled",
       ],
+      calculation_type: ["count", "sum", "average", "percentage", "custom_sql"],
       confidentiality_level: [
         "public",
         "internal",
@@ -10657,6 +10946,7 @@ export const Constants = {
         "consulting_agreement",
         "other",
       ],
+      dashboard_visibility: ["private", "role_based", "company_wide"],
       delivery_status: [
         "pending_receipt",
         "partially_received",
@@ -10679,6 +10969,13 @@ export const Constants = {
         "adjusting",
         "reversing",
         "recurring",
+      ],
+      kpi_category: [
+        "procurement",
+        "warehouse",
+        "finance",
+        "sourcing",
+        "custom",
       ],
       material_request_priority: ["low", "normal", "medium", "high", "urgent"],
       material_request_status: [
@@ -10712,6 +11009,7 @@ export const Constants = {
         "inspection",
       ],
       period_status: ["open", "closed", "locked"],
+      permission_level: ["view", "edit", "admin"],
       po_amendment_type: [
         "price_change",
         "quantity_change",
@@ -10793,6 +11091,15 @@ export const Constants = {
         "transfer_out",
       ],
       urgency_level: ["normal", "urgent", "emergency"],
+      widget_type: [
+        "kpi_card",
+        "line_chart",
+        "bar_chart",
+        "pie_chart",
+        "table",
+        "gauge",
+        "area_chart",
+      ],
       workflow_stage: [
         "submitted",
         "hod_approved",
