@@ -116,6 +116,13 @@ export interface DemandAnalysisResult {
     delivery_date?: string;
     expected_delivery?: string;
   }[];
+  cpo_details?: {
+    cpo_id: string;
+    cpo_number: string;
+    customer_name: string;
+    quantity_contributed: number;
+  }[];
+  total_cpos_involved?: number;
 }
 
 export interface MRPReport {

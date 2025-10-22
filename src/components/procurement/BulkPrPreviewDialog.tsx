@@ -24,7 +24,8 @@ import {
   Package, 
   TrendingUp,
   FileText,
-  Info
+  Info,
+  Ruler
 } from 'lucide-react';
 import { DemandAnalysisResult, DemandPriority } from '@/types/materialDemand';
 import { format, addDays } from 'date-fns';
@@ -37,6 +38,8 @@ interface BulkPrPreviewData {
     totalCost: number;
     maxLeadTime: number;
     supplierCount: number;
+    cpoCount?: number;
+    customerCount?: number;
   };
   supplierGroups: Record<string, DemandAnalysisResult[]>;
   suggestedRequiredDate: string;
@@ -45,6 +48,10 @@ interface BulkPrPreviewData {
     product_name: string;
     size?: string;
     sizeMultiplier?: number;
+  };
+  cpoInfo?: {
+    cpo_numbers: string[];
+    customers: string[];
   };
 }
 
@@ -147,17 +154,43 @@ export const BulkPrPreviewDialog: React.FC<BulkPrPreviewDialogProps> = ({
             <Alert>
               <Info className="h-4 w-4" />
               <AlertDescription>
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="font-medium">BOM:</span>
-                  <span>{previewData.bomInfo.bom_number} - {previewData.bomInfo.product_name}</span>
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium">BOM:</span>
+                    <span>{previewData.bomInfo.bom_number} - {previewData.bomInfo.product_name}</span>
+                  </div>
                   {previewData.bomInfo.size && (
-                    <Badge variant="secondary">
-                      Size: {previewData.bomInfo.size}
-                      {previewData.bomInfo.sizeMultiplier && previewData.bomInfo.sizeMultiplier !== 1.0 && (
-                        <span> ({previewData.bomInfo.sizeMultiplier}x)</span>
-                      )}
-                    </Badge>
+                    <div className="flex items-center gap-2">
+                      <Ruler className="h-3 w-3" />
+                      <span className="text-sm">
+                        Size: {previewData.bomInfo.size}
+                        {previewData.bomInfo.sizeMultiplier && previewData.bomInfo.sizeMultiplier !== 1.0 && (
+                          <span className="ml-1 text-muted-foreground">
+                            ({previewData.bomInfo.sizeMultiplier}x multiplier)
+                          </span>
+                        )}
+                      </span>
+                    </div>
                   )}
+                </div>
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {/* CPO Information */}
+          {previewData.cpoInfo && (
+            <Alert>
+              <Info className="h-4 w-4" />
+              <AlertDescription>
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-medium">Customer Purchase Orders:</span>
+                    <span className="text-sm">{previewData.cpoInfo.cpo_numbers.join(', ')}</span>
+                  </div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-medium">Customers:</span>
+                    <span className="text-sm">{previewData.cpoInfo.customers.join(', ')}</span>
+                  </div>
                 </div>
               </AlertDescription>
             </Alert>
@@ -202,6 +235,19 @@ export const BulkPrPreviewDialog: React.FC<BulkPrPreviewDialogProps> = ({
               <div className="text-2xl font-bold">{previewData.summary.supplierCount}</div>
               <div className="text-xs text-muted-foreground">unique</div>
             </div>
+
+            {previewData.summary.cpoCount && (
+              <div className="p-4 border rounded-lg">
+                <div className="flex items-center gap-2 text-muted-foreground mb-1">
+                  <FileText className="h-4 w-4" />
+                  <span className="text-sm">CPOs</span>
+                </div>
+                <div className="text-2xl font-bold">{previewData.summary.cpoCount}</div>
+                <div className="text-xs text-muted-foreground">
+                  {previewData.summary.customerCount} customer(s)
+                </div>
+              </div>
+            )}
           </div>
 
           {/* High Value Warning */}
@@ -300,14 +346,19 @@ export const BulkPrPreviewDialog: React.FC<BulkPrPreviewDialogProps> = ({
                           }
                         />
                       </TableCell>
-                      <TableCell>
-                        <div className="flex flex-col">
-                          <span className="font-medium">{item.item_name}</span>
-                          <span className="text-xs text-muted-foreground font-mono">
-                            {item.item_code}
-                          </span>
-                        </div>
-                      </TableCell>
+                <TableCell>
+                  <div className="flex flex-col gap-1">
+                    <span className="font-medium">{item.item_name}</span>
+                    <span className="text-xs text-muted-foreground font-mono">
+                      {item.item_code}
+                    </span>
+                    {item.cpo_details && item.cpo_details.length > 0 && (
+                      <Badge variant="outline" className="text-xs w-fit">
+                        {item.cpo_details.length} CPO(s)
+                      </Badge>
+                    )}
+                  </div>
+                </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1">
                           <AlertTriangle className="h-3 w-3 text-destructive" />

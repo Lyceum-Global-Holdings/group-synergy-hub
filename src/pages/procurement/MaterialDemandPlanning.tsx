@@ -171,6 +171,17 @@ const MaterialDemandPlanning = () => {
 
     const selectedBom = boms?.find(bom => bom.id === selectedBomId);
 
+    // NEW: Extract CPO information for traceability
+    let cpoInfo: { cpo_numbers: string[]; customers: string[] } | undefined;
+    
+    if (demandSource === 'customer_po') {
+      const selectedCPOData = confirmedCPOs.filter(cpo => selectedCPOs.includes(cpo.id));
+      cpoInfo = {
+        cpo_numbers: selectedCPOData.map(cpo => cpo.cpo_number),
+        customers: Array.from(new Set(selectedCPOData.map(cpo => cpo.customer?.customer_name).filter(Boolean))) as string[]
+      };
+    }
+
     return {
       items: bomMaterialsWithShortage,
       summary: {
@@ -178,6 +189,8 @@ const MaterialDemandPlanning = () => {
         totalCost: totalEstimatedCost,
         maxLeadTime,
         supplierCount: Object.keys(supplierGroups).length,
+        cpoCount: cpoInfo?.cpo_numbers.length,
+        customerCount: cpoInfo?.customers.length,
       },
       supplierGroups,
       suggestedRequiredDate: demandSource === 'bom' ? productionDate : analysisDate,
@@ -187,6 +200,7 @@ const MaterialDemandPlanning = () => {
         size: selectedBomDetails?.size,
         sizeMultiplier: selectedBomDetails?.sizeMultiplier,
       } : undefined,
+      cpoInfo,
     };
   };
 
@@ -247,11 +261,34 @@ const MaterialDemandPlanning = () => {
 
     // Prepare PR title and description
     const selectedBom = boms?.find(bom => bom.id === selectedBomId);
+    
+    // NEW: Enhanced PR title for CPO-based demand
     const prTitle = demandSource === 'bom' && selectedBom
       ? `Material Requisition for BOM ${selectedBom.bom_number}`
+      : demandSource === 'customer_po' && selectedCPOs.length > 0
+      ? `Material Requisition for ${selectedCPOs.length} CPO(s) - ${format(new Date(), 'MMM dd, yyyy')}`
       : `Material Requisition for CPO Analysis ${format(new Date(), 'MMM dd, yyyy')}`;
     
     let prDescription = `Auto-generated from Material Demand Planning. ${bomMaterialsWithShortage.length} BOM materials with shortage.`;
+    
+    // NEW: Add CPO summary for traceability
+    if (demandSource === 'customer_po' && selectedCPOs.length > 0) {
+      const cpoNumbers = confirmedCPOs
+        .filter(cpo => selectedCPOs.includes(cpo.id))
+        .map(cpo => cpo.cpo_number)
+        .join(', ');
+      
+      prDescription += `\n\nCustomer Purchase Orders: ${cpoNumbers}`;
+      
+      // Add customer summary
+      const uniqueCustomers = Array.from(new Set(
+        confirmedCPOs
+          .filter(cpo => selectedCPOs.includes(cpo.id))
+          .map(cpo => cpo.customer?.customer_name)
+          .filter(Boolean)
+      ));
+      prDescription += `\nCustomers: ${uniqueCustomers.join(', ')}`;
+    }
     
     // Add BOM and size info
     if (selectedBom) {
@@ -269,20 +306,46 @@ const MaterialDemandPlanning = () => {
       prDescription += `\n\n${adjustments.additionalNotes}`;
     }
 
-    // Map to PR items format
-    const prItems = bomMaterialsWithShortage.map(item => ({
-      warehouse_item_id: undefined,
-      finished_good_id: undefined,
-      item_code: item.item_code,
-      item_name: item.item_name,
-      description: item.bom_info ? `BOM: ${item.bom_info.bom_number} - ${item.bom_info.product_name}` : '',
-      quantity: item.suggested_order,
-      unit_of_measure: item.unit_of_measure,
-      estimated_unit_price: item.supplier_info?.last_unit_cost || 0,
-      estimated_total_price: item.suggested_order * (item.supplier_info?.last_unit_cost || 0),
-      specifications: `Required: ${item.total_required}, Available: ${item.available_stock}, Shortage: ${item.shortage}`,
-      notes: `Lead time: ${item.lead_time_days} days. Supplier: ${item.supplier_info?.supplier_name || 'N/A'}.`,
-    }));
+    // Map to PR items format with CPO details
+    const prItems = bomMaterialsWithShortage.map(item => {
+      // Build CPO-aware description
+      let itemDescription = item.bom_info 
+        ? `BOM: ${item.bom_info.bom_number} - ${item.bom_info.product_name}` 
+        : '';
+      
+      // NEW: Add CPO breakdown if available
+      if (item.cpo_details && item.cpo_details.length > 0) {
+        itemDescription += itemDescription ? '\n' : '';
+        itemDescription += `CPO(s): ${item.cpo_details.map(cpo => cpo.cpo_number).join(', ')}`;
+      }
+      
+      // Build CPO-aware notes
+      let itemNotes = `Lead time: ${item.lead_time_days} days. Supplier: ${item.supplier_info?.supplier_name || 'N/A'}.`;
+      
+      // NEW: Add per-CPO quantity breakdown
+      if (item.cpo_details && item.cpo_details.length > 1) {
+        itemNotes += '\n\nQuantity breakdown by CPO:';
+        item.cpo_details.forEach(cpo => {
+          itemNotes += `\n- ${cpo.cpo_number} (${cpo.customer_name}): ${cpo.quantity_contributed.toFixed(2)} ${item.unit_of_measure}`;
+        });
+      } else if (item.cpo_details && item.cpo_details.length === 1) {
+        itemNotes += `\nCPO: ${item.cpo_details[0].cpo_number} (${item.cpo_details[0].customer_name})`;
+      }
+      
+      return {
+        warehouse_item_id: undefined,
+        finished_good_id: undefined,
+        item_code: item.item_code,
+        item_name: item.item_name,
+        description: itemDescription,
+        quantity: item.suggested_order,
+        unit_of_measure: item.unit_of_measure,
+        estimated_unit_price: item.supplier_info?.last_unit_cost || 0,
+        estimated_total_price: item.suggested_order * (item.supplier_info?.last_unit_cost || 0),
+        specifications: `Required: ${item.total_required}, Available: ${item.available_stock}, Shortage: ${item.shortage}`,
+        notes: itemNotes,
+      };
+    });
 
     // Create PR data
     const prData = {

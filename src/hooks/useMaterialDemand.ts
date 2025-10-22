@@ -1099,6 +1099,7 @@ export const useDemandCalculation = (companyId?: string) => {
         const db = new Date(b.delivery_date || b.po_date || b.created_at);
         return da.getTime() - db.getTime();
       });
+      
       for (const cpo of sortedCPOs) {
         console.log(`\n--- Processing CPO: ${cpo.cpo_number} ---`);
         
@@ -1247,10 +1248,25 @@ export const useDemandCalculation = (companyId?: string) => {
                     // Add component-level analysis (leaf material or no sub-BOM)
                     let existingResult = analysisResults.find(r => r.item_code === bomItem.item_code);
                     
+                    // NEW: Track CPO contribution for this material
+                    const cpoContribution = {
+                      cpo_id: cpo.id,
+                      cpo_number: cpo.cpo_number,
+                      customer_name: cpo.customer?.customer_name || 'Unknown Customer',
+                      quantity_contributed: materialRequired
+                    };
+                    
                     if (existingResult) {
                       existingResult.total_required += materialRequired;
                       existingResult.shortage = Math.max(0, existingResult.total_required - existingResult.available_stock);
                       existingResult.suggested_order = existingResult.shortage;
+                      
+                      // NEW: Merge CPO contribution
+                      if (!existingResult.cpo_details) {
+                        existingResult.cpo_details = [];
+                      }
+                      existingResult.cpo_details.push(cpoContribution);
+                      existingResult.total_cpos_involved = existingResult.cpo_details.length;
                     } else {
                       analysisResults.push({
                         item_code: bomItem.item_code || 'N/A',
@@ -1273,7 +1289,9 @@ export const useDemandCalculation = (companyId?: string) => {
                           product_code: primaryFg.product_code,
                           product_name: primaryFg.product_name,
                           current_stock: totalAvailableStock
-                        }
+                        },
+                        cpo_details: [cpoContribution],
+                        total_cpos_involved: 1
                       });
                     }
                   }
