@@ -24,6 +24,7 @@ import { CreatePoAmendmentDialog } from "@/components/procurement/CreatePoAmendm
 import { PoAmendmentsTab } from "@/components/procurement/PoAmendmentsTab";
 import { useCurrentUserRoles } from "@/hooks/useCurrentUserRoles";
 import { PoDocument } from "@/components/procurement/PoDocument";
+import { PoDocumentDreamTeam } from "@/components/procurement/PoDocumentDreamTeam";
 
 interface PoDetailsDialogProps {
   open: boolean;
@@ -780,7 +781,7 @@ export function PoDetailsDialog({ open, onOpenChange, purchaseOrder }: PoDetails
         {showPdfView && (
           <Dialog open={showPdfView} onOpenChange={setShowPdfView}>
             <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
-              <PoDocument 
+              <PoDocumentDreamTeam 
                 purchaseOrder={po} 
                 onClose={() => setShowPdfView(false)} 
               />

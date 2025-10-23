@@ -32,6 +32,14 @@ export interface PurchaseOrder {
   department_head_approved_by?: string;
   department_head_approved_date?: string;
   department_head_comments?: string;
+  delivery_address?: string;
+  branch?: string;
+  request_person?: string;
+  mrn_number?: string;
+  department?: string;
+  document_number?: string;
+  revision_number?: string;
+  revision_date?: string;
   items?: PoItem[];
   receipts?: PoReceipt[];
   approvals?: PoApproval[];
@@ -112,6 +120,8 @@ export interface PoItem {
   notes?: string;
   created_at?: string;
   updated_at?: string;
+  line_discount_amount?: number;
+  line_discount_percentage?: number;
 }
 
 export interface PoReceipt {
