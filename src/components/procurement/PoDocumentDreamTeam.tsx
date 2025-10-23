@@ -80,6 +80,13 @@ export function PoDocumentDreamTeam({ purchaseOrder, onClose }: PoDocumentDreamT
   };
 
   const po = purchaseOrder;
+  
+  // Company details with fallback
+  const companyInfo = po.company || selectedCompany;
+  const companyName = companyInfo?.name || 'DREAM TEAM MEDIA (PRIVATE) LIMITED';
+  const companyAddress = companyInfo?.address || '9th Floor, No. 10, Raymond Road, Nugegoda';
+  const companyLogoUrl = companyInfo?.logo_url;
+  
   const MIN_ROWS = 12;
   const displayItems = [...(po.items || [])];
   
@@ -484,15 +491,29 @@ export function PoDocumentDreamTeam({ purchaseOrder, onClose }: PoDocumentDreamT
           {/* Header */}
           <div className="dt-header">
             <div className="dt-brand">
-              <div className="dt-logo">LOGO</div>
+              <div className="dt-logo">
+                {companyLogoUrl ? (
+                  <img 
+                    src={companyLogoUrl} 
+                    alt={companyName} 
+                    style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
+                  />
+                ) : (
+                  'LOGO'
+                )}
+              </div>
               <div>
-                <h1>Dreamteam</h1>
-                <small>Creative • Media • Solutions</small>
+                <h1>{companyInfo?.code === 'DTM' ? 'Dreamteam' : companyName}</h1>
+                {companyInfo?.code === 'DTM' && <small>Creative • Media • Solutions</small>}
               </div>
             </div>
             <div className="dt-company">
-              <b>DREAM TEAM MEDIA (PRIVATE) LIMITED</b>
-              9<sup>th</sup> Floor, No. 10, Raymond Road, Nugegoda<br />
+              <b>{companyName.toUpperCase()}</b>
+              {companyAddress && (
+                <>
+                  {companyAddress}<br />
+                </>
+              )}
               077 771 6690 &nbsp; | &nbsp; <a href="mailto:hello@dreamteam.lk">hello@dreamteam.lk</a><br />
               <a href="https://www.dreamteam.lk">www.dreamteam.lk</a>
             </div>

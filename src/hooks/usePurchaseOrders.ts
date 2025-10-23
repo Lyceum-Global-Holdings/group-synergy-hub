@@ -25,7 +25,8 @@ export function usePurchaseOrders() {
           *,
           supplier:suppliers(name, email, phone),
           pr:purchase_requisitions(pr_number, title),
-          items:po_items(*)
+          items:po_items(*),
+          company:companies(id, name, code, address, logo_url)
         `)
         .order('created_at', { ascending: false });
 
@@ -61,6 +62,7 @@ export function usePurchaseOrder(id: string) {
           supplier:suppliers(name, email, phone),
           pr:purchase_requisitions(pr_number, title),
           items:po_items(*),
+          company:companies(id, name, code, address, logo_url),
           receipts:po_receipts(
             *,
             items:po_receipt_items(

@@ -5,6 +5,7 @@ export type QualityStatus = 'good' | 'damaged' | 'rejected';
 export interface PurchaseOrder {
   id: string;
   po_number: string;
+  company_id?: string;
   pr_id?: string;
   supplier_id: string;
   status: PoStatus;
@@ -70,6 +71,13 @@ export interface PurchaseOrder {
       quality_status: string;
     }>;
   }>;
+  company?: {
+    id: string;
+    name: string;
+    code: string;
+    address: string | null;
+    logo_url: string | null;
+  };
   supplier?: {
     name: string;
     email?: string;
