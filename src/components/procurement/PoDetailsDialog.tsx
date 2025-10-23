@@ -23,6 +23,7 @@ import { toast } from "@/hooks/use-toast";
 import { CreatePoAmendmentDialog } from "@/components/procurement/CreatePoAmendmentDialog";
 import { PoAmendmentsTab } from "@/components/procurement/PoAmendmentsTab";
 import { useCurrentUserRoles } from "@/hooks/useCurrentUserRoles";
+import { PoDocument } from "@/components/procurement/PoDocument";
 
 interface PoDetailsDialogProps {
   open: boolean;
@@ -59,6 +60,7 @@ const statusLabels: Record<PoStatus, string> = {
 export function PoDetailsDialog({ open, onOpenChange, purchaseOrder }: PoDetailsDialogProps) {
   const [comments, setComments] = useState("");
   const [showAmendmentDialog, setShowAmendmentDialog] = useState(false);
+  const [showPdfView, setShowPdfView] = useState(false);
   const [deptHeadEmail, setDeptHeadEmail] = useState("");
   
   // Fetch full PO details including GRNs
@@ -168,6 +170,10 @@ export function PoDetailsDialog({ open, onOpenChange, purchaseOrder }: PoDetails
               <Badge className={statusColors[po.status]}>
                 {statusLabels[po.status]}
               </Badge>
+              <Button size="sm" variant="outline" onClick={() => setShowPdfView(true)}>
+                <FileText className="h-4 w-4 mr-2" />
+                View/Download PDF
+              </Button>
               {canSubmitForApproval && (
                 <Button size="sm" onClick={handleSubmitForApproval} disabled={submitMerchandiserMutation.isPending}>
                   <Clock className="h-4 w-4 mr-2" />
@@ -769,6 +775,18 @@ export function PoDetailsDialog({ open, onOpenChange, purchaseOrder }: PoDetails
           onOpenChange={setShowAmendmentDialog}
           poId={po.id}
         />
+
+        {/* PDF View Dialog */}
+        {showPdfView && (
+          <Dialog open={showPdfView} onOpenChange={setShowPdfView}>
+            <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
+              <PoDocument 
+                purchaseOrder={po} 
+                onClose={() => setShowPdfView(false)} 
+              />
+            </DialogContent>
+          </Dialog>
+        )}
       </DialogContent>
     </Dialog>
   );
