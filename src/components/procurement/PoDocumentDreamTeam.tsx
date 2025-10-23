@@ -187,7 +187,7 @@ export function PoDocumentDreamTeam({ purchaseOrder, onClose }: PoDocumentDreamT
             position: relative;
             background: #fff;
             color: var(--text);
-            font-family: "Segoe UI", Roboto, Arial, sans-serif;
+            font-family: Calibri, "Segoe UI", Arial, sans-serif;
             font-size: 12px;
             line-height: 1.35;
           }
