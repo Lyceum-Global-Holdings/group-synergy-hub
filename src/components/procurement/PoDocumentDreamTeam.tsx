@@ -87,23 +87,8 @@ export function PoDocumentDreamTeam({ purchaseOrder, onClose }: PoDocumentDreamT
   const companyAddress = companyInfo?.address || '9th Floor, No. 10, Raymond Road, Nugegoda';
   const companyLogoUrl = companyInfo?.logo_url;
   
-  const MIN_ROWS = 12;
-  const displayItems = [...(po.items || [])];
-  
-  // Pad with empty rows to ensure minimum 12 rows
-  while (displayItems.length < MIN_ROWS) {
-    displayItems.push({
-      id: `blank-${displayItems.length}`,
-      po_id: po.id,
-      item_name: '',
-      quantity_ordered: 0,
-      quantity_received: 0,
-      quantity_pending: 0,
-      unit_price: 0,
-      total_price: 0,
-      unit_of_measure: '',
-    });
-  }
+  // Display only actual items from the PO
+  const displayItems = po.items || [];
 
   // Calculate totals
   const subtotal = po.total_amount || 0;
