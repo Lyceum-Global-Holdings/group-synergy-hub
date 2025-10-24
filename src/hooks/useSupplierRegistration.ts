@@ -179,51 +179,74 @@ export function useApproveRegistration() {
       // Create supplier from registration data with correct column mapping
       const supplierData = registration.supplier_data as Record<string, any>;
 
-      // Generate supplier code using atomic database function
-      const { data: codeResult, error: codeError } = await supabase
-        .rpc('generate_next_supplier_code', {
-          p_company_id: registration.company_id
-        });
+      // Generate and insert supplier with retry on duplicate code
+      let supplier: any = null;
+      let lastError: any = null;
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        const { data: codeResult, error: codeError } = await supabase
+          .rpc('generate_next_supplier_code', {
+            p_company_id: registration.company_id
+          });
 
-      if (codeError) throw new Error(`Failed to generate supplier code: ${codeError.message}`);
-      const supplierCode = codeResult as string;
+        if (codeError) {
+          lastError = codeError;
+          break;
+        }
+        const supplierCode = codeResult as string;
 
-      const { data: supplier, error: supplierError } = await supabase
-        .from('suppliers')
-        .insert({
-          supplier_code: supplierCode,
-          name: supplierData.supplier_name || supplierData.name || '',
-          legal_name: supplierData.supplier_name || supplierData.name || null,
-          email: supplierData.email || null,
-          phone: supplierData.phone || null,
-          tax_id: supplierData.tax_id || null,
-          supplier_type: supplierData.supplier_type || undefined,
-          category: supplierData.category || null,
-          material_type: supplierData.material_type || null,
-          website: supplierData.website || null,
-          registration_number: supplierData.registration_number || null,
-          address_line1: supplierData.street_address || null,
-          address_line2: null,
-          city: supplierData.city || null,
-          state: supplierData.state_province || null,
-          postal_code: supplierData.postal_code || null,
-          country: supplierData.country || null,
-          payment_terms: supplierData.payment_terms || null,
-          company_id: registration.company_id,
-          status: 'active',
-          created_by: user.data.user?.id || null,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        } as any)
-        .select()
-        .single();
+        const { data, error } = await supabase
+          .from('suppliers')
+          .insert({
+            supplier_code: supplierCode,
+            name: supplierData.supplier_name || supplierData.name || '',
+            legal_name: supplierData.supplier_name || supplierData.name || null,
+            email: supplierData.email || null,
+            phone: supplierData.phone || null,
+            tax_id: supplierData.tax_id || null,
+            supplier_type: supplierData.supplier_type || undefined,
+            category: supplierData.category || null,
+            material_type: supplierData.material_type || null,
+            website: supplierData.website || null,
+            registration_number: supplierData.registration_number || null,
+            address_line1: supplierData.street_address || null,
+            address_line2: null,
+            city: supplierData.city || null,
+            state: supplierData.state_province || null,
+            postal_code: supplierData.postal_code || null,
+            country: supplierData.country || null,
+            payment_terms: supplierData.payment_terms || null,
+            company_id: registration.company_id,
+            status: 'active',
+            created_by: user.data.user?.id || null,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          } as any)
+          .select()
+          .single();
 
-      if (supplierError) {
-        // Check if it's a duplicate key error
-        if (supplierError.code === '23505' && supplierError.message.includes('supplier_code')) {
+        if (!error) {
+          supplier = data;
+          break;
+        }
+
+        if (error.code === '23505' && String(error.message).includes('supplier_code')) {
+          // Retry on unique violation for supplier_code
+          if (attempt < 3) {
+            console.info(`Supplier code conflict on attempt ${attempt}, retrying...`);
+            continue;
+          }
+        }
+
+        lastError = error;
+        break;
+      }
+
+      if (!supplier) {
+        if (lastError?.code === '23505' && String(lastError.message).includes('supplier_code')) {
           throw new Error('Supplier code conflict detected. Please try again.');
         }
-        throw supplierError;
+        if (lastError) throw lastError;
+        throw new Error('Failed to create supplier');
       }
 
       // Create primary contact if provided
@@ -245,7 +268,6 @@ export function useApproveRegistration() {
         }
       }
       
-      if (supplierError) throw supplierError;
 
       // Update registration status
       const { error: updateError } = await supabase
