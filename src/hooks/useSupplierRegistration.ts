@@ -179,17 +179,14 @@ export function useApproveRegistration() {
       // Create supplier from registration data with correct column mapping
       const supplierData = registration.supplier_data as Record<string, any>;
 
-      // Generate supplier code (incremental based on last code)
-      const { data: existingSuppliers } = await supabase
-        .from('suppliers')
-        .select('supplier_code')
-        .eq('company_id', registration.company_id)
-        .order('created_at', { ascending: false })
-        .limit(1);
+      // Generate supplier code using atomic database function
+      const { data: codeResult, error: codeError } = await supabase
+        .rpc('generate_next_supplier_code', {
+          p_company_id: registration.company_id
+        });
 
-      const lastCode = existingSuppliers?.[0]?.supplier_code as string | undefined;
-      const nextNumber = lastCode ? parseInt(lastCode.replace(/\D/g, '')) + 1 : 1;
-      const supplierCode = `SUP${String(nextNumber).padStart(5, '0')}`;
+      if (codeError) throw new Error(`Failed to generate supplier code: ${codeError.message}`);
+      const supplierCode = codeResult as string;
 
       const { data: supplier, error: supplierError } = await supabase
         .from('suppliers')
@@ -221,7 +218,13 @@ export function useApproveRegistration() {
         .select()
         .single();
 
-      if (supplierError) throw supplierError;
+      if (supplierError) {
+        // Check if it's a duplicate key error
+        if (supplierError.code === '23505' && supplierError.message.includes('supplier_code')) {
+          throw new Error('Supplier code conflict detected. Please try again.');
+        }
+        throw supplierError;
+      }
 
       // Create primary contact if provided
       if (supplierData.primary_contact_name && supplierData.primary_contact_email) {

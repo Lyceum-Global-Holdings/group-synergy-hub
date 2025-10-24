@@ -10441,6 +10441,10 @@ export type Database = {
       generate_min_number: { Args: never; Returns: string }
       generate_mr_number: { Args: never; Returns: string }
       generate_mrn_number: { Args: never; Returns: string }
+      generate_next_supplier_code: {
+        Args: { p_company_id: string }
+        Returns: string
+      }
       generate_pick_list_number: { Args: never; Returns: string }
       generate_po_amendment_number: { Args: never; Returns: string }
       generate_po_number: { Args: never; Returns: string }
