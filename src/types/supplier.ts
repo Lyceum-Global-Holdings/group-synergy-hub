@@ -47,6 +47,7 @@ export interface CreateSupplierData {
   name: string;
   legal_name?: string;
   supplier_type: 'vendor' | 'service_provider' | 'contractor' | 'manufacturer';
+  status?: 'active' | 'inactive' | 'suspended' | 'blacklisted';
   category?: string;
   material_type?: string;
   measurement_type?: string;

@@ -15,6 +15,7 @@ import { useDeleteSupplierContact } from '@/hooks/useSuppliers';
 import type { Supplier, SupplierContact } from '@/types/supplier';
 import { SUPPLIER_TYPES, SUPPLIER_STATUSES, SUPPLIER_CATEGORIES, PAYMENT_TERMS } from '@/types/supplier';
 import { SupplierItemsSection } from './SupplierItemsSection';
+import { CreateSupplierDialog } from './CreateSupplierDialog';
 
 interface SupplierDetailsDialogProps {
   supplier: Supplier;
@@ -28,6 +29,7 @@ export const SupplierDetailsDialog: React.FC<SupplierDetailsDialogProps> = ({
   onOpenChange,
 }) => {
   const [contactToDelete, setContactToDelete] = useState<SupplierContact | null>(null);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const deleteContactMutation = useDeleteSupplierContact();
 
   const getStatusColor = (status: string) => {
@@ -108,7 +110,7 @@ export const SupplierDetailsDialog: React.FC<SupplierDetailsDialogProps> = ({
                   </div>
                 </div>
               </div>
-              <Button variant="outline">
+              <Button variant="outline" onClick={() => setIsEditDialogOpen(true)}>
                 <Edit className="w-4 h-4 mr-2" />
                 Edit
               </Button>
@@ -435,6 +437,18 @@ export const SupplierDetailsDialog: React.FC<SupplierDetailsDialogProps> = ({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <CreateSupplierDialog
+        open={isEditDialogOpen}
+        onOpenChange={(open) => {
+          setIsEditDialogOpen(open);
+          if (!open) {
+            onOpenChange(false);
+          }
+        }}
+        supplier={supplier}
+        mode="edit"
+      />
     </>
   );
 };

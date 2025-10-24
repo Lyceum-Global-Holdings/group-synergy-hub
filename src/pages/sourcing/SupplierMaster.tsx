@@ -26,6 +26,7 @@ export const SupplierMaster: React.FC = () => {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null);
   const [supplierToDelete, setSupplierToDelete] = useState<Supplier | null>(null);
+  const [supplierToEdit, setSupplierToEdit] = useState<Supplier | null>(null);
 
   const { data: suppliers, isLoading, error } = useSuppliers();
   const { data: analytics } = useSupplierAnalytics();
@@ -435,6 +436,14 @@ export const SupplierMaster: React.FC = () => {
                             <DropdownMenuItem
                               onClick={(e) => {
                                 e.stopPropagation();
+                                setSupplierToEdit(supplier);
+                              }}
+                            >
+                              Edit
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={(e) => {
+                                e.stopPropagation();
                                 setSupplierToDelete(supplier);
                               }}
                               className="text-destructive"
@@ -488,6 +497,16 @@ export const SupplierMaster: React.FC = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Edit Supplier Dialog */}
+      {supplierToEdit && (
+        <CreateSupplierDialog
+          open={!!supplierToEdit}
+          onOpenChange={(open) => !open && setSupplierToEdit(null)}
+          supplier={supplierToEdit}
+          mode="edit"
+        />
+      )}
     </div>
   );
 };

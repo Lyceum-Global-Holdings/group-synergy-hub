@@ -129,12 +129,26 @@ export const useUpdateSupplier = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (supplierData: UpdateSupplierData): Promise<Supplier> => {
-      const { id, ...updateData } = supplierData;
+    mutationFn: async ({ 
+      updateData, 
+      contacts 
+    }: { 
+      updateData: UpdateSupplierData; 
+      contacts?: Array<{
+        name: string;
+        title?: string;
+        email?: string;
+        phone?: string;
+        mobile?: string;
+        is_primary: boolean;
+      }>;
+    }): Promise<Supplier> => {
+      const { id, ...data } = updateData;
 
-      const { data, error } = await supabase
+      // Update supplier basic info
+      const { data: supplier, error } = await supabase
         .from('suppliers')
-        .update(updateData)
+        .update(data)
         .eq('id', id)
         .select()
         .single();
@@ -144,7 +158,47 @@ export const useUpdateSupplier = () => {
         throw new Error(error.message);
       }
 
-      return data as Supplier;
+      // Handle contacts if provided
+      if (contacts) {
+        // Get existing contacts
+        const { data: existingContacts } = await supabase
+          .from('supplier_contacts')
+          .select('*')
+          .eq('supplier_id', id);
+
+        const existingIds = existingContacts?.map(c => c.id) || [];
+        
+        // Delete contacts that are no longer in the list
+        if (existingContacts && existingContacts.length > 0) {
+          const { error: deleteError } = await supabase
+            .from('supplier_contacts')
+            .delete()
+            .eq('supplier_id', id);
+
+          if (deleteError) {
+            console.error('Error deleting old contacts:', deleteError);
+          }
+        }
+
+        // Insert all contacts
+        if (contacts.length > 0) {
+          const contactsToInsert = contacts.map(contact => ({
+            ...contact,
+            supplier_id: id,
+          }));
+
+          const { error: contactsError } = await supabase
+            .from('supplier_contacts')
+            .insert(contactsToInsert);
+
+          if (contactsError) {
+            console.error('Error updating contacts:', contactsError);
+            toast.error('Supplier updated but failed to update contacts');
+          }
+        }
+      }
+
+      return supplier as Supplier;
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['suppliers'] });

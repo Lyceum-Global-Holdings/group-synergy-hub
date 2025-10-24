@@ -12,14 +12,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
 import { Checkbox } from '@/components/ui/checkbox';
-import { useCreateSupplier } from '@/hooks/useSuppliers';
+import { useCreateSupplier, useUpdateSupplier } from '@/hooks/useSuppliers';
 import type { Supplier, SupplierContact, CreateSupplierData, UpdateSupplierData } from '@/types/supplier';
-import { SUPPLIER_TYPES, SUPPLIER_CATEGORIES, PAYMENT_TERMS, MATERIAL_TYPES, MEASUREMENT_TYPES } from '@/types/supplier';
+import { SUPPLIER_TYPES, SUPPLIER_STATUSES, SUPPLIER_CATEGORIES, PAYMENT_TERMS, MATERIAL_TYPES, MEASUREMENT_TYPES } from '@/types/supplier';
 
 const supplierSchema = z.object({
   name: z.string().min(1, 'Supplier name is required'),
   legal_name: z.string().optional(),
   supplier_type: z.enum(['vendor', 'service_provider', 'contractor', 'manufacturer']),
+  status: z.enum(['active', 'inactive', 'suspended', 'blacklisted']).optional(),
   category: z.string().optional(),
   material_type: z.string().optional(),
   measurement_type: z.string().optional(),
@@ -56,21 +57,61 @@ type SupplierFormData = z.infer<typeof supplierSchema>;
 interface CreateSupplierDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  supplier?: Supplier;
+  mode?: 'create' | 'edit';
 }
 
 export const CreateSupplierDialog: React.FC<CreateSupplierDialogProps> = ({
   open,
   onOpenChange,
+  supplier,
+  mode = 'create',
 }) => {
   const [activeTab, setActiveTab] = useState('basic');
   const createSupplierMutation = useCreateSupplier();
+  const updateSupplierMutation = useUpdateSupplier();
+  
+  const isEditMode = mode === 'edit' && supplier;
 
   const form = useForm<SupplierFormData>({
     resolver: zodResolver(supplierSchema),
-    defaultValues: {
+    defaultValues: isEditMode ? {
+      name: supplier.name,
+      legal_name: supplier.legal_name || '',
+      supplier_type: supplier.supplier_type,
+      status: supplier.status || 'active',
+      category: supplier.category || '',
+      material_type: supplier.material_type || '',
+      measurement_type: supplier.measurement_type || '',
+      email: supplier.email || '',
+      phone: supplier.phone || '',
+      website: supplier.website || '',
+      tax_id: supplier.tax_id || '',
+      registration_number: supplier.registration_number || '',
+      address_line1: supplier.address_line1 || '',
+      address_line2: supplier.address_line2 || '',
+      city: supplier.city || '',
+      state: supplier.state || '',
+      postal_code: supplier.postal_code || '',
+      country: supplier.country || '',
+      payment_terms: supplier.payment_terms || '',
+      credit_limit: supplier.credit_limit?.toString() || '',
+      currency: supplier.currency || 'LKR',
+      rating: supplier.rating?.toString() || '',
+      notes: supplier.notes || '',
+      contacts: supplier.contacts?.map(c => ({
+        name: c.name,
+        title: c.title || '',
+        email: c.email || '',
+        phone: c.phone || '',
+        mobile: c.mobile || '',
+        is_primary: c.is_primary || false,
+      })) || [],
+    } : {
       name: '',
       legal_name: '',
       supplier_type: 'vendor',
+      status: 'active',
       category: '',
       material_type: '',
       measurement_type: '',
@@ -100,46 +141,92 @@ export const CreateSupplierDialog: React.FC<CreateSupplierDialogProps> = ({
   });
 
   const onSubmit = (data: SupplierFormData) => {
-    const submitData: CreateSupplierData = {
-      name: data.name,
-      legal_name: data.legal_name,
-      supplier_type: data.supplier_type,
-      category: data.category,
-      material_type: data.material_type,
-      measurement_type: data.measurement_type,
-      email: data.email,
-      phone: data.phone,
-      website: data.website,
-      tax_id: data.tax_id,
-      registration_number: data.registration_number,
-      address_line1: data.address_line1,
-      address_line2: data.address_line2,
-      city: data.city,
-      state: data.state,
-      postal_code: data.postal_code,
-      country: data.country,
-      payment_terms: data.payment_terms,
-      credit_limit: data.credit_limit ? parseFloat(data.credit_limit) : undefined,
-      currency: data.currency,
-      rating: data.rating ? parseFloat(data.rating) : undefined,
-      notes: data.notes,
-      contacts: data.contacts?.filter(contact => contact.name.trim() !== '').map(contact => ({
+    if (isEditMode) {
+      const updateData: UpdateSupplierData = {
+        id: supplier.id,
+        name: data.name,
+        legal_name: data.legal_name,
+        supplier_type: data.supplier_type,
+        status: data.status,
+        category: data.category,
+        material_type: data.material_type,
+        measurement_type: data.measurement_type,
+        email: data.email,
+        phone: data.phone,
+        website: data.website,
+        tax_id: data.tax_id,
+        registration_number: data.registration_number,
+        address_line1: data.address_line1,
+        address_line2: data.address_line2,
+        city: data.city,
+        state: data.state,
+        postal_code: data.postal_code,
+        country: data.country,
+        payment_terms: data.payment_terms,
+        credit_limit: data.credit_limit ? parseFloat(data.credit_limit) : undefined,
+        currency: data.currency,
+        rating: data.rating ? parseFloat(data.rating) : undefined,
+        notes: data.notes,
+      };
+
+      const contacts = data.contacts?.filter(contact => contact.name.trim() !== '').map(contact => ({
         name: contact.name,
         title: contact.title || undefined,
         email: contact.email || undefined,
         phone: contact.phone || undefined,
         mobile: contact.mobile || undefined,
         is_primary: contact.is_primary,
-      })),
-    };
+      }));
 
-    createSupplierMutation.mutate(submitData, {
-      onSuccess: () => {
-        form.reset();
-        setActiveTab('basic');
-        onOpenChange(false);
-      },
-    });
+      updateSupplierMutation.mutate({ updateData, contacts }, {
+        onSuccess: () => {
+          form.reset();
+          setActiveTab('basic');
+          onOpenChange(false);
+        },
+      });
+    } else {
+      const submitData: CreateSupplierData = {
+        name: data.name,
+        legal_name: data.legal_name,
+        supplier_type: data.supplier_type,
+        category: data.category,
+        material_type: data.material_type,
+        measurement_type: data.measurement_type,
+        email: data.email,
+        phone: data.phone,
+        website: data.website,
+        tax_id: data.tax_id,
+        registration_number: data.registration_number,
+        address_line1: data.address_line1,
+        address_line2: data.address_line2,
+        city: data.city,
+        state: data.state,
+        postal_code: data.postal_code,
+        country: data.country,
+        payment_terms: data.payment_terms,
+        credit_limit: data.credit_limit ? parseFloat(data.credit_limit) : undefined,
+        currency: data.currency,
+        rating: data.rating ? parseFloat(data.rating) : undefined,
+        notes: data.notes,
+        contacts: data.contacts?.filter(contact => contact.name.trim() !== '').map(contact => ({
+          name: contact.name,
+          title: contact.title || undefined,
+          email: contact.email || undefined,
+          phone: contact.phone || undefined,
+          mobile: contact.mobile || undefined,
+          is_primary: contact.is_primary,
+        })),
+      };
+
+      createSupplierMutation.mutate(submitData, {
+        onSuccess: () => {
+          form.reset();
+          setActiveTab('basic');
+          onOpenChange(false);
+        },
+      });
+    }
   };
 
   const addContact = () => {
@@ -159,10 +246,12 @@ export const CreateSupplierDialog: React.FC<CreateSupplierDialogProps> = ({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Building2 className="w-5 h-5" />
-            Add New Supplier
+            {isEditMode ? 'Edit Supplier' : 'Add New Supplier'}
           </DialogTitle>
           <DialogDescription>
-            Create a new supplier profile with contact information and business details.
+            {isEditMode 
+              ? 'Update supplier information and manage contacts.' 
+              : 'Create a new supplier profile with contact information and business details.'}
           </DialogDescription>
         </DialogHeader>
 
@@ -230,6 +319,33 @@ export const CreateSupplierDialog: React.FC<CreateSupplierDialogProps> = ({
                       </FormItem>
                     )}
                   />
+
+                  {isEditMode && (
+                    <FormField
+                      control={form.control}
+                      name="status"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Status</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value}>
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select status" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {SUPPLIER_STATUSES.map((status) => (
+                                <SelectItem key={status.value} value={status.value}>
+                                  {status.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  )}
 
                   <FormField
                     control={form.control}
@@ -722,8 +838,14 @@ export const CreateSupplierDialog: React.FC<CreateSupplierDialogProps> = ({
               >
                 Cancel
               </Button>
-              <Button type="submit" disabled={createSupplierMutation.isPending}>
-                {createSupplierMutation.isPending ? 'Creating...' : 'Create Supplier'}
+              <Button 
+                type="submit" 
+                disabled={createSupplierMutation.isPending || updateSupplierMutation.isPending}
+              >
+                {isEditMode 
+                  ? (updateSupplierMutation.isPending ? 'Updating...' : 'Update Supplier')
+                  : (createSupplierMutation.isPending ? 'Creating...' : 'Create Supplier')
+                }
               </Button>
             </DialogFooter>
           </form>
