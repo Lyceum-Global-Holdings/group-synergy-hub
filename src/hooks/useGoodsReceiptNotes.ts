@@ -120,26 +120,47 @@ export const useCreateGoodsReceiptNote = () => {
 
       if (grnError) throw grnError;
 
-      // Create GRN items
-      const itemsToInsert = data.items.map(item => ({
-        grn_id: grn.id,
-        po_item_id: item.po_item_id,
-        warehouse_item_id: item.warehouse_item_id,
-        item_code: item.item_code,
-        item_name: item.item_name,
-        description: item.description,
-        unit_of_measure: item.unit_of_measure,
-        quantity_ordered: item.quantity_ordered,
-        quantity_received: item.quantity_received,
-        unit_price: item.unit_price,
-        total_cost: item.total_cost,
-        quality_status: item.quality_status,
-        remarks: item.remarks,
-      }));
+      // Look up warehouse_item_id for items that have item_code but no warehouse_item_id
+      const enrichedItems = await Promise.all(
+        data.items.map(async (item) => {
+          let warehouseItemId = item.warehouse_item_id;
+          
+          // If no warehouse_item_id but has item_code, look it up
+          if (!warehouseItemId && item.item_code) {
+            const { data: warehouseItem } = await supabase
+              .from('warehouse_items')
+              .select('id')
+              .eq('item_code', item.item_code)
+              .or(`company_id.eq.${data.company_id},company_id.is.null`)
+              .limit(1)
+              .maybeSingle();
+            
+            if (warehouseItem) {
+              warehouseItemId = warehouseItem.id;
+            }
+          }
+          
+          return {
+            grn_id: grn.id,
+            po_item_id: item.po_item_id,
+            warehouse_item_id: warehouseItemId,
+            item_code: item.item_code,
+            item_name: item.item_name,
+            description: item.description,
+            unit_of_measure: item.unit_of_measure,
+            quantity_ordered: item.quantity_ordered,
+            quantity_received: item.quantity_received,
+            unit_price: item.unit_price,
+            total_cost: item.total_cost,
+            quality_status: item.quality_status,
+            remarks: item.remarks,
+          };
+        })
+      );
 
       const { error: itemsError } = await supabase
         .from('grn_items')
-        .insert(itemsToInsert);
+        .insert(enrichedItems);
 
       if (itemsError) throw itemsError;
 
@@ -149,6 +170,8 @@ export const useCreateGoodsReceiptNote = () => {
       queryClient.invalidateQueries({ queryKey: ['goods-receipt-notes'] });
       queryClient.invalidateQueries({ queryKey: ['grn-summary'] });
       queryClient.invalidateQueries({ queryKey: ['purchase-orders'] });
+      queryClient.invalidateQueries({ queryKey: ['warehouse-items'] });
+      queryClient.invalidateQueries({ queryKey: ['stock-transactions'] });
       toast({
         title: 'Success',
         description: 'Goods Receipt Note created successfully',
@@ -258,9 +281,11 @@ export const useApproveGoodsReceiptNote = () => {
       queryClient.invalidateQueries({ queryKey: ['goods-receipt-notes'] });
       queryClient.invalidateQueries({ queryKey: ['goods-receipt-note'] });
       queryClient.invalidateQueries({ queryKey: ['grn-summary'] });
+      queryClient.invalidateQueries({ queryKey: ['warehouse-items'] });
+      queryClient.invalidateQueries({ queryKey: ['stock-transactions'] });
       toast({
         title: 'Success',
-        description: 'GRN approved successfully',
+        description: 'GRN approved successfully. Stock has been updated.',
       });
     },
     onError: (error: Error) => {
