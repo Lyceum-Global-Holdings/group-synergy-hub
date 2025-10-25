@@ -483,7 +483,18 @@ export function PoDocumentDreamTeam({ purchaseOrder, onClose }: PoDocumentDreamT
                     style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
                   />
                 ) : (
-                  'LOGO'
+                  <div style={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'center',
+                    fontSize: '18px',
+                    fontWeight: '700',
+                    color: 'var(--accent)',
+                    textAlign: 'center',
+                    padding: '4px'
+                  }}>
+                    {companyInfo?.code || companyName.split(' ').map(word => word[0]).join('').substring(0, 3).toUpperCase()}
+                  </div>
                 )}
               </div>
               <div>
