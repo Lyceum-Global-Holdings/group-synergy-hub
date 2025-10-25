@@ -487,7 +487,6 @@ export function PoDocumentDreamTeam({ purchaseOrder, onClose }: PoDocumentDreamT
                 )}
               </div>
               <div>
-                <h1>{companyInfo?.code === 'DTM' ? 'Dreamteam' : companyName}</h1>
                 {companyInfo?.code === 'DTM' && <small>Creative • Media • Solutions</small>}
               </div>
             </div>
