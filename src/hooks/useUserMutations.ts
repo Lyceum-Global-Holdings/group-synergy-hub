@@ -7,6 +7,18 @@ export const useDeleteUser = () => {
 
   return useMutation({
     mutationFn: async (userId: string) => {
+      // Verify super admin status first
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+      
+      const { data: isSuperAdmin, error: checkError } = await supabase
+        .rpc('is_super_admin', { _user_id: user.id });
+      
+      if (checkError) throw checkError;
+      if (!isSuperAdmin) {
+        throw new Error('Only super administrators can delete users');
+      }
+
       // First delete user roles
       const { error: rolesError } = await supabase
         .from('user_roles')
