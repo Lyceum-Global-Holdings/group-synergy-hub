@@ -256,17 +256,16 @@ export function PoDocumentDreamTeam({ purchaseOrder, onClose }: PoDocumentDreamT
           }
 
           .dt-po-no {
-            position: absolute;
-            right: 14mm;
-            top: 20mm;
-            text-align: right;
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 8px;
+            margin-bottom: 6mm;
           }
 
           .dt-po-no label {
             font-size: 11px;
             color: var(--muted);
-            display: block;
-            margin-bottom: 3px;
           }
 
           .dt-po-no .box {
@@ -504,12 +503,14 @@ export function PoDocumentDreamTeam({ purchaseOrder, onClose }: PoDocumentDreamT
             </div>
           </div>
 
-          {/* Title and PO Number */}
-          <div className="dt-po-title">PURCHASE ORDER</div>
+          {/* PO Number */}
           <div className="dt-po-no">
             <label>PO No.</label>
             <div className="box">{po.po_number}</div>
           </div>
+
+          {/* Title */}
+          <div className="dt-po-title">PURCHASE ORDER</div>
 
           {/* Two-column details */}
           <div className="dt-details">
