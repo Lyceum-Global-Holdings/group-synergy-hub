@@ -192,7 +192,7 @@ export function CompanyAllocationSection({
                       <div className="grid gap-2">
                         <Label>Payment Terms</Label>
                         <Select
-                          value={settings.payment_terms || ''}
+                          value={settings.payment_terms || undefined}
                           onValueChange={(value) =>
                             updateSetting(allocation.company_id, 'payment_terms', value || undefined)
                           }
@@ -201,7 +201,6 @@ export function CompanyAllocationSection({
                             <SelectValue placeholder="Inherit from supplier" />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="">Inherit from supplier</SelectItem>
                             {PAYMENT_TERMS.map((term) => (
                               <SelectItem key={term.value} value={term.value}>
                                 {term.label}
@@ -309,7 +308,7 @@ export function CompanyAllocationSection({
                       <div className="grid gap-2">
                         <Label>Payment Terms</Label>
                         <Select
-                          value={settings.payment_terms || ''}
+                          value={settings.payment_terms || undefined}
                           onValueChange={(value) =>
                             updateSetting(company.id, 'payment_terms', value || undefined)
                           }
@@ -318,7 +317,6 @@ export function CompanyAllocationSection({
                             <SelectValue placeholder="Inherit from supplier" />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="">Inherit from supplier</SelectItem>
                             {PAYMENT_TERMS.map((term) => (
                               <SelectItem key={term.value} value={term.value}>
                                 {term.label}
