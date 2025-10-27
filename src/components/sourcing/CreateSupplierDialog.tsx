@@ -16,8 +16,9 @@ import { useCreateSupplier, useUpdateSupplier } from '@/hooks/useSuppliers';
 import type { Supplier, SupplierContact, CreateSupplierData, UpdateSupplierData } from '@/types/supplier';
 import { SUPPLIER_TYPES, SUPPLIER_STATUSES, SUPPLIER_CATEGORIES, PAYMENT_TERMS, MATERIAL_TYPES, MEASUREMENT_TYPES } from '@/types/supplier';
 import { CompanyAllocationSection, type AllocationSettings } from './CompanyAllocationSection';
-import { useBulkAllocateSupplier, useUpdateBulkAllocations } from '@/hooks/useCompanySuppliers';
+import { useBulkAllocateSupplier, useUpdateBulkAllocations, useCompanySuppliers } from '@/hooks/useCompanySuppliers';
 import { useSuperAdmin } from '@/hooks/useSuperAdmin';
+import { toast } from 'sonner';
 
 const supplierSchema = z.object({
   name: z.string().min(1, 'Supplier name is required'),
@@ -82,6 +83,9 @@ export const CreateSupplierDialog: React.FC<CreateSupplierDialogProps> = ({
   // Company allocation state
   const [selectedCompanyIds, setSelectedCompanyIds] = useState<string[]>([]);
   const [allocationSettings, setAllocationSettings] = useState<Map<string, AllocationSettings>>(new Map());
+
+  // Fetch existing allocations in edit mode
+  const { data: existingAllocationsData } = useCompanySuppliers(supplier?.id);
 
   const form = useForm<SupplierFormData>({
     resolver: zodResolver(supplierSchema),
@@ -197,12 +201,22 @@ export const CreateSupplierDialog: React.FC<CreateSupplierDialogProps> = ({
 
         await updateSupplierMutation.mutateAsync({ updateData, contacts });
 
+        // Validation: prevent removing all allocations
+        if (selectedCompanyIds.length === 0) {
+          toast.error('Supplier must be allocated to at least one company');
+          return;
+        }
+
         // Handle company allocations changes
-        const existingAllocations = Array.from(allocationSettings.entries())
-          .filter(([_, settings]) => settings.existing_id);
+        // Get existing allocation IDs from the fetched data
+        const existingAllocationIds = (existingAllocationsData || []).map(a => a.company_id);
         
+        // New allocations: selected companies that don't have existing_id
         const allocationsToAdd = selectedCompanyIds
-          .filter(companyId => !allocationSettings.get(companyId)?.existing_id)
+          .filter(companyId => {
+            const settings = allocationSettings.get(companyId);
+            return !settings?.existing_id; // Only new allocations
+          })
           .map(companyId => {
             const settings = allocationSettings.get(companyId)!;
             return {
@@ -215,20 +229,36 @@ export const CreateSupplierDialog: React.FC<CreateSupplierDialogProps> = ({
             };
           });
 
-        const allocationsToUpdate = existingAllocations
-          .filter(([companyId]) => selectedCompanyIds.includes(companyId))
-          .map(([companyId, settings]) => ({
-            id: settings.existing_id!,
-            company_id: companyId,
-            is_preferred: settings.is_preferred,
-            payment_terms: settings.payment_terms,
-            credit_limit: settings.credit_limit,
-            notes: settings.notes,
-          }));
+        // Updated allocations: selected companies that have existing_id
+        const allocationsToUpdate = selectedCompanyIds
+          .filter(companyId => {
+            const settings = allocationSettings.get(companyId);
+            return !!settings?.existing_id; // Only existing allocations
+          })
+          .map(companyId => {
+            const settings = allocationSettings.get(companyId)!;
+            return {
+              id: settings.existing_id!,
+              company_id: companyId,
+              is_preferred: settings.is_preferred,
+              payment_terms: settings.payment_terms,
+              credit_limit: settings.credit_limit,
+              notes: settings.notes,
+            };
+          });
 
-        const allocationsToRemove = existingAllocations
-          .filter(([companyId]) => !selectedCompanyIds.includes(companyId))
-          .map(([_, settings]) => settings.existing_id!);
+        // Removed allocations: existing allocations not in selected list
+        const allocationsToRemove = (existingAllocationsData || [])
+          .filter(existing => !selectedCompanyIds.includes(existing.company_id))
+          .map(a => a.id);
+
+        console.log('Allocation update payload:', {
+          allocationsToAdd,
+          allocationsToUpdate,
+          allocationsToRemove,
+          selectedCompanyIds,
+          allocationSettings: Array.from(allocationSettings.entries()),
+        });
 
         if (allocationsToAdd.length > 0 || allocationsToUpdate.length > 0 || allocationsToRemove.length > 0) {
           await updateBulkAllocations.mutateAsync({

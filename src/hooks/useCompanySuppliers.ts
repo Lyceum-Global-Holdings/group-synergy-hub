@@ -320,12 +320,21 @@ export function useUpdateBulkAllocations() {
       // Update existing allocations
       if (data.allocations_to_update && data.allocations_to_update.length > 0) {
         for (const allocation of data.allocations_to_update) {
-          const updateData: any = {
-            is_preferred: allocation.is_preferred,
-            payment_terms: allocation.payment_terms,
-            credit_limit: allocation.credit_limit,
-            notes: allocation.notes,
-          };
+          const updateData: any = {};
+
+          // Only include defined values in the update
+          if (allocation.is_preferred !== undefined) {
+            updateData.is_preferred = allocation.is_preferred;
+          }
+          if (allocation.payment_terms !== undefined) {
+            updateData.payment_terms = allocation.payment_terms || null;
+          }
+          if (allocation.credit_limit !== undefined) {
+            updateData.credit_limit = allocation.credit_limit || null;
+          }
+          if (allocation.notes !== undefined) {
+            updateData.notes = allocation.notes || null;
+          }
 
           if (allocation.status) {
             updateData.status = allocation.status;

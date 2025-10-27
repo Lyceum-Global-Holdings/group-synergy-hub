@@ -43,10 +43,11 @@ export function CompanyAllocationSection({
   const { data: isSuperAdmin } = useSuperAdmin();
   const { data: existingAllocations } = useCompanySuppliers(supplierId);
   const [autoApproveAll, setAutoApproveAll] = useState(false);
+  const [isInitialized, setIsInitialized] = useState(false);
 
-  // Load existing allocations in edit mode
+  // Load existing allocations in edit mode - only once
   useEffect(() => {
-    if (mode === 'edit' && existingAllocations && existingAllocations.length > 0) {
+    if (mode === 'edit' && existingAllocations && existingAllocations.length > 0 && !isInitialized) {
       const newSettings = new Map<string, AllocationSettings>();
       const selectedIds: string[] = [];
 
@@ -65,8 +66,9 @@ export function CompanyAllocationSection({
 
       onCompanySelectionChange(selectedIds);
       onAllocationSettingsChange(newSettings);
+      setIsInitialized(true);
     }
-  }, [mode, existingAllocations]);
+  }, [mode, existingAllocations, isInitialized]);
 
   const handleCompanyToggle = (companyId: string, checked: boolean) => {
     const newSelectedIds = checked
