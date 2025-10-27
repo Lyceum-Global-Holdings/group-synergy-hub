@@ -2136,6 +2136,89 @@ export type Database = {
           },
         ]
       }
+      company_suppliers: {
+        Row: {
+          allocated_at: string | null
+          allocated_by: string | null
+          allocation_type: string | null
+          approved_at: string | null
+          approved_by: string | null
+          company_id: string
+          created_at: string | null
+          credit_limit: number | null
+          id: string
+          is_preferred: boolean | null
+          notes: string | null
+          payment_terms: string | null
+          status: string
+          supplier_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          allocated_at?: string | null
+          allocated_by?: string | null
+          allocation_type?: string | null
+          approved_at?: string | null
+          approved_by?: string | null
+          company_id: string
+          created_at?: string | null
+          credit_limit?: number | null
+          id?: string
+          is_preferred?: boolean | null
+          notes?: string | null
+          payment_terms?: string | null
+          status?: string
+          supplier_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          allocated_at?: string | null
+          allocated_by?: string | null
+          allocation_type?: string | null
+          approved_at?: string | null
+          approved_by?: string | null
+          company_id?: string
+          created_at?: string | null
+          credit_limit?: number | null
+          id?: string
+          is_preferred?: boolean | null
+          notes?: string | null
+          payment_terms?: string | null
+          status?: string
+          supplier_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "company_suppliers_allocated_by_fkey"
+            columns: ["allocated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "company_suppliers_approved_by_fkey"
+            columns: ["approved_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "company_suppliers_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "company_suppliers_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       contract_amendments: {
         Row: {
           amendment_date: string
@@ -10383,6 +10466,10 @@ export type Database = {
         Args: { p_supplier_id: string }
         Returns: number
       }
+      can_access_company: {
+        Args: { target_company_id: string }
+        Returns: boolean
+      }
       check_duplicate_supplier: {
         Args: {
           p_email?: string
@@ -10476,6 +10563,18 @@ export type Database = {
           title: string
           type: string
           view_url: string
+        }[]
+      }
+      get_company_approved_suppliers: {
+        Args: { target_company_id: string }
+        Returns: {
+          credit_limit: number
+          is_preferred: boolean
+          payment_terms: string
+          supplier_code: string
+          supplier_id: string
+          supplier_name: string
+          supplier_type: string
         }[]
       }
       get_company_approvers: {

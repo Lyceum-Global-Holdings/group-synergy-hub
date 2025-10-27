@@ -2,36 +2,62 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCompany } from '@/contexts/CompanyContext';
+import { useSuperAdmin } from '@/hooks/useSuperAdmin';
 import { toast } from 'sonner';
 import type { Supplier, SupplierContact, CreateSupplierData, UpdateSupplierData } from '@/types/supplier';
 
 // Fetch all suppliers
 export const useSuppliers = () => {
   const { selectedCompany, isViewingAllCompanies } = useCompany();
+  const { data: isSuperAdmin } = useSuperAdmin();
   
   return useQuery({
     queryKey: ['suppliers', selectedCompany?.id, isViewingAllCompanies],
     queryFn: async (): Promise<Supplier[]> => {
-      let query = supabase
-        .from('suppliers')
-        .select(`
-          *,
-          contacts:supplier_contacts(*)
-        `);
+      // Super admins viewing all companies see ALL suppliers
+      if (isViewingAllCompanies && isSuperAdmin) {
+        const { data, error } = await supabase
+          .from('suppliers')
+          .select(`
+            *,
+            contacts:supplier_contacts(*)
+          `)
+          .order('created_at', { ascending: false });
 
-      // Filter by company if not viewing all companies
-      if (!isViewingAllCompanies && selectedCompany?.id) {
-        query = query.eq('company_id', selectedCompany.id);
+        if (error) {
+          console.error('Error fetching suppliers:', error);
+          throw new Error(error.message);
+        }
+
+        return (data || []) as Supplier[];
       }
 
-      const { data, error } = await query.order('created_at', { ascending: false });
+      // Regular users and admins see only APPROVED suppliers for their company
+      if (selectedCompany?.id) {
+        const { data, error } = await supabase
+          .from('company_suppliers')
+          .select(`
+            supplier:suppliers(
+              *,
+              contacts:supplier_contacts(*)
+            )
+          `)
+          .eq('company_id', selectedCompany.id)
+          .eq('status', 'approved')
+          .order('is_preferred', { ascending: false });
 
-      if (error) {
-        console.error('Error fetching suppliers:', error);
-        throw new Error(error.message);
+        if (error) {
+          console.error('Error fetching suppliers:', error);
+          throw new Error(error.message);
+        }
+
+        // Extract supplier objects from the nested structure
+        return ((data || [])
+          .map((item: any) => item.supplier)
+          .filter(Boolean)) as Supplier[];
       }
 
-      return (data || []) as Supplier[];
+      return [];
     },
     enabled: !!(isViewingAllCompanies || selectedCompany?.id),
   });

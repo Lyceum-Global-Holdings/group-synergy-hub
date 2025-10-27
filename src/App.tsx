@@ -23,6 +23,7 @@ import RfqRfp from "./pages/procurement/RfqRfp";
 import BlanketPurchaseOrder from "./pages/procurement/BlanketPurchaseOrder";
 import StockAdjustment from "./pages/warehouse/StockAdjustment";
 import { SupplierMaster } from "./pages/sourcing/SupplierMaster";
+import SupplierAllocation from "./pages/sourcing/SupplierAllocation";
 import SupplierScorecard from "./pages/sourcing/SupplierScorecard";
 import SupplierEvaluation from "./pages/sourcing/SupplierEvaluation";
 import SupplierRegistration from "./pages/sourcing/SupplierRegistration";
@@ -114,6 +115,7 @@ function App() {
               <Route path="/warehouse/stock-adjustment" element={<StockAdjustment />} />
               <Route path="/warehouse/grn" element={<GoodsReceiptNote />} />
               <Route path="/sourcing/supplier-master" element={<SupplierMaster />} />
+              <Route path="/sourcing/supplier-allocation" element={<SupplierAllocation />} />
               <Route path="/sourcing/supplier-scorecard" element={<SupplierScorecard />} />
               <Route path="/sourcing/supplier-evaluation" element={<SupplierEvaluation />} />
               <Route path="/sourcing/supplier-registration" element={<SupplierRegistration />} />

@@ -69,6 +69,7 @@ const departments = [
     icon: Users,
     items: [
       { title: "Supplier Master", url: "/sourcing/supplier-master" },
+      { title: "Supplier Allocation", url: "/sourcing/supplier-allocation" },
       { title: "Supplier Registration", url: "/sourcing/supplier-registration" },
       { title: "Supplier Evaluation", url: "/sourcing/supplier-evaluation" },
       { title: "RFQ / RFP Management", url: "/sourcing/rfq-management" },
