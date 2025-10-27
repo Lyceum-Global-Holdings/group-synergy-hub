@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -87,6 +87,32 @@ export const CreateSupplierDialog: React.FC<CreateSupplierDialogProps> = ({
   // Fetch existing allocations in edit mode
   const { data: existingAllocationsData } = useSupplierCompanyAllocations(supplier?.id);
 
+  useEffect(() => {
+    if (
+      isEditMode &&
+      existingAllocationsData &&
+      selectedCompanyIds.length === 0 &&
+      allocationSettings.size === 0
+    ) {
+      const selected = existingAllocationsData.map((a) => a.company_id);
+      const map = new Map<string, AllocationSettings>();
+      existingAllocationsData.forEach((a) => {
+        map.set(a.company_id, {
+          is_preferred: a.is_preferred,
+          payment_terms: a.payment_terms || undefined,
+          credit_limit: a.credit_limit ?? undefined,
+          notes: a.notes || undefined,
+          auto_approve: a.status === 'approved',
+          existing_id: a.id,
+          existing_status: a.status,
+        });
+      });
+      setSelectedCompanyIds(selected);
+      setAllocationSettings(map);
+    }
+  }, [isEditMode, existingAllocationsData, selectedCompanyIds.length, allocationSettings.size]);
+
+  const allocationsLoaded = !isEditMode || existingAllocationsData !== undefined;
   const form = useForm<SupplierFormData>({
     resolver: zodResolver(supplierSchema),
     defaultValues: isEditMode ? {
@@ -162,119 +188,109 @@ export const CreateSupplierDialog: React.FC<CreateSupplierDialogProps> = ({
         return;
       }
 
-      if (isEditMode) {
-        const updateData: UpdateSupplierData = {
-          id: supplier.id,
-          name: data.name,
-          legal_name: data.legal_name,
-          supplier_type: data.supplier_type,
-          status: data.status,
-          category: data.category,
-          material_type: data.material_type,
-          measurement_type: data.measurement_type,
-          email: data.email,
-          phone: data.phone,
-          website: data.website,
-          tax_id: data.tax_id,
-          registration_number: data.registration_number,
-          address_line1: data.address_line1,
-          address_line2: data.address_line2,
-          city: data.city,
-          state: data.state,
-          postal_code: data.postal_code,
-          country: data.country,
-          payment_terms: data.payment_terms,
-          credit_limit: data.credit_limit ? parseFloat(data.credit_limit) : undefined,
-          currency: data.currency,
-          rating: data.rating ? parseFloat(data.rating) : undefined,
-          notes: data.notes,
-        };
+        if (isEditMode) {
+          // Ensure allocations are loaded and valid before updating
+          if (!allocationsLoaded) {
+            toast.error('Allocations are still loading. Please wait a moment and try again.');
+            setActiveTab('allocation');
+            return;
+          }
+          if (selectedCompanyIds.length === 0) {
+            toast.error('Supplier must be allocated to at least one company');
+            setActiveTab('allocation');
+            return;
+          }
 
-        const contacts = data.contacts?.filter(contact => contact.name.trim() !== '').map(contact => ({
-          name: contact.name,
-          title: contact.title || undefined,
-          email: contact.email || undefined,
-          phone: contact.phone || undefined,
-          mobile: contact.mobile || undefined,
-          is_primary: contact.is_primary,
-        }));
+          const updateData: UpdateSupplierData = {
+            id: supplier.id,
+            name: data.name,
+            legal_name: data.legal_name,
+            supplier_type: data.supplier_type,
+            status: data.status,
+            category: data.category,
+            material_type: data.material_type,
+            measurement_type: data.measurement_type,
+            email: data.email,
+            phone: data.phone,
+            website: data.website,
+            tax_id: data.tax_id,
+            registration_number: data.registration_number,
+            address_line1: data.address_line1,
+            address_line2: data.address_line2,
+            city: data.city,
+            state: data.state,
+            postal_code: data.postal_code,
+            country: data.country,
+            payment_terms: data.payment_terms,
+            credit_limit: data.credit_limit ? parseFloat(data.credit_limit) : undefined,
+            currency: data.currency,
+            rating: data.rating ? parseFloat(data.rating) : undefined,
+            notes: data.notes,
+          };
 
-        await updateSupplierMutation.mutateAsync({ updateData, contacts });
+          const contacts = data.contacts?.filter(contact => contact.name.trim() !== '').map(contact => ({
+            name: contact.name,
+            title: contact.title || undefined,
+            email: contact.email || undefined,
+            phone: contact.phone || undefined,
+            mobile: contact.mobile || undefined,
+            is_primary: contact.is_primary,
+          }));
 
-        // Validation: prevent removing all allocations
-        if (selectedCompanyIds.length === 0) {
-          toast.error('Supplier must be allocated to at least one company');
-          return;
-        }
+          // 1) Update supplier basic fields first
+          await updateSupplierMutation.mutateAsync({ updateData, contacts });
 
-        // Handle company allocations changes
-        // Get existing allocation IDs from the fetched data
-        const existingAllocationIds = (existingAllocationsData || []).map(a => a.company_id);
-        
-        // New allocations: selected companies that don't have existing_id
-        const allocationsToAdd = selectedCompanyIds
-          .filter(companyId => {
-            const settings = allocationSettings.get(companyId);
-            return !settings?.existing_id; // Only new allocations
-          })
-          .map(companyId => {
-            const settings = allocationSettings.get(companyId)!;
-            return {
-              company_id: companyId,
-              status: (settings.auto_approve && isSuperAdmin ? 'approved' : 'pending') as 'pending' | 'approved',
-              is_preferred: settings.is_preferred,
-              payment_terms: settings.payment_terms,
-              credit_limit: settings.credit_limit,
-              notes: settings.notes,
-            };
-          });
+          // 2) Compute precise allocation diffs
+          const existingAllocations = existingAllocationsData || [];
+          const existingByCompany = new Map(existingAllocations.map((a) => [a.company_id, a]));
 
-        // Updated allocations: selected companies that have existing_id
-        const allocationsToUpdate = selectedCompanyIds
-          .filter(companyId => {
-            const settings = allocationSettings.get(companyId);
-            return !!settings?.existing_id; // Only existing allocations
-          })
-          .map(companyId => {
-            const settings = allocationSettings.get(companyId)!;
-            return {
-              id: settings.existing_id!,
-              company_id: companyId,
-              is_preferred: settings.is_preferred,
-              payment_terms: settings.payment_terms,
-              credit_limit: settings.credit_limit,
-              notes: settings.notes,
-            };
-          });
+          const allocationsToAdd = selectedCompanyIds
+            .filter((companyId) => !existingByCompany.has(companyId))
+            .map((companyId) => {
+              const settings = allocationSettings.get(companyId);
+              return {
+                company_id: companyId,
+                status: (settings?.auto_approve && isSuperAdmin ? 'approved' : 'pending') as 'pending' | 'approved',
+                is_preferred: settings?.is_preferred ?? false,
+                payment_terms: settings?.payment_terms,
+                credit_limit: settings?.credit_limit,
+                notes: settings?.notes,
+              };
+            });
 
-        // Removed allocations: existing allocations not in selected list
-        const allocationsToRemove = (existingAllocationsData || [])
-          .filter(existing => !selectedCompanyIds.includes(existing.company_id))
-          .map(a => a.id);
+          const allocationsToUpdate = selectedCompanyIds
+            .filter((companyId) => !!existingByCompany.get(companyId))
+            .map((companyId) => {
+              const settings = allocationSettings.get(companyId);
+              const existing = existingByCompany.get(companyId)!;
+              const diff: any = { id: existing.id, company_id: companyId };
+              if ((settings?.is_preferred ?? false) !== existing.is_preferred) diff.is_preferred = settings?.is_preferred ?? false;
+              if ((settings?.payment_terms || null) !== (existing.payment_terms || null)) diff.payment_terms = settings?.payment_terms;
+              if ((settings?.credit_limit ?? null) !== (existing.credit_limit ?? null)) diff.credit_limit = settings?.credit_limit;
+              if ((settings?.notes || null) !== (existing.notes || null)) diff.notes = settings?.notes;
+              return diff;
+            })
+            .filter((update) => Object.keys(update).length > 2); // has changes beyond id/company_id
 
-        console.log('Allocation update payload:', {
-          allocationsToAdd,
-          allocationsToUpdate,
-          allocationsToRemove,
-          selectedCompanyIds,
-          allocationSettings: Array.from(allocationSettings.entries()),
-        });
+          const allocationsToRemove = existingAllocations
+            .filter((a) => !selectedCompanyIds.includes(a.company_id))
+            .map((a) => a.id);
 
-        if (allocationsToAdd.length > 0 || allocationsToUpdate.length > 0 || allocationsToRemove.length > 0) {
-          await updateBulkAllocations.mutateAsync({
-            supplier_id: supplier.id,
-            allocations_to_add: allocationsToAdd.length > 0 ? allocationsToAdd : undefined,
-            allocations_to_update: allocationsToUpdate.length > 0 ? allocationsToUpdate : undefined,
-            allocations_to_remove: allocationsToRemove.length > 0 ? allocationsToRemove : undefined,
-          });
-        }
+          if (allocationsToAdd.length > 0 || allocationsToUpdate.length > 0 || allocationsToRemove.length > 0) {
+            await updateBulkAllocations.mutateAsync({
+              supplier_id: supplier.id,
+              allocations_to_add: allocationsToAdd.length ? allocationsToAdd : undefined,
+              allocations_to_update: allocationsToUpdate.length ? allocationsToUpdate : undefined,
+              allocations_to_remove: allocationsToRemove.length ? allocationsToRemove : undefined,
+            });
+          }
 
-        form.reset();
-        setSelectedCompanyIds([]);
-        setAllocationSettings(new Map());
-        setActiveTab('basic');
-        onOpenChange(false);
-      } else {
+          form.reset();
+          setSelectedCompanyIds([]);
+          setAllocationSettings(new Map());
+          setActiveTab('basic');
+          onOpenChange(false);
+        } else {
         const submitData: CreateSupplierData = {
           name: data.name,
           legal_name: data.legal_name,
@@ -962,7 +978,7 @@ export const CreateSupplierDialog: React.FC<CreateSupplierDialogProps> = ({
               </Button>
               <Button 
                 type="submit" 
-                disabled={createSupplierMutation.isPending || updateSupplierMutation.isPending || bulkAllocate.isPending || updateBulkAllocations.isPending}
+                disabled={((isEditMode && !allocationsLoaded)) || createSupplierMutation.isPending || updateSupplierMutation.isPending || bulkAllocate.isPending || updateBulkAllocations.isPending}
               >
                 {isEditMode 
                   ? (updateSupplierMutation.isPending ? 'Updating...' : 'Update Supplier')

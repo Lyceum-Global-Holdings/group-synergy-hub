@@ -47,7 +47,14 @@ export function CompanyAllocationSection({
 
   // Load existing allocations in edit mode - only once
   useEffect(() => {
-    if (mode === 'edit' && existingAllocations && existingAllocations.length > 0 && !isInitialized) {
+    if (
+      mode === 'edit' &&
+      existingAllocations &&
+      existingAllocations.length > 0 &&
+      !isInitialized &&
+      selectedCompanyIds.length === 0 &&
+      allocationSettings.size === 0
+    ) {
       const newSettings = new Map<string, AllocationSettings>();
       const selectedIds: string[] = [];
 
@@ -68,7 +75,7 @@ export function CompanyAllocationSection({
       onAllocationSettingsChange(newSettings);
       setIsInitialized(true);
     }
-  }, [mode, existingAllocations, isInitialized]);
+  }, [mode, existingAllocations, isInitialized, selectedCompanyIds.length, allocationSettings.size, onCompanySelectionChange, onAllocationSettingsChange]);
 
   const handleCompanyToggle = (companyId: string, checked: boolean) => {
     const newSelectedIds = checked
