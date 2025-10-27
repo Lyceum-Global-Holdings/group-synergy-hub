@@ -1,20 +1,29 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useCompany } from '@/contexts/CompanyContext';
 import { toast } from '@/hooks/use-toast';
 import type { PurchaseRequisition, CreatePrData, PrItem, PrStatus } from '@/types/procurement';
 
 export const usePurchaseRequisitions = () => {
+  const { selectedCompany, isViewingAllCompanies } = useCompany();
+  
   return useQuery({
-    queryKey: ['purchase-requisitions'],
+    queryKey: ['purchase-requisitions', selectedCompany?.id, isViewingAllCompanies],
     queryFn: async (): Promise<PurchaseRequisition[]> => {
-      const { data, error } = await supabase
+      let query = supabase
         .from('purchase_requisitions')
         .select(`
           *,
           items:pr_items(*)
-        `)
-        .order('created_at', { ascending: false });
+        `);
+
+      // Filter by company if not viewing all companies
+      if (!isViewingAllCompanies && selectedCompany?.id) {
+        query = query.eq('company_id', selectedCompany.id);
+      }
+
+      const { data, error } = await query.order('created_at', { ascending: false });
 
       if (error) throw error;
       
@@ -48,6 +57,7 @@ export const usePurchaseRequisitions = () => {
         approved_by_profile: undefined,
       }));
     },
+    enabled: !!(isViewingAllCompanies || selectedCompany?.id),
   });
 };
 
@@ -110,10 +120,15 @@ export const usePurchaseRequisition = (id: string) => {
 export const useCreatePurchaseRequisition = () => {
   const queryClient = useQueryClient();
   const { user } = useAuth();
+  const { selectedCompany } = useCompany();
 
   return useMutation({
     mutationFn: async (data: CreatePrData): Promise<PurchaseRequisition> => {
       if (!user?.id) throw new Error('User not authenticated');
+      
+      if (!selectedCompany?.id) {
+        throw new Error('No company selected');
+      }
 
       // Generate PR number
       const { data: prNumber, error: numberError } = await supabase
@@ -133,6 +148,7 @@ export const useCreatePurchaseRequisition = () => {
           priority: data.priority,
           required_date: data.required_date,
           justification: data.justification,
+          company_id: selectedCompany.id,
         })
         .select()
         .single();
@@ -156,7 +172,7 @@ export const useCreatePurchaseRequisition = () => {
       return pr;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['purchase-requisitions'] });
+      queryClient.invalidateQueries({ queryKey: ['purchase-requisitions', selectedCompany?.id] });
       toast({
         title: 'Purchase Requisition Created',
         description: 'Your purchase requisition has been created successfully.',

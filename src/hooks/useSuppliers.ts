@@ -1,21 +1,30 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useCompany } from '@/contexts/CompanyContext';
 import { toast } from 'sonner';
 import type { Supplier, SupplierContact, CreateSupplierData, UpdateSupplierData } from '@/types/supplier';
 
 // Fetch all suppliers
 export const useSuppliers = () => {
+  const { selectedCompany, isViewingAllCompanies } = useCompany();
+  
   return useQuery({
-    queryKey: ['suppliers'],
+    queryKey: ['suppliers', selectedCompany?.id, isViewingAllCompanies],
     queryFn: async (): Promise<Supplier[]> => {
-      const { data, error } = await supabase
+      let query = supabase
         .from('suppliers')
         .select(`
           *,
           contacts:supplier_contacts(*)
-        `)
-        .order('created_at', { ascending: false });
+        `);
+
+      // Filter by company if not viewing all companies
+      if (!isViewingAllCompanies && selectedCompany?.id) {
+        query = query.eq('company_id', selectedCompany.id);
+      }
+
+      const { data, error } = await query.order('created_at', { ascending: false });
 
       if (error) {
         console.error('Error fetching suppliers:', error);
@@ -24,6 +33,7 @@ export const useSuppliers = () => {
 
       return (data || []) as Supplier[];
     },
+    enabled: !!(isViewingAllCompanies || selectedCompany?.id),
   });
 };
 
@@ -59,11 +69,16 @@ export const useSupplier = (id: string) => {
 export const useCreateSupplier = () => {
   const queryClient = useQueryClient();
   const { user } = useAuth();
+  const { selectedCompany } = useCompany();
 
   return useMutation({
     mutationFn: async (supplierData: CreateSupplierData): Promise<Supplier> => {
       if (!user?.id) {
         throw new Error('User not authenticated');
+      }
+
+      if (!selectedCompany?.id) {
+        throw new Error('No company selected');
       }
 
       // Generate supplier code
@@ -83,6 +98,7 @@ export const useCreateSupplier = () => {
         .insert({
           ...supplierInfo,
           supplier_code: codeData,
+          company_id: selectedCompany.id,
           created_by: user.id,
         })
         .select()

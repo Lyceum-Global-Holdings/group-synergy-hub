@@ -2,26 +2,35 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { WarehouseItem, CreateWarehouseItemData } from '@/types/itemBin';
 import { useToast } from '@/hooks/use-toast';
+import { useCompany } from '@/contexts/CompanyContext';
 
 export const useWarehouseItems = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { selectedCompany, isViewingAllCompanies } = useCompany();
 
   const {
     data: items = [],
     isLoading,
     error
   } = useQuery({
-    queryKey: ['warehouse-items'],
+    queryKey: ['warehouse-items', selectedCompany?.id, isViewingAllCompanies],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from('warehouse_items')
-        .select('*')
-        .order('created_at', { ascending: false });
+        .select('*');
+
+      // Filter by company if not viewing all companies
+      if (!isViewingAllCompanies && selectedCompany?.id) {
+        query = query.eq('company_id', selectedCompany.id);
+      }
+
+      const { data, error } = await query.order('created_at', { ascending: false });
 
       if (error) throw error;
       return data as WarehouseItem[];
-    }
+    },
+    enabled: !!(isViewingAllCompanies || selectedCompany?.id),
   });
 
   const createItemMutation = useMutation({
@@ -29,12 +38,17 @@ export const useWarehouseItems = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User not authenticated');
 
+      if (!selectedCompany?.id) {
+        throw new Error('No company selected');
+      }
+
       const { initialStock, initialUnitCost, ...itemDataWithoutStock } = itemData;
 
       const { data, error } = await supabase
         .from('warehouse_items')
         .insert({
           ...itemDataWithoutStock,
+          company_id: selectedCompany.id,
           created_by: user.id
         })
         .select()
@@ -206,8 +220,13 @@ export const useWarehouseItems = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User not authenticated');
 
+      if (!selectedCompany?.id) {
+        throw new Error('No company selected');
+      }
+
       const itemsWithUser = itemsData.map(item => ({
         ...item,
+        company_id: selectedCompany.id,
         created_by: user.id
       }));
 

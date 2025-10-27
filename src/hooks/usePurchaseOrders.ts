@@ -2,11 +2,14 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { PurchaseOrder, CreatePoData, PoSummary, CreateReceiptData } from '@/types/purchaseOrder';
+import { useCompany } from '@/contexts/CompanyContext';
 
 // Fetch all purchase orders
 export function usePurchaseOrders() {
+  const { selectedCompany, isViewingAllCompanies } = useCompany();
+  
   return useQuery({
-    queryKey: ['purchase-orders'],
+    queryKey: ['purchase-orders', selectedCompany?.id, isViewingAllCompanies],
     queryFn: async () => {
       console.log('Fetching purchase orders...');
       
@@ -19,7 +22,7 @@ export function usePurchaseOrders() {
         throw authError;
       }
 
-      const { data, error } = await supabase
+      let query = supabase
         .from('purchase_orders')
         .select(`
           *,
@@ -27,8 +30,14 @@ export function usePurchaseOrders() {
           pr:purchase_requisitions(pr_number, title),
           items:po_items(*),
           company:companies(id, name, code, address, logo_url)
-        `)
-        .order('created_at', { ascending: false });
+        `);
+
+      // Filter by company if not viewing all companies
+      if (!isViewingAllCompanies && selectedCompany?.id) {
+        query = query.eq('company_id', selectedCompany.id);
+      }
+
+      const { data, error } = await query.order('created_at', { ascending: false });
 
       console.log('Purchase orders query result:', { data, error });
       if (error) {
@@ -47,6 +56,7 @@ export function usePurchaseOrders() {
       
       return posWithPending as PurchaseOrder[];
     },
+    enabled: !!(isViewingAllCompanies || selectedCompany?.id),
   });
 }
 
@@ -150,9 +160,13 @@ export function usePurchaseOrder(id: string) {
 export function useCreatePurchaseOrder() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const { selectedCompany } = useCompany();
 
   return useMutation({
     mutationFn: async (data: CreatePoData) => {
+      if (!selectedCompany?.id) {
+        throw new Error('No company selected');
+      }
       // Generate PO number
       const { data: poNumber, error: numberError } = await supabase
         .rpc('generate_po_number');
@@ -172,6 +186,7 @@ export function useCreatePurchaseOrder() {
           currency: data.currency || 'LKR',
           buyer_id: data.buyer_id,
           notes: data.notes,
+          company_id: selectedCompany.id,
           created_by: (await supabase.auth.getUser()).data.user?.id!,
         })
         .select()
@@ -205,7 +220,7 @@ export function useCreatePurchaseOrder() {
       return po;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['purchase-orders'] });
+      queryClient.invalidateQueries({ queryKey: ['purchase-orders', selectedCompany?.id] });
       toast({
         title: "Success",
         description: "Purchase Order created successfully",
@@ -406,12 +421,21 @@ export function useCreateGoodsReceipt() {
 
 // Get PO summary stats
 export function usePoSummaryStats() {
+  const { selectedCompany, isViewingAllCompanies } = useCompany();
+  
   return useQuery({
-    queryKey: ['po-summary-stats'],
+    queryKey: ['po-summary-stats', selectedCompany?.id, isViewingAllCompanies],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from('purchase_orders')
         .select('status, final_amount');
+
+      // Filter by company if not viewing all companies
+      if (!isViewingAllCompanies && selectedCompany?.id) {
+        query = query.eq('company_id', selectedCompany.id);
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
 
@@ -429,5 +453,6 @@ export function usePoSummaryStats() {
 
       return summary;
     },
+    enabled: !!(isViewingAllCompanies || selectedCompany?.id),
   });
 }
