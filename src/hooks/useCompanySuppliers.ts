@@ -363,6 +363,10 @@ export function useUpdateBulkAllocations() {
             if (allocation.status === 'approved') {
               updateData.approved_by = user?.id;
               updateData.approved_at = new Date().toISOString();
+            } else {
+              // Clear approval metadata when status changes to pending/rejected/suspended
+              updateData.approved_by = null;
+              updateData.approved_at = null;
             }
           }
 
@@ -380,6 +384,7 @@ export function useUpdateBulkAllocations() {
       queryClient.invalidateQueries({ queryKey: ['company-suppliers'] });
       queryClient.invalidateQueries({ queryKey: ['approved-company-suppliers'] });
       queryClient.invalidateQueries({ queryKey: ['suppliers'] });
+      queryClient.invalidateQueries({ queryKey: ['supplier-company-allocations'] });
       toast.success('Company allocations updated successfully');
     },
     onError: (error: Error) => {

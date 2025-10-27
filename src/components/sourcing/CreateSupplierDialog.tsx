@@ -264,10 +264,20 @@ export const CreateSupplierDialog: React.FC<CreateSupplierDialogProps> = ({
               const settings = allocationSettings.get(companyId);
               const existing = existingByCompany.get(companyId)!;
               const diff: any = { id: existing.id, company_id: companyId };
+              
+              // Check field changes
               if ((settings?.is_preferred ?? false) !== existing.is_preferred) diff.is_preferred = settings?.is_preferred ?? false;
               if ((settings?.payment_terms || null) !== (existing.payment_terms || null)) diff.payment_terms = settings?.payment_terms;
               if ((settings?.credit_limit ?? null) !== (existing.credit_limit ?? null)) diff.credit_limit = settings?.credit_limit;
               if ((settings?.notes || null) !== (existing.notes || null)) diff.notes = settings?.notes;
+              
+              // Map auto_approve toggle to status changes
+              const shouldApprove = !!settings?.auto_approve;
+              const wasApproved = existing.status === 'approved';
+              if (shouldApprove !== wasApproved) {
+                diff.status = shouldApprove ? 'approved' : 'pending';
+              }
+              
               return diff;
             })
             .filter((update) => Object.keys(update).length > 2); // has changes beyond id/company_id
@@ -428,7 +438,7 @@ export const CreateSupplierDialog: React.FC<CreateSupplierDialogProps> = ({
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Supplier Type *</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <Select value={field.value} onValueChange={field.onChange}>
                           <FormControl>
                             <SelectTrigger>
                               <SelectValue placeholder="Select supplier type" />
@@ -480,7 +490,7 @@ export const CreateSupplierDialog: React.FC<CreateSupplierDialogProps> = ({
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Category</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <Select value={field.value ?? undefined} onValueChange={field.onChange}>
                           <FormControl>
                             <SelectTrigger>
                               <SelectValue placeholder="Select category" />
@@ -505,7 +515,7 @@ export const CreateSupplierDialog: React.FC<CreateSupplierDialogProps> = ({
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Material Type</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <Select value={field.value ?? undefined} onValueChange={field.onChange}>
                           <FormControl>
                             <SelectTrigger>
                               <SelectValue placeholder="Select material type" />
@@ -530,7 +540,7 @@ export const CreateSupplierDialog: React.FC<CreateSupplierDialogProps> = ({
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Measurement Type</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <Select value={field.value ?? undefined} onValueChange={field.onChange}>
                           <FormControl>
                             <SelectTrigger>
                               <SelectValue placeholder="Select measurement type" />
@@ -736,7 +746,7 @@ export const CreateSupplierDialog: React.FC<CreateSupplierDialogProps> = ({
                           <CreditCard className="w-4 h-4" />
                           Payment Terms
                         </FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <Select value={field.value ?? undefined} onValueChange={field.onChange}>
                           <FormControl>
                             <SelectTrigger>
                               <SelectValue placeholder="Select payment terms" />
