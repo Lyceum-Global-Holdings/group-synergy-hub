@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useCompanies } from '@/hooks/useCompanies';
 import { useSuperAdmin } from '@/hooks/useSuperAdmin';
-import { useCompanySuppliers } from '@/hooks/useCompanySuppliers';
+import { useSupplierCompanyAllocations } from '@/hooks/useCompanySuppliers';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -41,7 +41,7 @@ export function CompanyAllocationSection({
 }: CompanyAllocationSectionProps) {
   const { companies } = useCompanies();
   const { data: isSuperAdmin } = useSuperAdmin();
-  const { data: existingAllocations } = useCompanySuppliers(supplierId);
+  const { data: existingAllocations } = useSupplierCompanyAllocations(supplierId);
   const [autoApproveAll, setAutoApproveAll] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
 

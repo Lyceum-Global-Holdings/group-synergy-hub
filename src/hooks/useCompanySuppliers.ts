@@ -60,6 +60,28 @@ export function useCompanySuppliers(companyId?: string) {
   });
 }
 
+// Fetch allocations for a given supplier across companies
+export function useSupplierCompanyAllocations(supplierId?: string) {
+  return useQuery({
+    queryKey: ['supplier-company-allocations', supplierId],
+    queryFn: async (): Promise<CompanySupplier[]> => {
+      const { data, error } = await supabase
+        .from('company_suppliers')
+        .select(`
+          *,
+          supplier:suppliers(id, supplier_code, name, supplier_type, email, phone, status),
+          company:companies(id, name, code)
+        `)
+        .eq('supplier_id', supplierId)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      return (data || []) as CompanySupplier[];
+    },
+    enabled: !!supplierId,
+  });
+}
+
 // Fetch only APPROVED suppliers for a company (for dropdowns)
 export function useApprovedCompanySuppliers(companyId?: string) {
   const { selectedCompany } = useCompany();

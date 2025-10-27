@@ -16,7 +16,7 @@ import { useCreateSupplier, useUpdateSupplier } from '@/hooks/useSuppliers';
 import type { Supplier, SupplierContact, CreateSupplierData, UpdateSupplierData } from '@/types/supplier';
 import { SUPPLIER_TYPES, SUPPLIER_STATUSES, SUPPLIER_CATEGORIES, PAYMENT_TERMS, MATERIAL_TYPES, MEASUREMENT_TYPES } from '@/types/supplier';
 import { CompanyAllocationSection, type AllocationSettings } from './CompanyAllocationSection';
-import { useBulkAllocateSupplier, useUpdateBulkAllocations, useCompanySuppliers } from '@/hooks/useCompanySuppliers';
+import { useBulkAllocateSupplier, useUpdateBulkAllocations, useSupplierCompanyAllocations } from '@/hooks/useCompanySuppliers';
 import { useSuperAdmin } from '@/hooks/useSuperAdmin';
 import { toast } from 'sonner';
 
@@ -85,7 +85,7 @@ export const CreateSupplierDialog: React.FC<CreateSupplierDialogProps> = ({
   const [allocationSettings, setAllocationSettings] = useState<Map<string, AllocationSettings>>(new Map());
 
   // Fetch existing allocations in edit mode
-  const { data: existingAllocationsData } = useCompanySuppliers(supplier?.id);
+  const { data: existingAllocationsData } = useSupplierCompanyAllocations(supplier?.id);
 
   const form = useForm<SupplierFormData>({
     resolver: zodResolver(supplierSchema),
