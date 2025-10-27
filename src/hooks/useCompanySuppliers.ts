@@ -205,3 +205,154 @@ export function useRemoveSupplierAllocation() {
     },
   });
 }
+
+// Bulk allocate supplier to multiple companies
+export function useBulkAllocateSupplier() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (data: {
+      supplier_id: string;
+      allocations: Array<{
+        company_id: string;
+        status: 'pending' | 'approved';
+        is_preferred: boolean;
+        payment_terms?: string;
+        credit_limit?: number;
+        notes?: string;
+      }>;
+    }) => {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      const allocationsToInsert = data.allocations.map(allocation => ({
+        supplier_id: data.supplier_id,
+        company_id: allocation.company_id,
+        status: allocation.status,
+        allocation_type: 'manual' as const,
+        allocated_by: user?.id,
+        is_preferred: allocation.is_preferred,
+        payment_terms: allocation.payment_terms,
+        credit_limit: allocation.credit_limit,
+        notes: allocation.notes,
+        approved_by: allocation.status === 'approved' ? user?.id : null,
+        approved_at: allocation.status === 'approved' ? new Date().toISOString() : null,
+      }));
+
+      const { data: result, error } = await supabase
+        .from('company_suppliers')
+        .insert(allocationsToInsert)
+        .select();
+
+      if (error) throw error;
+      return result;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['company-suppliers'] });
+      queryClient.invalidateQueries({ queryKey: ['approved-company-suppliers'] });
+      queryClient.invalidateQueries({ queryKey: ['suppliers'] });
+      toast.success('Supplier allocated to companies successfully');
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || 'Failed to allocate supplier');
+    },
+  });
+}
+
+// Update multiple allocations at once
+export function useUpdateBulkAllocations() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (data: {
+      supplier_id: string;
+      allocations_to_add?: Array<{
+        company_id: string;
+        status: 'pending' | 'approved';
+        is_preferred: boolean;
+        payment_terms?: string;
+        credit_limit?: number;
+        notes?: string;
+      }>;
+      allocations_to_update?: Array<{
+        id: string;
+        company_id: string;
+        status?: 'pending' | 'approved' | 'rejected' | 'suspended';
+        is_preferred?: boolean;
+        payment_terms?: string;
+        credit_limit?: number;
+        notes?: string;
+      }>;
+      allocations_to_remove?: string[];
+    }) => {
+      const { data: { user } } = await supabase.auth.getUser();
+
+      // Delete removed allocations
+      if (data.allocations_to_remove && data.allocations_to_remove.length > 0) {
+        const { error: deleteError } = await supabase
+          .from('company_suppliers')
+          .delete()
+          .in('id', data.allocations_to_remove);
+        if (deleteError) throw deleteError;
+      }
+
+      // Insert new allocations
+      if (data.allocations_to_add && data.allocations_to_add.length > 0) {
+        const allocationsToInsert = data.allocations_to_add.map(allocation => ({
+          supplier_id: data.supplier_id,
+          company_id: allocation.company_id,
+          status: allocation.status,
+          allocation_type: 'manual' as const,
+          allocated_by: user?.id,
+          is_preferred: allocation.is_preferred,
+          payment_terms: allocation.payment_terms,
+          credit_limit: allocation.credit_limit,
+          notes: allocation.notes,
+          approved_by: allocation.status === 'approved' ? user?.id : null,
+          approved_at: allocation.status === 'approved' ? new Date().toISOString() : null,
+        }));
+
+        const { error: insertError } = await supabase
+          .from('company_suppliers')
+          .insert(allocationsToInsert);
+        if (insertError) throw insertError;
+      }
+
+      // Update existing allocations
+      if (data.allocations_to_update && data.allocations_to_update.length > 0) {
+        for (const allocation of data.allocations_to_update) {
+          const updateData: any = {
+            is_preferred: allocation.is_preferred,
+            payment_terms: allocation.payment_terms,
+            credit_limit: allocation.credit_limit,
+            notes: allocation.notes,
+          };
+
+          if (allocation.status) {
+            updateData.status = allocation.status;
+            if (allocation.status === 'approved') {
+              updateData.approved_by = user?.id;
+              updateData.approved_at = new Date().toISOString();
+            }
+          }
+
+          const { error: updateError } = await supabase
+            .from('company_suppliers')
+            .update(updateData)
+            .eq('id', allocation.id);
+          if (updateError) throw updateError;
+        }
+      }
+
+      return { success: true };
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['company-suppliers'] });
+      queryClient.invalidateQueries({ queryKey: ['approved-company-suppliers'] });
+      queryClient.invalidateQueries({ queryKey: ['suppliers'] });
+      toast.success('Company allocations updated successfully');
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || 'Failed to update allocations');
+    },
+  });
+}

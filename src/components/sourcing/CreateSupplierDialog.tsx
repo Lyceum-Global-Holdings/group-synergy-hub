@@ -15,6 +15,9 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { useCreateSupplier, useUpdateSupplier } from '@/hooks/useSuppliers';
 import type { Supplier, SupplierContact, CreateSupplierData, UpdateSupplierData } from '@/types/supplier';
 import { SUPPLIER_TYPES, SUPPLIER_STATUSES, SUPPLIER_CATEGORIES, PAYMENT_TERMS, MATERIAL_TYPES, MEASUREMENT_TYPES } from '@/types/supplier';
+import { CompanyAllocationSection, type AllocationSettings } from './CompanyAllocationSection';
+import { useBulkAllocateSupplier, useUpdateBulkAllocations } from '@/hooks/useCompanySuppliers';
+import { useSuperAdmin } from '@/hooks/useSuperAdmin';
 
 const supplierSchema = z.object({
   name: z.string().min(1, 'Supplier name is required'),
@@ -70,8 +73,15 @@ export const CreateSupplierDialog: React.FC<CreateSupplierDialogProps> = ({
   const [activeTab, setActiveTab] = useState('basic');
   const createSupplierMutation = useCreateSupplier();
   const updateSupplierMutation = useUpdateSupplier();
+  const bulkAllocate = useBulkAllocateSupplier();
+  const updateBulkAllocations = useUpdateBulkAllocations();
+  const { data: isSuperAdmin } = useSuperAdmin();
   
   const isEditMode = mode === 'edit' && supplier;
+
+  // Company allocation state
+  const [selectedCompanyIds, setSelectedCompanyIds] = useState<string[]>([]);
+  const [allocationSettings, setAllocationSettings] = useState<Map<string, AllocationSettings>>(new Map());
 
   const form = useForm<SupplierFormData>({
     resolver: zodResolver(supplierSchema),
@@ -140,92 +150,162 @@ export const CreateSupplierDialog: React.FC<CreateSupplierDialogProps> = ({
     name: 'contacts',
   });
 
-  const onSubmit = (data: SupplierFormData) => {
-    if (isEditMode) {
-      const updateData: UpdateSupplierData = {
-        id: supplier.id,
-        name: data.name,
-        legal_name: data.legal_name,
-        supplier_type: data.supplier_type,
-        status: data.status,
-        category: data.category,
-        material_type: data.material_type,
-        measurement_type: data.measurement_type,
-        email: data.email,
-        phone: data.phone,
-        website: data.website,
-        tax_id: data.tax_id,
-        registration_number: data.registration_number,
-        address_line1: data.address_line1,
-        address_line2: data.address_line2,
-        city: data.city,
-        state: data.state,
-        postal_code: data.postal_code,
-        country: data.country,
-        payment_terms: data.payment_terms,
-        credit_limit: data.credit_limit ? parseFloat(data.credit_limit) : undefined,
-        currency: data.currency,
-        rating: data.rating ? parseFloat(data.rating) : undefined,
-        notes: data.notes,
-      };
+  const onSubmit = async (data: SupplierFormData) => {
+    try {
+      // Validate company allocation in create mode
+      if (!isEditMode && selectedCompanyIds.length === 0) {
+        setActiveTab('allocation');
+        return;
+      }
 
-      const contacts = data.contacts?.filter(contact => contact.name.trim() !== '').map(contact => ({
-        name: contact.name,
-        title: contact.title || undefined,
-        email: contact.email || undefined,
-        phone: contact.phone || undefined,
-        mobile: contact.mobile || undefined,
-        is_primary: contact.is_primary,
-      }));
+      if (isEditMode) {
+        const updateData: UpdateSupplierData = {
+          id: supplier.id,
+          name: data.name,
+          legal_name: data.legal_name,
+          supplier_type: data.supplier_type,
+          status: data.status,
+          category: data.category,
+          material_type: data.material_type,
+          measurement_type: data.measurement_type,
+          email: data.email,
+          phone: data.phone,
+          website: data.website,
+          tax_id: data.tax_id,
+          registration_number: data.registration_number,
+          address_line1: data.address_line1,
+          address_line2: data.address_line2,
+          city: data.city,
+          state: data.state,
+          postal_code: data.postal_code,
+          country: data.country,
+          payment_terms: data.payment_terms,
+          credit_limit: data.credit_limit ? parseFloat(data.credit_limit) : undefined,
+          currency: data.currency,
+          rating: data.rating ? parseFloat(data.rating) : undefined,
+          notes: data.notes,
+        };
 
-      updateSupplierMutation.mutate({ updateData, contacts }, {
-        onSuccess: () => {
-          form.reset();
-          setActiveTab('basic');
-          onOpenChange(false);
-        },
-      });
-    } else {
-      const submitData: CreateSupplierData = {
-        name: data.name,
-        legal_name: data.legal_name,
-        supplier_type: data.supplier_type,
-        category: data.category,
-        material_type: data.material_type,
-        measurement_type: data.measurement_type,
-        email: data.email,
-        phone: data.phone,
-        website: data.website,
-        tax_id: data.tax_id,
-        registration_number: data.registration_number,
-        address_line1: data.address_line1,
-        address_line2: data.address_line2,
-        city: data.city,
-        state: data.state,
-        postal_code: data.postal_code,
-        country: data.country,
-        payment_terms: data.payment_terms,
-        credit_limit: data.credit_limit ? parseFloat(data.credit_limit) : undefined,
-        currency: data.currency,
-        rating: data.rating ? parseFloat(data.rating) : undefined,
-        notes: data.notes,
-        contacts: data.contacts?.filter(contact => contact.name.trim() !== '').map(contact => ({
+        const contacts = data.contacts?.filter(contact => contact.name.trim() !== '').map(contact => ({
           name: contact.name,
           title: contact.title || undefined,
           email: contact.email || undefined,
           phone: contact.phone || undefined,
           mobile: contact.mobile || undefined,
           is_primary: contact.is_primary,
-        })),
-      };
+        }));
 
-      createSupplierMutation.mutate(submitData, {
-        onSuccess: () => {
-          form.reset();
-          setActiveTab('basic');
-          onOpenChange(false);
-        },
-      });
+        await updateSupplierMutation.mutateAsync({ updateData, contacts });
+
+        // Handle company allocations changes
+        const existingAllocations = Array.from(allocationSettings.entries())
+          .filter(([_, settings]) => settings.existing_id);
+        
+        const allocationsToAdd = selectedCompanyIds
+          .filter(companyId => !allocationSettings.get(companyId)?.existing_id)
+          .map(companyId => {
+            const settings = allocationSettings.get(companyId)!;
+            return {
+              company_id: companyId,
+              status: (settings.auto_approve && isSuperAdmin ? 'approved' : 'pending') as 'pending' | 'approved',
+              is_preferred: settings.is_preferred,
+              payment_terms: settings.payment_terms,
+              credit_limit: settings.credit_limit,
+              notes: settings.notes,
+            };
+          });
+
+        const allocationsToUpdate = existingAllocations
+          .filter(([companyId]) => selectedCompanyIds.includes(companyId))
+          .map(([companyId, settings]) => ({
+            id: settings.existing_id!,
+            company_id: companyId,
+            is_preferred: settings.is_preferred,
+            payment_terms: settings.payment_terms,
+            credit_limit: settings.credit_limit,
+            notes: settings.notes,
+          }));
+
+        const allocationsToRemove = existingAllocations
+          .filter(([companyId]) => !selectedCompanyIds.includes(companyId))
+          .map(([_, settings]) => settings.existing_id!);
+
+        if (allocationsToAdd.length > 0 || allocationsToUpdate.length > 0 || allocationsToRemove.length > 0) {
+          await updateBulkAllocations.mutateAsync({
+            supplier_id: supplier.id,
+            allocations_to_add: allocationsToAdd.length > 0 ? allocationsToAdd : undefined,
+            allocations_to_update: allocationsToUpdate.length > 0 ? allocationsToUpdate : undefined,
+            allocations_to_remove: allocationsToRemove.length > 0 ? allocationsToRemove : undefined,
+          });
+        }
+
+        form.reset();
+        setSelectedCompanyIds([]);
+        setAllocationSettings(new Map());
+        setActiveTab('basic');
+        onOpenChange(false);
+      } else {
+        const submitData: CreateSupplierData = {
+          name: data.name,
+          legal_name: data.legal_name,
+          supplier_type: data.supplier_type,
+          category: data.category,
+          material_type: data.material_type,
+          measurement_type: data.measurement_type,
+          email: data.email,
+          phone: data.phone,
+          website: data.website,
+          tax_id: data.tax_id,
+          registration_number: data.registration_number,
+          address_line1: data.address_line1,
+          address_line2: data.address_line2,
+          city: data.city,
+          state: data.state,
+          postal_code: data.postal_code,
+          country: data.country,
+          payment_terms: data.payment_terms,
+          credit_limit: data.credit_limit ? parseFloat(data.credit_limit) : undefined,
+          currency: data.currency,
+          rating: data.rating ? parseFloat(data.rating) : undefined,
+          notes: data.notes,
+          contacts: data.contacts?.filter(contact => contact.name.trim() !== '').map(contact => ({
+            name: contact.name,
+            title: contact.title || undefined,
+            email: contact.email || undefined,
+            phone: contact.phone || undefined,
+            mobile: contact.mobile || undefined,
+            is_primary: contact.is_primary,
+          })),
+        };
+
+        const newSupplier = await createSupplierMutation.mutateAsync(submitData);
+
+        // Create company allocations
+        const allocations = selectedCompanyIds.map(companyId => {
+          const settings = allocationSettings.get(companyId)!;
+          return {
+            company_id: companyId,
+            status: (settings.auto_approve && isSuperAdmin ? 'approved' : 'pending') as 'pending' | 'approved',
+            is_preferred: settings.is_preferred,
+            payment_terms: settings.payment_terms,
+            credit_limit: settings.credit_limit,
+            notes: settings.notes,
+          };
+        });
+
+        await bulkAllocate.mutateAsync({
+          supplier_id: newSupplier.id,
+          allocations,
+        });
+
+        form.reset();
+        setSelectedCompanyIds([]);
+        setAllocationSettings(new Map());
+        setActiveTab('basic');
+        onOpenChange(false);
+      }
+    } catch (error) {
+      console.error('Error saving supplier:', error);
     }
   };
 
@@ -258,11 +338,12 @@ export const CreateSupplierDialog: React.FC<CreateSupplierDialogProps> = ({
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
             <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="grid w-full grid-cols-4">
+            <TabsList className="grid w-full grid-cols-5">
               <TabsTrigger value="basic">Basic Info</TabsTrigger>
               <TabsTrigger value="contact">Contact</TabsTrigger>
               <TabsTrigger value="business">Business</TabsTrigger>
               <TabsTrigger value="contacts">Contacts</TabsTrigger>
+              <TabsTrigger value="allocation">Allocation</TabsTrigger>
             </TabsList>
 
               <TabsContent value="basic" className="space-y-4">
@@ -828,6 +909,17 @@ export const CreateSupplierDialog: React.FC<CreateSupplierDialogProps> = ({
                   </div>
                 )}
               </TabsContent>
+
+              <TabsContent value="allocation" className="space-y-4 mt-4">
+                <CompanyAllocationSection
+                  mode={mode}
+                  supplierId={supplier?.id}
+                  selectedCompanyIds={selectedCompanyIds}
+                  onCompanySelectionChange={setSelectedCompanyIds}
+                  allocationSettings={allocationSettings}
+                  onAllocationSettingsChange={setAllocationSettings}
+                />
+              </TabsContent>
             </Tabs>
 
             <DialogFooter>
@@ -840,7 +932,7 @@ export const CreateSupplierDialog: React.FC<CreateSupplierDialogProps> = ({
               </Button>
               <Button 
                 type="submit" 
-                disabled={createSupplierMutation.isPending || updateSupplierMutation.isPending}
+                disabled={createSupplierMutation.isPending || updateSupplierMutation.isPending || bulkAllocate.isPending || updateBulkAllocations.isPending}
               >
                 {isEditMode 
                   ? (updateSupplierMutation.isPending ? 'Updating...' : 'Update Supplier')
