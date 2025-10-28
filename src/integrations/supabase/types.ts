@@ -960,7 +960,6 @@ export type Database = {
           created_at: string
           created_by: string | null
           description: string | null
-          finished_good_id: string | null
           id: string
           is_legacy_bom: boolean | null
           po_id: string | null
@@ -981,7 +980,6 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           description?: string | null
-          finished_good_id?: string | null
           id?: string
           is_legacy_bom?: boolean | null
           po_id?: string | null
@@ -1002,7 +1000,6 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           description?: string | null
-          finished_good_id?: string | null
           id?: string
           is_legacy_bom?: boolean | null
           po_id?: string | null
@@ -1023,13 +1020,6 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "bill_of_materials_finished_good_id_fkey"
-            columns: ["finished_good_id"]
-            isOneToOne: false
-            referencedRelation: "finished_goods"
             referencedColumns: ["id"]
           },
           {
@@ -10267,7 +10257,6 @@ export type Database = {
           created_at: string | null
           created_by: string | null
           description: string | null
-          finished_good_id: string | null
           id: string | null
           is_legacy_bom: boolean | null
           po_id: string | null
@@ -10288,7 +10277,6 @@ export type Database = {
           created_at?: string | null
           created_by?: string | null
           description?: string | null
-          finished_good_id?: string | null
           id?: string | null
           is_legacy_bom?: boolean | null
           po_id?: string | null
@@ -10309,7 +10297,6 @@ export type Database = {
           created_at?: string | null
           created_by?: string | null
           description?: string | null
-          finished_good_id?: string | null
           id?: string | null
           is_legacy_bom?: boolean | null
           po_id?: string | null
@@ -10330,13 +10317,6 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "bill_of_materials_finished_good_id_fkey"
-            columns: ["finished_good_id"]
-            isOneToOne: false
-            referencedRelation: "finished_goods"
             referencedColumns: ["id"]
           },
           {
