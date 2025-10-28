@@ -47,8 +47,8 @@ export function useBomFinishedGoodsLinks(bomId?: string) {
           *,
           finished_goods:finished_good_id (
             id,
-            fg_code,
-            fg_name,
+            product_code,
+            product_name,
             size,
             color,
             product_master_id

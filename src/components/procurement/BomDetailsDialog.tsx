@@ -303,8 +303,8 @@ export function BomDetailsDialog({ bom, open, onOpenChange, onEdit }: BomDetails
                       <div key={link.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 transition-colors">
                         <div className="flex-1">
                           <div className="flex items-center gap-2">
-                            <Badge variant="outline">{link.finished_goods?.fg_code || 'N/A'}</Badge>
-                            <span className="font-medium">{link.finished_goods?.fg_name || 'Unknown Product'}</span>
+                            <Badge variant="outline">{link.finished_goods?.product_code || 'N/A'}</Badge>
+                            <span className="font-medium">{link.finished_goods?.product_name || 'Unknown Product'}</span>
                           </div>
                           <div className="flex gap-4 mt-1 text-sm text-muted-foreground">
                             {link.finished_goods?.size && (
