@@ -4,12 +4,13 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { X, ChevronDown } from 'lucide-react';
-import { getSizesByCategory, SIZE_CATEGORIES } from '@/constants/standardSizes';
+import { STANDARD_SIZES, getSizesByCategory, SIZE_CATEGORIES } from '@/constants/standardSizes';
 
 interface MultiSizeSelectorProps {
   selectedSizes: string[];
   onSizesChange: (sizes: string[]) => void;
   availableSizes?: string[];
+  categories?: string[];
   showSelectAll?: boolean;
   groupByCategory?: boolean;
   className?: string;
@@ -19,14 +20,17 @@ export function MultiSizeSelector({
   selectedSizes,
   onSizesChange,
   availableSizes,
+  categories,
   showSelectAll = true,
   groupByCategory = true,
   className = "",
 }: MultiSizeSelectorProps) {
-  // Use available sizes or default to Apparel category
+  // Use available sizes or filter by categories
   const sizeOptions = availableSizes 
     ? availableSizes.map(size => ({ value: size, label: size, category: 'Custom' }))
-    : getSizesByCategory('Apparel');
+    : categories && categories.length > 0
+      ? STANDARD_SIZES.filter(s => categories.includes(s.category))
+      : STANDARD_SIZES;
 
   const handleSizeToggle = (sizeValue: string) => {
     const isSelected = selectedSizes.includes(sizeValue);

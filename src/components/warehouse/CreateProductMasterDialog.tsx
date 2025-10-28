@@ -156,12 +156,13 @@ export function CreateProductMasterDialog({ open, onOpenChange }: CreateProductM
 
           <div className="space-y-2">
             <Label>Available Sizes</Label>
-            <MultiSizeSelector
-              selectedSizes={selectedSizes}
-              onSizesChange={setSelectedSizes}
-              groupByCategory={true}
-              showSelectAll={true}
-            />
+              <MultiSizeSelector
+                selectedSizes={selectedSizes}
+                onSizesChange={setSelectedSizes}
+                groupByCategory={true}
+                showSelectAll={true}
+                categories={['Apparel', 'Numeric']}
+              />
           </div>
 
           <div className="grid grid-cols-2 gap-4">
