@@ -50,9 +50,17 @@ export function BulkGenerateVariantsDialog({
 
   const availableColors = useMemo(() => {
     if (!productMaster?.available_colors) return [];
-    return Array.isArray(productMaster.available_colors) 
+    const colors = Array.isArray(productMaster.available_colors) 
       ? productMaster.available_colors 
       : [];
+    
+    // Map database structure to expected structure
+    return colors.map(color => ({
+      name: color.color_name,
+      code: color.color_code,
+      hex: color.color_code, // Use color_code as hex since hex_value is null
+      id: color.id,
+    }));
   }, [productMaster]);
 
   const totalCombinations = selectedSizes.length * selectedColors.length;
