@@ -50,7 +50,6 @@ const bomSchema = z.object({
   style_no: z.string().optional(),
   version: z.string().optional(),
   size: z.string().optional(),
-  color: z.string().optional(),
   description: z.string().optional(),
   status: z.enum(['active', 'inactive', 'draft']).default('draft'),
 });
@@ -85,7 +84,6 @@ export function CreateBomDialog({ children }: CreateBomDialogProps) {
       product_master_id: '',
       version: '1.0',
       size: '',
-      color: '',
       description: '',
       status: 'draft',
     },
@@ -496,20 +494,6 @@ export function CreateBomDialog({ children }: CreateBomDialogProps) {
                       <FormLabel>Size</FormLabel>
                       <FormControl>
                         <Input {...field} placeholder="Enter size" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="color"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Color</FormLabel>
-                      <FormControl>
-                        <Input {...field} placeholder="Enter color" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>

@@ -7,7 +7,6 @@ export interface BillOfMaterials {
   style_no?: string;
   version: string;
   size?: string;
-  color?: string;
   description?: string;
   status: 'active' | 'inactive' | 'draft';
   po_id?: string;
@@ -46,7 +45,6 @@ export interface CreateBomData {
   style_no?: string;
   version?: string;
   size?: string;
-  color?: string;
   description?: string;
   status?: 'active' | 'inactive' | 'draft';
   po_id?: string;

@@ -49,7 +49,6 @@ const bomSchema = z.object({
   style_no: z.string().optional(),
   version: z.string().optional(),
   size: z.string().optional(),
-  color: z.string().optional(),
   description: z.string().optional(),
   status: z.enum(['active', 'inactive', 'draft']).default('draft'),
 });
@@ -87,7 +86,6 @@ export function EditBomDialog({ bom, open, onOpenChange }: EditBomDialogProps) {
       style_no: '',
       version: '1.0',
       size: '',
-      color: '',
       description: '',
       status: 'draft',
     },
@@ -105,7 +103,6 @@ export function EditBomDialog({ bom, open, onOpenChange }: EditBomDialogProps) {
         style_no: bom.style_no || '',
         version: bom.version || '1.0',
         size: bom.size || '',
-        color: (bom as any).color || '',
         description: bom.description || '',
         status: bom.status,
       });
@@ -243,7 +240,6 @@ export function EditBomDialog({ bom, open, onOpenChange }: EditBomDialogProps) {
         style_no: data.style_no,
         version: data.version,
         size: data.size,
-        color: data.color,
         description: data.description,
         status: data.status,
         company_id: selectedCompany?.id,
@@ -564,20 +560,6 @@ export function EditBomDialog({ bom, open, onOpenChange }: EditBomDialogProps) {
                         <FormLabel>Size</FormLabel>
                         <FormControl>
                           <Input {...field} placeholder="Enter size (optional)" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="color"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Color</FormLabel>
-                        <FormControl>
-                          <Input {...field} placeholder="Enter color (optional)" />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
