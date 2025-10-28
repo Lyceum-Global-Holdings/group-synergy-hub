@@ -32,6 +32,45 @@ export function useBomLinkedProductsCounts() {
   });
 }
 
+// Hook to fetch all linked products with their details (colors and sizes) for all BOMs
+export function useBomLinkedProductsDetails() {
+  return useQuery({
+    queryKey: ['bom-linked-products-details'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('bom_finished_goods')
+        .select(`
+          bom_id,
+          finished_goods:finished_good_id (
+            color,
+            size
+          )
+        `);
+      
+      if (error) throw error;
+      
+      // Group products by BOM with their colors and sizes
+      const details: Record<string, Array<{ color?: string; size?: string }>> = {};
+      data.forEach(link => {
+        if (!details[link.bom_id]) {
+          details[link.bom_id] = [];
+        }
+        if (link.finished_goods) {
+          const fg = Array.isArray(link.finished_goods) 
+            ? link.finished_goods[0] 
+            : link.finished_goods;
+          details[link.bom_id].push({
+            color: fg?.color,
+            size: fg?.size
+          });
+        }
+      });
+      
+      return details;
+    }
+  });
+}
+
 export function useBomFinishedGoodsLinks(bomId?: string) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -85,6 +124,7 @@ export function useBomFinishedGoodsLinks(bomId?: string) {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['bom-finished-goods-links'] });
       queryClient.invalidateQueries({ queryKey: ['bom-linked-products-counts'] });
+      queryClient.invalidateQueries({ queryKey: ['bom-linked-products-details'] });
       queryClient.invalidateQueries({ queryKey: ['bill-of-materials'] });
       toast({
         title: "Success",
@@ -113,6 +153,7 @@ export function useBomFinishedGoodsLinks(bomId?: string) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['bom-finished-goods-links'] });
       queryClient.invalidateQueries({ queryKey: ['bom-linked-products-counts'] });
+      queryClient.invalidateQueries({ queryKey: ['bom-linked-products-details'] });
       queryClient.invalidateQueries({ queryKey: ['bill-of-materials'] });
       toast({
         title: "Success",

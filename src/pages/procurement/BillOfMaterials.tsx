@@ -26,7 +26,7 @@ import { CreateBomDialog } from "@/components/procurement/CreateBomDialog";
 import { BomDetailsDialog } from "@/components/procurement/BomDetailsDialog";
 import { EditBomDialog } from "@/components/procurement/EditBomDialog";
 import { BulkLinkProductsDialog } from "@/components/procurement/BulkLinkProductsDialog";
-import { useBomLinkedProductsCounts } from "@/hooks/useBomFinishedGoodsLinks";
+import { useBomLinkedProductsCounts, useBomLinkedProductsDetails } from "@/hooks/useBomFinishedGoodsLinks";
 
 const statusColors = {
   active: "bg-success text-success-foreground",
@@ -44,6 +44,7 @@ export default function BillOfMaterialsPage() {
   const { selectedCompany, isViewingAllCompanies } = useCompany();
   const { boms, isLoading, deleteBom, isDeleting } = useBillOfMaterials(isViewingAllCompanies ? undefined : selectedCompany?.id);
   const { data: linkedProductCounts = {} } = useBomLinkedProductsCounts();
+  const { data: linkedProductsDetails = {} } = useBomLinkedProductsDetails();
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [selectedBom, setSelectedBom] = useState<BillOfMaterials | null>(null);
@@ -190,6 +191,7 @@ export default function BillOfMaterialsPage() {
                 <TableHead>Version</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Linked Products</TableHead>
+                <TableHead>Colors & Sizes</TableHead>
                 {isViewingAllCompanies && <TableHead>Company</TableHead>}
                 <TableHead>Created Date</TableHead>
                 <TableHead>Actions</TableHead>
@@ -209,6 +211,27 @@ export default function BillOfMaterialsPage() {
                       </Badge>
                     ) : (
                       <span className="text-muted-foreground text-sm">None</span>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {linkedProductsDetails[bom.id] && linkedProductsDetails[bom.id].length > 0 ? (
+                      <div className="flex flex-wrap gap-1">
+                        {linkedProductsDetails[bom.id].slice(0, 3).map((product, idx) => (
+                          <Badge key={idx} variant="outline" className="text-xs">
+                            {product.color && product.size 
+                              ? `${product.color} / ${product.size}`
+                              : product.color || product.size || 'N/A'
+                            }
+                          </Badge>
+                        ))}
+                        {linkedProductsDetails[bom.id].length > 3 && (
+                          <Badge variant="outline" className="text-xs">
+                            +{linkedProductsDetails[bom.id].length - 3}
+                          </Badge>
+                        )}
+                      </div>
+                    ) : (
+                      <span className="text-muted-foreground text-sm">-</span>
                     )}
                   </TableCell>
                   {isViewingAllCompanies && (
