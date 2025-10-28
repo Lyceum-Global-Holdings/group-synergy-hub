@@ -15,7 +15,24 @@ export const useGoodsReceiptNotes = (companyId?: string) => {
           created_by_profile:profiles!goods_receipt_notes_created_by_profile_fkey(full_name),
           received_by_profile:profiles!goods_receipt_notes_received_by_profile_fkey(full_name),
           approved_by_profile:profiles!goods_receipt_notes_approved_by_profile_fkey(full_name),
-          grn_items(*)
+          grn_items(
+            id,
+            grn_id,
+            item_code,
+            item_name,
+            description,
+            warehouse_item_id,
+            po_item_id,
+            quantity_ordered,
+            quantity_received,
+            unit_of_measure,
+            unit_price,
+            total_cost,
+            quality_status,
+            remarks,
+            created_at,
+            updated_at
+          )
         `)
         .order('created_at', { ascending: false });
 
@@ -44,7 +61,24 @@ export const useGrnById = (id: string) => {
           created_by_profile:profiles!goods_receipt_notes_created_by_profile_fkey(full_name),
           received_by_profile:profiles!goods_receipt_notes_received_by_profile_fkey(full_name),
           approved_by_profile:profiles!goods_receipt_notes_approved_by_profile_fkey(full_name),
-          grn_items(*)
+          grn_items(
+            id,
+            grn_id,
+            item_code,
+            item_name,
+            description,
+            warehouse_item_id,
+            po_item_id,
+            quantity_ordered,
+            quantity_received,
+            unit_of_measure,
+            unit_price,
+            total_cost,
+            quality_status,
+            remarks,
+            created_at,
+            updated_at
+          )
         `)
         .eq('id', id)
         .single();
