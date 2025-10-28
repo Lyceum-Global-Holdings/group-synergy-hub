@@ -34,6 +34,20 @@ export interface CreateProductMasterData {
   company_id?: string;
 }
 
+// Helper function to calculate total possible variants for a product master
+export function calculateTotalVariants(productMaster: ProductMaster): number {
+  const sizes = productMaster.available_sizes?.length || 0;
+  const colors = productMaster.available_colors?.length || 0;
+  
+  // If no sizes or colors defined, at least 1 variant is possible
+  if (sizes === 0 && colors === 0) return 1;
+  if (sizes === 0) return colors;
+  if (colors === 0) return sizes;
+  
+  // Total combinations = sizes × colors
+  return sizes * colors;
+}
+
 export function useProductMaster(companyId?: string) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -54,6 +68,40 @@ export function useProductMaster(companyId?: string) {
       if (error) throw error;
       return data as any[] as ProductMaster[];
     },
+  });
+
+  // Query to get variant counts per product master
+  const { data: variantCounts } = useQuery({
+    queryKey: ['product-master-variants', companyId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('finished_goods')
+        .select('product_master_id, size, color');
+      
+      if (error) throw error;
+      
+      // Group by product_master_id and count unique size+color combinations
+      const counts = new Map<string, Set<string>>();
+      
+      data?.forEach((item) => {
+        if (item.product_master_id) {
+          if (!counts.has(item.product_master_id)) {
+            counts.set(item.product_master_id, new Set());
+          }
+          const variantKey = `${item.size || 'All'}-${item.color || 'None'}`;
+          counts.get(item.product_master_id)!.add(variantKey);
+        }
+      });
+      
+      // Convert to object with counts
+      const result: Record<string, number> = {};
+      counts.forEach((variants, productMasterId) => {
+        result[productMasterId] = variants.size;
+      });
+      
+      return result;
+    },
+    enabled: !!products,
   });
 
   const createProductMutation = useMutation({
@@ -148,6 +196,7 @@ export function useProductMaster(companyId?: string) {
     products,
     isLoading,
     error,
+    variantCounts,
     createProduct: createProductMutation.mutate,
     updateProduct: updateProductMutation.mutate,
     deleteProduct: deleteProductMutation.mutate,

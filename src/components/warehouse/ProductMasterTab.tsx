@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Plus, Search, Edit, Trash2, Eye, Sparkles } from "lucide-react";
-import { useProductMaster, ProductMaster } from "@/hooks/useProductMaster";
+import { useProductMaster, ProductMaster, calculateTotalVariants } from "@/hooks/useProductMaster";
 import { useCompany } from "@/contexts/CompanyContext";
 import { CreateProductMasterDialog } from "./CreateProductMasterDialog";
 import { ProductMasterDetailsDialog } from "./ProductMasterDetailsDialog";
@@ -21,7 +21,7 @@ export function ProductMasterTab() {
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [generateDialogOpen, setGenerateDialogOpen] = useState(false);
   const { selectedCompany } = useCompany();
-  const { products, isLoading, deleteProduct } = useProductMaster(selectedCompany?.id);
+  const { products, isLoading, deleteProduct, variantCounts } = useProductMaster(selectedCompany?.id);
 
   const filteredProducts = products?.filter((product) =>
     product.product_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -143,14 +143,25 @@ export function ProductMasterTab() {
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            title="Generate Variants"
-                            onClick={() => handleGenerateVariants(product)}
-                          >
-                            <Sparkles className="h-4 w-4" />
-                          </Button>
+                          {(() => {
+                            const existingVariants = variantCounts?.[product.id] || 0;
+                            const totalPossible = calculateTotalVariants(product);
+                            
+                            // Only render the button if there are missing variants
+                            if (existingVariants < totalPossible) {
+                              return (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  title={`Generate Variants (${existingVariants}/${totalPossible} created)`}
+                                  onClick={() => handleGenerateVariants(product)}
+                                >
+                                  <Sparkles className="h-4 w-4" />
+                                </Button>
+                              );
+                            }
+                            return null;
+                          })()}
                           <Button
                             variant="ghost"
                             size="icon"
