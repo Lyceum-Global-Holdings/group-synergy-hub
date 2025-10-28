@@ -93,6 +93,10 @@ export interface DemandAnalysisResult {
   category?: string;
   priority: DemandPriority;
   lead_time_days: number;
+  reserved_quantity?: number;
+  warehouse_item_id?: string;
+  bom_id?: string;
+  bom_item_id?: string;
   is_linked_to_bom?: boolean;
   bom_info?: {
     bom_number: string;

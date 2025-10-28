@@ -381,7 +381,7 @@ export const useDemandCalculation = (companyId?: string) => {
       if (warehouseItemIds.length > 0 || itemCodes.length > 0 || itemNames.length > 0) {
         let query = supabase
           .from('warehouse_items')
-          .select('id, item_code, name, current_stock, reorder_level, min_stock_level, unit_cost, supplier_id, company_id');
+          .select('id, item_code, name, current_stock, reserved_quantity, reorder_level, min_stock_level, unit_cost, supplier_id, company_id');
         
         // Add company filter if available
         if (companyId) {
@@ -461,6 +461,7 @@ export const useDemandCalculation = (companyId?: string) => {
         const adjustedConsumption = baseConsumption * sizeMultiplier;
         const totalRequired = adjustedConsumption * input.production_quantity;
         const availableStock = warehouseItem?.current_stock || 0;
+        const reservedQty = warehouseItem?.reserved_quantity || 0;
         const onOrder = relatedPOItems.reduce((sum, item) => sum + (item.quantity_pending || 0), 0);
         const shortage = Math.max(0, totalRequired - availableStock - onOrder);
         const safetyStock = input.include_safety_stock ? (warehouseItem?.min_stock_level || 0) : 0;
@@ -906,10 +907,10 @@ export const useDemandCalculation = (companyId?: string) => {
         throw new Error('Failed to fetch finished goods');
       }
 
-      // Fetch warehouse items for stock information
+      // Fetch warehouse items for stock information including reserved quantities
       const { data: warehouseItems, error: wiError } = await supabase
         .from('warehouse_items')
-        .select('*');
+        .select('id, item_code, name, current_stock, reserved_quantity, reorder_level, min_stock_level, unit_cost, supplier_id, company_id');
 
       if (wiError) {
         console.error('Error fetching warehouse items:', wiError);
@@ -1208,6 +1209,7 @@ export const useDemandCalculation = (companyId?: string) => {
                     
                     const warehouseItem = warehouseItemsMap.get(bomItem.item_code);
                     const currentMaterialStock = Number(warehouseItem?.current_stock) || 0;
+                    const reservedQty = Number(warehouseItem?.reserved_quantity) || 0;
                     const materialShortage = Math.max(0, materialRequired - currentMaterialStock);
                     
                     console.log(`    📦 Component: ${bomItem.item_name} (${bomItem.item_code})`);
@@ -1269,31 +1271,35 @@ export const useDemandCalculation = (companyId?: string) => {
                       existingResult.cpo_details.push(cpoContribution);
                       existingResult.total_cpos_involved = existingResult.cpo_details.length;
                     } else {
-                      analysisResults.push({
-                        item_code: bomItem.item_code || 'N/A',
-                        item_name: bomItem.item_name,
-                        total_required: materialRequired,
-                        available_stock: currentMaterialStock,
-                        on_order: 0,
-                        shortage: materialShortage,
-                        suggested_order: materialShortage,
-                        unit_of_measure: bomItem.unit_of_measure,
-                        category: 'BOM Material',
-                        priority: materialShortage > 0 ? 'high' : 'medium',
-                        lead_time_days: 7,
-                        is_linked_to_bom: true,
-                        bom_info: {
-                          bom_number: bomMeta.bom_number,
-                          product_name: bomMeta.product_name
-                        },
-                        finished_good_info: {
-                          product_code: primaryFg.product_code,
-                          product_name: primaryFg.product_name,
-                          current_stock: totalAvailableStock
-                        },
-                        cpo_details: [cpoContribution],
-                        total_cpos_involved: 1
-                      });
+                    analysisResults.push({
+                      item_code: bomItem.item_code || 'N/A',
+                      item_name: bomItem.item_name,
+                      total_required: materialRequired,
+                      available_stock: currentMaterialStock,
+                      reserved_quantity: Number(warehouseItem?.reserved_quantity) || 0,
+                      warehouse_item_id: bomItem.warehouse_item_id,
+                      bom_id: bomId,
+                      bom_item_id: bomItem.id,
+                      on_order: 0,
+                      shortage: materialShortage,
+                      suggested_order: materialShortage,
+                      unit_of_measure: bomItem.unit_of_measure,
+                      category: 'BOM Material',
+                      priority: materialShortage > 0 ? 'high' : 'medium',
+                      lead_time_days: 7,
+                      is_linked_to_bom: true,
+                      bom_info: {
+                        bom_number: bomMeta.bom_number,
+                        product_name: bomMeta.product_name
+                      },
+                      finished_good_info: {
+                        product_code: primaryFg.product_code,
+                        product_name: primaryFg.product_name,
+                        current_stock: totalAvailableStock
+                      },
+                      cpo_details: [cpoContribution],
+                      total_cpos_involved: 1
+                    });
                     }
                   }
                 } else {

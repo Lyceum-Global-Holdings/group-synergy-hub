@@ -22,6 +22,7 @@ import { useNavigate } from 'react-router-dom';
 import { CreateDispatchNoteDialog } from '@/components/warehouse/CreateDispatchNoteDialog';
 import { CreatePrFromDemandDialog } from '@/components/procurement/CreatePrFromDemandDialog';
 import { BulkPrPreviewDialog } from '@/components/procurement/BulkPrPreviewDialog';
+import { ReserveMaterialsFromCPODialog } from '@/components/procurement/ReserveMaterialsFromCPODialog';
 import { supabase } from '@/integrations/supabase/client';
 
 const MaterialDemandPlanning = () => {
@@ -53,6 +54,7 @@ const MaterialDemandPlanning = () => {
   const [selectedBomDetails, setSelectedBomDetails] = useState<{ size?: string; sizeMultiplier?: number } | null>(null);
   const [bulkPrDialogOpen, setBulkPrDialogOpen] = useState(false);
   const [bulkPrPreviewData, setBulkPrPreviewData] = useState<any>(null);
+  const [reservationDialogOpen, setReservationDialogOpen] = useState(false);
 
   // Filter confirmed CPOs for CPO-based demand calculation
   const confirmedCPOs = customerPOs?.filter(cpo => cpo.status === 'confirmed') || [];
@@ -690,16 +692,28 @@ const MaterialDemandPlanning = () => {
                       Material requirements based on your production parameters
                     </CardDescription>
                   </div>
-                  {bomMaterialsWithShortage.length > 0 && (
-                    <Button 
-                      onClick={handleOpenBulkPrPreview} 
-                      disabled={createPrMutation.isPending}
-                      variant="default"
-                    >
-                      <FileText className="h-4 w-4 mr-2" />
-                      Generate Consolidated PR ({bomMaterialsWithShortage.length} items)
-                    </Button>
-                  )}
+                  <div className="flex gap-2">
+                    {demandSource === 'customer_po' && bomMaterialsWithShortage.length > 0 && (
+                      <Button 
+                        onClick={() => setReservationDialogOpen(true)}
+                        variant="secondary"
+                        disabled={selectedCPOs.length === 0}
+                      >
+                        <Package className="h-4 w-4 mr-2" />
+                        Reserve Materials ({bomMaterialsWithShortage.length})
+                      </Button>
+                    )}
+                    {bomMaterialsWithShortage.length > 0 && (
+                      <Button 
+                        onClick={handleOpenBulkPrPreview} 
+                        disabled={createPrMutation.isPending}
+                        variant="default"
+                      >
+                        <FileText className="h-4 w-4 mr-2" />
+                        Generate Consolidated PR ({bomMaterialsWithShortage.length} items)
+                      </Button>
+                    )}
+                  </div>
                 </CardHeader>
                 <CardContent>
                   {/* Stock matching feedback */}
@@ -716,7 +730,7 @@ const MaterialDemandPlanning = () => {
                       </div>
                     </div>
                   </div>
-                  <Table>
+                   <Table>
                      <TableHeader>
                        <TableRow>
                          <TableHead>Status</TableHead>
@@ -726,6 +740,7 @@ const MaterialDemandPlanning = () => {
                          <TableHead>Category</TableHead>
                          <TableHead>Required</TableHead>
                          <TableHead>Available</TableHead>
+                         <TableHead>Reserved</TableHead>
                          <TableHead>On Order</TableHead>
                          <TableHead>Shortage</TableHead>
                          <TableHead>Suggested Order</TableHead>
@@ -778,6 +793,16 @@ const MaterialDemandPlanning = () => {
                            </TableCell>
                            <TableCell>{item.total_required} {item.unit_of_measure}</TableCell>
                            <TableCell>{item.available_stock} {item.unit_of_measure}</TableCell>
+                           <TableCell>
+                             <div className="flex flex-col gap-1">
+                               <span>{item.reserved_quantity || 0} {item.unit_of_measure}</span>
+                               {(item.reserved_quantity || 0) > 0 && (
+                                 <span className="text-xs text-muted-foreground">
+                                   Avail: {(item.available_stock - (item.reserved_quantity || 0))} {item.unit_of_measure}
+                                 </span>
+                               )}
+                             </div>
+                           </TableCell>
                            <TableCell>{item.on_order} {item.unit_of_measure}</TableCell>
                            <TableCell className={item.shortage > 0 ? 'text-destructive font-medium' : ''}>
                              {item.shortage} {item.unit_of_measure}
@@ -989,6 +1014,24 @@ const MaterialDemandPlanning = () => {
         previewData={bulkPrPreviewData}
         onConfirm={handleGeneratePR}
         isCreating={createPrMutation.isPending}
+      />
+
+      <ReserveMaterialsFromCPODialog
+        open={reservationDialogOpen}
+        onOpenChange={setReservationDialogOpen}
+        materials={bomMaterialsWithShortage}
+        cpoIds={selectedCPOs}
+        cpoNumbers={confirmedCPOs.filter(cpo => selectedCPOs.includes(cpo.id)).map(cpo => cpo.cpo_number)}
+        requiredDate={analysisDate}
+        onReservationComplete={() => {
+          setReservationDialogOpen(false);
+          // Re-calculate demand to show updated reserved quantities
+          handleCalculateDemand();
+          toast({
+            title: "Materials Reserved",
+            description: "Materials have been successfully reserved for the selected CPO(s).",
+          });
+        }}
       />
     </div>
   );
