@@ -160,6 +160,130 @@ export function useBillOfMaterials(companyId?: string) {
     }
   });
 
+  const duplicateBomMutation = useMutation({
+    mutationFn: async (id: string) => {
+      // Fetch original BOM
+      const { data: originalBom, error: bomError } = await supabase
+        .from('bill_of_materials')
+        .select('*')
+        .eq('id', id)
+        .single();
+
+      if (bomError) throw bomError;
+
+      // Fetch BOM items
+      const { data: originalItems, error: itemsError } = await supabase
+        .from('bom_items')
+        .select('*')
+        .eq('bom_id', id);
+
+      if (itemsError) throw itemsError;
+
+      // Fetch linked finished goods
+      const { data: linkedProducts, error: linkedError } = await supabase
+        .from('bom_finished_goods')
+        .select('finished_good_id')
+        .eq('bom_id', id);
+
+      if (linkedError) throw linkedError;
+
+      const user = await supabase.auth.getUser();
+
+      // Increment version
+      const incrementVersion = (version: string): string => {
+        const numericMatch = version.match(/^(\d+)\.(\d+)$/);
+        if (numericMatch) {
+          const [, major, minor] = numericMatch;
+          return `${major}.${parseInt(minor) + 1}`;
+        }
+        const majorOnlyMatch = version.match(/^(\d+)$/);
+        if (majorOnlyMatch) {
+          return `${majorOnlyMatch[1]}.1`;
+        }
+        return `${version} (Copy)`;
+      };
+
+      // Create new BOM
+      const { data: newBom, error: createError } = await supabase
+        .from('bill_of_materials')
+        .insert({
+          product_name: `${originalBom.product_name} (Copy)`,
+          product_master_id: originalBom.product_master_id,
+          warehouse_item_id: originalBom.warehouse_item_id,
+          style_no: originalBom.style_no,
+          version: incrementVersion(originalBom.version),
+          size: originalBom.size,
+          description: originalBom.description,
+          status: 'draft',
+          company_id: originalBom.company_id,
+          created_by: user.data.user?.id,
+        } as any)
+        .select()
+        .single();
+
+      if (createError) throw createError;
+
+      // Duplicate BOM items
+      if (originalItems && originalItems.length > 0) {
+        const newItems = originalItems.map(item => ({
+          bom_id: newBom.id,
+          item_name: item.item_name,
+          description: item.description,
+          quantity: item.quantity,
+          unit_of_measure: item.unit_of_measure,
+          unit_cost: item.unit_cost,
+          total_cost: item.total_cost,
+          supplier_part_number: item.supplier_part_number,
+          manufacturer_part_number: item.manufacturer_part_number,
+          po_item_id: item.po_item_id,
+          notes: item.notes,
+          item_code: item.item_code,
+          consumption: item.consumption,
+          category: item.category,
+          warehouse_item_id: item.warehouse_item_id,
+        }));
+
+        const { error: insertItemsError } = await supabase
+          .from('bom_items')
+          .insert(newItems);
+
+        if (insertItemsError) throw insertItemsError;
+      }
+
+      // Copy linked finished goods
+      if (linkedProducts && linkedProducts.length > 0) {
+        const newLinks = linkedProducts.map(link => ({
+          bom_id: newBom.id,
+          finished_good_id: link.finished_good_id,
+        }));
+
+        const { error: insertLinksError } = await supabase
+          .from('bom_finished_goods')
+          .insert(newLinks);
+
+        if (insertLinksError) throw insertLinksError;
+      }
+
+      return newBom;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['bill-of-materials'] });
+      queryClient.invalidateQueries({ queryKey: ['bom-linked-products-counts'] });
+      queryClient.invalidateQueries({ queryKey: ['bom-linked-products-details'] });
+      toast({
+        title: "Success",
+        description: `BOM duplicated successfully as ${data.bom_number}`,
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to duplicate BOM",
+        variant: "destructive",
+      });
+    }
+  });
+
   return {
     boms,
     isLoading,
@@ -167,9 +291,11 @@ export function useBillOfMaterials(companyId?: string) {
     createBom: createBomMutation.mutateAsync,
     updateBom: updateBomMutation.mutateAsync,
     deleteBom: deleteBomMutation.mutateAsync,
+    duplicateBom: duplicateBomMutation.mutateAsync,
     isCreating: createBomMutation.isPending,
     isUpdating: updateBomMutation.isPending,
     isDeleting: deleteBomMutation.isPending,
+    isDuplicating: duplicateBomMutation.isPending,
   };
 }
 

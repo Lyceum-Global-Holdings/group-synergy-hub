@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus, FileText, Edit, Trash2, Eye, Sparkles } from "lucide-react";
+import { Plus, FileText, Edit, Trash2, Eye, Sparkles, Copy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -42,7 +42,7 @@ const statusLabels = {
 
 export default function BillOfMaterialsPage() {
   const { selectedCompany, isViewingAllCompanies } = useCompany();
-  const { boms, isLoading, deleteBom, isDeleting } = useBillOfMaterials(isViewingAllCompanies ? undefined : selectedCompany?.id);
+  const { boms, isLoading, deleteBom, isDeleting, duplicateBom, isDuplicating } = useBillOfMaterials(isViewingAllCompanies ? undefined : selectedCompany?.id);
   const { data: linkedProductCounts = {} } = useBomLinkedProductsCounts();
   const { data: linkedProductsDetails = {} } = useBomLinkedProductsDetails();
   const [searchTerm, setSearchTerm] = useState("");
@@ -65,6 +65,12 @@ export default function BillOfMaterialsPage() {
   const handleDelete = async (id: string) => {
     if (confirm("Are you sure you want to delete this BOM?")) {
       await deleteBom(id);
+    }
+  };
+
+  const handleDuplicate = async (id: string) => {
+    if (confirm("Duplicate this BOM? This will create a copy with all items and linked products.")) {
+      await duplicateBom(id);
     }
   };
 
@@ -282,6 +288,15 @@ export default function BillOfMaterialsPage() {
                         title="Edit BOM"
                       >
                         <Edit className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleDuplicate(bom.id)}
+                        disabled={isDuplicating}
+                        title="Duplicate BOM"
+                      >
+                        <Copy className="h-4 w-4" />
                       </Button>
                       <Button
                         variant="ghost"
