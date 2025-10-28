@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Plus, Search, Filter, Edit, Trash2, Package, TrendingUp, TrendingDown, History, Settings, ShoppingCart, AlertTriangle, Calendar } from 'lucide-react';
+import { Plus, Search, Filter, Edit, Trash2, Package, TrendingUp, TrendingDown, History, Settings, ShoppingCart, AlertTriangle, Calendar, Upload } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -18,6 +18,7 @@ import { EditFinishedGoodDialog } from './EditFinishedGoodDialog';
 import { FinishedGoodsMovementDialog } from './FinishedGoodsMovementDialog';
 import { FinishedGoodsStockAdjustmentDialog } from './FinishedGoodsStockAdjustmentDialog';
 import { ViewRelatedOrdersDialog } from './ViewRelatedOrdersDialog';
+import { BulkUploadFinishedGoodsDialog } from './BulkUploadFinishedGoodsDialog';
 import { useToast } from '@/hooks/use-toast';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -27,6 +28,7 @@ import { format } from 'date-fns';
 export function FinishedGoodsMasterTab() {
   const [searchTerm, setSearchTerm] = useState('');
   const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [showBulkUploadDialog, setShowBulkUploadDialog] = useState(false);
   const [editingProduct, setEditingProduct] = useState<string | null>(null);
   const [movementDialogProduct, setMovementDialogProduct] = useState<{id: string, name: string, stock: number} | null>(null);
   const [adjustmentDialogProduct, setAdjustmentDialogProduct] = useState<{id: string, name: string, stock: number} | null>(null);
@@ -161,10 +163,16 @@ export function FinishedGoodsMasterTab() {
               <Package className="h-5 w-5" />
               Finished Goods Master
             </CardTitle>
-            <Button onClick={() => setShowCreateDialog(true)}>
-              <Plus className="h-4 w-4 mr-2" />
-              Add Product
-            </Button>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => setShowBulkUploadDialog(true)}>
+                <Upload className="h-4 w-4 mr-2" />
+                Bulk Upload
+              </Button>
+              <Button onClick={() => setShowCreateDialog(true)}>
+                <Plus className="h-4 w-4 mr-2" />
+                Add Product
+              </Button>
+            </div>
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -337,6 +345,12 @@ export function FinishedGoodsMasterTab() {
       <CreateFinishedGoodDialog
         open={showCreateDialog}
         onOpenChange={setShowCreateDialog}
+      />
+
+      <BulkUploadFinishedGoodsDialog
+        open={showBulkUploadDialog}
+        onOpenChange={setShowBulkUploadDialog}
+        companyId={selectedCompany?.id || ''}
       />
 
       {editingProduct && (
