@@ -266,7 +266,131 @@ export const useApproveGoodsReceiptNote = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
-      const { error } = await supabase
+      // Fetch GRN with items
+      const { data: grn, error: grnFetchError } = await supabase
+        .from('goods_receipt_notes')
+        .select('*, grn_items(*)')
+        .eq('id', id)
+        .single();
+
+      if (grnFetchError) throw grnFetchError;
+      if (!grn) throw new Error('GRN not found');
+
+      // Process each GRN item with 'good' quality status
+      const goodItems = grn.grn_items.filter((item: any) => item.quality_status === 'good');
+      
+      for (const item of goodItems) {
+        let warehouseItemId = item.warehouse_item_id;
+
+        // If no warehouse_item_id, try to look it up by item_code
+        if (!warehouseItemId && item.item_code) {
+          const { data: warehouseItem, error: lookupError } = await supabase
+            .from('warehouse_items')
+            .select('id')
+            .eq('item_code', item.item_code)
+            .eq('status', 'active')
+            .or(`company_id.eq.${grn.company_id},company_id.is.null`)
+            .limit(1)
+            .maybeSingle();
+
+          if (lookupError) {
+            console.error(`Error looking up warehouse item for ${item.item_code}:`, lookupError);
+            continue;
+          }
+
+          if (warehouseItem) {
+            warehouseItemId = warehouseItem.id;
+            
+            // Update grn_items with the found warehouse_item_id
+            await supabase
+              .from('grn_items')
+              .update({ warehouse_item_id: warehouseItemId })
+              .eq('id', item.id);
+          } else {
+            console.warn(`No warehouse item found for item_code: ${item.item_code}`);
+            continue;
+          }
+        }
+
+        if (!warehouseItemId) {
+          console.warn(`Skipping item ${item.item_code} - no warehouse_item_id`);
+          continue;
+        }
+
+        // Get current stock from warehouse_items
+        const { data: warehouseItem, error: stockError } = await supabase
+          .from('warehouse_items')
+          .select('current_stock')
+          .eq('id', warehouseItemId)
+          .single();
+
+        if (stockError) {
+          console.error(`Error fetching stock for warehouse item ${warehouseItemId}:`, stockError);
+          continue;
+        }
+
+        const currentStock = warehouseItem?.current_stock || 0;
+        const newStock = currentStock + item.quantity_received;
+
+        // Update warehouse stock
+        const { error: updateStockError } = await supabase
+          .from('warehouse_items')
+          .update({ 
+            current_stock: newStock,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', warehouseItemId);
+
+        if (updateStockError) {
+          console.error(`Error updating stock for warehouse item ${warehouseItemId}:`, updateStockError);
+          throw updateStockError;
+        }
+
+        // Create stock transaction record
+        const { error: transactionError } = await supabase
+          .from('stock_transactions')
+          .insert({
+            item_id: warehouseItemId,
+            transaction_type: 'goods_receipt',
+            reference_type: 'grn',
+            reference_id: grn.id,
+            quantity_change: item.quantity_received,
+            quantity_before: currentStock,
+            quantity_after: newStock,
+            unit_cost: item.unit_price || 0,
+            total_value: item.total_cost || 0,
+            notes: `GRN ${grn.grn_number} - ${item.item_name || item.item_code}`,
+            company_id: grn.company_id,
+            created_by: user.id,
+          });
+
+        if (transactionError) {
+          console.error(`Error creating stock transaction:`, transactionError);
+          throw transactionError;
+        }
+
+        // Update PO items if linked
+        if (item.po_item_id) {
+          const { data: poItem } = await supabase
+            .from('po_items')
+            .select('quantity_received')
+            .eq('id', item.po_item_id)
+            .single();
+
+          if (poItem) {
+            await supabase
+              .from('po_items')
+              .update({
+                quantity_received: (poItem.quantity_received || 0) + item.quantity_received,
+                updated_at: new Date().toISOString()
+              })
+              .eq('id', item.po_item_id);
+          }
+        }
+      }
+
+      // Finally, update GRN status to approved
+      const { error: approveError } = await supabase
         .from('goods_receipt_notes')
         .update({
           status: 'approved',
@@ -275,7 +399,9 @@ export const useApproveGoodsReceiptNote = () => {
         })
         .eq('id', id);
 
-      if (error) throw error;
+      if (approveError) throw approveError;
+
+      return { processedItems: goodItems.length };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['goods-receipt-notes'] });
