@@ -255,6 +255,7 @@ export function useBillOfMaterials(companyId?: string) {
         const newLinks = linkedProducts.map(link => ({
           bom_id: newBom.id,
           finished_good_id: link.finished_good_id,
+          created_by: user.data.user?.id,
         }));
 
         const { error: insertLinksError } = await supabase

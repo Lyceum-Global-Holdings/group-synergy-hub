@@ -22,6 +22,7 @@ import {
 import { useBillOfMaterials } from "@/hooks/useBillOfMaterials";
 import { useCompany } from "@/contexts/CompanyContext";
 import { BillOfMaterials } from "@/types/bom";
+import { useQueryClient } from "@tanstack/react-query";
 import { CreateBomDialog } from "@/components/procurement/CreateBomDialog";
 import { BomDetailsDialog } from "@/components/procurement/BomDetailsDialog";
 import { EditBomDialog } from "@/components/procurement/EditBomDialog";
@@ -45,10 +46,12 @@ export default function BillOfMaterialsPage() {
   const { boms, isLoading, deleteBom, isDeleting, duplicateBom, isDuplicating } = useBillOfMaterials(isViewingAllCompanies ? undefined : selectedCompany?.id);
   const { data: linkedProductCounts = {} } = useBomLinkedProductsCounts();
   const { data: linkedProductsDetails = {} } = useBomLinkedProductsDetails();
+  const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [selectedBom, setSelectedBom] = useState<BillOfMaterials | null>(null);
   const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
   const [bulkLinkBomId, setBulkLinkBomId] = useState<string>("");
   const [bulkLinkProductMasterId, setBulkLinkProductMasterId] = useState<string>("");
@@ -70,7 +73,21 @@ export default function BillOfMaterialsPage() {
 
   const handleDuplicate = async (id: string) => {
     if (confirm("Duplicate this BOM? This will create a copy with all items and linked products.")) {
-      await duplicateBom(id);
+      try {
+        await duplicateBom(id);
+        // Get the newly created BOM from the cache
+        const updatedBoms = queryClient.getQueryData(['bill-of-materials', isViewingAllCompanies ? undefined : selectedCompany?.id]) as BillOfMaterials[] | undefined;
+        if (updatedBoms && updatedBoms.length > 0) {
+          // The newest BOM will be the one we just created
+          const newestBom = updatedBoms.reduce((prev, current) => 
+            new Date(current.created_at) > new Date(prev.created_at) ? current : prev
+          );
+          setSelectedBom(newestBom);
+          setIsEditDialogOpen(true);
+        }
+      } catch (error) {
+        console.error('Error duplicating BOM:', error);
+      }
     }
   };
 
@@ -347,6 +364,18 @@ export default function BillOfMaterialsPage() {
           if (!open) {
             setSelectedBom(null);
             setIsEditMode(false);
+          }
+        }}
+      />
+
+      {/* Edit BOM Dialog (from duplicate) */}
+      <EditBomDialog
+        bom={selectedBom}
+        open={isEditDialogOpen}
+        onOpenChange={(open) => {
+          setIsEditDialogOpen(open);
+          if (!open) {
+            setSelectedBom(null);
           }
         }}
       />
