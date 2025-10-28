@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { Plus, Trash2, Link2, X, Ruler } from 'lucide-react';
+import { Plus, Trash2, Link2, X, Ruler, Sparkles } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import {
   Dialog,
@@ -41,6 +41,7 @@ import { CreateBomItemData } from '@/types/bom';
 import { ItemSelector } from '@/components/common/ItemSelector';
 import { ProductMasterSelector } from '@/components/common/ProductMasterSelector';
 import { BomSizeMultiplierDialog } from '@/components/procurement/BomSizeMultiplierDialog';
+import { BulkLinkProductsDialog } from '@/components/procurement/BulkLinkProductsDialog';
 import { WarehouseItem } from '@/types/itemBin';
 
 const bomSchema = z.object({
@@ -63,6 +64,7 @@ interface CreateBomDialogProps {
 export function CreateBomDialog({ children }: CreateBomDialogProps) {
   const [open, setOpen] = useState(false);
   const [multiplierDialogOpen, setMultiplierDialogOpen] = useState(false);
+  const [bulkLinkDialogOpen, setBulkLinkDialogOpen] = useState(false);
   const [createdBomId, setCreatedBomId] = useState<string | null>(null);
   const [items, setItems] = useState<Record<BomCategoryKey, CreateBomItemData[]>>({
     fabric: [],
@@ -598,6 +600,16 @@ export function CreateBomDialog({ children }: CreateBomDialogProps) {
             </Card>
 
             <div className="flex justify-end gap-4">
+              {createdBomId && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setBulkLinkDialogOpen(true)}
+                >
+                  <Sparkles className="h-4 w-4 mr-2" />
+                  Bulk Link Products
+                </Button>
+              )}
               <Button
                 type="button"
                 variant="outline"
@@ -642,6 +654,16 @@ export function CreateBomDialog({ children }: CreateBomDialogProps) {
                 });
               }
             }}
+          />
+        )}
+
+        {createdBomId && form.watch('product_master_id') && (
+          <BulkLinkProductsDialog
+            open={bulkLinkDialogOpen}
+            onOpenChange={setBulkLinkDialogOpen}
+            bomId={createdBomId}
+            productMasterId={form.watch('product_master_id')}
+            companyId={selectedCompany?.id}
           />
         )}
       </DialogContent>

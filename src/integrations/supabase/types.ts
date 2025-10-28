@@ -1627,6 +1627,52 @@ export type Database = {
           },
         ]
       }
+      bom_finished_goods: {
+        Row: {
+          bom_id: string
+          created_at: string
+          created_by: string | null
+          finished_good_id: string
+          id: string
+        }
+        Insert: {
+          bom_id: string
+          created_at?: string
+          created_by?: string | null
+          finished_good_id: string
+          id?: string
+        }
+        Update: {
+          bom_id?: string
+          created_at?: string
+          created_by?: string | null
+          finished_good_id?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bom_finished_goods_bom_id_fkey"
+            columns: ["bom_id"]
+            isOneToOne: false
+            referencedRelation: "bill_of_materials"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bom_finished_goods_bom_id_fkey"
+            columns: ["bom_id"]
+            isOneToOne: false
+            referencedRelation: "modern_boms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bom_finished_goods_finished_good_id_fkey"
+            columns: ["finished_good_id"]
+            isOneToOne: false
+            referencedRelation: "finished_goods"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       bom_item_substitutions: {
         Row: {
           availability_status: string | null
