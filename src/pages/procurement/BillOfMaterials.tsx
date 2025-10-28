@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus, FileText, Edit, Trash2, Eye } from "lucide-react";
+import { Plus, FileText, Edit, Trash2, Eye, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -25,6 +25,8 @@ import { BillOfMaterials } from "@/types/bom";
 import { CreateBomDialog } from "@/components/procurement/CreateBomDialog";
 import { BomDetailsDialog } from "@/components/procurement/BomDetailsDialog";
 import { EditBomDialog } from "@/components/procurement/EditBomDialog";
+import { BulkLinkProductsDialog } from "@/components/procurement/BulkLinkProductsDialog";
+import { useBomLinkedProductsCounts } from "@/hooks/useBomFinishedGoodsLinks";
 
 const statusColors = {
   active: "bg-success text-success-foreground",
@@ -41,11 +43,15 @@ const statusLabels = {
 export default function BillOfMaterialsPage() {
   const { selectedCompany, isViewingAllCompanies } = useCompany();
   const { boms, isLoading, deleteBom, isDeleting } = useBillOfMaterials(isViewingAllCompanies ? undefined : selectedCompany?.id);
+  const { data: linkedProductCounts = {} } = useBomLinkedProductsCounts();
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [selectedBom, setSelectedBom] = useState<BillOfMaterials | null>(null);
   const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
+  const [bulkLinkBomId, setBulkLinkBomId] = useState<string>("");
+  const [bulkLinkProductMasterId, setBulkLinkProductMasterId] = useState<string>("");
+  const [bulkLinkDialogOpen, setBulkLinkDialogOpen] = useState(false);
 
   // Filter BOMs
   const filteredBoms = boms.filter((bom) => {
@@ -183,6 +189,7 @@ export default function BillOfMaterialsPage() {
                 <TableHead>Product Name</TableHead>
                 <TableHead>Version</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead>Linked Products</TableHead>
                 {isViewingAllCompanies && <TableHead>Company</TableHead>}
                 <TableHead>Created Date</TableHead>
                 <TableHead>Actions</TableHead>
@@ -195,6 +202,15 @@ export default function BillOfMaterialsPage() {
                   <TableCell>{bom.product_name}</TableCell>
                   <TableCell>{bom.version}</TableCell>
                   <TableCell>{getStatusBadge(bom.status)}</TableCell>
+                  <TableCell>
+                    {linkedProductCounts[bom.id] > 0 ? (
+                      <Badge variant="secondary">
+                        {linkedProductCounts[bom.id]} linked
+                      </Badge>
+                    ) : (
+                      <span className="text-muted-foreground text-sm">None</span>
+                    )}
+                  </TableCell>
                   {isViewingAllCompanies && (
                     <TableCell>
                       <Badge variant="outline">
@@ -215,8 +231,22 @@ export default function BillOfMaterialsPage() {
                           setIsEditMode(false);
                           setIsDetailsDialogOpen(true);
                         }}
+                        title="View details"
                       >
                         <Eye className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setBulkLinkBomId(bom.id);
+                          setBulkLinkProductMasterId(bom.product_master_id || '');
+                          setBulkLinkDialogOpen(true);
+                        }}
+                        disabled={!bom.product_master_id}
+                        title={bom.product_master_id ? "Link products from product master" : "No product master linked"}
+                      >
+                        <Sparkles className="h-4 w-4" />
                       </Button>
                       <Button
                         variant="ghost"
@@ -226,6 +256,7 @@ export default function BillOfMaterialsPage() {
                           setIsEditMode(true);
                           setIsDetailsDialogOpen(true);
                         }}
+                        title="Edit BOM"
                       >
                         <Edit className="h-4 w-4" />
                       </Button>
@@ -234,6 +265,7 @@ export default function BillOfMaterialsPage() {
                         size="sm"
                         onClick={() => handleDelete(bom.id)}
                         disabled={isDeleting}
+                        title="Delete BOM"
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -279,6 +311,15 @@ export default function BillOfMaterialsPage() {
             setIsEditMode(false);
           }
         }}
+      />
+
+      {/* Bulk Link Products Dialog */}
+      <BulkLinkProductsDialog
+        open={bulkLinkDialogOpen}
+        onOpenChange={setBulkLinkDialogOpen}
+        bomId={bulkLinkBomId}
+        productMasterId={bulkLinkProductMasterId}
+        companyId={selectedCompany?.id}
       />
     </div>
   );

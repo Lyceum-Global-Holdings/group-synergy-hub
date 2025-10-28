@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { format } from 'date-fns';
-import { FileText, Calendar, User, Package, Edit2, Ruler } from 'lucide-react';
+import { FileText, Calendar, User, Package, Edit2, Ruler, Sparkles, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -23,6 +23,8 @@ import {
 } from '@/components/ui/table';
 import { useBomItems } from '@/hooks/useBillOfMaterials';
 import { useBomSizeMultipliers } from '@/hooks/useBomSizeMultipliers';
+import { useBomFinishedGoodsLinks } from '@/hooks/useBomFinishedGoodsLinks';
+import { BulkLinkProductsDialog } from '@/components/procurement/BulkLinkProductsDialog';
 import type { BillOfMaterials } from '@/types/bom';
 
 interface BomDetailsDialogProps {
@@ -45,8 +47,10 @@ const statusLabels = {
 };
 
 export function BomDetailsDialog({ bom, open, onOpenChange, onEdit }: BomDetailsDialogProps) {
+  const [bulkLinkDialogOpen, setBulkLinkDialogOpen] = useState(false);
   const { items, isLoading: itemsLoading } = useBomItems(bom?.id || '');
   const { multipliers, getMultiplierForSize } = useBomSizeMultipliers(bom?.id || '');
+  const { linkedProducts, unlinkFinishedGood, isUnlinking } = useBomFinishedGoodsLinks(bom?.id);
 
   if (!bom) return null;
 
@@ -80,6 +84,16 @@ export function BomDetailsDialog({ bom, open, onOpenChange, onEdit }: BomDetails
             </div>
             <div className="flex items-center gap-2">
               {getStatusBadge(bom.status)}
+              {bom.product_master_id && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setBulkLinkDialogOpen(true)}
+                >
+                  <Sparkles className="h-4 w-4 mr-2" />
+                  Manage Products ({linkedProducts.length})
+                </Button>
+              )}
               {onEdit && (
                 <Button
                   variant="outline"
@@ -95,9 +109,10 @@ export function BomDetailsDialog({ bom, open, onOpenChange, onEdit }: BomDetails
         </DialogHeader>
 
         <Tabs defaultValue="details" className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="details">Details</TabsTrigger>
             <TabsTrigger value="items">Items ({items?.length || 0})</TabsTrigger>
+            <TabsTrigger value="linked-products">Linked Products ({linkedProducts.length})</TabsTrigger>
             {bom.size && <TabsTrigger value="size-analysis">Size Analysis</TabsTrigger>}
           </TabsList>
 
@@ -261,6 +276,81 @@ export function BomDetailsDialog({ bom, open, onOpenChange, onEdit }: BomDetails
             </Card>
           </TabsContent>
 
+          <TabsContent value="linked-products" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Package className="h-5 w-5" />
+                    Linked Finished Goods ({linkedProducts.length})
+                  </div>
+                  {bom.product_master_id && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setBulkLinkDialogOpen(true)}
+                    >
+                      <Sparkles className="h-4 w-4 mr-2" />
+                      Add More Products
+                    </Button>
+                  )}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {linkedProducts.length > 0 ? (
+                  <div className="space-y-2">
+                    {linkedProducts.map((link: any) => (
+                      <div key={link.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 transition-colors">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <Badge variant="outline">{link.finished_goods?.fg_code || 'N/A'}</Badge>
+                            <span className="font-medium">{link.finished_goods?.fg_name || 'Unknown Product'}</span>
+                          </div>
+                          <div className="flex gap-4 mt-1 text-sm text-muted-foreground">
+                            {link.finished_goods?.size && (
+                              <span>Size: {link.finished_goods.size}</span>
+                            )}
+                            {link.finished_goods?.color && (
+                              <span>Color: {link.finished_goods.color}</span>
+                            )}
+                          </div>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => unlinkFinishedGood({ bomId: bom.id, finishedGoodId: link.finished_good_id })}
+                          disabled={isUnlinking}
+                          title="Unlink product"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-8 space-y-4">
+                    <p className="text-muted-foreground">
+                      No finished goods linked to this BOM yet.
+                    </p>
+                    {bom.product_master_id ? (
+                      <Button
+                        variant="outline"
+                        onClick={() => setBulkLinkDialogOpen(true)}
+                      >
+                        <Sparkles className="h-4 w-4 mr-2" />
+                        Link Products Now
+                      </Button>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">
+                        This BOM needs a product master to link products.
+                      </p>
+                    )}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
           {bom.size && (
             <TabsContent value="size-analysis" className="space-y-4">
               <Card>
@@ -344,6 +434,14 @@ export function BomDetailsDialog({ bom, open, onOpenChange, onEdit }: BomDetails
           )}
         </Tabs>
       </DialogContent>
+
+      {/* Bulk Link Products Dialog */}
+      <BulkLinkProductsDialog
+        open={bulkLinkDialogOpen}
+        onOpenChange={setBulkLinkDialogOpen}
+        bomId={bom.id}
+        productMasterId={bom.product_master_id || ''}
+      />
     </Dialog>
   );
 }

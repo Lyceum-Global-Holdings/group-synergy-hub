@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { Plus, Trash2, Link2, X, Ruler } from 'lucide-react';
+import { Plus, Trash2, Link2, X, Ruler, Sparkles } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -41,6 +41,7 @@ import { ItemSelector } from '@/components/common/ItemSelector';
 import { ProductMasterSelector } from '@/components/common/ProductMasterSelector';
 import { FinishedGoodsItemSelector } from '@/components/common/FinishedGoodsItemSelector';
 import { BomSizeMultiplierDialog } from '@/components/procurement/BomSizeMultiplierDialog';
+import { BulkLinkProductsDialog } from '@/components/procurement/BulkLinkProductsDialog';
 import { WarehouseItem } from '@/types/itemBin';
 
 const bomSchema = z.object({
@@ -72,6 +73,7 @@ export function EditBomDialog({ bom, open, onOpenChange }: EditBomDialogProps) {
   });
   const [selectedProductMasterId, setSelectedProductMasterId] = useState<string>('');
   const [multiplierDialogOpen, setMultiplierDialogOpen] = useState(false);
+  const [bulkLinkDialogOpen, setBulkLinkDialogOpen] = useState(false);
 
   const { selectedCompany } = useCompany();
   const { updateBom, isUpdating } = useBillOfMaterials(selectedCompany?.id);
@@ -471,18 +473,32 @@ export function EditBomDialog({ bom, open, onOpenChange }: EditBomDialogProps) {
         <DialogHeader>
           <div className="flex items-center justify-between">
             <DialogTitle>Edit Bill of Materials - {bom.bom_number}</DialogTitle>
-            {bom?.size && (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => setMultiplierDialogOpen(true)}
-                className="gap-2"
-              >
-                <Ruler className="h-4 w-4" />
-                Configure Size Multipliers
-              </Button>
-            )}
+            <div className="flex gap-2">
+              {bom?.product_master_id && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setBulkLinkDialogOpen(true)}
+                  className="gap-2"
+                >
+                  <Sparkles className="h-4 w-4" />
+                  Manage Products
+                </Button>
+              )}
+              {bom?.size && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setMultiplierDialogOpen(true)}
+                  className="gap-2"
+                >
+                  <Ruler className="h-4 w-4" />
+                  Configure Size Multipliers
+                </Button>
+              )}
+            </div>
           </div>
         </DialogHeader>
 
@@ -729,6 +745,16 @@ export function EditBomDialog({ bom, open, onOpenChange }: EditBomDialogProps) {
             availableSizes={bom.size ? [bom.size] : []}
             open={multiplierDialogOpen}
             onOpenChange={setMultiplierDialogOpen}
+          />
+        )}
+
+        {bom && bom.product_master_id && (
+          <BulkLinkProductsDialog
+            open={bulkLinkDialogOpen}
+            onOpenChange={setBulkLinkDialogOpen}
+            bomId={bom.id}
+            productMasterId={bom.product_master_id}
+            companyId={selectedCompany?.id}
           />
         )}
       </DialogContent>

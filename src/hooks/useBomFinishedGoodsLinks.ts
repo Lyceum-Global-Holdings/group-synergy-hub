@@ -10,6 +10,28 @@ export interface BomFinishedGoodLink {
   created_by?: string;
 }
 
+// Hook to fetch linked products counts for all BOMs
+export function useBomLinkedProductsCounts() {
+  return useQuery({
+    queryKey: ['bom-linked-products-counts'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('bom_finished_goods')
+        .select('bom_id, finished_good_id');
+      
+      if (error) throw error;
+      
+      // Count products per BOM
+      const counts: Record<string, number> = {};
+      data.forEach(link => {
+        counts[link.bom_id] = (counts[link.bom_id] || 0) + 1;
+      });
+      
+      return counts;
+    }
+  });
+}
+
 export function useBomFinishedGoodsLinks(bomId?: string) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -62,6 +84,7 @@ export function useBomFinishedGoodsLinks(bomId?: string) {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['bom-finished-goods-links'] });
+      queryClient.invalidateQueries({ queryKey: ['bom-linked-products-counts'] });
       queryClient.invalidateQueries({ queryKey: ['bill-of-materials'] });
       toast({
         title: "Success",
@@ -89,6 +112,7 @@ export function useBomFinishedGoodsLinks(bomId?: string) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['bom-finished-goods-links'] });
+      queryClient.invalidateQueries({ queryKey: ['bom-linked-products-counts'] });
       queryClient.invalidateQueries({ queryKey: ['bill-of-materials'] });
       toast({
         title: "Success",
