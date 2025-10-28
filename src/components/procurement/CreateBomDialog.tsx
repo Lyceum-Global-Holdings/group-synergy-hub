@@ -34,6 +34,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useBillOfMaterials } from '@/hooks/useBillOfMaterials';
 import { useCompany } from '@/contexts/CompanyContext';
 import { useItemUnits } from '@/hooks/useItemUnits';
+import { useProductMaster } from '@/hooks/useProductMaster';
 import { BOM_CATEGORIES, BomCategoryKey } from '@/constants/bomCategories';
 import { STANDARD_SIZES, SIZE_CATEGORIES, getSizesByCategory } from '@/constants/standardSizes';
 import { CreateBomItemData } from '@/types/bom';
@@ -75,6 +76,7 @@ export function CreateBomDialog({ children }: CreateBomDialogProps) {
   const { selectedCompany } = useCompany();
   const { createBom, isCreating } = useBillOfMaterials(selectedCompany?.id);
   const { units } = useItemUnits();
+  const { products } = useProductMaster(selectedCompany?.id);
 
   const form = useForm<BomFormData>({
     resolver: zodResolver(bomSchema),
@@ -92,6 +94,7 @@ export function CreateBomDialog({ children }: CreateBomDialogProps) {
 
   const initializeCategory = (category: BomCategoryKey) => {
     if (items[category].length === 0) {
+      const bomSize = form.watch('size');
       const categoryItems = BOM_CATEGORIES[category].items.map(item => ({
         ...item,
         description: '',
@@ -101,6 +104,7 @@ export function CreateBomDialog({ children }: CreateBomDialogProps) {
         category,
         item_code: '',
         colour: '',
+        size: bomSize || '',
         warehouse_item_id: undefined,
       }));
       setItems(prev => ({ ...prev, [category]: categoryItems }));
@@ -108,6 +112,7 @@ export function CreateBomDialog({ children }: CreateBomDialogProps) {
   };
 
   const addItem = (category: BomCategoryKey) => {
+    const bomSize = form.watch('size');
     const newItem: CreateBomItemData = {
       item_name: '',
       description: '',
@@ -118,6 +123,7 @@ export function CreateBomDialog({ children }: CreateBomDialogProps) {
       category,
       item_code: '',
       colour: '',
+      size: bomSize || '',
       warehouse_item_id: undefined,
     };
     setItems(prev => ({
@@ -141,6 +147,7 @@ export function CreateBomDialog({ children }: CreateBomDialogProps) {
           description: warehouseItem.description || '',
           unit_cost: warehouseItem.unit_cost || 0,
           unit_of_measure: unitAbbreviation,
+          // Preserve size field when linking
         } : item
       )
     }));
@@ -213,6 +220,9 @@ export function CreateBomDialog({ children }: CreateBomDialogProps) {
 
   const renderItemsTable = (category: BomCategoryKey) => {
     const categoryItems = items[category];
+    const selectedProductMasterId = form.watch('product_master_id');
+    const selectedProductMaster = products?.find(p => p.id === selectedProductMasterId);
+    const availableSizes = selectedProductMaster?.available_sizes || [];
     
     return (
       <div className="space-y-4">
@@ -249,6 +259,7 @@ export function CreateBomDialog({ children }: CreateBomDialogProps) {
                     <th className="p-2 text-left font-medium">Item Code</th>
                     <th className="p-2 text-left font-medium">Description</th>
                     <th className="p-2 text-left font-medium">Colour</th>
+                    <th className="p-2 text-left font-medium">Size</th>
                     <th className="p-2 text-left font-medium">Consumption</th>
                     <th className="p-2 text-left font-medium">UOM</th>
                     <th className="p-2 text-left font-medium">Qty</th>
@@ -311,6 +322,29 @@ export function CreateBomDialog({ children }: CreateBomDialogProps) {
                           placeholder="Colour"
                           className="h-8"
                         />
+                      </td>
+                      <td className="p-2">
+                        <Select
+                          value={item.size || ''}
+                          onValueChange={(value) => updateItem(category, index, 'size', value)}
+                        >
+                          <SelectTrigger className="h-8 w-24">
+                            <SelectValue placeholder="Select" />
+                          </SelectTrigger>
+                          <SelectContent className="bg-background border z-50">
+                            {availableSizes.length > 0 ? (
+                              availableSizes.map((size: string) => (
+                                <SelectItem key={size} value={size}>
+                                  {size}
+                                </SelectItem>
+                              ))
+                            ) : (
+                              <SelectItem value={item.size || 'N/A'} disabled>
+                                No sizes available
+                              </SelectItem>
+                            )}
+                          </SelectContent>
+                        </Select>
                       </td>
                       <td className="p-2">
                         <Input
