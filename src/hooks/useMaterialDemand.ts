@@ -187,24 +187,25 @@ export const useDemandCalculation = (companyId?: string) => {
     return null;
   };
 
-  // Helper function to fetch BOM by finished good ID
+  // Helper function to fetch BOM by finished good ID using the bom_finished_goods link table
   const fetchBomByFinishedGoodId = async (finishedGoodId: string) => {
     const cacheKey = `fg_${finishedGoodId}`;
     if (bomByWarehouseItemIdCache.has(cacheKey)) {
       return bomByWarehouseItemIdCache.get(cacheKey);
     }
 
-    const { data: bomData, error } = await supabase
-      .from('bill_of_materials')
-      .select('id, bom_number, product_name')
+    const { data: linkData, error } = await supabase
+      .from('bom_finished_goods')
+      .select('bom_id, bill_of_materials(id, bom_number, product_name)')
       .eq('finished_good_id', finishedGoodId)
-      .single();
+      .maybeSingle();
 
-    if (!error && bomData) {
+    if (!error && linkData && linkData.bill_of_materials) {
+      const bom = Array.isArray(linkData.bill_of_materials) ? linkData.bill_of_materials[0] : linkData.bill_of_materials;
       const bomMeta = {
-        bom_id: bomData.id,
-        bom_number: bomData.bom_number,
-        product_name: bomData.product_name
+        bom_id: bom.id,
+        bom_number: bom.bom_number,
+        product_name: bom.product_name
       };
       bomByWarehouseItemIdCache.set(cacheKey, bomMeta);
       return bomMeta;
