@@ -42,9 +42,9 @@ export function useBulkGenerateVariants() {
       
       for (const size of selectedSizes) {
         for (const color of selectedColors) {
-          const colorCode = color.code || color.name?.substring(0, 3).toUpperCase() || 'COL';
+          const colorName = color.name?.replace(/\s+/g, '').toUpperCase() || 'COL';
           const sizeCode = size === 'All' ? '' : `-${size}`;
-          const colorSuffix = colorCode ? `-${colorCode}` : '';
+          const colorSuffix = colorName ? `-${colorName}` : '';
           
           const productCode = `${productMaster.product_code}${sizeCode}${colorSuffix}`;
           const productName = `${productMaster.product_name} - ${size}${color.name ? ` - ${color.name}` : ''}`;

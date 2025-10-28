@@ -75,9 +75,9 @@ export function BulkGenerateVariantsDialog({
       
       const size = selectedSizes[sizeIndex];
       const color = selectedColors[colorIndex];
-      const colorCode = color.code || color.name?.substring(0, 3).toUpperCase() || 'COL';
+      const colorName = color.name?.replace(/\s+/g, '').toUpperCase() || 'COL';
       const sizeCode = size === 'All' ? '' : `-${size}`;
-      const colorSuffix = colorCode ? `-${colorCode}` : '';
+      const colorSuffix = colorName ? `-${colorName}` : '';
       
       previews.push({
         code: `${productMaster?.product_code}${sizeCode}${colorSuffix}`,
