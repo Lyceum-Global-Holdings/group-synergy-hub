@@ -740,9 +740,10 @@ const MaterialDemandPlanning = () => {
                          <TableHead>Category</TableHead>
                          <TableHead>Required</TableHead>
                          <TableHead>Available</TableHead>
-                         <TableHead>Reserved</TableHead>
-                         <TableHead>On Order</TableHead>
-                         <TableHead>Shortage</TableHead>
+                          <TableHead>Reserved</TableHead>
+                          <TableHead>On Order</TableHead>
+                          <TableHead>Issued</TableHead>
+                          <TableHead>Shortage</TableHead>
                          <TableHead>Suggested Order</TableHead>
                          <TableHead>Priority</TableHead>
                          <TableHead>Actions</TableHead>
@@ -802,11 +803,23 @@ const MaterialDemandPlanning = () => {
                                  </span>
                                )}
                              </div>
-                           </TableCell>
-                           <TableCell>{item.on_order} {item.unit_of_measure}</TableCell>
-                           <TableCell className={item.shortage > 0 ? 'text-destructive font-medium' : ''}>
-                             {item.shortage} {item.unit_of_measure}
-                           </TableCell>
+                            </TableCell>
+                            <TableCell>{item.on_order} {item.unit_of_measure}</TableCell>
+                            <TableCell>
+                              {item.issued_quantity ? (
+                                <div className="flex flex-col gap-1">
+                                  <span className="text-green-600 dark:text-green-400 font-medium">
+                                    {item.issued_quantity} {item.unit_of_measure}
+                                  </span>
+                                  <span className="text-xs text-muted-foreground">Issued for CPO</span>
+                                </div>
+                              ) : (
+                                <span className="text-muted-foreground">-</span>
+                              )}
+                            </TableCell>
+                            <TableCell className={item.shortage > 0 ? 'text-destructive font-medium' : ''}>
+                              {item.shortage} {item.unit_of_measure}
+                            </TableCell>
                            <TableCell className={item.suggested_order > 0 ? 'text-primary font-medium' : ''}>
                              {item.suggested_order} {item.unit_of_measure}
                            </TableCell>
