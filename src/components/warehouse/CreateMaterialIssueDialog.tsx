@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -11,11 +11,22 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Plus, Trash2 } from 'lucide-react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
+import { Plus, Trash2, Package, ListPlus } from 'lucide-react';
 import { useMaterialIssues } from '@/hooks/useMaterialIssues';
 import { useMaterialIssueItems } from '@/hooks/useMaterialIssueItems';
 import { ItemSelector } from '@/components/common/ItemSelector';
 import { useWarehouseItems } from '@/hooks/useWarehouseItems';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import {
   Table,
   TableBody,
@@ -37,6 +48,10 @@ interface IssueItem {
   unit_of_measure: string;
   quantity_required: number;
   purpose: string;
+  reservation_id?: string;
+  from_reservation?: boolean;
+  reserved_quantity?: number;
+  bin_location?: string;
 }
 
 export function CreateMaterialIssueDialog({ open, onOpenChange }: MaterialIssueDialogProps) {
@@ -53,17 +68,85 @@ export function CreateMaterialIssueDialog({ open, onOpenChange }: MaterialIssueD
     pr_number: '',
     po_number: '',
     notes: '',
+    cpo_id: '',
+    cpo_number: '',
   });
 
   const [items, setItems] = useState<IssueItem[]>([]);
   const [currentItem, setCurrentItem] = useState<Partial<IssueItem>>({});
+  const [reservedItems, setReservedItems] = useState<any[]>([]);
 
   const { items: warehouseItems } = useWarehouseItems();
   const { createMaterialIssueAsync, isCreating } = useMaterialIssues();
   const { createItems } = useMaterialIssueItems();
 
+  // Fetch confirmed CPOs
+  const { data: confirmedCPOs = [] } = useQuery({
+    queryKey: ['confirmed-cpos'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('customer_purchase_orders')
+        .select('id, cpo_number, customer:customers(customer_name), status, delivery_date')
+        .eq('status', 'confirmed')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      return data;
+    },
+    enabled: open,
+  });
+
+  // Fetch reservations when CPO is selected
+  useEffect(() => {
+    if (formData.cpo_id) {
+      fetchReservations();
+    } else {
+      setReservedItems([]);
+    }
+  }, [formData.cpo_id]);
+
+  const fetchReservations = async () => {
+    const { data, error } = await supabase
+      .from('warehouse_item_reservations')
+      .select(`
+        id,
+        warehouse_item_id,
+        reserved_quantity,
+        quantity_issued,
+        quantity_remaining,
+        status,
+        warehouse_item:warehouse_items(
+          id,
+          item_code,
+          name,
+          unit_of_measure,
+          current_stock,
+          reserved_quantity
+        ),
+        bin_allocation:warehouse_bin_allocations(
+          bin:warehouse_bins(bin_code, name)
+        )
+      `)
+      .eq('reference_type', 'cpo')
+      .eq('reference_id', formData.cpo_id)
+      .in('status', ['active', 'partially_issued']);
+
+    if (!error && data) {
+      setReservedItems(data);
+    }
+  };
+
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleCPOSelect = (cpoId: string) => {
+    const selectedCPO = confirmedCPOs.find(cpo => cpo.id === cpoId);
+    setFormData(prev => ({
+      ...prev,
+      cpo_id: cpoId,
+      cpo_number: selectedCPO?.cpo_number || '',
+    }));
   };
 
   const handleItemSelect = (item: any) => {
@@ -86,6 +169,25 @@ export function CreateMaterialIssueDialog({ open, onOpenChange }: MaterialIssueD
     }
   };
 
+  const handleAddAllReservedItems = () => {
+    const newItems: IssueItem[] = reservedItems
+      .filter(res => res.warehouse_item && res.quantity_remaining > 0)
+      .map(res => ({
+        item_id: res.warehouse_item.id,
+        item_code: res.warehouse_item.item_code,
+        description: res.warehouse_item.name,
+        unit_of_measure: res.warehouse_item.unit_of_measure,
+        quantity_required: res.quantity_remaining,
+        purpose: `Reserved for CPO ${formData.cpo_number}`,
+        reservation_id: res.id,
+        from_reservation: true,
+        reserved_quantity: res.reserved_quantity,
+        bin_location: res.bin_allocation?.bin?.bin_code || 'N/A',
+      }));
+
+    setItems(prev => [...prev, ...newItems]);
+  };
+
   const removeItem = (index: number) => {
     setItems(items.filter((_, i) => i !== index));
   };
@@ -100,6 +202,8 @@ export function CreateMaterialIssueDialog({ open, onOpenChange }: MaterialIssueD
         department: formData.department || undefined,
         purpose: formData.purpose || undefined,
         notes: formData.notes || undefined,
+        cpo_id: formData.cpo_id || undefined,
+        cpo_number: formData.cpo_number || undefined,
         requested_by: formData.requested_by,
         contact_number: formData.contact_number || undefined,
         epf_number: formData.epf_number || undefined,
@@ -109,7 +213,7 @@ export function CreateMaterialIssueDialog({ open, onOpenChange }: MaterialIssueD
         po_number: formData.po_number || undefined,
       });
 
-      // Create items
+      // Create items with reservation linkage
       const itemsToCreate = items.map((item, index) => ({
         min_id: issueNote.id,
         item_id: item.item_id,
@@ -120,6 +224,8 @@ export function CreateMaterialIssueDialog({ open, onOpenChange }: MaterialIssueD
         description: item.description,
         unit_of_measure: item.unit_of_measure,
         purpose: item.purpose || undefined,
+        reservation_id: item.reservation_id,
+        from_reservation: item.from_reservation || false,
       }));
 
       await createItems(itemsToCreate);
@@ -137,8 +243,11 @@ export function CreateMaterialIssueDialog({ open, onOpenChange }: MaterialIssueD
         pr_number: '',
         po_number: '',
         notes: '',
+        cpo_id: '',
+        cpo_number: '',
       });
       setItems([]);
+      setReservedItems([]);
       setCurrentTab('header');
       onOpenChange(false);
     } catch (error) {
@@ -152,7 +261,7 @@ export function CreateMaterialIssueDialog({ open, onOpenChange }: MaterialIssueD
         <DialogHeader>
           <DialogTitle>Create Material Issue Note</DialogTitle>
           <DialogDescription>
-            Fill in the material requisition details in three steps
+            Fill in the material issue details in three steps
           </DialogDescription>
         </DialogHeader>
 
@@ -164,6 +273,34 @@ export function CreateMaterialIssueDialog({ open, onOpenChange }: MaterialIssueD
           </TabsList>
 
           <TabsContent value="header" className="space-y-4">
+            {/* CPO Selection */}
+            <div className="space-y-2">
+              <Label htmlFor="cpo_id">Customer Purchase Order (Optional)</Label>
+              <Select value={formData.cpo_id} onValueChange={handleCPOSelect}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select CPO to issue reserved items" />
+                </SelectTrigger>
+                <SelectContent>
+                  {confirmedCPOs.map((cpo) => (
+                    <SelectItem key={cpo.id} value={cpo.id}>
+                      {cpo.cpo_number} - {cpo.customer?.customer_name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {formData.cpo_number && (
+              <Alert>
+                <Package className="h-4 w-4" />
+                <AlertDescription>
+                  Issuing materials for CPO: <strong>{formData.cpo_number}</strong>
+                  <br />
+                  {reservedItems.length} items reserved
+                </AlertDescription>
+              </Alert>
+            )}
+
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="requested_by">Requested By *</Label>
@@ -253,12 +390,12 @@ export function CreateMaterialIssueDialog({ open, onOpenChange }: MaterialIssueD
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="purpose">Purpose of Requisition *</Label>
+              <Label htmlFor="purpose">Purpose of Issue *</Label>
               <Textarea
                 id="purpose"
                 value={formData.purpose}
                 onChange={(e) => handleInputChange('purpose', e.target.value)}
-                placeholder="Describe the purpose of this requisition"
+                placeholder="Describe the purpose of this issue"
                 rows={3}
                 required
               />
@@ -272,6 +409,21 @@ export function CreateMaterialIssueDialog({ open, onOpenChange }: MaterialIssueD
           </TabsContent>
 
           <TabsContent value="items" className="space-y-4">
+            {reservedItems.length > 0 && (
+              <div className="border rounded-lg p-4 space-y-2 bg-muted/50">
+                <div className="flex justify-between items-center">
+                  <h3 className="font-semibold">Reserved Items for {formData.cpo_number}</h3>
+                  <Button onClick={handleAddAllReservedItems} size="sm">
+                    <ListPlus className="h-4 w-4 mr-2" />
+                    Add All Reserved Items
+                  </Button>
+                </div>
+                <div className="text-sm text-muted-foreground">
+                  {reservedItems.length} reserved items available
+                </div>
+              </div>
+            )}
+
             <div className="border rounded-lg p-4 space-y-4">
               <h3 className="font-semibold">Add Item</h3>
               
@@ -338,6 +490,8 @@ export function CreateMaterialIssueDialog({ open, onOpenChange }: MaterialIssueD
                       <TableHead>Description</TableHead>
                       <TableHead>UOM</TableHead>
                       <TableHead>Qty Required</TableHead>
+                      <TableHead>Reserved</TableHead>
+                      <TableHead>Bin</TableHead>
                       <TableHead>Purpose</TableHead>
                       <TableHead>Actions</TableHead>
                     </TableRow>
@@ -350,6 +504,14 @@ export function CreateMaterialIssueDialog({ open, onOpenChange }: MaterialIssueD
                         <TableCell>{item.description}</TableCell>
                         <TableCell>{item.unit_of_measure}</TableCell>
                         <TableCell>{item.quantity_required}</TableCell>
+                        <TableCell>
+                          {item.from_reservation ? (
+                            <Badge variant="secondary">Reserved</Badge>
+                          ) : (
+                            '-'
+                          )}
+                        </TableCell>
+                        <TableCell>{item.bin_location || '-'}</TableCell>
                         <TableCell>{item.purpose || '-'}</TableCell>
                         <TableCell>
                           <Button
@@ -380,6 +542,11 @@ export function CreateMaterialIssueDialog({ open, onOpenChange }: MaterialIssueD
           <TabsContent value="review" className="space-y-4">
             <div className="border rounded-lg p-4 space-y-3">
               <h3 className="font-semibold text-lg">Header Information</h3>
+              {formData.cpo_number && (
+                <div className="text-sm">
+                  <span className="font-medium">CPO:</span> {formData.cpo_number}
+                </div>
+              )}
               <div className="grid grid-cols-2 gap-3 text-sm">
                 <div><span className="font-medium">Requested By:</span> {formData.requested_by}</div>
                 <div><span className="font-medium">Department:</span> {formData.department}</div>
@@ -405,6 +572,7 @@ export function CreateMaterialIssueDialog({ open, onOpenChange }: MaterialIssueD
                     <TableHead>Description</TableHead>
                     <TableHead>UOM</TableHead>
                     <TableHead>Qty Required</TableHead>
+                    <TableHead>Reserved</TableHead>
                     <TableHead>Purpose</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -416,6 +584,13 @@ export function CreateMaterialIssueDialog({ open, onOpenChange }: MaterialIssueD
                       <TableCell>{item.description}</TableCell>
                       <TableCell>{item.unit_of_measure}</TableCell>
                       <TableCell>{item.quantity_required}</TableCell>
+                      <TableCell>
+                        {item.from_reservation ? (
+                          <Badge variant="secondary">Reserved</Badge>
+                        ) : (
+                          '-'
+                        )}
+                      </TableCell>
                       <TableCell>{item.purpose || '-'}</TableCell>
                     </TableRow>
                   ))}

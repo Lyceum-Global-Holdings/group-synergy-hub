@@ -5501,6 +5501,7 @@ export type Database = {
         Row: {
           created_at: string
           description: string | null
+          from_reservation: boolean | null
           id: string
           issued_at: string | null
           item_code: string | null
@@ -5514,6 +5515,7 @@ export type Database = {
           quantity_required: number | null
           received_at: string | null
           recipient_signature: string | null
+          reservation_id: string | null
           total_cost: number | null
           unit_cost: number | null
           unit_of_measure: string | null
@@ -5522,6 +5524,7 @@ export type Database = {
         Insert: {
           created_at?: string
           description?: string | null
+          from_reservation?: boolean | null
           id?: string
           issued_at?: string | null
           item_code?: string | null
@@ -5535,6 +5538,7 @@ export type Database = {
           quantity_required?: number | null
           received_at?: string | null
           recipient_signature?: string | null
+          reservation_id?: string | null
           total_cost?: number | null
           unit_cost?: number | null
           unit_of_measure?: string | null
@@ -5543,6 +5547,7 @@ export type Database = {
         Update: {
           created_at?: string
           description?: string | null
+          from_reservation?: boolean | null
           id?: string
           issued_at?: string | null
           item_code?: string | null
@@ -5556,6 +5561,7 @@ export type Database = {
           quantity_required?: number | null
           received_at?: string | null
           recipient_signature?: string | null
+          reservation_id?: string | null
           total_cost?: number | null
           unit_cost?: number | null
           unit_of_measure?: string | null
@@ -5583,6 +5589,13 @@ export type Database = {
             referencedRelation: "material_issue_notes"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "material_issue_items_reservation_id_fkey"
+            columns: ["reservation_id"]
+            isOneToOne: false
+            referencedRelation: "warehouse_item_reservations"
+            referencedColumns: ["id"]
+          },
         ]
       }
       material_issue_notes: {
@@ -5591,6 +5604,8 @@ export type Database = {
           approved_date: string | null
           company_id: string | null
           contact_number: string | null
+          cpo_id: string | null
+          cpo_number: string | null
           created_at: string
           created_by: string | null
           department: string | null
@@ -5630,6 +5645,8 @@ export type Database = {
           approved_date?: string | null
           company_id?: string | null
           contact_number?: string | null
+          cpo_id?: string | null
+          cpo_number?: string | null
           created_at?: string
           created_by?: string | null
           department?: string | null
@@ -5669,6 +5686,8 @@ export type Database = {
           approved_date?: string | null
           company_id?: string | null
           contact_number?: string | null
+          cpo_id?: string | null
+          cpo_number?: string | null
           created_at?: string
           created_by?: string | null
           department?: string | null
@@ -5704,6 +5723,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "material_issue_notes_cpo_id_fkey"
+            columns: ["cpo_id"]
+            isOneToOne: false
+            referencedRelation: "customer_purchase_orders"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "material_issue_notes_request_id_fkey"
             columns: ["request_id"]
@@ -10890,6 +10916,10 @@ export type Database = {
       transfer_assets_to_department: {
         Args: { p_request_id: string }
         Returns: Json
+      }
+      update_reservation_on_issue: {
+        Args: { p_quantity_issued: number; p_reservation_id: string }
+        Returns: undefined
       }
       validate_bpo_release: {
         Args: { p_bpo_id: string; p_requested_amount: number }

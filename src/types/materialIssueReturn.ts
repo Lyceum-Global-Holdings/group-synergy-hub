@@ -27,6 +27,8 @@ export interface MaterialIssueNote {
   status: MaterialIssueStatus;
   total_value: number | null;
   notes: string | null;
+  cpo_id: string | null;
+  cpo_number: string | null;
   company_id: string | null;
   created_by: string | null;
   approved_by: string | null;
@@ -62,6 +64,8 @@ export interface CreateMaterialIssueData {
   department?: string;
   purpose?: string;
   notes?: string;
+  cpo_id?: string;
+  cpo_number?: string;
   company_id?: string;
   requested_by?: string;
   contact_number?: string;
@@ -80,6 +84,8 @@ export interface MaterialIssueItem {
   unit_cost: number | null;
   total_cost: number | null;
   notes: string | null;
+  reservation_id: string | null;
+  from_reservation: boolean;
   created_at: string;
   updated_at: string;
   line_number: number | null;
@@ -106,6 +112,8 @@ export interface CreateMaterialIssueItemData {
   unit_cost?: number;
   total_cost?: number;
   notes?: string;
+  reservation_id?: string;
+  from_reservation?: boolean;
 }
 
 export interface MaterialReturnNote {

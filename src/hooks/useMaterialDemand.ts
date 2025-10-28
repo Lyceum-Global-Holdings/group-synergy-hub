@@ -1409,6 +1409,53 @@ export const useDemandCalculation = (companyId?: string) => {
         }
       }
 
+      // Fetch issued quantities for these CPOs
+      const { data: issuedItems, error: issuedError } = await supabase
+        .from('material_issue_items')
+        .select(`
+          item_id,
+          item_code,
+          quantity_issued,
+          reservation_id,
+          from_reservation,
+          material_issue_notes!material_issue_items_min_id_fkey(
+            cpo_id,
+            cpo_number,
+            min_number,
+            issue_date,
+            status
+          )
+        `)
+        .in('material_issue_notes.cpo_id', input.cpo_ids)
+        .eq('from_reservation', true);
+
+      if (issuedError) {
+        console.warn('Error fetching issued items:', issuedError);
+      }
+
+      // Group issued quantities by item_code
+      const issuedByItemCode = issuedItems?.reduce((acc, item) => {
+        const itemCode = item.item_code;
+        if (!itemCode) return acc;
+        acc[itemCode] = (acc[itemCode] || 0) + (item.quantity_issued || 0);
+        return acc;
+      }, {} as Record<string, number>) || {};
+
+      console.log('Issued quantities by item_code:', issuedByItemCode);
+
+      // Adjust shortages based on issued quantities
+      for (const result of analysisResults) {
+        const issuedQty = issuedByItemCode[result.item_code] || 0;
+        result.issued_quantity = issuedQty;
+        
+        // Adjust shortage: shortage = totalRequired - availableStock - onOrder - issuedQty
+        if (issuedQty > 0) {
+          result.shortage = Math.max(0, result.total_required - result.available_stock - (result.on_order || 0) - issuedQty);
+          result.suggested_order = result.shortage;
+          console.log(`Adjusted ${result.item_code}: shortage from ${result.shortage + issuedQty} to ${result.shortage} (issued: ${issuedQty})`);
+        }
+      }
+
       console.log(`=== CPO Demand Calculation Complete ===`);
       console.log(`Total analysis results: ${analysisResults.length}`);
       console.log(`Items requiring production: ${analysisResults.filter(r => r.category === 'BOM Material' && r.shortage > 0).length}`);

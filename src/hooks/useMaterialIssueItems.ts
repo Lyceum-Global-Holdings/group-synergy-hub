@@ -17,8 +17,28 @@ export const useMaterialIssueItems = () => {
       if (error) throw error;
       return data;
     },
-    onSuccess: () => {
+    onSuccess: async (createdItems) => {
+      // Update reservations for items that came from reservations
+      for (const item of createdItems) {
+        if (item.from_reservation && item.reservation_id) {
+          try {
+            const { error: rpcError } = await supabase.rpc('update_reservation_on_issue', {
+              p_reservation_id: item.reservation_id,
+              p_quantity_issued: item.quantity_issued
+            });
+            
+            if (rpcError) {
+              console.error('Error updating reservation:', rpcError);
+            }
+          } catch (err) {
+            console.error('Error calling update_reservation_on_issue:', err);
+          }
+        }
+      }
+      
       queryClient.invalidateQueries({ queryKey: ['material-issues'] });
+      queryClient.invalidateQueries({ queryKey: ['warehouse-reservations'] });
+      queryClient.invalidateQueries({ queryKey: ['warehouse-items'] });
     },
     onError: (error) => {
       console.error('Error creating material issue items:', error);
