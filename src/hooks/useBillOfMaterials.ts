@@ -40,7 +40,6 @@ export function useBillOfMaterials(companyId?: string) {
         .insert({
           ...bomDetails,
           created_by: user.data.user?.id,
-          finished_good_id: bomDetails.finished_good_id || null,
           warehouse_item_id: bomDetails.warehouse_item_id || null
         } as any)
         .select()

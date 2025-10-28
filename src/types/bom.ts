@@ -4,7 +4,6 @@ export interface BillOfMaterials {
   product_name: string;
   product_master_id?: string;
   warehouse_item_id?: string;
-  finished_good_id?: string;
   style_no?: string;
   version: string;
   size?: string;
@@ -44,7 +43,6 @@ export interface CreateBomData {
   product_name: string;
   product_master_id?: string;
   warehouse_item_id?: string;
-  finished_good_id?: string;
   style_no?: string;
   version?: string;
   size?: string;

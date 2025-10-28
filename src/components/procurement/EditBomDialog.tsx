@@ -39,15 +39,13 @@ import { BOM_CATEGORIES, BomCategoryKey } from '@/constants/bomCategories';
 import { CreateBomItemData, BillOfMaterials } from '@/types/bom';
 import { ItemSelector } from '@/components/common/ItemSelector';
 import { ProductMasterSelector } from '@/components/common/ProductMasterSelector';
-import { FinishedGoodsItemSelector } from '@/components/common/FinishedGoodsItemSelector';
 import { BomSizeMultiplierDialog } from '@/components/procurement/BomSizeMultiplierDialog';
 import { BulkLinkProductsDialog } from '@/components/procurement/BulkLinkProductsDialog';
 import { WarehouseItem } from '@/types/itemBin';
 
 const bomSchema = z.object({
-  product_name: z.string().min(1, 'Product name is required'),
+  product_name: z.string().min(1, 'Product master is required'),
   product_master_id: z.string().min(1, 'Product master is required'),
-  finished_good_id: z.string().min(1, 'Finished good is required'),
   style_no: z.string().optional(),
   version: z.string().optional(),
   size: z.string().optional(),
@@ -79,7 +77,6 @@ export function EditBomDialog({ bom, open, onOpenChange }: EditBomDialogProps) {
   const { updateBom, isUpdating } = useBillOfMaterials(selectedCompany?.id);
   const { items: existingItems, isLoading: itemsLoading } = useBomItems(bom?.id || '');
   const { units } = useItemUnits();
-  const { products: finishedGoodsList } = useFinishedGoods(selectedCompany?.id);
   const { products } = useProductMaster(selectedCompany?.id);
 
   const form = useForm<BomFormData>({
@@ -87,7 +84,7 @@ export function EditBomDialog({ bom, open, onOpenChange }: EditBomDialogProps) {
     defaultValues: {
       product_name: '',
       product_master_id: '',
-      finished_good_id: '',
+      style_no: '',
       version: '1.0',
       size: '',
       color: '',
@@ -95,10 +92,6 @@ export function EditBomDialog({ bom, open, onOpenChange }: EditBomDialogProps) {
       status: 'draft',
     },
   });
-
-  const selectedFinishedGood = finishedGoodsList?.find(
-    fg => fg.id === form.watch('finished_good_id')
-  );
 
   // Load existing BOM data when dialog opens
   useEffect(() => {
@@ -109,7 +102,6 @@ export function EditBomDialog({ bom, open, onOpenChange }: EditBomDialogProps) {
       form.reset({
         product_name: bom.product_name,
         product_master_id: productMasterId,
-        finished_good_id: bom.finished_good_id || '',
         style_no: bom.style_no || '',
         version: bom.version || '1.0',
         size: bom.size || '',
@@ -248,12 +240,13 @@ export function EditBomDialog({ bom, open, onOpenChange }: EditBomDialogProps) {
         id: bom.id,
         product_name: data.product_name,
         product_master_id: data.product_master_id,
-        finished_good_id: data.finished_good_id,
         style_no: data.style_no,
         version: data.version,
         size: data.size,
+        color: data.color,
         description: data.description,
         status: data.status,
+        company_id: selectedCompany?.id,
         items: allItems,
       });
 
@@ -517,59 +510,20 @@ export function EditBomDialog({ bom, open, onOpenChange }: EditBomDialogProps) {
                             if (product) {
                               field.onChange(product.id);
                               setSelectedProductMasterId(product.id);
-                              form.setValue('finished_good_id', '');
                               form.setValue('product_name', product.product_name);
                               form.setValue('style_no', product.style_no || '');
                             } else {
                               field.onChange('');
                               setSelectedProductMasterId('');
-                              form.setValue('finished_good_id', '');
                             }
                           }}
                           placeholder="Select product master template..."
                         />
                       </FormControl>
                       <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="finished_good_id"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Finished Good (Size & Color Variant) *</FormLabel>
-                      <FormControl>
-                        <FinishedGoodsItemSelector
-                          value={field.value}
-                          onSelect={(finishedGood) => {
-                            if (finishedGood) {
-                              field.onChange(finishedGood.id);
-                              form.setValue('size', finishedGood.size || '');
-                              form.setValue('color', finishedGood.color || '');
-                            } else {
-                              field.onChange('');
-                              form.setValue('size', '');
-                              form.setValue('color', '');
-                            }
-                          }}
-                          filterByProductMaster={selectedProductMasterId}
-                          disabled={!selectedProductMasterId}
-                          placeholder="Select finished good variant..."
-                        />
-                      </FormControl>
-                      <FormMessage />
-                      {selectedFinishedGood && (
-                        <div className="flex gap-2 mt-2">
-                          {selectedFinishedGood.size && (
-                            <Badge variant="secondary">Size: {selectedFinishedGood.size}</Badge>
-                          )}
-                          {selectedFinishedGood.color && (
-                            <Badge variant="secondary">Color: {selectedFinishedGood.color}</Badge>
-                          )}
-                        </div>
-                      )}
+                      <p className="text-xs text-muted-foreground">
+                        Use the "Manage Products" button after saving to link finished goods
+                      </p>
                     </FormItem>
                   )}
                 />
@@ -609,9 +563,8 @@ export function EditBomDialog({ bom, open, onOpenChange }: EditBomDialogProps) {
                       <FormItem>
                         <FormLabel>Size</FormLabel>
                         <FormControl>
-                          <Input {...field} disabled className="bg-muted" />
+                          <Input {...field} placeholder="Enter size (optional)" />
                         </FormControl>
-                        <p className="text-xs text-muted-foreground">Auto-filled from finished good</p>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -624,9 +577,8 @@ export function EditBomDialog({ bom, open, onOpenChange }: EditBomDialogProps) {
                       <FormItem>
                         <FormLabel>Color</FormLabel>
                         <FormControl>
-                          <Input {...field} disabled className="bg-muted" />
+                          <Input {...field} placeholder="Enter color (optional)" />
                         </FormControl>
-                        <p className="text-xs text-muted-foreground">Auto-filled from finished good</p>
                         <FormMessage />
                       </FormItem>
                     )}
