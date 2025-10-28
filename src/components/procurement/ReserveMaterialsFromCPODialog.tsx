@@ -7,13 +7,15 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { Package, AlertCircle, CheckCircle } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Package, AlertCircle, CheckCircle, ExternalLink } from "lucide-react";
 import { DemandAnalysisResult } from "@/types/materialDemand";
 import { useWarehouseReservations } from "@/hooks/useWarehouseReservations";
 import { useWarehouseBinAllocations } from "@/hooks/useWarehouseBinAllocations";
 import { BulkReservationRequest } from "@/types/warehouseReservation";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { Link } from "react-router-dom";
 
 interface ReserveMaterialsFromCPODialogProps {
   open: boolean;
@@ -240,6 +242,36 @@ export function ReserveMaterialsFromCPODialog({
           </div>
         ) : (
           <>
+            {/* Alert for unlinked warehouse items */}
+            {reservationItems.some(item => !item.material.warehouse_item_id) && (
+              <Alert className="mb-4">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>
+                  Some materials are not linked to warehouse items. 
+                  Please link them in the Item Master to enable bin allocation.
+                </AlertDescription>
+              </Alert>
+            )}
+
+            {/* Alert for missing bin allocations */}
+            {reservationItems.some(item => item.material.warehouse_item_id && item.binOptions.length === 0) && (
+              <Alert className="mb-4">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription className="flex items-center gap-2">
+                  Some warehouse items have no bin allocations. 
+                  <Link 
+                    to="/warehouse/item-bin-master" 
+                    target="_blank"
+                    className="inline-flex items-center gap-1 underline hover:text-primary"
+                  >
+                    Go to Item & Bin Master
+                    <ExternalLink className="h-3 w-3" />
+                  </Link>
+                  to allocate items to bins first.
+                </AlertDescription>
+              </Alert>
+            )}
+
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
                 <Checkbox
@@ -270,11 +302,11 @@ export function ReserveMaterialsFromCPODialog({
                 </TableHeader>
                 <TableBody>
                   {reservationItems.map((item, index) => {
-                    const availableUnreserved = item.material.available_stock - (item.material.reserved_quantity || 0);
+                    const availableUnreserved = Math.max(0, (item.material.available_stock || 0) - (item.material.reserved_quantity || 0));
                     const hasBins = item.binOptions.length > 0;
                     
                     return (
-                      <TableRow key={index}>
+                  <TableRow key={index}>
                         <TableCell>
                           <Checkbox
                             checked={item.selected}
@@ -283,19 +315,26 @@ export function ReserveMaterialsFromCPODialog({
                           />
                         </TableCell>
                         <TableCell className="font-medium">{item.material.item_code}</TableCell>
-                        <TableCell>{item.material.item_name}</TableCell>
+                        <TableCell>
+                          <div>
+                            {item.material.item_name}
+                            {!item.material.warehouse_item_id && (
+                              <Badge variant="outline" className="ml-2 text-xs">Not linked</Badge>
+                            )}
+                          </div>
+                        </TableCell>
                         <TableCell>{item.material.total_required} {item.material.unit_of_measure}</TableCell>
                         <TableCell>
                           <Badge variant={availableUnreserved > 0 ? "default" : "destructive"}>
-                            {availableUnreserved} {item.material.unit_of_measure}
+                            {availableUnreserved.toFixed(2)} {item.material.unit_of_measure}
                           </Badge>
                         </TableCell>
                         <TableCell>
-                          {item.material.reserved_quantity || 0} {item.material.unit_of_measure}
+                          {(item.material.reserved_quantity || 0).toFixed(2)} {item.material.unit_of_measure}
                         </TableCell>
                         <TableCell>
                           <Badge variant="destructive">
-                            {item.material.shortage} {item.material.unit_of_measure}
+                            {item.material.shortage.toFixed(2)} {item.material.unit_of_measure}
                           </Badge>
                         </TableCell>
                         <TableCell>
@@ -311,13 +350,15 @@ export function ReserveMaterialsFromCPODialog({
                               <SelectContent>
                                 {item.binOptions.map(bin => (
                                   <SelectItem key={bin.id} value={bin.id}>
-                                    {bin.bin_code} - Avail: {bin.available_quantity}
+                                    {bin.bin_code} - Avail: {bin.available_quantity.toFixed(2)}
                                   </SelectItem>
                                 ))}
                               </SelectContent>
                             </Select>
                           ) : (
-                            <span className="text-sm text-muted-foreground">No bins available</span>
+                            <div className="text-sm text-muted-foreground">
+                              {!item.material.warehouse_item_id ? "Not linked" : "No bins"}
+                            </div>
                           )}
                         </TableCell>
                         <TableCell>

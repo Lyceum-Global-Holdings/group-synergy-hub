@@ -689,9 +689,11 @@ export const useDemandCalculation = (companyId?: string) => {
                   const consumptionPerUnit = Number(bomItem.consumption) || Number(bomItem.quantity) || 0;
                   const materialRequired = requiredProduction * consumptionPerUnit;
                   
-                  const warehouseItem = warehouseItemsMap.get(bomItem.item_code);
-                  const currentMaterialStock = Number(warehouseItem?.current_stock) || 0;
-                  const materialShortage = Math.max(0, materialRequired - currentMaterialStock);
+                const warehouseItem = warehouseItemsMap.get(bomItem.item_code);
+                const currentMaterialStock = Number(warehouseItem?.current_stock) || 0;
+                const reservedQty = Number(warehouseItem?.reserved_quantity) || 0;
+                const availableQty = currentMaterialStock - reservedQty;
+                const materialShortage = Math.max(0, materialRequired - availableQty);
                   
                   console.log(`  📦 ${bomItem.item_name}:`);
                   console.log(`    Consumption: ${consumptionPerUnit} per unit`);
@@ -702,42 +704,59 @@ export const useDemandCalculation = (companyId?: string) => {
                   // Find existing result or create new one
                   let existingResult = analysisResults.find(r => r.item_code === bomItem.item_code);
                   
-                  if (existingResult) {
-                    existingResult.total_required += materialRequired;
-                    existingResult.shortage = Math.max(0, existingResult.total_required - existingResult.available_stock);
-                    existingResult.suggested_order = existingResult.shortage;
+                if (existingResult) {
+                  existingResult.total_required += materialRequired;
+                  existingResult.reserved_quantity = reservedQty;
+                  const existingAvailableQty = existingResult.available_stock - (existingResult.reserved_quantity || 0);
+                  existingResult.shortage = Math.max(0, existingResult.total_required - existingAvailableQty);
+                  existingResult.suggested_order = existingResult.shortage;
+                  
+                  // Ensure these are set if missing
+                  if (!existingResult.warehouse_item_id && warehouseItem?.id) {
+                    existingResult.warehouse_item_id = warehouseItem.id;
+                  }
+                  if (!existingResult.bom_id && matchedFinishedGood.bill_of_materials?.id) {
+                    existingResult.bom_id = matchedFinishedGood.bill_of_materials.id;
+                  }
+                  if (!existingResult.bom_item_id && bomItem.id) {
+                    existingResult.bom_item_id = bomItem.id;
+                  }
                   } else {
-                    analysisResults.push({
-                      item_code: bomItem.item_code || 'N/A',
-                      item_name: bomItem.item_name,
-                      total_required: materialRequired,
-                      available_stock: currentMaterialStock,
-                      on_order: 0,
-                      shortage: materialShortage,
-                      suggested_order: materialShortage,
-                      unit_of_measure: bomItem.unit_of_measure,
-                      category: 'BOM Material',
-                      priority: materialShortage > 0 ? 'high' : 'medium',
-                      lead_time_days: 7,
-                      is_linked_to_bom: true,
-                      bom_info: {
-                        bom_number: matchedFinishedGood.bill_of_materials.bom_number,
-                        product_name: matchedFinishedGood.bill_of_materials.product_name
-                      },
-                      finished_good_info: {
-                        product_code: matchedFinishedGood.product_code,
-                        product_name: matchedFinishedGood.product_name,
-                        current_stock: availableStock
-                      },
-                      po_details: [{
-                        po_number: po.po_number,
-                        supplier_name: po.supplier?.name || 'Unknown',
-                        quantity_ordered: poItem.quantity_ordered,
-                        quantity_pending: poItem.quantity_pending || 0,
-                        delivery_date: poItem.delivery_date,
-                        expected_delivery: po.expected_delivery_date
-                      }]
-                    });
+                  analysisResults.push({
+                    item_code: bomItem.item_code || 'N/A',
+                    item_name: bomItem.item_name,
+                    total_required: materialRequired,
+                    available_stock: currentMaterialStock,
+                    reserved_quantity: reservedQty,
+                    warehouse_item_id: warehouseItem?.id,
+                    bom_id: matchedFinishedGood.bill_of_materials?.id,
+                    bom_item_id: bomItem.id,
+                    on_order: 0,
+                    shortage: materialShortage,
+                    suggested_order: materialShortage,
+                    unit_of_measure: bomItem.unit_of_measure,
+                    category: 'BOM Material',
+                    priority: materialShortage > 0 ? 'high' : 'medium',
+                    lead_time_days: 7,
+                    is_linked_to_bom: true,
+                    bom_info: {
+                      bom_number: matchedFinishedGood.bill_of_materials.bom_number,
+                      product_name: matchedFinishedGood.bill_of_materials.product_name
+                    },
+                    finished_good_info: {
+                      product_code: matchedFinishedGood.product_code,
+                      product_name: matchedFinishedGood.product_name,
+                      current_stock: availableStock
+                    },
+                    po_details: [{
+                      po_number: po.po_number,
+                      supplier_name: po.supplier?.name || 'Unknown',
+                      quantity_ordered: poItem.quantity_ordered,
+                      quantity_pending: poItem.quantity_pending || 0,
+                      delivery_date: poItem.delivery_date,
+                      expected_delivery: po.expected_delivery_date
+                    }]
+                  });
                   }
                 }
               } else {
@@ -780,17 +799,21 @@ export const useDemandCalculation = (companyId?: string) => {
             // Direct raw material purchase - no BOM expansion needed
             const warehouseItem = warehouseItemsMap.get(poItem.item_code);
             const currentStock = Number(warehouseItem?.current_stock) || 0;
+            const reservedQty = Number(warehouseItem?.reserved_quantity) || 0;
+            const availableQty = currentStock - reservedQty;
             const poQuantityWithMultiplier = Number(poItem.quantity_ordered) * (input.multiplier || 1);
-            const shortage = Math.max(0, poQuantityWithMultiplier - currentStock);
+            const shortage = Math.max(0, poQuantityWithMultiplier - availableQty);
             
             console.log(`  Direct material: ${poItem.item_name}`);
-            console.log(`  Required: ${poQuantityWithMultiplier}, Stock: ${currentStock}, Shortage: ${shortage}`);
+            console.log(`  Required: ${poQuantityWithMultiplier}, Stock: ${currentStock}, Reserved: ${reservedQty}, Available: ${availableQty}, Shortage: ${shortage}`);
             
             analysisResults.push({
               item_code: poItem.item_code || 'N/A',
               item_name: poItem.item_name,
               total_required: poQuantityWithMultiplier,
               available_stock: currentStock,
+              reserved_quantity: reservedQty,
+              warehouse_item_id: warehouseItem?.id,
               on_order: 0,
               shortage: shortage,
               suggested_order: shortage,
@@ -1210,7 +1233,8 @@ export const useDemandCalculation = (companyId?: string) => {
                     const warehouseItem = warehouseItemsMap.get(bomItem.item_code);
                     const currentMaterialStock = Number(warehouseItem?.current_stock) || 0;
                     const reservedQty = Number(warehouseItem?.reserved_quantity) || 0;
-                    const materialShortage = Math.max(0, materialRequired - currentMaterialStock);
+                    const availableQty = currentMaterialStock - reservedQty;
+                    const materialShortage = Math.max(0, materialRequired - availableQty);
                     
                     console.log(`    📦 Component: ${bomItem.item_name} (${bomItem.item_code})`);
                     console.log(`      Required: ${materialRequired}, Stock: ${currentMaterialStock}, Shortage: ${materialShortage}`);
@@ -1261,8 +1285,21 @@ export const useDemandCalculation = (companyId?: string) => {
                     
                     if (existingResult) {
                       existingResult.total_required += materialRequired;
-                      existingResult.shortage = Math.max(0, existingResult.total_required - existingResult.available_stock);
+                      existingResult.reserved_quantity = reservedQty;
+                      const existingAvailableQty = existingResult.available_stock - (existingResult.reserved_quantity || 0);
+                      existingResult.shortage = Math.max(0, existingResult.total_required - existingAvailableQty);
                       existingResult.suggested_order = existingResult.shortage;
+                      
+                      // Ensure these are set if missing
+                      if (!existingResult.warehouse_item_id && bomItem.warehouse_item_id) {
+                        existingResult.warehouse_item_id = bomItem.warehouse_item_id;
+                      }
+                      if (!existingResult.bom_id && bomId) {
+                        existingResult.bom_id = bomId;
+                      }
+                      if (!existingResult.bom_item_id && bomItem.id) {
+                        existingResult.bom_item_id = bomItem.id;
+                      }
                       
                       // NEW: Merge CPO contribution
                       if (!existingResult.cpo_details) {

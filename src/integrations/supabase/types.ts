@@ -10277,6 +10277,7 @@ export type Database = {
       }
       warehouse_items: {
         Row: {
+          available_quantity: number | null
           barcode: string | null
           brand: string | null
           category_id: string | null
@@ -10305,6 +10306,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          available_quantity?: number | null
           barcode?: string | null
           brand?: string | null
           category_id?: string | null
@@ -10333,6 +10335,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          available_quantity?: number | null
           barcode?: string | null
           brand?: string | null
           category_id?: string | null
