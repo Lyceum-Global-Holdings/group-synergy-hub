@@ -11,9 +11,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Trash2, Package, ListPlus } from 'lucide-react';
+import { Plus, Trash2, Package, ListPlus, AlertTriangle } from 'lucide-react';
 import { useMaterialIssues } from '@/hooks/useMaterialIssues';
 import { useMaterialIssueItems } from '@/hooks/useMaterialIssueItems';
 import { ItemSelector } from '@/components/common/ItemSelector';
@@ -52,6 +52,7 @@ interface IssueItem {
   from_reservation?: boolean;
   reserved_quantity?: number;
   bin_location?: string;
+  available_stock?: number;
 }
 
 export function CreateMaterialIssueDialog({ open, onOpenChange }: MaterialIssueDialogProps) {
@@ -158,6 +159,7 @@ export function CreateMaterialIssueDialog({ open, onOpenChange }: MaterialIssueD
         unit_of_measure: item.unit_of_measure,
         quantity_required: 1,
         purpose: '',
+        available_stock: item.current_stock || 0,
       });
     }
   };
@@ -183,6 +185,7 @@ export function CreateMaterialIssueDialog({ open, onOpenChange }: MaterialIssueD
         from_reservation: true,
         reserved_quantity: res.reserved_quantity,
         bin_location: res.bin_allocation?.bin?.bin_code || 'N/A',
+        available_stock: res.warehouse_item.current_stock || 0,
       }));
 
     setItems(prev => [...prev, ...newItems]);
@@ -540,6 +543,24 @@ export function CreateMaterialIssueDialog({ open, onOpenChange }: MaterialIssueD
           </TabsContent>
 
           <TabsContent value="review" className="space-y-4">
+            {/* Stock Impact Warning */}
+            <Alert className="border-warning bg-warning/10">
+              <AlertTriangle className="h-4 w-4 text-warning" />
+              <AlertTitle>Stock Impact Notice</AlertTitle>
+              <AlertDescription>
+                Issuing these materials will:
+                <ul className="list-disc list-inside mt-2 space-y-1 text-sm">
+                  <li>Reduce warehouse stock quantities</li>
+                  <li>Update bin allocations (if from reservation)</li>
+                  <li>Close or update reservations</li>
+                  <li>Create audit trail in stock movements</li>
+                </ul>
+                <div className="mt-3 pt-2 border-t border-warning/20 font-medium">
+                  Total items: {items.length} | Total quantity: {items.reduce((sum, item) => sum + item.quantity_required, 0).toFixed(2)} units
+                </div>
+              </AlertDescription>
+            </Alert>
+
             <div className="border rounded-lg p-4 space-y-3">
               <h3 className="font-semibold text-lg">Header Information</h3>
               {formData.cpo_number && (
@@ -572,6 +593,7 @@ export function CreateMaterialIssueDialog({ open, onOpenChange }: MaterialIssueD
                     <TableHead>Description</TableHead>
                     <TableHead>UOM</TableHead>
                     <TableHead>Qty Required</TableHead>
+                    <TableHead>Available Stock</TableHead>
                     <TableHead>Reserved</TableHead>
                     <TableHead>Purpose</TableHead>
                   </TableRow>
@@ -583,7 +605,27 @@ export function CreateMaterialIssueDialog({ open, onOpenChange }: MaterialIssueD
                       <TableCell>{item.item_code}</TableCell>
                       <TableCell>{item.description}</TableCell>
                       <TableCell>{item.unit_of_measure}</TableCell>
-                      <TableCell>{item.quantity_required}</TableCell>
+                      <TableCell>
+                        <div className="flex flex-col gap-1">
+                          <span className="font-medium">{item.quantity_required}</span>
+                          {item.bin_location && item.bin_location !== 'N/A' && (
+                            <span className="text-xs text-muted-foreground">
+                              Bin: {item.bin_location}
+                            </span>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex flex-col gap-1">
+                          <span className="text-sm">{item.available_stock !== undefined ? item.available_stock : 'N/A'}</span>
+                          {item.available_stock !== undefined && item.available_stock < item.quantity_required && (
+                            <span className="text-xs text-destructive font-medium flex items-center gap-1">
+                              <AlertTriangle className="h-3 w-3" />
+                              Low stock
+                            </span>
+                          )}
+                        </div>
+                      </TableCell>
                       <TableCell>
                         {item.from_reservation ? (
                           <Badge variant="secondary">Reserved</Badge>

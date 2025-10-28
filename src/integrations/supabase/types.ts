@@ -10494,6 +10494,95 @@ export type Database = {
           },
         ]
       }
+      warehouse_stock_movements: {
+        Row: {
+          bin_allocation_id: string | null
+          company_id: string | null
+          created_at: string | null
+          created_by: string | null
+          id: string
+          movement_type: string
+          notes: string | null
+          quantity_after: number
+          quantity_before: number
+          quantity_change: number
+          reference_id: string | null
+          reference_number: string | null
+          reference_type: string | null
+          total_value: number | null
+          unit_cost: number | null
+          updated_at: string | null
+          warehouse_item_id: string
+        }
+        Insert: {
+          bin_allocation_id?: string | null
+          company_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          movement_type: string
+          notes?: string | null
+          quantity_after: number
+          quantity_before: number
+          quantity_change: number
+          reference_id?: string | null
+          reference_number?: string | null
+          reference_type?: string | null
+          total_value?: number | null
+          unit_cost?: number | null
+          updated_at?: string | null
+          warehouse_item_id: string
+        }
+        Update: {
+          bin_allocation_id?: string | null
+          company_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          movement_type?: string
+          notes?: string | null
+          quantity_after?: number
+          quantity_before?: number
+          quantity_change?: number
+          reference_id?: string | null
+          reference_number?: string | null
+          reference_type?: string | null
+          total_value?: number | null
+          unit_cost?: number | null
+          updated_at?: string | null
+          warehouse_item_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "warehouse_stock_movements_bin_allocation_id_fkey"
+            columns: ["bin_allocation_id"]
+            isOneToOne: false
+            referencedRelation: "warehouse_bin_allocations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "warehouse_stock_movements_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "warehouse_stock_movements_warehouse_item_id_fkey"
+            columns: ["warehouse_item_id"]
+            isOneToOne: false
+            referencedRelation: "v_adjustment_summary_by_item"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "warehouse_stock_movements_warehouse_item_id_fkey"
+            columns: ["warehouse_item_id"]
+            isOneToOne: false
+            referencedRelation: "warehouse_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       modern_boms: {
@@ -10904,6 +10993,16 @@ export type Database = {
         Returns: boolean
       }
       is_super_admin: { Args: { _user_id: string }; Returns: boolean }
+      process_material_issue_stock_update: {
+        Args: {
+          p_bin_allocation_id?: string
+          p_item_id: string
+          p_min_id?: string
+          p_min_number?: string
+          p_quantity_issued: number
+        }
+        Returns: undefined
+      }
       record_workflow_action: {
         Args: {
           p_comments?: string

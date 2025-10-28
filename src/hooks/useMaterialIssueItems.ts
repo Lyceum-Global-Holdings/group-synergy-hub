@@ -18,8 +18,9 @@ export const useMaterialIssueItems = () => {
       return data;
     },
     onSuccess: async (createdItems) => {
-      // Update reservations for items that came from reservations
+      // Update reservations and stock for each item
       for (const item of createdItems) {
+        // 1. Update reservation status if item came from reservation
         if (item.from_reservation && item.reservation_id) {
           try {
             const { error: rpcError } = await supabase.rpc('update_reservation_on_issue', {
@@ -34,11 +35,59 @@ export const useMaterialIssueItems = () => {
             console.error('Error calling update_reservation_on_issue:', err);
           }
         }
+
+        // 2. Update warehouse stock and bin allocations
+        try {
+          // Get bin_allocation_id from reservation if it exists
+          let binAllocationId = null;
+          if (item.reservation_id) {
+            const { data: reservation } = await supabase
+              .from('warehouse_item_reservations')
+              .select('bin_allocation_id')
+              .eq('id', item.reservation_id)
+              .single();
+            
+            binAllocationId = reservation?.bin_allocation_id;
+          }
+
+          // Get MIN number for reference
+          const { data: minData } = await supabase
+            .from('material_issue_notes')
+            .select('min_number')
+            .eq('id', item.min_id)
+            .single();
+
+          const { error: stockError } = await supabase.rpc('process_material_issue_stock_update', {
+            p_item_id: item.item_id,
+            p_quantity_issued: item.quantity_issued,
+            p_bin_allocation_id: binAllocationId,
+            p_min_id: item.min_id,
+            p_min_number: minData?.min_number || null
+          });
+          
+          if (stockError) {
+            console.error('Error updating stock:', stockError);
+            toast({
+              title: "Stock Update Warning",
+              description: `Item issued but stock update had warnings: ${stockError.message}`,
+              variant: "destructive",
+            });
+          }
+        } catch (err) {
+          console.error('Error calling process_material_issue_stock_update:', err);
+          toast({
+            title: "Stock Update Error",
+            description: "Item issued but failed to update warehouse stock. Please check stock levels manually.",
+            variant: "destructive",
+          });
+        }
       }
       
       queryClient.invalidateQueries({ queryKey: ['material-issues'] });
       queryClient.invalidateQueries({ queryKey: ['warehouse-reservations'] });
       queryClient.invalidateQueries({ queryKey: ['warehouse-items'] });
+      queryClient.invalidateQueries({ queryKey: ['warehouse-bin-allocations'] });
+      queryClient.invalidateQueries({ queryKey: ['warehouse-stock-movements'] });
     },
     onError: (error) => {
       console.error('Error creating material issue items:', error);
