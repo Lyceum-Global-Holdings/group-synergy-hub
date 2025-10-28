@@ -15,6 +15,7 @@ export const STANDARD_SIZES: SizeOption[] = [
   { value: 'XXXL', label: 'XXXL', category: 'Adult' },
   
   // Numeric Sizes (Clothing)
+  { value: '26', label: '26', category: 'Numeric' },
   { value: '28', label: '28', category: 'Numeric' },
   { value: '30', label: '30', category: 'Numeric' },
   { value: '32', label: '32', category: 'Numeric' },
