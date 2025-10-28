@@ -4,12 +4,13 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Search, Edit, Trash2, Eye } from "lucide-react";
+import { Plus, Search, Edit, Trash2, Eye, Sparkles } from "lucide-react";
 import { useProductMaster, ProductMaster } from "@/hooks/useProductMaster";
 import { useCompany } from "@/contexts/CompanyContext";
 import { CreateProductMasterDialog } from "./CreateProductMasterDialog";
 import { ProductMasterDetailsDialog } from "./ProductMasterDetailsDialog";
 import { EditProductMasterDialog } from "./EditProductMasterDialog";
+import { BulkGenerateVariantsDialog } from "./BulkGenerateVariantsDialog";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export function ProductMasterTab() {
@@ -18,6 +19,7 @@ export function ProductMasterTab() {
   const [selectedProduct, setSelectedProduct] = useState<ProductMaster | null>(null);
   const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [generateDialogOpen, setGenerateDialogOpen] = useState(false);
   const { selectedCompany } = useCompany();
   const { products, isLoading, deleteProduct } = useProductMaster(selectedCompany?.id);
 
@@ -41,6 +43,11 @@ export function ProductMasterTab() {
     if (window.confirm(`Are you sure you want to delete "${productName}"? This will not affect existing finished goods.`)) {
       deleteProduct(id);
     }
+  };
+
+  const handleGenerateVariants = (product: ProductMaster) => {
+    setSelectedProduct(product);
+    setGenerateDialogOpen(true);
   };
 
   if (isLoading) {
@@ -139,6 +146,14 @@ export function ProductMasterTab() {
                           <Button
                             variant="ghost"
                             size="icon"
+                            title="Generate Variants"
+                            onClick={() => handleGenerateVariants(product)}
+                          >
+                            <Sparkles className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
                             title="View Details"
                             onClick={() => handleView(product)}
                           >
@@ -197,6 +212,12 @@ export function ProductMasterTab() {
           />
         </>
       )}
+
+      <BulkGenerateVariantsDialog
+        productMaster={selectedProduct}
+        open={generateDialogOpen}
+        onOpenChange={setGenerateDialogOpen}
+      />
     </Card>
   );
 }
