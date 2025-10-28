@@ -72,17 +72,11 @@ export default function BillOfMaterialsPage() {
   };
 
   const handleDuplicate = async (id: string) => {
-    if (confirm("Duplicate this BOM? This will create a copy with all items and linked products.")) {
+    if (confirm("Duplicate this BOM? This will create a copy in Draft and open the editor.")) {
       try {
-        await duplicateBom(id);
-        // Get the newly created BOM from the cache
-        const updatedBoms = queryClient.getQueryData(['bill-of-materials', isViewingAllCompanies ? undefined : selectedCompany?.id]) as BillOfMaterials[] | undefined;
-        if (updatedBoms && updatedBoms.length > 0) {
-          // The newest BOM will be the one we just created
-          const newestBom = updatedBoms.reduce((prev, current) => 
-            new Date(current.created_at) > new Date(prev.created_at) ? current : prev
-          );
-          setSelectedBom(newestBom);
+        const newBom = await duplicateBom(id);
+        if (newBom) {
+          setSelectedBom(newBom as BillOfMaterials);
           setIsEditDialogOpen(true);
         }
       } catch (error) {

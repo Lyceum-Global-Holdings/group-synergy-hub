@@ -250,20 +250,10 @@ export function useBillOfMaterials(companyId?: string) {
         if (insertItemsError) throw insertItemsError;
       }
 
-      // Copy linked finished goods
-      if (linkedProducts && linkedProducts.length > 0) {
-        const newLinks = linkedProducts.map(link => ({
-          bom_id: newBom.id,
-          finished_good_id: link.finished_good_id,
-          created_by: user.data.user?.id,
-        }));
+      // Do not copy linked finished goods on duplicate. We'll let users manage links in the edit screen.
+      // This avoids DB trigger errors related to finished_good_id.
+      // If needed later, implement a safe copy with proper validations.
 
-        const { error: insertLinksError } = await supabase
-          .from('bom_finished_goods')
-          .insert(newLinks);
-
-        if (insertLinksError) throw insertLinksError;
-      }
 
       return newBom;
     },
