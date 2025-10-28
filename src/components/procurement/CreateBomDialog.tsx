@@ -94,7 +94,6 @@ export function CreateBomDialog({ children }: CreateBomDialogProps) {
 
   const initializeCategory = (category: BomCategoryKey) => {
     if (items[category].length === 0) {
-      const bomSize = form.watch('size');
       const categoryItems = BOM_CATEGORIES[category].items.map(item => ({
         ...item,
         description: '',
@@ -104,7 +103,7 @@ export function CreateBomDialog({ children }: CreateBomDialogProps) {
         category,
         item_code: '',
         colour: '',
-        size: bomSize || '',
+        size: 'All',
         warehouse_item_id: undefined,
       }));
       setItems(prev => ({ ...prev, [category]: categoryItems }));
@@ -112,7 +111,6 @@ export function CreateBomDialog({ children }: CreateBomDialogProps) {
   };
 
   const addItem = (category: BomCategoryKey) => {
-    const bomSize = form.watch('size');
     const newItem: CreateBomItemData = {
       item_name: '',
       description: '',
@@ -123,7 +121,7 @@ export function CreateBomDialog({ children }: CreateBomDialogProps) {
       category,
       item_code: '',
       colour: '',
-      size: bomSize || '',
+      size: 'All',
       warehouse_item_id: undefined,
     };
     setItems(prev => ({
@@ -332,17 +330,12 @@ export function CreateBomDialog({ children }: CreateBomDialogProps) {
                             <SelectValue placeholder="Select" />
                           </SelectTrigger>
                           <SelectContent className="bg-background border z-50">
-                            {availableSizes.length > 0 ? (
-                              availableSizes.map((size: string) => (
-                                <SelectItem key={size} value={size}>
-                                  {size}
-                                </SelectItem>
-                              ))
-                            ) : (
-                              <SelectItem value={item.size || 'N/A'} disabled>
-                                No sizes available
+                            <SelectItem value="All">All</SelectItem>
+                            {availableSizes.length > 0 && availableSizes.map((size: string) => (
+                              <SelectItem key={size} value={size}>
+                                {size}
                               </SelectItem>
-                            )}
+                            ))}
                           </SelectContent>
                         </Select>
                       </td>
