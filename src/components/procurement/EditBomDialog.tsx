@@ -130,7 +130,6 @@ export function EditBomDialog({ bom, open, onOpenChange }: EditBomDialogProps) {
           consumption: item.consumption || 0,
           category: item.category || 'fabric',
           item_code: item.item_code || '',
-          colour: item.colour || '',
           warehouse_item_id: item.warehouse_item_id || undefined,
           supplier_part_number: item.supplier_part_number || '',
           manufacturer_part_number: item.manufacturer_part_number || '',
@@ -152,7 +151,6 @@ export function EditBomDialog({ bom, open, onOpenChange }: EditBomDialogProps) {
         consumption: 0,
         category,
         item_code: '',
-        colour: '',
         warehouse_item_id: undefined,
       }));
       setItems(prev => ({ ...prev, [category]: categoryItems }));
@@ -169,7 +167,6 @@ export function EditBomDialog({ bom, open, onOpenChange }: EditBomDialogProps) {
       consumption: 0,
       category,
       item_code: '',
-      colour: '',
       warehouse_item_id: undefined,
     };
     setItems(prev => ({
@@ -294,7 +291,6 @@ export function EditBomDialog({ bom, open, onOpenChange }: EditBomDialogProps) {
                     <th className="p-2 text-left font-medium">Link Item</th>
                     <th className="p-2 text-left font-medium">Item Code</th>
                     <th className="p-2 text-left font-medium">Description</th>
-                    <th className="p-2 text-left font-medium">Colour</th>
                     <th className="p-2 text-left font-medium">Consumption</th>
                     <th className="p-2 text-left font-medium">UOM</th>
                     <th className="p-2 text-left font-medium">Qty</th>
@@ -348,14 +344,6 @@ export function EditBomDialog({ bom, open, onOpenChange }: EditBomDialogProps) {
                           placeholder="Description"
                           className="h-8 min-w-[150px]"
                           disabled={!!item.warehouse_item_id}
-                        />
-                      </td>
-                      <td className="p-2">
-                        <Input
-                          value={item.colour || ''}
-                          onChange={(e) => updateItem(category, index, 'colour', e.target.value)}
-                          placeholder="Colour"
-                          className="h-8"
                         />
                       </td>
                       <td className="p-2">

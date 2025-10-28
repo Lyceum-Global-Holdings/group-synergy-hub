@@ -30,7 +30,6 @@ export interface BomItem {
   po_item_id?: string;
   notes?: string;
   item_code?: string;
-  colour?: string;
   consumption?: number;
   category?: string;
   warehouse_item_id?: string;
@@ -63,7 +62,6 @@ export interface CreateBomItemData {
   po_item_id?: string;
   notes?: string;
   item_code?: string;
-  colour?: string;
   consumption?: number;
   category?: string;
   warehouse_item_id?: string;

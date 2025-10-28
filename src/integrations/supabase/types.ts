@@ -1728,7 +1728,6 @@ export type Database = {
         Row: {
           bom_id: string
           category: string | null
-          colour: string | null
           consumption: number | null
           created_at: string
           description: string | null
@@ -1749,7 +1748,6 @@ export type Database = {
         Insert: {
           bom_id: string
           category?: string | null
-          colour?: string | null
           consumption?: number | null
           created_at?: string
           description?: string | null
@@ -1770,7 +1768,6 @@ export type Database = {
         Update: {
           bom_id?: string
           category?: string | null
-          colour?: string | null
           consumption?: number | null
           created_at?: string
           description?: string | null

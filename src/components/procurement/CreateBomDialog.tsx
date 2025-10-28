@@ -99,7 +99,6 @@ export function CreateBomDialog({ children }: CreateBomDialogProps) {
         consumption: 0,
         category,
         item_code: '',
-        colour: '',
         warehouse_item_id: undefined,
       }));
       setItems(prev => ({ ...prev, [category]: categoryItems }));
@@ -116,7 +115,6 @@ export function CreateBomDialog({ children }: CreateBomDialogProps) {
       consumption: 0,
       category,
       item_code: '',
-      colour: '',
       warehouse_item_id: undefined,
     };
     setItems(prev => ({
@@ -250,7 +248,6 @@ export function CreateBomDialog({ children }: CreateBomDialogProps) {
                     <th className="p-2 text-left font-medium">Link Item</th>
                     <th className="p-2 text-left font-medium">Item Code</th>
                     <th className="p-2 text-left font-medium">Description</th>
-                    <th className="p-2 text-left font-medium">Colour</th>
                     <th className="p-2 text-left font-medium">Consumption</th>
                     <th className="p-2 text-left font-medium">UOM</th>
                     <th className="p-2 text-left font-medium">Qty</th>
@@ -304,14 +301,6 @@ export function CreateBomDialog({ children }: CreateBomDialogProps) {
                           placeholder="Description"
                           className="h-8 min-w-[150px]"
                           disabled={!!item.warehouse_item_id}
-                        />
-                      </td>
-                      <td className="p-2">
-                        <Input
-                          value={item.colour || ''}
-                          onChange={(e) => updateItem(category, index, 'colour', e.target.value)}
-                          placeholder="Colour"
-                          className="h-8"
                         />
                       </td>
                       <td className="p-2">
