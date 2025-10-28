@@ -1,9 +1,10 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Package, MapPin, Tag, Ruler } from 'lucide-react';
+import { Package, MapPin, Tag, Ruler, Grid3x3 } from 'lucide-react';
 import { ItemMasterTab } from '@/components/warehouse/ItemMasterTab';
 import { BinMasterTab } from '@/components/warehouse/BinMasterTab';
 import { ItemCategoriesTab } from '@/components/warehouse/ItemCategoriesTab';
 import { ItemUnitsTab } from '@/components/warehouse/ItemUnitsTab';
+import { BinAllocationsTab } from '@/components/warehouse/BinAllocationsTab';
 
 export default function ItemBinMaster() {
 
@@ -20,7 +21,7 @@ export default function ItemBinMaster() {
 
 
       <Tabs defaultValue="items" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="items" className="flex items-center gap-2">
             <Package className="h-4 w-4" />
             Item Master
@@ -28,6 +29,10 @@ export default function ItemBinMaster() {
           <TabsTrigger value="bins" className="flex items-center gap-2">
             <MapPin className="h-4 w-4" />
             Bin Master
+          </TabsTrigger>
+          <TabsTrigger value="allocations" className="flex items-center gap-2">
+            <Grid3x3 className="h-4 w-4" />
+            Bin Allocations
           </TabsTrigger>
           <TabsTrigger value="categories" className="flex items-center gap-2">
             <Tag className="h-4 w-4" />
@@ -45,6 +50,10 @@ export default function ItemBinMaster() {
 
         <TabsContent value="bins">
           <BinMasterTab />
+        </TabsContent>
+
+        <TabsContent value="allocations">
+          <BinAllocationsTab />
         </TabsContent>
 
         <TabsContent value="categories">

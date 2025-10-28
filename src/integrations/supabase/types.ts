@@ -10005,6 +10005,84 @@ export type Database = {
           },
         ]
       }
+      warehouse_bin_allocations: {
+        Row: {
+          allocated_quantity: number
+          available_quantity: number | null
+          bin_id: string
+          company_id: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          notes: string | null
+          reserved_quantity: number
+          updated_at: string
+          warehouse_item_id: string
+        }
+        Insert: {
+          allocated_quantity?: number
+          available_quantity?: number | null
+          bin_id: string
+          company_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          reserved_quantity?: number
+          updated_at?: string
+          warehouse_item_id: string
+        }
+        Update: {
+          allocated_quantity?: number
+          available_quantity?: number | null
+          bin_id?: string
+          company_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          reserved_quantity?: number
+          updated_at?: string
+          warehouse_item_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "warehouse_bin_allocations_bin_id_fkey"
+            columns: ["bin_id"]
+            isOneToOne: false
+            referencedRelation: "warehouse_bins"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "warehouse_bin_allocations_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "warehouse_bin_allocations_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "warehouse_bin_allocations_warehouse_item_id_fkey"
+            columns: ["warehouse_item_id"]
+            isOneToOne: false
+            referencedRelation: "v_adjustment_summary_by_item"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "warehouse_bin_allocations_warehouse_item_id_fkey"
+            columns: ["warehouse_item_id"]
+            isOneToOne: false
+            referencedRelation: "warehouse_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       warehouse_bins: {
         Row: {
           bin_code: string
@@ -10071,6 +10149,132 @@ export type Database = {
           },
         ]
       }
+      warehouse_item_reservations: {
+        Row: {
+          bin_allocation_id: string | null
+          bom_id: string | null
+          bom_item_id: string | null
+          company_id: string | null
+          created_at: string
+          expiry_date: string | null
+          id: string
+          notes: string | null
+          quantity_issued: number | null
+          quantity_remaining: number | null
+          reference_id: string | null
+          reference_number: string | null
+          reference_type: string
+          required_date: string | null
+          reserved_by: string | null
+          reserved_date: string
+          reserved_quantity: number
+          status: string
+          updated_at: string
+          warehouse_item_id: string
+        }
+        Insert: {
+          bin_allocation_id?: string | null
+          bom_id?: string | null
+          bom_item_id?: string | null
+          company_id?: string | null
+          created_at?: string
+          expiry_date?: string | null
+          id?: string
+          notes?: string | null
+          quantity_issued?: number | null
+          quantity_remaining?: number | null
+          reference_id?: string | null
+          reference_number?: string | null
+          reference_type: string
+          required_date?: string | null
+          reserved_by?: string | null
+          reserved_date?: string
+          reserved_quantity: number
+          status?: string
+          updated_at?: string
+          warehouse_item_id: string
+        }
+        Update: {
+          bin_allocation_id?: string | null
+          bom_id?: string | null
+          bom_item_id?: string | null
+          company_id?: string | null
+          created_at?: string
+          expiry_date?: string | null
+          id?: string
+          notes?: string | null
+          quantity_issued?: number | null
+          quantity_remaining?: number | null
+          reference_id?: string | null
+          reference_number?: string | null
+          reference_type?: string
+          required_date?: string | null
+          reserved_by?: string | null
+          reserved_date?: string
+          reserved_quantity?: number
+          status?: string
+          updated_at?: string
+          warehouse_item_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "warehouse_item_reservations_bin_allocation_id_fkey"
+            columns: ["bin_allocation_id"]
+            isOneToOne: false
+            referencedRelation: "warehouse_bin_allocations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "warehouse_item_reservations_bom_id_fkey"
+            columns: ["bom_id"]
+            isOneToOne: false
+            referencedRelation: "bill_of_materials"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "warehouse_item_reservations_bom_id_fkey"
+            columns: ["bom_id"]
+            isOneToOne: false
+            referencedRelation: "modern_boms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "warehouse_item_reservations_bom_item_id_fkey"
+            columns: ["bom_item_id"]
+            isOneToOne: false
+            referencedRelation: "bom_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "warehouse_item_reservations_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "warehouse_item_reservations_reserved_by_fkey"
+            columns: ["reserved_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "warehouse_item_reservations_warehouse_item_id_fkey"
+            columns: ["warehouse_item_id"]
+            isOneToOne: false
+            referencedRelation: "v_adjustment_summary_by_item"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "warehouse_item_reservations_warehouse_item_id_fkey"
+            columns: ["warehouse_item_id"]
+            isOneToOne: false
+            referencedRelation: "warehouse_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       warehouse_items: {
         Row: {
           barcode: string | null
@@ -10091,6 +10295,7 @@ export type Database = {
           name: string
           notes: string | null
           reorder_level: number | null
+          reserved_quantity: number | null
           selling_price: number | null
           sku: string | null
           status: string
@@ -10118,6 +10323,7 @@ export type Database = {
           name: string
           notes?: string | null
           reorder_level?: number | null
+          reserved_quantity?: number | null
           selling_price?: number | null
           sku?: string | null
           status?: string
@@ -10145,6 +10351,7 @@ export type Database = {
           name?: string
           notes?: string | null
           reorder_level?: number | null
+          reserved_quantity?: number | null
           selling_price?: number | null
           sku?: string | null
           status?: string
