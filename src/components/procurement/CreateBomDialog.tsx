@@ -40,14 +40,12 @@ import { STANDARD_SIZES, SIZE_CATEGORIES, getSizesByCategory } from '@/constants
 import { CreateBomItemData } from '@/types/bom';
 import { ItemSelector } from '@/components/common/ItemSelector';
 import { ProductMasterSelector } from '@/components/common/ProductMasterSelector';
-import { FinishedGoodsItemSelector } from '@/components/common/FinishedGoodsItemSelector';
 import { BomSizeMultiplierDialog } from '@/components/procurement/BomSizeMultiplierDialog';
 import { WarehouseItem } from '@/types/itemBin';
 
 const bomSchema = z.object({
   product_name: z.string().min(1, 'Product name is required'),
   product_master_id: z.string().min(1, 'Product template is required'),
-  finished_good_id: z.string().min(1, 'Finished good variant is required'),
   style_no: z.string().optional(),
   version: z.string().optional(),
   size: z.string().optional(),
@@ -83,7 +81,6 @@ export function CreateBomDialog({ children }: CreateBomDialogProps) {
     defaultValues: {
       product_name: '',
       product_master_id: '',
-      finished_good_id: '',
       version: '1.0',
       size: '',
       color: '',
@@ -188,7 +185,6 @@ export function CreateBomDialog({ children }: CreateBomDialogProps) {
       const createdBom = await createBom({
         product_name: data.product_name,
         product_master_id: data.product_master_id,
-        finished_good_id: data.finished_good_id,
         size: data.size,
         style_no: data.style_no,
         version: data.version,
@@ -465,9 +461,6 @@ export function CreateBomDialog({ children }: CreateBomDialogProps) {
                     onSelect={(product) => {
                       if (product) {
                         form.setValue('product_master_id', product.id);
-                        form.setValue('finished_good_id', '');
-                        form.setValue('size', '');
-                        form.setValue('color', '');
                         
                         if (!form.getValues('product_name')) {
                           form.setValue('product_name', product.product_name);
@@ -477,52 +470,12 @@ export function CreateBomDialog({ children }: CreateBomDialogProps) {
                         }
                       } else {
                         form.setValue('product_master_id', '');
-                        form.setValue('finished_good_id', '');
-                        form.setValue('size', '');
-                        form.setValue('color', '');
                       }
                     }}
                     placeholder="Select product template..."
                   />
                   <p className="text-xs text-muted-foreground">
                     Select the product template that defines available variants
-                  </p>
-                </div>
-
-                <div className="space-y-2">
-                  <FormLabel>Finished Good Variant *</FormLabel>
-                  <FinishedGoodsItemSelector
-                    value={form.watch('finished_good_id')}
-                    onSelect={(finishedGood) => {
-                      if (finishedGood) {
-                        form.setValue('finished_good_id', finishedGood.id);
-                        form.setValue('size', finishedGood.size || '');
-                        form.setValue('color', finishedGood.color || '');
-                        if (!form.getValues('product_name')) {
-                          form.setValue('product_name', finishedGood.product_name);
-                        }
-                      } else {
-                        form.setValue('finished_good_id', '');
-                        form.setValue('size', '');
-                        form.setValue('color', '');
-                      }
-                    }}
-                    filterByProductMaster={form.watch('product_master_id')}
-                    placeholder="Select finished good variant..."
-                    disabled={!form.watch('product_master_id')}
-                  />
-                  {form.watch('finished_good_id') && (
-                    <div className="flex gap-2 mt-2">
-                      {form.watch('size') && (
-                        <Badge variant="secondary">Size: {form.watch('size')}</Badge>
-                      )}
-                      {form.watch('color') && (
-                        <Badge variant="secondary">Color: {form.watch('color')}</Badge>
-                      )}
-                    </div>
-                  )}
-                  <p className="text-xs text-muted-foreground">
-                    Select the specific size/color variant for this BOM
                   </p>
                 </div>
 
@@ -561,12 +514,9 @@ export function CreateBomDialog({ children }: CreateBomDialogProps) {
                     <FormItem>
                       <FormLabel>Size</FormLabel>
                       <FormControl>
-                        <Input {...field} disabled placeholder="Auto-filled from finished good" />
+                        <Input {...field} placeholder="Enter size" />
                       </FormControl>
                       <FormMessage />
-                      <p className="text-xs text-muted-foreground">
-                        Auto-populated from selected finished good variant
-                      </p>
                     </FormItem>
                   )}
                 />
@@ -578,12 +528,9 @@ export function CreateBomDialog({ children }: CreateBomDialogProps) {
                     <FormItem>
                       <FormLabel>Color</FormLabel>
                       <FormControl>
-                        <Input {...field} disabled placeholder="Auto-filled from finished good" />
+                        <Input {...field} placeholder="Enter color" />
                       </FormControl>
                       <FormMessage />
-                      <p className="text-xs text-muted-foreground">
-                        Auto-populated from selected finished good variant
-                      </p>
                     </FormItem>
                   )}
                 />
