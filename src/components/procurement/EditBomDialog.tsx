@@ -34,6 +34,7 @@ import { useBillOfMaterials, useBomItems } from '@/hooks/useBillOfMaterials';
 import { useCompany } from '@/contexts/CompanyContext';
 import { useItemUnits } from '@/hooks/useItemUnits';
 import { useFinishedGoods } from '@/hooks/useFinishedGoods';
+import { useProductMaster } from '@/hooks/useProductMaster';
 import { BOM_CATEGORIES, BomCategoryKey } from '@/constants/bomCategories';
 import { CreateBomItemData, BillOfMaterials } from '@/types/bom';
 import { ItemSelector } from '@/components/common/ItemSelector';
@@ -77,6 +78,7 @@ export function EditBomDialog({ bom, open, onOpenChange }: EditBomDialogProps) {
   const { items: existingItems, isLoading: itemsLoading } = useBomItems(bom?.id || '');
   const { units } = useItemUnits();
   const { products: finishedGoodsList } = useFinishedGoods(selectedCompany?.id);
+  const { products } = useProductMaster(selectedCompany?.id);
 
   const form = useForm<BomFormData>({
     resolver: zodResolver(bomSchema),
@@ -138,6 +140,7 @@ export function EditBomDialog({ bom, open, onOpenChange }: EditBomDialogProps) {
           category: item.category || 'fabric',
           item_code: item.item_code || '',
           colour: item.colour || '',
+          size: item.size || 'All',
           warehouse_item_id: item.warehouse_item_id || undefined,
           supplier_part_number: item.supplier_part_number || '',
           manufacturer_part_number: item.manufacturer_part_number || '',
@@ -160,6 +163,7 @@ export function EditBomDialog({ bom, open, onOpenChange }: EditBomDialogProps) {
         category,
         item_code: '',
         colour: '',
+        size: 'All',
         warehouse_item_id: undefined,
       }));
       setItems(prev => ({ ...prev, [category]: categoryItems }));
@@ -177,6 +181,7 @@ export function EditBomDialog({ bom, open, onOpenChange }: EditBomDialogProps) {
       category,
       item_code: '',
       colour: '',
+      size: 'All',
       warehouse_item_id: undefined,
     };
     setItems(prev => ({
@@ -262,6 +267,11 @@ export function EditBomDialog({ bom, open, onOpenChange }: EditBomDialogProps) {
   const renderItemsTable = (category: BomCategoryKey) => {
     const categoryItems = items[category];
     
+    // Get available sizes from the selected product master
+    const selectedProductMasterId = form.watch('product_master_id');
+    const selectedProductMaster = products?.find(p => p.id === selectedProductMasterId);
+    const availableSizes = selectedProductMaster?.available_sizes || [];
+    
     return (
       <div className="space-y-4">
         <div className="flex justify-between items-center">
@@ -297,6 +307,7 @@ export function EditBomDialog({ bom, open, onOpenChange }: EditBomDialogProps) {
                     <th className="p-2 text-left font-medium">Item Code</th>
                     <th className="p-2 text-left font-medium">Description</th>
                     <th className="p-2 text-left font-medium">Colour</th>
+                    <th className="p-2 text-left font-medium">Size</th>
                     <th className="p-2 text-left font-medium">Consumption</th>
                     <th className="p-2 text-left font-medium">UOM</th>
                     <th className="p-2 text-left font-medium">Qty</th>
@@ -359,6 +370,24 @@ export function EditBomDialog({ bom, open, onOpenChange }: EditBomDialogProps) {
                           placeholder="Colour"
                           className="h-8"
                         />
+                      </td>
+                      <td className="p-2">
+                        <Select
+                          value={item.size || ''}
+                          onValueChange={(value) => updateItem(category, index, 'size', value)}
+                        >
+                          <SelectTrigger className="h-8 w-24">
+                            <SelectValue placeholder="Select" />
+                          </SelectTrigger>
+                          <SelectContent className="bg-background border z-50">
+                            <SelectItem value="All">All</SelectItem>
+                            {availableSizes.length > 0 && availableSizes.map((size: string) => (
+                              <SelectItem key={size} value={size}>
+                                {size}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </td>
                       <td className="p-2">
                         <Input
