@@ -171,6 +171,8 @@ export interface MaterialRequest {
   contact_number: string | null;
   epf_number: string | null;
   job_number: string | null;
+  cpo_id: string | null;
+  cpo_number: string | null;
   items_required_date: string;
   purpose: string;
   priority: MaterialRequestPriority;
@@ -197,6 +199,8 @@ export interface CreateMaterialRequestData {
   contact_number?: string;
   epf_number?: string;
   job_number?: string;
+  cpo_id?: string;
+  cpo_number?: string;
   items_required_date: string;
   purpose: string;
   priority?: MaterialRequestPriority;

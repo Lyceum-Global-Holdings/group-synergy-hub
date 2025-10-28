@@ -64,6 +64,18 @@ export default function MaterialIssueReturn() {
     { accessorKey: "requested_by", header: "Requested By" },
     { accessorKey: "department", header: "Department" },
     {
+      accessorKey: "cpo_number",
+      header: "CPO Number",
+      cell: ({ row }) => {
+        const cpoNumber = row.original.cpo_number;
+        return cpoNumber ? (
+          <Badge variant="outline">{cpoNumber}</Badge>
+        ) : (
+          <span className="text-muted-foreground">-</span>
+        );
+      }
+    },
+    {
       accessorKey: "priority",
       header: "Priority",
       cell: ({ row }) => (

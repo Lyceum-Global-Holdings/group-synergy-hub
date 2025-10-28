@@ -5805,6 +5805,8 @@ export type Database = {
         Row: {
           company_id: string | null
           contact_number: string | null
+          cpo_id: string | null
+          cpo_number: string | null
           created_at: string
           created_by: string | null
           department: string | null
@@ -5832,6 +5834,8 @@ export type Database = {
         Insert: {
           company_id?: string | null
           contact_number?: string | null
+          cpo_id?: string | null
+          cpo_number?: string | null
           created_at?: string
           created_by?: string | null
           department?: string | null
@@ -5859,6 +5863,8 @@ export type Database = {
         Update: {
           company_id?: string | null
           contact_number?: string | null
+          cpo_id?: string | null
+          cpo_number?: string | null
           created_at?: string
           created_by?: string | null
           department?: string | null
@@ -5884,6 +5890,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "material_requests_cpo_id_fkey"
+            columns: ["cpo_id"]
+            isOneToOne: false
+            referencedRelation: "customer_purchase_orders"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "material_requests_min_id_fkey"
             columns: ["min_id"]

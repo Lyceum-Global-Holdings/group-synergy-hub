@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -6,12 +6,18 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Trash2, ArrowLeft, ArrowRight, CheckCircle } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Plus, Trash2, ArrowLeft, ArrowRight, CheckCircle, Package } from "lucide-react";
 import { useMaterialRequests } from "@/hooks/useMaterialRequests";
 import { useMaterialRequestItems } from "@/hooks/useMaterialRequestItems";
+import { useWarehouseReservations } from "@/hooks/useWarehouseReservations";
 import { ItemSelector } from "@/components/common/ItemSelector";
 import { MaterialRequestPriority } from "@/types/materialIssueReturn";
 import { WarehouseItem } from "@/types/itemBin";
+import { ReservationWithDetails } from "@/types/warehouseReservation";
+import { supabase } from "@/integrations/supabase/client";
+import { useQuery } from "@tanstack/react-query";
 
 interface CreateMaterialRequestDialogProps {
   open: boolean;
@@ -26,6 +32,7 @@ interface RequestItem {
   quantity_requested: number;
   purpose?: string;
   notes?: string;
+  _reservation?: ReservationWithDetails;
 }
 
 export function CreateMaterialRequestDialog({ open, onOpenChange }: CreateMaterialRequestDialogProps) {
@@ -37,28 +44,103 @@ export function CreateMaterialRequestDialog({ open, onOpenChange }: CreateMateri
     contact_number: "",
     epf_number: "",
     job_number: "",
+    cpo_id: "",
+    cpo_number: "",
     items_required_date: "",
     purpose: "",
     priority: "medium" as MaterialRequestPriority,
     notes: "",
   });
   const [items, setItems] = useState<RequestItem[]>([]);
+  const [cpoReservations, setCpoReservations] = useState<ReservationWithDetails[]>([]);
   
   const { createRequestAsync, isCreating } = useMaterialRequests();
   const { createItems } = useMaterialRequestItems();
 
+  // Fetch confirmed CPOs
+  const { data: confirmedCPOs } = useQuery({
+    queryKey: ['confirmed-cpos'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('customer_purchase_orders')
+        .select(`
+          id, 
+          cpo_number,
+          customer:customers(customer_name)
+        `)
+        .eq('status', 'confirmed')
+        .order('cpo_number', { ascending: false });
+      
+      if (error) throw error;
+      return data;
+    }
+  });
+
+  // Fetch reservations when CPO is selected
+  useEffect(() => {
+    if (requestData.cpo_id) {
+      fetchCPOReservations(requestData.cpo_id);
+    } else {
+      setCpoReservations([]);
+    }
+  }, [requestData.cpo_id]);
+
+  const fetchCPOReservations = async (cpoId: string) => {
+    const { data, error } = await supabase
+      .from('warehouse_item_reservations')
+      .select(`
+        *,
+        warehouse_item:warehouse_items(id, item_code, name, current_stock, reserved_quantity),
+        bin_allocation:warehouse_bin_allocations(
+          id,
+          allocated_quantity,
+          available_quantity,
+          bin:warehouse_bins(bin_code, name)
+        )
+      `)
+      .eq('reference_id', cpoId)
+      .in('status', ['active', 'partially_issued']);
+
+    if (!error && data) {
+      setCpoReservations(data as ReservationWithDetails[]);
+    }
+  };
+
   const handleAddItem = (selectedItem: WarehouseItem | null) => {
     if (!selectedItem) return;
+
+    // Find reservation for this item
+    const reservation = cpoReservations.find(
+      r => r.warehouse_item_id === selectedItem.id
+    );
 
     setItems([...items, {
       item_id: selectedItem.id,
       item_code: selectedItem.item_code || "",
       description: selectedItem.description || "",
-      unit_of_measure: "pcs", // Default unit, can be enhanced later
-      quantity_requested: 1,
-      purpose: "",
-      notes: "",
+      unit_of_measure: "pcs",
+      quantity_requested: reservation?.quantity_remaining || 1,
+      purpose: reservation ? `For CPO ${requestData.cpo_number}` : "",
+      notes: reservation ? `Reserved in bin ${reservation.bin_allocation?.bin.bin_code}` : "",
+      _reservation: reservation,
     }]);
+  };
+
+  const handleAddAllReservedItems = () => {
+    const newItems = cpoReservations
+      .filter(res => !items.some(item => item.item_id === res.warehouse_item_id))
+      .map((res) => ({
+        item_id: res.warehouse_item_id,
+        item_code: res.warehouse_item?.item_code || "",
+        description: res.warehouse_item?.name || "",
+        unit_of_measure: "pcs",
+        quantity_requested: res.quantity_remaining,
+        purpose: `For CPO ${requestData.cpo_number}`,
+        notes: `Reserved in bin ${res.bin_allocation?.bin.bin_code}`,
+        _reservation: res,
+      }));
+    
+    setItems([...items, ...newItems]);
   };
 
   const handleRemoveItem = (index: number) => {
@@ -82,7 +164,13 @@ export function CreateMaterialRequestDialog({ open, onOpenChange }: CreateMateri
       if (items.length > 0 && newRequest) {
         await createItems(items.map((item, index) => ({
           request_id: newRequest.id,
-          ...item,
+          item_id: item.item_id,
+          item_code: item.item_code,
+          description: item.description,
+          unit_of_measure: item.unit_of_measure,
+          quantity_requested: item.quantity_requested,
+          purpose: item.purpose,
+          notes: item.notes,
           line_number: index + 1,
         })));
       }
@@ -108,12 +196,15 @@ export function CreateMaterialRequestDialog({ open, onOpenChange }: CreateMateri
       contact_number: "",
       epf_number: "",
       job_number: "",
+      cpo_id: "",
+      cpo_number: "",
       items_required_date: "",
       purpose: "",
       priority: "medium",
       notes: "",
     });
     setItems([]);
+    setCpoReservations([]);
   };
 
   const canProceedToStep2 = requestData.requested_by && requestData.items_required_date && requestData.purpose;
@@ -228,6 +319,35 @@ export function CreateMaterialRequestDialog({ open, onOpenChange }: CreateMateri
             </div>
 
             <div>
+              <Label htmlFor="cpo_number">CPO Number (Optional)</Label>
+              <Select 
+                value={requestData.cpo_id} 
+                onValueChange={(value) => {
+                  const selectedCPO = confirmedCPOs?.find(cpo => cpo.id === value);
+                  setRequestData({ 
+                    ...requestData, 
+                    cpo_id: value,
+                    cpo_number: selectedCPO?.cpo_number || ""
+                  });
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select CPO (if applicable)" />
+                </SelectTrigger>
+                <SelectContent>
+                  {confirmedCPOs?.map(cpo => (
+                    <SelectItem key={cpo.id} value={cpo.id}>
+                      {cpo.cpo_number} - {(cpo.customer as any)?.customer_name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground mt-1">
+                Link to CPO to view reserved materials
+              </p>
+            </div>
+
+            <div>
               <Label htmlFor="purpose">Purpose *</Label>
               <Textarea
                 id="purpose"
@@ -275,6 +395,20 @@ export function CreateMaterialRequestDialog({ open, onOpenChange }: CreateMateri
         {/* Step 2: Items */}
         {step === 2 && (
           <div className="space-y-4">
+            {requestData.cpo_number && (
+              <Alert>
+                <Package className="h-4 w-4" />
+                <AlertDescription>
+                  Linked to CPO: <strong>{requestData.cpo_number}</strong>
+                  {cpoReservations.length > 0 && (
+                    <span className="ml-2">
+                      ({cpoReservations.length} items reserved)
+                    </span>
+                  )}
+                </AlertDescription>
+              </Alert>
+            )}
+
             <div className="flex gap-2">
               <div className="flex-1">
                 <ItemSelector
@@ -283,6 +417,15 @@ export function CreateMaterialRequestDialog({ open, onOpenChange }: CreateMateri
                   placeholder="Select item to add"
                 />
               </div>
+              {cpoReservations.length > 0 && (
+                <Button 
+                  variant="outline" 
+                  onClick={handleAddAllReservedItems}
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add All Reserved Items
+                </Button>
+              )}
             </div>
 
             <div className="border rounded-lg">
@@ -293,6 +436,8 @@ export function CreateMaterialRequestDialog({ open, onOpenChange }: CreateMateri
                     <TableHead>Description</TableHead>
                     <TableHead>UOM</TableHead>
                     <TableHead>Qty Required</TableHead>
+                    <TableHead>Reserved</TableHead>
+                    <TableHead>Bin Location</TableHead>
                     <TableHead>Purpose</TableHead>
                     <TableHead>Notes</TableHead>
                     <TableHead className="w-[50px]"></TableHead>
@@ -301,7 +446,7 @@ export function CreateMaterialRequestDialog({ open, onOpenChange }: CreateMateri
                 <TableBody>
                   {items.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={7} className="text-center text-muted-foreground">
+                      <TableCell colSpan={9} className="text-center text-muted-foreground">
                         No items added yet
                       </TableCell>
                     </TableRow>
@@ -320,6 +465,18 @@ export function CreateMaterialRequestDialog({ open, onOpenChange }: CreateMateri
                             min="0.01"
                             step="0.01"
                           />
+                        </TableCell>
+                        <TableCell>
+                          {item._reservation ? (
+                            <Badge variant="secondary">
+                              {item._reservation.quantity_remaining}
+                            </Badge>
+                          ) : (
+                            <span className="text-muted-foreground">-</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {item._reservation?.bin_allocation?.bin.bin_code || "-"}
                         </TableCell>
                         <TableCell>
                           <Input
@@ -369,6 +526,9 @@ export function CreateMaterialRequestDialog({ open, onOpenChange }: CreateMateri
                 <div><span className="text-muted-foreground">Department:</span> {requestData.department || "N/A"}</div>
                 <div><span className="text-muted-foreground">Date Required:</span> {requestData.items_required_date}</div>
                 <div><span className="text-muted-foreground">Priority:</span> {requestData.priority}</div>
+                {requestData.cpo_number && (
+                  <div className="col-span-2"><span className="text-muted-foreground">CPO Number:</span> <Badge variant="outline">{requestData.cpo_number}</Badge></div>
+                )}
                 <div className="col-span-2"><span className="text-muted-foreground">Purpose:</span> {requestData.purpose}</div>
               </div>
             </div>
@@ -382,6 +542,7 @@ export function CreateMaterialRequestDialog({ open, onOpenChange }: CreateMateri
                     <TableHead>Description</TableHead>
                     <TableHead>Qty Required</TableHead>
                     <TableHead>UOM</TableHead>
+                    <TableHead>Reserved Qty</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -391,6 +552,13 @@ export function CreateMaterialRequestDialog({ open, onOpenChange }: CreateMateri
                       <TableCell>{item.description}</TableCell>
                       <TableCell>{item.quantity_requested}</TableCell>
                       <TableCell>{item.unit_of_measure}</TableCell>
+                      <TableCell>
+                        {item._reservation ? (
+                          <Badge variant="secondary">{item._reservation.quantity_remaining}</Badge>
+                        ) : (
+                          "-"
+                        )}
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
