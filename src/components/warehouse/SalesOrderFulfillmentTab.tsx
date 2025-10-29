@@ -172,7 +172,9 @@ export function SalesOrderFulfillmentTab() {
                         <TableCell>{cpo.customers?.customer_name}</TableCell>
                         <TableCell>{cpo.customer_po_items?.length || 0}</TableCell>
                         <TableCell>{formatCurrency(cpo.total_amount || 0)}</TableCell>
-                        <TableCell>{format(new Date(cpo.po_date), 'MMM dd, yyyy')}</TableCell>
+                        <TableCell>
+                          {cpo.po_date ? format(new Date(cpo.po_date), 'MMM dd, yyyy') : '-'}
+                        </TableCell>
                         <TableCell>
                           <Button 
                             size="sm" 
@@ -361,7 +363,9 @@ export function SalesOrderFulfillmentTab() {
                       <TableRow key={issue.id}>
                         <TableCell className="font-medium">{issue.issue_number}</TableCell>
                         <TableCell>{issue.sales_orders?.order_number || '-'}</TableCell>
-                        <TableCell>{format(new Date(issue.issue_date), 'MMM dd, yyyy')}</TableCell>
+                        <TableCell>
+                          {issue.issue_date ? format(new Date(issue.issue_date), 'MMM dd, yyyy') : '-'}
+                        </TableCell>
                         <TableCell>{getStatusBadge(issue.status)}</TableCell>
                         <TableCell>
                           <div className="text-sm">
@@ -456,7 +460,7 @@ export function SalesOrderFulfillmentTab() {
                         <TableCell>{deliveryOrder.customer?.customer_name}</TableCell>
                         <TableCell>{deliveryOrder.sales_order?.order_number}</TableCell>
                         <TableCell>
-                          {format(new Date(deliveryOrder.delivery_date), 'MMM dd, yyyy')}
+                          {deliveryOrder.delivery_date ? format(new Date(deliveryOrder.delivery_date), 'MMM dd, yyyy') : '-'}
                         </TableCell>
                         <TableCell>{getPriorityBadge(deliveryOrder.priority)}</TableCell>
                         <TableCell>{getStatusBadge(deliveryOrder.status)}</TableCell>
