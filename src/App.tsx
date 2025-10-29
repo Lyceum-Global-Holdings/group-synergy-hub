@@ -18,6 +18,7 @@ import PurchaseOrder from "./pages/procurement/PurchaseOrder";
 import BillOfMaterials from "./pages/procurement/BillOfMaterials";
 import CustomerMaster from "./pages/tuh-modules/CustomerMaster";
 import CustomerPO from "./pages/tuh-modules/CustomerPO";
+import CustomerPoView from "./pages/tuh-modules/CustomerPoView";
 import MaterialDemandPlanning from "./pages/procurement/MaterialDemandPlanning";
 import RfqRfp from "./pages/procurement/RfqRfp";
 import BlanketPurchaseOrder from "./pages/procurement/BlanketPurchaseOrder";
@@ -107,7 +108,8 @@ function App() {
               <Route path="/procurement/purchase-order" element={<PurchaseOrder />} />
               <Route path="/tuh-modules/bill-of-materials" element={<BillOfMaterials />} />
               <Route path="/tuh-modules/customer-master" element={<CustomerMaster />} />
-              <Route path="/tuh-modules/customer-po" element={<CustomerPO />} />
+          <Route path="/tuh-modules/customer-po" element={<CustomerPO />} />
+          <Route path="/tuh-modules/customer-po/:cpoId" element={<CustomerPoView />} />
               <Route path="/procurement/bill-of-materials" element={<BillOfMaterials />} />
               <Route path="/procurement/material-demand" element={<MaterialDemandPlanning />} />
               <Route path="/procurement/rfq-rfp" element={<RfqRfp />} />

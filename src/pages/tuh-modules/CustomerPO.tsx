@@ -1,12 +1,12 @@
 import { useState } from "react";
 import { Plus } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { DataTable } from "@/components/ui/data-table";
 import { useCustomerPurchaseOrders } from "@/hooks/useCustomerPurchaseOrders";
 import { useCompany } from "@/contexts/CompanyContext";
 import CreateCustomerPoDialog from "@/components/tuh-modules/customer-po/CreateCustomerPoDialog";
-import CustomerPoDetailsDialog from "@/components/tuh-modules/customer-po/CustomerPoDetailsDialog";
 import { Badge } from "@/components/ui/badge";
 import { formatCurrency } from "@/lib/utils";
 
@@ -22,13 +22,13 @@ const statusColors = {
 } as const;
 
 export default function CustomerPO() {
+  const navigate = useNavigate();
   const { selectedCompany, isViewingAllCompanies } = useCompany();
   const { customerPOs, isLoading } = useCustomerPurchaseOrders(
     isViewingAllCompanies ? undefined : selectedCompany?.id
   );
   
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
-  const [selectedPO, setSelectedPO] = useState<string | null>(null);
 
   const columns = [
     {
@@ -74,7 +74,7 @@ export default function CustomerPO() {
         <Button
           variant="outline"
           size="sm"
-          onClick={() => setSelectedPO(row.original.id)}
+          onClick={() => navigate(`/tuh-modules/customer-po/${row.original.id}`)}
         >
           View Details
         </Button>
@@ -165,14 +165,6 @@ export default function CustomerPO() {
         open={createDialogOpen}
         onOpenChange={setCreateDialogOpen}
       />
-
-      {selectedPO && (
-        <CustomerPoDetailsDialog
-          cpoId={selectedPO}
-          open={!!selectedPO}
-          onOpenChange={() => setSelectedPO(null)}
-        />
-      )}
     </div>
   );
 }
