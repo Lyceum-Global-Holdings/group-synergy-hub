@@ -11025,6 +11025,10 @@ export type Database = {
         Returns: boolean
       }
       validate_po_for_grn: { Args: { p_po_id: string }; Returns: boolean }
+      verify_admin_operation: {
+        Args: { _operation_name: string }
+        Returns: boolean
+      }
     }
     Enums: {
       account_category:
