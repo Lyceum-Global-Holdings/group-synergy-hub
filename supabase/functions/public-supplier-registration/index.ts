@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.4';
 import { Resend } from 'npm:resend@4.0.0';
+import { z } from 'https://deno.land/x/zod@v3.22.4/mod.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -9,6 +10,61 @@ const corsHeaders = {
 
 const resend = new Resend(Deno.env.get('RESEND_API_KEY'));
 
+// Rate limiting configuration
+const RATE_LIMIT_WINDOW = 60 * 60 * 1000; // 1 hour in milliseconds
+const MAX_REQUESTS_PER_WINDOW = 5; // Max 5 submissions per hour per IP
+const rateLimitStore = new Map<string, { count: number; resetTime: number }>();
+
+// Input validation schema
+const supplierDataSchema = z.object({
+  supplier_name: z.string().trim().min(2, "Supplier name must be at least 2 characters").max(200, "Supplier name too long"),
+  email: z.string().trim().email("Invalid email address").max(255, "Email too long"),
+  phone: z.string().trim().min(8, "Phone number must be at least 8 characters").max(20, "Phone number too long"),
+  tax_id: z.string().trim().max(50, "Tax ID too long").optional(),
+  address_line1: z.string().trim().max(255, "Address too long").optional(),
+  address_line2: z.string().trim().max(255, "Address too long").optional(),
+  city: z.string().trim().max(100, "City name too long").optional(),
+  state: z.string().trim().max(100, "State name too long").optional(),
+  postal_code: z.string().trim().max(20, "Postal code too long").optional(),
+  country: z.string().trim().max(100, "Country name too long").optional(),
+  website: z.string().trim().url("Invalid website URL").max(255, "Website URL too long").optional().or(z.literal('')),
+  business_nature: z.string().trim().max(500, "Business nature description too long").optional(),
+  year_established: z.number().int().min(1800).max(new Date().getFullYear()).optional(),
+});
+
+// Rate limiting function
+function checkRateLimit(ip: string): { allowed: boolean; resetTime?: number } {
+  const now = Date.now();
+  const record = rateLimitStore.get(ip);
+
+  // Clean up expired entries periodically
+  if (rateLimitStore.size > 10000) {
+    for (const [key, value] of rateLimitStore.entries()) {
+      if (value.resetTime < now) {
+        rateLimitStore.delete(key);
+      }
+    }
+  }
+
+  if (!record || record.resetTime < now) {
+    // Start new window
+    rateLimitStore.set(ip, {
+      count: 1,
+      resetTime: now + RATE_LIMIT_WINDOW,
+    });
+    return { allowed: true };
+  }
+
+  if (record.count >= MAX_REQUESTS_PER_WINDOW) {
+    return { allowed: false, resetTime: record.resetTime };
+  }
+
+  // Increment count
+  record.count++;
+  rateLimitStore.set(ip, record);
+  return { allowed: true };
+}
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -16,7 +72,54 @@ serve(async (req) => {
   }
 
   try {
+    // Extract IP for rate limiting
+    const ip = req.headers.get('x-forwarded-for')?.split(',')[0] || 
+               req.headers.get('x-real-ip') || 
+               'unknown';
+
+    // Check rate limit
+    const rateLimitCheck = checkRateLimit(ip);
+    if (!rateLimitCheck.allowed) {
+      const resetDate = new Date(rateLimitCheck.resetTime!);
+      console.log(`Rate limit exceeded for IP: ${ip}`);
+      return new Response(
+        JSON.stringify({ 
+          error: 'Too many registration attempts. Please try again later.',
+          retry_after: resetDate.toISOString()
+        }),
+        {
+          status: 429,
+          headers: { 
+            ...corsHeaders, 
+            'Content-Type': 'application/json',
+            'Retry-After': Math.ceil((rateLimitCheck.resetTime! - Date.now()) / 1000).toString()
+          },
+        }
+      );
+    }
+
     const { supplier_data } = await req.json();
+
+    // Validate input data
+    const validationResult = supplierDataSchema.safeParse(supplier_data);
+    if (!validationResult.success) {
+      console.log('Validation failed:', validationResult.error.issues);
+      return new Response(
+        JSON.stringify({ 
+          error: 'Invalid input data',
+          details: validationResult.error.issues.map(issue => ({
+            field: issue.path.join('.'),
+            message: issue.message
+          }))
+        }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
+
+    const validatedData = validationResult.data;
 
     // Initialize Supabase client with service role for admin access
     const supabaseAdmin = createClient(
@@ -30,17 +133,12 @@ serve(async (req) => {
       }
     );
 
-    // Basic validation
-    if (!supplier_data.supplier_name || !supplier_data.email || !supplier_data.phone) {
-      throw new Error('Missing required fields');
-    }
-
     // Check for duplicates
     const { data: duplicates, error: dupError } = await supabaseAdmin.rpc('check_duplicate_supplier', {
-      p_supplier_name: supplier_data.supplier_name,
-      p_email: supplier_data.email,
-      p_phone: supplier_data.phone,
-      p_tax_id: supplier_data.tax_id || null,
+      p_supplier_name: validatedData.supplier_name,
+      p_email: validatedData.email,
+      p_phone: validatedData.phone,
+      p_tax_id: validatedData.tax_id || null,
     });
 
     if (dupError) {
@@ -65,7 +163,7 @@ serve(async (req) => {
       .insert({
         request_type: 'self_service',
         status: 'pending_approval',
-        supplier_data: supplier_data,
+        supplier_data: validatedData,
         submitted_at: new Date().toISOString(),
       })
       .select()
@@ -90,11 +188,11 @@ serve(async (req) => {
     try {
       await resend.emails.send({
         from: 'Supplier Registration <onboarding@resend.dev>',
-        to: [supplier_data.email],
+        to: [validatedData.email],
         subject: 'Supplier Registration Received',
         html: `
           <h1>Thank you for registering!</h1>
-          <p>Dear ${supplier_data.supplier_name},</p>
+          <p>Dear ${validatedData.supplier_name},</p>
           <p>We have successfully received your supplier registration request.</p>
           <p><strong>Registration ID:</strong> ${registration.id}</p>
           <p>Our team will review your application and contact you within 2-3 business days.</p>
@@ -103,7 +201,7 @@ serve(async (req) => {
           <p>Best regards,<br>The Procurement Team</p>
         `,
       });
-      console.log('Confirmation email sent to:', supplier_data.email);
+      console.log('Confirmation email sent to:', validatedData.email);
     } catch (emailError) {
       console.error('Failed to send email:', emailError);
       // Don't fail the registration if email fails
