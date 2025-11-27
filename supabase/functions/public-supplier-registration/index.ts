@@ -50,8 +50,7 @@ serve(async (req) => {
     if (duplicates && duplicates.length > 0) {
       return new Response(
         JSON.stringify({ 
-          error: 'A supplier with similar information already exists',
-          duplicates 
+          error: 'A supplier with similar information already exists. Please contact support if you believe this is an error.'
         }),
         {
           status: 409,
