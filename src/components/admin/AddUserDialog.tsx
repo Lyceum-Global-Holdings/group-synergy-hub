@@ -29,21 +29,21 @@ import {
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { X, Info } from "lucide-react";
+import { Info } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useCompanies } from "@/hooks/useCompanies";
 import { useRoles, useCreateUser } from "@/hooks/useUsers";
 import { useAssignModulesToUser } from "@/hooks/useModuleAccess";
 import { moduleConfig } from "@/constants/moduleConfig";
 
-// Validation schema
+// Validation schema - changed roles from array to single string
 const userSchema = z.object({
   firstName: z.string().min(1, "First name is required"),
   lastName: z.string().min(1, "Last name is required"),
   email: z.string().email("Please enter a valid email"),
   password: z.string().min(6, "Password must be at least 6 characters"),
   company: z.string().min(1, "Company is required"),
-  roles: z.array(z.string()).min(1, "Please select at least one role"),
+  role: z.string().min(1, "Please select a role"),
   department: z.string().optional(),
   grantedModules: z.array(z.string()).optional(),
   deniedModules: z.array(z.string()).optional(),
@@ -62,7 +62,7 @@ export const AddUserDialog: React.FC<AddUserDialogProps> = ({
   onOpenChange,
   onUserAdded,
 }) => {
-  const [selectedRoles, setSelectedRoles] = useState<string[]>([]);
+  const [selectedRole, setSelectedRole] = useState<string>("");
   const [grantedModules, setGrantedModules] = useState<string[]>([]);
   const [deniedModules, setDeniedModules] = useState<string[]>([]);
   const [inheritedModules, setInheritedModules] = useState<string[]>([]);
@@ -81,26 +81,23 @@ export const AddUserDialog: React.FC<AddUserDialogProps> = ({
       email: "",
       password: "",
       company: "",
-      roles: [],
+      role: "",
       department: "",
       grantedModules: [],
       deniedModules: [],
     },
   });
 
-  // Calculate inherited modules from selected roles
+  // Calculate inherited modules from selected role
   useEffect(() => {
-    const selectedRoleObjects = roles?.filter(r => selectedRoles.includes(r.id)) || [];
-    const moduleSet = new Set<string>();
-    
-    // This is a simplified version - in production you'd fetch roleModules for each role
-    // For now, we'll show all available modules as inherited from roles
-    selectedRoleObjects.forEach(() => {
+    if (selectedRole) {
+      const moduleSet = new Set<string>();
       Object.keys(moduleConfig).forEach(key => moduleSet.add(key));
-    });
-    
-    setInheritedModules(Array.from(moduleSet));
-  }, [selectedRoles, roles]);
+      setInheritedModules(Array.from(moduleSet));
+    } else {
+      setInheritedModules([]);
+    }
+  }, [selectedRole]);
 
   const onSubmit = async (data: UserFormData) => {
     try {
@@ -110,7 +107,7 @@ export const AddUserDialog: React.FC<AddUserDialogProps> = ({
         fullName: `${data.firstName} ${data.lastName}`,
         department: data.department,
         companyId: data.company,
-        roleIds: selectedRoles,
+        roleId: selectedRole,
       });
 
       // Assign user-specific module overrides
@@ -144,7 +141,7 @@ export const AddUserDialog: React.FC<AddUserDialogProps> = ({
 
       // Reset form
       form.reset();
-      setSelectedRoles([]);
+      setSelectedRole("");
       setGrantedModules([]);
       setDeniedModules([]);
       onOpenChange(false);
@@ -158,15 +155,9 @@ export const AddUserDialog: React.FC<AddUserDialogProps> = ({
     }
   };
 
-  const handleRoleChange = (roleId: string, checked: boolean) => {
-    let updatedRoles;
-    if (checked) {
-      updatedRoles = [...selectedRoles, roleId];
-    } else {
-      updatedRoles = selectedRoles.filter((id) => id !== roleId);
-    }
-    setSelectedRoles(updatedRoles);
-    form.setValue("roles", updatedRoles);
+  const handleRoleChange = (roleId: string) => {
+    setSelectedRole(roleId);
+    form.setValue("role", roleId);
   };
 
   const handleModuleGrant = (moduleKey: string, checked: boolean) => {
@@ -321,51 +312,40 @@ export const AddUserDialog: React.FC<AddUserDialogProps> = ({
             )}
           />
 
-          <div className="space-y-4">
-            <div>
-              <FormLabel>Roles</FormLabel>
-              <div className="mt-2 space-y-2">
-                {roles?.map((role) => (
-                  <div key={role.id} className="flex items-center space-x-2">
-                    <Checkbox
-                      id={`role-${role.id}`}
-                      checked={selectedRoles.includes(role.id)}
-                      onCheckedChange={(checked) =>
-                        handleRoleChange(role.id, !!checked)
-                      }
-                    />
-                    <FormLabel
-                      htmlFor={`role-${role.id}`}
-                      className="text-sm font-normal cursor-pointer"
-                    >
-                      {role.name}
-                    </FormLabel>
-                  </div>
-                ))}
-              </div>
-              {selectedRoles.length > 0 && (
-                <div className="mt-3 flex flex-wrap gap-1">
-                  {selectedRoles.map((roleId) => {
-                    const role = roles?.find((r) => r.id === roleId);
-                    return (
-                      <Badge key={roleId} variant="secondary" className="text-xs">
-                        {role?.name}
-                        <X
-                          className="ml-1 h-3 w-3 cursor-pointer"
-                          onClick={() => handleRoleChange(roleId, false)}
-                        />
-                      </Badge>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
+          <FormField
+            control={form.control}
+            name="role"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Role</FormLabel>
+                <FormControl>
+                  <Select value={field.value} onValueChange={handleRoleChange}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select a role" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-background border shadow-md z-50">
+                      {roles?.map((role) => (
+                        <SelectItem key={role.id} value={role.id}>
+                          {role.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </FormControl>
+                <FormDescription>
+                  Each user can only have one role assigned.
+                </FormDescription>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
 
+          <div className="space-y-4">
             <div className="space-y-3">
               <div>
                 <FormLabel>Module Access</FormLabel>
                 <FormDescription>
-                  User will inherit module access from their assigned roles. You can grant additional or deny specific modules below.
+                  User will inherit module access from their assigned role. You can grant additional or deny specific modules below.
                 </FormDescription>
               </div>
 
@@ -373,7 +353,7 @@ export const AddUserDialog: React.FC<AddUserDialogProps> = ({
                 <div className="border rounded-lg p-3 bg-muted/30">
                   <div className="flex items-center gap-2 mb-2">
                     <Info className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-xs font-medium">From Selected Roles:</span>
+                    <span className="text-xs font-medium">From Selected Role:</span>
                   </div>
                   <div className="flex flex-wrap gap-1">
                     {inheritedModules.map(moduleKey => {

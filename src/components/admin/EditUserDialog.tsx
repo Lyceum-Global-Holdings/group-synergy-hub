@@ -29,7 +29,7 @@ import {
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { X, Info } from "lucide-react";
+import { Info } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useCompanies } from "@/hooks/useCompanies";
 import { useRoles, useUpdateProfile, useAssignRole, useRemoveRole, type User } from "@/hooks/useUsers";
@@ -41,7 +41,7 @@ const editUserSchema = z.object({
   lastName: z.string().min(1, "Last name is required"),
   department: z.string().optional(),
   company: z.string().min(1, "Company is required"),
-  roles: z.array(z.string()),
+  role: z.string().optional(),
   grantedModules: z.array(z.string()).optional(),
   deniedModules: z.array(z.string()).optional(),
 });
@@ -61,7 +61,7 @@ export const EditUserDialog: React.FC<EditUserDialogProps> = ({
   user,
   onUserUpdated,
 }) => {
-  const [selectedRoles, setSelectedRoles] = useState<string[]>([]);
+  const [selectedRole, setSelectedRole] = useState<string>("");
   const [grantedModules, setGrantedModules] = useState<string[]>([]);
   const [deniedModules, setDeniedModules] = useState<string[]>([]);
   const [inheritedModules, setInheritedModules] = useState<string[]>([]);
@@ -83,7 +83,7 @@ export const EditUserDialog: React.FC<EditUserDialogProps> = ({
       lastName: "",
       department: "",
       company: "",
-      roles: [],
+      role: "",
       grantedModules: [],
       deniedModules: [],
     },
@@ -93,16 +93,17 @@ export const EditUserDialog: React.FC<EditUserDialogProps> = ({
   useEffect(() => {
     if (user) {
       const [firstName, lastName] = (user.full_name || "").split(" ", 2);
+      const currentRoleId = user.roles.length > 0 ? user.roles[0].id : "";
       form.reset({
         firstName: firstName || "",
         lastName: lastName || "",
         department: user.department || "",
         company: user.company_id || "",
-        roles: user.roles.map(r => r.id),
+        role: currentRoleId,
         grantedModules: [],
         deniedModules: [],
       });
-      setSelectedRoles(user.roles.map(r => r.id));
+      setSelectedRole(currentRoleId);
     }
   }, [user, form]);
 
@@ -118,17 +119,16 @@ export const EditUserDialog: React.FC<EditUserDialogProps> = ({
     }
   }, [userModules, form]);
 
-  // Calculate inherited modules from selected roles
+  // Calculate inherited modules from selected role
   useEffect(() => {
-    const selectedRoleObjects = roles?.filter(r => selectedRoles.includes(r.id)) || [];
-    const moduleSet = new Set<string>();
-    
-    selectedRoleObjects.forEach(() => {
+    if (selectedRole) {
+      const moduleSet = new Set<string>();
       Object.keys(moduleConfig).forEach(key => moduleSet.add(key));
-    });
-    
-    setInheritedModules(Array.from(moduleSet));
-  }, [selectedRoles, roles]);
+      setInheritedModules(Array.from(moduleSet));
+    } else {
+      setInheritedModules([]);
+    }
+  }, [selectedRole]);
 
   const onSubmit = async (data: EditUserFormData) => {
     if (!user) return;
@@ -143,17 +143,18 @@ export const EditUserDialog: React.FC<EditUserDialogProps> = ({
         },
       });
 
-      // Handle role changes
-      const currentRoleIds = user.roles.map(r => r.id);
-      const rolesToAdd = selectedRoles.filter(roleId => !currentRoleIds.includes(roleId));
-      const rolesToRemove = currentRoleIds.filter(roleId => !selectedRoles.includes(roleId));
-
-      for (const roleId of rolesToAdd) {
-        await assignRole.mutateAsync({ userId: user.id, roleId });
-      }
-
-      for (const roleId of rolesToRemove) {
-        await removeRole.mutateAsync({ userId: user.id, roleId });
+      // Handle role change - since user can only have one role
+      const currentRoleId = user.roles.length > 0 ? user.roles[0].id : null;
+      
+      if (selectedRole !== currentRoleId) {
+        // Remove old role if exists
+        if (currentRoleId) {
+          await removeRole.mutateAsync({ userId: user.id, roleId: currentRoleId });
+        }
+        // Assign new role if selected
+        if (selectedRole) {
+          await assignRole.mutateAsync({ userId: user.id, roleId: selectedRole });
+        }
       }
 
       // Handle module overrides
@@ -214,15 +215,9 @@ export const EditUserDialog: React.FC<EditUserDialogProps> = ({
     }
   };
 
-  const handleRoleChange = (roleId: string, checked: boolean) => {
-    let updatedRoles;
-    if (checked) {
-      updatedRoles = [...selectedRoles, roleId];
-    } else {
-      updatedRoles = selectedRoles.filter((id) => id !== roleId);
-    }
-    setSelectedRoles(updatedRoles);
-    form.setValue("roles", updatedRoles);
+  const handleRoleChange = (roleId: string) => {
+    setSelectedRole(roleId);
+    form.setValue("role", roleId);
   };
 
   const handleModuleGrant = (moduleKey: string, checked: boolean) => {
@@ -331,46 +326,35 @@ export const EditUserDialog: React.FC<EditUserDialogProps> = ({
               )}
             />
 
-            <div className="space-y-4">
-              <div>
-                <FormLabel>Roles</FormLabel>
-                <div className="mt-2 space-y-2">
-                  {roles?.map((role) => (
-                    <div key={role.id} className="flex items-center space-x-2">
-                      <Checkbox
-                        id={`edit-role-${role.id}`}
-                        checked={selectedRoles.includes(role.id)}
-                        onCheckedChange={(checked) =>
-                          handleRoleChange(role.id, !!checked)
-                        }
-                      />
-                      <FormLabel
-                        htmlFor={`edit-role-${role.id}`}
-                        className="text-sm font-normal cursor-pointer"
-                      >
-                        {role.name}
-                      </FormLabel>
-                    </div>
-                  ))}
-                </div>
-                {selectedRoles.length > 0 && (
-                  <div className="mt-3 flex flex-wrap gap-1">
-                    {selectedRoles.map((roleId) => {
-                      const role = roles?.find((r) => r.id === roleId);
-                      return (
-                        <Badge key={roleId} variant="secondary" className="text-xs">
-                          {role?.name}
-                          <X
-                            className="ml-1 h-3 w-3 cursor-pointer"
-                            onClick={() => handleRoleChange(roleId, false)}
-                          />
-                        </Badge>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
+            <FormField
+              control={form.control}
+              name="role"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Role</FormLabel>
+                  <FormControl>
+                    <Select value={field.value} onValueChange={handleRoleChange}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a role" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-background border shadow-md z-50">
+                        {roles?.map((role) => (
+                          <SelectItem key={role.id} value={role.id}>
+                            {role.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </FormControl>
+                  <FormDescription>
+                    Each user can only have one role assigned.
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
+            <div className="space-y-4">
               <div className="space-y-3">
                 <div>
                   <FormLabel>Module Access Overrides</FormLabel>
@@ -383,7 +367,7 @@ export const EditUserDialog: React.FC<EditUserDialogProps> = ({
                   <div className="border rounded-lg p-3 bg-muted/30">
                     <div className="flex items-center gap-2 mb-2">
                       <Info className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-xs font-medium">From Selected Roles:</span>
+                      <span className="text-xs font-medium">From Selected Role:</span>
                     </div>
                     <div className="flex flex-wrap gap-1">
                       {inheritedModules.map(moduleKey => {

@@ -322,7 +322,7 @@ export const useCreateUser = () => {
       fullName: string;
       department?: string;
       companyId?: string;
-      roleIds: string[];
+      roleId: string; // Changed from roleIds: string[] to single roleId
     }) => {
       console.log('Creating user with data:', userData);
       
@@ -446,23 +446,21 @@ export const useCreateUser = () => {
         }
       }
 
-      // Assign roles if any provided
-      if (userData.roleIds && userData.roleIds.length > 0) {
-        const userRoleInserts = userData.roleIds.map(roleId => ({
-          user_id: authData.user.id,
-          role_id: roleId
-        }));
-
+      // Assign role if provided
+      if (userData.roleId) {
         const { error: roleError } = await supabase
           .from('user_roles')
-          .insert(userRoleInserts);
+          .insert({
+            user_id: authData.user.id,
+            role_id: userData.roleId
+          });
 
         if (roleError) {
           console.error('Role assignment error:', roleError);
           throw new Error(`Role assignment failed: ${roleError.message}. User account was created successfully.`);
         }
 
-        console.log('Roles assigned successfully');
+        console.log('Role assigned successfully');
       }
 
       return authData.user;
