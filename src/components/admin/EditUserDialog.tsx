@@ -27,14 +27,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Badge } from "@/components/ui/badge";
-import { Info } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useCompanies } from "@/hooks/useCompanies";
 import { useRoles, useUpdateProfile, useAssignRole, useRemoveRole, type User } from "@/hooks/useUsers";
-import { useUserModules, useAssignModulesToUser, useRemoveUserModule } from "@/hooks/useModuleAccess";
-import { moduleConfig } from "@/constants/moduleConfig";
+import { useRoleModules, useUserModules, useAssignModulesToUser, useRemoveUserModule } from "@/hooks/useModuleAccess";
+import { ModuleAccessEditor, ModuleAccessState } from "./ModuleAccessEditor";
 
 const editUserSchema = z.object({
   firstName: z.string().min(1, "First name is required"),
@@ -42,8 +39,6 @@ const editUserSchema = z.object({
   department: z.string().optional(),
   company: z.string().min(1, "Company is required"),
   role: z.string().optional(),
-  grantedModules: z.array(z.string()).optional(),
-  deniedModules: z.array(z.string()).optional(),
 });
 
 type EditUserFormData = z.infer<typeof editUserSchema>;
@@ -62,14 +57,21 @@ export const EditUserDialog: React.FC<EditUserDialogProps> = ({
   onUserUpdated,
 }) => {
   const [selectedRole, setSelectedRole] = useState<string>("");
-  const [grantedModules, setGrantedModules] = useState<string[]>([]);
-  const [deniedModules, setDeniedModules] = useState<string[]>([]);
-  const [inheritedModules, setInheritedModules] = useState<string[]>([]);
+  const [moduleAccessState, setModuleAccessState] = useState<ModuleAccessState>({
+    inheritedModules: {},
+    grantedSubmodules: {},
+    deniedSubmodules: {},
+  });
+  const [originalUserModules, setOriginalUserModules] = useState<{ granted: Record<string, string[]>; denied: Record<string, string[]> }>({
+    granted: {},
+    denied: {},
+  });
   const { toast } = useToast();
   
   const { companies } = useCompanies();
   const { data: roles } = useRoles();
   const { data: userModules = [] } = useUserModules(user?.id);
+  const { data: roleModules = [] } = useRoleModules(selectedRole || undefined);
   const updateProfile = useUpdateProfile();
   const assignRole = useAssignRole();
   const removeRole = useRemoveRole();
@@ -84,8 +86,6 @@ export const EditUserDialog: React.FC<EditUserDialogProps> = ({
       department: "",
       company: "",
       role: "",
-      grantedModules: [],
-      deniedModules: [],
     },
   });
 
@@ -100,8 +100,6 @@ export const EditUserDialog: React.FC<EditUserDialogProps> = ({
         department: user.department || "",
         company: user.company_id || "",
         role: currentRoleId,
-        grantedModules: [],
-        deniedModules: [],
       });
       setSelectedRole(currentRoleId);
     }
@@ -110,25 +108,51 @@ export const EditUserDialog: React.FC<EditUserDialogProps> = ({
   // Load user's module overrides
   useEffect(() => {
     if (userModules.length > 0) {
-      const granted = userModules.filter(um => um.access_type === 'grant').map(um => um.module_key);
-      const denied = userModules.filter(um => um.access_type === 'deny').map(um => um.module_key);
-      setGrantedModules(granted);
-      setDeniedModules(denied);
-      form.setValue('grantedModules', granted);
-      form.setValue('deniedModules', denied);
-    }
-  }, [userModules, form]);
-
-  // Calculate inherited modules from selected role
-  useEffect(() => {
-    if (selectedRole) {
-      const moduleSet = new Set<string>();
-      Object.keys(moduleConfig).forEach(key => moduleSet.add(key));
-      setInheritedModules(Array.from(moduleSet));
+      const granted: Record<string, string[]> = {};
+      const denied: Record<string, string[]> = {};
+      
+      userModules.forEach(um => {
+        if (um.access_type === 'grant') {
+          granted[um.module_key] = um.submodules || [];
+        } else if (um.access_type === 'deny') {
+          denied[um.module_key] = um.submodules || [];
+        }
+      });
+      
+      setModuleAccessState(prev => ({
+        ...prev,
+        grantedSubmodules: granted,
+        deniedSubmodules: denied,
+      }));
+      setOriginalUserModules({ granted, denied });
     } else {
-      setInheritedModules([]);
+      setModuleAccessState(prev => ({
+        ...prev,
+        grantedSubmodules: {},
+        deniedSubmodules: {},
+      }));
+      setOriginalUserModules({ granted: {}, denied: {} });
     }
-  }, [selectedRole]);
+  }, [userModules]);
+
+  // Update inherited modules when role changes
+  useEffect(() => {
+    if (roleModules.length > 0) {
+      const inherited: Record<string, string[]> = {};
+      roleModules.forEach(rm => {
+        inherited[rm.module_key] = rm.submodules || [];
+      });
+      setModuleAccessState(prev => ({
+        ...prev,
+        inheritedModules: inherited,
+      }));
+    } else {
+      setModuleAccessState(prev => ({
+        ...prev,
+        inheritedModules: {},
+      }));
+    }
+  }, [roleModules]);
 
   const onSubmit = async (data: EditUserFormData) => {
     if (!user) return;
@@ -143,57 +167,52 @@ export const EditUserDialog: React.FC<EditUserDialogProps> = ({
         },
       });
 
-      // Handle role change - since user can only have one role
+      // Handle role change
       const currentRoleId = user.roles.length > 0 ? user.roles[0].id : null;
       
       if (selectedRole !== currentRoleId) {
-        // Remove old role if exists
         if (currentRoleId) {
           await removeRole.mutateAsync({ userId: user.id, roleId: currentRoleId });
         }
-        // Assign new role if selected
         if (selectedRole) {
           await assignRole.mutateAsync({ userId: user.id, roleId: selectedRole });
         }
       }
 
-      // Handle module overrides
-      const originalGranted = userModules.filter(um => um.access_type === 'grant').map(um => um.module_key);
-      const originalDenied = userModules.filter(um => um.access_type === 'deny').map(um => um.module_key);
-
-      // Remove modules that are no longer in the lists
-      for (const moduleKey of originalGranted) {
-        if (!grantedModules.includes(moduleKey)) {
+      // Handle module overrides - remove modules no longer in use
+      const allOriginalModuleKeys = new Set([
+        ...Object.keys(originalUserModules.granted),
+        ...Object.keys(originalUserModules.denied),
+      ]);
+      
+      for (const moduleKey of allOriginalModuleKeys) {
+        const hasGranted = moduleAccessState.grantedSubmodules[moduleKey]?.length > 0;
+        const hasDenied = moduleAccessState.deniedSubmodules[moduleKey]?.length > 0;
+        
+        if (!hasGranted && !hasDenied) {
           await removeUserModule.mutateAsync({ userId: user.id, moduleKey });
         }
       }
-      for (const moduleKey of originalDenied) {
-        if (!deniedModules.includes(moduleKey)) {
-          await removeUserModule.mutateAsync({ userId: user.id, moduleKey });
-        }
-      }
 
-      // Add new granted modules
-      for (const moduleKey of grantedModules) {
-        if (!originalGranted.includes(moduleKey)) {
-          const config = moduleConfig[moduleKey];
+      // Save granted submodules
+      for (const [moduleKey, submodules] of Object.entries(moduleAccessState.grantedSubmodules)) {
+        if (submodules.length > 0) {
           await assignModulesToUser.mutateAsync({
             userId: user.id,
             moduleKey,
-            submodules: config?.subModules.map(sub => sub.key) || [],
+            submodules,
             accessType: 'grant',
           });
         }
       }
-
-      // Add new denied modules
-      for (const moduleKey of deniedModules) {
-        if (!originalDenied.includes(moduleKey)) {
-          const config = moduleConfig[moduleKey];
+      
+      // Save denied submodules
+      for (const [moduleKey, submodules] of Object.entries(moduleAccessState.deniedSubmodules)) {
+        if (submodules.length > 0) {
           await assignModulesToUser.mutateAsync({
             userId: user.id,
             moduleKey,
-            submodules: config?.subModules.map(sub => sub.key) || [],
+            submodules,
             accessType: 'deny',
           });
         }
@@ -220,30 +239,54 @@ export const EditUserDialog: React.FC<EditUserDialogProps> = ({
     form.setValue("role", roleId);
   };
 
-  const handleModuleGrant = (moduleKey: string, checked: boolean) => {
-    let updated = checked 
-      ? [...grantedModules, moduleKey]
-      : grantedModules.filter(k => k !== moduleKey);
-    
-    if (checked) {
-      setDeniedModules(deniedModules.filter(k => k !== moduleKey));
-    }
-    
-    setGrantedModules(updated);
-    form.setValue("grantedModules", updated);
+  const handleGrantChange = (moduleKey: string, submoduleKey: string, granted: boolean) => {
+    setModuleAccessState(prev => {
+      const newGranted = { ...prev.grantedSubmodules };
+      const newDenied = { ...prev.deniedSubmodules };
+      
+      if (granted) {
+        if (!newGranted[moduleKey]) newGranted[moduleKey] = [];
+        if (!newGranted[moduleKey].includes(submoduleKey)) {
+          newGranted[moduleKey] = [...newGranted[moduleKey], submoduleKey];
+        }
+        if (newDenied[moduleKey]) {
+          newDenied[moduleKey] = newDenied[moduleKey].filter(k => k !== submoduleKey);
+          if (newDenied[moduleKey].length === 0) delete newDenied[moduleKey];
+        }
+      } else {
+        if (newGranted[moduleKey]) {
+          newGranted[moduleKey] = newGranted[moduleKey].filter(k => k !== submoduleKey);
+          if (newGranted[moduleKey].length === 0) delete newGranted[moduleKey];
+        }
+      }
+      
+      return { ...prev, grantedSubmodules: newGranted, deniedSubmodules: newDenied };
+    });
   };
 
-  const handleModuleDeny = (moduleKey: string, checked: boolean) => {
-    let updated = checked 
-      ? [...deniedModules, moduleKey]
-      : deniedModules.filter(k => k !== moduleKey);
-    
-    if (checked) {
-      setGrantedModules(grantedModules.filter(k => k !== moduleKey));
-    }
-    
-    setDeniedModules(updated);
-    form.setValue("deniedModules", updated);
+  const handleDenyChange = (moduleKey: string, submoduleKey: string, denied: boolean) => {
+    setModuleAccessState(prev => {
+      const newGranted = { ...prev.grantedSubmodules };
+      const newDenied = { ...prev.deniedSubmodules };
+      
+      if (denied) {
+        if (!newDenied[moduleKey]) newDenied[moduleKey] = [];
+        if (!newDenied[moduleKey].includes(submoduleKey)) {
+          newDenied[moduleKey] = [...newDenied[moduleKey], submoduleKey];
+        }
+        if (newGranted[moduleKey]) {
+          newGranted[moduleKey] = newGranted[moduleKey].filter(k => k !== submoduleKey);
+          if (newGranted[moduleKey].length === 0) delete newGranted[moduleKey];
+        }
+      } else {
+        if (newDenied[moduleKey]) {
+          newDenied[moduleKey] = newDenied[moduleKey].filter(k => k !== submoduleKey);
+          if (newDenied[moduleKey].length === 0) delete newDenied[moduleKey];
+        }
+      }
+      
+      return { ...prev, grantedSubmodules: newGranted, deniedSubmodules: newDenied };
+    });
   };
 
   if (!user) return null;
@@ -354,81 +397,23 @@ export const EditUserDialog: React.FC<EditUserDialogProps> = ({
               )}
             />
 
-            <div className="space-y-4">
-              <div className="space-y-3">
-                <div>
-                  <FormLabel>Module Access Overrides</FormLabel>
-                  <FormDescription>
-                    Manage user-specific module access beyond their role permissions.
-                  </FormDescription>
-                </div>
-
-                {inheritedModules.length > 0 && (
-                  <div className="border rounded-lg p-3 bg-muted/30">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Info className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-xs font-medium">From Selected Role:</span>
-                    </div>
-                    <div className="flex flex-wrap gap-1">
-                      {inheritedModules.map(moduleKey => {
-                        const config = moduleConfig[moduleKey];
-                        return config ? (
-                          <Badge key={moduleKey} variant="outline" className="text-xs">
-                            {config.name}
-                          </Badge>
-                        ) : null;
-                      })}
-                    </div>
-                  </div>
-                )}
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <FormLabel className="text-xs text-muted-foreground">Grant Additional</FormLabel>
-                    <div className="mt-2 space-y-2">
-                      {Object.entries(moduleConfig).map(([key, config]) => (
-                        <div key={key} className="flex items-center space-x-2">
-                          <Checkbox
-                            id={`edit-grant-${key}`}
-                            checked={grantedModules.includes(key)}
-                            onCheckedChange={(checked) => handleModuleGrant(key, !!checked)}
-                            disabled={inheritedModules.includes(key)}
-                          />
-                          <label htmlFor={`edit-grant-${key}`} className="text-xs">
-                            {config.name}
-                          </label>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div>
-                    <FormLabel className="text-xs text-muted-foreground">Deny Access</FormLabel>
-                    <div className="mt-2 space-y-2">
-                      {Object.entries(moduleConfig).map(([key, config]) => (
-                        <div key={key} className="flex items-center space-x-2">
-                          <Checkbox
-                            id={`edit-deny-${key}`}
-                            checked={deniedModules.includes(key)}
-                            onCheckedChange={(checked) => handleModuleDeny(key, !!checked)}
-                          />
-                          <label htmlFor={`edit-deny-${key}`} className="text-xs">
-                            {config.name}
-                          </label>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
+            <div className="space-y-3">
+              <div>
+                <FormLabel>Module Access Overrides</FormLabel>
+                <FormDescription>
+                  Manage user-specific module access beyond their role permissions.
+                </FormDescription>
               </div>
+              
+              <ModuleAccessEditor
+                state={moduleAccessState}
+                onGrantChange={handleGrantChange}
+                onDenyChange={handleDenyChange}
+              />
             </div>
 
             <DialogFooter>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => onOpenChange(false)}
-              >
+              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
                 Cancel
               </Button>
               <Button 
