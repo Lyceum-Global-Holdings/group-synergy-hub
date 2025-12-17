@@ -5,6 +5,7 @@ import { Separator } from "@/components/ui/separator";
 import { WarehouseItem } from "@/types/itemBin";
 import { useItemCategories } from "@/hooks/useItemCategories";
 import { useItemUnits } from "@/hooks/useItemUnits";
+import { useWarehouseLocations } from "@/hooks/useWarehouseLocations";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
@@ -50,9 +51,11 @@ const fetchBinAllocations = async (itemId: string): Promise<BinAllocation[]> => 
 export const ItemDetailsDialog = ({ item, open, onOpenChange }: ItemDetailsDialogProps) => {
   const { categories } = useItemCategories();
   const { units } = useItemUnits();
+  const { locations } = useWarehouseLocations();
 
   const categoryName = categories.find(c => c.id === item?.category_id)?.name || "-";
   const unitName = units.find(u => u.id === item?.unit_id)?.name || "-";
+  const warehouseLocation = locations.find(l => l.id === item?.location_id);
 
   const { data: binAllocations } = useQuery<BinAllocation[]>({
     queryKey: ['bin-allocations', item?.id],
@@ -245,6 +248,14 @@ export const ItemDetailsDialog = ({ item, open, onOpenChange }: ItemDetailsDialo
                 <div>
                   <p className="text-xs text-muted-foreground">SKU</p>
                   <p className="font-medium">{item.sku || "-"}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Warehouse</p>
+                  <p className="font-medium">
+                    {warehouseLocation 
+                      ? `${warehouseLocation.name}${warehouseLocation.location_code ? ` (${warehouseLocation.location_code})` : ''}`
+                      : "-"}
+                  </p>
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground">Status</p>

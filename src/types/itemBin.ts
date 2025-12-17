@@ -55,6 +55,7 @@ export interface WarehouseItem {
   description: string | null;
   category_id: string | null;
   unit_id: string | null;
+  location_id: string | null;
   reorder_level: number | null;
   max_stock_level: number | null;
   min_stock_level: number | null;
@@ -116,6 +117,7 @@ export interface CreateWarehouseItemData {
   description?: string;
   category_id?: string;
   unit_id?: string;
+  location_id?: string;
   reorder_level?: number;
   max_stock_level?: number;
   min_stock_level?: number;
