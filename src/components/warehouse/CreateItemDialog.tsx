@@ -25,6 +25,9 @@ import { useItemUnits } from '@/hooks/useItemUnits';
 import { useStockTransactions } from '@/hooks/useStockTransactions';
 import { useCompany } from '@/contexts/CompanyContext';
 import { WarehouseItem } from '@/types/itemBin';
+import { supabase } from '@/integrations/supabase/client';
+import { Upload, X } from 'lucide-react';
+import { toast } from 'sonner';
 
 interface CreateItemDialogProps {
   open: boolean;
@@ -54,8 +57,12 @@ export function CreateItemDialog({ open, onOpenChange, editingItem }: CreateItem
     is_serialized: false,
     is_batch_tracked: false,
     notes: '',
+    image_url: '',
   });
   const [initialStock, setInitialStock] = useState('');
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
 
   const { createItem, createItemAsync, updateItem, isCreating, isUpdating } = useWarehouseItems();
   const { categories } = useItemCategories();
@@ -87,8 +94,11 @@ export function CreateItemDialog({ open, onOpenChange, editingItem }: CreateItem
         is_serialized: editingItem.is_serialized,
         is_batch_tracked: editingItem.is_batch_tracked,
         notes: editingItem.notes || '',
+        image_url: editingItem.image_url || '',
       });
-      setInitialStock(''); // Don't show current stock when editing
+      setInitialStock('');
+      setImagePreview(editingItem.image_url || null);
+      setImageFile(null);
     } else {
       setFormData({
         item_code: '',
@@ -111,19 +121,80 @@ export function CreateItemDialog({ open, onOpenChange, editingItem }: CreateItem
         is_serialized: false,
         is_batch_tracked: false,
         notes: '',
+        image_url: '',
       });
       setInitialStock('');
+      setImagePreview(null);
+      setImageFile(null);
     }
   }, [editingItem, open, selectedCompany?.id]);
+
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) {
+        toast.error('Image size must be less than 5MB');
+        return;
+      }
+      setImageFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleRemoveImage = () => {
+    setImageFile(null);
+    setImagePreview(null);
+    setFormData({ ...formData, image_url: '' });
+  };
+
+  const uploadImage = async (): Promise<string | null> => {
+    if (!imageFile) return formData.image_url || null;
+
+    setUploading(true);
+    try {
+      const fileExt = imageFile.name.split('.').pop();
+      const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+      const filePath = `items/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('item-images')
+        .upload(filePath, imageFile);
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('item-images')
+        .getPublicUrl(filePath);
+
+      return publicUrl;
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      toast.error('Failed to upload image');
+      return null;
+    } finally {
+      setUploading(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    console.log('Form submission - editingItem:', editingItem);
-    console.log('Form data before processing:', formData);
+    // Upload image first if there's a new file
+    let imageUrl = formData.image_url;
+    if (imageFile) {
+      const uploadedUrl = await uploadImage();
+      if (uploadedUrl) {
+        imageUrl = uploadedUrl;
+      }
+    }
     
     const baseData = {
       ...formData,
+      image_url: imageUrl || undefined,
       unit_cost: formData.unit_cost ? parseFloat(formData.unit_cost) : undefined,
       selling_price: formData.selling_price ? parseFloat(formData.selling_price) : undefined,
       reorder_level: formData.reorder_level ? parseFloat(formData.reorder_level) : undefined,
@@ -132,23 +203,19 @@ export function CreateItemDialog({ open, onOpenChange, editingItem }: CreateItem
       category_id: formData.category_id || undefined,
       unit_id: formData.unit_id || undefined,
       supplier_id: formData.supplier_id || undefined,
-      company_id: formData.company_id || null, // Convert empty string to null for proper database storage
-      sku: formData.sku.trim() || null, // Convert empty SKU to null to avoid unique constraint violations
-      barcode: formData.barcode.trim() || null, // Also handle barcode similarly
+      company_id: formData.company_id || null,
+      sku: formData.sku.trim() || null,
+      barcode: formData.barcode.trim() || null,
     };
 
     if (editingItem) {
-      // For updates, don't include current_stock to prevent overwriting it
-      console.log('Update data being sent:', { id: editingItem.id, ...baseData });
       updateItem({ id: editingItem.id, ...baseData });
       onOpenChange(false);
     } else {
-      // For new items, include initial stock
       const createData = {
         ...baseData,
-        current_stock: 0, // Will be updated by stock transaction
+        current_stock: 0,
       };
-      console.log('Create data being sent:', createData);
       try {
         const result = await createItemAsync({
           ...createData,
@@ -156,7 +223,6 @@ export function CreateItemDialog({ open, onOpenChange, editingItem }: CreateItem
           initialUnitCost: formData.unit_cost ? parseFloat(formData.unit_cost) : undefined,
         });
 
-        // Create opening stock transaction if initial stock provided
         if (initialStock && parseFloat(initialStock) > 0) {
           const stockQuantity = parseFloat(initialStock);
           const unitCostValue = formData.unit_cost ? parseFloat(formData.unit_cost) : 0;
@@ -212,6 +278,48 @@ export function CreateItemDialog({ open, onOpenChange, editingItem }: CreateItem
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                 required
               />
+            </div>
+          </div>
+
+          {/* Product Image Upload */}
+          <div className="space-y-2">
+            <Label>Product Image</Label>
+            <div className="flex items-center gap-4">
+              <div className="flex-shrink-0">
+                {imagePreview ? (
+                  <div className="relative">
+                    <img
+                      src={imagePreview}
+                      alt="Item preview"
+                      className="h-20 w-20 rounded-md object-cover border border-border"
+                    />
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      size="icon"
+                      className="absolute -top-2 -right-2 h-6 w-6"
+                      onClick={handleRemoveImage}
+                    >
+                      <X className="h-3 w-3" />
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="h-20 w-20 rounded-md border border-dashed border-border flex items-center justify-center bg-muted">
+                    <Upload className="h-6 w-6 text-muted-foreground" />
+                  </div>
+                )}
+              </div>
+              <div className="flex-1">
+                <Input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageChange}
+                  className="cursor-pointer"
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  PNG, JPG or WEBP (max 5MB)
+                </p>
+              </div>
             </div>
           </div>
 
@@ -278,7 +386,6 @@ export function CreateItemDialog({ open, onOpenChange, editingItem }: CreateItem
             <Select 
               value={formData.company_id || "all"} 
               onValueChange={(value) => {
-                console.log('Company selection changed to:', value);
                 setFormData({ ...formData, company_id: value === "all" ? "" : value });
               }}
             >
@@ -449,8 +556,8 @@ export function CreateItemDialog({ open, onOpenChange, editingItem }: CreateItem
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button type="submit" disabled={isCreating || isUpdating}>
-              {editingItem ? 'Update Item' : 'Create Item'}
+            <Button type="submit" disabled={isCreating || isUpdating || uploading}>
+              {uploading ? 'Uploading...' : editingItem ? 'Update Item' : 'Create Item'}
             </Button>
           </div>
         </form>

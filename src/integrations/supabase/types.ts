@@ -10326,6 +10326,7 @@ export type Database = {
           current_stock: number | null
           description: string | null
           id: string
+          image_url: string | null
           is_batch_tracked: boolean | null
           is_serialized: boolean | null
           item_code: string
@@ -10355,6 +10356,7 @@ export type Database = {
           current_stock?: number | null
           description?: string | null
           id?: string
+          image_url?: string | null
           is_batch_tracked?: boolean | null
           is_serialized?: boolean | null
           item_code: string
@@ -10384,6 +10386,7 @@ export type Database = {
           current_stock?: number | null
           description?: string | null
           id?: string
+          image_url?: string | null
           is_batch_tracked?: boolean | null
           is_serialized?: boolean | null
           item_code?: string
