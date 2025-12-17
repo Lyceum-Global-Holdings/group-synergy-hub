@@ -70,6 +70,7 @@ export interface WarehouseItem {
   is_serialized: boolean;
   is_batch_tracked: boolean;
   notes: string | null;
+  image_url: string | null;
   company_id: string | null;
   created_at: string;
   updated_at: string;
@@ -129,5 +130,6 @@ export interface CreateWarehouseItemData {
   is_serialized?: boolean;
   is_batch_tracked?: boolean;
   notes?: string;
+  image_url?: string;
   company_id?: string;
 }
