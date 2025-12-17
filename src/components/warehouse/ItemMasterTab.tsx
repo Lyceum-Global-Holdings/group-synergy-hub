@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Plus, Search, Edit, Trash2, History, Settings } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, History, Settings, Eye } from 'lucide-react';
 import { BulkItemImportDialog } from '@/components/warehouse/BulkItemImportDialog';
 import {
   Table,
@@ -20,12 +20,14 @@ import { CreateItemDialog } from '@/components/warehouse/CreateItemDialog';
 import { StockMovementDialog } from '@/components/warehouse/StockMovementDialog';
 import { StockAdjustmentDialog } from '@/components/warehouse/StockAdjustmentDialog';
 import { DeleteItemConfirmationDialog } from '@/components/warehouse/DeleteItemConfirmationDialog';
+import { ItemDetailsDialog } from '@/components/warehouse/ItemDetailsDialog';
 import { WarehouseItem } from '@/types/itemBin';
 
 export function ItemMasterTab() {
   const [searchTerm, setSearchTerm] = useState('');
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<WarehouseItem | null>(null);
+  const [viewingItem, setViewingItem] = useState<WarehouseItem | null>(null);
   const [stockMovementItem, setStockMovementItem] = useState<WarehouseItem | null>(null);
   const [stockAdjustmentItem, setStockAdjustmentItem] = useState<WarehouseItem | null>(null);
   const [deletingItem, setDeletingItem] = useState<WarehouseItem | null>(null);
@@ -169,11 +171,20 @@ export function ItemMasterTab() {
                     </Badge>
                   </TableCell>
                   <TableCell>
-                    <div className="flex items-center space-x-2">
+                    <div className="flex items-center space-x-1">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setViewingItem(item)}
+                        title="View Details"
+                      >
+                        <Eye className="h-4 w-4" />
+                      </Button>
                       <Button
                         variant="ghost"
                         size="sm"
                         onClick={() => setEditingItem(item)}
+                        title="Edit"
                       >
                         <Edit className="h-4 w-4" />
                       </Button>
@@ -182,6 +193,7 @@ export function ItemMasterTab() {
                         size="sm"
                         onClick={() => setDeletingItem(item)}
                         disabled={isDeleting || isMarkingInactive}
+                        title="Delete"
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -236,6 +248,14 @@ export function ItemMasterTab() {
         onConfirmDelete={(itemId, forceDelete) => deleteItem({ id: itemId, forceDelete })}
         onMarkInactive={markItemInactive}
         isLoading={isDeleting || isMarkingInactive}
+      />
+
+      <ItemDetailsDialog
+        item={viewingItem}
+        open={!!viewingItem}
+        onOpenChange={(open) => {
+          if (!open) setViewingItem(null);
+        }}
       />
     </div>
   );
