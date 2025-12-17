@@ -23,6 +23,7 @@ import { useItemCategories } from '@/hooks/useItemCategories';
 import { useSuppliers } from '@/hooks/useSuppliers';
 import { useItemUnits } from '@/hooks/useItemUnits';
 import { useStockTransactions } from '@/hooks/useStockTransactions';
+import { useWarehouseLocations } from '@/hooks/useWarehouseLocations';
 import { useCompany } from '@/contexts/CompanyContext';
 import { WarehouseItem } from '@/types/itemBin';
 import { supabase } from '@/integrations/supabase/client';
@@ -42,6 +43,7 @@ export function CreateItemDialog({ open, onOpenChange, editingItem }: CreateItem
     description: '',
     category_id: '',
     unit_id: '',
+    location_id: '',
     brand: '',
     manufacturer: '',
     supplier_id: '',
@@ -69,7 +71,11 @@ export function CreateItemDialog({ open, onOpenChange, editingItem }: CreateItem
   const { data: suppliers = [] } = useSuppliers();
   const { units } = useItemUnits();
   const { createTransaction } = useStockTransactions();
+  const { locations } = useWarehouseLocations();
   const { companies, selectedCompany } = useCompany();
+
+  // Filter locations to only show warehouses (type='location')
+  const warehouseLocations = locations.filter(loc => loc.type === 'location');
 
   useEffect(() => {
     if (editingItem) {
@@ -79,6 +85,7 @@ export function CreateItemDialog({ open, onOpenChange, editingItem }: CreateItem
         description: editingItem.description || '',
         category_id: editingItem.category_id || '',
         unit_id: editingItem.unit_id || '',
+        location_id: editingItem.location_id || '',
         brand: editingItem.brand || '',
         manufacturer: editingItem.manufacturer || '',
         supplier_id: editingItem.supplier_id || '',
@@ -106,6 +113,7 @@ export function CreateItemDialog({ open, onOpenChange, editingItem }: CreateItem
         description: '',
         category_id: '',
         unit_id: '',
+        location_id: '',
         brand: '',
         manufacturer: '',
         supplier_id: '',
@@ -202,6 +210,7 @@ export function CreateItemDialog({ open, onOpenChange, editingItem }: CreateItem
       max_stock_level: formData.max_stock_level ? parseFloat(formData.max_stock_level) : undefined,
       category_id: formData.category_id || undefined,
       unit_id: formData.unit_id || undefined,
+      location_id: formData.location_id || undefined,
       supplier_id: formData.supplier_id || undefined,
       company_id: formData.company_id || null,
       sku: formData.sku.trim() || null,
@@ -381,26 +390,49 @@ export function CreateItemDialog({ open, onOpenChange, editingItem }: CreateItem
             </div>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="company_id">Company Allocation</Label>
-            <Select 
-              value={formData.company_id || "all"} 
-              onValueChange={(value) => {
-                setFormData({ ...formData, company_id: value === "all" ? "" : value });
-              }}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select company allocation" />
-              </SelectTrigger>
-              <SelectContent className="bg-background border z-50">
-                <SelectItem value="all">All Companies</SelectItem>
-                {companies.map((company) => (
-                  <SelectItem key={company.id} value={company.id}>
-                    {company.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="location_id">Warehouse Location</Label>
+              <Select 
+                value={formData.location_id || "none"} 
+                onValueChange={(value) => {
+                  setFormData({ ...formData, location_id: value === "none" ? "" : value });
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select warehouse" />
+                </SelectTrigger>
+                <SelectContent className="bg-background border z-50">
+                  <SelectItem value="none">No Warehouse</SelectItem>
+                  {warehouseLocations.map((location) => (
+                    <SelectItem key={location.id} value={location.id}>
+                      {location.name} {location.location_code ? `(${location.location_code})` : ''}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="company_id">Company Allocation</Label>
+              <Select 
+                value={formData.company_id || "all"} 
+                onValueChange={(value) => {
+                  setFormData({ ...formData, company_id: value === "all" ? "" : value });
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select company allocation" />
+                </SelectTrigger>
+                <SelectContent className="bg-background border z-50">
+                  <SelectItem value="all">All Companies</SelectItem>
+                  {companies.map((company) => (
+                    <SelectItem key={company.id} value={company.id}>
+                      {company.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">

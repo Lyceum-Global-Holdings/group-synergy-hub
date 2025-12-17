@@ -10330,6 +10330,7 @@ export type Database = {
           is_batch_tracked: boolean | null
           is_serialized: boolean | null
           item_code: string
+          location_id: string | null
           manufacturer: string | null
           max_stock_level: number | null
           min_stock_level: number | null
@@ -10360,6 +10361,7 @@ export type Database = {
           is_batch_tracked?: boolean | null
           is_serialized?: boolean | null
           item_code: string
+          location_id?: string | null
           manufacturer?: string | null
           max_stock_level?: number | null
           min_stock_level?: number | null
@@ -10390,6 +10392,7 @@ export type Database = {
           is_batch_tracked?: boolean | null
           is_serialized?: boolean | null
           item_code?: string
+          location_id?: string | null
           manufacturer?: string | null
           max_stock_level?: number | null
           min_stock_level?: number | null
@@ -10411,6 +10414,13 @@ export type Database = {
             columns: ["category_id"]
             isOneToOne: false
             referencedRelation: "item_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "warehouse_items_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "warehouse_locations"
             referencedColumns: ["id"]
           },
           {
