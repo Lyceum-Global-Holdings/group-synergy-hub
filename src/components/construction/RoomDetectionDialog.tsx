@@ -10,11 +10,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Loader2, Scan, Trash2, Edit2, Check, X, Square, Plus, MousePointer2 } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
+import { Loader2, Scan, Trash2, Edit2, Check, X, Square, MousePointer2, ListChecks } from "lucide-react";
 import { FloorDrawing, FloorDrawingRoom, RoomCoordinate } from "@/types/construction";
 import { useFloorDrawingRooms, useDetectRooms, useDeleteRoom, useUpdateRoom } from "@/hooks/construction/useFloorRooms";
+import { useRoomStages } from "@/hooks/construction/useRoomStages";
 import { Floor2DRoomOverlay } from "./Floor2DRoomOverlay";
 import { AddManualRoomDialog } from "./AddManualRoomDialog";
+import { RoomStagesDialog } from "./RoomStagesDialog";
 
 interface RoomDetectionDialogProps {
   drawing: FloorDrawing | null;
@@ -32,6 +35,9 @@ export function RoomDetectionDialog({ drawing, open, onOpenChange }: RoomDetecti
   const [isDrawingMode, setIsDrawingMode] = useState(false);
   const [drawingPoints, setDrawingPoints] = useState<RoomCoordinate[]>([]);
   const [showAddRoomDialog, setShowAddRoomDialog] = useState(false);
+  
+  // Stages dialog state
+  const [stagesRoom, setStagesRoom] = useState<FloorDrawingRoom | null>(null);
 
   const { data: rooms = [], isLoading: roomsLoading } = useFloorDrawingRooms(drawing?.id || null);
   const detectRooms = useDetectRooms();
@@ -212,82 +218,20 @@ export function RoomDetectionDialog({ drawing, open, onOpenChange }: RoomDetecti
                 ) : (
                   <div className="p-2 space-y-2">
                     {rooms.map((room) => (
-                      <div
+                      <RoomListItem
                         key={room.id}
-                        className={`p-3 border rounded-lg cursor-pointer transition-colors ${
-                          selectedRoomId === room.id 
-                            ? 'border-primary bg-primary/5' 
-                            : 'hover:bg-muted/50'
-                        }`}
-                        onClick={() => setSelectedRoomId(room.id)}
-                      >
-                        <div className="flex items-start justify-between">
-                          <div className="flex items-center gap-2">
-                            <div 
-                              className="w-4 h-4 rounded" 
-                              style={{ backgroundColor: room.color || '#6366F1' }}
-                            />
-                            {editingRoomId === room.id ? (
-                              <div className="flex items-center gap-1">
-                                <Input
-                                  value={editingName}
-                                  onChange={(e) => setEditingName(e.target.value)}
-                                  className="h-7 w-32"
-                                  onClick={(e) => e.stopPropagation()}
-                                />
-                                <Button
-                                  size="icon"
-                                  variant="ghost"
-                                  className="h-7 w-7"
-                                  onClick={(e) => { e.stopPropagation(); handleSaveEdit(); }}
-                                >
-                                  <Check className="h-3 w-3" />
-                                </Button>
-                                <Button
-                                  size="icon"
-                                  variant="ghost"
-                                  className="h-7 w-7"
-                                  onClick={(e) => { e.stopPropagation(); handleCancelEdit(); }}
-                                >
-                                  <X className="h-3 w-3" />
-                                </Button>
-                              </div>
-                            ) : (
-                              <span className="font-medium text-sm">{room.room_name}</span>
-                            )}
-                          </div>
-                          {editingRoomId !== room.id && (
-                            <div className="flex items-center gap-1">
-                              <Button
-                                size="icon"
-                                variant="ghost"
-                                className="h-7 w-7"
-                                onClick={(e) => { e.stopPropagation(); handleStartEdit(room); }}
-                              >
-                                <Edit2 className="h-3 w-3" />
-                              </Button>
-                              <Button
-                                size="icon"
-                                variant="ghost"
-                                className="h-7 w-7 text-destructive hover:text-destructive"
-                                onClick={(e) => { e.stopPropagation(); deleteRoom.mutate(room.id); }}
-                              >
-                                <Trash2 className="h-3 w-3" />
-                              </Button>
-                            </div>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-2 mt-1">
-                          <Badge variant="outline" className="text-xs">
-                            {room.room_type}
-                          </Badge>
-                          {room.area_sqm && (
-                            <span className="text-xs text-muted-foreground">
-                              {room.area_sqm.toFixed(1)} sqm ({room.area_sqft?.toFixed(1)} sqft)
-                            </span>
-                          )}
-                        </div>
-                      </div>
+                        room={room}
+                        isSelected={selectedRoomId === room.id}
+                        isEditing={editingRoomId === room.id}
+                        editingName={editingName}
+                        onSelect={() => setSelectedRoomId(room.id)}
+                        onStartEdit={() => handleStartEdit(room)}
+                        onSaveEdit={handleSaveEdit}
+                        onCancelEdit={handleCancelEdit}
+                        onEditNameChange={setEditingName}
+                        onDelete={() => deleteRoom.mutate(room.id)}
+                        onOpenStages={() => setStagesRoom(room)}
+                      />
                     ))}
                   </div>
                 )}
@@ -310,6 +254,143 @@ export function RoomDetectionDialog({ drawing, open, onOpenChange }: RoomDetecti
         coordinates={drawingPoints}
         onSuccess={handleRoomAdded}
       />
+
+      {/* Room Stages Dialog */}
+      <RoomStagesDialog
+        room={stagesRoom}
+        open={!!stagesRoom}
+        onOpenChange={(open) => !open && setStagesRoom(null)}
+      />
     </>
+  );
+}
+
+// Room List Item Component with stages summary
+function RoomListItem({
+  room,
+  isSelected,
+  isEditing,
+  editingName,
+  onSelect,
+  onStartEdit,
+  onSaveEdit,
+  onCancelEdit,
+  onEditNameChange,
+  onDelete,
+  onOpenStages,
+}: {
+  room: FloorDrawingRoom;
+  isSelected: boolean;
+  isEditing: boolean;
+  editingName: string;
+  onSelect: () => void;
+  onStartEdit: () => void;
+  onSaveEdit: () => void;
+  onCancelEdit: () => void;
+  onEditNameChange: (name: string) => void;
+  onDelete: () => void;
+  onOpenStages: () => void;
+}) {
+  const { data: stages = [] } = useRoomStages(room.id);
+  const completedStages = stages.filter(s => s.status === 'completed').length;
+  const totalStages = stages.length;
+  const progress = totalStages > 0 ? Math.round((completedStages / totalStages) * 100) : 0;
+
+  return (
+    <div
+      className={`p-3 border rounded-lg cursor-pointer transition-colors ${
+        isSelected 
+          ? 'border-primary bg-primary/5' 
+          : 'hover:bg-muted/50'
+      }`}
+      onClick={onSelect}
+    >
+      <div className="flex items-start justify-between">
+        <div className="flex items-center gap-2">
+          <div 
+            className="w-4 h-4 rounded" 
+            style={{ backgroundColor: room.color || '#6366F1' }}
+          />
+          {isEditing ? (
+            <div className="flex items-center gap-1">
+              <Input
+                value={editingName}
+                onChange={(e) => onEditNameChange(e.target.value)}
+                className="h-7 w-32"
+                onClick={(e) => e.stopPropagation()}
+              />
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-7 w-7"
+                onClick={(e) => { e.stopPropagation(); onSaveEdit(); }}
+              >
+                <Check className="h-3 w-3" />
+              </Button>
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-7 w-7"
+                onClick={(e) => { e.stopPropagation(); onCancelEdit(); }}
+              >
+                <X className="h-3 w-3" />
+              </Button>
+            </div>
+          ) : (
+            <span className="font-medium text-sm">{room.room_name}</span>
+          )}
+        </div>
+        {!isEditing && (
+          <div className="flex items-center gap-1">
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-7 w-7"
+              onClick={(e) => { e.stopPropagation(); onOpenStages(); }}
+              title="Manage stages"
+            >
+              <ListChecks className="h-3 w-3" />
+            </Button>
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-7 w-7"
+              onClick={(e) => { e.stopPropagation(); onStartEdit(); }}
+            >
+              <Edit2 className="h-3 w-3" />
+            </Button>
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-7 w-7 text-destructive hover:text-destructive"
+              onClick={(e) => { e.stopPropagation(); onDelete(); }}
+            >
+              <Trash2 className="h-3 w-3" />
+            </Button>
+          </div>
+        )}
+      </div>
+      <div className="flex items-center gap-2 mt-1">
+        <Badge variant="outline" className="text-xs">
+          {room.room_type}
+        </Badge>
+        {room.area_sqm && (
+          <span className="text-xs text-muted-foreground">
+            {room.area_sqm.toFixed(1)} sqm ({room.area_sqft?.toFixed(1)} sqft)
+          </span>
+        )}
+      </div>
+      
+      {/* Stages Progress */}
+      {totalStages > 0 && (
+        <div className="mt-2 space-y-1">
+          <div className="flex items-center justify-between text-xs text-muted-foreground">
+            <span>{completedStages}/{totalStages} stages</span>
+            <span>{progress}%</span>
+          </div>
+          <Progress value={progress} className="h-1" />
+        </div>
+      )}
+    </div>
   );
 }

@@ -200,3 +200,46 @@ export interface DetectedRoom {
   area_sqft: number | null;
   color: string;
 }
+
+// Room Stages Types
+export type RoomStageStatus = 'pending' | 'in_progress' | 'completed' | 'blocked';
+
+export interface FloorRoomStage {
+  id: string;
+  room_id: string;
+  company_id: string | null;
+  stage_order: number;
+  stage_name: string;
+  description: string | null;
+  status: RoomStageStatus;
+  completion_percentage: number | null;
+  planned_start_date: string | null;
+  planned_end_date: string | null;
+  actual_start_date: string | null;
+  actual_end_date: string | null;
+  assigned_to: string | null;
+  notes: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export const DEFAULT_ROOM_STAGES = [
+  { stage_name: 'Preparation', description: 'Site preparation and cleanup' },
+  { stage_name: 'Structural Work', description: 'Framing, walls, ceiling structure' },
+  { stage_name: 'Electrical', description: 'Electrical wiring and outlets' },
+  { stage_name: 'Plumbing', description: 'Plumbing rough-in and fixtures' },
+  { stage_name: 'HVAC', description: 'Heating, ventilation, and air conditioning' },
+  { stage_name: 'Insulation', description: 'Wall and ceiling insulation' },
+  { stage_name: 'Drywall', description: 'Drywall installation and finishing' },
+  { stage_name: 'Painting', description: 'Priming and painting' },
+  { stage_name: 'Flooring', description: 'Floor installation' },
+  { stage_name: 'Finishing', description: 'Final touches and fixtures' },
+];
+
+export const ROOM_STAGE_STATUSES: { value: RoomStageStatus; label: string; color: string }[] = [
+  { value: 'pending', label: 'Pending', color: 'bg-muted text-muted-foreground' },
+  { value: 'in_progress', label: 'In Progress', color: 'bg-blue-100 text-blue-800' },
+  { value: 'completed', label: 'Completed', color: 'bg-green-100 text-green-800' },
+  { value: 'blocked', label: 'Blocked', color: 'bg-red-100 text-red-800' },
+];
