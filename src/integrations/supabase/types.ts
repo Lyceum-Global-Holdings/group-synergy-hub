@@ -4736,6 +4736,86 @@ export type Database = {
           },
         ]
       }
+      floor_room_materials: {
+        Row: {
+          company_id: string | null
+          created_at: string | null
+          created_by: string | null
+          id: string
+          notes: string | null
+          quantity_allocated: number | null
+          quantity_required: number
+          quantity_used: number | null
+          room_id: string
+          status: string | null
+          total_cost: number | null
+          unit_cost: number | null
+          updated_at: string | null
+          warehouse_item_id: string
+        }
+        Insert: {
+          company_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          quantity_allocated?: number | null
+          quantity_required?: number
+          quantity_used?: number | null
+          room_id: string
+          status?: string | null
+          total_cost?: number | null
+          unit_cost?: number | null
+          updated_at?: string | null
+          warehouse_item_id: string
+        }
+        Update: {
+          company_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          quantity_allocated?: number | null
+          quantity_required?: number
+          quantity_used?: number | null
+          room_id?: string
+          status?: string | null
+          total_cost?: number | null
+          unit_cost?: number | null
+          updated_at?: string | null
+          warehouse_item_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "floor_room_materials_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "floor_room_materials_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "floor_drawing_rooms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "floor_room_materials_warehouse_item_id_fkey"
+            columns: ["warehouse_item_id"]
+            isOneToOne: false
+            referencedRelation: "v_adjustment_summary_by_item"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "floor_room_materials_warehouse_item_id_fkey"
+            columns: ["warehouse_item_id"]
+            isOneToOne: false
+            referencedRelation: "warehouse_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       floor_room_stages: {
         Row: {
           actual_end_date: string | null

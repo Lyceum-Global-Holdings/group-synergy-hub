@@ -11,13 +11,15 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Progress } from "@/components/ui/progress";
-import { Loader2, Scan, Trash2, Edit2, Check, X, Square, MousePointer2, ListChecks } from "lucide-react";
+import { Loader2, Scan, Trash2, Edit2, Check, X, Square, MousePointer2, ListChecks, Package } from "lucide-react";
 import { FloorDrawing, FloorDrawingRoom, RoomCoordinate } from "@/types/construction";
 import { useFloorDrawingRooms, useDetectRooms, useDeleteRoom, useUpdateRoom } from "@/hooks/construction/useFloorRooms";
 import { useRoomStages } from "@/hooks/construction/useRoomStages";
+import { useRoomMaterialsSummary } from "@/hooks/construction/useRoomMaterials";
 import { Floor2DRoomOverlay } from "./Floor2DRoomOverlay";
 import { AddManualRoomDialog } from "./AddManualRoomDialog";
 import { RoomStagesDialog } from "./RoomStagesDialog";
+import { RoomMaterialsDialog } from "./RoomMaterialsDialog";
 
 interface RoomDetectionDialogProps {
   drawing: FloorDrawing | null;
@@ -38,6 +40,8 @@ export function RoomDetectionDialog({ drawing, open, onOpenChange }: RoomDetecti
   
   // Stages dialog state
   const [stagesRoom, setStagesRoom] = useState<FloorDrawingRoom | null>(null);
+  // Materials dialog state
+  const [materialsRoom, setMaterialsRoom] = useState<FloorDrawingRoom | null>(null);
 
   const { data: rooms = [], isLoading: roomsLoading } = useFloorDrawingRooms(drawing?.id || null);
   const detectRooms = useDetectRooms();
@@ -231,6 +235,7 @@ export function RoomDetectionDialog({ drawing, open, onOpenChange }: RoomDetecti
                         onEditNameChange={setEditingName}
                         onDelete={() => deleteRoom.mutate(room.id)}
                         onOpenStages={() => setStagesRoom(room)}
+                        onOpenMaterials={() => setMaterialsRoom(room)}
                       />
                     ))}
                   </div>
@@ -261,6 +266,13 @@ export function RoomDetectionDialog({ drawing, open, onOpenChange }: RoomDetecti
         open={!!stagesRoom}
         onOpenChange={(open) => !open && setStagesRoom(null)}
       />
+
+      {/* Room Materials Dialog */}
+      <RoomMaterialsDialog
+        room={materialsRoom}
+        open={!!materialsRoom}
+        onOpenChange={(open) => !open && setMaterialsRoom(null)}
+      />
     </>
   );
 }
@@ -278,6 +290,7 @@ function RoomListItem({
   onEditNameChange,
   onDelete,
   onOpenStages,
+  onOpenMaterials,
 }: {
   room: FloorDrawingRoom;
   isSelected: boolean;
@@ -290,8 +303,10 @@ function RoomListItem({
   onEditNameChange: (name: string) => void;
   onDelete: () => void;
   onOpenStages: () => void;
+  onOpenMaterials: () => void;
 }) {
   const { data: stages = [] } = useRoomStages(room.id);
+  const { data: materialsSummary } = useRoomMaterialsSummary(room.id);
   const completedStages = stages.filter(s => s.status === 'completed').length;
   const totalStages = stages.length;
   const progress = totalStages > 0 ? Math.round((completedStages / totalStages) * 100) : 0;
@@ -346,6 +361,15 @@ function RoomListItem({
               size="icon"
               variant="ghost"
               className="h-7 w-7"
+              onClick={(e) => { e.stopPropagation(); onOpenMaterials(); }}
+              title="Manage materials"
+            >
+              <Package className="h-3 w-3" />
+            </Button>
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-7 w-7"
               onClick={(e) => { e.stopPropagation(); onOpenStages(); }}
               title="Manage stages"
             >
@@ -389,6 +413,16 @@ function RoomListItem({
             <span>{progress}%</span>
           </div>
           <Progress value={progress} className="h-1" />
+        </div>
+      )}
+
+      {/* Materials Summary */}
+      {materialsSummary && materialsSummary.count > 0 && (
+        <div className="mt-2 text-xs text-muted-foreground flex items-center gap-2">
+          <Package className="h-3 w-3" />
+          <span>{materialsSummary.count} materials</span>
+          <span>•</span>
+          <span>${materialsSummary.totalCost.toLocaleString()}</span>
         </div>
       )}
     </div>

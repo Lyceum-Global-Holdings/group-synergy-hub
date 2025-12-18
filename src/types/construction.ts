@@ -243,3 +243,38 @@ export const ROOM_STAGE_STATUSES: { value: RoomStageStatus; label: string; color
   { value: 'completed', label: 'Completed', color: 'bg-green-100 text-green-800' },
   { value: 'blocked', label: 'Blocked', color: 'bg-red-100 text-red-800' },
 ];
+
+// Room Material Types
+export type RoomMaterialStatus = 'planned' | 'allocated' | 'partially_used' | 'fully_used';
+
+export interface FloorRoomMaterial {
+  id: string;
+  room_id: string;
+  warehouse_item_id: string;
+  company_id: string | null;
+  quantity_required: number;
+  quantity_allocated: number | null;
+  quantity_used: number | null;
+  unit_cost: number | null;
+  total_cost: number | null;
+  status: RoomMaterialStatus;
+  notes: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+  // Joined fields
+  warehouse_item?: {
+    id: string;
+    item_code: string;
+    name: string;
+    current_stock: number | null;
+    unit_cost: number | null;
+  };
+}
+
+export const ROOM_MATERIAL_STATUSES: { value: RoomMaterialStatus; label: string; color: string }[] = [
+  { value: 'planned', label: 'Planned', color: 'bg-blue-100 text-blue-800' },
+  { value: 'allocated', label: 'Allocated', color: 'bg-yellow-100 text-yellow-800' },
+  { value: 'partially_used', label: 'Partially Used', color: 'bg-orange-100 text-orange-800' },
+  { value: 'fully_used', label: 'Fully Used', color: 'bg-green-100 text-green-800' },
+];
