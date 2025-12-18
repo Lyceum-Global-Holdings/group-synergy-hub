@@ -52,15 +52,14 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
   // Auto-select company based on user's access
   useEffect(() => {
     if (safeCompanies.length > 0 && !selectedCompany && !isViewingAllCompanies && !isSuperAdminLoading) {
-      // If user has only one company (not super admin), auto-select it
       if (safeCompanies.length === 1) {
+        // Single company: auto-select it
         setSelectedCompany(safeCompanies[0]);
       } else if (isSuperAdmin) {
-        // Super admin: default to TUH or first company
-        const uniformHub = safeCompanies.find(c => c.code === 'TUH');
-        const defaultCompany = uniformHub || safeCompanies[0];
-        setSelectedCompany(defaultCompany);
+        // Super admin with multiple companies: default to "All Companies" view
+        setIsViewingAllCompanies(true);
       }
+      // Non-super-admin with multiple companies: leave unselected (must choose manually)
     }
   }, [safeCompanies, selectedCompany, isViewingAllCompanies, isSuperAdmin, isSuperAdminLoading]);
 
