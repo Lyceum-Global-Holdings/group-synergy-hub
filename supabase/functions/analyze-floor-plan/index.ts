@@ -21,6 +21,60 @@ const ROOM_COLORS: Record<string, string> = {
   default: '#6366F1',
 };
 
+// Retry logic with exponential backoff for transient errors
+async function fetchWithRetry(
+  url: string,
+  options: RequestInit,
+  maxRetries = 3
+): Promise<Response> {
+  let lastError: Error | null = null;
+  
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      console.log(`AI API request attempt ${attempt}/${maxRetries}`);
+      
+      // Create abort controller with 30s timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000);
+      
+      const response = await fetch(url, {
+        ...options,
+        signal: controller.signal
+      });
+      
+      clearTimeout(timeoutId);
+      
+      // If success or non-retryable error, return immediately
+      if (response.ok || ![502, 503, 504].includes(response.status)) {
+        return response;
+      }
+      
+      // Retryable error - log and prepare for retry
+      const errorText = await response.text();
+      console.log(`AI API error: ${response.status} ${errorText}`);
+      lastError = new Error(`HTTP ${response.status}: ${errorText}`);
+      
+    } catch (error) {
+      console.log(`Request failed: ${(error as Error).message}`);
+      lastError = error as Error;
+      
+      // Don't retry on abort (timeout)
+      if ((error as Error).name === 'AbortError') {
+        throw new Error('Request timed out after 30 seconds');
+      }
+    }
+    
+    // Wait before next retry (exponential backoff: 1s, 2s, 4s)
+    if (attempt < maxRetries) {
+      const delay = Math.pow(2, attempt - 1) * 1000;
+      console.log(`Waiting ${delay}ms before retry...`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+  }
+  
+  throw lastError || new Error('Max retries exceeded');
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -62,7 +116,7 @@ Be thorough and identify ALL visible rooms including hallways, closets, and util
       ? `Analyze this floor plan image. The total floor area is ${totalAreaSqm} square meters. Identify all rooms with their positions and calculate their areas based on their proportional sizes.`
       : `Analyze this floor plan image. Identify all rooms with their positions. Estimate relative sizes as percentages.`;
 
-    const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+    const response = await fetchWithRetry('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${LOVABLE_API_KEY}`,
@@ -160,7 +214,7 @@ Be thorough and identify ALL visible rooms including hallways, closets, and util
       }
       
       return new Response(
-        JSON.stringify({ error: 'Failed to analyze floor plan' }),
+        JSON.stringify({ error: 'Failed to analyze floor plan. Please try again.' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -211,8 +265,16 @@ Be thorough and identify ALL visible rooms including hallways, closets, and util
 
   } catch (error) {
     console.error('Error in analyze-floor-plan:', error);
+    
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    const isTransient = errorMessage.includes('503') || errorMessage.includes('502') || errorMessage.includes('timed out');
+    
     return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }),
+      JSON.stringify({ 
+        error: isTransient 
+          ? 'AI service temporarily unavailable. Please try again in a moment.' 
+          : errorMessage 
+      }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
