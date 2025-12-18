@@ -11,16 +11,21 @@ import { useItemUnits } from '@/hooks/useItemUnits';
 import { useSuppliers } from '@/hooks/useSuppliers';
 import { useCompany } from '@/contexts/CompanyContext';
 import { useWarehouseLocations } from '@/hooks/useWarehouseLocations';
+import { useWarehouseBins } from '@/hooks/useWarehouseBins';
 import { CreateWarehouseItemData } from '@/types/itemBin';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { supabase } from '@/integrations/supabase/client';
+import { useQueryClient } from '@tanstack/react-query';
 
 interface ParsedItem extends Partial<CreateWarehouseItemData> {
   rowNumber: number;
   errors: string[];
   warnings: string[];
+  initial_stock?: number;
+  bin_id?: string;
 }
 
 export function BulkItemImportDialog() {
@@ -36,8 +41,10 @@ export function BulkItemImportDialog() {
   const { categories } = useItemCategories();
   const { units } = useItemUnits();
   const { data: suppliers = [] } = useSuppliers();
-  const { companies } = useCompany();
+  const { companies, selectedCompany } = useCompany();
   const { locations } = useWarehouseLocations();
+  const { bins } = useWarehouseBins();
+  const queryClient = useQueryClient();
 
   const downloadTemplate = () => {
     const headers = [
@@ -47,6 +54,8 @@ export function BulkItemImportDialog() {
       'category',
       'unit',
       'location',
+      'initial_stock',
+      'bin',
       'reorder_level',
       'min_stock_level',
       'max_stock_level',
@@ -71,6 +80,8 @@ export function BulkItemImportDialog() {
       'Electronics',
       'PCS',
       'Main Warehouse',
+      '100',
+      'BIN-001',
       '10',
       '5',
       '100',
@@ -246,6 +257,28 @@ export function BulkItemImportDialog() {
                 }
               }
               break;
+            case 'initial_stock':
+              if (value) {
+                const num = parseFloat(value);
+                if (isNaN(num) || num < 0) {
+                  item.errors.push('Initial stock must be a positive number');
+                } else {
+                  item.initial_stock = num;
+                }
+              }
+              break;
+            case 'bin':
+              if (value) {
+                const bin = bins.find(b => 
+                  b.bin_code.toLowerCase() === value.toLowerCase() ||
+                  b.name.toLowerCase() === value.toLowerCase()
+                );
+                if (bin) {
+                  item.bin_id = bin.id;
+                } else {
+                  item.warnings.push(`Bin "${value}" not found`);
+                }
+              }
             case 'supplier':
               if (value) {
                 const supplier = suppliers.find(s => 
@@ -321,6 +354,11 @@ export function BulkItemImportDialog() {
           }
         });
 
+        // Validate: warn if initial_stock specified without a valid bin
+        if (item.initial_stock && item.initial_stock > 0 && !item.bin_id) {
+          item.warnings.push('Initial stock specified but no valid bin provided - stock will not be set');
+        }
+
         parsed.push(item);
       }
 
@@ -360,7 +398,56 @@ export function BulkItemImportDialog() {
     }
 
     try {
-      await bulkCreateItemsAsync(validData);
+      // Step 1: Create items
+      const createdItems = await bulkCreateItemsAsync(validData);
+      
+      // Step 2: Create bin allocations for items with initial stock
+      const { data: user } = await supabase.auth.getUser();
+      
+      const binAllocations: Array<{
+        warehouse_item_id: string;
+        bin_id: string;
+        allocated_quantity: number;
+        company_id?: string;
+        created_by?: string;
+      }> = [];
+      
+      for (const createdItem of createdItems) {
+        // Find the original parsed item by item_code to get initial_stock and bin_id
+        const originalItem = parsedData.find(p => 
+          p.item_code === createdItem.item_code && 
+          p.errors.length === 0
+        );
+        
+        if (originalItem?.initial_stock && originalItem.initial_stock > 0 && originalItem?.bin_id) {
+          binAllocations.push({
+            warehouse_item_id: createdItem.id,
+            bin_id: originalItem.bin_id,
+            allocated_quantity: originalItem.initial_stock,
+            company_id: selectedCompany?.id,
+            created_by: user.user?.id,
+          });
+        }
+      }
+      
+      // Step 3: Bulk insert bin allocations if any
+      if (binAllocations.length > 0) {
+        const { error } = await supabase
+          .from('warehouse_bin_allocations')
+          .insert(binAllocations);
+        
+        if (error) {
+          console.error('Error creating bin allocations:', error);
+          toast({
+            title: "Partial Success",
+            description: `Items imported but some initial stock could not be set: ${error.message}`,
+          });
+        }
+        
+        // Invalidate queries to refresh data
+        queryClient.invalidateQueries({ queryKey: ['warehouse-bin-allocations'] });
+      }
+      
       setOpen(false);
       resetState();
     } catch (error) {
