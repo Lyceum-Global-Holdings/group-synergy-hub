@@ -2252,6 +2252,107 @@ export type Database = {
           },
         ]
       }
+      construction_projects: {
+        Row: {
+          actual_cost: number | null
+          actual_end_date: string | null
+          address: string | null
+          city: string | null
+          client_contact: string | null
+          client_name: string | null
+          company_id: string | null
+          completion_percentage: number | null
+          contract_number: string | null
+          contract_value: number | null
+          country: string | null
+          created_at: string
+          created_by: string | null
+          description: string | null
+          estimated_budget: number | null
+          id: string
+          latitude: number | null
+          longitude: number | null
+          notes: string | null
+          project_code: string
+          project_manager_id: string | null
+          project_name: string
+          project_type: string | null
+          start_date: string | null
+          state: string | null
+          status: string
+          target_end_date: string | null
+          updated_at: string
+        }
+        Insert: {
+          actual_cost?: number | null
+          actual_end_date?: string | null
+          address?: string | null
+          city?: string | null
+          client_contact?: string | null
+          client_name?: string | null
+          company_id?: string | null
+          completion_percentage?: number | null
+          contract_number?: string | null
+          contract_value?: number | null
+          country?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          estimated_budget?: number | null
+          id?: string
+          latitude?: number | null
+          longitude?: number | null
+          notes?: string | null
+          project_code: string
+          project_manager_id?: string | null
+          project_name: string
+          project_type?: string | null
+          start_date?: string | null
+          state?: string | null
+          status?: string
+          target_end_date?: string | null
+          updated_at?: string
+        }
+        Update: {
+          actual_cost?: number | null
+          actual_end_date?: string | null
+          address?: string | null
+          city?: string | null
+          client_contact?: string | null
+          client_name?: string | null
+          company_id?: string | null
+          completion_percentage?: number | null
+          contract_number?: string | null
+          contract_value?: number | null
+          country?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          estimated_budget?: number | null
+          id?: string
+          latitude?: number | null
+          longitude?: number | null
+          notes?: string | null
+          project_code?: string
+          project_manager_id?: string | null
+          project_name?: string
+          project_type?: string | null
+          start_date?: string | null
+          state?: string | null
+          status?: string
+          target_end_date?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "construction_projects_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       contract_amendments: {
         Row: {
           amendment_date: string
@@ -7010,6 +7111,195 @@ export type Database = {
           },
         ]
       }
+      project_phases: {
+        Row: {
+          actual_cost: number | null
+          actual_end_date: string | null
+          actual_start_date: string | null
+          budget_allocated: number | null
+          completion_percentage: number | null
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          notes: string | null
+          phase_name: string
+          phase_number: number
+          planned_end_date: string | null
+          planned_start_date: string | null
+          project_id: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          actual_cost?: number | null
+          actual_end_date?: string | null
+          actual_start_date?: string | null
+          budget_allocated?: number | null
+          completion_percentage?: number | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          notes?: string | null
+          phase_name: string
+          phase_number: number
+          planned_end_date?: string | null
+          planned_start_date?: string | null
+          project_id: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          actual_cost?: number | null
+          actual_end_date?: string | null
+          actual_start_date?: string | null
+          budget_allocated?: number | null
+          completion_percentage?: number | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          notes?: string | null
+          phase_name?: string
+          phase_number?: number
+          planned_end_date?: string | null
+          planned_start_date?: string | null
+          project_id?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_phases_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "construction_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      project_sites: {
+        Row: {
+          address: string | null
+          area_sqft: number | null
+          city: string | null
+          country: string | null
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          latitude: number | null
+          longitude: number | null
+          notes: string | null
+          project_id: string
+          site_code: string
+          site_manager_id: string | null
+          site_name: string
+          state: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          address?: string | null
+          area_sqft?: number | null
+          city?: string | null
+          country?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          latitude?: number | null
+          longitude?: number | null
+          notes?: string | null
+          project_id: string
+          site_code: string
+          site_manager_id?: string | null
+          site_name: string
+          state?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          address?: string | null
+          area_sqft?: number | null
+          city?: string | null
+          country?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          latitude?: number | null
+          longitude?: number | null
+          notes?: string | null
+          project_id?: string
+          site_code?: string
+          site_manager_id?: string | null
+          site_name?: string
+          state?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_sites_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "construction_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      project_team_members: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          end_date: string | null
+          id: string
+          is_active: boolean | null
+          notes: string | null
+          project_id: string
+          role: string
+          start_date: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          end_date?: string | null
+          id?: string
+          is_active?: boolean | null
+          notes?: string | null
+          project_id: string
+          role: string
+          start_date?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          end_date?: string | null
+          id?: string
+          is_active?: boolean | null
+          notes?: string | null
+          project_id?: string
+          role?: string
+          start_date?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_team_members_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "construction_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       purchase_orders: {
         Row: {
           actual_delivery_date: string | null
@@ -10910,6 +11200,7 @@ export type Database = {
       generate_po_amendment_number: { Args: never; Returns: string }
       generate_po_number: { Args: never; Returns: string }
       generate_pr_number: { Args: never; Returns: string }
+      generate_project_code: { Args: never; Returns: string }
       generate_putaway_number: { Args: never; Returns: string }
       generate_quote_number: { Args: never; Returns: string }
       generate_release_number: { Args: never; Returns: string }
