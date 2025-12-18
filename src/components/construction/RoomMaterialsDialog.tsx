@@ -8,7 +8,6 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   Select,
@@ -17,8 +16,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Plus, Trash2, Package, Loader2 } from 'lucide-react';
-import { FloorDrawingRoom, ROOM_MATERIAL_STATUSES, RoomMaterialStatus } from '@/types/construction';
+import { Plus, Trash2, Package, Loader2, History } from 'lucide-react';
+import { FloorDrawingRoom, FloorRoomMaterial, ROOM_MATERIAL_STATUSES, RoomMaterialStatus } from '@/types/construction';
 import {
   useRoomMaterials,
   useCreateRoomMaterial,
@@ -27,6 +26,7 @@ import {
 } from '@/hooks/construction/useRoomMaterials';
 import { ItemSelector } from '@/components/common/ItemSelector';
 import { useCompany } from '@/contexts/CompanyContext';
+import { MaterialTransactionsDialog } from './MaterialTransactionsDialog';
 
 interface RoomMaterialsDialogProps {
   room: FloorDrawingRoom | null;
@@ -41,6 +41,7 @@ export function RoomMaterialsDialog({ room, open, onOpenChange }: RoomMaterialsD
   const [selectedItemCost, setSelectedItemCost] = useState<number>(0);
   const [quantityRequired, setQuantityRequired] = useState<string>('1');
   const [notes, setNotes] = useState<string>('');
+  const [transactionsMaterial, setTransactionsMaterial] = useState<FloorRoomMaterial | null>(null);
 
   const { data: materials = [], isLoading } = useRoomMaterials(room?.id || null);
   const createMaterial = useCreateRoomMaterial();
@@ -225,6 +226,15 @@ export function RoomMaterialsDialog({ room, open, onOpenChange }: RoomMaterialsD
                           <Button
                             variant="ghost"
                             size="icon"
+                            className="h-8 w-8"
+                            onClick={() => setTransactionsMaterial(material)}
+                            title="View Transactions"
+                          >
+                            <History className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
                             className="h-8 w-8 text-destructive hover:text-destructive"
                             onClick={() => handleDelete(material.id)}
                           >
@@ -279,6 +289,14 @@ export function RoomMaterialsDialog({ room, open, onOpenChange }: RoomMaterialsD
             </div>
           </div>
         </div>
+
+        {/* Transactions Dialog */}
+        <MaterialTransactionsDialog
+          material={transactionsMaterial}
+          roomId={room?.id || ''}
+          open={!!transactionsMaterial}
+          onOpenChange={(open) => !open && setTransactionsMaterial(null)}
+        />
       </DialogContent>
     </Dialog>
   );
