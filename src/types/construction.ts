@@ -149,7 +149,8 @@ export interface FloorDrawing {
   floor_number: number;
   image_url: string;
   wall_height: number;
-  scale_factor: number;
+  scale_factor: number | null;
+  total_area_sqm: number | null;
   created_by: string | null;
   created_at: string;
   updated_at: string;
@@ -163,4 +164,39 @@ export interface CreateFloorDrawingData {
   image_url: string;
   wall_height?: number;
   scale_factor?: number;
+  total_area_sqm?: number;
+}
+
+export interface FloorDrawingRoom {
+  id: string;
+  floor_drawing_id: string;
+  room_name: string;
+  room_type: string | null;
+  area_sqm: number | null;
+  area_sqft: number | null;
+  coordinates: RoomCoordinate[] | null;
+  center_x: number | null;
+  center_y: number | null;
+  width_percent: number | null;
+  height_percent: number | null;
+  color: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface RoomCoordinate {
+  x: number;
+  y: number;
+}
+
+export interface DetectedRoom {
+  room_name: string;
+  room_type: string;
+  center_x: number;
+  center_y: number;
+  width_percent: number;
+  height_percent: number;
+  area_sqm: number | null;
+  area_sqft: number | null;
+  color: string;
 }
