@@ -6,11 +6,12 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Plus, Eye, Trash2, Box, Image } from "lucide-react";
+import { Plus, Trash2, Box, Image, Scan } from "lucide-react";
 import { useFloorDrawings, useDeleteFloorDrawing } from "@/hooks/construction/useFloorDrawings";
 import { ConstructionProject, FloorDrawing } from "@/types/construction";
 import { AddFloorDrawingDialog } from "./AddFloorDrawingDialog";
 import { FloorPlan3DDialog } from "./FloorPlan3DDialog";
+import { RoomDetectionDialog } from "./RoomDetectionDialog";
 import {
   Table,
   TableBody,
@@ -45,6 +46,7 @@ export function FloorDrawingsDialog({
   const [viewing3D, setViewing3D] = useState<FloorDrawing | null>(null);
   const [viewingImage, setViewingImage] = useState<FloorDrawing | null>(null);
   const [deletingDrawing, setDeletingDrawing] = useState<FloorDrawing | null>(null);
+  const [detectingRooms, setDetectingRooms] = useState<FloorDrawing | null>(null);
 
   const { data: drawings = [], isLoading } = useFloorDrawings(project?.id);
   const deleteDrawing = useDeleteFloorDrawing();
@@ -134,6 +136,14 @@ export function FloorDrawingsDialog({
                           <Button
                             variant="ghost"
                             size="icon"
+                            onClick={() => setDetectingRooms(drawing)}
+                            title="Detect Rooms"
+                          >
+                            <Scan className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
                             onClick={() => setDeletingDrawing(drawing)}
                           >
                             <Trash2 className="h-4 w-4 text-destructive" />
@@ -161,6 +171,12 @@ export function FloorDrawingsDialog({
         drawing={viewing3D}
         open={!!viewing3D}
         onOpenChange={(open) => !open && setViewing3D(null)}
+      />
+
+      <RoomDetectionDialog
+        drawing={detectingRooms}
+        open={!!detectingRooms}
+        onOpenChange={(open) => !open && setDetectingRooms(null)}
       />
 
       {/* 2D Image Viewer */}

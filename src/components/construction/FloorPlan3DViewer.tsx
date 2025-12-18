@@ -1,29 +1,21 @@
-import { Suspense, useRef, useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { Canvas, useLoader, useThree } from "@react-three/fiber";
-import { OrbitControls, Environment, Grid } from "@react-three/drei";
+import { OrbitControls, Environment, Grid, Html } from "@react-three/drei";
 import * as THREE from "three";
-import { FloorDrawing } from "@/types/construction";
+import { FloorDrawing, FloorDrawingRoom } from "@/types/construction";
+import { useFloorDrawingRooms } from "@/hooks/construction/useFloorRooms";
 
 interface FloorPlan3DViewerProps {
   drawing: FloorDrawing;
 }
 
-function FloorPlanMesh({ imageUrl, wallHeight }: { imageUrl: string; wallHeight: number }) {
+function FloorPlanMesh({ imageUrl, wallHeight, rooms, dimensions }: { 
+  imageUrl: string; 
+  wallHeight: number;
+  rooms: FloorDrawingRoom[];
+  dimensions: { width: number; height: number };
+}) {
   const texture = useLoader(THREE.TextureLoader, imageUrl);
-  const [dimensions, setDimensions] = useState({ width: 10, height: 10 });
-
-  useEffect(() => {
-    if (texture.image) {
-      const aspectRatio = texture.image.width / texture.image.height;
-      const baseSize = 10;
-      if (aspectRatio > 1) {
-        setDimensions({ width: baseSize, height: baseSize / aspectRatio });
-      } else {
-        setDimensions({ width: baseSize * aspectRatio, height: baseSize });
-      }
-    }
-  }, [texture]);
-
   const { width, height } = dimensions;
 
   return (
@@ -33,6 +25,41 @@ function FloorPlanMesh({ imageUrl, wallHeight }: { imageUrl: string; wallHeight:
         <planeGeometry args={[width, height]} />
         <meshStandardMaterial map={texture} side={THREE.DoubleSide} />
       </mesh>
+
+      {/* Room Labels on floor */}
+      {rooms.map((room) => {
+        if (room.center_x === null || room.center_y === null) return null;
+        
+        // Convert percentage positions to world coordinates
+        const x = ((room.center_x / 100) - 0.5) * width;
+        const z = ((room.center_y / 100) - 0.5) * height;
+        
+        return (
+          <Html
+            key={room.id}
+            position={[x, 0.1, z]}
+            center
+            distanceFactor={8}
+            occlude={false}
+          >
+            <div 
+              className="px-2 py-1 rounded text-xs font-medium whitespace-nowrap pointer-events-none"
+              style={{ 
+                backgroundColor: room.color || '#6366F1',
+                color: 'white',
+                opacity: 0.9,
+              }}
+            >
+              {room.room_name}
+              {room.area_sqm && (
+                <span className="block text-[10px] opacity-80">
+                  {room.area_sqm.toFixed(1)} sqm
+                </span>
+              )}
+            </div>
+          </Html>
+        );
+      })}
 
       {/* Walls */}
       <Wall
@@ -87,8 +114,22 @@ function Wall({
   );
 }
 
-function Scene({ drawing }: { drawing: FloorDrawing }) {
+function Scene({ drawing, rooms }: { drawing: FloorDrawing; rooms: FloorDrawingRoom[] }) {
   const { camera } = useThree();
+  const texture = useLoader(THREE.TextureLoader, drawing.image_url);
+  const [dimensions, setDimensions] = useState({ width: 10, height: 10 });
+
+  useEffect(() => {
+    if (texture.image) {
+      const aspectRatio = texture.image.width / texture.image.height;
+      const baseSize = 10;
+      if (aspectRatio > 1) {
+        setDimensions({ width: baseSize, height: baseSize / aspectRatio });
+      } else {
+        setDimensions({ width: baseSize * aspectRatio, height: baseSize });
+      }
+    }
+  }, [texture]);
 
   useEffect(() => {
     camera.position.set(8, 8, 8);
@@ -105,6 +146,8 @@ function Scene({ drawing }: { drawing: FloorDrawing }) {
         <FloorPlanMesh
           imageUrl={drawing.image_url}
           wallHeight={drawing.wall_height}
+          rooms={rooms}
+          dimensions={dimensions}
         />
       </Suspense>
 
@@ -147,10 +190,12 @@ function LoadingFallback() {
 }
 
 export function FloorPlan3DViewer({ drawing }: FloorPlan3DViewerProps) {
+  const { data: rooms = [] } = useFloorDrawingRooms(drawing.id);
+
   return (
     <div className="w-full h-full min-h-[500px] bg-gradient-to-b from-slate-900 to-slate-800 rounded-lg overflow-hidden">
       <Canvas shadows camera={{ fov: 50, near: 0.1, far: 100 }}>
-        <Scene drawing={drawing} />
+        <Scene drawing={drawing} rooms={rooms} />
       </Canvas>
     </div>
   );

@@ -5,3 +5,6 @@ verify_jwt = false
 
 [functions.public-asset-request]
 verify_jwt = false
+
+[functions.analyze-floor-plan]
+verify_jwt = true

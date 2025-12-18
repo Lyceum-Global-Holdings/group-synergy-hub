@@ -4677,6 +4677,65 @@ export type Database = {
         }
         Relationships: []
       }
+      floor_drawing_rooms: {
+        Row: {
+          area_sqft: number | null
+          area_sqm: number | null
+          center_x: number | null
+          center_y: number | null
+          color: string | null
+          coordinates: Json | null
+          created_at: string | null
+          floor_drawing_id: string
+          height_percent: number | null
+          id: string
+          room_name: string
+          room_type: string | null
+          updated_at: string | null
+          width_percent: number | null
+        }
+        Insert: {
+          area_sqft?: number | null
+          area_sqm?: number | null
+          center_x?: number | null
+          center_y?: number | null
+          color?: string | null
+          coordinates?: Json | null
+          created_at?: string | null
+          floor_drawing_id: string
+          height_percent?: number | null
+          id?: string
+          room_name: string
+          room_type?: string | null
+          updated_at?: string | null
+          width_percent?: number | null
+        }
+        Update: {
+          area_sqft?: number | null
+          area_sqm?: number | null
+          center_x?: number | null
+          center_y?: number | null
+          color?: string | null
+          coordinates?: Json | null
+          created_at?: string | null
+          floor_drawing_id?: string
+          height_percent?: number | null
+          id?: string
+          room_name?: string
+          room_type?: string | null
+          updated_at?: string | null
+          width_percent?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "floor_drawing_rooms_floor_drawing_id_fkey"
+            columns: ["floor_drawing_id"]
+            isOneToOne: false
+            referencedRelation: "project_floor_drawings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       gl_settings: {
         Row: {
           allow_posting_to_closed_periods: boolean | null
@@ -7123,6 +7182,7 @@ export type Database = {
           image_url: string
           project_id: string
           scale_factor: number | null
+          total_area_sqm: number | null
           updated_at: string | null
           wall_height: number | null
         }
@@ -7137,6 +7197,7 @@ export type Database = {
           image_url: string
           project_id: string
           scale_factor?: number | null
+          total_area_sqm?: number | null
           updated_at?: string | null
           wall_height?: number | null
         }
@@ -7151,6 +7212,7 @@ export type Database = {
           image_url?: string
           project_id?: string
           scale_factor?: number | null
+          total_area_sqm?: number | null
           updated_at?: string | null
           wall_height?: number | null
         }
