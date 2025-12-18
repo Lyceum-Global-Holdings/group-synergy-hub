@@ -10,6 +10,7 @@ import { useItemCategories } from '@/hooks/useItemCategories';
 import { useItemUnits } from '@/hooks/useItemUnits';
 import { useSuppliers } from '@/hooks/useSuppliers';
 import { useCompany } from '@/contexts/CompanyContext';
+import { useWarehouseLocations } from '@/hooks/useWarehouseLocations';
 import { CreateWarehouseItemData } from '@/types/itemBin';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
@@ -36,6 +37,7 @@ export function BulkItemImportDialog() {
   const { units } = useItemUnits();
   const { data: suppliers = [] } = useSuppliers();
   const { companies } = useCompany();
+  const { locations } = useWarehouseLocations();
 
   const downloadTemplate = () => {
     const headers = [
@@ -44,6 +46,7 @@ export function BulkItemImportDialog() {
       'description',
       'category',
       'unit',
+      'location',
       'reorder_level',
       'min_stock_level',
       'max_stock_level',
@@ -67,6 +70,7 @@ export function BulkItemImportDialog() {
       'This is a sample item',
       'Electronics',
       'PCS',
+      'Main Warehouse',
       '10',
       '5',
       '100',
@@ -225,6 +229,20 @@ export function BulkItemImportDialog() {
                   item.unit_id = unit.id;
                 } else {
                   item.warnings.push(`Unit "${value}" not found`);
+                }
+              }
+              break;
+            case 'location':
+              if (value) {
+                const warehouseLocations = locations.filter(l => l.type === 'location');
+                const location = warehouseLocations.find(l => 
+                  l.name.toLowerCase() === value.toLowerCase() ||
+                  l.location_code?.toLowerCase() === value.toLowerCase()
+                );
+                if (location) {
+                  item.location_id = location.id;
+                } else {
+                  item.warnings.push(`Warehouse location "${value}" not found`);
                 }
               }
               break;
