@@ -333,6 +333,8 @@ export interface CreateWorkOrderData {
   notes?: string;
 }
 
+export type UpdateWorkOrderData = Partial<CreateWorkOrderData>;
+
 export const WORK_ORDER_STATUSES: { value: WorkOrderStatus; label: string; color: string }[] = [
   { value: 'pending', label: 'Pending', color: 'bg-muted text-muted-foreground' },
   { value: 'in_progress', label: 'In Progress', color: 'bg-blue-100 text-blue-800' },
@@ -410,6 +412,8 @@ export interface CreateDailySiteReportData {
   photos_url?: string[];
 }
 
+export type UpdateDailySiteReportData = Partial<CreateDailySiteReportData>;
+
 export interface SiteReportActivity {
   id: string;
   report_id: string;
@@ -477,6 +481,12 @@ export interface CreateResourceData {
   assigned_site_id?: string;
   notes?: string;
 }
+
+export type UpdateResourceData = Partial<CreateResourceData>;
+
+// Aliases for consistency
+export type CreateConstructionResourceData = CreateResourceData;
+export type UpdateConstructionResourceData = UpdateResourceData;
 
 export const RESOURCE_TYPES: { value: ResourceType; label: string }[] = [
   { value: 'labor', label: 'Labor' },
@@ -552,6 +562,8 @@ export interface CreateQualityInspectionData {
   inspection_date: string;
   inspector_id?: string;
 }
+
+export type UpdateQualityInspectionData = Partial<CreateQualityInspectionData>;
 
 export const QUALITY_INSPECTION_TYPES: { value: QualityInspectionType; label: string }[] = [
   { value: 'structural', label: 'Structural' },
@@ -629,6 +641,8 @@ export interface CreateSafetyIncidentData {
   immediate_actions?: string;
 }
 
+export type UpdateSafetyIncidentData = Partial<CreateSafetyIncidentData>;
+
 export const INCIDENT_TYPES: { value: IncidentType; label: string }[] = [
   { value: 'near_miss', label: 'Near Miss' },
   { value: 'first_aid', label: 'First Aid' },
@@ -691,6 +705,8 @@ export interface CreateSafetyInspectionData {
   inspector_id?: string;
 }
 
+export type UpdateSafetyInspectionData = Partial<CreateSafetyInspectionData>;
+
 export const SAFETY_INSPECTION_TYPES: { value: SafetyInspectionType; label: string }[] = [
   { value: 'daily', label: 'Daily' },
   { value: 'weekly', label: 'Weekly' },
@@ -748,6 +764,12 @@ export interface CreateDocumentData {
   file_type?: string;
   tags?: string[];
 }
+
+export type UpdateDocumentData = Partial<CreateDocumentData>;
+
+// Aliases for consistency
+export type CreateConstructionDocumentData = CreateDocumentData;
+export type UpdateConstructionDocumentData = UpdateDocumentData;
 
 export const DOCUMENT_TYPES: { value: DocumentType; label: string }[] = [
   { value: 'drawing', label: 'Drawing' },
@@ -820,6 +842,12 @@ export interface CreateBudgetItemData {
   unit_cost?: number;
   notes?: string;
 }
+
+export type UpdateBudgetItemData = Partial<CreateBudgetItemData>;
+
+// Aliases for consistency
+export type CreateProjectBudgetItemData = CreateBudgetItemData;
+export type UpdateProjectBudgetItemData = UpdateBudgetItemData;
 
 export interface CreateBudgetTransactionData {
   budget_item_id: string;
