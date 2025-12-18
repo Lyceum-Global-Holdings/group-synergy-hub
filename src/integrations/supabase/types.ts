@@ -4736,6 +4736,81 @@ export type Database = {
           },
         ]
       }
+      floor_room_stages: {
+        Row: {
+          actual_end_date: string | null
+          actual_start_date: string | null
+          assigned_to: string | null
+          company_id: string | null
+          completion_percentage: number | null
+          created_at: string | null
+          created_by: string | null
+          description: string | null
+          id: string
+          notes: string | null
+          planned_end_date: string | null
+          planned_start_date: string | null
+          room_id: string
+          stage_name: string
+          stage_order: number
+          status: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          actual_end_date?: string | null
+          actual_start_date?: string | null
+          assigned_to?: string | null
+          company_id?: string | null
+          completion_percentage?: number | null
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          notes?: string | null
+          planned_end_date?: string | null
+          planned_start_date?: string | null
+          room_id: string
+          stage_name: string
+          stage_order: number
+          status?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          actual_end_date?: string | null
+          actual_start_date?: string | null
+          assigned_to?: string | null
+          company_id?: string | null
+          completion_percentage?: number | null
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          notes?: string | null
+          planned_end_date?: string | null
+          planned_start_date?: string | null
+          room_id?: string
+          stage_name?: string
+          stage_order?: number
+          status?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "floor_room_stages_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "floor_room_stages_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "floor_drawing_rooms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       gl_settings: {
         Row: {
           allow_posting_to_closed_periods: boolean | null
