@@ -12,6 +12,15 @@ interface Floor2DRoomOverlayProps {
   onPolygonComplete?: () => void;
 }
 
+// Calculate centroid of a polygon for label positioning
+function getPolygonCentroid(coordinates: RoomCoordinate[]): { x: number; y: number } {
+  const n = coordinates.length;
+  if (n === 0) return { x: 50, y: 50 };
+  const centroidX = coordinates.reduce((sum, p) => sum + p.x, 0) / n;
+  const centroidY = coordinates.reduce((sum, p) => sum + p.y, 0) / n;
+  return { x: centroidX, y: centroidY };
+}
+
 export function Floor2DRoomOverlay({ 
   imageUrl, 
   rooms, 
@@ -83,6 +92,83 @@ export function Floor2DRoomOverlay({
       >
         {/* Existing Rooms */}
         {rooms.map((room) => {
+          const hasPolygonCoords = room.coordinates && Array.isArray(room.coordinates) && room.coordinates.length >= 3;
+          const isSelected = selectedRoomId === room.id;
+          const isHovered = hoveredRoomId === room.id;
+
+          // For polygon rooms (manually drawn), use coordinates
+          if (hasPolygonCoords) {
+            const coords = room.coordinates as RoomCoordinate[];
+            const pathD = coords.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ') + ' Z';
+            const centroid = getPolygonCentroid(coords);
+
+            return (
+              <g key={room.id}>
+                {/* Room Polygon */}
+                <path
+                  d={pathD}
+                  fill={room.color || '#6366F1'}
+                  fillOpacity={isSelected ? 0.4 : isHovered ? 0.3 : 0.2}
+                  stroke={room.color || '#6366F1'}
+                  strokeWidth={isSelected ? 0.5 : 0.3}
+                  strokeOpacity={isSelected ? 1 : 0.8}
+                  className={`${isDrawingMode ? '' : 'pointer-events-auto cursor-pointer'} transition-all`}
+                  onMouseEnter={() => !isDrawingMode && setHoveredRoomId(room.id)}
+                  onMouseLeave={() => !isDrawingMode && setHoveredRoomId(null)}
+                  onClick={(e) => {
+                    if (!isDrawingMode) {
+                      e.stopPropagation();
+                      onRoomClick?.(room.id);
+                    }
+                  }}
+                />
+                
+                {/* Room Label Background */}
+                <rect
+                  x={centroid.x - 8}
+                  y={centroid.y - 2.5}
+                  width={16}
+                  height={5}
+                  fill="white"
+                  fillOpacity={0.9}
+                  rx={0.5}
+                />
+                
+                {/* Room Label */}
+                <text
+                  x={centroid.x}
+                  y={centroid.y}
+                  textAnchor="middle"
+                  dominantBaseline="middle"
+                  fontSize={2.5}
+                  fontWeight={isSelected ? 600 : 500}
+                  fill={room.color || '#6366F1'}
+                  className="pointer-events-none select-none"
+                >
+                  {room.room_name.length > 12 
+                    ? room.room_name.substring(0, 12) + '...' 
+                    : room.room_name}
+                </text>
+                
+                {/* Area Label */}
+                {room.area_sqm && (
+                  <text
+                    x={centroid.x}
+                    y={centroid.y + 3.5}
+                    textAnchor="middle"
+                    dominantBaseline="middle"
+                    fontSize={1.8}
+                    fill="#666"
+                    className="pointer-events-none select-none"
+                  >
+                    {room.area_sqm.toFixed(1)} sqm
+                  </text>
+                )}
+              </g>
+            );
+          }
+
+          // For rectangle rooms (AI-detected), use center + dimensions
           if (room.center_x === null || room.center_y === null || 
               room.width_percent === null || room.height_percent === null) {
             return null;
@@ -90,8 +176,6 @@ export function Floor2DRoomOverlay({
 
           const x = room.center_x - room.width_percent / 2;
           const y = room.center_y - room.height_percent / 2;
-          const isSelected = selectedRoomId === room.id;
-          const isHovered = hoveredRoomId === room.id;
 
           return (
             <g key={room.id}>
