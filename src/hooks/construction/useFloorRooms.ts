@@ -117,6 +117,88 @@ export function useDetectRooms() {
   });
 }
 
+// Room type color mapping
+const ROOM_TYPE_COLORS: Record<string, string> = {
+  bedroom: '#6366F1',
+  bathroom: '#06B6D4',
+  kitchen: '#F97316',
+  living: '#22C55E',
+  dining: '#EAB308',
+  office: '#8B5CF6',
+  storage: '#78716C',
+  garage: '#64748B',
+  balcony: '#14B8A6',
+  other: '#EC4899',
+};
+
+export function getRoomTypeColor(roomType: string): string {
+  return ROOM_TYPE_COLORS[roomType.toLowerCase()] || ROOM_TYPE_COLORS.other;
+}
+
+export function useCreateRoom() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      drawingId,
+      roomName,
+      roomType,
+      areaSqm,
+      coordinates,
+    }: {
+      drawingId: string;
+      roomName: string;
+      roomType: string;
+      areaSqm?: number;
+      coordinates: RoomCoordinate[];
+    }) => {
+      // Calculate bounding box from coordinates
+      const xCoords = coordinates.map(c => c.x);
+      const yCoords = coordinates.map(c => c.y);
+      const minX = Math.min(...xCoords);
+      const maxX = Math.max(...xCoords);
+      const minY = Math.min(...yCoords);
+      const maxY = Math.max(...yCoords);
+
+      const centerX = (minX + maxX) / 2;
+      const centerY = (minY + maxY) / 2;
+      const widthPercent = maxX - minX;
+      const heightPercent = maxY - minY;
+
+      const color = getRoomTypeColor(roomType);
+      const areaSqft = areaSqm ? areaSqm * 10.764 : null;
+
+      const { data, error } = await supabase
+        .from("floor_drawing_rooms")
+        .insert({
+          floor_drawing_id: drawingId,
+          room_name: roomName,
+          room_type: roomType,
+          area_sqm: areaSqm || null,
+          area_sqft: areaSqft,
+          center_x: centerX,
+          center_y: centerY,
+          width_percent: widthPercent,
+          height_percent: heightPercent,
+          color,
+          coordinates: coordinates as unknown as Json[],
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      return mapDbRowToRoom(data);
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["floor-drawing-rooms", variables.drawingId] });
+      toast.success("Room added successfully");
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || "Failed to add room");
+    },
+  });
+}
+
 export function useDeleteRoom() {
   const queryClient = useQueryClient();
 
