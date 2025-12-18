@@ -56,6 +56,7 @@ import DashboardsKPIs from "./pages/management/DashboardsKPIs";
 import DashboardView from "./pages/management/DashboardView";
 import DashboardEdit from "./pages/management/DashboardEdit";
 import ApprovalConsole from "./pages/management/ApprovalConsole";
+import ProjectMaster from "./pages/construction/ProjectMaster";
 
 const queryClient = new QueryClient();
 
@@ -138,6 +139,9 @@ function App() {
               <Route path="/management/dashboards/:id/edit" element={<DashboardEdit />} />
               <Route path="/management/dashboards/:id" element={<DashboardView />} />
               <Route path="/management/approvals" element={<ApprovalConsole />} />
+              
+              {/* Construction routes */}
+              <Route path="/construction/project-master" element={<ProjectMaster />} />
             </Route>
             
             {/* Catch-all 404 route */}

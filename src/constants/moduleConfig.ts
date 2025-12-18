@@ -7,7 +7,8 @@ import {
   Building2,
   ClipboardList,
   GraduationCap,
-  Settings
+  Settings,
+  HardHat
 } from "lucide-react";
 
 export interface ModuleConfig {
@@ -139,6 +140,24 @@ export const moduleConfig: Record<string, ModuleConfig> = {
       { key: 'user-role-management', name: 'User & Role Management', description: 'Manage users, roles, and permissions', url: '/admin/users-roles' },
       { key: 'module-allocation', name: 'Module Allocation', description: 'Assign modules to companies', url: '/admin/modules' },
       { key: 'warehouse-management', name: 'Warehouse Management', description: 'Configure warehouse settings', url: '/admin/warehouse-management' }
+    ]
+  },
+  construction: {
+    key: 'construction',
+    name: 'Construction',
+    description: 'Construction project management',
+    icon: HardHat,
+    subModules: [
+      { key: 'project-master', name: 'Project Master', description: 'Manage construction projects', url: '/construction/project-master' },
+      { key: 'work-orders', name: 'Work Orders', description: 'Create and track work orders', url: '/construction/work-orders' },
+      { key: 'site-management', name: 'Site Management', description: 'Manage project sites', url: '/construction/site-management' },
+      { key: 'progress-tracking', name: 'Progress Tracking', description: 'Track project progress and milestones', url: '/construction/progress-tracking' },
+      { key: 'daily-reports', name: 'Daily Site Reports', description: 'Daily site activity reports', url: '/construction/daily-reports' },
+      { key: 'resource-allocation', name: 'Resource Allocation', description: 'Allocate resources to projects', url: '/construction/resource-allocation' },
+      { key: 'quality-control', name: 'Quality Control', description: 'Quality inspections and checklists', url: '/construction/quality-control' },
+      { key: 'safety-management', name: 'Safety Management', description: 'Safety incidents and compliance', url: '/construction/safety-management' },
+      { key: 'project-documents', name: 'Project Documents', description: 'Project document management', url: '/construction/project-documents' },
+      { key: 'project-budgeting', name: 'Project Budgeting', description: 'Project budget planning and tracking', url: '/construction/project-budgeting' }
     ]
   }
 };
