@@ -158,8 +158,8 @@ function App() {
               <Route path="/construction/resource-allocation" element={<ResourceAllocation />} />
               <Route path="/construction/quality-control" element={<QualityControl />} />
               <Route path="/construction/safety-management" element={<SafetyManagement />} />
-              <Route path="/construction/documents" element={<ProjectDocuments />} />
-              <Route path="/construction/budgeting" element={<ProjectBudgeting />} />
+              <Route path="/construction/project-documents" element={<ProjectDocuments />} />
+              <Route path="/construction/project-budgeting" element={<ProjectBudgeting />} />
             </Route>
             
             {/* Catch-all 404 route */}
