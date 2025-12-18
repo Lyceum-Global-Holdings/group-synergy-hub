@@ -139,3 +139,28 @@ export const TEAM_ROLES: { value: TeamRole; label: string }[] = [
   { value: 'safety_officer', label: 'Safety Officer' },
   { value: 'quality_inspector', label: 'Quality Inspector' },
 ];
+
+export interface FloorDrawing {
+  id: string;
+  project_id: string;
+  company_id: string | null;
+  drawing_name: string;
+  description: string | null;
+  floor_number: number;
+  image_url: string;
+  wall_height: number;
+  scale_factor: number;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateFloorDrawingData {
+  project_id: string;
+  drawing_name: string;
+  description?: string;
+  floor_number?: number;
+  image_url: string;
+  wall_height?: number;
+  scale_factor?: number;
+}
