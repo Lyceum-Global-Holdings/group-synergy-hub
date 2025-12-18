@@ -57,6 +57,15 @@ import DashboardView from "./pages/management/DashboardView";
 import DashboardEdit from "./pages/management/DashboardEdit";
 import ApprovalConsole from "./pages/management/ApprovalConsole";
 import ProjectMaster from "./pages/construction/ProjectMaster";
+import WorkOrders from "./pages/construction/WorkOrders";
+import SiteManagement from "./pages/construction/SiteManagement";
+import ProgressTracking from "./pages/construction/ProgressTracking";
+import DailySiteReports from "./pages/construction/DailySiteReports";
+import ResourceAllocation from "./pages/construction/ResourceAllocation";
+import QualityControl from "./pages/construction/QualityControl";
+import SafetyManagement from "./pages/construction/SafetyManagement";
+import ProjectDocuments from "./pages/construction/ProjectDocuments";
+import ProjectBudgeting from "./pages/construction/ProjectBudgeting";
 
 const queryClient = new QueryClient();
 
@@ -142,6 +151,15 @@ function App() {
               
               {/* Construction routes */}
               <Route path="/construction/project-master" element={<ProjectMaster />} />
+              <Route path="/construction/work-orders" element={<WorkOrders />} />
+              <Route path="/construction/site-management" element={<SiteManagement />} />
+              <Route path="/construction/progress-tracking" element={<ProgressTracking />} />
+              <Route path="/construction/daily-reports" element={<DailySiteReports />} />
+              <Route path="/construction/resource-allocation" element={<ResourceAllocation />} />
+              <Route path="/construction/quality-control" element={<QualityControl />} />
+              <Route path="/construction/safety-management" element={<SafetyManagement />} />
+              <Route path="/construction/documents" element={<ProjectDocuments />} />
+              <Route path="/construction/budgeting" element={<ProjectBudgeting />} />
             </Route>
             
             {/* Catch-all 404 route */}
