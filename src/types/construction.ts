@@ -278,3 +278,570 @@ export const ROOM_MATERIAL_STATUSES: { value: RoomMaterialStatus; label: string;
   { value: 'partially_used', label: 'Partially Used', color: 'bg-orange-100 text-orange-800' },
   { value: 'fully_used', label: 'Fully Used', color: 'bg-green-100 text-green-800' },
 ];
+
+// =====================================================
+// WORK ORDERS
+// =====================================================
+
+export type WorkOrderStatus = 'pending' | 'in_progress' | 'completed' | 'cancelled';
+export type WorkOrderPriority = 'low' | 'medium' | 'high' | 'urgent';
+export type WorkOrderType = 'civil' | 'electrical' | 'plumbing' | 'finishing' | 'structural' | 'mechanical' | 'other';
+
+export interface WorkOrder {
+  id: string;
+  project_id: string;
+  company_id: string | null;
+  work_order_number: string;
+  title: string;
+  description: string | null;
+  work_type: WorkOrderType | null;
+  priority: WorkOrderPriority;
+  status: WorkOrderStatus;
+  assigned_to: string | null;
+  site_id: string | null;
+  planned_start_date: string | null;
+  planned_end_date: string | null;
+  actual_start_date: string | null;
+  actual_end_date: string | null;
+  estimated_hours: number | null;
+  actual_hours: number | null;
+  estimated_cost: number | null;
+  actual_cost: number | null;
+  notes: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+  // Joined fields
+  project?: ConstructionProject;
+  site?: ProjectSite;
+  assigned_user?: { full_name: string };
+}
+
+export interface CreateWorkOrderData {
+  project_id: string;
+  title: string;
+  description?: string;
+  work_type?: WorkOrderType;
+  priority?: WorkOrderPriority;
+  status?: WorkOrderStatus;
+  assigned_to?: string;
+  site_id?: string;
+  planned_start_date?: string;
+  planned_end_date?: string;
+  estimated_hours?: number;
+  estimated_cost?: number;
+  notes?: string;
+}
+
+export const WORK_ORDER_STATUSES: { value: WorkOrderStatus; label: string; color: string }[] = [
+  { value: 'pending', label: 'Pending', color: 'bg-muted text-muted-foreground' },
+  { value: 'in_progress', label: 'In Progress', color: 'bg-blue-100 text-blue-800' },
+  { value: 'completed', label: 'Completed', color: 'bg-green-100 text-green-800' },
+  { value: 'cancelled', label: 'Cancelled', color: 'bg-red-100 text-red-800' },
+];
+
+export const WORK_ORDER_PRIORITIES: { value: WorkOrderPriority; label: string; color: string }[] = [
+  { value: 'low', label: 'Low', color: 'bg-gray-100 text-gray-800' },
+  { value: 'medium', label: 'Medium', color: 'bg-blue-100 text-blue-800' },
+  { value: 'high', label: 'High', color: 'bg-orange-100 text-orange-800' },
+  { value: 'urgent', label: 'Urgent', color: 'bg-red-100 text-red-800' },
+];
+
+export const WORK_ORDER_TYPES: { value: WorkOrderType; label: string }[] = [
+  { value: 'civil', label: 'Civil' },
+  { value: 'electrical', label: 'Electrical' },
+  { value: 'plumbing', label: 'Plumbing' },
+  { value: 'finishing', label: 'Finishing' },
+  { value: 'structural', label: 'Structural' },
+  { value: 'mechanical', label: 'Mechanical' },
+  { value: 'other', label: 'Other' },
+];
+
+// =====================================================
+// DAILY SITE REPORTS
+// =====================================================
+
+export type DailyReportStatus = 'draft' | 'submitted' | 'approved';
+
+export interface DailySiteReport {
+  id: string;
+  project_id: string;
+  company_id: string | null;
+  report_number: string;
+  report_date: string;
+  site_id: string | null;
+  weather_conditions: string | null;
+  temperature_high: number | null;
+  temperature_low: number | null;
+  labor_count: number | null;
+  subcontractor_count: number | null;
+  visitor_count: number | null;
+  work_summary: string | null;
+  delays_issues: string | null;
+  materials_received: string | null;
+  equipment_on_site: string | null;
+  safety_observations: string | null;
+  photos_url: string[] | null;
+  submitted_by: string | null;
+  approved_by: string | null;
+  status: DailyReportStatus;
+  created_at: string;
+  updated_at: string;
+  // Joined fields
+  project?: ConstructionProject;
+  site?: ProjectSite;
+}
+
+export interface CreateDailySiteReportData {
+  project_id: string;
+  report_date: string;
+  site_id?: string;
+  weather_conditions?: string;
+  temperature_high?: number;
+  temperature_low?: number;
+  labor_count?: number;
+  subcontractor_count?: number;
+  visitor_count?: number;
+  work_summary?: string;
+  delays_issues?: string;
+  materials_received?: string;
+  equipment_on_site?: string;
+  safety_observations?: string;
+  photos_url?: string[];
+}
+
+export interface SiteReportActivity {
+  id: string;
+  report_id: string;
+  activity_type: string;
+  description: string | null;
+  location: string | null;
+  labor_hours: number | null;
+  completion_percentage: number | null;
+  notes: string | null;
+  created_at: string;
+}
+
+export const DAILY_REPORT_STATUSES: { value: DailyReportStatus; label: string; color: string }[] = [
+  { value: 'draft', label: 'Draft', color: 'bg-muted text-muted-foreground' },
+  { value: 'submitted', label: 'Submitted', color: 'bg-blue-100 text-blue-800' },
+  { value: 'approved', label: 'Approved', color: 'bg-green-100 text-green-800' },
+];
+
+export const WEATHER_CONDITIONS = [
+  'Sunny', 'Partly Cloudy', 'Cloudy', 'Rainy', 'Stormy', 'Windy', 'Hot', 'Cold', 'Humid'
+];
+
+// =====================================================
+// CONSTRUCTION RESOURCES
+// =====================================================
+
+export type ResourceType = 'labor' | 'equipment' | 'material' | 'subcontractor';
+export type ResourceStatus = 'planned' | 'active' | 'completed' | 'released';
+
+export interface ConstructionResource {
+  id: string;
+  project_id: string;
+  company_id: string | null;
+  resource_type: ResourceType;
+  resource_name: string;
+  description: string | null;
+  unit: string | null;
+  quantity_allocated: number | null;
+  quantity_used: number | null;
+  unit_cost: number | null;
+  total_cost: number | null;
+  start_date: string | null;
+  end_date: string | null;
+  status: ResourceStatus;
+  assigned_site_id: string | null;
+  notes: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+  // Joined fields
+  project?: ConstructionProject;
+  site?: ProjectSite;
+}
+
+export interface CreateResourceData {
+  project_id: string;
+  resource_type: ResourceType;
+  resource_name: string;
+  description?: string;
+  unit?: string;
+  quantity_allocated?: number;
+  unit_cost?: number;
+  start_date?: string;
+  end_date?: string;
+  assigned_site_id?: string;
+  notes?: string;
+}
+
+export const RESOURCE_TYPES: { value: ResourceType; label: string }[] = [
+  { value: 'labor', label: 'Labor' },
+  { value: 'equipment', label: 'Equipment' },
+  { value: 'material', label: 'Material' },
+  { value: 'subcontractor', label: 'Subcontractor' },
+];
+
+export const RESOURCE_STATUSES: { value: ResourceStatus; label: string; color: string }[] = [
+  { value: 'planned', label: 'Planned', color: 'bg-muted text-muted-foreground' },
+  { value: 'active', label: 'Active', color: 'bg-green-100 text-green-800' },
+  { value: 'completed', label: 'Completed', color: 'bg-blue-100 text-blue-800' },
+  { value: 'released', label: 'Released', color: 'bg-purple-100 text-purple-800' },
+];
+
+// =====================================================
+// QUALITY INSPECTIONS
+// =====================================================
+
+export type QualityInspectionType = 'structural' | 'electrical' | 'plumbing' | 'finishing' | 'safety' | 'general';
+export type QualityInspectionStatus = 'scheduled' | 'in_progress' | 'completed' | 'failed';
+export type InspectionResult = 'pass' | 'fail' | 'conditional_pass';
+export type InspectionItemResult = 'pass' | 'fail' | 'na';
+
+export interface QualityInspection {
+  id: string;
+  project_id: string;
+  company_id: string | null;
+  inspection_number: string;
+  inspection_type: QualityInspectionType;
+  title: string;
+  description: string | null;
+  site_id: string | null;
+  work_order_id: string | null;
+  inspection_date: string;
+  inspector_id: string | null;
+  status: QualityInspectionStatus;
+  overall_result: InspectionResult | null;
+  findings: string | null;
+  corrective_actions: string | null;
+  follow_up_date: string | null;
+  photos_url: string[] | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+  // Joined fields
+  project?: ConstructionProject;
+  site?: ProjectSite;
+  work_order?: WorkOrder;
+  inspector?: { full_name: string };
+}
+
+export interface QualityInspectionItem {
+  id: string;
+  inspection_id: string;
+  item_order: number | null;
+  checklist_item: string;
+  requirement: string | null;
+  result: InspectionItemResult | null;
+  measured_value: string | null;
+  expected_value: string | null;
+  notes: string | null;
+  created_at: string;
+}
+
+export interface CreateQualityInspectionData {
+  project_id: string;
+  inspection_type: QualityInspectionType;
+  title: string;
+  description?: string;
+  site_id?: string;
+  work_order_id?: string;
+  inspection_date: string;
+  inspector_id?: string;
+}
+
+export const QUALITY_INSPECTION_TYPES: { value: QualityInspectionType; label: string }[] = [
+  { value: 'structural', label: 'Structural' },
+  { value: 'electrical', label: 'Electrical' },
+  { value: 'plumbing', label: 'Plumbing' },
+  { value: 'finishing', label: 'Finishing' },
+  { value: 'safety', label: 'Safety' },
+  { value: 'general', label: 'General' },
+];
+
+export const QUALITY_INSPECTION_STATUSES: { value: QualityInspectionStatus; label: string; color: string }[] = [
+  { value: 'scheduled', label: 'Scheduled', color: 'bg-muted text-muted-foreground' },
+  { value: 'in_progress', label: 'In Progress', color: 'bg-blue-100 text-blue-800' },
+  { value: 'completed', label: 'Completed', color: 'bg-green-100 text-green-800' },
+  { value: 'failed', label: 'Failed', color: 'bg-red-100 text-red-800' },
+];
+
+export const INSPECTION_RESULTS: { value: InspectionResult; label: string; color: string }[] = [
+  { value: 'pass', label: 'Pass', color: 'bg-green-100 text-green-800' },
+  { value: 'fail', label: 'Fail', color: 'bg-red-100 text-red-800' },
+  { value: 'conditional_pass', label: 'Conditional Pass', color: 'bg-yellow-100 text-yellow-800' },
+];
+
+// =====================================================
+// SAFETY INCIDENTS
+// =====================================================
+
+export type IncidentType = 'near_miss' | 'first_aid' | 'medical' | 'lost_time' | 'fatality';
+export type IncidentSeverity = 'low' | 'medium' | 'high' | 'critical';
+export type IncidentStatus = 'reported' | 'investigating' | 'closed';
+
+export interface SafetyIncident {
+  id: string;
+  project_id: string;
+  company_id: string | null;
+  incident_number: string;
+  incident_type: IncidentType;
+  severity: IncidentSeverity;
+  title: string;
+  description: string | null;
+  site_id: string | null;
+  incident_date: string;
+  incident_time: string | null;
+  location: string | null;
+  injured_party: string | null;
+  injury_description: string | null;
+  immediate_actions: string | null;
+  root_cause: string | null;
+  corrective_actions: string | null;
+  preventive_actions: string | null;
+  reported_by: string | null;
+  investigated_by: string | null;
+  status: IncidentStatus;
+  photos_url: string[] | null;
+  created_at: string;
+  updated_at: string;
+  // Joined fields
+  project?: ConstructionProject;
+  site?: ProjectSite;
+  reporter?: { full_name: string };
+}
+
+export interface CreateSafetyIncidentData {
+  project_id: string;
+  incident_type: IncidentType;
+  severity?: IncidentSeverity;
+  title: string;
+  description?: string;
+  site_id?: string;
+  incident_date: string;
+  incident_time?: string;
+  location?: string;
+  injured_party?: string;
+  injury_description?: string;
+  immediate_actions?: string;
+}
+
+export const INCIDENT_TYPES: { value: IncidentType; label: string }[] = [
+  { value: 'near_miss', label: 'Near Miss' },
+  { value: 'first_aid', label: 'First Aid' },
+  { value: 'medical', label: 'Medical Treatment' },
+  { value: 'lost_time', label: 'Lost Time Injury' },
+  { value: 'fatality', label: 'Fatality' },
+];
+
+export const INCIDENT_SEVERITIES: { value: IncidentSeverity; label: string; color: string }[] = [
+  { value: 'low', label: 'Low', color: 'bg-gray-100 text-gray-800' },
+  { value: 'medium', label: 'Medium', color: 'bg-yellow-100 text-yellow-800' },
+  { value: 'high', label: 'High', color: 'bg-orange-100 text-orange-800' },
+  { value: 'critical', label: 'Critical', color: 'bg-red-100 text-red-800' },
+];
+
+export const INCIDENT_STATUSES: { value: IncidentStatus; label: string; color: string }[] = [
+  { value: 'reported', label: 'Reported', color: 'bg-blue-100 text-blue-800' },
+  { value: 'investigating', label: 'Investigating', color: 'bg-yellow-100 text-yellow-800' },
+  { value: 'closed', label: 'Closed', color: 'bg-green-100 text-green-800' },
+];
+
+// =====================================================
+// SAFETY INSPECTIONS
+// =====================================================
+
+export type SafetyInspectionType = 'daily' | 'weekly' | 'monthly' | 'special';
+export type SafetyInspectionStatus = 'scheduled' | 'completed';
+
+export interface SafetyInspection {
+  id: string;
+  project_id: string;
+  company_id: string | null;
+  inspection_number: string;
+  inspection_type: SafetyInspectionType;
+  site_id: string | null;
+  inspection_date: string;
+  inspector_id: string | null;
+  status: SafetyInspectionStatus;
+  overall_score: number | null;
+  findings: string | null;
+  hazards_identified: string | null;
+  corrective_actions: string | null;
+  follow_up_required: boolean;
+  follow_up_date: string | null;
+  photos_url: string[] | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+  // Joined fields
+  project?: ConstructionProject;
+  site?: ProjectSite;
+  inspector?: { full_name: string };
+}
+
+export interface CreateSafetyInspectionData {
+  project_id: string;
+  inspection_type: SafetyInspectionType;
+  site_id?: string;
+  inspection_date: string;
+  inspector_id?: string;
+}
+
+export const SAFETY_INSPECTION_TYPES: { value: SafetyInspectionType; label: string }[] = [
+  { value: 'daily', label: 'Daily' },
+  { value: 'weekly', label: 'Weekly' },
+  { value: 'monthly', label: 'Monthly' },
+  { value: 'special', label: 'Special' },
+];
+
+export const SAFETY_INSPECTION_STATUSES: { value: SafetyInspectionStatus; label: string; color: string }[] = [
+  { value: 'scheduled', label: 'Scheduled', color: 'bg-muted text-muted-foreground' },
+  { value: 'completed', label: 'Completed', color: 'bg-green-100 text-green-800' },
+];
+
+// =====================================================
+// CONSTRUCTION DOCUMENTS
+// =====================================================
+
+export type DocumentType = 'drawing' | 'specification' | 'permit' | 'contract' | 'report' | 'photo' | 'other';
+export type DocumentStatus = 'draft' | 'pending_approval' | 'approved' | 'superseded';
+
+export interface ConstructionDocument {
+  id: string;
+  project_id: string;
+  company_id: string | null;
+  document_number: string;
+  document_type: DocumentType;
+  title: string;
+  description: string | null;
+  file_url: string;
+  file_name: string | null;
+  file_size: number | null;
+  file_type: string | null;
+  version: string;
+  is_latest: boolean;
+  revision_notes: string | null;
+  tags: string[] | null;
+  uploaded_by: string | null;
+  approved_by: string | null;
+  approval_date: string | null;
+  status: DocumentStatus;
+  created_at: string;
+  updated_at: string;
+  // Joined fields
+  project?: ConstructionProject;
+  uploader?: { full_name: string };
+}
+
+export interface CreateDocumentData {
+  project_id: string;
+  document_type: DocumentType;
+  title: string;
+  description?: string;
+  file_url: string;
+  file_name?: string;
+  file_size?: number;
+  file_type?: string;
+  tags?: string[];
+}
+
+export const DOCUMENT_TYPES: { value: DocumentType; label: string }[] = [
+  { value: 'drawing', label: 'Drawing' },
+  { value: 'specification', label: 'Specification' },
+  { value: 'permit', label: 'Permit' },
+  { value: 'contract', label: 'Contract' },
+  { value: 'report', label: 'Report' },
+  { value: 'photo', label: 'Photo' },
+  { value: 'other', label: 'Other' },
+];
+
+export const DOCUMENT_STATUSES: { value: DocumentStatus; label: string; color: string }[] = [
+  { value: 'draft', label: 'Draft', color: 'bg-muted text-muted-foreground' },
+  { value: 'pending_approval', label: 'Pending Approval', color: 'bg-yellow-100 text-yellow-800' },
+  { value: 'approved', label: 'Approved', color: 'bg-green-100 text-green-800' },
+  { value: 'superseded', label: 'Superseded', color: 'bg-gray-100 text-gray-800' },
+];
+
+// =====================================================
+// PROJECT BUDGET
+// =====================================================
+
+export type BudgetCategory = 'labor' | 'materials' | 'equipment' | 'subcontractor' | 'overhead' | 'contingency';
+export type BudgetTransactionType = 'commitment' | 'actual' | 'adjustment';
+
+export interface ProjectBudgetItem {
+  id: string;
+  project_id: string;
+  company_id: string | null;
+  budget_code: string;
+  category: BudgetCategory;
+  description: string;
+  planned_amount: number;
+  committed_amount: number;
+  actual_amount: number;
+  unit: string | null;
+  quantity: number | null;
+  unit_cost: number | null;
+  notes: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+  // Computed
+  variance?: number;
+  // Joined fields
+  project?: ConstructionProject;
+}
+
+export interface BudgetTransaction {
+  id: string;
+  budget_item_id: string;
+  transaction_type: BudgetTransactionType;
+  amount: number;
+  transaction_date: string;
+  reference_number: string | null;
+  vendor: string | null;
+  description: string | null;
+  created_by: string | null;
+  created_at: string;
+}
+
+export interface CreateBudgetItemData {
+  project_id: string;
+  budget_code: string;
+  category: BudgetCategory;
+  description: string;
+  planned_amount: number;
+  unit?: string;
+  quantity?: number;
+  unit_cost?: number;
+  notes?: string;
+}
+
+export interface CreateBudgetTransactionData {
+  budget_item_id: string;
+  transaction_type: BudgetTransactionType;
+  amount: number;
+  transaction_date: string;
+  reference_number?: string;
+  vendor?: string;
+  description?: string;
+}
+
+export const BUDGET_CATEGORIES: { value: BudgetCategory; label: string }[] = [
+  { value: 'labor', label: 'Labor' },
+  { value: 'materials', label: 'Materials' },
+  { value: 'equipment', label: 'Equipment' },
+  { value: 'subcontractor', label: 'Subcontractor' },
+  { value: 'overhead', label: 'Overhead' },
+  { value: 'contingency', label: 'Contingency' },
+];
+
+export const BUDGET_TRANSACTION_TYPES: { value: BudgetTransactionType; label: string; color: string }[] = [
+  { value: 'commitment', label: 'Commitment', color: 'bg-blue-100 text-blue-800' },
+  { value: 'actual', label: 'Actual', color: 'bg-green-100 text-green-800' },
+  { value: 'adjustment', label: 'Adjustment', color: 'bg-yellow-100 text-yellow-800' },
+];

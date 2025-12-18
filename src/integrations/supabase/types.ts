@@ -1976,6 +1976,53 @@ export type Database = {
           },
         ]
       }
+      budget_transactions: {
+        Row: {
+          amount: number
+          budget_item_id: string
+          created_at: string | null
+          created_by: string | null
+          description: string | null
+          id: string
+          reference_number: string | null
+          transaction_date: string
+          transaction_type: string
+          vendor: string | null
+        }
+        Insert: {
+          amount: number
+          budget_item_id: string
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          reference_number?: string | null
+          transaction_date: string
+          transaction_type: string
+          vendor?: string | null
+        }
+        Update: {
+          amount?: number
+          budget_item_id?: string
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          reference_number?: string | null
+          transaction_date?: string
+          transaction_type?: string
+          vendor?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "budget_transactions_budget_item_id_fkey"
+            columns: ["budget_item_id"]
+            isOneToOne: false
+            referencedRelation: "project_budget_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       chart_of_accounts: {
         Row: {
           account_category: Database["public"]["Enums"]["account_category"]
@@ -2252,6 +2299,93 @@ export type Database = {
           },
         ]
       }
+      construction_documents: {
+        Row: {
+          approval_date: string | null
+          approved_by: string | null
+          company_id: string | null
+          created_at: string | null
+          description: string | null
+          document_number: string
+          document_type: string
+          file_name: string | null
+          file_size: number | null
+          file_type: string | null
+          file_url: string
+          id: string
+          is_latest: boolean | null
+          project_id: string
+          revision_notes: string | null
+          status: string | null
+          tags: string[] | null
+          title: string
+          updated_at: string | null
+          uploaded_by: string | null
+          version: string | null
+        }
+        Insert: {
+          approval_date?: string | null
+          approved_by?: string | null
+          company_id?: string | null
+          created_at?: string | null
+          description?: string | null
+          document_number: string
+          document_type: string
+          file_name?: string | null
+          file_size?: number | null
+          file_type?: string | null
+          file_url: string
+          id?: string
+          is_latest?: boolean | null
+          project_id: string
+          revision_notes?: string | null
+          status?: string | null
+          tags?: string[] | null
+          title: string
+          updated_at?: string | null
+          uploaded_by?: string | null
+          version?: string | null
+        }
+        Update: {
+          approval_date?: string | null
+          approved_by?: string | null
+          company_id?: string | null
+          created_at?: string | null
+          description?: string | null
+          document_number?: string
+          document_type?: string
+          file_name?: string | null
+          file_size?: number | null
+          file_type?: string | null
+          file_url?: string
+          id?: string
+          is_latest?: boolean | null
+          project_id?: string
+          revision_notes?: string | null
+          status?: string | null
+          tags?: string[] | null
+          title?: string
+          updated_at?: string | null
+          uploaded_by?: string | null
+          version?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "construction_documents_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "construction_documents_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "construction_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       construction_projects: {
         Row: {
           actual_cost: number | null
@@ -2349,6 +2483,194 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      construction_resources: {
+        Row: {
+          assigned_site_id: string | null
+          company_id: string | null
+          created_at: string | null
+          created_by: string | null
+          description: string | null
+          end_date: string | null
+          id: string
+          notes: string | null
+          project_id: string
+          quantity_allocated: number | null
+          quantity_used: number | null
+          resource_name: string
+          resource_type: string
+          start_date: string | null
+          status: string | null
+          total_cost: number | null
+          unit: string | null
+          unit_cost: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          assigned_site_id?: string | null
+          company_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          end_date?: string | null
+          id?: string
+          notes?: string | null
+          project_id: string
+          quantity_allocated?: number | null
+          quantity_used?: number | null
+          resource_name: string
+          resource_type: string
+          start_date?: string | null
+          status?: string | null
+          total_cost?: number | null
+          unit?: string | null
+          unit_cost?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          assigned_site_id?: string | null
+          company_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          end_date?: string | null
+          id?: string
+          notes?: string | null
+          project_id?: string
+          quantity_allocated?: number | null
+          quantity_used?: number | null
+          resource_name?: string
+          resource_type?: string
+          start_date?: string | null
+          status?: string | null
+          total_cost?: number | null
+          unit?: string | null
+          unit_cost?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "construction_resources_assigned_site_id_fkey"
+            columns: ["assigned_site_id"]
+            isOneToOne: false
+            referencedRelation: "project_sites"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "construction_resources_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "construction_resources_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "construction_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      construction_work_orders: {
+        Row: {
+          actual_cost: number | null
+          actual_end_date: string | null
+          actual_hours: number | null
+          actual_start_date: string | null
+          assigned_to: string | null
+          company_id: string | null
+          created_at: string | null
+          created_by: string | null
+          description: string | null
+          estimated_cost: number | null
+          estimated_hours: number | null
+          id: string
+          notes: string | null
+          planned_end_date: string | null
+          planned_start_date: string | null
+          priority: string | null
+          project_id: string
+          site_id: string | null
+          status: string | null
+          title: string
+          updated_at: string | null
+          work_order_number: string
+          work_type: string | null
+        }
+        Insert: {
+          actual_cost?: number | null
+          actual_end_date?: string | null
+          actual_hours?: number | null
+          actual_start_date?: string | null
+          assigned_to?: string | null
+          company_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          estimated_cost?: number | null
+          estimated_hours?: number | null
+          id?: string
+          notes?: string | null
+          planned_end_date?: string | null
+          planned_start_date?: string | null
+          priority?: string | null
+          project_id: string
+          site_id?: string | null
+          status?: string | null
+          title: string
+          updated_at?: string | null
+          work_order_number: string
+          work_type?: string | null
+        }
+        Update: {
+          actual_cost?: number | null
+          actual_end_date?: string | null
+          actual_hours?: number | null
+          actual_start_date?: string | null
+          assigned_to?: string | null
+          company_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          estimated_cost?: number | null
+          estimated_hours?: number | null
+          id?: string
+          notes?: string | null
+          planned_end_date?: string | null
+          planned_start_date?: string | null
+          priority?: string | null
+          project_id?: string
+          site_id?: string | null
+          status?: string | null
+          title?: string
+          updated_at?: string | null
+          work_order_number?: string
+          work_type?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "construction_work_orders_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "construction_work_orders_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "construction_projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "construction_work_orders_site_id_fkey"
+            columns: ["site_id"]
+            isOneToOne: false
+            referencedRelation: "project_sites"
             referencedColumns: ["id"]
           },
         ]
@@ -3553,6 +3875,106 @@ export type Database = {
             columns: ["schedule_id"]
             isOneToOne: false
             referencedRelation: "cycle_count_schedules"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      daily_site_reports: {
+        Row: {
+          approved_by: string | null
+          company_id: string | null
+          created_at: string | null
+          delays_issues: string | null
+          equipment_on_site: string | null
+          id: string
+          labor_count: number | null
+          materials_received: string | null
+          photos_url: string[] | null
+          project_id: string
+          report_date: string
+          report_number: string
+          safety_observations: string | null
+          site_id: string | null
+          status: string | null
+          subcontractor_count: number | null
+          submitted_by: string | null
+          temperature_high: number | null
+          temperature_low: number | null
+          updated_at: string | null
+          visitor_count: number | null
+          weather_conditions: string | null
+          work_summary: string | null
+        }
+        Insert: {
+          approved_by?: string | null
+          company_id?: string | null
+          created_at?: string | null
+          delays_issues?: string | null
+          equipment_on_site?: string | null
+          id?: string
+          labor_count?: number | null
+          materials_received?: string | null
+          photos_url?: string[] | null
+          project_id: string
+          report_date: string
+          report_number: string
+          safety_observations?: string | null
+          site_id?: string | null
+          status?: string | null
+          subcontractor_count?: number | null
+          submitted_by?: string | null
+          temperature_high?: number | null
+          temperature_low?: number | null
+          updated_at?: string | null
+          visitor_count?: number | null
+          weather_conditions?: string | null
+          work_summary?: string | null
+        }
+        Update: {
+          approved_by?: string | null
+          company_id?: string | null
+          created_at?: string | null
+          delays_issues?: string | null
+          equipment_on_site?: string | null
+          id?: string
+          labor_count?: number | null
+          materials_received?: string | null
+          photos_url?: string[] | null
+          project_id?: string
+          report_date?: string
+          report_number?: string
+          safety_observations?: string | null
+          site_id?: string | null
+          status?: string | null
+          subcontractor_count?: number | null
+          submitted_by?: string | null
+          temperature_high?: number | null
+          temperature_low?: number | null
+          updated_at?: string | null
+          visitor_count?: number | null
+          weather_conditions?: string | null
+          work_summary?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "daily_site_reports_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "daily_site_reports_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "construction_projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "daily_site_reports_site_id_fkey"
+            columns: ["site_id"]
+            isOneToOne: false
+            referencedRelation: "project_sites"
             referencedColumns: ["id"]
           },
         ]
@@ -7325,6 +7747,78 @@ export type Database = {
           },
         ]
       }
+      project_budget_items: {
+        Row: {
+          actual_amount: number | null
+          budget_code: string
+          category: string
+          committed_amount: number | null
+          company_id: string | null
+          created_at: string | null
+          created_by: string | null
+          description: string
+          id: string
+          notes: string | null
+          planned_amount: number
+          project_id: string
+          quantity: number | null
+          unit: string | null
+          unit_cost: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          actual_amount?: number | null
+          budget_code: string
+          category: string
+          committed_amount?: number | null
+          company_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          description: string
+          id?: string
+          notes?: string | null
+          planned_amount: number
+          project_id: string
+          quantity?: number | null
+          unit?: string | null
+          unit_cost?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          actual_amount?: number | null
+          budget_code?: string
+          category?: string
+          committed_amount?: number | null
+          company_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          description?: string
+          id?: string
+          notes?: string | null
+          planned_amount?: number
+          project_id?: string
+          quantity?: number | null
+          unit?: string | null
+          unit_cost?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_budget_items_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_budget_items_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "construction_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       project_floor_drawings: {
         Row: {
           company_id: string | null
@@ -7928,6 +8422,151 @@ export type Database = {
             columns: ["grn_id"]
             isOneToOne: false
             referencedRelation: "goods_receipt_notes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      quality_inspection_items: {
+        Row: {
+          checklist_item: string
+          created_at: string | null
+          expected_value: string | null
+          id: string
+          inspection_id: string
+          item_order: number | null
+          measured_value: string | null
+          notes: string | null
+          requirement: string | null
+          result: string | null
+        }
+        Insert: {
+          checklist_item: string
+          created_at?: string | null
+          expected_value?: string | null
+          id?: string
+          inspection_id: string
+          item_order?: number | null
+          measured_value?: string | null
+          notes?: string | null
+          requirement?: string | null
+          result?: string | null
+        }
+        Update: {
+          checklist_item?: string
+          created_at?: string | null
+          expected_value?: string | null
+          id?: string
+          inspection_id?: string
+          item_order?: number | null
+          measured_value?: string | null
+          notes?: string | null
+          requirement?: string | null
+          result?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quality_inspection_items_inspection_id_fkey"
+            columns: ["inspection_id"]
+            isOneToOne: false
+            referencedRelation: "quality_inspections"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      quality_inspections: {
+        Row: {
+          company_id: string | null
+          corrective_actions: string | null
+          created_at: string | null
+          created_by: string | null
+          description: string | null
+          findings: string | null
+          follow_up_date: string | null
+          id: string
+          inspection_date: string
+          inspection_number: string
+          inspection_type: string
+          inspector_id: string | null
+          overall_result: string | null
+          photos_url: string[] | null
+          project_id: string
+          site_id: string | null
+          status: string | null
+          title: string
+          updated_at: string | null
+          work_order_id: string | null
+        }
+        Insert: {
+          company_id?: string | null
+          corrective_actions?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          findings?: string | null
+          follow_up_date?: string | null
+          id?: string
+          inspection_date: string
+          inspection_number: string
+          inspection_type: string
+          inspector_id?: string | null
+          overall_result?: string | null
+          photos_url?: string[] | null
+          project_id: string
+          site_id?: string | null
+          status?: string | null
+          title: string
+          updated_at?: string | null
+          work_order_id?: string | null
+        }
+        Update: {
+          company_id?: string | null
+          corrective_actions?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          findings?: string | null
+          follow_up_date?: string | null
+          id?: string
+          inspection_date?: string
+          inspection_number?: string
+          inspection_type?: string
+          inspector_id?: string | null
+          overall_result?: string | null
+          photos_url?: string[] | null
+          project_id?: string
+          site_id?: string | null
+          status?: string | null
+          title?: string
+          updated_at?: string | null
+          work_order_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quality_inspections_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quality_inspections_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "construction_projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quality_inspections_site_id_fkey"
+            columns: ["site_id"]
+            isOneToOne: false
+            referencedRelation: "project_sites"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quality_inspections_work_order_id_fkey"
+            columns: ["work_order_id"]
+            isOneToOne: false
+            referencedRelation: "construction_work_orders"
             referencedColumns: ["id"]
           },
         ]
@@ -8561,6 +9200,197 @@ export type Database = {
         }
         Relationships: []
       }
+      safety_incidents: {
+        Row: {
+          company_id: string | null
+          corrective_actions: string | null
+          created_at: string | null
+          description: string | null
+          id: string
+          immediate_actions: string | null
+          incident_date: string
+          incident_number: string
+          incident_time: string | null
+          incident_type: string
+          injured_party: string | null
+          injury_description: string | null
+          investigated_by: string | null
+          location: string | null
+          photos_url: string[] | null
+          preventive_actions: string | null
+          project_id: string
+          reported_by: string | null
+          root_cause: string | null
+          severity: string | null
+          site_id: string | null
+          status: string | null
+          title: string
+          updated_at: string | null
+        }
+        Insert: {
+          company_id?: string | null
+          corrective_actions?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          immediate_actions?: string | null
+          incident_date: string
+          incident_number: string
+          incident_time?: string | null
+          incident_type: string
+          injured_party?: string | null
+          injury_description?: string | null
+          investigated_by?: string | null
+          location?: string | null
+          photos_url?: string[] | null
+          preventive_actions?: string | null
+          project_id: string
+          reported_by?: string | null
+          root_cause?: string | null
+          severity?: string | null
+          site_id?: string | null
+          status?: string | null
+          title: string
+          updated_at?: string | null
+        }
+        Update: {
+          company_id?: string | null
+          corrective_actions?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          immediate_actions?: string | null
+          incident_date?: string
+          incident_number?: string
+          incident_time?: string | null
+          incident_type?: string
+          injured_party?: string | null
+          injury_description?: string | null
+          investigated_by?: string | null
+          location?: string | null
+          photos_url?: string[] | null
+          preventive_actions?: string | null
+          project_id?: string
+          reported_by?: string | null
+          root_cause?: string | null
+          severity?: string | null
+          site_id?: string | null
+          status?: string | null
+          title?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "safety_incidents_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "safety_incidents_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "construction_projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "safety_incidents_site_id_fkey"
+            columns: ["site_id"]
+            isOneToOne: false
+            referencedRelation: "project_sites"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      safety_inspections: {
+        Row: {
+          company_id: string | null
+          corrective_actions: string | null
+          created_at: string | null
+          created_by: string | null
+          findings: string | null
+          follow_up_date: string | null
+          follow_up_required: boolean | null
+          hazards_identified: string | null
+          id: string
+          inspection_date: string
+          inspection_number: string
+          inspection_type: string
+          inspector_id: string | null
+          overall_score: number | null
+          photos_url: string[] | null
+          project_id: string
+          site_id: string | null
+          status: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          company_id?: string | null
+          corrective_actions?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          findings?: string | null
+          follow_up_date?: string | null
+          follow_up_required?: boolean | null
+          hazards_identified?: string | null
+          id?: string
+          inspection_date: string
+          inspection_number: string
+          inspection_type: string
+          inspector_id?: string | null
+          overall_score?: number | null
+          photos_url?: string[] | null
+          project_id: string
+          site_id?: string | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          company_id?: string | null
+          corrective_actions?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          findings?: string | null
+          follow_up_date?: string | null
+          follow_up_required?: boolean | null
+          hazards_identified?: string | null
+          id?: string
+          inspection_date?: string
+          inspection_number?: string
+          inspection_type?: string
+          inspector_id?: string | null
+          overall_score?: number | null
+          photos_url?: string[] | null
+          project_id?: string
+          site_id?: string | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "safety_inspections_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "safety_inspections_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "construction_projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "safety_inspections_site_id_fkey"
+            columns: ["site_id"]
+            isOneToOne: false
+            referencedRelation: "project_sites"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       sales_order_items: {
         Row: {
           company_id: string | null
@@ -8724,6 +9554,50 @@ export type Database = {
             columns: ["customer_id"]
             isOneToOne: false
             referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      site_report_activities: {
+        Row: {
+          activity_type: string
+          completion_percentage: number | null
+          created_at: string | null
+          description: string | null
+          id: string
+          labor_hours: number | null
+          location: string | null
+          notes: string | null
+          report_id: string
+        }
+        Insert: {
+          activity_type: string
+          completion_percentage?: number | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          labor_hours?: number | null
+          location?: string | null
+          notes?: string | null
+          report_id: string
+        }
+        Update: {
+          activity_type?: string
+          completion_percentage?: number | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          labor_hours?: number | null
+          location?: string | null
+          notes?: string | null
+          report_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "site_report_activities_report_id_fkey"
+            columns: ["report_id"]
+            isOneToOne: false
+            referencedRelation: "daily_site_reports"
             referencedColumns: ["id"]
           },
         ]
@@ -11457,10 +12331,12 @@ export type Database = {
       generate_asset_request_number: { Args: never; Returns: string }
       generate_bom_number: { Args: never; Returns: string }
       generate_bpo_number: { Args: never; Returns: string }
+      generate_construction_document_number: { Args: never; Returns: string }
       generate_contract_number: { Args: never; Returns: string }
       generate_cpo_number: { Args: never; Returns: string }
       generate_customer_code: { Args: never; Returns: string }
       generate_cycle_count_number: { Args: never; Returns: string }
+      generate_daily_report_number: { Args: never; Returns: string }
       generate_do_number: { Args: never; Returns: string }
       generate_evaluation_number: { Args: never; Returns: string }
       generate_grn_number: { Args: never; Returns: string }
@@ -11479,13 +12355,17 @@ export type Database = {
       generate_pr_number: { Args: never; Returns: string }
       generate_project_code: { Args: never; Returns: string }
       generate_putaway_number: { Args: never; Returns: string }
+      generate_quality_inspection_number: { Args: never; Returns: string }
       generate_quote_number: { Args: never; Returns: string }
       generate_release_number: { Args: never; Returns: string }
       generate_rfp_number: { Args: never; Returns: string }
       generate_rfq_number: { Args: never; Returns: string }
+      generate_safety_incident_number: { Args: never; Returns: string }
+      generate_safety_inspection_number: { Args: never; Returns: string }
       generate_sales_order_number: { Args: never; Returns: string }
       generate_supplier_code: { Args: never; Returns: string }
       generate_transfer_number: { Args: never; Returns: string }
+      generate_work_order_number: { Args: never; Returns: string }
       get_approval_console: {
         Args: { user_id?: string }
         Returns: {
