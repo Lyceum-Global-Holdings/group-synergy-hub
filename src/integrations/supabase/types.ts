@@ -7111,6 +7111,66 @@ export type Database = {
           },
         ]
       }
+      project_floor_drawings: {
+        Row: {
+          company_id: string | null
+          created_at: string | null
+          created_by: string | null
+          description: string | null
+          drawing_name: string
+          floor_number: number | null
+          id: string
+          image_url: string
+          project_id: string
+          scale_factor: number | null
+          updated_at: string | null
+          wall_height: number | null
+        }
+        Insert: {
+          company_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          drawing_name: string
+          floor_number?: number | null
+          id?: string
+          image_url: string
+          project_id: string
+          scale_factor?: number | null
+          updated_at?: string | null
+          wall_height?: number | null
+        }
+        Update: {
+          company_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          drawing_name?: string
+          floor_number?: number | null
+          id?: string
+          image_url?: string
+          project_id?: string
+          scale_factor?: number | null
+          updated_at?: string | null
+          wall_height?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_floor_drawings_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_floor_drawings_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "construction_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       project_phases: {
         Row: {
           actual_cost: number | null

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Plus, Search, Eye, Pencil, Trash2 } from "lucide-react";
+import { Plus, Search, Eye, Pencil, Trash2, Layers } from "lucide-react";
 import { useProjects } from "@/hooks/construction/useProjects";
 import { useDeleteProject } from "@/hooks/construction/useProjectMutations";
 import { ConstructionProject, PROJECT_STATUSES } from "@/types/construction";
@@ -28,6 +28,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { CreateProjectDialog } from "@/components/construction/CreateProjectDialog";
 import { ProjectDetailsDialog } from "@/components/construction/ProjectDetailsDialog";
+import { FloorDrawingsDialog } from "@/components/construction/FloorDrawingsDialog";
 
 export default function ProjectMaster() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -35,6 +36,7 @@ export default function ProjectMaster() {
   const [editingProject, setEditingProject] = useState<ConstructionProject | null>(null);
   const [viewingProject, setViewingProject] = useState<ConstructionProject | null>(null);
   const [deletingProject, setDeletingProject] = useState<ConstructionProject | null>(null);
+  const [floorDrawingsProject, setFloorDrawingsProject] = useState<ConstructionProject | null>(null);
 
   const { data: projects = [], isLoading } = useProjects();
   const deleteProject = useDeleteProject();
@@ -164,8 +166,17 @@ export default function ProjectMaster() {
                           variant="ghost"
                           size="icon"
                           onClick={() => setViewingProject(project)}
+                          title="View Details"
                         >
                           <Eye className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => setFloorDrawingsProject(project)}
+                          title="Floor Drawings"
+                        >
+                          <Layers className="h-4 w-4" />
                         </Button>
                         <Button
                           variant="ghost"
@@ -174,6 +185,7 @@ export default function ProjectMaster() {
                             setEditingProject(project);
                             setCreateDialogOpen(true);
                           }}
+                          title="Edit"
                         >
                           <Pencil className="h-4 w-4" />
                         </Button>
@@ -181,6 +193,7 @@ export default function ProjectMaster() {
                           variant="ghost"
                           size="icon"
                           onClick={() => setDeletingProject(project)}
+                          title="Delete"
                         >
                           <Trash2 className="h-4 w-4 text-destructive" />
                         </Button>
@@ -207,6 +220,12 @@ export default function ProjectMaster() {
         project={viewingProject}
         open={!!viewingProject}
         onOpenChange={(open) => !open && setViewingProject(null)}
+      />
+
+      <FloorDrawingsDialog
+        project={floorDrawingsProject}
+        open={!!floorDrawingsProject}
+        onOpenChange={(open) => !open && setFloorDrawingsProject(null)}
       />
 
       <AlertDialog
