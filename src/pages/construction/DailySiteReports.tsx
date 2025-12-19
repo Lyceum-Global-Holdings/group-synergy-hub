@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus, Search, FileText, Calendar, Cloud, Users, Pencil, Trash2 } from "lucide-react";
+import { Plus, Search, FileText, Calendar, Cloud, Users, Pencil, Trash2, Package } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -20,9 +20,35 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useDailySiteReports, useCreateDailySiteReport, useUpdateDailySiteReport, useDeleteDailySiteReport } from "@/hooks/construction/useDailySiteReports";
+import { useProjectMaterialSummary } from "@/hooks/construction/useRoomMaterialSummary";
 import { DAILY_REPORT_STATUSES, DailySiteReport } from "@/types/construction";
 import { format } from "date-fns";
 import { DailySiteReportDialog, DeleteConfirmDialog } from "@/components/construction/dialogs";
+import { RoomMaterialSummaryDialog } from "@/components/construction/RoomMaterialSummaryDialog";
+
+// Component to display material counts for a single report
+function MaterialCountCell({ projectId, reportDate }: { projectId: string; reportDate: string }) {
+  const { data: summary } = useProjectMaterialSummary(projectId, reportDate);
+  
+  if (!summary || (summary.totalIssued === 0 && summary.totalReturned === 0)) {
+    return <span className="text-muted-foreground">-</span>;
+  }
+
+  return (
+    <div className="flex items-center gap-2 text-sm">
+      {summary.totalIssued > 0 && (
+        <span className="text-green-600 dark:text-green-400">
+          ↓{summary.totalIssued}
+        </span>
+      )}
+      {summary.totalReturned > 0 && (
+        <span className="text-orange-600 dark:text-orange-400">
+          ↑{summary.totalReturned}
+        </span>
+      )}
+    </div>
+  );
+}
 
 export default function DailySiteReports() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -30,6 +56,11 @@ export default function DailySiteReports() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<DailySiteReport | null>(null);
   const [deletingItem, setDeletingItem] = useState<DailySiteReport | null>(null);
+  const [materialSummaryReport, setMaterialSummaryReport] = useState<{
+    projectId: string;
+    projectName: string;
+    reportDate: string;
+  } | null>(null);
 
   const { data: reports, isLoading } = useDailySiteReports();
   const createMutation = useCreateDailySiteReport();
@@ -67,6 +98,16 @@ export default function DailySiteReports() {
     if (deletingItem) {
       await deleteMutation.mutateAsync(deletingItem.id);
       setDeletingItem(null);
+    }
+  };
+
+  const handleViewMaterials = (report: any) => {
+    if (report.project?.id) {
+      setMaterialSummaryReport({
+        projectId: report.project.id,
+        projectName: report.project.project_name || 'Unknown Project',
+        reportDate: report.report_date,
+      });
     }
   };
 
@@ -170,7 +211,8 @@ export default function DailySiteReports() {
                   <TableHead>Project</TableHead>
                   <TableHead>Date</TableHead>
                   <TableHead>Weather</TableHead>
-                  <TableHead>Labor Count</TableHead>
+                  <TableHead>Labor</TableHead>
+                  <TableHead>Materials</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
@@ -178,7 +220,7 @@ export default function DailySiteReports() {
               <TableBody>
                 {filteredReports?.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                       No reports found
                     </TableCell>
                   </TableRow>
@@ -192,9 +234,36 @@ export default function DailySiteReports() {
                       </TableCell>
                       <TableCell>{report.weather_conditions || "-"}</TableCell>
                       <TableCell>{report.labor_count || 0}</TableCell>
+                      <TableCell>
+                        {report.project?.id ? (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-auto py-1 px-2"
+                            onClick={() => handleViewMaterials(report)}
+                          >
+                            <MaterialCountCell 
+                              projectId={report.project.id} 
+                              reportDate={report.report_date} 
+                            />
+                          </Button>
+                        ) : (
+                          <span className="text-muted-foreground">-</span>
+                        )}
+                      </TableCell>
                       <TableCell>{getStatusBadge(report.status)}</TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">
+                          {report.project?.id && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleViewMaterials(report)}
+                              title="View Materials"
+                            >
+                              <Package className="h-4 w-4 text-primary" />
+                            </Button>
+                          )}
                           <Button
                             variant="ghost"
                             size="icon"
@@ -233,6 +302,14 @@ export default function DailySiteReports() {
         title="Delete Report"
         description={`Are you sure you want to delete report "${deletingItem?.report_number}"? This action cannot be undone.`}
         isDeleting={deleteMutation.isPending}
+      />
+
+      <RoomMaterialSummaryDialog
+        open={!!materialSummaryReport}
+        onOpenChange={(open) => !open && setMaterialSummaryReport(null)}
+        projectId={materialSummaryReport?.projectId || null}
+        projectName={materialSummaryReport?.projectName || ''}
+        reportDate={materialSummaryReport?.reportDate || null}
       />
     </div>
   );
