@@ -5158,6 +5158,99 @@ export type Database = {
           },
         ]
       }
+      floor_room_material_transactions: {
+        Row: {
+          company_id: string | null
+          created_at: string
+          id: string
+          new_quantity: number
+          new_warehouse_stock: number | null
+          notes: string | null
+          performed_by: string | null
+          previous_quantity: number
+          previous_warehouse_stock: number | null
+          quantity: number
+          room_id: string
+          room_material_id: string
+          total_value: number | null
+          transaction_type: string
+          unit_cost: number | null
+          warehouse_item_id: string
+        }
+        Insert: {
+          company_id?: string | null
+          created_at?: string
+          id?: string
+          new_quantity: number
+          new_warehouse_stock?: number | null
+          notes?: string | null
+          performed_by?: string | null
+          previous_quantity?: number
+          previous_warehouse_stock?: number | null
+          quantity: number
+          room_id: string
+          room_material_id: string
+          total_value?: number | null
+          transaction_type: string
+          unit_cost?: number | null
+          warehouse_item_id: string
+        }
+        Update: {
+          company_id?: string | null
+          created_at?: string
+          id?: string
+          new_quantity?: number
+          new_warehouse_stock?: number | null
+          notes?: string | null
+          performed_by?: string | null
+          previous_quantity?: number
+          previous_warehouse_stock?: number | null
+          quantity?: number
+          room_id?: string
+          room_material_id?: string
+          total_value?: number | null
+          transaction_type?: string
+          unit_cost?: number | null
+          warehouse_item_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "floor_room_material_transactions_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "floor_room_material_transactions_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "floor_drawing_rooms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "floor_room_material_transactions_room_material_id_fkey"
+            columns: ["room_material_id"]
+            isOneToOne: false
+            referencedRelation: "floor_room_materials"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "floor_room_material_transactions_warehouse_item_id_fkey"
+            columns: ["warehouse_item_id"]
+            isOneToOne: false
+            referencedRelation: "v_adjustment_summary_by_item"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "floor_room_material_transactions_warehouse_item_id_fkey"
+            columns: ["warehouse_item_id"]
+            isOneToOne: false
+            referencedRelation: "warehouse_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       floor_room_materials: {
         Row: {
           company_id: string | null

@@ -2,17 +2,24 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
-export type MaterialTransactionType = 'allocation' | 'usage' | 'return' | 'adjustment';
+export type MaterialTransactionType = 'issue' | 'return' | 'adjustment';
 
 export interface MaterialTransaction {
   id: string;
   room_material_id: string;
+  warehouse_item_id: string;
+  room_id: string;
   transaction_type: MaterialTransactionType;
   quantity: number;
   previous_quantity: number;
   new_quantity: number;
+  previous_warehouse_stock: number | null;
+  new_warehouse_stock: number | null;
+  unit_cost: number | null;
+  total_value: number | null;
   notes: string | null;
   performed_by: string | null;
+  company_id: string | null;
   created_at: string;
 }
 
@@ -23,7 +30,7 @@ export const useRoomMaterialTransactions = (roomMaterialId: string | null) => {
       if (!roomMaterialId) return [];
       
       const { data, error } = await supabase
-        .from('floor_room_material_transactions' as any)
+        .from('floor_room_material_transactions')
         .select('*')
         .eq('room_material_id', roomMaterialId)
         .order('created_at', { ascending: false });
@@ -35,112 +42,262 @@ export const useRoomMaterialTransactions = (roomMaterialId: string | null) => {
   });
 };
 
-interface CreateTransactionData {
+interface IssueMaterialData {
   room_material_id: string;
   room_id: string;
-  transaction_type: MaterialTransactionType;
+  warehouse_item_id: string;
   quantity: number;
+  unit_cost?: number;
+  company_id?: string;
   notes?: string;
 }
 
-export const useCreateMaterialTransaction = () => {
+export const useIssueMaterial = () => {
   const queryClient = useQueryClient();
   
   return useMutation({
-    mutationFn: async (data: CreateTransactionData) => {
-      // First, get the current material to determine previous quantities
-      const { data: material, error: fetchError } = await supabase
+    mutationFn: async (data: IssueMaterialData) => {
+      // Get current warehouse stock
+      const { data: warehouseItem, error: warehouseError } = await supabase
+        .from('warehouse_items')
+        .select('current_stock, unit_cost')
+        .eq('id', data.warehouse_item_id)
+        .single();
+      
+      if (warehouseError) throw warehouseError;
+      
+      const currentWarehouseStock = warehouseItem.current_stock || 0;
+      
+      // Validate stock availability
+      if (data.quantity > currentWarehouseStock) {
+        throw new Error(`Insufficient stock. Available: ${currentWarehouseStock}`);
+      }
+      
+      // Get current room material quantities
+      const { data: material, error: materialError } = await supabase
         .from('floor_room_materials')
         .select('quantity_allocated, quantity_used')
         .eq('id', data.room_material_id)
         .single();
       
-      if (fetchError) throw fetchError;
+      if (materialError) throw materialError;
       
-      const currentAllocated = material.quantity_allocated || 0;
-      const currentUsed = material.quantity_used || 0;
-      
-      let previousQuantity: number;
-      let newQuantity: number;
-      let updateData: { quantity_allocated?: number; quantity_used?: number; status?: string } = {};
-      
-      switch (data.transaction_type) {
-        case 'allocation':
-          previousQuantity = currentAllocated;
-          newQuantity = currentAllocated + data.quantity;
-          updateData = { 
-            quantity_allocated: newQuantity,
-            status: newQuantity > 0 ? 'allocated' : 'planned'
-          };
-          break;
-        case 'usage':
-          previousQuantity = currentUsed;
-          newQuantity = currentUsed + data.quantity;
-          updateData = { 
-            quantity_used: newQuantity,
-            status: newQuantity >= currentAllocated ? 'fully_used' : 'partially_used'
-          };
-          break;
-        case 'return':
-          previousQuantity = currentUsed;
-          newQuantity = Math.max(0, currentUsed - data.quantity);
-          updateData = { 
-            quantity_used: newQuantity,
-            status: newQuantity === 0 ? 'allocated' : 'partially_used'
-          };
-          break;
-        case 'adjustment':
-          previousQuantity = currentAllocated;
-          newQuantity = data.quantity; // For adjustment, quantity is the new absolute value
-          updateData = { 
-            quantity_allocated: newQuantity,
-            status: newQuantity > 0 ? 'allocated' : 'planned'
-          };
-          break;
-        default:
-          throw new Error('Invalid transaction type');
-      }
+      const previousAllocated = material.quantity_allocated || 0;
+      const newAllocated = previousAllocated + data.quantity;
+      const newWarehouseStock = currentWarehouseStock - data.quantity;
+      const unitCost = data.unit_cost || warehouseItem.unit_cost || 0;
       
       // Create the transaction record
-      const { data: transaction, error: transactionError } = await supabase
-        .from('floor_room_material_transactions' as any)
+      const { error: transactionError } = await supabase
+        .from('floor_room_material_transactions')
         .insert({
           room_material_id: data.room_material_id,
-          transaction_type: data.transaction_type,
+          warehouse_item_id: data.warehouse_item_id,
+          room_id: data.room_id,
+          transaction_type: 'issue',
           quantity: data.quantity,
-          previous_quantity: previousQuantity,
-          new_quantity: newQuantity,
+          previous_quantity: previousAllocated,
+          new_quantity: newAllocated,
+          previous_warehouse_stock: currentWarehouseStock,
+          new_warehouse_stock: newWarehouseStock,
+          unit_cost: unitCost,
+          total_value: data.quantity * unitCost,
           notes: data.notes || null,
-        })
-        .select()
-        .single();
+          company_id: data.company_id || null,
+        });
       
       if (transactionError) throw transactionError;
       
-      // Update the material quantities
-      const { error: updateError } = await supabase
+      // Update warehouse stock
+      const { error: updateWarehouseError } = await supabase
+        .from('warehouse_items')
+        .update({ current_stock: newWarehouseStock })
+        .eq('id', data.warehouse_item_id);
+      
+      if (updateWarehouseError) throw updateWarehouseError;
+      
+      // Update room material quantities
+      const { error: updateMaterialError } = await supabase
         .from('floor_room_materials')
-        .update(updateData)
+        .update({ 
+          quantity_allocated: newAllocated,
+          status: 'allocated'
+        })
         .eq('id', data.room_material_id);
       
-      if (updateError) throw updateError;
+      if (updateMaterialError) throw updateMaterialError;
       
-      return { transaction, room_id: data.room_id };
+      return { room_id: data.room_id };
     },
     onSuccess: (data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['room-material-transactions', variables.room_material_id] });
       queryClient.invalidateQueries({ queryKey: ['room-materials', data.room_id] });
-      
-      const typeLabels: Record<MaterialTransactionType, string> = {
-        allocation: 'Material allocated',
-        usage: 'Usage recorded',
-        return: 'Material returned',
-        adjustment: 'Quantity adjusted',
-      };
-      toast.success(typeLabels[variables.transaction_type]);
+      queryClient.invalidateQueries({ queryKey: ['warehouse-items'] });
+      toast.success('Material issued successfully');
     },
     onError: (error: Error) => {
-      toast.error('Failed to record transaction: ' + error.message);
+      toast.error('Failed to issue material: ' + error.message);
+    },
+  });
+};
+
+interface ReturnMaterialData {
+  room_material_id: string;
+  room_id: string;
+  warehouse_item_id: string;
+  quantity: number;
+  unit_cost?: number;
+  company_id?: string;
+  notes?: string;
+}
+
+export const useReturnMaterial = () => {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async (data: ReturnMaterialData) => {
+      // Get current warehouse stock
+      const { data: warehouseItem, error: warehouseError } = await supabase
+        .from('warehouse_items')
+        .select('current_stock, unit_cost')
+        .eq('id', data.warehouse_item_id)
+        .single();
+      
+      if (warehouseError) throw warehouseError;
+      
+      const currentWarehouseStock = warehouseItem.current_stock || 0;
+      
+      // Get current room material quantities
+      const { data: material, error: materialError } = await supabase
+        .from('floor_room_materials')
+        .select('quantity_allocated, quantity_used')
+        .eq('id', data.room_material_id)
+        .single();
+      
+      if (materialError) throw materialError;
+      
+      const previousAllocated = material.quantity_allocated || 0;
+      
+      // Validate return quantity
+      if (data.quantity > previousAllocated) {
+        throw new Error(`Cannot return more than allocated. Allocated: ${previousAllocated}`);
+      }
+      
+      const newAllocated = previousAllocated - data.quantity;
+      const newWarehouseStock = currentWarehouseStock + data.quantity;
+      const unitCost = data.unit_cost || warehouseItem.unit_cost || 0;
+      
+      // Create the transaction record
+      const { error: transactionError } = await supabase
+        .from('floor_room_material_transactions')
+        .insert({
+          room_material_id: data.room_material_id,
+          warehouse_item_id: data.warehouse_item_id,
+          room_id: data.room_id,
+          transaction_type: 'return',
+          quantity: data.quantity,
+          previous_quantity: previousAllocated,
+          new_quantity: newAllocated,
+          previous_warehouse_stock: currentWarehouseStock,
+          new_warehouse_stock: newWarehouseStock,
+          unit_cost: unitCost,
+          total_value: data.quantity * unitCost,
+          notes: data.notes || null,
+          company_id: data.company_id || null,
+        });
+      
+      if (transactionError) throw transactionError;
+      
+      // Update warehouse stock
+      const { error: updateWarehouseError } = await supabase
+        .from('warehouse_items')
+        .update({ current_stock: newWarehouseStock })
+        .eq('id', data.warehouse_item_id);
+      
+      if (updateWarehouseError) throw updateWarehouseError;
+      
+      // Update room material quantities
+      const { error: updateMaterialError } = await supabase
+        .from('floor_room_materials')
+        .update({ 
+          quantity_allocated: newAllocated,
+          status: newAllocated > 0 ? 'allocated' : 'planned'
+        })
+        .eq('id', data.room_material_id);
+      
+      if (updateMaterialError) throw updateMaterialError;
+      
+      return { room_id: data.room_id };
+    },
+    onSuccess: (data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['room-material-transactions', variables.room_material_id] });
+      queryClient.invalidateQueries({ queryKey: ['room-materials', data.room_id] });
+      queryClient.invalidateQueries({ queryKey: ['warehouse-items'] });
+      toast.success('Material returned successfully');
+    },
+    onError: (error: Error) => {
+      toast.error('Failed to return material: ' + error.message);
+    },
+  });
+};
+
+// Legacy hook for backward compatibility
+export const useCreateMaterialTransaction = () => {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async (data: {
+      room_material_id: string;
+      room_id: string;
+      transaction_type: 'adjustment';
+      quantity: number;
+      notes?: string;
+    }) => {
+      const { data: material, error: fetchError } = await supabase
+        .from('floor_room_materials')
+        .select('quantity_allocated, warehouse_item_id')
+        .eq('id', data.room_material_id)
+        .single();
+      
+      if (fetchError) throw fetchError;
+      
+      const previousQuantity = material.quantity_allocated || 0;
+      const newQuantity = data.quantity;
+      
+      const { error: transactionError } = await supabase
+        .from('floor_room_material_transactions')
+        .insert({
+          room_material_id: data.room_material_id,
+          warehouse_item_id: material.warehouse_item_id,
+          room_id: data.room_id,
+          transaction_type: 'adjustment',
+          quantity: data.quantity,
+          previous_quantity: previousQuantity,
+          new_quantity: newQuantity,
+          notes: data.notes || null,
+        });
+      
+      if (transactionError) throw transactionError;
+      
+      const { error: updateError } = await supabase
+        .from('floor_room_materials')
+        .update({ 
+          quantity_allocated: newQuantity,
+          status: newQuantity > 0 ? 'allocated' : 'planned'
+        })
+        .eq('id', data.room_material_id);
+      
+      if (updateError) throw updateError;
+      
+      return { room_id: data.room_id };
+    },
+    onSuccess: (data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['room-material-transactions', variables.room_material_id] });
+      queryClient.invalidateQueries({ queryKey: ['room-materials', data.room_id] });
+      toast.success('Quantity adjusted');
+    },
+    onError: (error: Error) => {
+      toast.error('Failed to adjust quantity: ' + error.message);
     },
   });
 };

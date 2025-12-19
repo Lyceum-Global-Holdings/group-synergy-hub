@@ -10,14 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { Plus, History, Loader2, ArrowUpCircle, ArrowDownCircle, RotateCcw, Settings2 } from 'lucide-react';
+import { History, Loader2, ArrowUpCircle, RotateCcw, Settings2 } from 'lucide-react';
 import { FloorRoomMaterial } from '@/types/construction';
 import {
   useRoomMaterialTransactions,
@@ -33,12 +26,11 @@ interface MaterialTransactionsDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
-const TRANSACTION_TYPES: { value: MaterialTransactionType; label: string; icon: React.ElementType; color: string }[] = [
-  { value: 'allocation', label: 'Allocate', icon: ArrowUpCircle, color: 'text-green-600' },
-  { value: 'usage', label: 'Record Usage', icon: ArrowDownCircle, color: 'text-blue-600' },
-  { value: 'return', label: 'Return', icon: RotateCcw, color: 'text-orange-600' },
-  { value: 'adjustment', label: 'Adjust', icon: Settings2, color: 'text-purple-600' },
-];
+const TRANSACTION_CONFIG: Record<MaterialTransactionType, { label: string; icon: React.ElementType; color: string }> = {
+  issue: { label: 'Issue', icon: ArrowUpCircle, color: 'text-green-600' },
+  return: { label: 'Return', icon: RotateCcw, color: 'text-orange-600' },
+  adjustment: { label: 'Adjustment', icon: Settings2, color: 'text-purple-600' },
+};
 
 export function MaterialTransactionsDialog({
   material,
@@ -46,38 +38,36 @@ export function MaterialTransactionsDialog({
   open,
   onOpenChange,
 }: MaterialTransactionsDialogProps) {
-  const [showAddForm, setShowAddForm] = useState(false);
-  const [transactionType, setTransactionType] = useState<MaterialTransactionType>('allocation');
-  const [quantity, setQuantity] = useState<string>('1');
-  const [notes, setNotes] = useState<string>('');
+  const [showAdjustForm, setShowAdjustForm] = useState(false);
+  const [adjustQuantity, setAdjustQuantity] = useState<string>('');
+  const [adjustNotes, setAdjustNotes] = useState<string>('');
 
   const { data: transactions = [], isLoading } = useRoomMaterialTransactions(material?.id || null);
   const createTransaction = useCreateMaterialTransaction();
 
-  const handleAddTransaction = () => {
+  const handleAdjust = () => {
     if (!material) return;
 
     createTransaction.mutate(
       {
         room_material_id: material.id,
         room_id: roomId,
-        transaction_type: transactionType,
-        quantity: parseFloat(quantity) || 0,
-        notes: notes || undefined,
+        transaction_type: 'adjustment',
+        quantity: parseFloat(adjustQuantity) || 0,
+        notes: adjustNotes || undefined,
       },
       {
         onSuccess: () => {
-          setShowAddForm(false);
-          setTransactionType('allocation');
-          setQuantity('1');
-          setNotes('');
+          setShowAdjustForm(false);
+          setAdjustQuantity('');
+          setAdjustNotes('');
         },
       }
     );
   };
 
   const getTransactionIcon = (type: MaterialTransactionType) => {
-    const config = TRANSACTION_TYPES.find((t) => t.value === type);
+    const config = TRANSACTION_CONFIG[type];
     if (!config) return null;
     const Icon = config.icon;
     return <Icon className={`h-4 w-4 ${config.color}`} />;
@@ -85,14 +75,12 @@ export function MaterialTransactionsDialog({
 
   const getTransactionBadgeVariant = (type: MaterialTransactionType): 'default' | 'secondary' | 'destructive' | 'outline' => {
     switch (type) {
-      case 'allocation':
+      case 'issue':
         return 'default';
-      case 'usage':
-        return 'secondary';
       case 'return':
         return 'outline';
       case 'adjustment':
-        return 'destructive';
+        return 'secondary';
       default:
         return 'default';
     }
@@ -104,7 +92,7 @@ export function MaterialTransactionsDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <History className="h-5 w-5" />
-            Material Transactions
+            Transaction History
           </DialogTitle>
           {material && (
             <div className="text-sm text-muted-foreground mt-1">
@@ -122,8 +110,8 @@ export function MaterialTransactionsDialog({
                 <span className="font-medium">{material.quantity_required}</span>
               </div>
               <div>
-                <span className="text-muted-foreground">Allocated:</span>{' '}
-                <span className="font-medium">{material.quantity_allocated || 0}</span>
+                <span className="text-muted-foreground">Issued:</span>{' '}
+                <span className="font-medium text-primary">{material.quantity_allocated || 0}</span>
               </div>
               <div>
                 <span className="text-muted-foreground">Used:</span>{' '}
@@ -132,60 +120,40 @@ export function MaterialTransactionsDialog({
             </div>
           )}
 
-          {/* Add Transaction Button/Form */}
-          {!showAddForm ? (
-            <Button onClick={() => setShowAddForm(true)} size="sm" className="w-full">
-              <Plus className="h-4 w-4 mr-2" />
-              Record Transaction
+          {/* Adjust Quantity Form */}
+          {!showAdjustForm ? (
+            <Button 
+              onClick={() => setShowAdjustForm(true)} 
+              size="sm" 
+              variant="outline"
+              className="w-full"
+            >
+              <Settings2 className="h-4 w-4 mr-2" />
+              Manual Adjustment
             </Button>
           ) : (
             <div className="border rounded-lg p-4 space-y-4 bg-muted/30">
               <div className="space-y-2">
-                <Label>Transaction Type</Label>
-                <Select
-                  value={transactionType}
-                  onValueChange={(value) => setTransactionType(value as MaterialTransactionType)}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {TRANSACTION_TYPES.map((type) => (
-                      <SelectItem key={type.value} value={type.value}>
-                        <div className="flex items-center gap-2">
-                          <type.icon className={`h-4 w-4 ${type.color}`} />
-                          {type.label}
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label>
-                  {transactionType === 'adjustment' ? 'New Quantity' : 'Quantity'}
-                </Label>
+                <Label>New Allocated Quantity</Label>
                 <Input
                   type="number"
                   min="0"
                   step="0.001"
-                  value={quantity}
-                  onChange={(e) => setQuantity(e.target.value)}
+                  value={adjustQuantity}
+                  onChange={(e) => setAdjustQuantity(e.target.value)}
+                  placeholder="Enter new quantity"
                 />
-                {transactionType === 'adjustment' && (
-                  <p className="text-xs text-muted-foreground">
-                    This will set the allocated quantity to this exact value
-                  </p>
-                )}
+                <p className="text-xs text-muted-foreground">
+                  This will set the allocated quantity to this exact value (does not affect warehouse stock)
+                </p>
               </div>
 
               <div className="space-y-2">
                 <Label>Notes (Optional)</Label>
                 <Input
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  placeholder="Add notes..."
+                  value={adjustNotes}
+                  onChange={(e) => setAdjustNotes(e.target.value)}
+                  placeholder="Reason for adjustment..."
                 />
               </div>
 
@@ -194,21 +162,20 @@ export function MaterialTransactionsDialog({
                   variant="outline"
                   size="sm"
                   onClick={() => {
-                    setShowAddForm(false);
-                    setTransactionType('allocation');
-                    setQuantity('1');
-                    setNotes('');
+                    setShowAdjustForm(false);
+                    setAdjustQuantity('');
+                    setAdjustNotes('');
                   }}
                 >
                   Cancel
                 </Button>
                 <Button
                   size="sm"
-                  onClick={handleAddTransaction}
-                  disabled={!quantity || parseFloat(quantity) <= 0 || createTransaction.isPending}
+                  onClick={handleAdjust}
+                  disabled={!adjustQuantity || createTransaction.isPending}
                 >
                   {createTransaction.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                  Record
+                  Apply Adjustment
                 </Button>
               </div>
             </div>
@@ -228,35 +195,55 @@ export function MaterialTransactionsDialog({
                 </div>
               ) : (
                 <div className="space-y-2">
-                  {transactions.map((transaction) => (
-                    <div
-                      key={transaction.id}
-                      className="border rounded-lg p-3 space-y-2"
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          {getTransactionIcon(transaction.transaction_type as MaterialTransactionType)}
-                          <Badge variant={getTransactionBadgeVariant(transaction.transaction_type as MaterialTransactionType)}>
-                            {transaction.transaction_type}
-                          </Badge>
+                  {transactions.map((transaction) => {
+                    const config = TRANSACTION_CONFIG[transaction.transaction_type as MaterialTransactionType];
+                    return (
+                      <div
+                        key={transaction.id}
+                        className="border rounded-lg p-3 space-y-2"
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            {getTransactionIcon(transaction.transaction_type as MaterialTransactionType)}
+                            <Badge variant={getTransactionBadgeVariant(transaction.transaction_type as MaterialTransactionType)}>
+                              {config?.label || transaction.transaction_type}
+                            </Badge>
+                            {transaction.total_value && (
+                              <span className="text-xs text-muted-foreground">
+                                ${transaction.total_value.toLocaleString()}
+                              </span>
+                            )}
+                          </div>
+                          <span className="text-xs text-muted-foreground">
+                            {format(new Date(transaction.created_at), 'MMM d, yyyy HH:mm')}
+                          </span>
                         </div>
-                        <span className="text-xs text-muted-foreground">
-                          {format(new Date(transaction.created_at), 'MMM d, yyyy HH:mm')}
-                        </span>
+                        <div className="text-sm flex flex-wrap gap-x-4 gap-y-1">
+                          <div>
+                            <span className="text-muted-foreground">Qty:</span>{' '}
+                            <span className="font-medium">{transaction.quantity}</span>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground">Room:</span>{' '}
+                            <span>{transaction.previous_quantity}</span>
+                            <span className="text-muted-foreground mx-1">→</span>
+                            <span className="font-medium">{transaction.new_quantity}</span>
+                          </div>
+                          {transaction.previous_warehouse_stock !== null && (
+                            <div>
+                              <span className="text-muted-foreground">Warehouse:</span>{' '}
+                              <span>{transaction.previous_warehouse_stock}</span>
+                              <span className="text-muted-foreground mx-1">→</span>
+                              <span className="font-medium">{transaction.new_warehouse_stock}</span>
+                            </div>
+                          )}
+                        </div>
+                        {transaction.notes && (
+                          <p className="text-xs text-muted-foreground">{transaction.notes}</p>
+                        )}
                       </div>
-                      <div className="text-sm">
-                        <span className="text-muted-foreground">Qty:</span>{' '}
-                        <span className="font-medium">{transaction.quantity}</span>
-                        <span className="text-muted-foreground mx-2">|</span>
-                        <span className="text-muted-foreground">{transaction.previous_quantity}</span>
-                        <span className="text-muted-foreground mx-1">→</span>
-                        <span className="font-medium">{transaction.new_quantity}</span>
-                      </div>
-                      {transaction.notes && (
-                        <p className="text-xs text-muted-foreground">{transaction.notes}</p>
-                      )}
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </ScrollArea>
