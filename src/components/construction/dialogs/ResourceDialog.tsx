@@ -29,6 +29,8 @@ import { useProjects } from "@/hooks/construction/useProjects";
 import { useCreateConstructionResource, useUpdateConstructionResource } from "@/hooks/construction/useConstructionResources";
 import { ConstructionResource, RESOURCE_TYPES, RESOURCE_STATUSES } from "@/types/construction";
 import { useEffect } from "react";
+import { useCompany } from "@/contexts/CompanyContext";
+import { toast } from "sonner";
 
 const formSchema = z.object({
   project_id: z.string().min(1, "Project is required"),
@@ -53,6 +55,7 @@ interface ResourceDialogProps {
 
 export function ResourceDialog({ open, onOpenChange, resource }: ResourceDialogProps) {
   const { data: projects } = useProjects();
+  const { selectedCompany } = useCompany();
   const createResource = useCreateConstructionResource();
   const updateResource = useUpdateConstructionResource();
 
@@ -103,19 +106,32 @@ export function ResourceDialog({ open, onOpenChange, resource }: ResourceDialogP
   }, [resource, form]);
 
   const onSubmit = async (data: FormData) => {
+    if (!resource && !selectedCompany?.id) {
+      toast.error("Please select a company before adding a resource");
+      return;
+    }
+    
     try {
+      const payload = {
+        project_id: data.project_id,
+        resource_name: data.resource_name,
+        resource_type: data.resource_type as any,
+        description: data.description || undefined,
+        unit: data.unit || undefined,
+        quantity_allocated: data.quantity_allocated || undefined,
+        unit_cost: data.unit_cost || undefined,
+        start_date: data.start_date || null,
+        end_date: data.end_date || null,
+        notes: data.notes || undefined,
+      };
+      
       if (resource) {
         await updateResource.mutateAsync({
           id: resource.id,
-          ...data,
-          resource_type: data.resource_type as any,
+          ...payload,
         });
       } else {
-        await createResource.mutateAsync({
-          project_id: data.project_id,
-          resource_name: data.resource_name,
-          resource_type: data.resource_type as any,
-        });
+        await createResource.mutateAsync(payload);
       }
       onOpenChange(false);
     } catch (error) {

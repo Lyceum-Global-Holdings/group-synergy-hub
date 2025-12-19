@@ -30,6 +30,8 @@ import { useCreateSafetyIncident, useUpdateSafetyIncident } from "@/hooks/constr
 import { SafetyIncident, INCIDENT_TYPES, INCIDENT_SEVERITIES, INCIDENT_STATUSES } from "@/types/construction";
 import { useEffect } from "react";
 import { format } from "date-fns";
+import { useCompany } from "@/contexts/CompanyContext";
+import { toast } from "sonner";
 
 const formSchema = z.object({
   project_id: z.string().min(1, "Project is required"),
@@ -58,6 +60,7 @@ interface SafetyIncidentDialogProps {
 
 export function SafetyIncidentDialog({ open, onOpenChange, incident }: SafetyIncidentDialogProps) {
   const { data: projects } = useProjects();
+  const { selectedCompany } = useCompany();
   const createIncident = useCreateSafetyIncident();
   const updateIncident = useUpdateSafetyIncident();
 
@@ -120,28 +123,36 @@ export function SafetyIncidentDialog({ open, onOpenChange, incident }: SafetyInc
   }, [incident, form]);
 
   const onSubmit = async (data: FormData) => {
+    if (!incident && !selectedCompany?.id) {
+      toast.error("Please select a company before reporting an incident");
+      return;
+    }
+    
     try {
+      const payload = {
+        project_id: data.project_id,
+        title: data.title,
+        incident_date: data.incident_date,
+        incident_type: data.incident_type as any,
+        severity: data.severity as any || undefined,
+        description: data.description || undefined,
+        incident_time: data.incident_time || undefined,
+        location: data.location || undefined,
+        injured_party: data.injured_party || undefined,
+        injury_description: data.injury_description || undefined,
+        immediate_actions: data.immediate_actions || undefined,
+        root_cause: data.root_cause || undefined,
+        corrective_actions: data.corrective_actions || undefined,
+        preventive_actions: data.preventive_actions || undefined,
+      };
+      
       if (incident) {
         await updateIncident.mutateAsync({
           id: incident.id,
-          ...data,
-          incident_type: data.incident_type as any,
-          severity: data.severity as any,
+          ...payload,
         });
       } else {
-        await createIncident.mutateAsync({
-          project_id: data.project_id,
-          title: data.title,
-          incident_date: data.incident_date,
-          incident_type: data.incident_type as any,
-          severity: data.severity as any,
-          description: data.description,
-          incident_time: data.incident_time,
-          location: data.location,
-          injured_party: data.injured_party,
-          injury_description: data.injury_description,
-          immediate_actions: data.immediate_actions,
-        });
+        await createIncident.mutateAsync(payload);
       }
       onOpenChange(false);
     } catch (error) {

@@ -30,6 +30,8 @@ import { useCreateDailySiteReport, useUpdateDailySiteReport } from "@/hooks/cons
 import { DailySiteReport, WEATHER_CONDITIONS } from "@/types/construction";
 import { useEffect } from "react";
 import { format } from "date-fns";
+import { useCompany } from "@/contexts/CompanyContext";
+import { toast } from "sonner";
 
 const formSchema = z.object({
   project_id: z.string().min(1, "Project is required"),
@@ -57,6 +59,7 @@ interface DailySiteReportDialogProps {
 
 export function DailySiteReportDialog({ open, onOpenChange, report }: DailySiteReportDialogProps) {
   const { data: projects } = useProjects();
+  const { selectedCompany } = useCompany();
   const createReport = useCreateDailySiteReport();
   const updateReport = useUpdateDailySiteReport();
 
@@ -112,11 +115,32 @@ export function DailySiteReportDialog({ open, onOpenChange, report }: DailySiteR
   }, [report, form]);
 
   const onSubmit = async (data: FormData) => {
+    if (!report && !selectedCompany?.id) {
+      toast.error("Please select a company before creating a report");
+      return;
+    }
+    
     try {
+      const payload = {
+        project_id: data.project_id,
+        report_date: data.report_date,
+        weather_conditions: data.weather_conditions || undefined,
+        temperature_high: data.temperature_high || undefined,
+        temperature_low: data.temperature_low || undefined,
+        labor_count: data.labor_count || undefined,
+        subcontractor_count: data.subcontractor_count || undefined,
+        visitor_count: data.visitor_count || undefined,
+        work_summary: data.work_summary || undefined,
+        delays_issues: data.delays_issues || undefined,
+        materials_received: data.materials_received || undefined,
+        equipment_on_site: data.equipment_on_site || undefined,
+        safety_observations: data.safety_observations || undefined,
+      };
+      
       if (report) {
-        await updateReport.mutateAsync({ id: report.id, ...data });
+        await updateReport.mutateAsync({ id: report.id, ...payload });
       } else {
-        await createReport.mutateAsync({ project_id: data.project_id, report_date: data.report_date, ...data });
+        await createReport.mutateAsync(payload);
       }
       onOpenChange(false);
     } catch (error) {
