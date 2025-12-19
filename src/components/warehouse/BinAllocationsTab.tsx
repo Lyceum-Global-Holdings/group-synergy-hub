@@ -2,13 +2,16 @@ import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { DataTable } from '@/components/ui/data-table';
-import { Plus } from 'lucide-react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Plus, AlertCircle } from 'lucide-react';
 import { useWarehouseBinAllocations } from '@/hooks/useWarehouseBinAllocations';
+import { useCompany } from '@/contexts/CompanyContext';
 import { CreateBinAllocationDialog } from './CreateBinAllocationDialog';
 import type { ColumnDef } from '@tanstack/react-table';
 import type { BinAllocationWithDetails } from '@/types/warehouseReservation';
 
 export function BinAllocationsTab() {
+  const { isViewingAllCompanies } = useCompany();
   const [dialogOpen, setDialogOpen] = useState(false);
   const { binAllocations, isLoading } = useWarehouseBinAllocations();
 
@@ -68,12 +71,24 @@ export function BinAllocationsTab() {
             Manage item-to-bin allocations and track reserved quantities
           </CardDescription>
         </div>
-        <Button onClick={() => setDialogOpen(true)}>
+        <Button 
+          onClick={() => setDialogOpen(true)}
+          disabled={isViewingAllCompanies}
+          title={isViewingAllCompanies ? "Select a specific company to allocate items" : ""}
+        >
           <Plus className="mr-2 h-4 w-4" />
           Allocate Item to Bin
         </Button>
       </CardHeader>
       <CardContent>
+        {isViewingAllCompanies && (
+          <Alert className="mb-4">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>
+              Viewing allocations from all companies. Select a specific company to create or manage allocations.
+            </AlertDescription>
+          </Alert>
+        )}
         <DataTable
           columns={columns}
           data={binAllocations || []}
