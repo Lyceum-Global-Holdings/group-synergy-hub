@@ -297,6 +297,7 @@ export const useUpdateProfile = () => {
         full_name?: string;
         department?: string;
         avatar_url?: string;
+        company_id?: string;
       };
     }) => {
       const { error } = await supabase

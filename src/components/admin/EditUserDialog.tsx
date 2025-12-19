@@ -164,6 +164,7 @@ export const EditUserDialog: React.FC<EditUserDialogProps> = ({
         updates: {
           full_name: `${data.firstName} ${data.lastName}`,
           department: data.department,
+          company_id: data.company,
         },
       });
 
