@@ -2,26 +2,36 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { WarehouseBin, CreateWarehouseBinData } from '@/types/itemBin';
 import { useToast } from '@/hooks/use-toast';
+import { useCompany } from '@/contexts/CompanyContext';
 
 export const useWarehouseBins = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { selectedCompany, isViewingAllCompanies } = useCompany();
 
   const {
     data: bins = [],
     isLoading,
     error
   } = useQuery({
-    queryKey: ['warehouse-bins'],
+    queryKey: ['warehouse-bins', selectedCompany?.id, isViewingAllCompanies],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from('warehouse_bins')
         .select('*')
         .order('bin_code');
 
+      // Filter by company if not viewing all companies
+      if (!isViewingAllCompanies && selectedCompany?.id) {
+        query = query.eq('company_id', selectedCompany.id);
+      }
+
+      const { data, error } = await query;
+
       if (error) throw error;
       return data as WarehouseBin[];
-    }
+    },
+    enabled: !!(isViewingAllCompanies || selectedCompany?.id),
   });
 
   const createBinMutation = useMutation({
@@ -29,10 +39,15 @@ export const useWarehouseBins = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User not authenticated');
 
+      if (!selectedCompany?.id) {
+        throw new Error('Please select a company first');
+      }
+
       const { data, error } = await supabase
         .from('warehouse_bins')
         .insert({
           ...binData,
+          company_id: selectedCompany.id,
           created_by: user.id
         })
         .select()
@@ -52,7 +67,7 @@ export const useWarehouseBins = () => {
       console.error('Error creating bin:', error);
       toast({
         title: "Error",
-        description: "Failed to create bin",
+        description: error.message || "Failed to create bin",
         variant: "destructive",
       });
     }

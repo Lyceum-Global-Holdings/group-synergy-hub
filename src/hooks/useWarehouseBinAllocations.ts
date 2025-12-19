@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { useCompany } from '@/contexts/CompanyContext';
 import type { 
   WarehouseBinAllocation, 
   CreateBinAllocationData,
@@ -9,12 +10,13 @@ import type {
 
 export function useWarehouseBinAllocations() {
   const queryClient = useQueryClient();
+  const { selectedCompany, isViewingAllCompanies } = useCompany();
 
   // Fetch all bin allocations with details
   const { data: binAllocations, isLoading, error } = useQuery({
-    queryKey: ['warehouse-bin-allocations'],
+    queryKey: ['warehouse-bin-allocations', selectedCompany?.id, isViewingAllCompanies],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from('warehouse_bin_allocations')
         .select(`
           *,
@@ -29,9 +31,17 @@ export function useWarehouseBinAllocations() {
         `)
         .order('created_at', { ascending: false });
 
+      // Filter by company if not viewing all companies
+      if (!isViewingAllCompanies && selectedCompany?.id) {
+        query = query.eq('company_id', selectedCompany.id);
+      }
+
+      const { data, error } = await query;
+
       if (error) throw error;
       return data as BinAllocationWithDetails[];
     },
+    enabled: !!(isViewingAllCompanies || selectedCompany?.id),
   });
 
   // Get allocations for a specific item
@@ -76,10 +86,15 @@ export function useWarehouseBinAllocations() {
     mutationFn: async (data: CreateBinAllocationData) => {
       const { data: user } = await supabase.auth.getUser();
       
+      if (!selectedCompany?.id) {
+        throw new Error('Please select a company first');
+      }
+      
       const { data: allocation, error } = await supabase
         .from('warehouse_bin_allocations')
         .insert({
           ...data,
+          company_id: selectedCompany.id,
           created_by: user.user?.id,
         })
         .select()

@@ -11,11 +11,15 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { AlertCircle } from 'lucide-react';
 import { useWarehouseBins } from '@/hooks/useWarehouseBins';
 import { CreateBinDialog } from '@/components/warehouse/CreateBinDialog';
 import { WarehouseBin } from '@/types/itemBin';
+import { useCompany } from '@/contexts/CompanyContext';
 
 export function BinMasterTab() {
+  const { selectedCompany, isViewingAllCompanies } = useCompany();
   const [searchTerm, setSearchTerm] = useState('');
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [editingBin, setEditingBin] = useState<WarehouseBin | null>(null);
@@ -51,11 +55,24 @@ export function BinMasterTab() {
             />
           </div>
         </div>
-        <Button onClick={() => setIsCreateDialogOpen(true)}>
+        <Button 
+          onClick={() => setIsCreateDialogOpen(true)}
+          disabled={isViewingAllCompanies}
+          title={isViewingAllCompanies ? "Select a specific company to add bins" : ""}
+        >
           <Plus className="mr-2 h-4 w-4" />
           Add Bin
         </Button>
       </div>
+
+      {isViewingAllCompanies && (
+        <Alert>
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            Viewing bins from all companies. Select a specific company to create or manage bins.
+          </AlertDescription>
+        </Alert>
+      )}
 
       <div className="border rounded-lg">
         <Table>
