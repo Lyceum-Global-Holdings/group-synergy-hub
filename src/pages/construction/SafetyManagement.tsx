@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus, Search, ShieldAlert, AlertTriangle, ClipboardCheck, FileWarning } from "lucide-react";
+import { Plus, Search, ShieldAlert, AlertTriangle, ClipboardCheck, FileWarning, Pencil, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -20,17 +20,47 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useSafetyIncidents, useSafetyInspections } from "@/hooks/construction/useSafetyManagement";
-import { INCIDENT_STATUSES, INCIDENT_SEVERITIES, SAFETY_INSPECTION_STATUSES } from "@/types/construction";
+import { 
+  useSafetyIncidents, 
+  useSafetyInspections,
+  useCreateSafetyIncident,
+  useUpdateSafetyIncident,
+  useDeleteSafetyIncident,
+  useCreateSafetyInspection,
+  useUpdateSafetyInspection,
+  useDeleteSafetyInspection
+} from "@/hooks/construction/useSafetyManagement";
+import { INCIDENT_STATUSES, INCIDENT_SEVERITIES, SAFETY_INSPECTION_STATUSES, SafetyIncident, SafetyInspection } from "@/types/construction";
 import { format } from "date-fns";
+import { SafetyIncidentDialog, SafetyInspectionDialog, DeleteConfirmDialog } from "@/components/construction/dialogs";
 
 export default function SafetyManagement() {
   const [searchTerm, setSearchTerm] = useState("");
   const [incidentStatusFilter, setIncidentStatusFilter] = useState<string>("all");
   const [inspectionStatusFilter, setInspectionStatusFilter] = useState<string>("all");
   
+  // Dialog states for incidents
+  const [incidentDialogOpen, setIncidentDialogOpen] = useState(false);
+  const [editingIncident, setEditingIncident] = useState<SafetyIncident | null>(null);
+  const [deletingIncident, setDeletingIncident] = useState<SafetyIncident | null>(null);
+  
+  // Dialog states for inspections
+  const [inspectionDialogOpen, setInspectionDialogOpen] = useState(false);
+  const [editingInspection, setEditingInspection] = useState<SafetyInspection | null>(null);
+  const [deletingInspection, setDeletingInspection] = useState<SafetyInspection | null>(null);
+  
   const { data: incidents, isLoading: incidentsLoading } = useSafetyIncidents();
   const { data: inspections, isLoading: inspectionsLoading } = useSafetyInspections();
+  
+  // Incident mutations
+  const createIncidentMutation = useCreateSafetyIncident();
+  const updateIncidentMutation = useUpdateSafetyIncident();
+  const deleteIncidentMutation = useDeleteSafetyIncident();
+  
+  // Inspection mutations
+  const createInspectionMutation = useCreateSafetyInspection();
+  const updateInspectionMutation = useUpdateSafetyInspection();
+  const deleteInspectionMutation = useDeleteSafetyInspection();
 
   const filteredIncidents = incidents?.filter((incident) => {
     const matchesSearch =
@@ -71,6 +101,42 @@ export default function SafetyManagement() {
         {statusConfig?.label || status}
       </Badge>
     );
+  };
+
+  // Incident handlers
+  const handleCreateIncident = () => {
+    setEditingIncident(null);
+    setIncidentDialogOpen(true);
+  };
+
+  const handleEditIncident = (item: SafetyIncident) => {
+    setEditingIncident(item);
+    setIncidentDialogOpen(true);
+  };
+
+  const handleDeleteIncident = async () => {
+    if (deletingIncident) {
+      await deleteIncidentMutation.mutateAsync(deletingIncident.id);
+      setDeletingIncident(null);
+    }
+  };
+
+  // Inspection handlers
+  const handleCreateInspection = () => {
+    setEditingInspection(null);
+    setInspectionDialogOpen(true);
+  };
+
+  const handleEditInspection = (item: SafetyInspection) => {
+    setEditingInspection(item);
+    setInspectionDialogOpen(true);
+  };
+
+  const handleDeleteInspection = async () => {
+    if (deletingInspection) {
+      await deleteInspectionMutation.mutateAsync(deletingInspection.id);
+      setDeletingInspection(null);
+    }
   };
 
   return (
@@ -161,7 +227,7 @@ export default function SafetyManagement() {
                     </SelectContent>
                   </Select>
                 </div>
-                <Button>
+                <Button onClick={handleCreateIncident}>
                   <Plus className="mr-2 h-4 w-4" />
                   Report Incident
                 </Button>
@@ -183,12 +249,13 @@ export default function SafetyManagement() {
                       <TableHead>Severity</TableHead>
                       <TableHead>Date</TableHead>
                       <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {filteredIncidents?.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                        <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                           No incidents found
                         </TableCell>
                       </TableRow>
@@ -204,6 +271,24 @@ export default function SafetyManagement() {
                             {format(new Date(incident.incident_date), "MMM d, yyyy")}
                           </TableCell>
                           <TableCell>{getIncidentStatusBadge(incident.status)}</TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex justify-end gap-2">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleEditIncident(incident as SafetyIncident)}
+                              >
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => setDeletingIncident(incident as SafetyIncident)}
+                              >
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                              </Button>
+                            </div>
+                          </TableCell>
                         </TableRow>
                       ))
                     )}
@@ -242,7 +327,7 @@ export default function SafetyManagement() {
                     </SelectContent>
                   </Select>
                 </div>
-                <Button>
+                <Button onClick={handleCreateInspection}>
                   <Plus className="mr-2 h-4 w-4" />
                   New Inspection
                 </Button>
@@ -264,12 +349,13 @@ export default function SafetyManagement() {
                       <TableHead>Score</TableHead>
                       <TableHead>Follow-up</TableHead>
                       <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {filteredInspections?.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                        <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                           No inspections found
                         </TableCell>
                       </TableRow>
@@ -293,6 +379,24 @@ export default function SafetyManagement() {
                             )}
                           </TableCell>
                           <TableCell>{getInspectionStatusBadge(inspection.status)}</TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex justify-end gap-2">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleEditInspection(inspection as SafetyInspection)}
+                              >
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => setDeletingInspection(inspection as SafetyInspection)}
+                              >
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                              </Button>
+                            </div>
+                          </TableCell>
                         </TableRow>
                       ))
                     )}
@@ -303,6 +407,38 @@ export default function SafetyManagement() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Incident Dialogs */}
+      <SafetyIncidentDialog
+        open={incidentDialogOpen}
+        onOpenChange={setIncidentDialogOpen}
+        incident={editingIncident}
+      />
+
+      <DeleteConfirmDialog
+        open={!!deletingIncident}
+        onOpenChange={(open) => !open && setDeletingIncident(null)}
+        onConfirm={handleDeleteIncident}
+        title="Delete Incident"
+        description={`Are you sure you want to delete incident "${deletingIncident?.incident_number}"? This action cannot be undone.`}
+        isDeleting={deleteIncidentMutation.isPending}
+      />
+
+      {/* Inspection Dialogs */}
+      <SafetyInspectionDialog
+        open={inspectionDialogOpen}
+        onOpenChange={setInspectionDialogOpen}
+        inspection={editingInspection}
+      />
+
+      <DeleteConfirmDialog
+        open={!!deletingInspection}
+        onOpenChange={(open) => !open && setDeletingInspection(null)}
+        onConfirm={handleDeleteInspection}
+        title="Delete Inspection"
+        description={`Are you sure you want to delete inspection "${deletingInspection?.inspection_number}"? This action cannot be undone.`}
+        isDeleting={deleteInspectionMutation.isPending}
+      />
     </div>
   );
 }

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus, Search, Users, Wrench, Package, Building } from "lucide-react";
+import { Plus, Search, Users, Wrench, Package, Building, Pencil, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -19,14 +19,22 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useConstructionResources } from "@/hooks/construction/useConstructionResources";
-import { RESOURCE_TYPES, RESOURCE_STATUSES } from "@/types/construction";
+import { useConstructionResources, useCreateConstructionResource, useUpdateConstructionResource, useDeleteConstructionResource } from "@/hooks/construction/useConstructionResources";
+import { RESOURCE_TYPES, RESOURCE_STATUSES, ConstructionResource } from "@/types/construction";
 import { format } from "date-fns";
+import { ResourceDialog, DeleteConfirmDialog } from "@/components/construction/dialogs";
 
 export default function ResourceAllocation() {
   const [searchTerm, setSearchTerm] = useState("");
   const [typeFilter, setTypeFilter] = useState<string>("all");
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingItem, setEditingItem] = useState<ConstructionResource | null>(null);
+  const [deletingItem, setDeletingItem] = useState<ConstructionResource | null>(null);
+
   const { data: resources, isLoading } = useConstructionResources();
+  const createMutation = useCreateConstructionResource();
+  const updateMutation = useUpdateConstructionResource();
+  const deleteMutation = useDeleteConstructionResource();
 
   const filteredResources = resources?.filter((resource) => {
     const matchesSearch = resource.resource_name
@@ -60,6 +68,23 @@ export default function ResourceAllocation() {
     }
   };
 
+  const handleCreate = () => {
+    setEditingItem(null);
+    setDialogOpen(true);
+  };
+
+  const handleEdit = (item: ConstructionResource) => {
+    setEditingItem(item);
+    setDialogOpen(true);
+  };
+
+  const handleDelete = async () => {
+    if (deletingItem) {
+      await deleteMutation.mutateAsync(deletingItem.id);
+      setDeletingItem(null);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -69,7 +94,7 @@ export default function ResourceAllocation() {
             Manage project resources including labor, equipment, and materials
           </p>
         </div>
-        <Button>
+        <Button onClick={handleCreate}>
           <Plus className="mr-2 h-4 w-4" />
           Add Resource
         </Button>
@@ -165,12 +190,13 @@ export default function ResourceAllocation() {
                   <TableHead>Qty Used</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Start Date</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredResources?.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                       No resources found
                     </TableCell>
                   </TableRow>
@@ -193,6 +219,24 @@ export default function ResourceAllocation() {
                           ? format(new Date(resource.start_date), "MMM d, yyyy")
                           : "-"}
                       </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-2">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleEdit(resource as ConstructionResource)}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setDeletingItem(resource as ConstructionResource)}
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </div>
+                      </TableCell>
                     </TableRow>
                   ))
                 )}
@@ -201,6 +245,21 @@ export default function ResourceAllocation() {
           )}
         </CardContent>
       </Card>
+
+      <ResourceDialog
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        resource={editingItem}
+      />
+
+      <DeleteConfirmDialog
+        open={!!deletingItem}
+        onOpenChange={(open) => !open && setDeletingItem(null)}
+        onConfirm={handleDelete}
+        title="Delete Resource"
+        description={`Are you sure you want to delete resource "${deletingItem?.resource_name}"? This action cannot be undone.`}
+        isDeleting={deleteMutation.isPending}
+      />
     </div>
   );
 }

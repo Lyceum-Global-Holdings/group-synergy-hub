@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus, Search, FileText, Calendar, User } from "lucide-react";
+import { Plus, Search, FileText, Calendar, User, Pencil, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -19,14 +19,22 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useWorkOrders } from "@/hooks/construction/useWorkOrders";
-import { WORK_ORDER_STATUSES, WORK_ORDER_PRIORITIES } from "@/types/construction";
+import { useWorkOrders, useCreateWorkOrder, useUpdateWorkOrder, useDeleteWorkOrder } from "@/hooks/construction/useWorkOrders";
+import { WORK_ORDER_STATUSES, WORK_ORDER_PRIORITIES, WorkOrder } from "@/types/construction";
 import { format } from "date-fns";
+import { WorkOrderDialog, DeleteConfirmDialog } from "@/components/construction/dialogs";
 
 export default function WorkOrders() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingItem, setEditingItem] = useState<WorkOrder | null>(null);
+  const [deletingItem, setDeletingItem] = useState<WorkOrder | null>(null);
+  
   const { data: workOrders, isLoading } = useWorkOrders();
+  const createMutation = useCreateWorkOrder();
+  const updateMutation = useUpdateWorkOrder();
+  const deleteMutation = useDeleteWorkOrder();
 
   const filteredWorkOrders = workOrders?.filter((wo) => {
     const matchesSearch =
@@ -54,6 +62,23 @@ export default function WorkOrders() {
     );
   };
 
+  const handleCreate = () => {
+    setEditingItem(null);
+    setDialogOpen(true);
+  };
+
+  const handleEdit = (item: WorkOrder) => {
+    setEditingItem(item);
+    setDialogOpen(true);
+  };
+
+  const handleDelete = async () => {
+    if (deletingItem) {
+      await deleteMutation.mutateAsync(deletingItem.id);
+      setDeletingItem(null);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -63,7 +88,7 @@ export default function WorkOrders() {
             Manage and track construction work orders
           </p>
         </div>
-        <Button>
+        <Button onClick={handleCreate}>
           <Plus className="mr-2 h-4 w-4" />
           Create Work Order
         </Button>
@@ -157,12 +182,13 @@ export default function WorkOrders() {
                   <TableHead>Status</TableHead>
                   <TableHead>Planned Start</TableHead>
                   <TableHead>Planned End</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredWorkOrders?.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                       No work orders found
                     </TableCell>
                   </TableRow>
@@ -184,6 +210,24 @@ export default function WorkOrders() {
                           ? format(new Date(wo.planned_end_date), "MMM d, yyyy")
                           : "-"}
                       </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-2">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleEdit(wo as WorkOrder)}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setDeletingItem(wo as WorkOrder)}
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </div>
+                      </TableCell>
                     </TableRow>
                   ))
                 )}
@@ -192,6 +236,21 @@ export default function WorkOrders() {
           )}
         </CardContent>
       </Card>
+
+      <WorkOrderDialog
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        workOrder={editingItem}
+      />
+
+      <DeleteConfirmDialog
+        open={!!deletingItem}
+        onOpenChange={(open) => !open && setDeletingItem(null)}
+        onConfirm={handleDelete}
+        title="Delete Work Order"
+        description={`Are you sure you want to delete work order "${deletingItem?.work_order_number}"? This action cannot be undone.`}
+        isDeleting={deleteMutation.isPending}
+      />
     </div>
   );
 }

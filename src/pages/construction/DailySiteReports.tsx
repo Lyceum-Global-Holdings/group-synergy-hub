@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus, Search, FileText, Calendar, Cloud, Users } from "lucide-react";
+import { Plus, Search, FileText, Calendar, Cloud, Users, Pencil, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -19,14 +19,22 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useDailySiteReports } from "@/hooks/construction/useDailySiteReports";
-import { DAILY_REPORT_STATUSES } from "@/types/construction";
+import { useDailySiteReports, useCreateDailySiteReport, useUpdateDailySiteReport, useDeleteDailySiteReport } from "@/hooks/construction/useDailySiteReports";
+import { DAILY_REPORT_STATUSES, DailySiteReport } from "@/types/construction";
 import { format } from "date-fns";
+import { DailySiteReportDialog, DeleteConfirmDialog } from "@/components/construction/dialogs";
 
 export default function DailySiteReports() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingItem, setEditingItem] = useState<DailySiteReport | null>(null);
+  const [deletingItem, setDeletingItem] = useState<DailySiteReport | null>(null);
+
   const { data: reports, isLoading } = useDailySiteReports();
+  const createMutation = useCreateDailySiteReport();
+  const updateMutation = useUpdateDailySiteReport();
+  const deleteMutation = useDeleteDailySiteReport();
 
   const filteredReports = reports?.filter((report) => {
     const matchesSearch =
@@ -45,6 +53,23 @@ export default function DailySiteReports() {
     );
   };
 
+  const handleCreate = () => {
+    setEditingItem(null);
+    setDialogOpen(true);
+  };
+
+  const handleEdit = (item: DailySiteReport) => {
+    setEditingItem(item);
+    setDialogOpen(true);
+  };
+
+  const handleDelete = async () => {
+    if (deletingItem) {
+      await deleteMutation.mutateAsync(deletingItem.id);
+      setDeletingItem(null);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -54,7 +79,7 @@ export default function DailySiteReports() {
             Track daily construction site activities and progress
           </p>
         </div>
-        <Button>
+        <Button onClick={handleCreate}>
           <Plus className="mr-2 h-4 w-4" />
           New Report
         </Button>
@@ -147,12 +172,13 @@ export default function DailySiteReports() {
                   <TableHead>Weather</TableHead>
                   <TableHead>Labor Count</TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredReports?.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                       No reports found
                     </TableCell>
                   </TableRow>
@@ -167,6 +193,24 @@ export default function DailySiteReports() {
                       <TableCell>{report.weather_conditions || "-"}</TableCell>
                       <TableCell>{report.labor_count || 0}</TableCell>
                       <TableCell>{getStatusBadge(report.status)}</TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-2">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleEdit(report as DailySiteReport)}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setDeletingItem(report as DailySiteReport)}
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </div>
+                      </TableCell>
                     </TableRow>
                   ))
                 )}
@@ -175,6 +219,21 @@ export default function DailySiteReports() {
           )}
         </CardContent>
       </Card>
+
+      <DailySiteReportDialog
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        report={editingItem}
+      />
+
+      <DeleteConfirmDialog
+        open={!!deletingItem}
+        onOpenChange={(open) => !open && setDeletingItem(null)}
+        onConfirm={handleDelete}
+        title="Delete Report"
+        description={`Are you sure you want to delete report "${deletingItem?.report_number}"? This action cannot be undone.`}
+        isDeleting={deleteMutation.isPending}
+      />
     </div>
   );
 }
