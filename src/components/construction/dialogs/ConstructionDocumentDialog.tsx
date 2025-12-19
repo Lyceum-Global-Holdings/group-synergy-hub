@@ -29,6 +29,8 @@ import { useProjects } from "@/hooks/construction/useProjects";
 import { useCreateConstructionDocument, useUpdateConstructionDocument } from "@/hooks/construction/useConstructionDocuments";
 import { ConstructionDocument, DOCUMENT_TYPES, DOCUMENT_STATUSES } from "@/types/construction";
 import { useEffect } from "react";
+import { useCompany } from "@/contexts/CompanyContext";
+import { toast } from "sonner";
 
 const formSchema = z.object({
   project_id: z.string().min(1, "Project is required"),
@@ -50,6 +52,7 @@ interface ConstructionDocumentDialogProps {
 
 export function ConstructionDocumentDialog({ open, onOpenChange, document }: ConstructionDocumentDialogProps) {
   const { data: projects } = useProjects();
+  const { selectedCompany } = useCompany();
   const createDocument = useCreateConstructionDocument();
   const updateDocument = useUpdateConstructionDocument();
 
@@ -91,26 +94,31 @@ export function ConstructionDocumentDialog({ open, onOpenChange, document }: Con
   }, [document, form]);
 
   const onSubmit = async (data: FormData) => {
+    if (!document && !selectedCompany?.id) {
+      toast.error("Please select a company before uploading a document");
+      return;
+    }
+    
     try {
       const tagsArray = data.tags ? data.tags.split(",").map(t => t.trim()).filter(Boolean) : undefined;
+      
+      const payload = {
+        project_id: data.project_id,
+        title: data.title,
+        file_url: data.file_url,
+        document_type: data.document_type as any,
+        description: data.description || undefined,
+        file_name: data.file_name || undefined,
+        tags: tagsArray,
+      };
       
       if (document) {
         await updateDocument.mutateAsync({
           id: document.id,
-          ...data,
-          document_type: data.document_type as any,
-          tags: tagsArray,
+          ...payload,
         });
       } else {
-        await createDocument.mutateAsync({
-          project_id: data.project_id,
-          title: data.title,
-          file_url: data.file_url,
-          document_type: data.document_type as any,
-          description: data.description,
-          file_name: data.file_name,
-          tags: tagsArray,
-        });
+        await createDocument.mutateAsync(payload);
       }
       onOpenChange(false);
     } catch (error) {

@@ -29,6 +29,8 @@ import { useProjects } from "@/hooks/construction/useProjects";
 import { useCreateProjectBudgetItem, useUpdateProjectBudgetItem } from "@/hooks/construction/useProjectBudgets";
 import { ProjectBudgetItem, BUDGET_CATEGORIES } from "@/types/construction";
 import { useEffect } from "react";
+import { useCompany } from "@/contexts/CompanyContext";
+import { toast } from "sonner";
 
 const formSchema = z.object({
   project_id: z.string().min(1, "Project is required"),
@@ -52,6 +54,7 @@ interface BudgetItemDialogProps {
 
 export function BudgetItemDialog({ open, onOpenChange, budgetItem }: BudgetItemDialogProps) {
   const { data: projects } = useProjects();
+  const { selectedCompany } = useCompany();
   const createBudgetItem = useCreateProjectBudgetItem();
   const updateBudgetItem = useUpdateProjectBudgetItem();
 
@@ -99,25 +102,31 @@ export function BudgetItemDialog({ open, onOpenChange, budgetItem }: BudgetItemD
   }, [budgetItem, form]);
 
   const onSubmit = async (data: FormData) => {
+    if (!budgetItem && !selectedCompany?.id) {
+      toast.error("Please select a company before adding a budget item");
+      return;
+    }
+    
     try {
+      const payload = {
+        project_id: data.project_id,
+        budget_code: data.budget_code,
+        description: data.description,
+        planned_amount: data.planned_amount,
+        category: data.category as any,
+        unit: data.unit || undefined,
+        quantity: data.quantity || undefined,
+        unit_cost: data.unit_cost || undefined,
+        notes: data.notes || undefined,
+      };
+      
       if (budgetItem) {
         await updateBudgetItem.mutateAsync({
           id: budgetItem.id,
-          ...data,
-          category: data.category as any,
+          ...payload,
         });
       } else {
-        await createBudgetItem.mutateAsync({
-          project_id: data.project_id,
-          budget_code: data.budget_code,
-          description: data.description,
-          planned_amount: data.planned_amount,
-          category: data.category as any,
-          unit: data.unit,
-          quantity: data.quantity,
-          unit_cost: data.unit_cost,
-          notes: data.notes,
-        });
+        await createBudgetItem.mutateAsync(payload);
       }
       onOpenChange(false);
     } catch (error) {

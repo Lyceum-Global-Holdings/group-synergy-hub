@@ -30,6 +30,8 @@ import { useCreateQualityInspection, useUpdateQualityInspection } from "@/hooks/
 import { QualityInspection, QUALITY_INSPECTION_TYPES, QUALITY_INSPECTION_STATUSES, INSPECTION_RESULTS } from "@/types/construction";
 import { useEffect } from "react";
 import { format } from "date-fns";
+import { useCompany } from "@/contexts/CompanyContext";
+import { toast } from "sonner";
 
 const formSchema = z.object({
   project_id: z.string().min(1, "Project is required"),
@@ -54,6 +56,7 @@ interface QualityInspectionDialogProps {
 
 export function QualityInspectionDialog({ open, onOpenChange, inspection }: QualityInspectionDialogProps) {
   const { data: projects } = useProjects();
+  const { selectedCompany } = useCompany();
   const createInspection = useCreateQualityInspection();
   const updateInspection = useUpdateQualityInspection();
 
@@ -104,20 +107,32 @@ export function QualityInspectionDialog({ open, onOpenChange, inspection }: Qual
   }, [inspection, form]);
 
   const onSubmit = async (data: FormData) => {
+    if (!inspection && !selectedCompany?.id) {
+      toast.error("Please select a company before creating an inspection");
+      return;
+    }
+    
     try {
+      const payload = {
+        project_id: data.project_id,
+        title: data.title,
+        inspection_date: data.inspection_date,
+        inspection_type: data.inspection_type as any,
+        description: data.description || undefined,
+        status: data.status as any || undefined,
+        overall_result: data.overall_result as any || undefined,
+        findings: data.findings || undefined,
+        corrective_actions: data.corrective_actions || undefined,
+        follow_up_date: data.follow_up_date || null,
+      };
+      
       if (inspection) {
         await updateInspection.mutateAsync({
           id: inspection.id,
-          ...data,
-          inspection_type: data.inspection_type as any,
+          ...payload,
         });
       } else {
-        await createInspection.mutateAsync({
-          project_id: data.project_id,
-          title: data.title,
-          inspection_date: data.inspection_date,
-          inspection_type: data.inspection_type as any,
-        });
+        await createInspection.mutateAsync(payload);
       }
       onOpenChange(false);
     } catch (error) {

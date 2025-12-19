@@ -34,6 +34,8 @@ import {
   WORK_ORDER_TYPES,
 } from "@/types/construction";
 import { useEffect } from "react";
+import { useCompany } from "@/contexts/CompanyContext";
+import { toast } from "sonner";
 
 const formSchema = z.object({
   project_id: z.string().min(1, "Project is required"),
@@ -59,6 +61,7 @@ interface WorkOrderDialogProps {
 
 export function WorkOrderDialog({ open, onOpenChange, workOrder }: WorkOrderDialogProps) {
   const { data: projects } = useProjects();
+  const { selectedCompany } = useCompany();
   const createWorkOrder = useCreateWorkOrder();
   const updateWorkOrder = useUpdateWorkOrder();
 
@@ -108,29 +111,33 @@ export function WorkOrderDialog({ open, onOpenChange, workOrder }: WorkOrderDial
   }, [workOrder, form]);
 
   const onSubmit = async (data: FormData) => {
+    if (!workOrder && !selectedCompany?.id) {
+      toast.error("Please select a company before creating a work order");
+      return;
+    }
+    
     try {
+      const payload = {
+        project_id: data.project_id,
+        title: data.title,
+        description: data.description || undefined,
+        work_type: data.work_type as any || undefined,
+        priority: data.priority as any || undefined,
+        status: data.status as any || undefined,
+        planned_start_date: data.planned_start_date || null,
+        planned_end_date: data.planned_end_date || null,
+        estimated_hours: data.estimated_hours || undefined,
+        estimated_cost: data.estimated_cost || undefined,
+        notes: data.notes || undefined,
+      };
+      
       if (workOrder) {
         await updateWorkOrder.mutateAsync({
           id: workOrder.id,
-          ...data,
-          work_type: data.work_type as any,
-          priority: data.priority as any,
-          status: data.status as any,
+          ...payload,
         });
       } else {
-        await createWorkOrder.mutateAsync({
-          project_id: data.project_id,
-          title: data.title,
-          description: data.description,
-          work_type: data.work_type as any,
-          priority: data.priority as any,
-          status: data.status as any,
-          planned_start_date: data.planned_start_date,
-          planned_end_date: data.planned_end_date,
-          estimated_hours: data.estimated_hours,
-          estimated_cost: data.estimated_cost,
-          notes: data.notes,
-        });
+        await createWorkOrder.mutateAsync(payload);
       }
       onOpenChange(false);
     } catch (error) {
