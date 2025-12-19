@@ -16,8 +16,21 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Plus, Trash2, Package, Loader2, History } from 'lucide-react';
-import { FloorDrawingRoom, FloorRoomMaterial, ROOM_MATERIAL_STATUSES, RoomMaterialStatus } from '@/types/construction';
+import { 
+  Plus, 
+  Trash2, 
+  Package, 
+  Loader2, 
+  History, 
+  ArrowUpCircle, 
+  RotateCcw 
+} from 'lucide-react';
+import { 
+  FloorDrawingRoom, 
+  FloorRoomMaterial, 
+  ROOM_MATERIAL_STATUSES, 
+  RoomMaterialStatus 
+} from '@/types/construction';
 import {
   useRoomMaterials,
   useCreateRoomMaterial,
@@ -27,6 +40,14 @@ import {
 import { ItemSelector } from '@/components/common/ItemSelector';
 import { useCompany } from '@/contexts/CompanyContext';
 import { MaterialTransactionsDialog } from './MaterialTransactionsDialog';
+import { IssueMaterialDialog } from './IssueMaterialDialog';
+import { ReturnMaterialDialog } from './ReturnMaterialDialog';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 
 interface RoomMaterialsDialogProps {
   room: FloorDrawingRoom | null;
@@ -42,6 +63,8 @@ export function RoomMaterialsDialog({ room, open, onOpenChange }: RoomMaterialsD
   const [quantityRequired, setQuantityRequired] = useState<string>('1');
   const [notes, setNotes] = useState<string>('');
   const [transactionsMaterial, setTransactionsMaterial] = useState<FloorRoomMaterial | null>(null);
+  const [issueMaterial, setIssueMaterial] = useState<FloorRoomMaterial | null>(null);
+  const [returnMaterial, setReturnMaterial] = useState<FloorRoomMaterial | null>(null);
 
   const { data: materials = [], isLoading } = useRoomMaterials(room?.id || null);
   const createMaterial = useCreateRoomMaterial();
@@ -90,7 +113,7 @@ export function RoomMaterialsDialog({ room, open, onOpenChange }: RoomMaterialsD
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[85vh]">
+      <DialogContent className="max-w-3xl max-h-[85vh]">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Package className="h-5 w-5" />
@@ -190,7 +213,11 @@ export function RoomMaterialsDialog({ room, open, onOpenChange }: RoomMaterialsD
             ) : (
               <div className="space-y-3">
                 {materials.map((material) => {
-                  const statusInfo = ROOM_MATERIAL_STATUSES.find((s) => s.value === material.status);
+                  const warehouseStock = material.warehouse_item?.current_stock ?? 0;
+                  const allocated = material.quantity_allocated ?? 0;
+                  const canIssue = warehouseStock > 0;
+                  const canReturn = allocated > 0;
+                  
                   return (
                     <div
                       key={material.id}
@@ -202,17 +229,17 @@ export function RoomMaterialsDialog({ room, open, onOpenChange }: RoomMaterialsD
                             {material.warehouse_item?.item_code} - {material.warehouse_item?.name}
                           </div>
                           <div className="text-sm text-muted-foreground">
-                            Stock: {material.warehouse_item?.current_stock ?? 0}
+                            Warehouse Stock: <span className={warehouseStock > 0 ? 'text-green-600 font-medium' : 'text-destructive font-medium'}>{warehouseStock}</span>
                           </div>
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1">
                           <Select
                             value={material.status}
                             onValueChange={(value) =>
                               handleStatusChange(material.id, value as RoomMaterialStatus)
                             }
                           >
-                            <SelectTrigger className="w-[140px] h-8">
+                            <SelectTrigger className="w-[130px] h-8">
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
@@ -223,6 +250,45 @@ export function RoomMaterialsDialog({ room, open, onOpenChange }: RoomMaterialsD
                               ))}
                             </SelectContent>
                           </Select>
+                          
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 text-green-600 hover:text-green-700 hover:bg-green-50"
+                                  onClick={() => setIssueMaterial(material)}
+                                  disabled={!canIssue}
+                                >
+                                  <ArrowUpCircle className="h-4 w-4" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                {canIssue ? 'Issue material from warehouse' : 'No stock available'}
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                          
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 text-orange-600 hover:text-orange-700 hover:bg-orange-50"
+                                  onClick={() => setReturnMaterial(material)}
+                                  disabled={!canReturn}
+                                >
+                                  <RotateCcw className="h-4 w-4" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                {canReturn ? 'Return material to warehouse' : 'No material issued to return'}
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                          
                           <Button
                             variant="ghost"
                             size="icon"
@@ -249,8 +315,8 @@ export function RoomMaterialsDialog({ room, open, onOpenChange }: RoomMaterialsD
                           <span className="font-medium">{material.quantity_required}</span>
                         </div>
                         <div>
-                          <span className="text-muted-foreground">Allocated:</span>{' '}
-                          <span className="font-medium">{material.quantity_allocated || 0}</span>
+                          <span className="text-muted-foreground">Issued:</span>{' '}
+                          <span className="font-medium text-primary">{allocated}</span>
                         </div>
                         <div>
                           <span className="text-muted-foreground">Used:</span>{' '}
@@ -296,6 +362,22 @@ export function RoomMaterialsDialog({ room, open, onOpenChange }: RoomMaterialsD
           roomId={room?.id || ''}
           open={!!transactionsMaterial}
           onOpenChange={(open) => !open && setTransactionsMaterial(null)}
+        />
+
+        {/* Issue Material Dialog */}
+        <IssueMaterialDialog
+          material={issueMaterial}
+          roomId={room?.id || ''}
+          open={!!issueMaterial}
+          onOpenChange={(open) => !open && setIssueMaterial(null)}
+        />
+
+        {/* Return Material Dialog */}
+        <ReturnMaterialDialog
+          material={returnMaterial}
+          roomId={room?.id || ''}
+          open={!!returnMaterial}
+          onOpenChange={(open) => !open && setReturnMaterial(null)}
         />
       </DialogContent>
     </Dialog>
