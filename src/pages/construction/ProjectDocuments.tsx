@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus, Search, FileText, FileImage, FileCheck, Upload } from "lucide-react";
+import { Plus, Search, FileText, FileImage, FileCheck, Upload, Pencil, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -19,14 +19,22 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useConstructionDocuments } from "@/hooks/construction/useConstructionDocuments";
-import { DOCUMENT_TYPES, DOCUMENT_STATUSES } from "@/types/construction";
+import { useConstructionDocuments, useCreateConstructionDocument, useUpdateConstructionDocument, useDeleteConstructionDocument } from "@/hooks/construction/useConstructionDocuments";
+import { DOCUMENT_TYPES, DOCUMENT_STATUSES, ConstructionDocument } from "@/types/construction";
 import { format } from "date-fns";
+import { ConstructionDocumentDialog, DeleteConfirmDialog } from "@/components/construction/dialogs";
 
 export default function ProjectDocuments() {
   const [searchTerm, setSearchTerm] = useState("");
   const [typeFilter, setTypeFilter] = useState<string>("all");
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingItem, setEditingItem] = useState<ConstructionDocument | null>(null);
+  const [deletingItem, setDeletingItem] = useState<ConstructionDocument | null>(null);
+
   const { data: documents, isLoading } = useConstructionDocuments();
+  const createMutation = useCreateConstructionDocument();
+  const updateMutation = useUpdateConstructionDocument();
+  const deleteMutation = useDeleteConstructionDocument();
 
   const filteredDocuments = documents?.filter((doc) => {
     const matchesSearch =
@@ -52,6 +60,23 @@ export default function ProjectDocuments() {
     return `${(kb / 1024).toFixed(1)} MB`;
   };
 
+  const handleCreate = () => {
+    setEditingItem(null);
+    setDialogOpen(true);
+  };
+
+  const handleEdit = (item: ConstructionDocument) => {
+    setEditingItem(item);
+    setDialogOpen(true);
+  };
+
+  const handleDelete = async () => {
+    if (deletingItem) {
+      await deleteMutation.mutateAsync(deletingItem.id);
+      setDeletingItem(null);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -61,7 +86,7 @@ export default function ProjectDocuments() {
             Manage project drawings, specifications, permits, and other documents
           </p>
         </div>
-        <Button>
+        <Button onClick={handleCreate}>
           <Upload className="mr-2 h-4 w-4" />
           Upload Document
         </Button>
@@ -156,12 +181,13 @@ export default function ProjectDocuments() {
                   <TableHead>Size</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Uploaded</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredDocuments?.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
                       No documents found
                     </TableCell>
                   </TableRow>
@@ -187,6 +213,24 @@ export default function ProjectDocuments() {
                       <TableCell>
                         {format(new Date(doc.created_at), "MMM d, yyyy")}
                       </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-2">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleEdit(doc as ConstructionDocument)}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setDeletingItem(doc as ConstructionDocument)}
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </div>
+                      </TableCell>
                     </TableRow>
                   ))
                 )}
@@ -195,6 +239,21 @@ export default function ProjectDocuments() {
           )}
         </CardContent>
       </Card>
+
+      <ConstructionDocumentDialog
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        document={editingItem}
+      />
+
+      <DeleteConfirmDialog
+        open={!!deletingItem}
+        onOpenChange={(open) => !open && setDeletingItem(null)}
+        onConfirm={handleDelete}
+        title="Delete Document"
+        description={`Are you sure you want to delete document "${deletingItem?.document_number}"? This action cannot be undone.`}
+        isDeleting={deleteMutation.isPending}
+      />
     </div>
   );
 }

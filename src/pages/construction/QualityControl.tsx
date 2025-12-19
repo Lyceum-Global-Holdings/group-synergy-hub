@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus, Search, ClipboardCheck, CheckCircle, XCircle, AlertCircle } from "lucide-react";
+import { Plus, Search, ClipboardCheck, CheckCircle, XCircle, AlertCircle, Pencil, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -19,14 +19,22 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useQualityInspections } from "@/hooks/construction/useQualityInspections";
-import { QUALITY_INSPECTION_STATUSES, QUALITY_INSPECTION_TYPES, INSPECTION_RESULTS } from "@/types/construction";
+import { useQualityInspections, useCreateQualityInspection, useUpdateQualityInspection, useDeleteQualityInspection } from "@/hooks/construction/useQualityInspections";
+import { QUALITY_INSPECTION_STATUSES, INSPECTION_RESULTS, QualityInspection } from "@/types/construction";
 import { format } from "date-fns";
+import { QualityInspectionDialog, DeleteConfirmDialog } from "@/components/construction/dialogs";
 
 export default function QualityControl() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingItem, setEditingItem] = useState<QualityInspection | null>(null);
+  const [deletingItem, setDeletingItem] = useState<QualityInspection | null>(null);
+
   const { data: inspections, isLoading } = useQualityInspections();
+  const createMutation = useCreateQualityInspection();
+  const updateMutation = useUpdateQualityInspection();
+  const deleteMutation = useDeleteQualityInspection();
 
   const filteredInspections = inspections?.filter((inspection) => {
     const matchesSearch =
@@ -55,6 +63,23 @@ export default function QualityControl() {
     );
   };
 
+  const handleCreate = () => {
+    setEditingItem(null);
+    setDialogOpen(true);
+  };
+
+  const handleEdit = (item: QualityInspection) => {
+    setEditingItem(item);
+    setDialogOpen(true);
+  };
+
+  const handleDelete = async () => {
+    if (deletingItem) {
+      await deleteMutation.mutateAsync(deletingItem.id);
+      setDeletingItem(null);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -64,7 +89,7 @@ export default function QualityControl() {
             Manage quality inspections and track compliance
           </p>
         </div>
-        <Button>
+        <Button onClick={handleCreate}>
           <Plus className="mr-2 h-4 w-4" />
           New Inspection
         </Button>
@@ -158,12 +183,13 @@ export default function QualityControl() {
                   <TableHead>Date</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Result</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredInspections?.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                       No inspections found
                     </TableCell>
                   </TableRow>
@@ -179,6 +205,24 @@ export default function QualityControl() {
                       </TableCell>
                       <TableCell>{getStatusBadge(inspection.status)}</TableCell>
                       <TableCell>{getResultBadge(inspection.overall_result)}</TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-2">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleEdit(inspection as QualityInspection)}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setDeletingItem(inspection as QualityInspection)}
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </div>
+                      </TableCell>
                     </TableRow>
                   ))
                 )}
@@ -187,6 +231,21 @@ export default function QualityControl() {
           )}
         </CardContent>
       </Card>
+
+      <QualityInspectionDialog
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        inspection={editingItem}
+      />
+
+      <DeleteConfirmDialog
+        open={!!deletingItem}
+        onOpenChange={(open) => !open && setDeletingItem(null)}
+        onConfirm={handleDelete}
+        title="Delete Inspection"
+        description={`Are you sure you want to delete inspection "${deletingItem?.inspection_number}"? This action cannot be undone.`}
+        isDeleting={deleteMutation.isPending}
+      />
     </div>
   );
 }
