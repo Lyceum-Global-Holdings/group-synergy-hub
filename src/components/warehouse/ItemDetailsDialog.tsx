@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,9 +9,10 @@ import { useItemUnits } from "@/hooks/useItemUnits";
 import { useWarehouseLocations } from "@/hooks/useWarehouseLocations";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { format } from "date-fns";
-import { Package, DollarSign, Info, Grid3X3, CheckCircle, XCircle } from "lucide-react";
+import { format, parseISO, startOfDay } from "date-fns";
+import { Package, DollarSign, Info, Grid3X3, CheckCircle, XCircle, TrendingUp, History } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, BarChart, Bar } from "recharts";
 
 interface ItemDetailsDialogProps {
   item: WarehouseItem | null;
@@ -29,8 +31,18 @@ interface BinAllocation {
   } | null;
 }
 
+interface StockTransaction {
+  id: string;
+  transaction_type: string;
+  quantity_change: number;
+  quantity_before: number;
+  quantity_after: number;
+  notes: string | null;
+  created_at: string;
+}
+
 const fetchBinAllocations = async (itemId: string): Promise<BinAllocation[]> => {
-  const { data, error } = await (supabase as any)
+  const { data, error } = await supabase
     .from('warehouse_bin_allocations')
     .select(`
       id,
@@ -42,10 +54,22 @@ const fetchBinAllocations = async (itemId: string): Promise<BinAllocation[]> => 
         status
       )
     `)
-    .eq('item_id', itemId);
+    .eq('warehouse_item_id', itemId);
   
   if (error) throw error;
   return (data || []) as BinAllocation[];
+};
+
+const fetchStockTransactions = async (itemId: string): Promise<StockTransaction[]> => {
+  const { data, error } = await supabase
+    .from('stock_transactions')
+    .select('id, transaction_type, quantity_change, quantity_before, quantity_after, notes, created_at')
+    .eq('item_id', itemId)
+    .order('created_at', { ascending: false })
+    .limit(100);
+  
+  if (error) throw error;
+  return (data || []) as StockTransaction[];
 };
 
 export const ItemDetailsDialog = ({ item, open, onOpenChange }: ItemDetailsDialogProps) => {
@@ -62,6 +86,43 @@ export const ItemDetailsDialog = ({ item, open, onOpenChange }: ItemDetailsDialo
     queryFn: () => fetchBinAllocations(item!.id),
     enabled: !!item?.id && open,
   });
+
+  const { data: stockTransactions = [] } = useQuery<StockTransaction[]>({
+    queryKey: ['stock-transactions', item?.id],
+    queryFn: () => fetchStockTransactions(item!.id),
+    enabled: !!item?.id && open,
+  });
+
+  // Aggregate transactions by day for chart
+  const dailyStockData = useMemo(() => {
+    if (!stockTransactions.length) return [];
+
+    // Group by day and get the last quantity_after for each day
+    const dayMap = new Map<string, { date: string; quantity: number; changes: number }>();
+    
+    // Process in reverse chronological order (oldest first for the chart)
+    const sorted = [...stockTransactions].sort((a, b) => 
+      new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+    );
+
+    sorted.forEach((txn) => {
+      const dayKey = format(parseISO(txn.created_at), 'yyyy-MM-dd');
+      const existing = dayMap.get(dayKey);
+      
+      if (existing) {
+        existing.quantity = txn.quantity_after;
+        existing.changes += txn.quantity_change;
+      } else {
+        dayMap.set(dayKey, {
+          date: format(parseISO(txn.created_at), 'MMM dd'),
+          quantity: txn.quantity_after,
+          changes: txn.quantity_change,
+        });
+      }
+    });
+
+    return Array.from(dayMap.values());
+  }, [stockTransactions]);
 
   const getStockStatus = () => {
     if (!item) return { label: "-", variant: "secondary" as const };
@@ -315,6 +376,105 @@ export const ItemDetailsDialog = ({ item, open, onOpenChange }: ItemDetailsDialo
                     ))}
                   </TableBody>
                 </Table>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Daily Stock Movement Chart */}
+          {dailyStockData.length > 0 && (
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <TrendingUp className="h-4 w-4" />
+                  Daily Stock Movement
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={200}>
+                  <LineChart data={dailyStockData}>
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                    <XAxis 
+                      dataKey="date" 
+                      tick={{ fontSize: 12 }} 
+                      className="text-muted-foreground"
+                    />
+                    <YAxis 
+                      tick={{ fontSize: 12 }} 
+                      className="text-muted-foreground"
+                    />
+                    <Tooltip 
+                      contentStyle={{ 
+                        backgroundColor: 'hsl(var(--popover))', 
+                        border: '1px solid hsl(var(--border))',
+                        borderRadius: '6px'
+                      }}
+                      labelStyle={{ color: 'hsl(var(--popover-foreground))' }}
+                    />
+                    <Line 
+                      type="monotone" 
+                      dataKey="quantity" 
+                      stroke="hsl(var(--primary))" 
+                      strokeWidth={2}
+                      dot={{ fill: 'hsl(var(--primary))' }}
+                      name="Stock Level"
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Stock Transaction History */}
+          {stockTransactions.length > 0 && (
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <History className="h-4 w-4" />
+                  Stock Transaction History
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="max-h-[300px] overflow-y-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Date</TableHead>
+                        <TableHead>Type</TableHead>
+                        <TableHead className="text-right">Change</TableHead>
+                        <TableHead className="text-right">After</TableHead>
+                        <TableHead>Notes</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {stockTransactions.slice(0, 20).map((txn) => (
+                        <TableRow key={txn.id}>
+                          <TableCell className="whitespace-nowrap">
+                            {format(parseISO(txn.created_at), 'MMM dd, yyyy')}
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline" className="capitalize">
+                              {txn.transaction_type.replace(/_/g, ' ')}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className={`text-right font-medium ${
+                            txn.quantity_change > 0 ? 'text-green-600' : 'text-red-600'
+                          }`}>
+                            {txn.quantity_change > 0 ? '+' : ''}{txn.quantity_change}
+                          </TableCell>
+                          <TableCell className="text-right">{txn.quantity_after}</TableCell>
+                          <TableCell className="max-w-[200px] truncate text-muted-foreground">
+                            {txn.notes || '-'}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+                {stockTransactions.length > 20 && (
+                  <p className="text-xs text-muted-foreground text-center mt-2">
+                    Showing 20 of {stockTransactions.length} transactions
+                  </p>
+                )}
               </CardContent>
             </Card>
           )}

@@ -1,7 +1,8 @@
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -31,6 +32,7 @@ import { useCreateStockTransfer, useCreateStockTransferItem } from "@/hooks/useS
 import { useWarehouseLocations } from "@/hooks/useWarehouseLocations";
 import { WarehouseItem } from "@/types/itemBin";
 import { useItemUnits } from "@/hooks/useItemUnits";
+import { supabase } from "@/integrations/supabase/client";
 
 const formSchema = z.object({
   transfer_date: z.string(),
@@ -82,18 +84,88 @@ export function ItemTransferDialog({
     ? units.find(u => u.id === item.unit_id)?.abbreviation || "units"
     : "units";
 
-  // Get current location name
-  const currentLocationName = item?.location_id 
-    ? mainLocations.find(loc => loc.id === item.location_id)?.name || "Unknown Location"
-    : "No location assigned";
+  // Fetch bin allocations with location info for this item
+  const { data: itemBinAllocations = [] } = useQuery({
+    queryKey: ['item-bin-allocations-for-transfer', item?.id],
+    queryFn: async () => {
+      if (!item?.id) return [];
+      
+      const { data, error } = await supabase
+        .from('warehouse_bin_allocations')
+        .select(`
+          id,
+          allocated_quantity,
+          available_quantity,
+          warehouse_bins!inner (
+            id,
+            bin_code,
+            name,
+            location_id
+          )
+        `)
+        .eq('warehouse_item_id', item.id)
+        .gt('available_quantity', 0);
+      
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!item?.id && open,
+  });
+
+  // Aggregate stock by location
+  const itemLocationsWithStock = useMemo(() => {
+    const locationMap = new Map<string, { locationId: string; locationName: string; totalStock: number }>();
+    
+    itemBinAllocations.forEach((allocation: any) => {
+      const locationId = allocation.warehouse_bins?.location_id;
+      if (locationId) {
+        const location = mainLocations.find(l => l.id === locationId);
+        if (location) {
+          const existing = locationMap.get(locationId);
+          if (existing) {
+            existing.totalStock += Number(allocation.available_quantity) || 0;
+          } else {
+            locationMap.set(locationId, {
+              locationId,
+              locationName: location.name,
+              totalStock: Number(allocation.available_quantity) || 0,
+            });
+          }
+        }
+      }
+    });
+
+    // Also include the item's primary location if it has stock there
+    if (item?.location_id && item.current_stock && item.current_stock > 0) {
+      const primaryLocation = mainLocations.find(l => l.id === item.location_id);
+      if (primaryLocation && !locationMap.has(item.location_id)) {
+        locationMap.set(item.location_id, {
+          locationId: item.location_id,
+          locationName: primaryLocation.name,
+          totalStock: item.current_stock,
+        });
+      }
+    }
+
+    return Array.from(locationMap.values());
+  }, [itemBinAllocations, mainLocations, item]);
+
+  const selectedFromLocation = form.watch('from_location_id');
+  const selectedLocationStock = itemLocationsWithStock.find(l => l.locationId === selectedFromLocation)?.totalStock || 0;
+
+  const hasLocationsWithStock = itemLocationsWithStock.length > 0;
 
   // Auto-set from_location_id when item changes
   useEffect(() => {
     if (item && open) {
+      const defaultLocationId = itemLocationsWithStock.length > 0 
+        ? itemLocationsWithStock[0].locationId 
+        : item.location_id || "";
+      
       form.reset({
         transfer_date: new Date().toISOString().split("T")[0],
         priority: "normal",
-        from_location_id: item.location_id || "",
+        from_location_id: defaultLocationId,
         from_department_id: "",
         to_location_id: "",
         to_department_id: "",
@@ -102,15 +174,16 @@ export function ItemTransferDialog({
         notes: "",
       });
     }
-  }, [item, open, form]);
+  }, [item, open, form, itemLocationsWithStock.length]);
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     if (!item) return;
 
-    // Validate quantity against available stock
-    if (values.quantity > (item.current_stock || 0)) {
+    // Validate quantity against available stock at selected location
+    const availableAtLocation = itemLocationsWithStock.find(l => l.locationId === values.from_location_id)?.totalStock || 0;
+    if (values.quantity > availableAtLocation) {
       form.setError("quantity", {
-        message: `Cannot transfer more than available stock (${item.current_stock || 0})`,
+        message: `Cannot transfer more than available stock at this location (${availableAtLocation})`,
       });
       return;
     }
@@ -164,7 +237,7 @@ export function ItemTransferDialog({
         </DialogHeader>
 
         <div className="bg-muted p-3 rounded-lg mb-4">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
             <div>
               <span className="text-muted-foreground">Item Code:</span>
               <p className="font-medium">{item.item_code}</p>
@@ -174,19 +247,28 @@ export function ItemTransferDialog({
               <p className="font-medium">{item.name}</p>
             </div>
             <div>
-              <span className="text-muted-foreground">Current Location:</span>
-              <p className="font-medium">{currentLocationName}</p>
-            </div>
-            <div>
-              <span className="text-muted-foreground">Available Stock:</span>
+              <span className="text-muted-foreground">Total Stock:</span>
               <p className="font-medium">{item.current_stock || 0} {unitName}</p>
             </div>
           </div>
+          {itemLocationsWithStock.length > 0 && (
+            <div className="mt-3 pt-3 border-t">
+              <p className="text-xs text-muted-foreground mb-2">Stock by Location:</p>
+              <div className="flex flex-wrap gap-2">
+                {itemLocationsWithStock.map((loc) => (
+                  <span key={loc.locationId} className="inline-flex items-center gap-1 px-2 py-1 bg-background rounded text-xs">
+                    <span className="font-medium">{loc.locationName}:</span>
+                    <span>{loc.totalStock} {unitName}</span>
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
-        {!item.location_id && (
+        {!hasLocationsWithStock && (
           <div className="bg-destructive/10 text-destructive p-3 rounded-lg mb-4 text-sm">
-            This item has no assigned location. Please assign a location before transferring.
+            This item has no stock in any location. Cannot transfer items without available stock.
           </div>
         )}
 
@@ -238,16 +320,28 @@ export function ItemTransferDialog({
                 <FormField
                   control={form.control}
                   name="from_location_id"
-                  render={() => (
+                  render={({ field }) => (
                     <FormItem>
                       <FormLabel>From Location *</FormLabel>
-                      <FormControl>
-                        <Input 
-                          value={currentLocationName}
-                          disabled
-                          className="bg-muted"
-                        />
-                      </FormControl>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select source location" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {itemLocationsWithStock.map((loc) => (
+                            <SelectItem key={loc.locationId} value={loc.locationId}>
+                              {loc.locationName} ({loc.totalStock} {unitName} available)
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {selectedFromLocation && (
+                        <p className="text-xs text-muted-foreground">
+                          Available: {selectedLocationStock} {unitName}
+                        </p>
+                      )}
                       <FormMessage />
                     </FormItem>
                   )}
@@ -345,7 +439,7 @@ export function ItemTransferDialog({
                     <Input
                       type="number"
                       min={1}
-                      max={item.current_stock || 0}
+                      max={selectedLocationStock || 0}
                       {...field}
                       onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
                     />
@@ -389,7 +483,7 @@ export function ItemTransferDialog({
               </Button>
               <Button 
                 type="submit" 
-                disabled={createTransfer.isPending || createItem.isPending || !item.location_id}
+                disabled={createTransfer.isPending || createItem.isPending || !hasLocationsWithStock}
               >
                 {createTransfer.isPending ? "Creating Transfer..." : "Create Transfer"}
               </Button>
