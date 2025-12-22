@@ -366,7 +366,7 @@ export function BulkItemImportDialog() {
       
       const valid = parsed
         .filter(item => item.errors.length === 0)
-        .map(({ rowNumber, errors, warnings, ...item }) => item as CreateWarehouseItemData);
+        .map(({ rowNumber, errors, warnings, initial_stock, bin_id, ...item }) => item as CreateWarehouseItemData);
       
       setValidData(valid);
       setShowPreview(true);
