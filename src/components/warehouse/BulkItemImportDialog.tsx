@@ -478,6 +478,24 @@ export function BulkItemImportDialog() {
         // Invalidate queries to refresh data
         queryClient.invalidateQueries({ queryKey: ['warehouse-bin-allocations'] });
       }
+
+      // Step 4: Update current_stock for items with initial stock
+      for (const createdItem of createdItems) {
+        const originalItem = parsedData.find(p => 
+          p.item_code === createdItem.item_code && 
+          p.errors.length === 0
+        );
+        
+        if (originalItem?.initial_stock && originalItem.initial_stock > 0) {
+          await supabase
+            .from('warehouse_items')
+            .update({ current_stock: originalItem.initial_stock })
+            .eq('id', createdItem.id);
+        }
+      }
+
+      // Invalidate warehouse items query to refresh data
+      queryClient.invalidateQueries({ queryKey: ['warehouse-items'] });
       
       setOpen(false);
       resetState();
