@@ -87,8 +87,8 @@ export const useIssueMaterial = () => {
       const newWarehouseStock = currentWarehouseStock - data.quantity;
       const unitCost = data.unit_cost || warehouseItem.unit_cost || 0;
       
-      // Create the transaction record
-      const { error: transactionError } = await supabase
+      // Create the transaction record in floor_room_material_transactions
+      const { data: transaction, error: transactionError } = await supabase
         .from('floor_room_material_transactions')
         .insert({
           room_material_id: data.room_material_id,
@@ -104,9 +104,32 @@ export const useIssueMaterial = () => {
           total_value: data.quantity * unitCost,
           notes: data.notes || null,
           company_id: data.company_id || null,
-        });
+        })
+        .select('id')
+        .single();
       
       if (transactionError) throw transactionError;
+      
+      // Create stock_transactions record for warehouse stock movement history
+      const { error: stockTransactionError } = await supabase
+        .from('stock_transactions')
+        .insert({
+          item_id: data.warehouse_item_id,
+          transaction_type: 'project_issue',
+          reference_type: 'project',
+          reference_id: transaction.id,
+          quantity_change: -data.quantity,
+          quantity_before: currentWarehouseStock,
+          quantity_after: newWarehouseStock,
+          unit_cost: unitCost,
+          total_value: data.quantity * unitCost,
+          notes: `Project Issue: ${data.notes || 'Material issued to project'}`,
+          company_id: data.company_id || null,
+        });
+      
+      if (stockTransactionError) {
+        console.error('Failed to create stock transaction:', stockTransactionError);
+      }
       
       // Update warehouse stock
       const { error: updateWarehouseError } = await supabase
@@ -133,6 +156,7 @@ export const useIssueMaterial = () => {
       queryClient.invalidateQueries({ queryKey: ['room-material-transactions', variables.room_material_id] });
       queryClient.invalidateQueries({ queryKey: ['room-materials', data.room_id] });
       queryClient.invalidateQueries({ queryKey: ['warehouse-items'] });
+      queryClient.invalidateQueries({ queryKey: ['stock-transactions'] });
       toast.success('Material issued successfully');
     },
     onError: (error: Error) => {
@@ -187,8 +211,8 @@ export const useReturnMaterial = () => {
       const newWarehouseStock = currentWarehouseStock + data.quantity;
       const unitCost = data.unit_cost || warehouseItem.unit_cost || 0;
       
-      // Create the transaction record
-      const { error: transactionError } = await supabase
+      // Create the transaction record in floor_room_material_transactions
+      const { data: transaction, error: transactionError } = await supabase
         .from('floor_room_material_transactions')
         .insert({
           room_material_id: data.room_material_id,
@@ -204,9 +228,32 @@ export const useReturnMaterial = () => {
           total_value: data.quantity * unitCost,
           notes: data.notes || null,
           company_id: data.company_id || null,
-        });
+        })
+        .select('id')
+        .single();
       
       if (transactionError) throw transactionError;
+      
+      // Create stock_transactions record for warehouse stock movement history
+      const { error: stockTransactionError } = await supabase
+        .from('stock_transactions')
+        .insert({
+          item_id: data.warehouse_item_id,
+          transaction_type: 'project_return',
+          reference_type: 'project',
+          reference_id: transaction.id,
+          quantity_change: data.quantity,
+          quantity_before: currentWarehouseStock,
+          quantity_after: newWarehouseStock,
+          unit_cost: unitCost,
+          total_value: data.quantity * unitCost,
+          notes: `Project Return: ${data.notes || 'Material returned from project'}`,
+          company_id: data.company_id || null,
+        });
+      
+      if (stockTransactionError) {
+        console.error('Failed to create stock transaction:', stockTransactionError);
+      }
       
       // Update warehouse stock
       const { error: updateWarehouseError } = await supabase
@@ -233,6 +280,7 @@ export const useReturnMaterial = () => {
       queryClient.invalidateQueries({ queryKey: ['room-material-transactions', variables.room_material_id] });
       queryClient.invalidateQueries({ queryKey: ['room-materials', data.room_id] });
       queryClient.invalidateQueries({ queryKey: ['warehouse-items'] });
+      queryClient.invalidateQueries({ queryKey: ['stock-transactions'] });
       toast.success('Material returned successfully');
     },
     onError: (error: Error) => {
