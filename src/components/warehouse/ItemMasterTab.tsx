@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Plus, Search, Edit, Trash2, History, Settings, Eye } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, History, Settings, Eye, ArrowLeftRight } from 'lucide-react';
 import { BulkItemImportDialog } from '@/components/warehouse/BulkItemImportDialog';
 import {
   Table,
@@ -21,6 +21,7 @@ import { StockMovementDialog } from '@/components/warehouse/StockMovementDialog'
 import { StockAdjustmentDialog } from '@/components/warehouse/StockAdjustmentDialog';
 import { DeleteItemConfirmationDialog } from '@/components/warehouse/DeleteItemConfirmationDialog';
 import { ItemDetailsDialog } from '@/components/warehouse/ItemDetailsDialog';
+import { ItemTransferDialog } from '@/components/warehouse/ItemTransferDialog';
 import { WarehouseItem } from '@/types/itemBin';
 
 export function ItemMasterTab() {
@@ -31,6 +32,7 @@ export function ItemMasterTab() {
   const [stockMovementItem, setStockMovementItem] = useState<WarehouseItem | null>(null);
   const [stockAdjustmentItem, setStockAdjustmentItem] = useState<WarehouseItem | null>(null);
   const [deletingItem, setDeletingItem] = useState<WarehouseItem | null>(null);
+  const [transferItem, setTransferItem] = useState<WarehouseItem | null>(null);
   
   const { 
     items, 
@@ -191,6 +193,14 @@ export function ItemMasterTab() {
                       <Button
                         variant="ghost"
                         size="sm"
+                        onClick={() => setTransferItem(item)}
+                        title="Transfer Between Warehouses"
+                      >
+                        <ArrowLeftRight className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
                         onClick={() => setDeletingItem(item)}
                         disabled={isDeleting || isMarkingInactive}
                         title="Delete"
@@ -256,6 +266,14 @@ export function ItemMasterTab() {
         onOpenChange={(open) => {
           if (!open) setViewingItem(null);
         }}
+      />
+
+      <ItemTransferDialog
+        open={!!transferItem}
+        onOpenChange={(open) => {
+          if (!open) setTransferItem(null);
+        }}
+        item={transferItem}
       />
     </div>
   );
