@@ -30,14 +30,15 @@ const getStatusColor = (status: string): "default" | "destructive" | "secondary"
 
 export function MaterialReturnDetailsDialog({ open, onOpenChange, returnNote }: MaterialReturnDetailsDialogProps) {
   const { returnItems, isLoading } = useMaterialReturnItems(returnNote?.id);
-  const { updateMaterialReturn, isUpdating } = useMaterialReturns();
+  const { updateMaterialReturn, approveMaterialReturn, isUpdating, isApproving } = useMaterialReturns();
 
   if (!returnNote) return null;
 
   const handleApprove = () => {
-    updateMaterialReturn({
+    // Use the new approveMaterialReturn mutation that handles stock updates
+    approveMaterialReturn({
       id: returnNote.id,
-      status: 'returned'
+      mrnNumber: returnNote.mrn_number
     });
   };
 
@@ -49,6 +50,7 @@ export function MaterialReturnDetailsDialog({ open, onOpenChange, returnNote }: 
   };
 
   const totalValue = returnItems?.reduce((sum, item) => sum + (item.total_cost || 0), 0) || 0;
+  const isProcessing = isUpdating || isApproving;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -166,17 +168,17 @@ export function MaterialReturnDetailsDialog({ open, onOpenChange, returnNote }: 
                 <Button
                   variant="outline"
                   onClick={handleCancel}
-                  disabled={isUpdating}
+                  disabled={isProcessing}
                 >
                   <XCircle className="h-4 w-4 mr-2" />
                   Cancel Return
                 </Button>
                 <Button
                   onClick={handleApprove}
-                  disabled={isUpdating}
+                  disabled={isProcessing}
                 >
                   <CheckCircle className="h-4 w-4 mr-2" />
-                  Approve Return
+                  {isApproving ? 'Processing...' : 'Approve Return'}
                 </Button>
               </div>
             </>
