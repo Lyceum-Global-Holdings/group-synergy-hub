@@ -219,9 +219,12 @@ export const useCompleteStockTransfer = () => {
 
       if (transferError) throw transferError;
 
+      const fromLocationId = transfer.from_location_id;
+      const toLocationId = transfer.to_location_id;
+
       // Process each item
       for (const item of items) {
-        // Get current stock
+        // Get current stock for transaction records
         const { data: warehouseItem } = await supabase
           .from("warehouse_items")
           .select("current_stock")
@@ -239,7 +242,7 @@ export const useCompleteStockTransfer = () => {
           quantity_change: -item.quantity_requested,
           quantity_before: currentStock,
           quantity_after: currentStock - item.quantity_requested,
-          notes: `Transfer ${transfer.transfer_number} - Out`,
+          notes: `Transfer ${transfer.transfer_number} - Out from ${fromLocationId}`,
           created_by: user.id,
         });
 
@@ -252,7 +255,7 @@ export const useCompleteStockTransfer = () => {
           quantity_change: item.quantity_requested,
           quantity_before: currentStock - item.quantity_requested,
           quantity_after: currentStock,
-          notes: `Transfer ${transfer.transfer_number} - In`,
+          notes: `Transfer ${transfer.transfer_number} - In to ${toLocationId}`,
           created_by: user.id,
         });
 
@@ -265,7 +268,67 @@ export const useCompleteStockTransfer = () => {
           })
           .eq("id", item.id);
 
-        // Update bin quantities if bins specified
+        // ===== UPDATE SOURCE BIN ALLOCATION (decrease stock) =====
+        const { data: sourceAllocations } = await supabase
+          .from('warehouse_bin_allocations')
+          .select('*, warehouse_bins!inner(location_id)')
+          .eq('warehouse_item_id', item.warehouse_item_id)
+          .eq('warehouse_bins.location_id', fromLocationId);
+
+        if (sourceAllocations && sourceAllocations.length > 0) {
+          const sourceAlloc = sourceAllocations[0];
+          await supabase
+            .from('warehouse_bin_allocations')
+            .update({
+              allocated_quantity: Math.max(0, (sourceAlloc.allocated_quantity || 0) - item.quantity_requested),
+              available_quantity: Math.max(0, (sourceAlloc.available_quantity || 0) - item.quantity_requested),
+            })
+            .eq('id', sourceAlloc.id);
+        }
+
+        // ===== CREATE OR UPDATE DESTINATION BIN ALLOCATION (increase stock) =====
+        // First, find a bin at the destination location
+        const { data: destBins } = await supabase
+          .from('warehouse_bins')
+          .select('id')
+          .eq('location_id', toLocationId)
+          .limit(1);
+
+        if (destBins && destBins.length > 0) {
+          const destBinId = destBins[0].id;
+
+          // Check if allocation already exists at destination
+          const { data: destAllocation } = await supabase
+            .from('warehouse_bin_allocations')
+            .select('*')
+            .eq('warehouse_item_id', item.warehouse_item_id)
+            .eq('bin_id', destBinId)
+            .maybeSingle();
+
+          if (destAllocation) {
+            // Update existing allocation
+            await supabase
+              .from('warehouse_bin_allocations')
+              .update({
+                allocated_quantity: (destAllocation.allocated_quantity || 0) + item.quantity_requested,
+                available_quantity: (destAllocation.available_quantity || 0) + item.quantity_requested,
+              })
+              .eq('id', destAllocation.id);
+          } else {
+            // Create new allocation at destination
+            await supabase
+              .from('warehouse_bin_allocations')
+              .insert({
+                warehouse_item_id: item.warehouse_item_id,
+                bin_id: destBinId,
+                allocated_quantity: item.quantity_requested,
+                available_quantity: item.quantity_requested,
+                reserved_quantity: 0,
+              });
+          }
+        }
+
+        // Also update bin current_quantity if bins specified (for backward compatibility)
         if (item.from_bin_id) {
           const { data: fromBin } = await supabase
             .from("warehouse_bins")
@@ -277,7 +340,7 @@ export const useCompleteStockTransfer = () => {
             await supabase
               .from("warehouse_bins")
               .update({
-                current_quantity: (fromBin.current_quantity || 0) - item.quantity_requested,
+                current_quantity: Math.max(0, (fromBin.current_quantity || 0) - item.quantity_requested),
               })
               .eq("id", item.from_bin_id);
           }
@@ -318,6 +381,8 @@ export const useCompleteStockTransfer = () => {
       queryClient.invalidateQueries({ queryKey: ["stock-transfer-items"] });
       queryClient.invalidateQueries({ queryKey: ["warehouse-items"] });
       queryClient.invalidateQueries({ queryKey: ["warehouse-bins"] });
+      queryClient.invalidateQueries({ queryKey: ["all-items-location-stock"] });
+      queryClient.invalidateQueries({ queryKey: ["item-bin-allocations-for-transfer"] });
       toast({
         title: "Transfer Completed",
         description: "Stock transfer has been completed successfully.",

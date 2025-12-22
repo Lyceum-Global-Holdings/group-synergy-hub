@@ -225,13 +225,19 @@ export function ItemTransferDialog({
 
       const transfer = await createTransfer.mutateAsync(transferData);
 
-      // Create the transfer item
+      // Find the source bin allocation for the selected location
+      const sourceBinAllocation = itemBinAllocations.find((alloc: any) => 
+        alloc.warehouse_bins?.location_id === values.from_location_id
+      );
+
+      // Create the transfer item with source bin
       await createItem.mutateAsync({
         transfer_id: transfer.id,
         warehouse_item_id: item.id,
         item_name: item.name,
         quantity_requested: values.quantity,
         unit_of_measure: unitName,
+        from_bin_id: sourceBinAllocation?.warehouse_bins?.id,
       });
 
       // Show verification dialog instead of closing
