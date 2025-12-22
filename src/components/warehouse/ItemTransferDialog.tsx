@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -81,6 +82,28 @@ export function ItemTransferDialog({
     ? units.find(u => u.id === item.unit_id)?.abbreviation || "units"
     : "units";
 
+  // Get current location name
+  const currentLocationName = item?.location_id 
+    ? mainLocations.find(loc => loc.id === item.location_id)?.name || "Unknown Location"
+    : "No location assigned";
+
+  // Auto-set from_location_id when item changes
+  useEffect(() => {
+    if (item && open) {
+      form.reset({
+        transfer_date: new Date().toISOString().split("T")[0],
+        priority: "normal",
+        from_location_id: item.location_id || "",
+        from_department_id: "",
+        to_location_id: "",
+        to_department_id: "",
+        quantity: 1,
+        reason: "",
+        notes: "",
+      });
+    }
+  }, [item, open, form]);
+
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     if (!item) return;
 
@@ -141,7 +164,7 @@ export function ItemTransferDialog({
         </DialogHeader>
 
         <div className="bg-muted p-3 rounded-lg mb-4">
-          <div className="grid grid-cols-3 gap-4 text-sm">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
             <div>
               <span className="text-muted-foreground">Item Code:</span>
               <p className="font-medium">{item.item_code}</p>
@@ -151,11 +174,21 @@ export function ItemTransferDialog({
               <p className="font-medium">{item.name}</p>
             </div>
             <div>
+              <span className="text-muted-foreground">Current Location:</span>
+              <p className="font-medium">{currentLocationName}</p>
+            </div>
+            <div>
               <span className="text-muted-foreground">Available Stock:</span>
               <p className="font-medium">{item.current_stock || 0} {unitName}</p>
             </div>
           </div>
         </div>
+
+        {!item.location_id && (
+          <div className="bg-destructive/10 text-destructive p-3 rounded-lg mb-4 text-sm">
+            This item has no assigned location. Please assign a location before transferring.
+          </div>
+        )}
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
@@ -205,23 +238,16 @@ export function ItemTransferDialog({
                 <FormField
                   control={form.control}
                   name="from_location_id"
-                  render={({ field }) => (
+                  render={() => (
                     <FormItem>
                       <FormLabel>From Location *</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select location" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {mainLocations.map((loc) => (
-                            <SelectItem key={loc.id} value={loc.id}>
-                              {loc.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <FormControl>
+                        <Input 
+                          value={currentLocationName}
+                          disabled
+                          className="bg-muted"
+                        />
+                      </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -361,7 +387,10 @@ export function ItemTransferDialog({
               <Button type="button" variant="outline" onClick={handleClose}>
                 Cancel
               </Button>
-              <Button type="submit" disabled={createTransfer.isPending || createItem.isPending}>
+              <Button 
+                type="submit" 
+                disabled={createTransfer.isPending || createItem.isPending || !item.location_id}
+              >
                 {createTransfer.isPending ? "Creating Transfer..." : "Create Transfer"}
               </Button>
             </div>
