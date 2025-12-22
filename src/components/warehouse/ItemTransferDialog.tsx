@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -11,6 +11,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   Form,
   FormControl,
@@ -28,11 +38,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useCreateStockTransfer, useCreateStockTransferItem } from "@/hooks/useStockTransfer";
+import { useCreateStockTransfer, useCreateStockTransferItem, useCompleteStockTransfer } from "@/hooks/useStockTransfer";
 import { useWarehouseLocations } from "@/hooks/useWarehouseLocations";
 import { WarehouseItem } from "@/types/itemBin";
 import { useItemUnits } from "@/hooks/useItemUnits";
 import { supabase } from "@/integrations/supabase/client";
+import { StockTransferRequest } from "@/types/stockTransfer";
+import { ArrowRight, CheckCircle2, Loader2 } from "lucide-react";
 
 const formSchema = z.object({
   transfer_date: z.string(),
@@ -74,8 +86,17 @@ export function ItemTransferDialog({
 
   const createTransfer = useCreateStockTransfer();
   const createItem = useCreateStockTransferItem();
+  const completeTransfer = useCompleteStockTransfer();
   const { locations = [] } = useWarehouseLocations();
   const { units } = useItemUnits();
+
+  // State for verification dialog
+  const [showVerificationDialog, setShowVerificationDialog] = useState(false);
+  const [pendingTransferData, setPendingTransferData] = useState<{
+    transfer: StockTransferRequest;
+    values: z.infer<typeof formSchema>;
+  } | null>(null);
+  const [isCompleting, setIsCompleting] = useState(false);
 
   const mainLocations = locations.filter((l) => l.type === "location");
   const departments = locations.filter((l) => l.type === "department");
@@ -213,15 +234,57 @@ export function ItemTransferDialog({
         unit_of_measure: unitName,
       });
 
-      form.reset();
-      onOpenChange(false);
+      // Show verification dialog instead of closing
+      setPendingTransferData({ transfer, values });
+      setShowVerificationDialog(true);
     } catch (error) {
       console.error("Error creating transfer:", error);
     }
   };
 
-  const handleClose = () => {
+  const handleConfirmTransfer = async () => {
+    if (!pendingTransferData) return;
+    
+    setIsCompleting(true);
+    try {
+      // Complete the transfer immediately
+      await completeTransfer.mutateAsync(pendingTransferData.transfer.id);
+      
+      // Reset and close
+      setShowVerificationDialog(false);
+      setPendingTransferData(null);
+      form.reset();
+      onOpenChange(false);
+    } catch (error) {
+      console.error("Error completing transfer:", error);
+    } finally {
+      setIsCompleting(false);
+    }
+  };
+
+  const handleCancelVerification = () => {
+    // Keep the transfer as approved but don't complete it
+    setShowVerificationDialog(false);
+    setPendingTransferData(null);
     form.reset();
+    onOpenChange(false);
+  };
+
+  // Get location names for verification dialog
+  const fromLocationName = useMemo(() => {
+    if (!pendingTransferData) return "";
+    return itemLocationsWithStock.find(l => l.locationId === pendingTransferData.values.from_location_id)?.locationName || "";
+  }, [pendingTransferData, itemLocationsWithStock]);
+
+  const toLocationName = useMemo(() => {
+    if (!pendingTransferData) return "";
+    return mainLocations.find(l => l.id === pendingTransferData.values.to_location_id)?.name || "";
+  }, [pendingTransferData, mainLocations]);
+
+  const handleClose = () => {
+    if (showVerificationDialog) return; // Don't close if verification is showing
+    form.reset();
+    setPendingTransferData(null);
     onOpenChange(false);
   };
 
@@ -492,6 +555,74 @@ export function ItemTransferDialog({
           </form>
         </Form>
       </DialogContent>
+
+      {/* Verification Dialog */}
+      <AlertDialog open={showVerificationDialog} onOpenChange={setShowVerificationDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <CheckCircle2 className="h-5 w-5 text-primary" />
+              Verify & Complete Transfer
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Please verify the transfer details before completing. Once completed, the stock will be moved immediately.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          
+          {pendingTransferData && item && (
+            <div className="space-y-4 py-4">
+              <div className="bg-muted rounded-lg p-4">
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <p className="text-muted-foreground text-xs mb-1">Item</p>
+                    <p className="font-medium">{item.name}</p>
+                    <p className="text-xs text-muted-foreground">{item.item_code}</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground text-xs mb-1">Quantity</p>
+                    <p className="font-medium text-lg">{pendingTransferData.values.quantity} {unitName}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3 justify-center">
+                <div className="text-center flex-1 bg-muted/50 rounded-lg p-3">
+                  <p className="text-xs text-muted-foreground mb-1">From</p>
+                  <p className="font-medium">{fromLocationName}</p>
+                </div>
+                <ArrowRight className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+                <div className="text-center flex-1 bg-muted/50 rounded-lg p-3">
+                  <p className="text-xs text-muted-foreground mb-1">To</p>
+                  <p className="font-medium">{toLocationName}</p>
+                </div>
+              </div>
+
+              {pendingTransferData.values.reason && (
+                <div className="text-sm">
+                  <p className="text-muted-foreground text-xs mb-1">Reason</p>
+                  <p>{pendingTransferData.values.reason}</p>
+                </div>
+              )}
+            </div>
+          )}
+          
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={handleCancelVerification} disabled={isCompleting}>
+              Cancel (Keep as Pending)
+            </AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmTransfer} disabled={isCompleting}>
+              {isCompleting ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Completing...
+                </>
+              ) : (
+                "Verify & Complete Transfer"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Dialog>
   );
 }
