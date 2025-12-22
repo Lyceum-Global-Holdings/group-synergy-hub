@@ -94,6 +94,75 @@ export const useMaterialReturns = () => {
     }
   });
 
+  // New mutation for approving returns with stock update
+  const approveMaterialReturnMutation = useMutation({
+    mutationFn: async ({ id, mrnNumber }: { id: string; mrnNumber: string }) => {
+      // First, get the return items
+      const { data: returnItems, error: itemsError } = await supabase
+        .from('material_return_items')
+        .select('*')
+        .eq('mrn_id', id);
+
+      if (itemsError) throw itemsError;
+
+      // Process stock updates for each item
+      for (const item of returnItems || []) {
+        // Find bin allocation for the item
+        const { data: binAllocation } = await supabase
+          .from('warehouse_bin_allocations')
+          .select('id')
+          .eq('warehouse_item_id', item.item_id)
+          .limit(1)
+          .maybeSingle();
+
+        // Call the RPC to update stock
+        const { error: rpcError } = await supabase.rpc('process_material_return_stock_update', {
+          p_item_id: item.item_id,
+          p_quantity_returned: item.quantity_returned,
+          p_bin_allocation_id: binAllocation?.id || null,
+          p_mrn_id: id,
+          p_mrn_number: mrnNumber
+        });
+
+        if (rpcError) {
+          console.error('Error processing stock update for item:', item.item_id, rpcError);
+          throw rpcError;
+        }
+      }
+
+      // Update the return note status to 'returned'
+      const { data, error } = await supabase
+        .from('material_return_notes')
+        .update({ status: 'returned' })
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['material-returns'] });
+      queryClient.invalidateQueries({ queryKey: ['material-return-items'] });
+      queryClient.invalidateQueries({ queryKey: ['warehouse-items'] });
+      queryClient.invalidateQueries({ queryKey: ['stock-transactions'] });
+      queryClient.invalidateQueries({ queryKey: ['stock-movements'] });
+      queryClient.invalidateQueries({ queryKey: ['item-bin-allocations'] });
+      toast({
+        title: "Success",
+        description: "Material return approved and stock updated",
+      });
+    },
+    onError: (error) => {
+      console.error('Error approving material return:', error);
+      toast({
+        title: "Error",
+        description: "Failed to approve material return",
+        variant: "destructive",
+      });
+    }
+  });
+
   const deleteMaterialReturnMutation = useMutation({
     mutationFn: async (id: string) => {
       const { error } = await supabase
@@ -127,9 +196,11 @@ export const useMaterialReturns = () => {
     createMaterialReturn: createMaterialReturnMutation.mutate,
     createMaterialReturnAsync: createMaterialReturnMutation.mutateAsync,
     updateMaterialReturn: updateMaterialReturnMutation.mutate,
+    approveMaterialReturn: approveMaterialReturnMutation.mutate,
     deleteMaterialReturn: deleteMaterialReturnMutation.mutate,
     isCreating: createMaterialReturnMutation.isPending,
     isUpdating: updateMaterialReturnMutation.isPending,
+    isApproving: approveMaterialReturnMutation.isPending,
     isDeleting: deleteMaterialReturnMutation.isPending,
   };
 };
