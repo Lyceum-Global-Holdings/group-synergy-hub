@@ -199,6 +199,7 @@ export function ItemTransferDialog({
         to_department_id: values.to_department_id || undefined,
         reason: values.reason || undefined,
         notes: values.notes || undefined,
+        status: 'approved' as const, // Auto-approve transfers from Item Master
       };
 
       const transfer = await createTransfer.mutateAsync(transferData);
