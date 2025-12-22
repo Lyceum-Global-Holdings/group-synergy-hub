@@ -37,7 +37,7 @@ export function BulkItemImportDialog() {
   const [showPreview, setShowPreview] = useState(false);
 
   const { toast } = useToast();
-  const { bulkCreateItemsAsync, isBulkCreating } = useWarehouseItems();
+  const { bulkCreateItemsAsync, isBulkCreating, items: existingItems = [] } = useWarehouseItems();
   const { categories } = useItemCategories();
   const { units } = useItemUnits();
   const { data: suppliers = [] } = useSuppliers();
@@ -361,6 +361,37 @@ export function BulkItemImportDialog() {
 
         parsed.push(item);
       }
+
+      // Check for duplicate item_codes within the CSV file
+      const itemCodeCounts = new Map<string, number>();
+      parsed.forEach(item => {
+        if (item.item_code) {
+          const key = `${item.item_code?.toLowerCase()}_${item.company_id || selectedCompany?.id || ''}`;
+          itemCodeCounts.set(key, (itemCodeCounts.get(key) || 0) + 1);
+        }
+      });
+
+      // Mark duplicates within CSV and existing items in database
+      parsed.forEach(item => {
+        if (item.item_code) {
+          const companyId = item.company_id || selectedCompany?.id || '';
+          const key = `${item.item_code.toLowerCase()}_${companyId}`;
+          
+          // Check for duplicates within the CSV
+          if ((itemCodeCounts.get(key) || 0) > 1) {
+            item.errors.push(`Duplicate item code "${item.item_code}" in CSV`);
+          }
+          
+          // Check if item_code already exists in the database for this company
+          const existsInDb = existingItems.some(
+            existing => existing.item_code?.toLowerCase() === item.item_code?.toLowerCase() &&
+                       existing.company_id === companyId
+          );
+          if (existsInDb) {
+            item.errors.push(`Item code "${item.item_code}" already exists in database`);
+          }
+        }
+      });
 
       setParsedData(parsed);
       
