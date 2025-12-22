@@ -1,7 +1,8 @@
 import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Plus, Search, Edit, Trash2, History, Settings, Eye, ArrowLeftRight } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, History, Settings, Eye, ArrowLeftRight, MapPin } from 'lucide-react';
 import { BulkItemImportDialog } from '@/components/warehouse/BulkItemImportDialog';
 import {
   Table,
@@ -12,6 +13,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useWarehouseItems } from '@/hooks/useWarehouseItems';
 import { useItemCategories } from '@/hooks/useItemCategories';
 import { useItemUnits } from '@/hooks/useItemUnits';
@@ -23,6 +25,17 @@ import { DeleteItemConfirmationDialog } from '@/components/warehouse/DeleteItemC
 import { ItemDetailsDialog } from '@/components/warehouse/ItemDetailsDialog';
 import { ItemTransferDialog } from '@/components/warehouse/ItemTransferDialog';
 import { WarehouseItem } from '@/types/itemBin';
+import { supabase } from '@/integrations/supabase/client';
+
+interface LocationStock {
+  locationId: string;
+  locationName: string;
+  stock: number;
+}
+
+interface ItemLocationStockMap {
+  [itemId: string]: LocationStock[];
+}
 
 export function ItemMasterTab() {
   const [searchTerm, setSearchTerm] = useState('');
@@ -45,6 +58,50 @@ export function ItemMasterTab() {
   const { categories } = useItemCategories();
   const { units } = useItemUnits();
   const { companies } = useCompany();
+
+  // Fetch stock by location for all items
+  const { data: itemLocationStock = {} } = useQuery<ItemLocationStockMap>({
+    queryKey: ['all-items-location-stock'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('warehouse_bin_allocations')
+        .select(`
+          warehouse_item_id,
+          available_quantity,
+          warehouse_bins!inner (
+            location_id,
+            warehouse_locations!inner (id, name)
+          )
+        `)
+        .gt('available_quantity', 0);
+      
+      if (error) throw error;
+      
+      // Group by item_id and location_id
+      const grouped: ItemLocationStockMap = {};
+      
+      data?.forEach((alloc: any) => {
+        const itemId = alloc.warehouse_item_id;
+        const locationId = alloc.warehouse_bins.location_id;
+        const locationName = alloc.warehouse_bins.warehouse_locations.name;
+        
+        if (!grouped[itemId]) grouped[itemId] = [];
+        
+        const existing = grouped[itemId].find(l => l.locationId === locationId);
+        if (existing) {
+          existing.stock += Number(alloc.available_quantity);
+        } else {
+          grouped[itemId].push({ 
+            locationId, 
+            locationName, 
+            stock: Number(alloc.available_quantity) 
+          });
+        }
+      });
+      
+      return grouped;
+    },
+  });
 
   const filteredItems = items.filter(item =>
     item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -138,32 +195,75 @@ export function ItemMasterTab() {
                     }
                   </TableCell>
                   <TableCell className="text-right">
-                    <div className="flex items-center justify-end gap-1">
-                      <span className={`font-medium ${
-                        item.current_stock <= (item.reorder_level || 0) ? 'text-red-600' : 
-                        item.current_stock <= (item.min_stock_level || 0) ? 'text-yellow-600' : 
-                        'text-green-600'
-                      }`}>
-                        {item.current_stock || 0}
-                      </span>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setStockAdjustmentItem(item)}
-                        className="p-1 h-6 w-6"
-                        title="Adjust Stock"
-                      >
-                        <Settings className="h-3 w-3" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setStockMovementItem(item)}
-                        className="p-1 h-6 w-6"
-                        title="View History"
-                      >
-                        <History className="h-3 w-3" />
-                      </Button>
+                    <div className="flex items-center justify-end gap-2">
+                      <div className="space-y-1 text-right">
+                        {itemLocationStock[item.id]?.length > 0 ? (
+                          <>
+                            {itemLocationStock[item.id].slice(0, 2).map((loc) => (
+                              <div key={loc.locationId} className="flex items-center justify-end gap-1.5 text-xs">
+                                <MapPin className="h-3 w-3 text-muted-foreground" />
+                                <span className="text-muted-foreground truncate max-w-[80px]">{loc.locationName}:</span>
+                                <span className={`font-medium ${
+                                  loc.stock <= (item.reorder_level || 0) ? 'text-destructive' : 'text-green-600'
+                                }`}>
+                                  {loc.stock}
+                                </span>
+                              </div>
+                            ))}
+                            {itemLocationStock[item.id].length > 2 && (
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <span className="text-xs text-muted-foreground cursor-help">
+                                      +{itemLocationStock[item.id].length - 2} more...
+                                    </span>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <div className="space-y-1">
+                                      {itemLocationStock[item.id].slice(2).map((loc) => (
+                                        <div key={loc.locationId} className="text-xs">
+                                          {loc.locationName}: {loc.stock}
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            )}
+                            <div className="text-xs border-t border-border pt-1 text-muted-foreground">
+                              Total: <span className="font-semibold text-foreground">{item.current_stock || 0}</span>
+                            </div>
+                          </>
+                        ) : (
+                          <span className={`font-medium ${
+                            (item.current_stock || 0) <= (item.reorder_level || 0) ? 'text-destructive' : 
+                            (item.current_stock || 0) <= (item.min_stock_level || 0) ? 'text-yellow-600' : 
+                            'text-green-600'
+                          }`}>
+                            {item.current_stock || 0}
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex flex-col gap-0.5">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setStockAdjustmentItem(item)}
+                          className="p-1 h-6 w-6"
+                          title="Adjust Stock"
+                        >
+                          <Settings className="h-3 w-3" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setStockMovementItem(item)}
+                          className="p-1 h-6 w-6"
+                          title="View History"
+                        >
+                          <History className="h-3 w-3" />
+                        </Button>
+                      </div>
                     </div>
                   </TableCell>
                   <TableCell>{item.unit_cost ? `LKR ${item.unit_cost}` : '-'}</TableCell>
