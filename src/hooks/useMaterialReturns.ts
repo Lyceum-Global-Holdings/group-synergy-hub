@@ -97,26 +97,60 @@ export const useMaterialReturns = () => {
   // New mutation for approving returns with stock update
   const approveMaterialReturnMutation = useMutation({
     mutationFn: async ({ id, mrnNumber }: { id: string; mrnNumber: string }) => {
+      console.log('[MaterialReturn] ===== STARTING APPROVAL PROCESS =====');
+      console.log('[MaterialReturn] MRN ID:', id);
+      console.log('[MaterialReturn] MRN Number:', mrnNumber);
+      
       // First, get the return items
+      console.log('[MaterialReturn] Fetching return items...');
       const { data: returnItems, error: itemsError } = await supabase
         .from('material_return_items')
         .select('*')
         .eq('mrn_id', id);
 
-      if (itemsError) throw itemsError;
+      if (itemsError) {
+        console.error('[MaterialReturn] ERROR fetching return items:', itemsError);
+        throw itemsError;
+      }
+      
+      console.log('[MaterialReturn] Return items found:', returnItems?.length || 0);
+      console.log('[MaterialReturn] Return items data:', JSON.stringify(returnItems, null, 2));
+
+      if (!returnItems || returnItems.length === 0) {
+        console.warn('[MaterialReturn] WARNING: No return items found!');
+      }
 
       // Process stock updates for each item
       for (const item of returnItems || []) {
+        console.log('[MaterialReturn] ----- Processing item -----');
+        console.log('[MaterialReturn] Item ID:', item.item_id);
+        console.log('[MaterialReturn] Quantity returned:', item.quantity_returned);
+        
         // Find bin allocation for the item
-        const { data: binAllocation } = await supabase
+        console.log('[MaterialReturn] Looking for bin allocation...');
+        const { data: binAllocation, error: binError } = await supabase
           .from('warehouse_bin_allocations')
           .select('id')
           .eq('warehouse_item_id', item.item_id)
           .limit(1)
           .maybeSingle();
 
+        if (binError) {
+          console.warn('[MaterialReturn] Warning getting bin allocation:', binError);
+        }
+        
+        console.log('[MaterialReturn] Bin allocation found:', binAllocation?.id || 'NONE');
+
         // Call the RPC to update stock
-        const { error: rpcError } = await supabase.rpc('process_material_return_stock_update', {
+        console.log('[MaterialReturn] Calling RPC process_material_return_stock_update with params:', {
+          p_item_id: item.item_id,
+          p_quantity_returned: item.quantity_returned,
+          p_bin_allocation_id: binAllocation?.id || null,
+          p_mrn_id: id,
+          p_mrn_number: mrnNumber
+        });
+        
+        const { data: rpcResult, error: rpcError } = await supabase.rpc('process_material_return_stock_update', {
           p_item_id: item.item_id,
           p_quantity_returned: item.quantity_returned,
           p_bin_allocation_id: binAllocation?.id || null,
@@ -125,12 +159,17 @@ export const useMaterialReturns = () => {
         });
 
         if (rpcError) {
-          console.error('Error processing stock update for item:', item.item_id, rpcError);
+          console.error('[MaterialReturn] RPC ERROR for item:', item.item_id);
+          console.error('[MaterialReturn] RPC Error details:', JSON.stringify(rpcError, null, 2));
           throw rpcError;
         }
+        
+        console.log('[MaterialReturn] RPC SUCCESS for item:', item.item_id);
+        console.log('[MaterialReturn] RPC Result:', rpcResult);
       }
 
       // Update the return note status to 'returned'
+      console.log('[MaterialReturn] Updating MRN status to "returned"...');
       const { data, error } = await supabase
         .from('material_return_notes')
         .update({ status: 'returned' })
@@ -138,10 +177,17 @@ export const useMaterialReturns = () => {
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('[MaterialReturn] ERROR updating MRN status:', error);
+        throw error;
+      }
+      
+      console.log('[MaterialReturn] ===== APPROVAL COMPLETE =====');
+      console.log('[MaterialReturn] Updated MRN:', data);
       return data;
     },
     onSuccess: () => {
+      console.log('[MaterialReturn] onSuccess - Invalidating queries...');
       queryClient.invalidateQueries({ queryKey: ['material-returns'] });
       queryClient.invalidateQueries({ queryKey: ['material-return-items'] });
       queryClient.invalidateQueries({ queryKey: ['warehouse-items'] });
@@ -154,7 +200,7 @@ export const useMaterialReturns = () => {
       });
     },
     onError: (error) => {
-      console.error('Error approving material return:', error);
+      console.error('[MaterialReturn] onError - Approval failed:', error);
       toast({
         title: "Error",
         description: "Failed to approve material return",
