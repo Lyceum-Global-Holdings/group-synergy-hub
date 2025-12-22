@@ -62,6 +62,7 @@ export interface CreateStockTransferData {
   reason?: string;
   notes?: string;
   company_id?: string;
+  status?: TransferStatus; // Optional: set to 'approved' to skip approval workflow
 }
 
 export interface CreateStockTransferItemData {
