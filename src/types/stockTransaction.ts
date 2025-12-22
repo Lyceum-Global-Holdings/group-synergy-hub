@@ -5,14 +5,17 @@ export type StockTransactionType =
   | 'material_return'
   | 'adjustment'
   | 'transfer_in'
-  | 'transfer_out';
+  | 'transfer_out'
+  | 'project_issue'
+  | 'project_return';
 
 export type StockReferenceType = 
   | 'manual'
   | 'grn'
   | 'mrn' 
   | 'adjustment'
-  | 'transfer';
+  | 'transfer'
+  | 'project';
 
 export interface StockTransaction {
   id: string;

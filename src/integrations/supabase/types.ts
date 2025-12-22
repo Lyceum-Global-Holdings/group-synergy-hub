@@ -12870,7 +12870,13 @@ export type Database = {
         | "pending"
         | "partially_signed"
         | "fully_signed"
-      stock_reference_type: "manual" | "grn" | "mrn" | "adjustment" | "transfer"
+      stock_reference_type:
+        | "manual"
+        | "grn"
+        | "mrn"
+        | "adjustment"
+        | "transfer"
+        | "project"
       stock_transaction_type:
         | "opening_stock"
         | "goods_receipt"
@@ -12879,6 +12885,8 @@ export type Database = {
         | "adjustment"
         | "transfer_in"
         | "transfer_out"
+        | "project_issue"
+        | "project_return"
       urgency_level: "normal" | "urgent" | "emergency"
       widget_type:
         | "kpi_card"
@@ -13329,7 +13337,14 @@ export const Constants = {
         "partially_signed",
         "fully_signed",
       ],
-      stock_reference_type: ["manual", "grn", "mrn", "adjustment", "transfer"],
+      stock_reference_type: [
+        "manual",
+        "grn",
+        "mrn",
+        "adjustment",
+        "transfer",
+        "project",
+      ],
       stock_transaction_type: [
         "opening_stock",
         "goods_receipt",
@@ -13338,6 +13353,8 @@ export const Constants = {
         "adjustment",
         "transfer_in",
         "transfer_out",
+        "project_issue",
+        "project_return",
       ],
       urgency_level: ["normal", "urgent", "emergency"],
       widget_type: [
