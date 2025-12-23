@@ -259,21 +259,37 @@ export function ItemMasterTab() {
                                 +{itemLocationStock[item.id].length - 3} more locations
                               </div>
                             )}
-                            <div className="text-xs border-t border-border pt-1 mt-1 text-muted-foreground flex items-center justify-end gap-2">
-                              <span>Total: <span className="font-semibold text-foreground">{item.current_stock || 0}</span></span>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => setStockDetailsItem(item)}
-                                className="p-0.5 h-5 w-5"
-                                title="View Stock Details"
-                              >
-                                <BarChart3 className="h-3.5 w-3.5" />
-                              </Button>
-                            </div>
+                            {(() => {
+                              const calculatedTotal = itemLocationStock[item.id]?.reduce((sum, loc) => sum + loc.stock, 0) || 0;
+                              const isOutOfSync = calculatedTotal !== (item.current_stock || 0);
+                              return (
+                                <div className="text-xs border-t border-border pt-1 mt-1 text-muted-foreground flex items-center justify-end gap-2">
+                                  {isOutOfSync && (
+                                    <span className="text-yellow-600" title={`DB shows ${item.current_stock || 0}, allocations total ${calculatedTotal}. Run Reconcile Stock to fix.`}>
+                                      ⚠️
+                                    </span>
+                                  )}
+                                  <span>Total: <span className="font-semibold text-foreground">{calculatedTotal}</span></span>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => setStockDetailsItem(item)}
+                                    className="p-0.5 h-5 w-5"
+                                    title="View Stock Details"
+                                  >
+                                    <BarChart3 className="h-3.5 w-3.5" />
+                                  </Button>
+                                </div>
+                              );
+                            })()}
                           </>
                         ) : (
                           <div className="flex items-center justify-end gap-2">
+                            {(item.current_stock || 0) > 0 && (
+                              <span className="text-yellow-600" title={`Stock exists (${item.current_stock}) but no bin allocations. Run Reconcile Stock to fix.`}>
+                                ⚠️
+                              </span>
+                            )}
                             <span className={`font-medium ${
                               (item.current_stock || 0) <= (item.reorder_level || 0) ? 'text-destructive' : 
                               (item.current_stock || 0) <= (item.min_stock_level || 0) ? 'text-yellow-600' : 
