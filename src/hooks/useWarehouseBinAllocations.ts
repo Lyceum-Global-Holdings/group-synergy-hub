@@ -105,6 +105,8 @@ export function useWarehouseBinAllocations() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['warehouse-bin-allocations'] });
+      queryClient.invalidateQueries({ queryKey: ['all-items-location-stock'] });
+      queryClient.invalidateQueries({ queryKey: ['warehouse-items'] });
       toast.success('Bin allocation created successfully');
     },
     onError: (error: Error) => {
@@ -133,6 +135,8 @@ export function useWarehouseBinAllocations() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['warehouse-bin-allocations'] });
+      queryClient.invalidateQueries({ queryKey: ['all-items-location-stock'] });
+      queryClient.invalidateQueries({ queryKey: ['warehouse-items'] });
       toast.success('Bin allocation updated successfully');
     },
     onError: (error: Error) => {
@@ -152,6 +156,8 @@ export function useWarehouseBinAllocations() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['warehouse-bin-allocations'] });
+      queryClient.invalidateQueries({ queryKey: ['all-items-location-stock'] });
+      queryClient.invalidateQueries({ queryKey: ['warehouse-items'] });
       toast.success('Bin allocation deleted');
     },
     onError: (error: Error) => {
@@ -199,6 +205,8 @@ export function useWarehouseBinAllocations() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['warehouse-bin-allocations'] });
+      queryClient.invalidateQueries({ queryKey: ['all-items-location-stock'] });
+      queryClient.invalidateQueries({ queryKey: ['warehouse-items'] });
       toast.success('Bin allocation adjusted');
     },
     onError: (error: Error) => {
