@@ -490,7 +490,10 @@ export const useCompleteStockTransfer = () => {
               warehouse_item_id: item.warehouse_item_id,
               bin_id: destBinId,
               allocated_quantity: item.quantity_requested,
+              available_quantity: item.quantity_requested,
               reserved_quantity: 0,
+              company_id: transfer.company_id,
+              created_by: user.id,
             });
 
           if (insertDestError) {
