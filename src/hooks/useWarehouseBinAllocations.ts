@@ -217,7 +217,8 @@ export function useWarehouseBinAllocations() {
   // Migration function to fix bin allocations based on item's location_id
   const migrateAllocationsMutation = useMutation({
     mutationFn: async () => {
-      console.log('Starting bin allocation migration...');
+      console.log('=== Starting bin allocation migration ===');
+      toast.info('Starting migration...');
       
       // Step 1: Get all items with their location_id
       const { data: items, error: itemsError } = await supabase
@@ -225,17 +226,24 @@ export function useWarehouseBinAllocations() {
         .select('id, location_id, name, item_code')
         .not('location_id', 'is', null);
       
-      if (itemsError) throw itemsError;
+      if (itemsError) {
+        console.error('Failed to fetch items:', itemsError);
+        throw itemsError;
+      }
+      
       console.log(`Found ${items?.length || 0} items with location_id`);
       
       if (!items || items.length === 0) {
-        return { fixed: 0, total: 0 };
+        return { fixed: 0, total: 0, skipped: 0 };
       }
       
       let fixedCount = 0;
       let totalAllocations = 0;
+      let skippedItems = 0;
       
       for (const item of items) {
+        console.log(`\nProcessing item: ${item.item_code} (location_id: ${item.location_id})`);
+        
         // Step 2: Get a bin at the item's location
         const { data: correctBins, error: binsError } = await supabase
           .from('warehouse_bins')
@@ -245,40 +253,50 @@ export function useWarehouseBinAllocations() {
         
         if (binsError) {
           console.error(`Error fetching bins for location ${item.location_id}:`, binsError);
+          skippedItems++;
           continue;
         }
         
         if (!correctBins || correctBins.length === 0) {
           console.warn(`No bins found at location ${item.location_id} for item ${item.item_code}`);
+          skippedItems++;
           continue;
         }
         
         const correctBinId = correctBins[0].id;
+        const correctBinCode = correctBins[0].bin_code;
+        console.log(`Correct bin for ${item.item_code}: ${correctBinCode} (${correctBinId})`);
         
-        // Step 3: Get all allocations for this item that are in wrong bins
+        // Step 3: Get ALL allocations for this item (simplified query without !inner)
         const { data: allocations, error: allocError } = await supabase
           .from('warehouse_bin_allocations')
-          .select(`
-            id,
-            bin_id,
-            warehouse_bins!inner (location_id)
-          `)
-          .eq('warehouse_item_id', item.id)
-          .neq('bin_id', correctBinId);
+          .select('id, bin_id')
+          .eq('warehouse_item_id', item.id);
         
         if (allocError) {
           console.error(`Error fetching allocations for item ${item.item_code}:`, allocError);
+          skippedItems++;
           continue;
         }
         
         if (!allocations || allocations.length === 0) {
+          console.log(`No allocations found for item ${item.item_code}`);
           continue;
         }
         
-        totalAllocations += allocations.length;
+        // Filter to only those in wrong bins
+        const wrongAllocations = allocations.filter(a => a.bin_id !== correctBinId);
+        
+        if (wrongAllocations.length === 0) {
+          console.log(`All ${allocations.length} allocations for ${item.item_code} are already in correct bin`);
+          continue;
+        }
+        
+        console.log(`Found ${wrongAllocations.length} allocations in wrong bins for ${item.item_code}`);
+        totalAllocations += wrongAllocations.length;
         
         // Step 4: Update each allocation to use the correct bin
-        for (const alloc of allocations) {
+        for (const alloc of wrongAllocations) {
           const { error: updateError } = await supabase
             .from('warehouse_bin_allocations')
             .update({ bin_id: correctBinId })
@@ -288,13 +306,16 @@ export function useWarehouseBinAllocations() {
             console.error(`Error updating allocation ${alloc.id}:`, updateError);
           } else {
             fixedCount++;
-            console.log(`Fixed allocation ${alloc.id} for item ${item.item_code}: moved to bin ${correctBins[0].bin_code}`);
+            console.log(`✓ Fixed allocation ${alloc.id}: moved to bin ${correctBinCode}`);
           }
         }
       }
       
-      console.log(`Migration complete: Fixed ${fixedCount} of ${totalAllocations} allocations`);
-      return { fixed: fixedCount, total: totalAllocations };
+      console.log(`\n=== Migration complete ===`);
+      console.log(`Fixed: ${fixedCount}/${totalAllocations} allocations`);
+      console.log(`Skipped items: ${skippedItems}`);
+      
+      return { fixed: fixedCount, total: totalAllocations, skipped: skippedItems };
     },
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ['warehouse-bin-allocations'] });
@@ -305,8 +326,12 @@ export function useWarehouseBinAllocations() {
       } else {
         toast.success(`Fixed ${result.fixed} of ${result.total} bin allocations`);
       }
+      if (result.skipped > 0) {
+        toast.warning(`${result.skipped} items skipped (no bin at their location)`);
+      }
     },
     onError: (error: Error) => {
+      console.error('Migration failed:', error);
       toast.error(`Migration failed: ${error.message}`);
     },
   });
