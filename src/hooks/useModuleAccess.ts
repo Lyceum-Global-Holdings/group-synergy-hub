@@ -80,30 +80,42 @@ export const useUserEffectiveModules = (userId: string | undefined) => {
       
       if (userModulesError) throw userModulesError;
       
-      // Build module map from roles
+      // Build module map
       const moduleMap: Record<string, Set<string>> = {};
-      
-      roleModules?.forEach(rm => {
-        if (!moduleMap[rm.module_key]) {
-          moduleMap[rm.module_key] = new Set();
-        }
-        rm.submodules.forEach(sub => moduleMap[rm.module_key].add(sub));
-      });
-      
-      // Apply user overrides
       const deniedModules: string[] = [];
       
-      userModules?.forEach(um => {
-        if (um.access_type === 'grant') {
-          if (!moduleMap[um.module_key]) {
-            moduleMap[um.module_key] = new Set();
+      // Check if user has any user-specific grants
+      const hasUserSpecificGrants = userModules?.some(um => um.access_type === 'grant');
+      
+      if (hasUserSpecificGrants) {
+        // User has specific grants - use ONLY those (ignore role modules)
+        userModules?.forEach(um => {
+          if (um.access_type === 'grant') {
+            if (!moduleMap[um.module_key]) {
+              moduleMap[um.module_key] = new Set();
+            }
+            um.submodules.forEach(sub => moduleMap[um.module_key].add(sub));
+          } else if (um.access_type === 'deny') {
+            deniedModules.push(um.module_key);
           }
-          um.submodules.forEach(sub => moduleMap[um.module_key].add(sub));
-        } else if (um.access_type === 'deny') {
-          delete moduleMap[um.module_key];
-          deniedModules.push(um.module_key);
-        }
-      });
+        });
+      } else {
+        // No user-specific grants - use role-based modules
+        roleModules?.forEach(rm => {
+          if (!moduleMap[rm.module_key]) {
+            moduleMap[rm.module_key] = new Set();
+          }
+          rm.submodules.forEach(sub => moduleMap[rm.module_key].add(sub));
+        });
+        
+        // Apply user denials
+        userModules?.forEach(um => {
+          if (um.access_type === 'deny') {
+            delete moduleMap[um.module_key];
+            deniedModules.push(um.module_key);
+          }
+        });
+      }
       
       const result: UserModuleAccess = {
         availableModules: Object.keys(moduleMap),
