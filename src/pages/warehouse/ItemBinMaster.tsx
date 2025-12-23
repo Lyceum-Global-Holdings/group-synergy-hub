@@ -5,8 +5,11 @@ import { BinMasterTab } from '@/components/warehouse/BinMasterTab';
 import { ItemCategoriesTab } from '@/components/warehouse/ItemCategoriesTab';
 import { ItemUnitsTab } from '@/components/warehouse/ItemUnitsTab';
 import { BinAllocationsTab } from '@/components/warehouse/BinAllocationsTab';
+import { useRealtimeStockUpdates } from '@/hooks/useRealtimeStockUpdates';
 
 export default function ItemBinMaster() {
+  // Enable real-time stock updates
+  useRealtimeStockUpdates();
 
   return (
     <div className="space-y-6">

@@ -17,8 +17,11 @@ import { useWarehouseBins } from '@/hooks/useWarehouseBins';
 import { CreateBinDialog } from '@/components/warehouse/CreateBinDialog';
 import { WarehouseBin } from '@/types/itemBin';
 import { useCompany } from '@/contexts/CompanyContext';
+import { useRealtimeStockUpdates } from '@/hooks/useRealtimeStockUpdates';
 
 export function BinMasterTab() {
+  // Enable real-time stock updates
+  useRealtimeStockUpdates();
   const { selectedCompany, isViewingAllCompanies } = useCompany();
   const [searchTerm, setSearchTerm] = useState('');
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
