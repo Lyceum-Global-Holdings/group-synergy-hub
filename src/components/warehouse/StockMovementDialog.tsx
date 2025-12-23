@@ -103,6 +103,7 @@ export function StockMovementDialog({ open, onOpenChange, itemId, itemName, curr
                   <TableHead className="text-right">Qty After</TableHead>
                   <TableHead className="text-right">Unit Cost</TableHead>
                   <TableHead className="text-right">Total Value</TableHead>
+                  <TableHead>Created By</TableHead>
                   <TableHead>Notes</TableHead>
                 </TableRow>
               </TableHeader>
@@ -139,6 +140,9 @@ export function StockMovementDialog({ open, onOpenChange, itemId, itemName, curr
                     </TableCell>
                     <TableCell className="text-right">
                       {transaction.total_value ? `LKR ${transaction.total_value.toFixed(2)}` : '-'}
+                    </TableCell>
+                    <TableCell>
+                      {transaction.profiles?.full_name || transaction.profiles?.email || '-'}
                     </TableCell>
                     <TableCell>
                       {transaction.notes || '-'}

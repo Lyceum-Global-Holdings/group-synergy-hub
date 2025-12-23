@@ -33,6 +33,10 @@ export interface StockTransaction {
   created_by: string | null;
   created_at: string;
   updated_at: string;
+  profiles?: {
+    full_name: string | null;
+    email: string | null;
+  } | null;
 }
 
 export interface CreateStockTransactionData {

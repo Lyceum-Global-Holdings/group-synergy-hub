@@ -23,9 +23,35 @@ export const useStockTransactions = (itemId?: string) => {
         query = query.eq('item_id', itemId);
       }
 
-      const { data, error } = await query;
+      const { data: transactionsData, error } = await query;
       if (error) throw error;
-      return data as StockTransaction[];
+
+      // Fetch profiles for all unique created_by user IDs
+      const userIds = [...new Set(transactionsData?.map(t => t.created_by).filter(Boolean))] as string[];
+      
+      let profilesMap: Record<string, { full_name: string | null; email: string | null }> = {};
+      
+      if (userIds.length > 0) {
+        const { data: profilesData } = await supabase
+          .from('profiles')
+          .select('user_id, full_name, email')
+          .in('user_id', userIds);
+        
+        if (profilesData) {
+          profilesMap = profilesData.reduce((acc, profile) => {
+            acc[profile.user_id] = { full_name: profile.full_name, email: profile.email };
+            return acc;
+          }, {} as Record<string, { full_name: string | null; email: string | null }>);
+        }
+      }
+
+      // Merge profiles with transactions
+      const transactionsWithProfiles = transactionsData?.map(transaction => ({
+        ...transaction,
+        profiles: transaction.created_by ? profilesMap[transaction.created_by] || null : null
+      })) || [];
+
+      return transactionsWithProfiles as StockTransaction[];
     }
   });
 
