@@ -67,7 +67,7 @@ export function MaterialIssueDialog({ open, onOpenChange, editingIssue }: Materi
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-[500px] max-h-[80vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
             {editingIssue ? 'Edit Material Issue' : 'Create New Material Issue'}

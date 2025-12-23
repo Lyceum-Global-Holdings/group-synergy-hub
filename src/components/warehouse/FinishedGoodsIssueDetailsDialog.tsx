@@ -123,7 +123,7 @@ export function FinishedGoodsIssueDetailsDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
         <DialogHeader>
           <div className="flex items-center justify-between">
             <DialogTitle className="text-2xl">Finished Goods Issue Details</DialogTitle>
@@ -310,7 +310,7 @@ export function FinishedGoodsIssueDetailsDialog({
 
       {/* Delivery Note Dialog */}
       <Dialog open={showDeliveryNote} onOpenChange={setShowDeliveryNote}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-auto">
+        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="sr-only">Delivery Note</DialogTitle>
           </DialogHeader>

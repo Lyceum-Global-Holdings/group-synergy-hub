@@ -526,7 +526,7 @@ export function BulkItemImportDialog() {
           Bulk Import
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-6xl max-h-[90vh]">
+      <DialogContent className="max-w-6xl max-h-[80vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Bulk Import Items from CSV</DialogTitle>
           <DialogDescription>
