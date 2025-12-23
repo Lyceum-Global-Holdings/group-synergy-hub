@@ -45,7 +45,7 @@ export function ColorMasterDialog({ open, onOpenChange, onColorCreated }: ColorM
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       {open ? (
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-md max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Add New Color</DialogTitle>
           </DialogHeader>

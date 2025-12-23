@@ -163,7 +163,7 @@ export function BulkGenerateVariantsDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh]">
+      <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Generate Product Variants</DialogTitle>
         </DialogHeader>

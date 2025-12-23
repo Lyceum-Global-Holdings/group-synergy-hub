@@ -72,7 +72,7 @@ export const CreateDispatchNoteDialog: React.FC<CreateDispatchNoteDialogProps> =
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[600px]">
+      <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Create Dispatch Note</DialogTitle>
           <DialogDescription>

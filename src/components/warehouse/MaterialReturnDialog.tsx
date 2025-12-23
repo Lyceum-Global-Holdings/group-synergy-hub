@@ -80,7 +80,7 @@ export function MaterialReturnDialog({ open, onOpenChange, editingReturn }: Mate
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-[500px] max-h-[80vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
             {editingReturn ? 'Edit Material Return' : 'Create New Material Return'}

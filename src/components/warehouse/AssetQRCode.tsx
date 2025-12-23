@@ -150,7 +150,7 @@ export default function AssetQRCode({ assetId, assetName, assetIdentifier }: Ass
           QR Code
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md max-h-[80vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Asset QR Code</DialogTitle>
         </DialogHeader>

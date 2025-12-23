@@ -54,7 +54,7 @@ export function MaterialReturnDetailsDialog({ open, onOpenChange, returnNote }: 
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-5xl max-h-[80vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Material Return Note Details</DialogTitle>
         </DialogHeader>

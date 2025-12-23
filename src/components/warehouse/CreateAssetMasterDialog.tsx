@@ -159,7 +159,7 @@ export function CreateAssetMasterDialog({ open, onOpenChange }: CreateAssetMaste
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Add Asset Master Item</DialogTitle>
         </DialogHeader>

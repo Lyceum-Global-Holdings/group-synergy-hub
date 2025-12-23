@@ -79,7 +79,7 @@ export function BulkAssetUpdateDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-[500px] max-h-[80vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Update Multiple Assets</DialogTitle>
           <DialogDescription>
