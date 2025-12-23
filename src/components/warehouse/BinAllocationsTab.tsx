@@ -3,9 +3,20 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { DataTable } from '@/components/ui/data-table';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Plus, AlertCircle } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { Plus, AlertCircle, Trash2 } from 'lucide-react';
 import { useWarehouseBinAllocations } from '@/hooks/useWarehouseBinAllocations';
 import { useCompany } from '@/contexts/CompanyContext';
+import { useIsAdminOrHigher } from '@/hooks/useIsAdminOrHigher';
 import { CreateBinAllocationDialog } from './CreateBinAllocationDialog';
 import type { ColumnDef } from '@tanstack/react-table';
 import type { BinAllocationWithDetails } from '@/types/warehouseReservation';
@@ -13,7 +24,16 @@ import type { BinAllocationWithDetails } from '@/types/warehouseReservation';
 export function BinAllocationsTab() {
   const { isViewingAllCompanies } = useCompany();
   const [dialogOpen, setDialogOpen] = useState(false);
-  const { binAllocations, isLoading } = useWarehouseBinAllocations();
+  const [allocationToDelete, setAllocationToDelete] = useState<string | null>(null);
+  const { binAllocations, isLoading, deleteAllocation, isDeleting } = useWarehouseBinAllocations();
+  const { canDelete } = useIsAdminOrHigher();
+
+  const handleDelete = () => {
+    if (allocationToDelete) {
+      deleteAllocation(allocationToDelete);
+      setAllocationToDelete(null);
+    }
+  };
 
   const columns: ColumnDef<BinAllocationWithDetails>[] = [
     {
@@ -60,6 +80,21 @@ export function BinAllocationsTab() {
       header: 'Notes',
       cell: ({ row }) => row.original.notes || '-',
     },
+    ...(canDelete ? [{
+      id: 'actions',
+      header: 'Actions',
+      cell: ({ row }: { row: { original: BinAllocationWithDetails } }) => (
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => setAllocationToDelete(row.original.id)}
+          className="text-destructive hover:text-destructive hover:bg-destructive/10"
+          title="Delete allocation"
+        >
+          <Trash2 className="h-4 w-4" />
+        </Button>
+      ),
+    }] as ColumnDef<BinAllocationWithDetails>[] : []),
   ];
 
   return (
@@ -100,6 +135,27 @@ export function BinAllocationsTab() {
         open={dialogOpen}
         onOpenChange={setDialogOpen}
       />
+
+      <AlertDialog open={!!allocationToDelete} onOpenChange={() => setAllocationToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Bin Allocation</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this bin allocation? This action cannot be undone and may affect stock tracking.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              disabled={isDeleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeleting ? 'Deleting...' : 'Delete'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 }
