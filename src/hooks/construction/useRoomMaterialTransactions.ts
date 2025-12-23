@@ -57,9 +57,6 @@ export const useIssueMaterial = () => {
   
   return useMutation({
     mutationFn: async (data: IssueMaterialData) => {
-      // Get current user for RLS compliance
-      const { data: { user } } = await supabase.auth.getUser();
-      
       // Get current warehouse stock
       const { data: warehouseItem, error: warehouseError } = await supabase
         .from('warehouse_items')
@@ -113,27 +110,7 @@ export const useIssueMaterial = () => {
       
       if (transactionError) throw transactionError;
       
-      // Create stock_transactions record for warehouse stock movement history
-      const { error: stockTransactionError } = await supabase
-        .from('stock_transactions')
-        .insert({
-          item_id: data.warehouse_item_id,
-          transaction_type: 'project_issue',
-          reference_type: 'project',
-          reference_id: transaction.id,
-          quantity_change: -data.quantity,
-          quantity_before: currentWarehouseStock,
-          quantity_after: newWarehouseStock,
-          unit_cost: unitCost,
-          total_value: data.quantity * unitCost,
-          notes: `Project Issue: ${data.notes || 'Material issued to project'}`,
-          company_id: data.company_id || null,
-          created_by: user?.id || null,
-        });
-      
-      if (stockTransactionError) {
-        throw new Error(`Failed to record stock movement: ${stockTransactionError.message}`);
-      }
+      // Note: stock_transactions record is now created automatically by database trigger
       
       // Update warehouse stock
       const { error: updateWarehouseError } = await supabase
@@ -184,9 +161,6 @@ export const useReturnMaterial = () => {
   
   return useMutation({
     mutationFn: async (data: ReturnMaterialData) => {
-      // Get current user for RLS compliance
-      const { data: { user } } = await supabase.auth.getUser();
-      
       // Get current warehouse stock
       const { data: warehouseItem, error: warehouseError } = await supabase
         .from('warehouse_items')
@@ -241,27 +215,7 @@ export const useReturnMaterial = () => {
       
       if (transactionError) throw transactionError;
       
-      // Create stock_transactions record for warehouse stock movement history
-      const { error: stockTransactionError } = await supabase
-        .from('stock_transactions')
-        .insert({
-          item_id: data.warehouse_item_id,
-          transaction_type: 'project_return',
-          reference_type: 'project',
-          reference_id: transaction.id,
-          quantity_change: data.quantity,
-          quantity_before: currentWarehouseStock,
-          quantity_after: newWarehouseStock,
-          unit_cost: unitCost,
-          total_value: data.quantity * unitCost,
-          notes: `Project Return: ${data.notes || 'Material returned from project'}`,
-          company_id: data.company_id || null,
-          created_by: user?.id || null,
-        });
-      
-      if (stockTransactionError) {
-        throw new Error(`Failed to record stock movement: ${stockTransactionError.message}`);
-      }
+      // Note: stock_transactions record is now created automatically by database trigger
       
       // Update warehouse stock
       const { error: updateWarehouseError } = await supabase
