@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, startOfDay, endOfDay } from "date-fns";
-import { Calendar as CalendarIcon } from "lucide-react";
+import { Calendar as CalendarIcon, BarChart3, Table as TableIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -14,6 +14,11 @@ import { ReportSummaryCards } from "./ReportSummaryCards";
 import { FloorWiseChart } from "./FloorWiseChart";
 import { ItemWiseChart } from "./ItemWiseChart";
 import { TrendChart } from "./TrendChart";
+import { FloorWiseTable } from "./FloorWiseTable";
+import { ItemWiseTable } from "./ItemWiseTable";
+import { TrendTable } from "./TrendTable";
+
+type ViewMode = 'chart' | 'table';
 
 export function SiteReportAnalytics() {
   const [periodType, setPeriodType] = useState<PeriodType>('monthly');
@@ -21,6 +26,7 @@ export function SiteReportAnalytics() {
   const [customStartDate, setCustomStartDate] = useState<Date>(startOfMonth(new Date()));
   const [customEndDate, setCustomEndDate] = useState<Date>(endOfMonth(new Date()));
   const [selectedProjectId, setSelectedProjectId] = useState<string>('all');
+  const [viewMode, setViewMode] = useState<ViewMode>('chart');
 
   // Fetch projects for filter
   const { data: projects } = useQuery({
@@ -189,6 +195,26 @@ export function SiteReportAnalytics() {
             </SelectContent>
           </Select>
         </div>
+
+        {/* View Mode Toggle */}
+        <div className="flex gap-1 ml-auto">
+          <Button
+            variant={viewMode === 'chart' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setViewMode('chart')}
+          >
+            <BarChart3 className="h-4 w-4 mr-2" />
+            Charts
+          </Button>
+          <Button
+            variant={viewMode === 'table' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setViewMode('table')}
+          >
+            <TableIcon className="h-4 w-4 mr-2" />
+            Tables
+          </Button>
+        </div>
       </div>
 
       {/* Summary Cards */}
@@ -204,14 +230,24 @@ export function SiteReportAnalytics() {
         isLoading={isLoading}
       />
 
-      {/* Charts Grid */}
-      <div className="grid gap-6 md:grid-cols-2">
-        <FloorWiseChart data={analytics?.byFloor || []} isLoading={isLoading} />
-        <ItemWiseChart data={analytics?.byItem || []} isLoading={isLoading} />
-      </div>
-
-      {/* Trend Chart */}
-      <TrendChart data={analytics?.trend || []} isLoading={isLoading} />
+      {/* Charts or Tables based on view mode */}
+      {viewMode === 'chart' ? (
+        <>
+          <div className="grid gap-6 md:grid-cols-2">
+            <FloorWiseChart data={analytics?.byFloor || []} isLoading={isLoading} />
+            <ItemWiseChart data={analytics?.byItem || []} isLoading={isLoading} />
+          </div>
+          <TrendChart data={analytics?.trend || []} isLoading={isLoading} />
+        </>
+      ) : (
+        <>
+          <div className="grid gap-6 md:grid-cols-2">
+            <FloorWiseTable data={analytics?.byFloor || []} isLoading={isLoading} />
+            <ItemWiseTable data={analytics?.byItem || []} isLoading={isLoading} />
+          </div>
+          <TrendTable data={analytics?.trend || []} isLoading={isLoading} />
+        </>
+      )}
     </div>
   );
 }
