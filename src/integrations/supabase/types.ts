@@ -8173,6 +8173,67 @@ export type Database = {
           },
         ]
       }
+      project_warehouse_allocations: {
+        Row: {
+          allocated_date: string | null
+          company_id: string | null
+          created_at: string | null
+          created_by: string | null
+          id: string
+          is_primary: boolean | null
+          notes: string | null
+          project_id: string
+          updated_at: string | null
+          warehouse_location_id: string
+        }
+        Insert: {
+          allocated_date?: string | null
+          company_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          is_primary?: boolean | null
+          notes?: string | null
+          project_id: string
+          updated_at?: string | null
+          warehouse_location_id: string
+        }
+        Update: {
+          allocated_date?: string | null
+          company_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          is_primary?: boolean | null
+          notes?: string | null
+          project_id?: string
+          updated_at?: string | null
+          warehouse_location_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_warehouse_allocations_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_warehouse_allocations_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "construction_projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_warehouse_allocations_warehouse_location_id_fkey"
+            columns: ["warehouse_location_id"]
+            isOneToOne: false
+            referencedRelation: "warehouse_locations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       purchase_orders: {
         Row: {
           actual_delivery_date: string | null
