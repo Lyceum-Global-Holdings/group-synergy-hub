@@ -7,3 +7,4 @@ export { SafetyInspectionDialog } from "./SafetyInspectionDialog";
 export { ConstructionDocumentDialog } from "./ConstructionDocumentDialog";
 export { BudgetItemDialog } from "./BudgetItemDialog";
 export { DeleteConfirmDialog } from "./DeleteConfirmDialog";
+export { GenerateReportDialog } from "./GenerateReportDialog";
