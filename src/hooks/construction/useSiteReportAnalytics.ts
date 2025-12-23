@@ -99,7 +99,7 @@ export const useSiteReportAnalytics = (filters: AnalyticsFilters) => {
           ),
           warehouse_items (
             id,
-            item_name,
+            name,
             item_code
           )
         `)
@@ -180,7 +180,7 @@ export const useSiteReportAnalytics = (filters: AnalyticsFilters) => {
 
           const existing = itemMap.get(itemId) || {
             itemId,
-            itemName: itemData.item_name || 'Unknown Item',
+            itemName: itemData.name || 'Unknown Item',
             itemCode: itemData.item_code || '',
             issued: 0,
             returned: 0,
