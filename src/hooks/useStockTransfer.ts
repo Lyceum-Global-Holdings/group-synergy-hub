@@ -269,54 +269,152 @@ export const useCompleteStockTransfer = () => {
           .eq("id", item.id);
 
         // ===== UPDATE SOURCE BIN ALLOCATION (decrease stock) =====
-        const { data: sourceAllocations } = await supabase
-          .from('warehouse_bin_allocations')
-          .select('*, warehouse_bins!inner(location_id)')
-          .eq('warehouse_item_id', item.warehouse_item_id)
-          .eq('warehouse_bins.location_id', fromLocationId);
+        // Two-step approach: First get bin IDs at from_location, then filter allocations
+        const { data: fromBins, error: fromBinsError } = await supabase
+          .from('warehouse_bins')
+          .select('id')
+          .eq('location_id', fromLocationId);
 
-        if (sourceAllocations && sourceAllocations.length > 0) {
-          const sourceAlloc = sourceAllocations[0];
-          await supabase
+        if (fromBinsError) {
+          console.error('Failed to get source bins:', fromBinsError);
+          throw fromBinsError;
+        }
+
+        if (fromBins && fromBins.length > 0) {
+          const fromBinIds = fromBins.map(b => b.id);
+          
+          // Get allocations for this item in those bins
+          const { data: sourceAllocations, error: sourceAllocError } = await supabase
             .from('warehouse_bin_allocations')
-            .update({
-              allocated_quantity: Math.max(0, (sourceAlloc.allocated_quantity || 0) - item.quantity_requested),
-              available_quantity: Math.max(0, (sourceAlloc.available_quantity || 0) - item.quantity_requested),
-            })
-            .eq('id', sourceAlloc.id);
+            .select('*')
+            .eq('warehouse_item_id', item.warehouse_item_id)
+            .in('bin_id', fromBinIds);
+
+          if (sourceAllocError) {
+            console.error('Failed to get source allocations:', sourceAllocError);
+            throw sourceAllocError;
+          }
+
+          console.log('Source allocations found:', sourceAllocations);
+
+          if (sourceAllocations && sourceAllocations.length > 0) {
+            const sourceAlloc = sourceAllocations[0];
+            const newAllocated = Math.max(0, (sourceAlloc.allocated_quantity || 0) - item.quantity_requested);
+            const newAvailable = Math.max(0, (sourceAlloc.available_quantity || 0) - item.quantity_requested);
+
+            console.log('Updating source allocation:', {
+              id: sourceAlloc.id,
+              oldAllocated: sourceAlloc.allocated_quantity,
+              oldAvailable: sourceAlloc.available_quantity,
+              newAllocated,
+              newAvailable,
+              quantityTransferred: item.quantity_requested,
+            });
+
+            const { error: updateSourceError } = await supabase
+              .from('warehouse_bin_allocations')
+              .update({
+                allocated_quantity: newAllocated,
+                available_quantity: newAvailable,
+              })
+              .eq('id', sourceAlloc.id);
+
+            if (updateSourceError) {
+              console.error('Failed to update source allocation:', updateSourceError);
+              throw updateSourceError;
+            }
+
+            // Also update the source bin's current_quantity
+            const { data: sourceBinData, error: sourceBinFetchError } = await supabase
+              .from("warehouse_bins")
+              .select("current_quantity")
+              .eq("id", sourceAlloc.bin_id)
+              .single();
+
+            if (sourceBinFetchError) {
+              console.error('Failed to get source bin data:', sourceBinFetchError);
+            } else if (sourceBinData) {
+              const { error: updateSourceBinError } = await supabase
+                .from("warehouse_bins")
+                .update({
+                  current_quantity: Math.max(0, (sourceBinData.current_quantity || 0) - item.quantity_requested),
+                })
+                .eq("id", sourceAlloc.bin_id);
+
+              if (updateSourceBinError) {
+                console.error('Failed to update source bin quantity:', updateSourceBinError);
+              }
+            }
+          } else {
+            console.warn('No source allocations found for item:', item.warehouse_item_id, 'at location:', fromLocationId);
+          }
+        } else {
+          console.warn('No bins found at source location:', fromLocationId);
         }
 
         // ===== CREATE OR UPDATE DESTINATION BIN ALLOCATION (increase stock) =====
         // First, find a bin at the destination location
-        const { data: destBins } = await supabase
+        const { data: destBins, error: destBinsError } = await supabase
           .from('warehouse_bins')
           .select('id')
           .eq('location_id', toLocationId)
           .limit(1);
 
+        if (destBinsError) {
+          console.error('Failed to get destination bins:', destBinsError);
+          throw destBinsError;
+        }
+
         if (destBins && destBins.length > 0) {
           const destBinId = destBins[0].id;
 
           // Check if allocation already exists at destination
-          const { data: destAllocation } = await supabase
+          const { data: destAllocation, error: destAllocError } = await supabase
             .from('warehouse_bin_allocations')
             .select('*')
             .eq('warehouse_item_id', item.warehouse_item_id)
             .eq('bin_id', destBinId)
             .maybeSingle();
 
+          if (destAllocError) {
+            console.error('Failed to check destination allocation:', destAllocError);
+            throw destAllocError;
+          }
+
           if (destAllocation) {
             // Update existing allocation
-            await supabase
+            const newAllocated = (destAllocation.allocated_quantity || 0) + item.quantity_requested;
+            const newAvailable = (destAllocation.available_quantity || 0) + item.quantity_requested;
+
+            console.log('Updating destination allocation:', {
+              id: destAllocation.id,
+              oldAllocated: destAllocation.allocated_quantity,
+              oldAvailable: destAllocation.available_quantity,
+              newAllocated,
+              newAvailable,
+            });
+
+            const { error: updateDestError } = await supabase
               .from('warehouse_bin_allocations')
               .update({
-                allocated_quantity: (destAllocation.allocated_quantity || 0) + item.quantity_requested,
-                available_quantity: (destAllocation.available_quantity || 0) + item.quantity_requested,
+                allocated_quantity: newAllocated,
+                available_quantity: newAvailable,
               })
               .eq('id', destAllocation.id);
+
+            if (updateDestError) {
+              console.error('Failed to update destination allocation:', updateDestError);
+              throw updateDestError;
+            }
           } else {
             // Create new allocation at destination
-            await supabase
+            console.log('Creating new destination allocation:', {
+              warehouse_item_id: item.warehouse_item_id,
+              bin_id: destBinId,
+              quantity: item.quantity_requested,
+            });
+
+            const { error: insertDestError } = await supabase
               .from('warehouse_bin_allocations')
               .insert({
                 warehouse_item_id: item.warehouse_item_id,
@@ -325,23 +423,36 @@ export const useCompleteStockTransfer = () => {
                 available_quantity: item.quantity_requested,
                 reserved_quantity: 0,
               });
+
+            if (insertDestError) {
+              console.error('Failed to create destination allocation:', insertDestError);
+              throw insertDestError;
+            }
           }
 
           // Update destination bin's current_quantity
-          const { data: destBinData } = await supabase
+          const { data: destBinData, error: destBinFetchError } = await supabase
             .from("warehouse_bins")
             .select("current_quantity")
             .eq("id", destBinId)
             .single();
 
-          if (destBinData) {
-            await supabase
+          if (destBinFetchError) {
+            console.error('Failed to get destination bin data:', destBinFetchError);
+          } else if (destBinData) {
+            const { error: updateDestBinError } = await supabase
               .from("warehouse_bins")
               .update({
                 current_quantity: (destBinData.current_quantity || 0) + item.quantity_requested,
               })
               .eq("id", destBinId);
+
+            if (updateDestBinError) {
+              console.error('Failed to update destination bin quantity:', updateDestBinError);
+            }
           }
+        } else {
+          console.warn('No bins found at destination location:', toLocationId);
         }
 
         // Also update bin current_quantity if bins specified (for backward compatibility)
