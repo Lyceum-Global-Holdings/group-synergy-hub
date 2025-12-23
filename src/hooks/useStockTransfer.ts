@@ -326,6 +326,22 @@ export const useCompleteStockTransfer = () => {
                 reserved_quantity: 0,
               });
           }
+
+          // Update destination bin's current_quantity
+          const { data: destBinData } = await supabase
+            .from("warehouse_bins")
+            .select("current_quantity")
+            .eq("id", destBinId)
+            .single();
+
+          if (destBinData) {
+            await supabase
+              .from("warehouse_bins")
+              .update({
+                current_quantity: (destBinData.current_quantity || 0) + item.quantity_requested,
+              })
+              .eq("id", destBinId);
+          }
         }
 
         // Also update bin current_quantity if bins specified (for backward compatibility)
