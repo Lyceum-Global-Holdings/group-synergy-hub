@@ -16,13 +16,14 @@ export function useWarehouseBinAllocations() {
   const { data: binAllocations, isLoading, error } = useQuery({
     queryKey: ['warehouse-bin-allocations', selectedCompany?.id, isViewingAllCompanies],
     queryFn: async () => {
-      let query = supabase
+      const { data: allAllocations, error: fetchError } = await supabase
         .from('warehouse_bin_allocations')
         .select(`
           *,
           warehouse_item:warehouse_items!warehouse_bin_allocations_warehouse_item_id_fkey(
             item_code,
-            name
+            name,
+            company_id
           ),
           warehouse_bin:warehouse_bins!warehouse_bin_allocations_bin_id_fkey(
             bin_code,
@@ -31,15 +32,17 @@ export function useWarehouseBinAllocations() {
         `)
         .order('created_at', { ascending: false });
 
-      // Filter by company if not viewing all companies
+      if (fetchError) throw fetchError;
+
+      // Filter by warehouse item's company_id (not allocation's company_id)
+      // This ensures allocations show if the item belongs to the selected company
       if (!isViewingAllCompanies && selectedCompany?.id) {
-        query = query.eq('company_id', selectedCompany.id);
+        return (allAllocations as BinAllocationWithDetails[]).filter(
+          (allocation) => (allocation.warehouse_item as { item_code: string; name: string; company_id: string | null })?.company_id === selectedCompany.id
+        );
       }
 
-      const { data, error } = await query;
-
-      if (error) throw error;
-      return data as BinAllocationWithDetails[];
+      return allAllocations as BinAllocationWithDetails[];
     },
     enabled: !!(isViewingAllCompanies || selectedCompany?.id),
   });
