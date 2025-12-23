@@ -57,6 +57,9 @@ export const useIssueMaterial = () => {
   
   return useMutation({
     mutationFn: async (data: IssueMaterialData) => {
+      // Get current user for RLS compliance
+      const { data: { user } } = await supabase.auth.getUser();
+      
       // Get current warehouse stock
       const { data: warehouseItem, error: warehouseError } = await supabase
         .from('warehouse_items')
@@ -125,6 +128,7 @@ export const useIssueMaterial = () => {
           total_value: data.quantity * unitCost,
           notes: `Project Issue: ${data.notes || 'Material issued to project'}`,
           company_id: data.company_id || null,
+          created_by: user?.id || null,
         });
       
       if (stockTransactionError) {
@@ -180,6 +184,9 @@ export const useReturnMaterial = () => {
   
   return useMutation({
     mutationFn: async (data: ReturnMaterialData) => {
+      // Get current user for RLS compliance
+      const { data: { user } } = await supabase.auth.getUser();
+      
       // Get current warehouse stock
       const { data: warehouseItem, error: warehouseError } = await supabase
         .from('warehouse_items')
@@ -249,6 +256,7 @@ export const useReturnMaterial = () => {
           total_value: data.quantity * unitCost,
           notes: `Project Return: ${data.notes || 'Material returned from project'}`,
           company_id: data.company_id || null,
+          created_by: user?.id || null,
         });
       
       if (stockTransactionError) {
