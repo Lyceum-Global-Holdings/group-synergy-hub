@@ -222,9 +222,6 @@ export function SiteReportAnalytics() {
         totalIssued={analytics?.summary.totalIssued || 0}
         totalReturned={analytics?.summary.totalReturned || 0}
         netUsage={analytics?.summary.netUsage || 0}
-        totalIssuedValue={analytics?.summary.totalIssuedValue || 0}
-        totalReturnedValue={analytics?.summary.totalReturnedValue || 0}
-        netValue={analytics?.summary.netValue || 0}
         uniqueItems={analytics?.summary.uniqueItems || 0}
         uniqueFloors={analytics?.summary.uniqueFloors || 0}
         isLoading={isLoading}

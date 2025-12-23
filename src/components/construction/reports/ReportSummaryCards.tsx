@@ -5,9 +5,6 @@ interface ReportSummaryCardsProps {
   totalIssued: number;
   totalReturned: number;
   netUsage: number;
-  totalIssuedValue: number;
-  totalReturnedValue: number;
-  netValue: number;
   uniqueItems: number;
   uniqueFloors: number;
   isLoading?: boolean;
@@ -17,21 +14,10 @@ export function ReportSummaryCards({
   totalIssued,
   totalReturned,
   netUsage,
-  totalIssuedValue,
-  totalReturnedValue,
-  netValue,
   uniqueItems,
   uniqueFloors,
   isLoading,
 }: ReportSummaryCardsProps) {
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('en-NG', {
-      style: 'currency',
-      currency: 'NGN',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(value);
-  };
 
   if (isLoading) {
     return (
@@ -60,9 +46,6 @@ export function ReportSummaryCards({
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold">{totalIssued.toLocaleString()} units</div>
-          <p className="text-xs text-muted-foreground">
-            {formatCurrency(totalIssuedValue)}
-          </p>
         </CardContent>
       </Card>
 
@@ -73,9 +56,6 @@ export function ReportSummaryCards({
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold">{totalReturned.toLocaleString()} units</div>
-          <p className="text-xs text-muted-foreground">
-            {formatCurrency(totalReturnedValue)}
-          </p>
         </CardContent>
       </Card>
 
@@ -86,9 +66,6 @@ export function ReportSummaryCards({
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold">{netUsage.toLocaleString()} units</div>
-          <p className="text-xs text-muted-foreground">
-            {formatCurrency(netValue)}
-          </p>
         </CardContent>
       </Card>
 
