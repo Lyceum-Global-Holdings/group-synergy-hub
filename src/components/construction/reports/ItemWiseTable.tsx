@@ -12,7 +12,7 @@ interface ItemWiseTableProps {
   isLoading?: boolean;
 }
 
-type SortField = 'itemCode' | 'itemName' | 'issued' | 'returned' | 'net' | 'issuedValue' | 'returnedValue';
+type SortField = 'itemCode' | 'itemName' | 'issued' | 'returned' | 'net';
 type SortDirection = 'asc' | 'desc';
 
 export function ItemWiseTable({ data, isLoading }: ItemWiseTableProps) {
@@ -65,14 +65,6 @@ export function ItemWiseTable({ data, isLoading }: ItemWiseTableProps) {
           aVal = a.issued - a.returned;
           bVal = b.issued - b.returned;
           break;
-        case 'issuedValue':
-          aVal = a.issuedValue;
-          bVal = b.issuedValue;
-          break;
-        case 'returnedValue':
-          aVal = a.returnedValue;
-          bVal = b.returnedValue;
-          break;
         default:
           return 0;
       }
@@ -85,7 +77,6 @@ export function ItemWiseTable({ data, isLoading }: ItemWiseTableProps) {
   }, [filteredData, sortField, sortDirection]);
 
   const formatNumber = (num: number) => num.toLocaleString();
-  const formatCurrency = (num: number) => `₹${num.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
   const SortButton = ({ field, children }: { field: SortField; children: React.ReactNode }) => (
     <Button
@@ -136,14 +127,12 @@ export function ItemWiseTable({ data, isLoading }: ItemWiseTableProps) {
                 <TableHead className="text-right"><SortButton field="issued">Issued</SortButton></TableHead>
                 <TableHead className="text-right"><SortButton field="returned">Returned</SortButton></TableHead>
                 <TableHead className="text-right"><SortButton field="net">Net</SortButton></TableHead>
-                <TableHead className="text-right"><SortButton field="issuedValue">Issued Value</SortButton></TableHead>
-                <TableHead className="text-right"><SortButton field="returnedValue">Returned Value</SortButton></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {sortedData.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                  <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
                     {searchTerm ? 'No items match your search' : 'No item data available for the selected period'}
                   </TableCell>
                 </TableRow>
@@ -157,8 +146,6 @@ export function ItemWiseTable({ data, isLoading }: ItemWiseTableProps) {
                     <TableCell className="text-right font-medium">
                       {formatNumber(item.issued - item.returned)}
                     </TableCell>
-                    <TableCell className="text-right">{formatCurrency(item.issuedValue)}</TableCell>
-                    <TableCell className="text-right">{formatCurrency(item.returnedValue)}</TableCell>
                   </TableRow>
                 ))
               )}

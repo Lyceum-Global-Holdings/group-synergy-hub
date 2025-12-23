@@ -11,7 +11,7 @@ interface FloorWiseTableProps {
   isLoading?: boolean;
 }
 
-type SortField = 'floorName' | 'issued' | 'returned' | 'net' | 'issuedValue' | 'returnedValue' | 'netValue';
+type SortField = 'floorName' | 'issued' | 'returned' | 'net';
 type SortDirection = 'asc' | 'desc';
 
 export function FloorWiseTable({ data, isLoading }: FloorWiseTableProps) {
@@ -48,18 +48,6 @@ export function FloorWiseTable({ data, isLoading }: FloorWiseTableProps) {
         aVal = a.issued - a.returned;
         bVal = b.issued - b.returned;
         break;
-      case 'issuedValue':
-        aVal = a.issuedValue;
-        bVal = b.issuedValue;
-        break;
-      case 'returnedValue':
-        aVal = a.returnedValue;
-        bVal = b.returnedValue;
-        break;
-      case 'netValue':
-        aVal = a.issuedValue - a.returnedValue;
-        bVal = b.issuedValue - b.returnedValue;
-        break;
       default:
         return 0;
     }
@@ -71,7 +59,6 @@ export function FloorWiseTable({ data, isLoading }: FloorWiseTableProps) {
   });
 
   const formatNumber = (num: number) => num.toLocaleString();
-  const formatCurrency = (num: number) => `₹${num.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
   const SortButton = ({ field, children }: { field: SortField; children: React.ReactNode }) => (
     <Button
@@ -112,15 +99,12 @@ export function FloorWiseTable({ data, isLoading }: FloorWiseTableProps) {
                 <TableHead className="text-right"><SortButton field="issued">Issued</SortButton></TableHead>
                 <TableHead className="text-right"><SortButton field="returned">Returned</SortButton></TableHead>
                 <TableHead className="text-right"><SortButton field="net">Net</SortButton></TableHead>
-                <TableHead className="text-right"><SortButton field="issuedValue">Issued Value</SortButton></TableHead>
-                <TableHead className="text-right"><SortButton field="returnedValue">Returned Value</SortButton></TableHead>
-                <TableHead className="text-right"><SortButton field="netValue">Net Value</SortButton></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {sortedData.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                  <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
                     No floor data available for the selected period
                   </TableCell>
                 </TableRow>
@@ -132,11 +116,6 @@ export function FloorWiseTable({ data, isLoading }: FloorWiseTableProps) {
                     <TableCell className="text-right">{formatNumber(floor.returned)}</TableCell>
                     <TableCell className="text-right font-medium">
                       {formatNumber(floor.issued - floor.returned)}
-                    </TableCell>
-                    <TableCell className="text-right">{formatCurrency(floor.issuedValue)}</TableCell>
-                    <TableCell className="text-right">{formatCurrency(floor.returnedValue)}</TableCell>
-                    <TableCell className="text-right font-medium">
-                      {formatCurrency(floor.issuedValue - floor.returnedValue)}
                     </TableCell>
                   </TableRow>
                 ))

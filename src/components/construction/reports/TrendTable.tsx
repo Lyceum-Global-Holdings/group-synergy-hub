@@ -11,7 +11,6 @@ interface TrendTableProps {
 
 export function TrendTable({ data, isLoading }: TrendTableProps) {
   const formatNumber = (num: number) => num.toLocaleString();
-  const formatCurrency = (num: number) => `₹${num.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
   // Filter out days with no activity
   const activeData = data.filter(d => d.issued > 0 || d.returned > 0);
@@ -21,10 +20,8 @@ export function TrendTable({ data, isLoading }: TrendTableProps) {
     (acc, d) => ({
       issued: acc.issued + d.issued,
       returned: acc.returned + d.returned,
-      issuedValue: acc.issuedValue + d.issuedValue,
-      returnedValue: acc.returnedValue + d.returnedValue,
     }),
-    { issued: 0, returned: 0, issuedValue: 0, returnedValue: 0 }
+    { issued: 0, returned: 0 }
   );
 
   if (isLoading) {
@@ -57,15 +54,12 @@ export function TrendTable({ data, isLoading }: TrendTableProps) {
                 <TableHead className="text-right">Issued Qty</TableHead>
                 <TableHead className="text-right">Returned Qty</TableHead>
                 <TableHead className="text-right">Net Qty</TableHead>
-                <TableHead className="text-right">Issued Value</TableHead>
-                <TableHead className="text-right">Returned Value</TableHead>
-                <TableHead className="text-right">Net Value</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {data.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                  <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
                     No trend data available for the selected period
                   </TableCell>
                 </TableRow>
@@ -83,11 +77,6 @@ export function TrendTable({ data, isLoading }: TrendTableProps) {
                         <TableCell className="text-right font-medium">
                           {formatNumber(point.issued - point.returned)}
                         </TableCell>
-                        <TableCell className="text-right">{formatCurrency(point.issuedValue)}</TableCell>
-                        <TableCell className="text-right">{formatCurrency(point.returnedValue)}</TableCell>
-                        <TableCell className="text-right font-medium">
-                          {formatCurrency(point.issuedValue - point.returnedValue)}
-                        </TableCell>
                       </TableRow>
                     );
                   })}
@@ -97,9 +86,6 @@ export function TrendTable({ data, isLoading }: TrendTableProps) {
                     <TableCell className="text-right">{formatNumber(totals.issued)}</TableCell>
                     <TableCell className="text-right">{formatNumber(totals.returned)}</TableCell>
                     <TableCell className="text-right">{formatNumber(totals.issued - totals.returned)}</TableCell>
-                    <TableCell className="text-right">{formatCurrency(totals.issuedValue)}</TableCell>
-                    <TableCell className="text-right">{formatCurrency(totals.returnedValue)}</TableCell>
-                    <TableCell className="text-right">{formatCurrency(totals.issuedValue - totals.returnedValue)}</TableCell>
                   </TableRow>
                 </>
               )}
