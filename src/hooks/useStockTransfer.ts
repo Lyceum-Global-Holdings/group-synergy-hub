@@ -198,32 +198,47 @@ export const useCompleteStockTransfer = () => {
 
   return useMutation({
     mutationFn: async (transferId: string) => {
+      console.log('[CompleteTransfer] Starting completion for transfer:', transferId);
+      
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("User not authenticated");
+      console.log('[CompleteTransfer] User authenticated:', user.id);
 
       // Get transfer items
+      console.log('[CompleteTransfer] Fetching transfer items...');
       const { data: items, error: itemsError } = await supabase
         .from("stock_transfer_items")
         .select("*")
         .eq("transfer_id", transferId);
 
-      if (itemsError) throw itemsError;
+      if (itemsError) {
+        console.error('[CompleteTransfer] Failed to fetch items:', itemsError);
+        throw itemsError;
+      }
       if (!items || items.length === 0) throw new Error("No items in transfer");
+      console.log('[CompleteTransfer] Found items:', items.length);
 
       // Get transfer details
+      console.log('[CompleteTransfer] Fetching transfer details...');
       const { data: transfer, error: transferError } = await supabase
         .from("stock_transfer_requests")
         .select("*")
         .eq("id", transferId)
         .single();
 
-      if (transferError) throw transferError;
+      if (transferError) {
+        console.error('[CompleteTransfer] Failed to fetch transfer:', transferError);
+        throw transferError;
+      }
+      console.log('[CompleteTransfer] Transfer details:', { from: transfer.from_location_id, to: transfer.to_location_id });
 
       const fromLocationId = transfer.from_location_id;
       const toLocationId = transfer.to_location_id;
 
       // Process each item
       for (const item of items) {
+        console.log('[CompleteTransfer] Processing item:', item.item_name, 'quantity:', item.quantity_requested);
+        
         // Get current stock for transaction records
         const { data: warehouseItem } = await supabase
           .from("warehouse_items")
@@ -232,9 +247,11 @@ export const useCompleteStockTransfer = () => {
           .single();
 
         const currentStock = warehouseItem?.current_stock || 0;
+        console.log('[CompleteTransfer] Current stock for item:', currentStock);
 
         // Create transfer out transaction
-        await supabase.from("stock_transactions").insert({
+        console.log('[CompleteTransfer] Creating transfer OUT transaction...');
+        const { error: transOutError } = await supabase.from("stock_transactions").insert({
           item_id: item.warehouse_item_id,
           transaction_type: 'transfer_out',
           reference_type: 'transfer',
@@ -245,9 +262,14 @@ export const useCompleteStockTransfer = () => {
           notes: `Transfer ${transfer.transfer_number} - Out from ${fromLocationId}`,
           created_by: user.id,
         });
+        if (transOutError) {
+          console.error('[CompleteTransfer] Failed to create transfer OUT transaction:', transOutError);
+          throw transOutError;
+        }
 
         // Create transfer in transaction
-        await supabase.from("stock_transactions").insert({
+        console.log('[CompleteTransfer] Creating transfer IN transaction...');
+        const { error: transInError } = await supabase.from("stock_transactions").insert({
           item_id: item.warehouse_item_id,
           transaction_type: 'transfer_in',
           reference_type: 'transfer',
@@ -258,27 +280,37 @@ export const useCompleteStockTransfer = () => {
           notes: `Transfer ${transfer.transfer_number} - In to ${toLocationId}`,
           created_by: user.id,
         });
+        if (transInError) {
+          console.error('[CompleteTransfer] Failed to create transfer IN transaction:', transInError);
+          throw transInError;
+        }
 
         // Update item status
-        await supabase
+        console.log('[CompleteTransfer] Updating transfer item status to completed...');
+        const { error: itemStatusError } = await supabase
           .from("stock_transfer_items")
           .update({
             status: 'completed',
             quantity_transferred: item.quantity_requested,
           })
           .eq("id", item.id);
+        if (itemStatusError) {
+          console.error('[CompleteTransfer] Failed to update item status:', itemStatusError);
+          throw itemStatusError;
+        }
 
         // ===== UPDATE SOURCE BIN ALLOCATION (decrease stock) =====
-        // Two-step approach: First get bin IDs at from_location, then filter allocations
+        console.log('[CompleteTransfer] Getting source bins for location:', fromLocationId);
         const { data: fromBins, error: fromBinsError } = await supabase
           .from('warehouse_bins')
           .select('id')
           .eq('location_id', fromLocationId);
 
         if (fromBinsError) {
-          console.error('Failed to get source bins:', fromBinsError);
+          console.error('[CompleteTransfer] Failed to get source bins:', fromBinsError);
           throw fromBinsError;
         }
+        console.log('[CompleteTransfer] Found source bins:', fromBins?.length || 0);
 
         if (fromBins && fromBins.length > 0) {
           const fromBinIds = fromBins.map(b => b.id);
@@ -311,6 +343,7 @@ export const useCompleteStockTransfer = () => {
               quantityTransferred: item.quantity_requested,
             });
 
+            console.log('[CompleteTransfer] Executing source allocation update...');
             const { error: updateSourceError } = await supabase
               .from('warehouse_bin_allocations')
               .update({
@@ -319,9 +352,10 @@ export const useCompleteStockTransfer = () => {
               .eq('id', sourceAlloc.id);
 
             if (updateSourceError) {
-              console.error('Failed to update source allocation:', updateSourceError);
+              console.error('[CompleteTransfer] FAILED to update source allocation:', updateSourceError);
               throw updateSourceError;
             }
+            console.log('[CompleteTransfer] Source allocation updated successfully');
 
             // Also update the source bin's current_quantity
             const { data: sourceBinData, error: sourceBinFetchError } = await supabase
@@ -352,7 +386,7 @@ export const useCompleteStockTransfer = () => {
         }
 
         // ===== CREATE OR UPDATE DESTINATION BIN ALLOCATION (increase stock) =====
-        // First, find a bin at the destination location
+        console.log('[CompleteTransfer] Getting destination bins for location:', toLocationId);
         const { data: destBins, error: destBinsError } = await supabase
           .from('warehouse_bins')
           .select('id')
@@ -360,12 +394,14 @@ export const useCompleteStockTransfer = () => {
           .limit(1);
 
         if (destBinsError) {
-          console.error('Failed to get destination bins:', destBinsError);
+          console.error('[CompleteTransfer] Failed to get destination bins:', destBinsError);
           throw destBinsError;
         }
+        console.log('[CompleteTransfer] Found destination bins:', destBins?.length || 0);
 
         if (destBins && destBins.length > 0) {
           const destBinId = destBins[0].id;
+          console.log('[CompleteTransfer] Using destination bin:', destBinId);
 
           // Check if allocation already exists at destination
           const { data: destAllocation, error: destAllocError } = await supabase
@@ -393,6 +429,7 @@ export const useCompleteStockTransfer = () => {
               newAvailable,
             });
 
+            console.log('[CompleteTransfer] Executing destination allocation update...');
             const { error: updateDestError } = await supabase
               .from('warehouse_bin_allocations')
               .update({
@@ -401,9 +438,10 @@ export const useCompleteStockTransfer = () => {
               .eq('id', destAllocation.id);
 
             if (updateDestError) {
-              console.error('Failed to update destination allocation:', updateDestError);
+              console.error('[CompleteTransfer] FAILED to update destination allocation:', updateDestError);
               throw updateDestError;
             }
+            console.log('[CompleteTransfer] Destination allocation updated successfully');
           } else {
             // Create new allocation at destination
             console.log('Creating new destination allocation:', {
@@ -412,6 +450,7 @@ export const useCompleteStockTransfer = () => {
               quantity: item.quantity_requested,
             });
 
+            console.log('[CompleteTransfer] Executing destination allocation insert...');
             const { error: insertDestError } = await supabase
               .from('warehouse_bin_allocations')
               .insert({
@@ -422,9 +461,10 @@ export const useCompleteStockTransfer = () => {
               });
 
             if (insertDestError) {
-              console.error('Failed to create destination allocation:', insertDestError);
+              console.error('[CompleteTransfer] FAILED to create destination allocation:', insertDestError);
               throw insertDestError;
             }
+            console.log('[CompleteTransfer] Destination allocation created successfully');
           }
 
           // Update destination bin's current_quantity
