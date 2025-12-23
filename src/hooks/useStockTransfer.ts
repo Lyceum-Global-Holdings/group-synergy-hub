@@ -343,11 +343,12 @@ export const useCompleteStockTransfer = () => {
               quantityTransferred: item.quantity_requested,
             });
 
-            console.log('[CompleteTransfer] Executing source allocation update...');
+          console.log('[CompleteTransfer] Executing source allocation update...');
             const { error: updateSourceError } = await supabase
               .from('warehouse_bin_allocations')
               .update({
                 allocated_quantity: newAllocated,
+                available_quantity: newAvailable,
               })
               .eq('id', sourceAlloc.id);
 
@@ -462,11 +463,14 @@ export const useCompleteStockTransfer = () => {
             newAllocated,
           });
 
+          const newAvailable = (destAllocation.available_quantity || 0) + item.quantity_requested;
+          
           console.log('[CompleteTransfer] Executing destination allocation update...');
           const { error: updateDestError } = await supabase
             .from('warehouse_bin_allocations')
             .update({
               allocated_quantity: newAllocated,
+              available_quantity: newAvailable,
             })
             .eq('id', destAllocation.id);
 
