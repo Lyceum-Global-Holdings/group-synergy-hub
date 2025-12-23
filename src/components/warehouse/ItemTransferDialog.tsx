@@ -221,6 +221,7 @@ export function ItemTransferDialog({
         reason: values.reason || undefined,
         notes: values.notes || undefined,
         status: 'approved' as const, // Auto-approve transfers from Item Master
+        company_id: item.company_id, // Include company_id from the item being transferred
       };
 
       const transfer = await createTransfer.mutateAsync(transferData);
