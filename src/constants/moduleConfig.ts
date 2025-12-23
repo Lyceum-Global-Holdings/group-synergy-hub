@@ -153,6 +153,7 @@ export const moduleConfig: Record<string, ModuleConfig> = {
       { key: 'site-management', name: 'Site Management', description: 'Manage project sites', url: '/construction/site-management' },
       { key: 'progress-tracking', name: 'Progress Tracking', description: 'Track project progress and milestones', url: '/construction/progress-tracking' },
       { key: 'daily-reports', name: 'Daily Site Reports', description: 'Daily site activity reports', url: '/construction/daily-reports' },
+      { key: 'reports-analytics', name: 'Reports Analytics', description: 'Analytics dashboard for site reports', url: '/construction/reports-analytics' },
       { key: 'resource-allocation', name: 'Resource Allocation', description: 'Allocate resources to projects', url: '/construction/resource-allocation' },
       { key: 'quality-control', name: 'Quality Control', description: 'Quality inspections and checklists', url: '/construction/quality-control' },
       { key: 'safety-management', name: 'Safety Management', description: 'Safety incidents and compliance', url: '/construction/safety-management' },

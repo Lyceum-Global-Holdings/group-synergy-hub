@@ -66,6 +66,7 @@ import QualityControl from "./pages/construction/QualityControl";
 import SafetyManagement from "./pages/construction/SafetyManagement";
 import ProjectDocuments from "./pages/construction/ProjectDocuments";
 import ProjectBudgeting from "./pages/construction/ProjectBudgeting";
+import ReportsAnalytics from "./pages/construction/ReportsAnalytics";
 
 const queryClient = new QueryClient();
 
@@ -160,6 +161,7 @@ function App() {
               <Route path="/construction/safety-management" element={<SafetyManagement />} />
               <Route path="/construction/project-documents" element={<ProjectDocuments />} />
               <Route path="/construction/project-budgeting" element={<ProjectBudgeting />} />
+              <Route path="/construction/reports-analytics" element={<ReportsAnalytics />} />
             </Route>
             
             {/* Catch-all 404 route */}
