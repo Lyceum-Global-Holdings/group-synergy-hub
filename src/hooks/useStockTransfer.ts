@@ -348,7 +348,6 @@ export const useCompleteStockTransfer = () => {
               .from('warehouse_bin_allocations')
               .update({
                 allocated_quantity: newAllocated,
-                available_quantity: newAvailable,
               })
               .eq('id', sourceAlloc.id);
 
@@ -463,14 +462,11 @@ export const useCompleteStockTransfer = () => {
             newAllocated,
           });
 
-          const newAvailable = (destAllocation.available_quantity || 0) + item.quantity_requested;
-          
           console.log('[CompleteTransfer] Executing destination allocation update...');
           const { error: updateDestError } = await supabase
             .from('warehouse_bin_allocations')
             .update({
               allocated_quantity: newAllocated,
-              available_quantity: newAvailable,
             })
             .eq('id', destAllocation.id);
 
@@ -494,7 +490,6 @@ export const useCompleteStockTransfer = () => {
               warehouse_item_id: item.warehouse_item_id,
               bin_id: destBinId,
               allocated_quantity: item.quantity_requested,
-              available_quantity: item.quantity_requested,
               reserved_quantity: 0,
               company_id: transfer.company_id,
               created_by: user.id,
