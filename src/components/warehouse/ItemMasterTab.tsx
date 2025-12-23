@@ -65,7 +65,7 @@ export function ItemMasterTab() {
   const { categories } = useItemCategories();
   const { units } = useItemUnits();
   const { companies } = useCompany();
-  const { migrateAllocationsToCorrectLocation, isMigrating } = useWarehouseBinAllocations();
+  const { migrateAllocationsToCorrectLocation, isMigrating, reconcileStock, isReconciling } = useWarehouseBinAllocations();
   const { canDelete } = useIsAdminOrHigher();
 
   // Fetch all top-level warehouse locations
@@ -158,14 +158,24 @@ export function ItemMasterTab() {
         </div>
         <div className="flex items-center gap-2">
           {canDelete && (
-            <Button 
-              variant="outline" 
-              onClick={() => migrateAllocationsToCorrectLocation()}
-              disabled={isMigrating}
-            >
-              <Wrench className="mr-2 h-4 w-4" />
-              {isMigrating ? 'Fixing...' : 'Fix Allocations'}
-            </Button>
+            <>
+              <Button 
+                variant="outline" 
+                onClick={() => reconcileStock()}
+                disabled={isReconciling}
+              >
+                <BarChart3 className="mr-2 h-4 w-4" />
+                {isReconciling ? 'Reconciling...' : 'Reconcile Stock'}
+              </Button>
+              <Button 
+                variant="outline" 
+                onClick={() => migrateAllocationsToCorrectLocation()}
+                disabled={isMigrating}
+              >
+                <Wrench className="mr-2 h-4 w-4" />
+                {isMigrating ? 'Fixing...' : 'Fix Allocations'}
+              </Button>
+            </>
           )}
           <BulkItemImportDialog />
           <Button onClick={() => setIsCreateDialogOpen(true)}>

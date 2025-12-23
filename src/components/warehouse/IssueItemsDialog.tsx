@@ -130,7 +130,7 @@ export function IssueItemsDialog({ open, onOpenChange, issueId, onSuccess }: Iss
 
       if (stockError) throw stockError;
 
-      // Update warehouse items stock levels and material_issue_items with issued_at
+      // Update warehouse items stock levels, bin allocations, and material_issue_items with issued_at
       for (const item of items) {
         const currentStock = stockMap.get(item.item_id) || 0;
         
@@ -143,6 +143,32 @@ export function IssueItemsDialog({ open, onOpenChange, issueId, onSuccess }: Iss
           .eq('id', item.item_id);
 
         if (updateStockError) throw updateStockError;
+
+        // Update bin allocations - reduce the allocated quantity
+        const { data: allocations } = await supabase
+          .from('warehouse_bin_allocations')
+          .select('id, allocated_quantity')
+          .eq('warehouse_item_id', item.item_id)
+          .gt('allocated_quantity', 0)
+          .order('allocated_quantity', { ascending: false });
+
+        if (allocations && allocations.length > 0) {
+          let remainingToReduce = item.quantity_issued;
+          
+          for (const alloc of allocations) {
+            if (remainingToReduce <= 0) break;
+            
+            const reduceAmount = Math.min(remainingToReduce, alloc.allocated_quantity);
+            const newAllocQty = alloc.allocated_quantity - reduceAmount;
+            
+            await supabase
+              .from('warehouse_bin_allocations')
+              .update({ allocated_quantity: newAllocQty })
+              .eq('id', alloc.id);
+            
+            remainingToReduce -= reduceAmount;
+          }
+        }
 
         // Update material_issue_items with issued_at
         const { error: updateItemError } = await supabase
