@@ -31,6 +31,8 @@ import { Badge } from "@/components/ui/badge";
 import { Company } from "@/types/company";
 import { moduleConfig, normalizeCompanyModules, isModuleEnabled, isSubModuleEnabled } from "@/constants/moduleConfig";
 import { useSuperAdmin } from "@/hooks/useSuperAdmin";
+import { useAuth } from "@/contexts/AuthContext";
+import { useUserEffectiveModules } from "@/hooks/useModuleAccess";
 
 type ModuleWithCompanies = {
   key: string;
@@ -46,6 +48,8 @@ export function CompanySidebar() {
   const location = useLocation();
   const { selectedCompany, companies, isViewingAllCompanies } = useCompany();
   const { data: isSuperAdmin } = useSuperAdmin();
+  const { user } = useAuth();
+  const { data: userEffectiveModules } = useUserEffectiveModules(user?.id);
   const currentPath = location.pathname;
 
   const isActive = (path: string) => currentPath === path;
@@ -82,11 +86,18 @@ export function CompanySidebar() {
   // Filter modules based on selected company or show all when viewing all companies
   // Super admins see all modules only when viewing "All Companies"
   // When a specific company is selected, show only that company's modules
-  const availableModules = isViewingAllCompanies
+  const companyModules = isViewingAllCompanies
     ? (isSuperAdmin ? Object.keys(moduleConfig) : getAllUniqueModules())
     : selectedCompany
       ? Object.keys(normalizeCompanyModules(selectedCompany.modules))
       : [];
+
+  // Filter by user permissions (unless super admin)
+  const availableModules = isSuperAdmin 
+    ? companyModules 
+    : companyModules.filter(moduleKey => 
+        userEffectiveModules?.availableModules?.includes(moduleKey)
+      );
     
   // Ensure availableModules is always an array
   const safeAvailableModules = Array.isArray(availableModules) ? availableModules : [];
@@ -112,6 +123,17 @@ export function CompanySidebar() {
           enabledSubModules.includes(item.key)
         );
       }
+
+      // Further filter by user permissions (unless super admin)
+      if (!isSuperAdmin && userEffectiveModules?.moduleSubModules) {
+        const userSubModules = userEffectiveModules.moduleSubModules[moduleKey] || [];
+        enabledItems = enabledItems.filter(item =>
+          userSubModules.includes(item.key)
+        );
+      }
+
+      // Skip modules with no enabled items for the user
+      if (enabledItems.length === 0) return null;
       
       // Add companies using this module when viewing all companies
       if (isViewingAllCompanies) {
