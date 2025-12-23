@@ -31,8 +31,12 @@ import { ProjectDetailsDialog } from "@/components/construction/ProjectDetailsDi
 import { FloorDrawingsDialog } from "@/components/construction/FloorDrawingsDialog";
 import { ProjectWarehouseAllocationDialog } from "@/components/construction/ProjectWarehouseAllocationDialog";
 import { FloorWiseStockAllocationDialog } from "@/components/construction/FloorWiseStockAllocationDialog";
+import { useIsAdmin, useSuperAdmin } from "@/hooks/useSuperAdmin";
 
 export default function ProjectMaster() {
+  const { data: isSuperAdmin } = useSuperAdmin();
+  const { data: isAdmin } = useIsAdmin();
+  const canManageProjects = isSuperAdmin || isAdmin;
   const [searchTerm, setSearchTerm] = useState("");
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<ConstructionProject | null>(null);
@@ -86,10 +90,12 @@ export default function ProjectMaster() {
             Manage construction projects and track progress
           </p>
         </div>
-        <Button onClick={() => setCreateDialogOpen(true)}>
-          <Plus className="mr-2 h-4 w-4" />
-          New Project
-        </Button>
+        {canManageProjects && (
+          <Button onClick={() => setCreateDialogOpen(true)}>
+            <Plus className="mr-2 h-4 w-4" />
+            New Project
+          </Button>
+        )}
       </div>
 
       <Card>
@@ -198,25 +204,29 @@ export default function ProjectMaster() {
                         >
                           <Building2 className="h-4 w-4" />
                         </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => {
-                            setEditingProject(project);
-                            setCreateDialogOpen(true);
-                          }}
-                          title="Edit"
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => setDeletingProject(project)}
-                          title="Delete"
-                        >
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
+                        {canManageProjects && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => {
+                              setEditingProject(project);
+                              setCreateDialogOpen(true);
+                            }}
+                            title="Edit"
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                        )}
+                        {canManageProjects && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setDeletingProject(project)}
+                            title="Delete"
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        )}
                       </div>
                     </TableCell>
                   </TableRow>

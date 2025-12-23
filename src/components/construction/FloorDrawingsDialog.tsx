@@ -30,6 +30,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { useIsAdmin, useSuperAdmin } from "@/hooks/useSuperAdmin";
 
 interface FloorDrawingsDialogProps {
   project: ConstructionProject | null;
@@ -42,6 +43,10 @@ export function FloorDrawingsDialog({
   open,
   onOpenChange,
 }: FloorDrawingsDialogProps) {
+  const { data: isSuperAdmin } = useSuperAdmin();
+  const { data: isAdmin } = useIsAdmin();
+  const canManageFloors = isSuperAdmin || isAdmin;
+
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [viewing3D, setViewing3D] = useState<FloorDrawing | null>(null);
   const [viewingImage, setViewingImage] = useState<FloorDrawing | null>(null);
@@ -68,10 +73,12 @@ export function FloorDrawingsDialog({
           <DialogHeader>
             <DialogTitle className="flex items-center justify-between">
               <span>Floor Drawings - {project?.project_name}</span>
-              <Button onClick={() => setAddDialogOpen(true)} size="sm">
-                <Plus className="mr-2 h-4 w-4" />
-                Add Drawing
-              </Button>
+              {canManageFloors && (
+                <Button onClick={() => setAddDialogOpen(true)} size="sm">
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add Drawing
+                </Button>
+              )}
             </DialogTitle>
           </DialogHeader>
 
@@ -141,13 +148,15 @@ export function FloorDrawingsDialog({
                           >
                             <Scan className="h-4 w-4" />
                           </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => setDeletingDrawing(drawing)}
-                          >
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                          </Button>
+                          {canManageFloors && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => setDeletingDrawing(drawing)}
+                            >
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          )}
                         </div>
                       </TableCell>
                     </TableRow>
