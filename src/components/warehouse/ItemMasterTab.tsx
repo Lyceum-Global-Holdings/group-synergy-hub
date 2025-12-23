@@ -27,6 +27,7 @@ import { ItemTransferDialog } from '@/components/warehouse/ItemTransferDialog';
 import { ItemStockDetailsDialog } from '@/components/warehouse/ItemStockDetailsDialog';
 import { WarehouseItem } from '@/types/itemBin';
 import { supabase } from '@/integrations/supabase/client';
+import { useRealtimeStockUpdates } from '@/hooks/useRealtimeStockUpdates';
 
 interface LocationStock {
   locationId: string;
@@ -39,6 +40,8 @@ interface ItemLocationStockMap {
 }
 
 export function ItemMasterTab() {
+  // Enable real-time stock updates
+  useRealtimeStockUpdates();
   const [searchTerm, setSearchTerm] = useState('');
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<WarehouseItem | null>(null);
