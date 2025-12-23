@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { DataTable } from '@/components/ui/data-table';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
@@ -13,7 +14,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Plus, AlertCircle, Trash2 } from 'lucide-react';
+import { Plus, AlertCircle, Trash2, Search } from 'lucide-react';
 import { useWarehouseBinAllocations } from '@/hooks/useWarehouseBinAllocations';
 import { useCompany } from '@/contexts/CompanyContext';
 import { useIsAdminOrHigher } from '@/hooks/useIsAdminOrHigher';
@@ -25,7 +26,20 @@ export function BinAllocationsTab() {
   const { isViewingAllCompanies } = useCompany();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [allocationToDelete, setAllocationToDelete] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
   const { binAllocations, isLoading, deleteAllocation, isDeleting } = useWarehouseBinAllocations();
+
+  const filteredAllocations = useMemo(() => {
+    if (!searchTerm.trim()) return binAllocations || [];
+    
+    const term = searchTerm.toLowerCase();
+    return (binAllocations || []).filter((allocation) => 
+      allocation.warehouse_item?.item_code?.toLowerCase().includes(term) ||
+      allocation.warehouse_item?.name?.toLowerCase().includes(term) ||
+      allocation.warehouse_bin?.bin_code?.toLowerCase().includes(term) ||
+      allocation.warehouse_bin?.name?.toLowerCase().includes(term)
+    );
+  }, [binAllocations, searchTerm]);
   const { canDelete } = useIsAdminOrHigher();
 
   const handleDelete = () => {
@@ -99,21 +113,32 @@ export function BinAllocationsTab() {
 
   return (
     <Card>
-      <CardHeader className="flex flex-row items-center justify-between">
+      <CardHeader className="flex flex-row items-center justify-between gap-4">
         <div>
           <CardTitle>Bin Allocations</CardTitle>
           <CardDescription>
             Manage item-to-bin allocations and track reserved quantities
           </CardDescription>
         </div>
-        <Button 
-          onClick={() => setDialogOpen(true)}
-          disabled={isViewingAllCompanies}
-          title={isViewingAllCompanies ? "Select a specific company to allocate items" : ""}
-        >
-          <Plus className="mr-2 h-4 w-4" />
-          Allocate Item to Bin
-        </Button>
+        <div className="flex items-center gap-4">
+          <div className="relative w-64">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search items, bins..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-8"
+            />
+          </div>
+          <Button 
+            onClick={() => setDialogOpen(true)}
+            disabled={isViewingAllCompanies}
+            title={isViewingAllCompanies ? "Select a specific company to allocate items" : ""}
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            Allocate Item to Bin
+          </Button>
+        </div>
       </CardHeader>
       <CardContent>
         {isViewingAllCompanies && (
@@ -126,7 +151,7 @@ export function BinAllocationsTab() {
         )}
         <DataTable
           columns={columns}
-          data={binAllocations || []}
+          data={filteredAllocations}
           isLoading={isLoading}
         />
       </CardContent>
