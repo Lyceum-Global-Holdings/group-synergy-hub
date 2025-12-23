@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Plus, Search, Edit, Trash2, History, Settings, Eye, ArrowLeftRight, MapPin } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, History, Settings, Eye, ArrowLeftRight, MapPin, BarChart3 } from 'lucide-react';
 import { BulkItemImportDialog } from '@/components/warehouse/BulkItemImportDialog';
 import {
   Table,
@@ -24,6 +24,7 @@ import { StockAdjustmentDialog } from '@/components/warehouse/StockAdjustmentDia
 import { DeleteItemConfirmationDialog } from '@/components/warehouse/DeleteItemConfirmationDialog';
 import { ItemDetailsDialog } from '@/components/warehouse/ItemDetailsDialog';
 import { ItemTransferDialog } from '@/components/warehouse/ItemTransferDialog';
+import { ItemStockDetailsDialog } from '@/components/warehouse/ItemStockDetailsDialog';
 import { WarehouseItem } from '@/types/itemBin';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -46,6 +47,7 @@ export function ItemMasterTab() {
   const [stockAdjustmentItem, setStockAdjustmentItem] = useState<WarehouseItem | null>(null);
   const [deletingItem, setDeletingItem] = useState<WarehouseItem | null>(null);
   const [transferItem, setTransferItem] = useState<WarehouseItem | null>(null);
+  const [stockDetailsItem, setStockDetailsItem] = useState<WarehouseItem | null>(null);
   
   const { 
     items, 
@@ -58,6 +60,21 @@ export function ItemMasterTab() {
   const { categories } = useItemCategories();
   const { units } = useItemUnits();
   const { companies } = useCompany();
+
+  // Fetch all top-level warehouse locations
+  const { data: allLocations = [] } = useQuery({
+    queryKey: ['all-warehouse-locations'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('warehouse_locations')
+        .select('id, name')
+        .is('parent_id', null)
+        .order('name');
+      
+      if (error) throw error;
+      return data || [];
+    },
+  });
 
   // Fetch stock by location for all items
   const { data: itemLocationStock = {} } = useQuery<ItemLocationStockMap>({
@@ -196,12 +213,12 @@ export function ItemMasterTab() {
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-2">
-                      <div className="space-y-1 text-right">
+                      <div className="space-y-1 text-right min-w-[140px]">
                         {itemLocationStock[item.id]?.length > 0 ? (
                           <>
-                            {itemLocationStock[item.id].slice(0, 2).map((loc) => (
+                            {itemLocationStock[item.id].slice(0, 3).map((loc) => (
                               <div key={loc.locationId} className="flex items-center justify-end gap-1.5 text-xs">
-                                <MapPin className="h-3 w-3 text-muted-foreground" />
+                                <MapPin className="h-3 w-3 text-primary flex-shrink-0" />
                                 <span className="text-muted-foreground truncate max-w-[80px]">{loc.locationName}:</span>
                                 <span className={`font-medium ${
                                   loc.stock <= (item.reorder_level || 0) ? 'text-destructive' : 'text-green-600'
@@ -210,38 +227,43 @@ export function ItemMasterTab() {
                                 </span>
                               </div>
                             ))}
-                            {itemLocationStock[item.id].length > 2 && (
-                              <TooltipProvider>
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <span className="text-xs text-muted-foreground cursor-help">
-                                      +{itemLocationStock[item.id].length - 2} more...
-                                    </span>
-                                  </TooltipTrigger>
-                                  <TooltipContent>
-                                    <div className="space-y-1">
-                                      {itemLocationStock[item.id].slice(2).map((loc) => (
-                                        <div key={loc.locationId} className="text-xs">
-                                          {loc.locationName}: {loc.stock}
-                                        </div>
-                                      ))}
-                                    </div>
-                                  </TooltipContent>
-                                </Tooltip>
-                              </TooltipProvider>
+                            {itemLocationStock[item.id].length > 3 && (
+                              <div className="text-xs text-muted-foreground">
+                                +{itemLocationStock[item.id].length - 3} more locations
+                              </div>
                             )}
-                            <div className="text-xs border-t border-border pt-1 text-muted-foreground">
-                              Total: <span className="font-semibold text-foreground">{item.current_stock || 0}</span>
+                            <div className="text-xs border-t border-border pt-1 mt-1 text-muted-foreground flex items-center justify-end gap-2">
+                              <span>Total: <span className="font-semibold text-foreground">{item.current_stock || 0}</span></span>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setStockDetailsItem(item)}
+                                className="p-0.5 h-5 w-5"
+                                title="View Stock Details"
+                              >
+                                <BarChart3 className="h-3.5 w-3.5" />
+                              </Button>
                             </div>
                           </>
                         ) : (
-                          <span className={`font-medium ${
-                            (item.current_stock || 0) <= (item.reorder_level || 0) ? 'text-destructive' : 
-                            (item.current_stock || 0) <= (item.min_stock_level || 0) ? 'text-yellow-600' : 
-                            'text-green-600'
-                          }`}>
-                            {item.current_stock || 0}
-                          </span>
+                          <div className="flex items-center justify-end gap-2">
+                            <span className={`font-medium ${
+                              (item.current_stock || 0) <= (item.reorder_level || 0) ? 'text-destructive' : 
+                              (item.current_stock || 0) <= (item.min_stock_level || 0) ? 'text-yellow-600' : 
+                              'text-green-600'
+                            }`}>
+                              {item.current_stock || 0}
+                            </span>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setStockDetailsItem(item)}
+                              className="p-0.5 h-5 w-5"
+                              title="View Stock Details"
+                            >
+                              <BarChart3 className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
                         )}
                       </div>
                       <div className="flex flex-col gap-0.5">
@@ -374,6 +396,16 @@ export function ItemMasterTab() {
           if (!open) setTransferItem(null);
         }}
         item={transferItem}
+      />
+
+      <ItemStockDetailsDialog
+        open={!!stockDetailsItem}
+        onOpenChange={(open) => {
+          if (!open) setStockDetailsItem(null);
+        }}
+        item={stockDetailsItem}
+        locationStock={stockDetailsItem ? (itemLocationStock[stockDetailsItem.id] || []) : []}
+        allLocations={allLocations}
       />
     </div>
   );
