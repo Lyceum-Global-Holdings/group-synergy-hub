@@ -3889,10 +3889,13 @@ export type Database = {
           id: string
           labor_count: number | null
           materials_received: string | null
+          period_end_date: string | null
+          period_start_date: string | null
           photos_url: string[] | null
           project_id: string
           report_date: string
           report_number: string
+          report_type: Database["public"]["Enums"]["report_period_type"]
           safety_observations: string | null
           site_id: string | null
           status: string | null
@@ -3914,10 +3917,13 @@ export type Database = {
           id?: string
           labor_count?: number | null
           materials_received?: string | null
+          period_end_date?: string | null
+          period_start_date?: string | null
           photos_url?: string[] | null
           project_id: string
           report_date: string
           report_number: string
+          report_type?: Database["public"]["Enums"]["report_period_type"]
           safety_observations?: string | null
           site_id?: string | null
           status?: string | null
@@ -3939,10 +3945,13 @@ export type Database = {
           id?: string
           labor_count?: number | null
           materials_received?: string | null
+          period_end_date?: string | null
+          period_start_date?: string | null
           photos_url?: string[] | null
           project_id?: string
           report_date?: string
           report_number?: string
+          report_type?: Database["public"]["Enums"]["report_period_type"]
           safety_observations?: string | null
           site_id?: string | null
           status?: string | null
@@ -12842,6 +12851,7 @@ export type Database = {
         | "awarded"
         | "rejected"
       renewal_type: "auto_renewal" | "manual_review" | "renegotiation_required"
+      report_period_type: "daily" | "weekly" | "monthly"
       rfq_rfp_priority: "low" | "medium" | "high" | "urgent"
       rfq_rfp_publish_type: "public" | "invited" | "limited"
       rfq_rfp_status:
@@ -13306,6 +13316,7 @@ export const Constants = {
         "rejected",
       ],
       renewal_type: ["auto_renewal", "manual_review", "renegotiation_required"],
+      report_period_type: ["daily", "weekly", "monthly"],
       rfq_rfp_priority: ["low", "medium", "high", "urgent"],
       rfq_rfp_publish_type: ["public", "invited", "limited"],
       rfq_rfp_status: [
