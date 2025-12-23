@@ -299,7 +299,7 @@ export function ItemTransferDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Transfer Item Between Warehouses</DialogTitle>
           <DialogDescription>
