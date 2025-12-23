@@ -132,7 +132,7 @@ export const useIssueMaterial = () => {
         });
       
       if (stockTransactionError) {
-        console.error('Failed to create stock transaction:', stockTransactionError);
+        throw new Error(`Failed to record stock movement: ${stockTransactionError.message}`);
       }
       
       // Update warehouse stock
@@ -260,7 +260,7 @@ export const useReturnMaterial = () => {
         });
       
       if (stockTransactionError) {
-        console.error('Failed to create stock transaction:', stockTransactionError);
+        throw new Error(`Failed to record stock movement: ${stockTransactionError.message}`);
       }
       
       // Update warehouse stock

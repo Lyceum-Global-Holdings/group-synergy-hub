@@ -28,7 +28,7 @@ interface StockMovementDialogProps {
   currentStock?: number;
 }
 
-const transactionTypeLabels = {
+const transactionTypeLabels: Record<string, string> = {
   opening_stock: 'Opening Stock',
   goods_receipt: 'Goods Receipt',
   material_issue: 'Material Issue',
@@ -36,6 +36,8 @@ const transactionTypeLabels = {
   adjustment: 'Stock Adjustment',
   transfer_in: 'Transfer In',
   transfer_out: 'Transfer Out',
+  project_issue: 'Project Issue',
+  project_return: 'Project Return',
 };
 
 const getTransactionTypeColor = (type: string) => {
@@ -44,10 +46,12 @@ const getTransactionTypeColor = (type: string) => {
       return 'bg-blue-100 text-blue-800';
     case 'goods_receipt':
     case 'transfer_in':
+    case 'project_return':
       return 'bg-green-100 text-green-800';
     case 'material_issue':
     case 'material_return':
     case 'transfer_out':
+    case 'project_issue':
       return 'bg-red-100 text-red-800';
     case 'adjustment':
       return 'bg-yellow-100 text-yellow-800';
