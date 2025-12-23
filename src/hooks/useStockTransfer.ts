@@ -399,97 +399,127 @@ export const useCompleteStockTransfer = () => {
         }
         console.log('[CompleteTransfer] Found destination bins:', destBins?.length || 0);
 
+        let destBinId: string;
+
         if (destBins && destBins.length > 0) {
-          const destBinId = destBins[0].id;
-          console.log('[CompleteTransfer] Using destination bin:', destBinId);
-
-          // Check if allocation already exists at destination
-          const { data: destAllocation, error: destAllocError } = await supabase
-            .from('warehouse_bin_allocations')
-            .select('*')
-            .eq('warehouse_item_id', item.warehouse_item_id)
-            .eq('bin_id', destBinId)
-            .maybeSingle();
-
-          if (destAllocError) {
-            console.error('Failed to check destination allocation:', destAllocError);
-            throw destAllocError;
-          }
-
-          if (destAllocation) {
-            // Update existing allocation
-            const newAllocated = (destAllocation.allocated_quantity || 0) + item.quantity_requested;
-            const newAvailable = (destAllocation.available_quantity || 0) + item.quantity_requested;
-
-            console.log('Updating destination allocation:', {
-              id: destAllocation.id,
-              oldAllocated: destAllocation.allocated_quantity,
-              oldAvailable: destAllocation.available_quantity,
-              newAllocated,
-              newAvailable,
-            });
-
-            console.log('[CompleteTransfer] Executing destination allocation update...');
-            const { error: updateDestError } = await supabase
-              .from('warehouse_bin_allocations')
-              .update({
-                allocated_quantity: newAllocated,
-              })
-              .eq('id', destAllocation.id);
-
-            if (updateDestError) {
-              console.error('[CompleteTransfer] FAILED to update destination allocation:', updateDestError);
-              throw updateDestError;
-            }
-            console.log('[CompleteTransfer] Destination allocation updated successfully');
-          } else {
-            // Create new allocation at destination
-            console.log('Creating new destination allocation:', {
-              warehouse_item_id: item.warehouse_item_id,
-              bin_id: destBinId,
-              quantity: item.quantity_requested,
-            });
-
-            console.log('[CompleteTransfer] Executing destination allocation insert...');
-            const { error: insertDestError } = await supabase
-              .from('warehouse_bin_allocations')
-              .insert({
-                warehouse_item_id: item.warehouse_item_id,
-                bin_id: destBinId,
-                allocated_quantity: item.quantity_requested,
-                reserved_quantity: 0,
-              });
-
-            if (insertDestError) {
-              console.error('[CompleteTransfer] FAILED to create destination allocation:', insertDestError);
-              throw insertDestError;
-            }
-            console.log('[CompleteTransfer] Destination allocation created successfully');
-          }
-
-          // Update destination bin's current_quantity
-          const { data: destBinData, error: destBinFetchError } = await supabase
-            .from("warehouse_bins")
-            .select("current_quantity")
-            .eq("id", destBinId)
+          destBinId = destBins[0].id;
+          console.log('[CompleteTransfer] Using existing destination bin:', destBinId);
+        } else {
+          // Auto-create a default bin at destination location
+          console.log('[CompleteTransfer] No bins found at destination, creating default bin...');
+          
+          // Get location name for better bin naming
+          const { data: locationData } = await supabase
+            .from('warehouse_locations')
+            .select('name')
+            .eq('id', toLocationId)
+            .single();
+          
+          const locationName = locationData?.name || 'Unknown Location';
+          
+          const { data: newBin, error: createBinError } = await supabase
+            .from('warehouse_bins')
+            .insert({
+              location_id: toLocationId,
+              bin_code: 'DEFAULT',
+              name: `${locationName} - Default Bin`,
+              company_id: transfer.company_id,
+              current_quantity: 0,
+              max_capacity: 10000,
+            })
+            .select()
             .single();
 
-          if (destBinFetchError) {
-            console.error('Failed to get destination bin data:', destBinFetchError);
-          } else if (destBinData) {
-            const { error: updateDestBinError } = await supabase
-              .from("warehouse_bins")
-              .update({
-                current_quantity: (destBinData.current_quantity || 0) + item.quantity_requested,
-              })
-              .eq("id", destBinId);
-
-            if (updateDestBinError) {
-              console.error('Failed to update destination bin quantity:', updateDestBinError);
-            }
+          if (createBinError) {
+            console.error('[CompleteTransfer] Failed to create default bin:', createBinError);
+            throw createBinError;
           }
+          
+          destBinId = newBin.id;
+          console.log('[CompleteTransfer] Auto-created default bin at destination:', destBinId);
+        }
+
+        // Check if allocation already exists at destination
+        const { data: destAllocation, error: destAllocError } = await supabase
+          .from('warehouse_bin_allocations')
+          .select('*')
+          .eq('warehouse_item_id', item.warehouse_item_id)
+          .eq('bin_id', destBinId)
+          .maybeSingle();
+
+        if (destAllocError) {
+          console.error('Failed to check destination allocation:', destAllocError);
+          throw destAllocError;
+        }
+
+        if (destAllocation) {
+          // Update existing allocation
+          const newAllocated = (destAllocation.allocated_quantity || 0) + item.quantity_requested;
+
+          console.log('Updating destination allocation:', {
+            id: destAllocation.id,
+            oldAllocated: destAllocation.allocated_quantity,
+            newAllocated,
+          });
+
+          console.log('[CompleteTransfer] Executing destination allocation update...');
+          const { error: updateDestError } = await supabase
+            .from('warehouse_bin_allocations')
+            .update({
+              allocated_quantity: newAllocated,
+            })
+            .eq('id', destAllocation.id);
+
+          if (updateDestError) {
+            console.error('[CompleteTransfer] FAILED to update destination allocation:', updateDestError);
+            throw updateDestError;
+          }
+          console.log('[CompleteTransfer] Destination allocation updated successfully');
         } else {
-          console.warn('No bins found at destination location:', toLocationId);
+          // Create new allocation at destination
+          console.log('Creating new destination allocation:', {
+            warehouse_item_id: item.warehouse_item_id,
+            bin_id: destBinId,
+            quantity: item.quantity_requested,
+          });
+
+          console.log('[CompleteTransfer] Executing destination allocation insert...');
+          const { error: insertDestError } = await supabase
+            .from('warehouse_bin_allocations')
+            .insert({
+              warehouse_item_id: item.warehouse_item_id,
+              bin_id: destBinId,
+              allocated_quantity: item.quantity_requested,
+              reserved_quantity: 0,
+            });
+
+          if (insertDestError) {
+            console.error('[CompleteTransfer] FAILED to create destination allocation:', insertDestError);
+            throw insertDestError;
+          }
+          console.log('[CompleteTransfer] Destination allocation created successfully');
+        }
+
+        // Update destination bin's current_quantity
+        const { data: destBinData, error: destBinFetchError } = await supabase
+          .from("warehouse_bins")
+          .select("current_quantity")
+          .eq("id", destBinId)
+          .single();
+
+        if (destBinFetchError) {
+          console.error('Failed to get destination bin data:', destBinFetchError);
+        } else if (destBinData) {
+          const { error: updateDestBinError } = await supabase
+            .from("warehouse_bins")
+            .update({
+              current_quantity: (destBinData.current_quantity || 0) + item.quantity_requested,
+            })
+            .eq("id", destBinId);
+
+          if (updateDestBinError) {
+            console.error('Failed to update destination bin quantity:', updateDestBinError);
+          }
         }
 
         // Also update bin current_quantity if bins specified (for backward compatibility)
