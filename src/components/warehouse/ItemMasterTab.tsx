@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Plus, Search, Edit, Trash2, History, Settings, Eye, ArrowLeftRight, MapPin, BarChart3 } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, History, Settings, Eye, ArrowLeftRight, MapPin, BarChart3, Wrench } from 'lucide-react';
 import { BulkItemImportDialog } from '@/components/warehouse/BulkItemImportDialog';
 import {
   Table,
@@ -28,6 +28,7 @@ import { ItemStockDetailsDialog } from '@/components/warehouse/ItemStockDetailsD
 import { WarehouseItem } from '@/types/itemBin';
 import { supabase } from '@/integrations/supabase/client';
 import { useRealtimeStockUpdates } from '@/hooks/useRealtimeStockUpdates';
+import { useWarehouseBinAllocations } from '@/hooks/useWarehouseBinAllocations';
 
 interface LocationStock {
   locationId: string;
@@ -63,6 +64,7 @@ export function ItemMasterTab() {
   const { categories } = useItemCategories();
   const { units } = useItemUnits();
   const { companies } = useCompany();
+  const { migrateAllocationsToCorrectLocation, isMigrating } = useWarehouseBinAllocations();
 
   // Fetch all top-level warehouse locations
   const { data: allLocations = [] } = useQuery({
@@ -153,6 +155,14 @@ export function ItemMasterTab() {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          <Button 
+            variant="outline" 
+            onClick={() => migrateAllocationsToCorrectLocation()}
+            disabled={isMigrating}
+          >
+            <Wrench className="mr-2 h-4 w-4" />
+            {isMigrating ? 'Fixing...' : 'Fix Allocations'}
+          </Button>
           <BulkItemImportDialog />
           <Button onClick={() => setIsCreateDialogOpen(true)}>
             <Plus className="mr-2 h-4 w-4" />

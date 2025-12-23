@@ -214,6 +214,103 @@ export function useWarehouseBinAllocations() {
     },
   });
 
+  // Migration function to fix bin allocations based on item's location_id
+  const migrateAllocationsMutation = useMutation({
+    mutationFn: async () => {
+      console.log('Starting bin allocation migration...');
+      
+      // Step 1: Get all items with their location_id
+      const { data: items, error: itemsError } = await supabase
+        .from('warehouse_items')
+        .select('id, location_id, name, item_code')
+        .not('location_id', 'is', null);
+      
+      if (itemsError) throw itemsError;
+      console.log(`Found ${items?.length || 0} items with location_id`);
+      
+      if (!items || items.length === 0) {
+        return { fixed: 0, total: 0 };
+      }
+      
+      let fixedCount = 0;
+      let totalAllocations = 0;
+      
+      for (const item of items) {
+        // Step 2: Get a bin at the item's location
+        const { data: correctBins, error: binsError } = await supabase
+          .from('warehouse_bins')
+          .select('id, bin_code')
+          .eq('location_id', item.location_id)
+          .limit(1);
+        
+        if (binsError) {
+          console.error(`Error fetching bins for location ${item.location_id}:`, binsError);
+          continue;
+        }
+        
+        if (!correctBins || correctBins.length === 0) {
+          console.warn(`No bins found at location ${item.location_id} for item ${item.item_code}`);
+          continue;
+        }
+        
+        const correctBinId = correctBins[0].id;
+        
+        // Step 3: Get all allocations for this item that are in wrong bins
+        const { data: allocations, error: allocError } = await supabase
+          .from('warehouse_bin_allocations')
+          .select(`
+            id,
+            bin_id,
+            warehouse_bins!inner (location_id)
+          `)
+          .eq('warehouse_item_id', item.id)
+          .neq('bin_id', correctBinId);
+        
+        if (allocError) {
+          console.error(`Error fetching allocations for item ${item.item_code}:`, allocError);
+          continue;
+        }
+        
+        if (!allocations || allocations.length === 0) {
+          continue;
+        }
+        
+        totalAllocations += allocations.length;
+        
+        // Step 4: Update each allocation to use the correct bin
+        for (const alloc of allocations) {
+          const { error: updateError } = await supabase
+            .from('warehouse_bin_allocations')
+            .update({ bin_id: correctBinId })
+            .eq('id', alloc.id);
+          
+          if (updateError) {
+            console.error(`Error updating allocation ${alloc.id}:`, updateError);
+          } else {
+            fixedCount++;
+            console.log(`Fixed allocation ${alloc.id} for item ${item.item_code}: moved to bin ${correctBins[0].bin_code}`);
+          }
+        }
+      }
+      
+      console.log(`Migration complete: Fixed ${fixedCount} of ${totalAllocations} allocations`);
+      return { fixed: fixedCount, total: totalAllocations };
+    },
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: ['warehouse-bin-allocations'] });
+      queryClient.invalidateQueries({ queryKey: ['all-items-location-stock'] });
+      queryClient.invalidateQueries({ queryKey: ['warehouse-items'] });
+      if (result.total === 0) {
+        toast.info('All bin allocations are already correct');
+      } else {
+        toast.success(`Fixed ${result.fixed} of ${result.total} bin allocations`);
+      }
+    },
+    onError: (error: Error) => {
+      toast.error(`Migration failed: ${error.message}`);
+    },
+  });
+
   return {
     binAllocations,
     isLoading,
@@ -224,9 +321,11 @@ export function useWarehouseBinAllocations() {
     updateAllocation: updateAllocationMutation.mutate,
     deleteAllocation: deleteAllocationMutation.mutate,
     adjustAllocation: adjustAllocationMutation.mutate,
+    migrateAllocationsToCorrectLocation: migrateAllocationsMutation.mutate,
     isCreating: createAllocationMutation.isPending,
     isUpdating: updateAllocationMutation.isPending,
     isDeleting: deleteAllocationMutation.isPending,
     isAdjusting: adjustAllocationMutation.isPending,
+    isMigrating: migrateAllocationsMutation.isPending,
   };
 }
