@@ -27,6 +27,7 @@ interface CategoryTreeItemProps {
   onEdit: (category: ItemCategory) => void;
   onDelete: (categoryId: string) => void;
   isDeleting?: boolean;
+  canDelete?: boolean;
 }
 
 export function CategoryTreeItem({ 
@@ -35,7 +36,8 @@ export function CategoryTreeItem({
   level, 
   onEdit, 
   onDelete,
-  isDeleting = false
+  isDeleting = false,
+  canDelete = true
 }: CategoryTreeItemProps) {
   const [isOpen, setIsOpen] = useState(false);
   const hasChildren = children.length > 0;
@@ -93,37 +95,39 @@ export function CategoryTreeItem({
             <Edit className="h-4 w-4" />
           </Button>
           
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button
-                variant="ghost"
-                size="sm"
-                disabled={isDeleting}
-                className="h-8 w-8 p-0 hover:bg-destructive/10 hover:text-destructive"
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Delete Category</AlertDialogTitle>
-                <AlertDialogDescription>
-                  Are you sure you want to delete "{category.name}"? 
-                  {hasChildren && " This will also delete all subcategories."}
-                  This action cannot be undone.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction
-                  onClick={() => onDelete(category.id)}
-                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+          {canDelete && (
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  disabled={isDeleting}
+                  className="h-8 w-8 p-0 hover:bg-destructive/10 hover:text-destructive"
                 >
-                  Delete
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Delete Category</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Are you sure you want to delete "{category.name}"? 
+                    {hasChildren && " This will also delete all subcategories."}
+                    This action cannot be undone.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={() => onDelete(category.id)}
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  >
+                    Delete
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          )}
         </div>
       </div>
 
@@ -142,6 +146,7 @@ export function CategoryTreeItem({
                   onEdit={onEdit}
                   onDelete={onDelete}
                   isDeleting={isDeleting}
+                  canDelete={canDelete}
                 />
               );
             })}

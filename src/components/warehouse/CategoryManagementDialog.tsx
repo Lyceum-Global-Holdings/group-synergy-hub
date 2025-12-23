@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { Trash2, Plus, Edit2, FolderOpen, Package } from 'lucide-react';
 import { useAssetCategories } from '@/hooks/useAssetCategories';
+import { useIsAdminOrHigher } from '@/hooks/useIsAdminOrHigher';
 
 export const CategoryManagementDialog = () => {
   const [open, setOpen] = useState(false);
@@ -28,6 +29,7 @@ export const CategoryManagementDialog = () => {
     isUpdating,
     isDeleting
   } = useAssetCategories();
+  const { canDelete } = useIsAdminOrHigher();
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -178,14 +180,16 @@ export const CategoryManagementDialog = () => {
                       >
                         <Edit2 className="h-3 w-3" />
                       </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => handleDelete(category.id)}
-                        disabled={isDeleting}
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </Button>
+                      {canDelete && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handleDelete(category.id)}
+                          disabled={isDeleting}
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      )}
                     </div>
                   </div>
 
@@ -214,14 +218,16 @@ export const CategoryManagementDialog = () => {
                         >
                           <Edit2 className="h-3 w-3" />
                         </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => handleDelete(subcategory.id)}
-                          disabled={isDeleting}
-                        >
-                          <Trash2 className="h-3 w-3" />
-                        </Button>
+                        {canDelete && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => handleDelete(subcategory.id)}
+                            disabled={isDeleting}
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        )}
                       </div>
                     </div>
                   ))}

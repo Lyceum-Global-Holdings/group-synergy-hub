@@ -29,6 +29,7 @@ import { WarehouseItem } from '@/types/itemBin';
 import { supabase } from '@/integrations/supabase/client';
 import { useRealtimeStockUpdates } from '@/hooks/useRealtimeStockUpdates';
 import { useWarehouseBinAllocations } from '@/hooks/useWarehouseBinAllocations';
+import { useIsAdminOrHigher } from '@/hooks/useIsAdminOrHigher';
 
 interface LocationStock {
   locationId: string;
@@ -65,6 +66,7 @@ export function ItemMasterTab() {
   const { units } = useItemUnits();
   const { companies } = useCompany();
   const { migrateAllocationsToCorrectLocation, isMigrating } = useWarehouseBinAllocations();
+  const { canDelete } = useIsAdminOrHigher();
 
   // Fetch all top-level warehouse locations
   const { data: allLocations = [] } = useQuery({
@@ -155,14 +157,16 @@ export function ItemMasterTab() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <Button 
-            variant="outline" 
-            onClick={() => migrateAllocationsToCorrectLocation()}
-            disabled={isMigrating}
-          >
-            <Wrench className="mr-2 h-4 w-4" />
-            {isMigrating ? 'Fixing...' : 'Fix Allocations'}
-          </Button>
+          {canDelete && (
+            <Button 
+              variant="outline" 
+              onClick={() => migrateAllocationsToCorrectLocation()}
+              disabled={isMigrating}
+            >
+              <Wrench className="mr-2 h-4 w-4" />
+              {isMigrating ? 'Fixing...' : 'Fix Allocations'}
+            </Button>
+          )}
           <BulkItemImportDialog />
           <Button onClick={() => setIsCreateDialogOpen(true)}>
             <Plus className="mr-2 h-4 w-4" />
@@ -333,15 +337,17 @@ export function ItemMasterTab() {
                       >
                         <ArrowLeftRight className="h-4 w-4" />
                       </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setDeletingItem(item)}
-                        disabled={isDeleting || isMarkingInactive}
-                        title="Delete"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      {canDelete && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setDeletingItem(item)}
+                          disabled={isDeleting || isMarkingInactive}
+                          title="Delete"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
                     </div>
                   </TableCell>
                 </TableRow>

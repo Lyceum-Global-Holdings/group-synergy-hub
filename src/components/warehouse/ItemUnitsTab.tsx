@@ -14,6 +14,7 @@ import { useItemUnits } from '@/hooks/useItemUnits';
 import { CreateUnitDialog } from '@/components/warehouse/CreateUnitDialog';
 import { ImportStandardUnitsDialog } from '@/components/warehouse/ImportStandardUnitsDialog';
 import { ItemUnit } from '@/types/itemBin';
+import { useIsAdminOrHigher } from '@/hooks/useIsAdminOrHigher';
 
 export function ItemUnitsTab() {
   const [searchTerm, setSearchTerm] = useState('');
@@ -22,6 +23,7 @@ export function ItemUnitsTab() {
   const [editingUnit, setEditingUnit] = useState<ItemUnit | null>(null);
   
   const { units, isLoading, deleteUnit, isDeleting } = useItemUnits();
+  const { canDelete } = useIsAdminOrHigher();
 
   const filteredUnits = units.filter(unit =>
     unit.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -92,14 +94,16 @@ export function ItemUnitsTab() {
                       >
                         <Edit className="h-4 w-4" />
                       </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => deleteUnit(unit.id)}
-                        disabled={isDeleting}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      {canDelete && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => deleteUnit(unit.id)}
+                          disabled={isDeleting}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
                     </div>
                   </TableCell>
                 </TableRow>

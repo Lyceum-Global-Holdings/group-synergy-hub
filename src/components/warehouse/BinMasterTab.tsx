@@ -18,6 +18,7 @@ import { CreateBinDialog } from '@/components/warehouse/CreateBinDialog';
 import { WarehouseBin } from '@/types/itemBin';
 import { useCompany } from '@/contexts/CompanyContext';
 import { useRealtimeStockUpdates } from '@/hooks/useRealtimeStockUpdates';
+import { useIsAdminOrHigher } from '@/hooks/useIsAdminOrHigher';
 
 export function BinMasterTab() {
   // Enable real-time stock updates
@@ -28,6 +29,7 @@ export function BinMasterTab() {
   const [editingBin, setEditingBin] = useState<WarehouseBin | null>(null);
   
   const { bins, isLoading, deleteBin, isDeleting } = useWarehouseBins();
+  const { canDelete } = useIsAdminOrHigher();
 
   const filteredBins = bins.filter(bin =>
     bin.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -123,14 +125,16 @@ export function BinMasterTab() {
                       >
                         <Edit className="h-4 w-4" />
                       </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => deleteBin(bin.id)}
-                        disabled={isDeleting}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      {canDelete && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => deleteBin(bin.id)}
+                          disabled={isDeleting}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
                     </div>
                   </TableCell>
                 </TableRow>
