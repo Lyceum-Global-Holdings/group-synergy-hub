@@ -239,6 +239,12 @@ export const useCompleteStockTransfer = () => {
       for (const item of items) {
         console.log('[CompleteTransfer] Processing item:', item.item_name, 'quantity:', item.quantity_requested);
         
+        // Skip already completed items (for retry scenarios)
+        if (item.status === 'completed') {
+          console.log('[CompleteTransfer] Item already completed, skipping:', item.id);
+          continue;
+        }
+
         // Get current stock for transaction records
         const { data: warehouseItem } = await supabase
           .from("warehouse_items")
@@ -249,54 +255,52 @@ export const useCompleteStockTransfer = () => {
         const currentStock = warehouseItem?.current_stock || 0;
         console.log('[CompleteTransfer] Current stock for item:', currentStock);
 
-        // Create transfer out transaction
-        console.log('[CompleteTransfer] Creating transfer OUT transaction...');
-        const { error: transOutError } = await supabase.from("stock_transactions").insert({
-          item_id: item.warehouse_item_id,
-          transaction_type: 'transfer_out',
-          reference_type: 'transfer',
-          reference_id: transferId,
-          quantity_change: -item.quantity_requested,
-          quantity_before: currentStock,
-          quantity_after: currentStock - item.quantity_requested,
-          notes: `Transfer ${transfer.transfer_number} - Out from ${fromLocationId}`,
-          created_by: user.id,
-        });
-        if (transOutError) {
-          console.error('[CompleteTransfer] Failed to create transfer OUT transaction:', transOutError);
-          throw transOutError;
-        }
+        // Check if transactions already exist (for retry scenarios)
+        const { data: existingTransactions } = await supabase
+          .from("stock_transactions")
+          .select("id")
+          .eq("reference_id", transferId)
+          .eq("item_id", item.warehouse_item_id)
+          .limit(1);
 
-        // Create transfer in transaction
-        console.log('[CompleteTransfer] Creating transfer IN transaction...');
-        const { error: transInError } = await supabase.from("stock_transactions").insert({
-          item_id: item.warehouse_item_id,
-          transaction_type: 'transfer_in',
-          reference_type: 'transfer',
-          reference_id: transferId,
-          quantity_change: item.quantity_requested,
-          quantity_before: currentStock - item.quantity_requested,
-          quantity_after: currentStock,
-          notes: `Transfer ${transfer.transfer_number} - In to ${toLocationId}`,
-          created_by: user.id,
-        });
-        if (transInError) {
-          console.error('[CompleteTransfer] Failed to create transfer IN transaction:', transInError);
-          throw transInError;
-        }
+        if (!existingTransactions || existingTransactions.length === 0) {
+          // Create transfer out transaction
+          console.log('[CompleteTransfer] Creating transfer OUT transaction...');
+          const { error: transOutError } = await supabase.from("stock_transactions").insert({
+            item_id: item.warehouse_item_id,
+            transaction_type: 'transfer_out',
+            reference_type: 'transfer',
+            reference_id: transferId,
+            quantity_change: -item.quantity_requested,
+            quantity_before: currentStock,
+            quantity_after: currentStock - item.quantity_requested,
+            notes: `Transfer ${transfer.transfer_number} - Out from ${fromLocationId}`,
+            created_by: user.id,
+          });
+          if (transOutError) {
+            console.error('[CompleteTransfer] Failed to create transfer OUT transaction:', transOutError);
+            throw transOutError;
+          }
 
-        // Update item status
-        console.log('[CompleteTransfer] Updating transfer item status to completed...');
-        const { error: itemStatusError } = await supabase
-          .from("stock_transfer_items")
-          .update({
-            status: 'completed',
-            quantity_transferred: item.quantity_requested,
-          })
-          .eq("id", item.id);
-        if (itemStatusError) {
-          console.error('[CompleteTransfer] Failed to update item status:', itemStatusError);
-          throw itemStatusError;
+          // Create transfer in transaction
+          console.log('[CompleteTransfer] Creating transfer IN transaction...');
+          const { error: transInError } = await supabase.from("stock_transactions").insert({
+            item_id: item.warehouse_item_id,
+            transaction_type: 'transfer_in',
+            reference_type: 'transfer',
+            reference_id: transferId,
+            quantity_change: item.quantity_requested,
+            quantity_before: currentStock - item.quantity_requested,
+            quantity_after: currentStock,
+            notes: `Transfer ${transfer.transfer_number} - In to ${toLocationId}`,
+            created_by: user.id,
+          });
+          if (transInError) {
+            console.error('[CompleteTransfer] Failed to create transfer IN transaction:', transInError);
+            throw transInError;
+          }
+        } else {
+          console.log('[CompleteTransfer] Transactions already exist for this item, skipping creation');
         }
 
         // ===== UPDATE SOURCE BIN ALLOCATION (decrease stock) =====
@@ -558,6 +562,21 @@ export const useCompleteStockTransfer = () => {
               .eq("id", item.to_bin_id);
           }
         }
+
+        // Update item status to completed AFTER all allocations are done
+        console.log('[CompleteTransfer] Updating transfer item status to completed...');
+        const { error: itemStatusError } = await supabase
+          .from("stock_transfer_items")
+          .update({
+            status: 'completed',
+            quantity_transferred: item.quantity_requested,
+          })
+          .eq("id", item.id);
+        if (itemStatusError) {
+          console.error('[CompleteTransfer] Failed to update item status:', itemStatusError);
+          throw itemStatusError;
+        }
+        console.log('[CompleteTransfer] Item completed successfully:', item.id);
       }
 
       // Update transfer status
