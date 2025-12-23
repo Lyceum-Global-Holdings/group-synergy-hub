@@ -245,14 +245,16 @@ export const useCompleteStockTransfer = () => {
           continue;
         }
 
-        // Get current stock for transaction records
+        // Get current stock and company_id for transaction records
         const { data: warehouseItem } = await supabase
           .from("warehouse_items")
-          .select("current_stock")
+          .select("current_stock, company_id")
           .eq("id", item.warehouse_item_id)
           .single();
 
         const currentStock = warehouseItem?.current_stock || 0;
+        // Use company_id from transfer, fallback to warehouse item's company_id
+        const companyId = transfer.company_id || warehouseItem?.company_id;
         console.log('[CompleteTransfer] Current stock for item:', currentStock);
 
         // Check if transactions already exist (for retry scenarios)
@@ -495,7 +497,7 @@ export const useCompleteStockTransfer = () => {
               bin_id: destBinId,
               allocated_quantity: item.quantity_requested,
               reserved_quantity: 0,
-              company_id: transfer.company_id,
+              company_id: companyId,
               created_by: user.id,
             });
 
