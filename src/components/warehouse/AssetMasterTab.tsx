@@ -19,6 +19,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { AssetMaster } from "@/types/assetMaster";
+import { useIsAdminOrHigher } from "@/hooks/useIsAdminOrHigher";
 
 export function AssetMasterTab() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -31,6 +32,7 @@ export function AssetMasterTab() {
   const { assetMasterItems, isLoading, deleteAssetMaster } = useAssetMaster();
   const { categories } = useAssetCategories();
   const { toast } = useToast();
+  const { canDelete } = useIsAdminOrHigher();
 
   const getCategoryName = (categoryId: string | null) => {
     if (!categoryId) return 'N/A';
@@ -270,13 +272,15 @@ export function AssetMasterTab() {
                       >
                         <Edit className="h-4 w-4" />
                       </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleDeleteClick(asset)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      {canDelete && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDeleteClick(asset)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
                     </div>
                   </TableCell>
                 </TableRow>

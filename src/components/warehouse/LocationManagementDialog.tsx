@@ -8,6 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Trash2, Plus, Edit2, Building, MapPin, Users } from 'lucide-react';
 import { useWarehouseLocations } from '@/hooks/useWarehouseLocations';
+import { useIsAdminOrHigher } from '@/hooks/useIsAdminOrHigher';
 
 type LocationType = 'location' | 'sublocation' | 'department';
 
@@ -49,6 +50,7 @@ export const LocationManagementDialog = () => {
     isUpdating,
     isDeleting
   } = useWarehouseLocations();
+  const { canDelete } = useIsAdminOrHigher();
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -373,14 +375,16 @@ export const LocationManagementDialog = () => {
                       >
                         <Edit2 className="h-3 w-3" />
                       </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => handleDelete(location.id)}
-                        disabled={isDeleting}
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </Button>
+                      {canDelete && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handleDelete(location.id)}
+                          disabled={isDeleting}
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      )}
                     </div>
                   </div>
 
@@ -412,14 +416,16 @@ export const LocationManagementDialog = () => {
                           >
                             <Edit2 className="h-3 w-3" />
                           </Button>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => handleDelete(sublocation.id)}
-                            disabled={isDeleting}
-                          >
-                            <Trash2 className="h-3 w-3" />
-                          </Button>
+                          {canDelete && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => handleDelete(sublocation.id)}
+                              disabled={isDeleting}
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          )}
                         </div>
                       </div>
 
@@ -451,14 +457,16 @@ export const LocationManagementDialog = () => {
                               >
                                 <Edit2 className="h-3 w-3" />
                               </Button>
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => handleDelete(department.id)}
-                                disabled={isDeleting}
-                              >
-                                <Trash2 className="h-3 w-3" />
-                              </Button>
+                              {canDelete && (
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => handleDelete(department.id)}
+                                  disabled={isDeleting}
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                </Button>
+                              )}
                             </div>
                           </div>
                         </div>
