@@ -32,11 +32,22 @@ export function useCreateFloorDrawing() {
     mutationFn: async (data: CreateFloorDrawingData) => {
       const { data: user } = await supabase.auth.getUser();
       
+      // Get company_id from the project if selectedCompany is not set
+      let companyId = selectedCompany?.id;
+      if (!companyId) {
+        const { data: project } = await supabase
+          .from("construction_projects")
+          .select("company_id")
+          .eq("id", data.project_id)
+          .single();
+        companyId = project?.company_id;
+      }
+      
       const { data: result, error } = await supabase
         .from("project_floor_drawings")
         .insert({
           ...data,
-          company_id: selectedCompany?.id,
+          company_id: companyId,
           created_by: user.user?.id,
         })
         .select()
