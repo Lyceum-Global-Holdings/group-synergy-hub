@@ -383,6 +383,7 @@ export const useCompleteStockTransfer = () => {
       queryClient.invalidateQueries({ queryKey: ["warehouse-bins"] });
       queryClient.invalidateQueries({ queryKey: ["all-items-location-stock"] });
       queryClient.invalidateQueries({ queryKey: ["item-bin-allocations-for-transfer"] });
+      queryClient.invalidateQueries({ queryKey: ["warehouse-bin-allocations"] });
       toast({
         title: "Transfer Completed",
         description: "Stock transfer has been completed successfully.",
