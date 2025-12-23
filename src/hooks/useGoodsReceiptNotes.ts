@@ -400,6 +400,57 @@ export const useApproveGoodsReceiptNote = () => {
           throw updateStockError;
         }
 
+        // Update bin allocations to match new stock
+        // Get the item's location to find the correct bin
+        const { data: itemData } = await supabase
+          .from('warehouse_items')
+          .select('location_id')
+          .eq('id', warehouseItemId)
+          .single();
+
+        if (itemData?.location_id) {
+          // Find a bin at this location
+          const { data: bins } = await supabase
+            .from('warehouse_bins')
+            .select('id')
+            .eq('location_id', itemData.location_id)
+            .limit(1);
+
+          if (bins && bins.length > 0) {
+            const binId = bins[0].id;
+            
+            // Check for existing allocation
+            const { data: existingAlloc } = await supabase
+              .from('warehouse_bin_allocations')
+              .select('id, allocated_quantity')
+              .eq('warehouse_item_id', warehouseItemId)
+              .eq('bin_id', binId)
+              .maybeSingle();
+
+            if (existingAlloc) {
+              // Update existing allocation
+              await supabase
+                .from('warehouse_bin_allocations')
+                .update({ 
+                  allocated_quantity: existingAlloc.allocated_quantity + item.quantity_received
+                })
+                .eq('id', existingAlloc.id);
+            } else {
+              // Create new allocation
+              await supabase
+                .from('warehouse_bin_allocations')
+                .insert({
+                  warehouse_item_id: warehouseItemId,
+                  bin_id: binId,
+                  allocated_quantity: item.quantity_received,
+                  reserved_quantity: 0,
+                  company_id: grn.company_id,
+                  created_by: user.id,
+                });
+            }
+          }
+        }
+
         // Create stock transaction record
         const { error: transactionError } = await supabase
           .from('stock_transactions')

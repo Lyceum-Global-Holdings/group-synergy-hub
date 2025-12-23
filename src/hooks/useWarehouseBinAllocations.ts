@@ -214,6 +214,165 @@ export function useWarehouseBinAllocations() {
     },
   });
 
+  // Reconcile stock: sync bin allocations with warehouse_items.current_stock
+  const reconcileStockMutation = useMutation({
+    mutationFn: async () => {
+      console.log('=== Starting stock reconciliation ===');
+      toast.info('Starting stock reconciliation...');
+      
+      if (!selectedCompany?.id) {
+        throw new Error('Please select a company first');
+      }
+
+      // Step 1: Get all warehouse items with their current_stock and location_id
+      const { data: items, error: itemsError } = await supabase
+        .from('warehouse_items')
+        .select('id, item_code, name, current_stock, location_id, company_id')
+        .eq('company_id', selectedCompany.id)
+        .eq('status', 'active');
+
+      if (itemsError) {
+        console.error('Failed to fetch items:', itemsError);
+        throw itemsError;
+      }
+
+      console.log(`Found ${items?.length || 0} active items`);
+
+      if (!items || items.length === 0) {
+        return { reconciled: 0, created: 0, updated: 0, skipped: 0 };
+      }
+
+      let createdCount = 0;
+      let updatedCount = 0;
+      let skippedCount = 0;
+
+      const { data: user } = await supabase.auth.getUser();
+
+      for (const item of items) {
+        const currentStock = item.current_stock || 0;
+        
+        console.log(`\nProcessing item: ${item.item_code} (current_stock: ${currentStock})`);
+
+        // Step 2: Get existing allocations for this item
+        const { data: allocations, error: allocError } = await supabase
+          .from('warehouse_bin_allocations')
+          .select('id, bin_id, allocated_quantity, reserved_quantity')
+          .eq('warehouse_item_id', item.id);
+
+        if (allocError) {
+          console.error(`Error fetching allocations for ${item.item_code}:`, allocError);
+          skippedCount++;
+          continue;
+        }
+
+        const totalAllocated = allocations?.reduce((sum, a) => sum + (a.allocated_quantity || 0), 0) || 0;
+
+        // If totals match, skip
+        if (totalAllocated === currentStock) {
+          console.log(`Item ${item.item_code}: allocations already match current_stock (${currentStock})`);
+          continue;
+        }
+
+        console.log(`Item ${item.item_code}: mismatch - current_stock=${currentStock}, total_allocated=${totalAllocated}`);
+
+        // Step 3: Get the correct bin for this item's location
+        let targetBinId: string | null = null;
+        if (item.location_id) {
+          const { data: bins } = await supabase
+            .from('warehouse_bins')
+            .select('id')
+            .eq('location_id', item.location_id)
+            .limit(1);
+          
+          if (bins && bins.length > 0) {
+            targetBinId = bins[0].id;
+          }
+        }
+
+        // If no bin at location, get any bin in the company
+        if (!targetBinId) {
+          const { data: anyBins } = await supabase
+            .from('warehouse_bins')
+            .select('id')
+            .eq('company_id', selectedCompany.id)
+            .limit(1);
+          
+          if (anyBins && anyBins.length > 0) {
+            targetBinId = anyBins[0].id;
+          }
+        }
+
+        if (!targetBinId) {
+          console.warn(`No bin found for item ${item.item_code}, skipping`);
+          skippedCount++;
+          continue;
+        }
+
+        // Step 4: Update or create allocation
+        if (allocations && allocations.length > 0) {
+          // Update the first allocation to have the correct total
+          const otherAllocationsTotal = allocations.slice(1).reduce((sum, a) => sum + (a.allocated_quantity || 0), 0);
+          const firstAllocationNewQty = Math.max(0, currentStock - otherAllocationsTotal);
+          
+          const { error: updateError } = await supabase
+            .from('warehouse_bin_allocations')
+            .update({ allocated_quantity: firstAllocationNewQty })
+            .eq('id', allocations[0].id);
+
+          if (updateError) {
+            console.error(`Error updating allocation for ${item.item_code}:`, updateError);
+            skippedCount++;
+          } else {
+            console.log(`✓ Updated allocation for ${item.item_code}: ${allocations[0].allocated_quantity} -> ${firstAllocationNewQty}`);
+            updatedCount++;
+          }
+        } else {
+          // Create new allocation
+          const { error: insertError } = await supabase
+            .from('warehouse_bin_allocations')
+            .insert({
+              warehouse_item_id: item.id,
+              bin_id: targetBinId,
+              allocated_quantity: currentStock,
+              reserved_quantity: 0,
+              company_id: selectedCompany.id,
+              created_by: user.user?.id,
+            });
+
+          if (insertError) {
+            console.error(`Error creating allocation for ${item.item_code}:`, insertError);
+            skippedCount++;
+          } else {
+            console.log(`✓ Created allocation for ${item.item_code}: ${currentStock}`);
+            createdCount++;
+          }
+        }
+      }
+
+      console.log(`\n=== Reconciliation complete ===`);
+      console.log(`Created: ${createdCount}, Updated: ${updatedCount}, Skipped: ${skippedCount}`);
+
+      return { reconciled: createdCount + updatedCount, created: createdCount, updated: updatedCount, skipped: skippedCount };
+    },
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: ['warehouse-bin-allocations'] });
+      queryClient.invalidateQueries({ queryKey: ['all-items-location-stock'] });
+      queryClient.invalidateQueries({ queryKey: ['warehouse-items'] });
+      if (result.reconciled === 0 && result.skipped === 0) {
+        toast.info('All stock is already reconciled');
+      } else {
+        toast.success(`Reconciled ${result.reconciled} items (${result.created} created, ${result.updated} updated)`);
+      }
+      if (result.skipped > 0) {
+        toast.warning(`${result.skipped} items skipped`);
+      }
+    },
+    onError: (error: Error) => {
+      console.error('Reconciliation failed:', error);
+      toast.error(`Reconciliation failed: ${error.message}`);
+    },
+  });
+
   // Migration function to fix bin allocations based on item's location_id
   const migrateAllocationsMutation = useMutation({
     mutationFn: async () => {
@@ -347,10 +506,12 @@ export function useWarehouseBinAllocations() {
     deleteAllocation: deleteAllocationMutation.mutate,
     adjustAllocation: adjustAllocationMutation.mutate,
     migrateAllocationsToCorrectLocation: migrateAllocationsMutation.mutate,
+    reconcileStock: reconcileStockMutation.mutate,
     isCreating: createAllocationMutation.isPending,
     isUpdating: updateAllocationMutation.isPending,
     isDeleting: deleteAllocationMutation.isPending,
     isAdjusting: adjustAllocationMutation.isPending,
     isMigrating: migrateAllocationsMutation.isPending,
+    isReconciling: reconcileStockMutation.isPending,
   };
 }
