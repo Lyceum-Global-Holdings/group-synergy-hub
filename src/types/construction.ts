@@ -376,6 +376,8 @@ export interface DailySiteReport {
   temperature_high: number | null;
   temperature_low: number | null;
   labor_count: number | null;
+  skilled_labor_count: number | null;
+  unskilled_labor_count: number | null;
   subcontractor_count: number | null;
   visitor_count: number | null;
   work_summary: string | null;

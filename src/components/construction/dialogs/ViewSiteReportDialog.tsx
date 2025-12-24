@@ -169,11 +169,22 @@ export function ViewSiteReportDialog({ open, onOpenChange, report }: ViewSiteRep
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm font-medium flex items-center gap-2">
                     <Users className="h-4 w-4 text-green-500" />
-                    Total Labor
+                    Labor
                   </CardTitle>
                 </CardHeader>
-                <CardContent>
-                  <p className="text-lg font-semibold">{displayReport.labor_count || 0}</p>
+                <CardContent className="text-sm space-y-1">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Skilled:</span>
+                    <span>{(displayReport as any).skilled_labor_count || 0}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Non-Skilled:</span>
+                    <span>{(displayReport as any).unskilled_labor_count || 0}</span>
+                  </div>
+                  <div className="flex justify-between font-medium pt-1 border-t">
+                    <span>Total:</span>
+                    <span>{((displayReport as any).skilled_labor_count || 0) + ((displayReport as any).unskilled_labor_count || 0)}</span>
+                  </div>
                 </CardContent>
               </Card>
 
@@ -184,11 +195,11 @@ export function ViewSiteReportDialog({ open, onOpenChange, report }: ViewSiteRep
                 <CardContent className="text-sm space-y-1">
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Subcontractors:</span>
-                    <span>{displayReport.subcontractor_count || 0}</span>
+                    <span>{(displayReport as any).subcontractor_count || 0}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Visitors:</span>
-                    <span>{displayReport.visitor_count || 0}</span>
+                    <span>{(displayReport as any).visitor_count || 0}</span>
                   </div>
                 </CardContent>
               </Card>

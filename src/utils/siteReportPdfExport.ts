@@ -14,10 +14,10 @@ interface ReportData {
   temperature_high?: number;
   temperature_low?: number;
   labor_count?: number;
-  skilled_workers?: number;
-  unskilled_workers?: number;
-  subcontractors?: number;
-  visitors?: number;
+  skilled_labor_count?: number;
+  unskilled_labor_count?: number;
+  subcontractor_count?: number;
+  visitor_count?: number;
   work_summary?: string;
   delays_issues?: string;
   safety_observations?: string;
@@ -85,11 +85,11 @@ export function exportSiteReportToPdf(report: ReportData, materials: MaterialsDa
   ];
   
   const laborInfo = [
-    ["Total Labor:", String(report.labor_count || 0)],
-    ["Skilled Workers:", String(report.skilled_workers || 0)],
-    ["Unskilled Workers:", String(report.unskilled_workers || 0)],
-    ["Subcontractors:", String(report.subcontractors || 0)],
-    ["Visitors:", String(report.visitors || 0)],
+    ["Total Labor:", String((report.skilled_labor_count || 0) + (report.unskilled_labor_count || 0))],
+    ["Skilled:", String(report.skilled_labor_count || 0)],
+    ["Non-Skilled:", String(report.unskilled_labor_count || 0)],
+    ["Subcontractors:", String(report.subcontractor_count || 0)],
+    ["Visitors:", String(report.visitor_count || 0)],
   ];
 
   weatherInfo.forEach(([label, value]) => {
