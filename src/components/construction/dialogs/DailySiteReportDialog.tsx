@@ -41,7 +41,7 @@ import { useEffect } from "react";
 import { format } from "date-fns";
 import { useCompany } from "@/contexts/CompanyContext";
 import { toast } from "sonner";
-import { Package, RotateCcw, Loader2 } from "lucide-react";
+import { Package, RotateCcw, Loader2, SlidersHorizontal } from "lucide-react";
 
 const formSchema = z.object({
   project_id: z.string().min(1, "Project is required"),
@@ -93,7 +93,7 @@ export function DailySiteReportDialog({ open, onOpenChange, report }: DailySiteR
   });
 
   const watchedDate = form.watch("report_date");
-  const { issues, returns, isLoading: materialsLoading } = useDailyMaterialsActivity(watchedDate);
+  const { issues, returns, adjustments, isLoading: materialsLoading } = useDailyMaterialsActivity(watchedDate);
 
   useEffect(() => {
     if (report) {
@@ -455,6 +455,53 @@ export function DailySiteReportDialog({ open, onOpenChange, report }: DailySiteR
                 </div>
               ) : (
                 <p className="text-sm text-muted-foreground">No items returned on this date</p>
+              )}
+            </div>
+
+            {/* Stock Adjustments Section */}
+            <div className="border rounded-lg p-4 bg-muted/30">
+              <div className="flex items-center gap-2 mb-3">
+                <SlidersHorizontal className="h-4 w-4 text-primary" />
+                <h3 className="font-medium">Stock Adjustments on {formattedDate}</h3>
+                {materialsLoading && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
+              </div>
+              {adjustments.length > 0 ? (
+                <div className="rounded-md border bg-background">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Item Code</TableHead>
+                        <TableHead>Item Name</TableHead>
+                        <TableHead className="text-right">Change</TableHead>
+                        <TableHead className="text-right">Before → After</TableHead>
+                        <TableHead>Adjustment Notes</TableHead>
+                        <TableHead>Item Master Notes</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {adjustments.map((adj, idx) => (
+                        <TableRow key={idx}>
+                          <TableCell className="font-mono text-xs">{adj.item_code || "-"}</TableCell>
+                          <TableCell>{adj.item_name}</TableCell>
+                          <TableCell className={`text-right font-medium ${adj.quantity_change > 0 ? "text-green-600" : adj.quantity_change < 0 ? "text-red-600" : ""}`}>
+                            {adj.quantity_change > 0 ? "+" : ""}{adj.quantity_change}
+                          </TableCell>
+                          <TableCell className="text-right text-muted-foreground">
+                            {adj.quantity_before} → {adj.quantity_after}
+                          </TableCell>
+                          <TableCell className="text-sm max-w-[150px] truncate">
+                            {adj.adjustment_notes || "-"}
+                          </TableCell>
+                          <TableCell className="text-sm text-muted-foreground max-w-[150px] truncate">
+                            {adj.item_master_notes || "-"}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">No stock adjustments on this date</p>
               )}
             </div>
 
