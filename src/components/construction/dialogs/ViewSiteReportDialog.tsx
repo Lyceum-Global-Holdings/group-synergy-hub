@@ -99,15 +99,27 @@ export function ViewSiteReportDialog({ open, onOpenChange, report }: ViewSiteRep
     exportSiteReportToPdf(displayReport as any, { adjustments, issues, stockBalances });
   };
 
-  // Sort stock balances by warehouse first, then by item code
+  // Sort stock balances by item name first, then by warehouse
   const sortedStockBalances = [...stockBalances].sort((a, b) => {
+    const nameA = a.item_name || "";
+    const nameB = b.item_name || "";
+    if (nameA !== nameB) {
+      return nameA.localeCompare(nameB);
+    }
     const warehouseA = a.warehouse_name || "Unassigned";
     const warehouseB = b.warehouse_name || "Unassigned";
-    if (warehouseA !== warehouseB) {
-      return warehouseA.localeCompare(warehouseB);
-    }
-    return (a.item_code || "").localeCompare(b.item_code || "");
+    return warehouseA.localeCompare(warehouseB);
   });
+
+  // Calculate total stock per item (across all warehouses)
+  const itemTotals = stockBalances.reduce((acc, item) => {
+    const itemCode = item.item_code || "unknown";
+    if (!acc[itemCode]) {
+      acc[itemCode] = 0;
+    }
+    acc[itemCode] += item.current_stock;
+    return acc;
+  }, {} as Record<string, number>);
 
   // Group sorted stock balances by warehouse
   const stockByWarehouse = sortedStockBalances.reduce((acc, item) => {
@@ -455,6 +467,7 @@ export function ViewSiteReportDialog({ open, onOpenChange, report }: ViewSiteRep
                               <TableHead>Item</TableHead>
                               <TableHead>Current Stock</TableHead>
                               <TableHead>Warehouse</TableHead>
+                              <TableHead>Total Stock</TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
@@ -464,6 +477,7 @@ export function ViewSiteReportDialog({ open, onOpenChange, report }: ViewSiteRep
                                 <TableCell>{item.item_name}</TableCell>
                                 <TableCell>{item.current_stock}</TableCell>
                                 <TableCell>{item.warehouse_name || "Unassigned"}</TableCell>
+                                <TableCell className="font-medium">{itemTotals[item.item_code || "unknown"] || 0}</TableCell>
                               </TableRow>
                             ))}
                           </TableBody>

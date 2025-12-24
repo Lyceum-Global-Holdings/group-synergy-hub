@@ -226,15 +226,27 @@ export function exportSiteReportToPdf(report: ReportData, materials: MaterialsDa
     doc.text("Current Stock Balances", 14, yPos);
     yPos += 8;
 
-    // Sort stock balances by warehouse, then by item code
+    // Sort stock balances by item name first, then by warehouse
     const sortedStockBalances = [...materials.stockBalances].sort((a, b) => {
+      const nameA = a.item_name || "";
+      const nameB = b.item_name || "";
+      if (nameA !== nameB) {
+        return nameA.localeCompare(nameB);
+      }
       const warehouseA = a.warehouse_name || "Unassigned";
       const warehouseB = b.warehouse_name || "Unassigned";
-      if (warehouseA !== warehouseB) {
-        return warehouseA.localeCompare(warehouseB);
-      }
-      return (a.item_code || "").localeCompare(b.item_code || "");
+      return warehouseA.localeCompare(warehouseB);
     });
+
+    // Calculate total stock per item (across all warehouses)
+    const itemTotals = materials.stockBalances.reduce((acc, item) => {
+      const itemCode = item.item_code || "unknown";
+      if (!acc[itemCode]) {
+        acc[itemCode] = 0;
+      }
+      acc[itemCode] += item.current_stock;
+      return acc;
+    }, {} as Record<string, number>);
 
     // Group sorted stock balances by warehouse
     const stockByWarehouse = sortedStockBalances.reduce((acc, item) => {
@@ -282,12 +294,13 @@ export function exportSiteReportToPdf(report: ReportData, materials: MaterialsDa
 
     autoTable(doc, {
       startY: yPos,
-      head: [["Code", "Item", "Current Stock", "Warehouse"]],
+      head: [["Code", "Item", "Current Stock", "Warehouse", "Total Stock"]],
       body: sortedStockBalances.map((item) => [
         item.item_code || "-",
         item.item_name,
         String(item.current_stock),
         item.warehouse_name || "Unassigned",
+        String(itemTotals[item.item_code || "unknown"] || 0),
       ]),
       styles: { fontSize: 8 },
       headStyles: { fillColor: [91, 192, 222] },
