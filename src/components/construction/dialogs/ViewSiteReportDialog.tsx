@@ -24,14 +24,20 @@ const REPORT_TYPE_CONFIG = {
 };
 
 export function ViewSiteReportDialog({ open, onOpenChange, report }: ViewSiteReportDialogProps) {
-  const reportDate = report?.report_date || null;
-  const { issues, returns, adjustments, isLoading } = useDailyMaterialsActivity(reportDate);
+  // Determine date range based on report type
+  const reportType = (report as any)?.report_type || 'daily';
+  const periodStartDate = reportType !== 'daily' && (report as any)?.period_start_date 
+    ? (report as any).period_start_date 
+    : report?.report_date || null;
+  const periodEndDate = reportType !== 'daily' && (report as any)?.period_end_date 
+    ? (report as any).period_end_date 
+    : undefined;
+
+  const { issues, returns, adjustments, isLoading } = useDailyMaterialsActivity(periodStartDate, periodEndDate);
 
   if (!report) return null;
 
   const statusConfig = DAILY_REPORT_STATUSES.find((s) => s.value === report.status);
-  // Type assertion for report_type since it may come from extended query
-  const reportType = (report as any).report_type || 'daily';
   const typeConfig = REPORT_TYPE_CONFIG[reportType as keyof typeof REPORT_TYPE_CONFIG] || REPORT_TYPE_CONFIG.daily;
 
   const formatPeriod = () => {
