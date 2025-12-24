@@ -99,8 +99,18 @@ export function ViewSiteReportDialog({ open, onOpenChange, report }: ViewSiteRep
     exportSiteReportToPdf(displayReport as any, { adjustments, issues, stockBalances });
   };
 
-  // Group stock balances by warehouse
-  const stockByWarehouse = stockBalances.reduce((acc, item) => {
+  // Sort stock balances by warehouse first, then by item code
+  const sortedStockBalances = [...stockBalances].sort((a, b) => {
+    const warehouseA = a.warehouse_name || "Unassigned";
+    const warehouseB = b.warehouse_name || "Unassigned";
+    if (warehouseA !== warehouseB) {
+      return warehouseA.localeCompare(warehouseB);
+    }
+    return (a.item_code || "").localeCompare(b.item_code || "");
+  });
+
+  // Group sorted stock balances by warehouse
+  const stockByWarehouse = sortedStockBalances.reduce((acc, item) => {
     const warehouseName = item.warehouse_name || "Unassigned";
     if (!acc[warehouseName]) {
       acc[warehouseName] = { items: [], totalStock: 0 };
@@ -429,11 +439,11 @@ export function ViewSiteReportDialog({ open, onOpenChange, report }: ViewSiteRep
                   <Card>
                     <CardHeader className="pb-2">
                       <CardTitle className="text-sm font-medium">
-                        Detailed Stock Balances ({stockBalances.length} items)
+                        Detailed Stock Balances ({sortedStockBalances.length} items)
                       </CardTitle>
                     </CardHeader>
                     <CardContent>
-                      {stockBalances.length === 0 ? (
+                      {sortedStockBalances.length === 0 ? (
                         <p className="text-sm text-muted-foreground py-4 text-center">
                           No stock data available
                         </p>
@@ -448,8 +458,8 @@ export function ViewSiteReportDialog({ open, onOpenChange, report }: ViewSiteRep
                             </TableRow>
                           </TableHeader>
                           <TableBody>
-                            {stockBalances.map((item, idx) => (
-                              <TableRow key={idx}>
+                            {sortedStockBalances.map((item, idx) => (
+                              <TableRow key={`${item.item_code}-${item.warehouse_id}-${idx}`}>
                                 <TableCell>{item.item_code || "-"}</TableCell>
                                 <TableCell>{item.item_name}</TableCell>
                                 <TableCell>{item.current_stock}</TableCell>
