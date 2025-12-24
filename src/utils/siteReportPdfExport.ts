@@ -226,8 +226,18 @@ export function exportSiteReportToPdf(report: ReportData, materials: MaterialsDa
     doc.text("Current Stock Balances", 14, yPos);
     yPos += 8;
 
-    // Group by warehouse
-    const stockByWarehouse = materials.stockBalances.reduce((acc, item) => {
+    // Sort stock balances by warehouse, then by item code
+    const sortedStockBalances = [...materials.stockBalances].sort((a, b) => {
+      const warehouseA = a.warehouse_name || "Unassigned";
+      const warehouseB = b.warehouse_name || "Unassigned";
+      if (warehouseA !== warehouseB) {
+        return warehouseA.localeCompare(warehouseB);
+      }
+      return (a.item_code || "").localeCompare(b.item_code || "");
+    });
+
+    // Group sorted stock balances by warehouse
+    const stockByWarehouse = sortedStockBalances.reduce((acc, item) => {
       const warehouseName = item.warehouse_name || "Unassigned";
       if (!acc[warehouseName]) {
         acc[warehouseName] = { items: [] as CurrentStockBalance[], totalStock: 0 };
@@ -273,7 +283,7 @@ export function exportSiteReportToPdf(report: ReportData, materials: MaterialsDa
     autoTable(doc, {
       startY: yPos,
       head: [["Code", "Item", "Current Stock", "Warehouse"]],
-      body: materials.stockBalances.map((item) => [
+      body: sortedStockBalances.map((item) => [
         item.item_code || "-",
         item.item_name,
         String(item.current_stock),
