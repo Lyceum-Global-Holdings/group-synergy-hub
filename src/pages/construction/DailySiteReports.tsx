@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus, Search, FileText, Calendar, Cloud, Users, Pencil, Trash2, Sparkles, BarChart3 } from "lucide-react";
+import { Plus, Search, FileText, Calendar, Cloud, Users, Pencil, Trash2, Sparkles, BarChart3, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -23,7 +23,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useDailySiteReports, useDeleteDailySiteReport, ReportPeriodType } from "@/hooks/construction/useDailySiteReports";
 import { DAILY_REPORT_STATUSES, DailySiteReport } from "@/types/construction";
 import { format } from "date-fns";
-import { DailySiteReportDialog, DeleteConfirmDialog } from "@/components/construction/dialogs";
+import { DailySiteReportDialog, DeleteConfirmDialog, ViewSiteReportDialog } from "@/components/construction/dialogs";
 import { GenerateReportDialog } from "@/components/construction/dialogs/GenerateReportDialog";
 import { SiteReportAnalytics } from "@/components/construction/reports/SiteReportAnalytics";
 
@@ -41,6 +41,7 @@ export default function DailySiteReports() {
   const [generateDialogOpen, setGenerateDialogOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<DailySiteReport | null>(null);
   const [deletingItem, setDeletingItem] = useState<DailySiteReport | null>(null);
+  const [viewingItem, setViewingItem] = useState<DailySiteReport | null>(null);
 
   const { data: reports, isLoading } = useDailySiteReports(
     undefined,
@@ -258,11 +259,20 @@ export default function DailySiteReports() {
                           <TableCell>{report.labor_count || 0}</TableCell>
                           <TableCell>{getStatusBadge(report.status)}</TableCell>
                           <TableCell className="text-right">
-                            <div className="flex justify-end gap-2">
+                            <div className="flex justify-end gap-1">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => setViewingItem(report as DailySiteReport)}
+                                title="View Report"
+                              >
+                                <Eye className="h-4 w-4" />
+                              </Button>
                               <Button
                                 variant="ghost"
                                 size="icon"
                                 onClick={() => handleEdit(report as DailySiteReport)}
+                                title="Edit Report"
                               >
                                 <Pencil className="h-4 w-4" />
                               </Button>
@@ -270,6 +280,7 @@ export default function DailySiteReports() {
                                 variant="ghost"
                                 size="icon"
                                 onClick={() => setDeletingItem(report as DailySiteReport)}
+                                title="Delete Report"
                               >
                                 <Trash2 className="h-4 w-4 text-destructive" />
                               </Button>
@@ -299,6 +310,12 @@ export default function DailySiteReports() {
       <GenerateReportDialog
         open={generateDialogOpen}
         onOpenChange={setGenerateDialogOpen}
+      />
+
+      <ViewSiteReportDialog
+        open={!!viewingItem}
+        onOpenChange={(open) => !open && setViewingItem(null)}
+        report={viewingItem}
       />
 
       <DeleteConfirmDialog

@@ -1,5 +1,6 @@
 export { WorkOrderDialog } from "./WorkOrderDialog";
 export { DailySiteReportDialog } from "./DailySiteReportDialog";
+export { ViewSiteReportDialog } from "./ViewSiteReportDialog";
 export { ResourceDialog } from "./ResourceDialog";
 export { QualityInspectionDialog } from "./QualityInspectionDialog";
 export { SafetyIncidentDialog } from "./SafetyIncidentDialog";
