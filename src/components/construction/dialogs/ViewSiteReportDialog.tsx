@@ -33,7 +33,7 @@ export function ViewSiteReportDialog({ open, onOpenChange, report }: ViewSiteRep
     ? (report as any).period_end_date 
     : undefined;
 
-  const { issues, returns, adjustments, isLoading } = useDailyMaterialsActivity(periodStartDate, periodEndDate);
+  const { adjustments, isLoading } = useDailyMaterialsActivity(periodStartDate, periodEndDate);
 
   if (!report) return null;
 
@@ -57,7 +57,7 @@ export function ViewSiteReportDialog({ open, onOpenChange, report }: ViewSiteRep
   };
 
   const handleExportPdf = () => {
-    exportSiteReportToPdf(report as any, { issues, returns, adjustments });
+    exportSiteReportToPdf(report as any, { adjustments });
   };
 
   return (
@@ -215,143 +215,56 @@ export function ViewSiteReportDialog({ open, onOpenChange, report }: ViewSiteRep
 
             <Separator />
 
-            {/* Material Activity Section */}
+            {/* Stock Adjustments Section */}
             <div className="space-y-4">
-              <h3 className="font-semibold text-lg">Material Activity</h3>
+              <h3 className="font-semibold text-lg">Stock Adjustments</h3>
 
               {isLoading ? (
                 <div className="flex items-center justify-center py-8">
                   <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary" />
                 </div>
               ) : (
-                <>
-                  {/* Items Issued */}
-                  <Card>
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-sm font-medium">
-                        Items Issued ({issues.length})
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      {issues.length === 0 ? (
-                        <p className="text-sm text-muted-foreground py-4 text-center">
-                          No items issued on this date
-                        </p>
-                      ) : (
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead>Issue #</TableHead>
-                              <TableHead>Code</TableHead>
-                              <TableHead>Item</TableHead>
-                              <TableHead>Qty</TableHead>
-                              <TableHead>Issued To</TableHead>
-                              <TableHead>Notes</TableHead>
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium">
+                      Stock Adjustments ({adjustments.length})
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {adjustments.length === 0 ? (
+                      <p className="text-sm text-muted-foreground py-4 text-center">
+                        No stock adjustments for this period
+                      </p>
+                    ) : (
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Code</TableHead>
+                            <TableHead>Item</TableHead>
+                            <TableHead>Change</TableHead>
+                            <TableHead>Before</TableHead>
+                            <TableHead>After</TableHead>
+                            <TableHead>Notes</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {adjustments.map((item, idx) => (
+                            <TableRow key={idx}>
+                              <TableCell>{item.item_code || "-"}</TableCell>
+                              <TableCell>{item.item_name}</TableCell>
+                              <TableCell className={item.quantity_change > 0 ? "text-green-600" : "text-red-600"}>
+                                {item.quantity_change > 0 ? `+${item.quantity_change}` : item.quantity_change}
+                              </TableCell>
+                              <TableCell>{item.quantity_before}</TableCell>
+                              <TableCell>{item.quantity_after}</TableCell>
+                              <TableCell className="max-w-[200px] truncate">{item.adjustment_notes || "-"}</TableCell>
                             </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {issues.map((item, idx) => (
-                              <TableRow key={idx}>
-                                <TableCell className="font-mono text-xs">{item.min_number}</TableCell>
-                                <TableCell>{item.item_code || "-"}</TableCell>
-                                <TableCell>{item.item_name}</TableCell>
-                                <TableCell>{item.quantity_issued}</TableCell>
-                                <TableCell>{item.issued_to || "-"}</TableCell>
-                                <TableCell className="max-w-[150px] truncate">{item.item_notes || "-"}</TableCell>
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
-                      )}
-                    </CardContent>
-                  </Card>
-
-                  {/* Items Returned */}
-                  <Card>
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-sm font-medium">
-                        Items Returned ({returns.length})
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      {returns.length === 0 ? (
-                        <p className="text-sm text-muted-foreground py-4 text-center">
-                          No items returned on this date
-                        </p>
-                      ) : (
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead>Return #</TableHead>
-                              <TableHead>Code</TableHead>
-                              <TableHead>Item</TableHead>
-                              <TableHead>Qty</TableHead>
-                              <TableHead>By</TableHead>
-                              <TableHead>Condition</TableHead>
-                              <TableHead>Notes</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {returns.map((item, idx) => (
-                              <TableRow key={idx}>
-                                <TableCell className="font-mono text-xs">{item.mrn_number}</TableCell>
-                                <TableCell>{item.item_code || "-"}</TableCell>
-                                <TableCell>{item.item_name}</TableCell>
-                                <TableCell>{item.quantity_returned}</TableCell>
-                                <TableCell>{item.returned_by || "-"}</TableCell>
-                                <TableCell>{item.condition || "-"}</TableCell>
-                                <TableCell className="max-w-[150px] truncate">{item.item_notes || "-"}</TableCell>
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
-                      )}
-                    </CardContent>
-                  </Card>
-
-                  {/* Stock Adjustments */}
-                  <Card>
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-sm font-medium">
-                        Stock Adjustments ({adjustments.length})
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      {adjustments.length === 0 ? (
-                        <p className="text-sm text-muted-foreground py-4 text-center">
-                          No stock adjustments on this date
-                        </p>
-                      ) : (
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead>Code</TableHead>
-                              <TableHead>Item</TableHead>
-                              <TableHead>Change</TableHead>
-                              <TableHead>Before</TableHead>
-                              <TableHead>After</TableHead>
-                              <TableHead>Notes</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {adjustments.map((item, idx) => (
-                              <TableRow key={idx}>
-                                <TableCell>{item.item_code || "-"}</TableCell>
-                                <TableCell>{item.item_name}</TableCell>
-                                <TableCell className={item.quantity_change > 0 ? "text-green-600" : "text-red-600"}>
-                                  {item.quantity_change > 0 ? `+${item.quantity_change}` : item.quantity_change}
-                                </TableCell>
-                                <TableCell>{item.quantity_before}</TableCell>
-                                <TableCell>{item.quantity_after}</TableCell>
-                                <TableCell className="max-w-[200px] truncate">{item.adjustment_notes || "-"}</TableCell>
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
-                      )}
-                    </CardContent>
-                  </Card>
-                </>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    )}
+                  </CardContent>
+                </Card>
               )}
             </div>
           </div>
