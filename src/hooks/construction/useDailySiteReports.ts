@@ -287,34 +287,14 @@ export function useGenerateSiteReports() {
         : format(reportDate, 'yyyyMMdd');
       const reportNumber = `${typePrefix}-${project.project_code}-${dateSuffix}`;
 
-      // Build work summary
+      // Calculate period days for summary
       const periodDays = differenceInDays(parseISO(endDate), parseISO(startDate)) + 1;
-      const periodLabel = reportType === 'daily' 
-        ? format(reportDate, 'MMMM d, yyyy')
-        : `${format(parseISO(startDate), 'MMM d')} - ${format(parseISO(endDate), 'MMM d, yyyy')}`;
-
-      let workSummary = `${reportType.charAt(0).toUpperCase() + reportType.slice(1)} Report for ${periodLabel}`;
-      
-      if (issuedCount > 0 || returnedCount > 0) {
-        workSummary += `\n\nMaterial Activity Summary:\n`;
-        workSummary += `- Total Issued: ${issuedCount} items (₦${issuedValue.toLocaleString()})\n`;
-        workSummary += `- Total Returned: ${returnedCount} items (₦${returnedValue.toLocaleString()})\n`;
-        
-        if (floorSummaries.length > 0) {
-          workSummary += `\nBreakdown by Floor:\n`;
-          floorSummaries.forEach(floor => {
-            workSummary += `- ${floor.name}: ↓${floor.issued} issued, ↑${floor.returned} returned\n`;
-          });
-        }
-      } else {
-        workSummary += `\n\nNo material transactions recorded for this period.`;
-      }
 
       const materialsReceived = issuedCount > 0 || returnedCount > 0
         ? `Issued: ${issuedCount} items, Returned: ${returnedCount} items`
         : "No material activity";
 
-      // Create the report
+      // Create the report with empty work_summary for user to fill in
       const { data: newReport, error: insertError } = await supabase
         .from("daily_site_reports")
         .insert({
@@ -325,7 +305,7 @@ export function useGenerateSiteReports() {
           period_start_date: startDate,
           period_end_date: endDate,
           status: "draft",
-          work_summary: workSummary,
+          work_summary: null,
           materials_received: materialsReceived,
           company_id: selectedCompany.id,
           submitted_by: user.user?.id,
