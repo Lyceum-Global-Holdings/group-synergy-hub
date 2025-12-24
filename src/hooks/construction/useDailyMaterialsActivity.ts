@@ -194,26 +194,26 @@ export function useDailyMaterialsActivity(startDate: string | null, endDate?: st
       if (!selectedCompany?.id) return [];
 
       // Fetch stock from bin allocations - this correctly tracks stock per warehouse
+      // Use explicit foreign key hints and filter directly on company_id
       const { data, error } = await supabase
         .from("warehouse_bin_allocations")
         .select(`
           allocated_quantity,
-          warehouse_item_id,
-          warehouse_items!inner (
+          company_id,
+          warehouse_items:warehouse_item_id (
             id,
             item_code,
-            name,
-            company_id
+            name
           ),
-          warehouse_bins!inner (
+          warehouse_bins:bin_id (
             location_id,
-            warehouse_locations!inner (
+            warehouse_locations:location_id (
               id,
               name
             )
           )
         `)
-        .eq("warehouse_items.company_id", selectedCompany.id)
+        .eq("company_id", selectedCompany.id)
         .gt("allocated_quantity", 0);
 
       if (error) throw error;
