@@ -3898,11 +3898,13 @@ export type Database = {
           report_type: Database["public"]["Enums"]["report_period_type"]
           safety_observations: string | null
           site_id: string | null
+          skilled_labor_count: number | null
           status: string | null
           subcontractor_count: number | null
           submitted_by: string | null
           temperature_high: number | null
           temperature_low: number | null
+          unskilled_labor_count: number | null
           updated_at: string | null
           visitor_count: number | null
           weather_conditions: string | null
@@ -3926,11 +3928,13 @@ export type Database = {
           report_type?: Database["public"]["Enums"]["report_period_type"]
           safety_observations?: string | null
           site_id?: string | null
+          skilled_labor_count?: number | null
           status?: string | null
           subcontractor_count?: number | null
           submitted_by?: string | null
           temperature_high?: number | null
           temperature_low?: number | null
+          unskilled_labor_count?: number | null
           updated_at?: string | null
           visitor_count?: number | null
           weather_conditions?: string | null
@@ -3954,11 +3958,13 @@ export type Database = {
           report_type?: Database["public"]["Enums"]["report_period_type"]
           safety_observations?: string | null
           site_id?: string | null
+          skilled_labor_count?: number | null
           status?: string | null
           subcontractor_count?: number | null
           submitted_by?: string | null
           temperature_high?: number | null
           temperature_low?: number | null
+          unskilled_labor_count?: number | null
           updated_at?: string | null
           visitor_count?: number | null
           weather_conditions?: string | null
