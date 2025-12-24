@@ -9,7 +9,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, Users, AlertCircle, CheckCircle } from 'lucide-react';
-
 export default function Auth() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -19,11 +18,18 @@ export default function Auth() {
   const [isLoading, setIsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('signin');
   const [isResettingPassword, setIsResettingPassword] = useState(false);
-  
-  const { signIn, signUp, user, resetPassword, updatePassword } = useAuth();
+  const {
+    signIn,
+    signUp,
+    user,
+    resetPassword,
+    updatePassword
+  } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const { toast } = useToast();
+  const {
+    toast
+  } = useToast();
 
   // Check if this is a password reset callback
   useEffect(() => {
@@ -38,13 +44,13 @@ export default function Auth() {
   useEffect(() => {
     if (user) {
       const from = location.state?.from?.pathname || '/';
-      navigate(from, { replace: true });
+      navigate(from, {
+        replace: true
+      });
     }
   }, [user, navigate, location]);
-
   const getErrorMessage = (error: any) => {
     const message = error?.message || '';
-    
     if (message.includes('Invalid login credentials')) {
       return 'Invalid email or password. Please check your credentials and try again.';
     }
@@ -57,53 +63,50 @@ export default function Auth() {
     if (message.includes('Signup is disabled')) {
       return 'Account creation is currently disabled. Please contact your administrator.';
     }
-    
     return message || 'An unexpected error occurred. Please try again.';
   };
-
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    
     try {
-      const { error } = await signIn(email, password);
-      
+      const {
+        error
+      } = await signIn(email, password);
       if (error) {
         console.error('Sign in error:', error);
         toast({
           title: "Sign in failed",
           description: getErrorMessage(error),
-          variant: "destructive",
+          variant: "destructive"
         });
       } else {
         toast({
           title: "Welcome back!",
-          description: "You have successfully signed in.",
+          description: "You have successfully signed in."
         });
       }
     } finally {
       setIsLoading(false);
     }
   };
-
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    
     try {
-      const { error } = await signUp(email, password, fullName);
-      
+      const {
+        error
+      } = await signUp(email, password, fullName);
       if (error) {
         console.error('Sign up error:', error);
         toast({
           title: "Sign up failed",
           description: getErrorMessage(error),
-          variant: "destructive",
+          variant: "destructive"
         });
       } else {
         toast({
           title: "Account created successfully!",
-          description: "Please check your email to confirm your account, then sign in.",
+          description: "Please check your email to confirm your account, then sign in."
         });
         setActiveTab('signin');
         setEmail('');
@@ -114,25 +117,24 @@ export default function Auth() {
       setIsLoading(false);
     }
   };
-
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    
     try {
-      const { error } = await resetPassword(email);
-      
+      const {
+        error
+      } = await resetPassword(email);
       if (error) {
         console.error('Password reset error:', error);
         toast({
           title: "Password reset failed",
           description: getErrorMessage(error),
-          variant: "destructive",
+          variant: "destructive"
         });
       } else {
         toast({
           title: "Password reset email sent!",
-          description: "Please check your email for the password reset link.",
+          description: "Please check your email for the password reset link."
         });
         setEmail('');
         setActiveTab('signin');
@@ -141,69 +143,74 @@ export default function Auth() {
       setIsLoading(false);
     }
   };
-
   const handleUpdatePassword = async (e: React.FormEvent) => {
     e.preventDefault();
-    
     if (newPassword !== confirmPassword) {
       toast({
         title: "Passwords don't match",
         description: "Please make sure both passwords are the same.",
-        variant: "destructive",
+        variant: "destructive"
       });
       return;
     }
-
     if (newPassword.length < 6) {
       toast({
         title: "Password too short",
         description: "Password must be at least 6 characters long.",
-        variant: "destructive",
+        variant: "destructive"
       });
       return;
     }
-
     setIsLoading(true);
-    
     try {
-      const { error } = await updatePassword(newPassword);
-      
+      const {
+        error
+      } = await updatePassword(newPassword);
       if (error) {
         console.error('Password update error:', error);
         toast({
           title: "Password update failed",
           description: getErrorMessage(error),
-          variant: "destructive",
+          variant: "destructive"
         });
       } else {
         toast({
           title: "Password updated successfully!",
-          description: "You can now sign in with your new password.",
+          description: "You can now sign in with your new password."
         });
         setNewPassword('');
         setConfirmPassword('');
         setIsResettingPassword(false);
-        navigate('/', { replace: true });
+        navigate('/', {
+          replace: true
+        });
       }
     } finally {
       setIsLoading(false);
     }
   };
-
   const createTestUsers = async () => {
     setIsLoading(true);
-    const testUsers = [
-      { name: "Admin User", email: "admin@example.com", password: "admin123" },
-      { name: "Manager User", email: "manager@example.com", password: "manager123" },
-      { name: "Regular User", email: "user@example.com", password: "user123" }
-    ];
-
+    const testUsers = [{
+      name: "Admin User",
+      email: "admin@example.com",
+      password: "admin123"
+    }, {
+      name: "Manager User",
+      email: "manager@example.com",
+      password: "manager123"
+    }, {
+      name: "Regular User",
+      email: "user@example.com",
+      password: "user123"
+    }];
     let successCount = 0;
     let errors: string[] = [];
-
     try {
       for (const testUser of testUsers) {
-        const { error } = await signUp(testUser.email, testUser.password, testUser.name);
+        const {
+          error
+        } = await signUp(testUser.email, testUser.password, testUser.name);
         if (error) {
           if (error.message.includes('already registered')) {
             successCount++; // Count as success if already exists
@@ -214,17 +221,16 @@ export default function Auth() {
           successCount++;
         }
       }
-      
       if (errors.length === 0) {
         toast({
           title: "Test users ready!",
-          description: `${successCount} test accounts available. Try: admin@example.com / admin123`,
+          description: `${successCount} test accounts available. Try: admin@example.com / admin123`
         });
       } else {
         toast({
           title: `${successCount} users ready, ${errors.length} failed`,
           description: `Working accounts available. Errors: ${errors.join(', ')}`,
-          variant: errors.length === testUsers.length ? "destructive" : "default",
+          variant: errors.length === testUsers.length ? "destructive" : "default"
         });
       }
     } catch (error: any) {
@@ -232,15 +238,13 @@ export default function Auth() {
       toast({
         title: "Error creating test users",
         description: getErrorMessage(error),
-        variant: "destructive",
+        variant: "destructive"
       });
     } finally {
       setIsLoading(false);
     }
   };
-
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-background p-4">
+  return <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <div className="w-full max-w-md space-y-6">
         <div className="flex flex-col items-center space-y-2">
           <div className="w-12 h-12 bg-gradient-to-br from-primary to-info rounded-lg flex items-center justify-center">
@@ -253,29 +257,10 @@ export default function Auth() {
         </div>
 
         <div className="mb-4 space-y-3">
-          <Alert>
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription>
-              <strong>First time setup:</strong> If you get login errors, check Supabase Auth settings:
-              <br />• Enable Email provider & new signups
-              <br />• Disable domain allowlist (or add your domain)
-              <br />• Set Site URL and Redirect URLs correctly
-            </AlertDescription>
-          </Alert>
           
-          <Button 
-            onClick={createTestUsers} 
-            disabled={isLoading}
-            variant="outline"
-            className="w-full"
-          >
-            <Users className="mr-2 h-4 w-4" />
-            {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Create Test Users (Dev Only)
-          </Button>
-          <p className="text-xs text-muted-foreground text-center">
-            Creates: admin@example.com, manager@example.com, user@example.com (all with password: role123)
-          </p>
+          
+          
+          
         </div>
 
         <Card>
@@ -298,25 +283,11 @@ export default function Auth() {
                 <form onSubmit={handleSignIn} className="space-y-4">
                   <div className="space-y-2">
                     <Label htmlFor="signin-email">Email</Label>
-                    <Input
-                      id="signin-email"
-                      type="email"
-                      placeholder="Enter your email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      required
-                    />
+                    <Input id="signin-email" type="email" placeholder="Enter your email" value={email} onChange={e => setEmail(e.target.value)} required />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="signin-password">Password</Label>
-                    <Input
-                      id="signin-password"
-                      type="password"
-                      placeholder="Enter your password"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      required
-                    />
+                    <Input id="signin-password" type="password" placeholder="Enter your password" value={password} onChange={e => setPassword(e.target.value)} required />
                   </div>
                   <Button type="submit" className="w-full" disabled={isLoading}>
                     {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
@@ -329,37 +300,15 @@ export default function Auth() {
                 <form onSubmit={handleSignUp} className="space-y-4">
                   <div className="space-y-2">
                     <Label htmlFor="signup-name">Full Name</Label>
-                    <Input
-                      id="signup-name"
-                      type="text"
-                      placeholder="Enter your full name"
-                      value={fullName}
-                      onChange={(e) => setFullName(e.target.value)}
-                      required
-                    />
+                    <Input id="signup-name" type="text" placeholder="Enter your full name" value={fullName} onChange={e => setFullName(e.target.value)} required />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="signup-email">Email</Label>
-                    <Input
-                      id="signup-email"
-                      type="email"
-                      placeholder="Enter your email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      required
-                    />
+                    <Input id="signup-email" type="email" placeholder="Enter your email" value={email} onChange={e => setEmail(e.target.value)} required />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="signup-password">Password</Label>
-                    <Input
-                      id="signup-password"
-                      type="password"
-                      placeholder="Create a password"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      required
-                      minLength={6}
-                    />
+                    <Input id="signup-password" type="password" placeholder="Create a password" value={password} onChange={e => setPassword(e.target.value)} required minLength={6} />
                   </div>
                   <Button type="submit" className="w-full" disabled={isLoading}>
                     {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
@@ -372,14 +321,7 @@ export default function Auth() {
                 <form onSubmit={handleForgotPassword} className="space-y-4">
                   <div className="space-y-2">
                     <Label htmlFor="forgot-email">Email</Label>
-                    <Input
-                      id="forgot-email"
-                      type="email"
-                      placeholder="Enter your email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      required
-                    />
+                    <Input id="forgot-email" type="email" placeholder="Enter your email" value={email} onChange={e => setEmail(e.target.value)} required />
                   </div>
                   <Button type="submit" className="w-full" disabled={isLoading}>
                     {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
@@ -395,27 +337,11 @@ export default function Auth() {
                 <form onSubmit={handleUpdatePassword} className="space-y-4">
                   <div className="space-y-2">
                     <Label htmlFor="new-password">New Password</Label>
-                    <Input
-                      id="new-password"
-                      type="password"
-                      placeholder="Enter new password"
-                      value={newPassword}
-                      onChange={(e) => setNewPassword(e.target.value)}
-                      required
-                      minLength={6}
-                    />
+                    <Input id="new-password" type="password" placeholder="Enter new password" value={newPassword} onChange={e => setNewPassword(e.target.value)} required minLength={6} />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="confirm-password">Confirm Password</Label>
-                    <Input
-                      id="confirm-password"
-                      type="password"
-                      placeholder="Confirm new password"
-                      value={confirmPassword}
-                      onChange={(e) => setConfirmPassword(e.target.value)}
-                      required
-                      minLength={6}
-                    />
+                    <Input id="confirm-password" type="password" placeholder="Confirm new password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} required minLength={6} />
                   </div>
                   <Button type="submit" className="w-full" disabled={isLoading}>
                     {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
@@ -436,6 +362,5 @@ export default function Auth() {
           </Alert>
         </div>
       </div>
-    </div>
-  );
+    </div>;
 }
