@@ -25,13 +25,23 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { useProjects } from "@/hooks/construction/useProjects";
 import { useCreateDailySiteReport, useUpdateDailySiteReport } from "@/hooks/construction/useDailySiteReports";
+import { useDailyMaterialsActivity } from "@/hooks/construction/useDailyMaterialsActivity";
 import { DailySiteReport, WEATHER_CONDITIONS } from "@/types/construction";
 import { useEffect } from "react";
 import { format } from "date-fns";
 import { useCompany } from "@/contexts/CompanyContext";
 import { toast } from "sonner";
+import { Package, RotateCcw, Loader2 } from "lucide-react";
 
 const formSchema = z.object({
   project_id: z.string().min(1, "Project is required"),
@@ -39,7 +49,8 @@ const formSchema = z.object({
   weather_conditions: z.string().optional(),
   temperature_high: z.coerce.number().optional(),
   temperature_low: z.coerce.number().optional(),
-  labor_count: z.coerce.number().optional(),
+  skilled_labor_count: z.coerce.number().optional(),
+  unskilled_labor_count: z.coerce.number().optional(),
   subcontractor_count: z.coerce.number().optional(),
   visitor_count: z.coerce.number().optional(),
   work_summary: z.string().optional(),
@@ -69,7 +80,8 @@ export function DailySiteReportDialog({ open, onOpenChange, report }: DailySiteR
       project_id: "",
       report_date: format(new Date(), "yyyy-MM-dd"),
       weather_conditions: "",
-      labor_count: 0,
+      skilled_labor_count: 0,
+      unskilled_labor_count: 0,
       subcontractor_count: 0,
       visitor_count: 0,
       work_summary: "",
@@ -80,6 +92,9 @@ export function DailySiteReportDialog({ open, onOpenChange, report }: DailySiteR
     },
   });
 
+  const watchedDate = form.watch("report_date");
+  const { issues, returns, isLoading: materialsLoading } = useDailyMaterialsActivity(watchedDate);
+
   useEffect(() => {
     if (report) {
       form.reset({
@@ -88,7 +103,8 @@ export function DailySiteReportDialog({ open, onOpenChange, report }: DailySiteR
         weather_conditions: report.weather_conditions || "",
         temperature_high: report.temperature_high || undefined,
         temperature_low: report.temperature_low || undefined,
-        labor_count: report.labor_count || 0,
+        skilled_labor_count: (report as any).skilled_labor_count || 0,
+        unskilled_labor_count: (report as any).unskilled_labor_count || 0,
         subcontractor_count: report.subcontractor_count || 0,
         visitor_count: report.visitor_count || 0,
         work_summary: report.work_summary || "",
@@ -102,7 +118,8 @@ export function DailySiteReportDialog({ open, onOpenChange, report }: DailySiteR
         project_id: "",
         report_date: format(new Date(), "yyyy-MM-dd"),
         weather_conditions: "",
-        labor_count: 0,
+        skilled_labor_count: 0,
+        unskilled_labor_count: 0,
         subcontractor_count: 0,
         visitor_count: 0,
         work_summary: "",
@@ -127,7 +144,8 @@ export function DailySiteReportDialog({ open, onOpenChange, report }: DailySiteR
         weather_conditions: data.weather_conditions || undefined,
         temperature_high: data.temperature_high || undefined,
         temperature_low: data.temperature_low || undefined,
-        labor_count: data.labor_count || undefined,
+        skilled_labor_count: data.skilled_labor_count || undefined,
+        unskilled_labor_count: data.unskilled_labor_count || undefined,
         subcontractor_count: data.subcontractor_count || undefined,
         visitor_count: data.visitor_count || undefined,
         work_summary: data.work_summary || undefined,
@@ -148,9 +166,11 @@ export function DailySiteReportDialog({ open, onOpenChange, report }: DailySiteR
     }
   };
 
+  const formattedDate = watchedDate ? format(new Date(watchedDate), "MMM dd, yyyy") : "";
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
             {report ? "Edit Daily Site Report" : "New Daily Site Report"}
@@ -254,13 +274,27 @@ export function DailySiteReportDialog({ open, onOpenChange, report }: DailySiteR
               />
             </div>
 
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-4 gap-4">
               <FormField
                 control={form.control}
-                name="labor_count"
+                name="skilled_labor_count"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Labor Count</FormLabel>
+                    <FormLabel>Skilled Labor</FormLabel>
+                    <FormControl>
+                      <Input type="number" placeholder="0" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="unskilled_labor_count"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Non-Skilled Labor</FormLabel>
                     <FormControl>
                       <Input type="number" placeholder="0" {...field} />
                     </FormControl>
@@ -339,6 +373,90 @@ export function DailySiteReportDialog({ open, onOpenChange, report }: DailySiteR
                 </FormItem>
               )}
             />
+
+            {/* Items Issued Section */}
+            <div className="border rounded-lg p-4 bg-muted/30">
+              <div className="flex items-center gap-2 mb-3">
+                <Package className="h-4 w-4 text-primary" />
+                <h3 className="font-medium">Items Issued on {formattedDate}</h3>
+                {materialsLoading && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
+              </div>
+              {issues.length > 0 ? (
+                <div className="rounded-md border bg-background">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-[100px]">Issue #</TableHead>
+                        <TableHead>Item Code</TableHead>
+                        <TableHead>Item Name</TableHead>
+                        <TableHead className="text-right">Qty</TableHead>
+                        <TableHead>Issued To</TableHead>
+                        <TableHead>Item Master Notes</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {issues.map((issue, idx) => (
+                        <TableRow key={`${issue.min_number}-${idx}`}>
+                          <TableCell className="font-mono text-xs">{issue.min_number}</TableCell>
+                          <TableCell className="font-mono text-xs">{issue.item_code || "-"}</TableCell>
+                          <TableCell>{issue.item_name}</TableCell>
+                          <TableCell className="text-right">{issue.quantity_issued}</TableCell>
+                          <TableCell>{issue.issued_to || "-"}</TableCell>
+                          <TableCell className="text-sm text-muted-foreground max-w-[200px] truncate">
+                            {issue.item_master_notes || "-"}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">No items issued on this date</p>
+              )}
+            </div>
+
+            {/* Items Returned Section */}
+            <div className="border rounded-lg p-4 bg-muted/30">
+              <div className="flex items-center gap-2 mb-3">
+                <RotateCcw className="h-4 w-4 text-primary" />
+                <h3 className="font-medium">Items Returned on {formattedDate}</h3>
+                {materialsLoading && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
+              </div>
+              {returns.length > 0 ? (
+                <div className="rounded-md border bg-background">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-[100px]">Return #</TableHead>
+                        <TableHead>Item Code</TableHead>
+                        <TableHead>Item Name</TableHead>
+                        <TableHead className="text-right">Qty</TableHead>
+                        <TableHead>Returned By</TableHead>
+                        <TableHead>Condition</TableHead>
+                        <TableHead>Item Master Notes</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {returns.map((ret, idx) => (
+                        <TableRow key={`${ret.mrn_number}-${idx}`}>
+                          <TableCell className="font-mono text-xs">{ret.mrn_number}</TableCell>
+                          <TableCell className="font-mono text-xs">{ret.item_code || "-"}</TableCell>
+                          <TableCell>{ret.item_name}</TableCell>
+                          <TableCell className="text-right">{ret.quantity_returned}</TableCell>
+                          <TableCell>{ret.returned_by || "-"}</TableCell>
+                          <TableCell>{ret.condition || "-"}</TableCell>
+                          <TableCell className="text-sm text-muted-foreground max-w-[200px] truncate">
+                            {ret.item_master_notes || "-"}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">No items returned on this date</p>
+              )}
+            </div>
 
             <div className="flex justify-end gap-3 pt-4">
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
