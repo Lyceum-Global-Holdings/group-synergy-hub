@@ -375,6 +375,7 @@ export function ViewSiteReportDialog({ open, onOpenChange, report }: ViewSiteRep
                               <TableHead>Before</TableHead>
                               <TableHead>After</TableHead>
                               <TableHead>Notes</TableHead>
+                              <TableHead>Adjusted By</TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
@@ -388,6 +389,7 @@ export function ViewSiteReportDialog({ open, onOpenChange, report }: ViewSiteRep
                                 <TableCell>{item.quantity_before}</TableCell>
                                 <TableCell>{item.quantity_after}</TableCell>
                                 <TableCell className="max-w-[200px] truncate">{item.adjustment_notes || "-"}</TableCell>
+                                <TableCell>{item.adjusted_by || "-"}</TableCell>
                               </TableRow>
                             ))}
                           </TableBody>
