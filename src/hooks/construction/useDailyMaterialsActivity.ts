@@ -145,13 +145,14 @@ export function useDailyMaterialsActivity(date: string | null) {
           quantity_before,
           quantity_after,
           notes,
-          warehouse_items (
+          warehouse_items!inner (
             item_code,
             item_name,
-            notes
+            notes,
+            company_id
           )
         `)
-        .eq("company_id", selectedCompany.id)
+        .eq("warehouse_items.company_id", selectedCompany.id)
         .eq("transaction_type", "adjustment")
         .gte("created_at", `${date}T00:00:00`)
         .lt("created_at", `${date}T23:59:59.999`);
