@@ -9912,6 +9912,20 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "fk_stock_transactions_warehouse_items"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "v_adjustment_summary_by_item"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_stock_transactions_warehouse_items"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "warehouse_items"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "stock_transactions_batch_id_fkey"
             columns: ["batch_id"]
             isOneToOne: false
