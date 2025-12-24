@@ -1,7 +1,7 @@
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { format } from "date-fns";
-import { DailyStockAdjustment } from "@/hooks/construction/useDailyMaterialsActivity";
+import { DailyStockAdjustment, DailyMaterialIssue, CurrentStockBalance } from "@/hooks/construction/useDailyMaterialsActivity";
 
 interface ReportData {
   report_number: string;
@@ -30,6 +30,8 @@ interface ReportData {
 
 interface MaterialsData {
   adjustments: DailyStockAdjustment[];
+  issues: DailyMaterialIssue[];
+  stockBalances: CurrentStockBalance[];
 }
 
 export function exportSiteReportToPdf(report: ReportData, materials: MaterialsData) {
@@ -149,21 +151,48 @@ export function exportSiteReportToPdf(report: ReportData, materials: MaterialsDa
     yPos = 20;
   }
 
-  // Stock Adjustments Section
+  // Items Issued Section
   doc.setFont("helvetica", "bold");
   doc.setFontSize(12);
-  doc.text("Stock Adjustments", 14, yPos);
+  doc.text("Material Activity", 14, yPos);
   yPos += 10;
+
+  // Items Issued Table
+  if (materials.issues.length > 0) {
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "bold");
+    doc.text(`Items Issued (${materials.issues.length})`, 14, yPos);
+    yPos += 2;
+
+    autoTable(doc, {
+      startY: yPos,
+      head: [["MIN#", "Code", "Item", "Qty Issued", "Issued To", "Department"]],
+      body: materials.issues.map((item) => [
+        item.min_number || "-",
+        item.item_code || "-",
+        item.item_name,
+        String(item.quantity_issued),
+        item.issued_to || "-",
+        item.department || "-",
+      ]),
+      styles: { fontSize: 8 },
+      headStyles: { fillColor: [66, 139, 202] },
+      margin: { left: 14, right: 14 },
+    });
+    yPos = (doc as any).lastAutoTable.finalY + 10;
+  }
+
+  // Check if we need a new page
+  if (yPos > 230) {
+    doc.addPage();
+    yPos = 20;
+  }
 
   // Stock Adjustments Table
   if (materials.adjustments.length > 0) {
-    if (yPos > 230) {
-      doc.addPage();
-      yPos = 20;
-    }
-
     doc.setFontSize(10);
-    doc.text("Stock Adjustments", 14, yPos);
+    doc.setFont("helvetica", "bold");
+    doc.text(`Stock Adjustments (${materials.adjustments.length})`, 14, yPos);
     yPos += 2;
 
     autoTable(doc, {
@@ -179,6 +208,79 @@ export function exportSiteReportToPdf(report: ReportData, materials: MaterialsDa
       ]),
       styles: { fontSize: 8 },
       headStyles: { fillColor: [240, 173, 78] },
+      margin: { left: 14, right: 14 },
+    });
+    yPos = (doc as any).lastAutoTable.finalY + 10;
+  }
+
+  // Check if we need a new page for stock balances
+  if (yPos > 200) {
+    doc.addPage();
+    yPos = 20;
+  }
+
+  // Current Stock Balances Section
+  if (materials.stockBalances.length > 0) {
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(12);
+    doc.text("Current Stock Balances", 14, yPos);
+    yPos += 8;
+
+    // Group by warehouse
+    const stockByWarehouse = materials.stockBalances.reduce((acc, item) => {
+      const warehouseName = item.warehouse_name || "Unassigned";
+      if (!acc[warehouseName]) {
+        acc[warehouseName] = { items: [] as CurrentStockBalance[], totalStock: 0 };
+      }
+      acc[warehouseName].items.push(item);
+      acc[warehouseName].totalStock += item.current_stock;
+      return acc;
+    }, {} as Record<string, { items: CurrentStockBalance[]; totalStock: number }>);
+
+    // Warehouse Summary Table
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "bold");
+    doc.text("Stock by Warehouse", 14, yPos);
+    yPos += 2;
+
+    const warehouseSummary = Object.entries(stockByWarehouse).map(([name, data]) => [
+      name,
+      String(data.items.length),
+      String(data.totalStock),
+    ]);
+
+    autoTable(doc, {
+      startY: yPos,
+      head: [["Warehouse", "Items Count", "Total Stock"]],
+      body: warehouseSummary,
+      styles: { fontSize: 8 },
+      headStyles: { fillColor: [92, 184, 92] },
+      margin: { left: 14, right: 14 },
+    });
+    yPos = (doc as any).lastAutoTable.finalY + 10;
+
+    // Detailed Stock Balances
+    if (yPos > 230) {
+      doc.addPage();
+      yPos = 20;
+    }
+
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "bold");
+    doc.text("Detailed Stock Balances", 14, yPos);
+    yPos += 2;
+
+    autoTable(doc, {
+      startY: yPos,
+      head: [["Code", "Item", "Current Stock", "Warehouse"]],
+      body: materials.stockBalances.map((item) => [
+        item.item_code || "-",
+        item.item_name,
+        String(item.current_stock),
+        item.warehouse_name || "Unassigned",
+      ]),
+      styles: { fontSize: 8 },
+      headStyles: { fillColor: [91, 192, 222] },
       margin: { left: 14, right: 14 },
     });
   }

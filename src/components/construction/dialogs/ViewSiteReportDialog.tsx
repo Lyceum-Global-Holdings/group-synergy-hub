@@ -5,12 +5,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Printer, FileDown, X, Cloud, Thermometer, Users, AlertTriangle, Shield, Package } from "lucide-react";
+import { Printer, FileDown, X, Cloud, Thermometer, Users, AlertTriangle, Shield, Package, Warehouse, ArrowRightLeft } from "lucide-react";
 import { format } from "date-fns";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { DailySiteReport, DAILY_REPORT_STATUSES } from "@/types/construction";
-import { useDailyMaterialsActivity } from "@/hooks/construction/useDailyMaterialsActivity";
+import { useDailyMaterialsActivity, CurrentStockBalance } from "@/hooks/construction/useDailyMaterialsActivity";
 import { exportSiteReportToPdf } from "@/utils/siteReportPdfExport";
 
 interface ViewSiteReportDialogProps {
@@ -59,7 +59,7 @@ export function ViewSiteReportDialog({ open, onOpenChange, report }: ViewSiteRep
     ? (displayReport as any).period_end_date 
     : undefined;
 
-  const { adjustments, isLoading } = useDailyMaterialsActivity(periodStartDate, periodEndDate);
+  const { adjustments, issues, stockBalances, isLoading } = useDailyMaterialsActivity(periodStartDate, periodEndDate);
 
   if (!report) return null;
 
@@ -96,8 +96,19 @@ export function ViewSiteReportDialog({ open, onOpenChange, report }: ViewSiteRep
   };
 
   const handleExportPdf = () => {
-    exportSiteReportToPdf(displayReport as any, { adjustments });
+    exportSiteReportToPdf(displayReport as any, { adjustments, issues, stockBalances });
   };
+
+  // Group stock balances by warehouse
+  const stockByWarehouse = stockBalances.reduce((acc, item) => {
+    const warehouseName = item.warehouse_name || "Unassigned";
+    if (!acc[warehouseName]) {
+      acc[warehouseName] = { items: [], totalStock: 0 };
+    }
+    acc[warehouseName].items.push(item);
+    acc[warehouseName].totalStock += item.current_stock;
+    return acc;
+  }, {} as Record<string, { items: CurrentStockBalance[]; totalStock: number }>);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -265,56 +276,192 @@ export function ViewSiteReportDialog({ open, onOpenChange, report }: ViewSiteRep
 
             <Separator />
 
-            {/* Stock Adjustments Section */}
+            {/* Material Activity Section */}
             <div className="space-y-4">
-              <h3 className="font-semibold text-lg">Stock Adjustments</h3>
+              <h3 className="font-semibold text-lg flex items-center gap-2">
+                <ArrowRightLeft className="h-5 w-5" />
+                Material Activity
+              </h3>
 
               {isLoading ? (
                 <div className="flex items-center justify-center py-8">
                   <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary" />
                 </div>
               ) : (
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-medium">
-                      Stock Adjustments ({adjustments.length})
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    {adjustments.length === 0 ? (
-                      <p className="text-sm text-muted-foreground py-4 text-center">
-                        No stock adjustments for this period
-                      </p>
-                    ) : (
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>Code</TableHead>
-                            <TableHead>Item</TableHead>
-                            <TableHead>Change</TableHead>
-                            <TableHead>Before</TableHead>
-                            <TableHead>After</TableHead>
-                            <TableHead>Notes</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {adjustments.map((item, idx) => (
-                            <TableRow key={idx}>
-                              <TableCell>{item.item_code || "-"}</TableCell>
-                              <TableCell>{item.item_name}</TableCell>
-                              <TableCell className={item.quantity_change > 0 ? "text-green-600" : "text-red-600"}>
-                                {item.quantity_change > 0 ? `+${item.quantity_change}` : item.quantity_change}
-                              </TableCell>
-                              <TableCell>{item.quantity_before}</TableCell>
-                              <TableCell>{item.quantity_after}</TableCell>
-                              <TableCell className="max-w-[200px] truncate">{item.adjustment_notes || "-"}</TableCell>
+                <div className="space-y-4">
+                  {/* Items Issued */}
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm font-medium flex items-center gap-2">
+                        <Package className="h-4 w-4 text-blue-500" />
+                        Items Issued ({issues.length})
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      {issues.length === 0 ? (
+                        <p className="text-sm text-muted-foreground py-4 text-center">
+                          No items issued for this period
+                        </p>
+                      ) : (
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>MIN#</TableHead>
+                              <TableHead>Code</TableHead>
+                              <TableHead>Item</TableHead>
+                              <TableHead>Qty Issued</TableHead>
+                              <TableHead>Issued To</TableHead>
+                              <TableHead>Department</TableHead>
                             </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    )}
-                  </CardContent>
-                </Card>
+                          </TableHeader>
+                          <TableBody>
+                            {issues.map((item, idx) => (
+                              <TableRow key={idx}>
+                                <TableCell>{item.min_number || "-"}</TableCell>
+                                <TableCell>{item.item_code || "-"}</TableCell>
+                                <TableCell>{item.item_name}</TableCell>
+                                <TableCell>{item.quantity_issued}</TableCell>
+                                <TableCell>{item.issued_to || "-"}</TableCell>
+                                <TableCell>{item.department || "-"}</TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      )}
+                    </CardContent>
+                  </Card>
+
+                  {/* Stock Adjustments */}
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm font-medium">
+                        Stock Adjustments ({adjustments.length})
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      {adjustments.length === 0 ? (
+                        <p className="text-sm text-muted-foreground py-4 text-center">
+                          No stock adjustments for this period
+                        </p>
+                      ) : (
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Code</TableHead>
+                              <TableHead>Item</TableHead>
+                              <TableHead>Change</TableHead>
+                              <TableHead>Before</TableHead>
+                              <TableHead>After</TableHead>
+                              <TableHead>Notes</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {adjustments.map((item, idx) => (
+                              <TableRow key={idx}>
+                                <TableCell>{item.item_code || "-"}</TableCell>
+                                <TableCell>{item.item_name}</TableCell>
+                                <TableCell className={item.quantity_change > 0 ? "text-green-600" : "text-red-600"}>
+                                  {item.quantity_change > 0 ? `+${item.quantity_change}` : item.quantity_change}
+                                </TableCell>
+                                <TableCell>{item.quantity_before}</TableCell>
+                                <TableCell>{item.quantity_after}</TableCell>
+                                <TableCell className="max-w-[200px] truncate">{item.adjustment_notes || "-"}</TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      )}
+                    </CardContent>
+                  </Card>
+                </div>
+              )}
+            </div>
+
+            <Separator />
+
+            {/* Current Stock Balances Section */}
+            <div className="space-y-4">
+              <h3 className="font-semibold text-lg flex items-center gap-2">
+                <Warehouse className="h-5 w-5" />
+                Current Stock Balances
+              </h3>
+
+              {isLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary" />
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {/* Warehouse Summary */}
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm font-medium">Stock by Warehouse</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      {Object.keys(stockByWarehouse).length === 0 ? (
+                        <p className="text-sm text-muted-foreground py-4 text-center">
+                          No stock data available
+                        </p>
+                      ) : (
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Warehouse</TableHead>
+                              <TableHead>Items Count</TableHead>
+                              <TableHead>Total Stock</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {Object.entries(stockByWarehouse).map(([warehouse, data], idx) => (
+                              <TableRow key={idx}>
+                                <TableCell className="font-medium">{warehouse}</TableCell>
+                                <TableCell>{data.items.length}</TableCell>
+                                <TableCell>{data.totalStock}</TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      )}
+                    </CardContent>
+                  </Card>
+
+                  {/* Detailed Stock Balances */}
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm font-medium">
+                        Detailed Stock Balances ({stockBalances.length} items)
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      {stockBalances.length === 0 ? (
+                        <p className="text-sm text-muted-foreground py-4 text-center">
+                          No stock data available
+                        </p>
+                      ) : (
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Code</TableHead>
+                              <TableHead>Item</TableHead>
+                              <TableHead>Current Stock</TableHead>
+                              <TableHead>Warehouse</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {stockBalances.map((item, idx) => (
+                              <TableRow key={idx}>
+                                <TableCell>{item.item_code || "-"}</TableCell>
+                                <TableCell>{item.item_name}</TableCell>
+                                <TableCell>{item.current_stock}</TableCell>
+                                <TableCell>{item.warehouse_name || "Unassigned"}</TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      )}
+                    </CardContent>
+                  </Card>
+                </div>
               )}
             </div>
           </div>
