@@ -187,34 +187,60 @@ export function useDailyMaterialsActivity(startDate: string | null, endDate?: st
     enabled: !!selectedCompany?.id && !!startDate,
   });
 
-  // Query for current stock balances with warehouse info
+  // Query for current stock balances from bin allocations (tracks stock per warehouse correctly)
   const stockBalanceQuery = useQuery({
     queryKey: ["current-stock-balance", selectedCompany?.id],
     queryFn: async (): Promise<CurrentStockBalance[]> => {
       if (!selectedCompany?.id) return [];
 
+      // Fetch stock from bin allocations - this correctly tracks stock per warehouse
       const { data, error } = await supabase
-        .from("warehouse_items")
+        .from("warehouse_bin_allocations")
         .select(`
-          id,
-          item_code,
-          name,
-          current_stock,
-          location_id,
-          warehouse_locations!warehouse_items_location_id_fkey(id, name)
+          allocated_quantity,
+          warehouse_item_id,
+          warehouse_items!inner (
+            id,
+            item_code,
+            name,
+            company_id
+          ),
+          warehouse_bins!inner (
+            location_id,
+            warehouse_locations!inner (
+              id,
+              name
+            )
+          )
         `)
-        .eq("company_id", selectedCompany.id)
-        .gt("current_stock", 0);
+        .eq("warehouse_items.company_id", selectedCompany.id)
+        .gt("allocated_quantity", 0);
 
       if (error) throw error;
 
-      return (data || []).map((item: any) => ({
-        item_code: item.item_code,
-        item_name: item.name,
-        current_stock: item.current_stock || 0,
-        warehouse_id: item.location_id,
-        warehouse_name: item.warehouse_locations?.name || null,
-      }));
+      // Group by item_code + warehouse to aggregate stock
+      const stockMap = new Map<string, CurrentStockBalance>();
+      
+      (data || []).forEach((allocation: any) => {
+        const itemCode = allocation.warehouse_items?.item_code || "";
+        const warehouseId = allocation.warehouse_bins?.warehouse_locations?.id || "";
+        const key = `${itemCode}-${warehouseId}`;
+        
+        if (stockMap.has(key)) {
+          const existing = stockMap.get(key)!;
+          existing.current_stock += allocation.allocated_quantity || 0;
+        } else {
+          stockMap.set(key, {
+            item_code: allocation.warehouse_items?.item_code || null,
+            item_name: allocation.warehouse_items?.name || "Unknown Item",
+            current_stock: allocation.allocated_quantity || 0,
+            warehouse_id: allocation.warehouse_bins?.warehouse_locations?.id || null,
+            warehouse_name: allocation.warehouse_bins?.warehouse_locations?.name || null,
+          });
+        }
+      });
+      
+      return Array.from(stockMap.values());
     },
     enabled: !!selectedCompany?.id,
   });
