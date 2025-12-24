@@ -53,7 +53,7 @@ export function useDailyMaterialsActivity(date: string | null) {
             notes,
             warehouse_items (
               item_code,
-              item_name,
+              name,
               notes
             )
           )
@@ -72,7 +72,7 @@ export function useDailyMaterialsActivity(date: string | null) {
             issued_to: issue.issued_to,
             department: issue.department,
             item_code: item.warehouse_items?.item_code || null,
-            item_name: item.warehouse_items?.item_name || "Unknown Item",
+            item_name: item.warehouse_items?.name || "Unknown Item",
             quantity_issued: item.quantity_issued,
             item_notes: item.notes,
             item_master_notes: item.warehouse_items?.notes || null,
@@ -101,7 +101,7 @@ export function useDailyMaterialsActivity(date: string | null) {
             notes,
             warehouse_items (
               item_code,
-              item_name,
+              name,
               notes
             )
           )
@@ -119,7 +119,7 @@ export function useDailyMaterialsActivity(date: string | null) {
             mrn_number: ret.mrn_number,
             returned_by: ret.returned_by,
             item_code: item.warehouse_items?.item_code || null,
-            item_name: item.warehouse_items?.item_name || "Unknown Item",
+            item_name: item.warehouse_items?.name || "Unknown Item",
             quantity_returned: item.quantity_returned,
             condition: item.condition,
             item_notes: item.notes,
@@ -147,7 +147,7 @@ export function useDailyMaterialsActivity(date: string | null) {
           notes,
           warehouse_items!inner (
             item_code,
-            item_name,
+            name,
             notes,
             company_id
           )
@@ -161,7 +161,7 @@ export function useDailyMaterialsActivity(date: string | null) {
 
       return (data || []).map((adj: any) => ({
         item_code: adj.warehouse_items?.item_code || null,
-        item_name: adj.warehouse_items?.item_name || "Unknown Item",
+        item_name: adj.warehouse_items?.name || "Unknown Item",
         quantity_change: adj.quantity_change,
         quantity_before: adj.quantity_before,
         quantity_after: adj.quantity_after,
