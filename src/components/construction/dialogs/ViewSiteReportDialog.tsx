@@ -12,39 +12,50 @@ import { supabase } from "@/integrations/supabase/client";
 import { DailySiteReport, DAILY_REPORT_STATUSES } from "@/types/construction";
 import { useDailyMaterialsActivity, CurrentStockBalance } from "@/hooks/construction/useDailyMaterialsActivity";
 import { exportSiteReportToPdf } from "@/utils/siteReportPdfExport";
-
 interface ViewSiteReportDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   report: DailySiteReport | null;
 }
-
 const REPORT_TYPE_CONFIG = {
-  daily: { label: "Daily", color: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300" },
-  weekly: { label: "Weekly", color: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300" },
-  monthly: { label: "Monthly", color: "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300" },
+  daily: {
+    label: "Daily",
+    color: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300"
+  },
+  weekly: {
+    label: "Weekly",
+    color: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300"
+  },
+  monthly: {
+    label: "Monthly",
+    color: "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300"
+  }
 };
-
-export function ViewSiteReportDialog({ open, onOpenChange, report }: ViewSiteReportDialogProps) {
+export function ViewSiteReportDialog({
+  open,
+  onOpenChange,
+  report
+}: ViewSiteReportDialogProps) {
   // Fetch fresh report data when dialog opens
-  const { data: freshReport, isLoading: reportLoading } = useQuery({
+  const {
+    data: freshReport,
+    isLoading: reportLoading
+  } = useQuery({
     queryKey: ["daily-site-report", report?.id],
     queryFn: async () => {
       if (!report?.id) return null;
-      const { data, error } = await supabase
-        .from("daily_site_reports")
-        .select(`
+      const {
+        data,
+        error
+      } = await supabase.from("daily_site_reports").select(`
           *,
           project:construction_projects(id, project_name, project_code)
-        `)
-        .eq("id", report.id)
-        .maybeSingle();
-      
+        `).eq("id", report.id).maybeSingle();
       if (error) throw error;
       return data;
     },
     enabled: !!report?.id && open,
-    staleTime: 0, // Always fetch fresh data
+    staleTime: 0 // Always fetch fresh data
   });
 
   // Use fresh data if available, fallback to prop
@@ -52,33 +63,28 @@ export function ViewSiteReportDialog({ open, onOpenChange, report }: ViewSiteRep
 
   // Determine date range based on report type
   const reportType = (displayReport as any)?.report_type || 'daily';
-  const periodStartDate = reportType !== 'daily' && (displayReport as any)?.period_start_date 
-    ? (displayReport as any).period_start_date 
-    : displayReport?.report_date || null;
-  const periodEndDate = reportType !== 'daily' && (displayReport as any)?.period_end_date 
-    ? (displayReport as any).period_end_date 
-    : undefined;
-
-  const { adjustments, issues, stockBalances, isLoading } = useDailyMaterialsActivity(periodStartDate, periodEndDate);
-
+  const periodStartDate = reportType !== 'daily' && (displayReport as any)?.period_start_date ? (displayReport as any).period_start_date : displayReport?.report_date || null;
+  const periodEndDate = reportType !== 'daily' && (displayReport as any)?.period_end_date ? (displayReport as any).period_end_date : undefined;
+  const {
+    adjustments,
+    issues,
+    stockBalances,
+    isLoading
+  } = useDailyMaterialsActivity(periodStartDate, periodEndDate);
   if (!report) return null;
 
   // Show loading state while fetching fresh data
   if (reportLoading) {
-    return (
-      <Dialog open={open} onOpenChange={onOpenChange}>
+    return <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="max-w-4xl">
           <div className="flex items-center justify-center py-12">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
           </div>
         </DialogContent>
-      </Dialog>
-    );
+      </Dialog>;
   }
-
-  const statusConfig = DAILY_REPORT_STATUSES.find((s) => s.value === displayReport.status);
+  const statusConfig = DAILY_REPORT_STATUSES.find(s => s.value === displayReport.status);
   const typeConfig = REPORT_TYPE_CONFIG[reportType as keyof typeof REPORT_TYPE_CONFIG] || REPORT_TYPE_CONFIG.daily;
-
   const formatPeriod = () => {
     if (reportType === 'daily') {
       return format(new Date(displayReport.report_date), "MMMM d, yyyy");
@@ -90,13 +96,15 @@ export function ViewSiteReportDialog({ open, onOpenChange, report }: ViewSiteRep
     }
     return format(new Date(displayReport.report_date), "MMMM d, yyyy");
   };
-
   const handlePrint = () => {
     window.print();
   };
-
   const handleExportPdf = () => {
-    exportSiteReportToPdf(displayReport as any, { adjustments, issues, stockBalances });
+    exportSiteReportToPdf(displayReport as any, {
+      adjustments,
+      issues,
+      stockBalances
+    });
   };
 
   // Sort stock balances by item name first, then by warehouse
@@ -125,15 +133,19 @@ export function ViewSiteReportDialog({ open, onOpenChange, report }: ViewSiteRep
   const stockByWarehouse = sortedStockBalances.reduce((acc, item) => {
     const warehouseName = item.warehouse_name || "Unassigned";
     if (!acc[warehouseName]) {
-      acc[warehouseName] = { items: [], totalStock: 0 };
+      acc[warehouseName] = {
+        items: [],
+        totalStock: 0
+      };
     }
     acc[warehouseName].items.push(item);
     acc[warehouseName].totalStock += item.current_stock;
     return acc;
-  }, {} as Record<string, { items: CurrentStockBalance[]; totalStock: number }>);
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+  }, {} as Record<string, {
+    items: CurrentStockBalance[];
+    totalStock: number;
+  }>);
+  return <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl max-h-[90vh] p-0">
         <DialogHeader className="px-6 pt-6 pb-4 border-b">
           <div className="flex items-center justify-between">
@@ -191,9 +203,7 @@ export function ViewSiteReportDialog({ open, onOpenChange, report }: ViewSiteRep
                 </CardHeader>
                 <CardContent>
                   <p className="text-lg font-semibold">
-                    {displayReport.temperature_high && displayReport.temperature_low
-                      ? `${displayReport.temperature_high}°F / ${displayReport.temperature_low}°F`
-                      : "N/A"}
+                    {displayReport.temperature_high && displayReport.temperature_low ? `${displayReport.temperature_high}°F / ${displayReport.temperature_low}°F` : "N/A"}
                   </p>
                 </CardContent>
               </Card>
@@ -239,21 +249,18 @@ export function ViewSiteReportDialog({ open, onOpenChange, report }: ViewSiteRep
             </div>
 
             {/* Work Summary */}
-            {displayReport.work_summary && (
-              <Card>
+            {displayReport.work_summary && <Card>
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm font-medium">Work Summary</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <p className="text-sm whitespace-pre-wrap">{displayReport.work_summary}</p>
                 </CardContent>
-              </Card>
-            )}
+              </Card>}
 
             {/* Delays & Safety */}
             <div className="grid md:grid-cols-2 gap-4">
-              {displayReport.delays_issues && (
-                <Card>
+              {displayReport.delays_issues && <Card>
                   <CardHeader className="pb-2">
                     <CardTitle className="text-sm font-medium flex items-center gap-2">
                       <AlertTriangle className="h-4 w-4 text-yellow-500" />
@@ -263,11 +270,9 @@ export function ViewSiteReportDialog({ open, onOpenChange, report }: ViewSiteRep
                   <CardContent>
                     <p className="text-sm whitespace-pre-wrap">{displayReport.delays_issues}</p>
                   </CardContent>
-                </Card>
-              )}
+                </Card>}
 
-              {displayReport.safety_observations && (
-                <Card>
+              {displayReport.safety_observations && <Card>
                   <CardHeader className="pb-2">
                     <CardTitle className="text-sm font-medium flex items-center gap-2">
                       <Shield className="h-4 w-4 text-red-500" />
@@ -277,24 +282,11 @@ export function ViewSiteReportDialog({ open, onOpenChange, report }: ViewSiteRep
                   <CardContent>
                     <p className="text-sm whitespace-pre-wrap">{displayReport.safety_observations}</p>
                   </CardContent>
-                </Card>
-              )}
+                </Card>}
             </div>
 
             {/* Materials Received */}
-            {displayReport.materials_received && (
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium flex items-center gap-2">
-                    <Package className="h-4 w-4 text-purple-500" />
-                    Materials Received
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm whitespace-pre-wrap">{displayReport.materials_received}</p>
-                </CardContent>
-              </Card>
-            )}
+            {displayReport.materials_received}
 
             <Separator />
 
@@ -305,53 +297,11 @@ export function ViewSiteReportDialog({ open, onOpenChange, report }: ViewSiteRep
                 Material Activity
               </h3>
 
-              {isLoading ? (
-                <div className="flex items-center justify-center py-8">
+              {isLoading ? <div className="flex items-center justify-center py-8">
                   <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary" />
-                </div>
-              ) : (
-                <div className="space-y-4">
+                </div> : <div className="space-y-4">
                   {/* Items Issued */}
-                  <Card>
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-sm font-medium flex items-center gap-2">
-                        <Package className="h-4 w-4 text-blue-500" />
-                        Items Issued ({issues.length})
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      {issues.length === 0 ? (
-                        <p className="text-sm text-muted-foreground py-4 text-center">
-                          No items issued for this period
-                        </p>
-                      ) : (
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead>MIN#</TableHead>
-                              <TableHead>Code</TableHead>
-                              <TableHead>Item</TableHead>
-                              <TableHead>Qty Issued</TableHead>
-                              <TableHead>Issued To</TableHead>
-                              <TableHead>Department</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {issues.map((item, idx) => (
-                              <TableRow key={idx}>
-                                <TableCell>{item.min_number || "-"}</TableCell>
-                                <TableCell>{item.item_code || "-"}</TableCell>
-                                <TableCell>{item.item_name}</TableCell>
-                                <TableCell>{item.quantity_issued}</TableCell>
-                                <TableCell>{item.issued_to || "-"}</TableCell>
-                                <TableCell>{item.department || "-"}</TableCell>
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
-                      )}
-                    </CardContent>
-                  </Card>
+                  
 
                   {/* Stock Adjustments */}
                   <Card>
@@ -361,12 +311,9 @@ export function ViewSiteReportDialog({ open, onOpenChange, report }: ViewSiteRep
                       </CardTitle>
                     </CardHeader>
                     <CardContent>
-                      {adjustments.length === 0 ? (
-                        <p className="text-sm text-muted-foreground py-4 text-center">
+                      {adjustments.length === 0 ? <p className="text-sm text-muted-foreground py-4 text-center">
                           No stock adjustments for this period
-                        </p>
-                      ) : (
-                        <Table>
+                        </p> : <Table>
                           <TableHeader>
                             <TableRow>
                               <TableHead>Code</TableHead>
@@ -375,12 +322,10 @@ export function ViewSiteReportDialog({ open, onOpenChange, report }: ViewSiteRep
                               <TableHead>Before</TableHead>
                               <TableHead>After</TableHead>
                               <TableHead>Notes</TableHead>
-                              <TableHead>Adjusted By</TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
-                            {adjustments.map((item, idx) => (
-                              <TableRow key={idx}>
+                            {adjustments.map((item, idx) => <TableRow key={idx}>
                                 <TableCell>{item.item_code || "-"}</TableCell>
                                 <TableCell>{item.item_name}</TableCell>
                                 <TableCell className={item.quantity_change > 0 ? "text-green-600" : "text-red-600"}>
@@ -389,16 +334,12 @@ export function ViewSiteReportDialog({ open, onOpenChange, report }: ViewSiteRep
                                 <TableCell>{item.quantity_before}</TableCell>
                                 <TableCell>{item.quantity_after}</TableCell>
                                 <TableCell className="max-w-[200px] truncate">{item.adjustment_notes || "-"}</TableCell>
-                                <TableCell>{item.adjusted_by || "-"}</TableCell>
-                              </TableRow>
-                            ))}
+                              </TableRow>)}
                           </TableBody>
-                        </Table>
-                      )}
+                        </Table>}
                     </CardContent>
                   </Card>
-                </div>
-              )}
+                </div>}
             </div>
 
             <Separator />
@@ -410,24 +351,18 @@ export function ViewSiteReportDialog({ open, onOpenChange, report }: ViewSiteRep
                 Current Stock Balances
               </h3>
 
-              {isLoading ? (
-                <div className="flex items-center justify-center py-8">
+              {isLoading ? <div className="flex items-center justify-center py-8">
                   <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary" />
-                </div>
-              ) : (
-                <div className="space-y-4">
+                </div> : <div className="space-y-4">
                   {/* Warehouse Summary */}
                   <Card>
                     <CardHeader className="pb-2">
                       <CardTitle className="text-sm font-medium">Stock by Warehouse</CardTitle>
                     </CardHeader>
                     <CardContent>
-                      {Object.keys(stockByWarehouse).length === 0 ? (
-                        <p className="text-sm text-muted-foreground py-4 text-center">
+                      {Object.keys(stockByWarehouse).length === 0 ? <p className="text-sm text-muted-foreground py-4 text-center">
                           No stock data available
-                        </p>
-                      ) : (
-                        <Table>
+                        </p> : <Table>
                           <TableHeader>
                             <TableRow>
                               <TableHead>Warehouse</TableHead>
@@ -436,16 +371,13 @@ export function ViewSiteReportDialog({ open, onOpenChange, report }: ViewSiteRep
                             </TableRow>
                           </TableHeader>
                           <TableBody>
-                            {Object.entries(stockByWarehouse).map(([warehouse, data], idx) => (
-                              <TableRow key={idx}>
+                            {Object.entries(stockByWarehouse).map(([warehouse, data], idx) => <TableRow key={idx}>
                                 <TableCell className="font-medium">{warehouse}</TableCell>
                                 <TableCell>{data.items.length}</TableCell>
                                 <TableCell>{data.totalStock}</TableCell>
-                              </TableRow>
-                            ))}
+                              </TableRow>)}
                           </TableBody>
-                        </Table>
-                      )}
+                        </Table>}
                     </CardContent>
                   </Card>
 
@@ -457,12 +389,9 @@ export function ViewSiteReportDialog({ open, onOpenChange, report }: ViewSiteRep
                       </CardTitle>
                     </CardHeader>
                     <CardContent>
-                      {sortedStockBalances.length === 0 ? (
-                        <p className="text-sm text-muted-foreground py-4 text-center">
+                      {sortedStockBalances.length === 0 ? <p className="text-sm text-muted-foreground py-4 text-center">
                           No stock data available
-                        </p>
-                      ) : (
-                        <Table>
+                        </p> : <Table>
                           <TableHeader>
                             <TableRow>
                               <TableHead>Code</TableHead>
@@ -473,22 +402,18 @@ export function ViewSiteReportDialog({ open, onOpenChange, report }: ViewSiteRep
                             </TableRow>
                           </TableHeader>
                           <TableBody>
-                            {sortedStockBalances.map((item, idx) => (
-                              <TableRow key={`${item.item_code}-${item.warehouse_id}-${idx}`}>
+                            {sortedStockBalances.map((item, idx) => <TableRow key={`${item.item_code}-${item.warehouse_id}-${idx}`}>
                                 <TableCell>{item.item_code || "-"}</TableCell>
                                 <TableCell>{item.item_name}</TableCell>
                                 <TableCell>{item.current_stock}</TableCell>
                                 <TableCell>{item.warehouse_name || "Unassigned"}</TableCell>
                                 <TableCell className="font-medium">{itemTotals[item.item_code || "unknown"] || 0}</TableCell>
-                              </TableRow>
-                            ))}
+                              </TableRow>)}
                           </TableBody>
-                        </Table>
-                      )}
+                        </Table>}
                     </CardContent>
                   </Card>
-                </div>
-              )}
+                </div>}
             </div>
           </div>
         </ScrollArea>
@@ -509,6 +434,5 @@ export function ViewSiteReportDialog({ open, onOpenChange, report }: ViewSiteRep
           </Button>
         </div>
       </DialogContent>
-    </Dialog>
-  );
+    </Dialog>;
 }
