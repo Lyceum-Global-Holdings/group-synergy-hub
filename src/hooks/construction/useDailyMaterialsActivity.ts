@@ -34,6 +34,14 @@ export interface DailyStockAdjustment {
   item_master_notes: string | null;
 }
 
+export interface CurrentStockBalance {
+  item_code: string | null;
+  item_name: string;
+  current_stock: number;
+  warehouse_id: string | null;
+  warehouse_name: string | null;
+}
+
 export function useDailyMaterialsActivity(startDate: string | null, endDate?: string | null) {
   const { selectedCompany } = useCompany();
   const effectiveEndDate = endDate || startDate;
@@ -179,11 +187,44 @@ export function useDailyMaterialsActivity(startDate: string | null, endDate?: st
     enabled: !!selectedCompany?.id && !!startDate,
   });
 
+  // Query for current stock balances with warehouse info
+  const stockBalanceQuery = useQuery({
+    queryKey: ["current-stock-balance", selectedCompany?.id],
+    queryFn: async (): Promise<CurrentStockBalance[]> => {
+      if (!selectedCompany?.id) return [];
+
+      const { data, error } = await supabase
+        .from("warehouse_items")
+        .select(`
+          id,
+          item_code,
+          name,
+          current_stock,
+          location_id,
+          warehouse_locations!warehouse_items_location_id_fkey(id, name)
+        `)
+        .eq("company_id", selectedCompany.id)
+        .gt("current_stock", 0);
+
+      if (error) throw error;
+
+      return (data || []).map((item: any) => ({
+        item_code: item.item_code,
+        item_name: item.name,
+        current_stock: item.current_stock || 0,
+        warehouse_id: item.location_id,
+        warehouse_name: item.warehouse_locations?.name || null,
+      }));
+    },
+    enabled: !!selectedCompany?.id,
+  });
+
   return {
     issues: issuesQuery.data || [],
     returns: returnsQuery.data || [],
     adjustments: adjustmentsQuery.data || [],
-    isLoading: issuesQuery.isLoading || returnsQuery.isLoading || adjustmentsQuery.isLoading,
-    isError: issuesQuery.isError || returnsQuery.isError || adjustmentsQuery.isError,
+    stockBalances: stockBalanceQuery.data || [],
+    isLoading: issuesQuery.isLoading || returnsQuery.isLoading || adjustmentsQuery.isLoading || stockBalanceQuery.isLoading,
+    isError: issuesQuery.isError || returnsQuery.isError || adjustmentsQuery.isError || stockBalanceQuery.isError,
   };
 }
