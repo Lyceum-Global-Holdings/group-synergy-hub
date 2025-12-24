@@ -24,6 +24,16 @@ export interface DailyMaterialReturn {
   item_master_notes: string | null;
 }
 
+export interface DailyStockAdjustment {
+  item_code: string | null;
+  item_name: string;
+  quantity_change: number;
+  quantity_before: number;
+  quantity_after: number;
+  adjustment_notes: string | null;
+  item_master_notes: string | null;
+}
+
 export function useDailyMaterialsActivity(date: string | null) {
   const { selectedCompany } = useCompany();
 
@@ -123,10 +133,49 @@ export function useDailyMaterialsActivity(date: string | null) {
     enabled: !!selectedCompany?.id && !!date,
   });
 
+  const adjustmentsQuery = useQuery({
+    queryKey: ["daily-stock-adjustments", selectedCompany?.id, date],
+    queryFn: async (): Promise<DailyStockAdjustment[]> => {
+      if (!selectedCompany?.id || !date) return [];
+
+      const { data, error } = await supabase
+        .from("stock_transactions")
+        .select(`
+          quantity_change,
+          quantity_before,
+          quantity_after,
+          notes,
+          warehouse_items (
+            item_code,
+            item_name,
+            notes
+          )
+        `)
+        .eq("company_id", selectedCompany.id)
+        .eq("transaction_type", "adjustment")
+        .gte("created_at", `${date}T00:00:00`)
+        .lt("created_at", `${date}T23:59:59.999`);
+
+      if (error) throw error;
+
+      return (data || []).map((adj: any) => ({
+        item_code: adj.warehouse_items?.item_code || null,
+        item_name: adj.warehouse_items?.item_name || "Unknown Item",
+        quantity_change: adj.quantity_change,
+        quantity_before: adj.quantity_before,
+        quantity_after: adj.quantity_after,
+        adjustment_notes: adj.notes,
+        item_master_notes: adj.warehouse_items?.notes || null,
+      }));
+    },
+    enabled: !!selectedCompany?.id && !!date,
+  });
+
   return {
     issues: issuesQuery.data || [],
     returns: returnsQuery.data || [],
-    isLoading: issuesQuery.isLoading || returnsQuery.isLoading,
-    isError: issuesQuery.isError || returnsQuery.isError,
+    adjustments: adjustmentsQuery.data || [],
+    isLoading: issuesQuery.isLoading || returnsQuery.isLoading || adjustmentsQuery.isLoading,
+    isError: issuesQuery.isError || returnsQuery.isError || adjustmentsQuery.isError,
   };
 }
