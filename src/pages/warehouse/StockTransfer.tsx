@@ -92,14 +92,18 @@ export default function StockTransfer() {
               <TableCell>{format(new Date(transfer.transfer_date), "MMM dd, yyyy")}</TableCell>
               <TableCell className="text-sm">
                 <div className="space-y-0.5">
-                  {transfer.from_location_id && <div>Location</div>}
-                  {transfer.from_department_id && <div>Department</div>}
+                  {transfer.from_location?.name && <div>{transfer.from_location.name}</div>}
+                  {transfer.from_sublocation?.name && <div className="text-muted-foreground text-xs">{transfer.from_sublocation.name}</div>}
+                  {transfer.from_department?.name && <div className="text-muted-foreground text-xs">{transfer.from_department.name}</div>}
+                  {!transfer.from_location?.name && !transfer.from_department?.name && <span className="text-muted-foreground">-</span>}
                 </div>
               </TableCell>
               <TableCell className="text-sm">
                 <div className="space-y-0.5">
-                  {transfer.to_location_id && <div>Location</div>}
-                  {transfer.to_department_id && <div>Department</div>}
+                  {transfer.to_location?.name && <div>{transfer.to_location.name}</div>}
+                  {transfer.to_sublocation?.name && <div className="text-muted-foreground text-xs">{transfer.to_sublocation.name}</div>}
+                  {transfer.to_department?.name && <div className="text-muted-foreground text-xs">{transfer.to_department.name}</div>}
+                  {!transfer.to_location?.name && !transfer.to_department?.name && <span className="text-muted-foreground">-</span>}
                 </div>
               </TableCell>
               <TableCell>{transfer.transfer_type}</TableCell>
