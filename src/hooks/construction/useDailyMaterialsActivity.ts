@@ -34,15 +34,16 @@ export interface DailyStockAdjustment {
   item_master_notes: string | null;
 }
 
-export function useDailyMaterialsActivity(date: string | null) {
+export function useDailyMaterialsActivity(startDate: string | null, endDate?: string | null) {
   const { selectedCompany } = useCompany();
+  const effectiveEndDate = endDate || startDate;
 
   const issuesQuery = useQuery({
-    queryKey: ["daily-material-issues", selectedCompany?.id, date],
+    queryKey: ["daily-material-issues", selectedCompany?.id, startDate, effectiveEndDate],
     queryFn: async (): Promise<DailyMaterialIssue[]> => {
-      if (!selectedCompany?.id || !date) return [];
+      if (!selectedCompany?.id || !startDate) return [];
 
-      const { data, error } = await supabase
+      let query = supabase
         .from("material_issue_notes")
         .select(`
           min_number,
@@ -59,7 +60,10 @@ export function useDailyMaterialsActivity(date: string | null) {
           )
         `)
         .eq("company_id", selectedCompany.id)
-        .eq("issue_date", date);
+        .gte("issue_date", startDate)
+        .lte("issue_date", effectiveEndDate!);
+
+      const { data, error } = await query;
 
       if (error) throw error;
 
@@ -82,15 +86,15 @@ export function useDailyMaterialsActivity(date: string | null) {
 
       return issues;
     },
-    enabled: !!selectedCompany?.id && !!date,
+    enabled: !!selectedCompany?.id && !!startDate,
   });
 
   const returnsQuery = useQuery({
-    queryKey: ["daily-material-returns", selectedCompany?.id, date],
+    queryKey: ["daily-material-returns", selectedCompany?.id, startDate, effectiveEndDate],
     queryFn: async (): Promise<DailyMaterialReturn[]> => {
-      if (!selectedCompany?.id || !date) return [];
+      if (!selectedCompany?.id || !startDate) return [];
 
-      const { data, error } = await supabase
+      let query = supabase
         .from("material_return_notes")
         .select(`
           mrn_number,
@@ -107,7 +111,10 @@ export function useDailyMaterialsActivity(date: string | null) {
           )
         `)
         .eq("company_id", selectedCompany.id)
-        .eq("return_date", date);
+        .gte("return_date", startDate)
+        .lte("return_date", effectiveEndDate!);
+
+      const { data, error } = await query;
 
       if (error) throw error;
 
@@ -130,13 +137,13 @@ export function useDailyMaterialsActivity(date: string | null) {
 
       return returns;
     },
-    enabled: !!selectedCompany?.id && !!date,
+    enabled: !!selectedCompany?.id && !!startDate,
   });
 
   const adjustmentsQuery = useQuery({
-    queryKey: ["daily-stock-adjustments", selectedCompany?.id, date],
+    queryKey: ["daily-stock-adjustments", selectedCompany?.id, startDate, effectiveEndDate],
     queryFn: async (): Promise<DailyStockAdjustment[]> => {
-      if (!selectedCompany?.id || !date) return [];
+      if (!selectedCompany?.id || !startDate) return [];
 
       const { data, error } = await supabase
         .from("stock_transactions")
@@ -154,8 +161,8 @@ export function useDailyMaterialsActivity(date: string | null) {
         `)
         .eq("warehouse_items.company_id", selectedCompany.id)
         .eq("transaction_type", "adjustment")
-        .gte("created_at", `${date}T00:00:00`)
-        .lt("created_at", `${date}T23:59:59.999`);
+        .gte("created_at", `${startDate}T00:00:00`)
+        .lt("created_at", `${effectiveEndDate}T23:59:59.999`);
 
       if (error) throw error;
 
@@ -169,7 +176,7 @@ export function useDailyMaterialsActivity(date: string | null) {
         item_master_notes: adj.warehouse_items?.notes || null,
       }));
     },
-    enabled: !!selectedCompany?.id && !!date,
+    enabled: !!selectedCompany?.id && !!startDate,
   });
 
   return {
