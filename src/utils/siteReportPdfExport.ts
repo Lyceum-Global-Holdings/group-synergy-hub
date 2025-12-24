@@ -197,7 +197,7 @@ export function exportSiteReportToPdf(report: ReportData, materials: MaterialsDa
 
     autoTable(doc, {
       startY: yPos,
-      head: [["Code", "Item", "Change", "Before", "After", "Notes"]],
+      head: [["Code", "Item", "Change", "Before", "After", "Notes", "Adjusted By"]],
       body: materials.adjustments.map((item) => [
         item.item_code || "-",
         item.item_name,
@@ -205,6 +205,7 @@ export function exportSiteReportToPdf(report: ReportData, materials: MaterialsDa
         String(item.quantity_before),
         String(item.quantity_after),
         item.adjustment_notes || "-",
+        item.adjusted_by || "-",
       ]),
       styles: { fontSize: 8 },
       headStyles: { fillColor: [240, 173, 78] },

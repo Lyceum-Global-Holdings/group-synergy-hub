@@ -32,6 +32,7 @@ export interface DailyStockAdjustment {
   quantity_after: number;
   adjustment_notes: string | null;
   item_master_notes: string | null;
+  adjusted_by: string | null;
 }
 
 export interface CurrentStockBalance {
@@ -160,6 +161,7 @@ export function useDailyMaterialsActivity(startDate: string | null, endDate?: st
           quantity_before,
           quantity_after,
           notes,
+          created_by,
           warehouse_items!inner (
             item_code,
             name,
@@ -174,6 +176,25 @@ export function useDailyMaterialsActivity(startDate: string | null, endDate?: st
 
       if (error) throw error;
 
+      // Fetch profiles for all unique created_by user IDs
+      const userIds = [...new Set((data || []).map((t: any) => t.created_by).filter(Boolean))] as string[];
+      
+      let profilesMap: Record<string, string> = {};
+      
+      if (userIds.length > 0) {
+        const { data: profilesData } = await supabase
+          .from('profiles')
+          .select('user_id, full_name, email')
+          .in('user_id', userIds);
+        
+        if (profilesData) {
+          profilesMap = profilesData.reduce((acc, profile) => {
+            acc[profile.user_id] = profile.full_name || profile.email || 'Unknown';
+            return acc;
+          }, {} as Record<string, string>);
+        }
+      }
+
       return (data || []).map((adj: any) => ({
         item_code: adj.warehouse_items?.item_code || null,
         item_name: adj.warehouse_items?.name || "Unknown Item",
@@ -182,6 +203,7 @@ export function useDailyMaterialsActivity(startDate: string | null, endDate?: st
         quantity_after: adj.quantity_after,
         adjustment_notes: adj.notes,
         item_master_notes: adj.warehouse_items?.notes || null,
+        adjusted_by: adj.created_by ? profilesMap[adj.created_by] || null : null,
       }));
     },
     enabled: !!selectedCompany?.id && !!startDate,
