@@ -1,7 +1,7 @@
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { format } from "date-fns";
-import { DailyMaterialIssue, DailyMaterialReturn, DailyStockAdjustment } from "@/hooks/construction/useDailyMaterialsActivity";
+import { DailyStockAdjustment } from "@/hooks/construction/useDailyMaterialsActivity";
 
 interface ReportData {
   report_number: string;
@@ -29,8 +29,6 @@ interface ReportData {
 }
 
 interface MaterialsData {
-  issues: DailyMaterialIssue[];
-  returns: DailyMaterialReturn[];
   adjustments: DailyStockAdjustment[];
 }
 
@@ -151,67 +149,11 @@ export function exportSiteReportToPdf(report: ReportData, materials: MaterialsDa
     yPos = 20;
   }
 
-  // Materials Section
+  // Stock Adjustments Section
   doc.setFont("helvetica", "bold");
   doc.setFontSize(12);
-  doc.text("Material Activity", 14, yPos);
+  doc.text("Stock Adjustments", 14, yPos);
   yPos += 10;
-
-  // Items Issued Table
-  if (materials.issues.length > 0) {
-    doc.setFontSize(10);
-    doc.text("Items Issued", 14, yPos);
-    yPos += 2;
-
-    autoTable(doc, {
-      startY: yPos,
-      head: [["Issue #", "Code", "Item", "Qty", "Issued To", "Notes"]],
-      body: materials.issues.map((item) => [
-        item.min_number,
-        item.item_code || "-",
-        item.item_name,
-        String(item.quantity_issued),
-        item.issued_to || "-",
-        item.item_notes || "-",
-      ]),
-      styles: { fontSize: 8 },
-      headStyles: { fillColor: [66, 139, 202] },
-      margin: { left: 14, right: 14 },
-    });
-
-    yPos = (doc as any).lastAutoTable.finalY + 10;
-  }
-
-  // Items Returned Table
-  if (materials.returns.length > 0) {
-    if (yPos > 230) {
-      doc.addPage();
-      yPos = 20;
-    }
-
-    doc.setFontSize(10);
-    doc.text("Items Returned", 14, yPos);
-    yPos += 2;
-
-    autoTable(doc, {
-      startY: yPos,
-      head: [["Return #", "Code", "Item", "Qty", "By", "Condition", "Notes"]],
-      body: materials.returns.map((item) => [
-        item.mrn_number,
-        item.item_code || "-",
-        item.item_name,
-        String(item.quantity_returned),
-        item.returned_by || "-",
-        item.condition || "-",
-        item.item_notes || "-",
-      ]),
-      styles: { fontSize: 8 },
-      headStyles: { fillColor: [92, 184, 92] },
-      margin: { left: 14, right: 14 },
-    });
-
-    yPos = (doc as any).lastAutoTable.finalY + 10;
-  }
 
   // Stock Adjustments Table
   if (materials.adjustments.length > 0) {
