@@ -7,6 +7,8 @@ import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Printer, FileDown, X, Cloud, Thermometer, Users, AlertTriangle, Shield, Package } from "lucide-react";
 import { format } from "date-fns";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import { DailySiteReport, DAILY_REPORT_STATUSES } from "@/types/construction";
 import { useDailyMaterialsActivity } from "@/hooks/construction/useDailyMaterialsActivity";
 import { exportSiteReportToPdf } from "@/utils/siteReportPdfExport";
@@ -24,32 +26,69 @@ const REPORT_TYPE_CONFIG = {
 };
 
 export function ViewSiteReportDialog({ open, onOpenChange, report }: ViewSiteReportDialogProps) {
+  // Fetch fresh report data when dialog opens
+  const { data: freshReport, isLoading: reportLoading } = useQuery({
+    queryKey: ["daily-site-report", report?.id],
+    queryFn: async () => {
+      if (!report?.id) return null;
+      const { data, error } = await supabase
+        .from("daily_site_reports")
+        .select(`
+          *,
+          project:construction_projects(id, project_name, project_code)
+        `)
+        .eq("id", report.id)
+        .maybeSingle();
+      
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!report?.id && open,
+    staleTime: 0, // Always fetch fresh data
+  });
+
+  // Use fresh data if available, fallback to prop
+  const displayReport = (freshReport || report) as DailySiteReport;
+
   // Determine date range based on report type
-  const reportType = (report as any)?.report_type || 'daily';
-  const periodStartDate = reportType !== 'daily' && (report as any)?.period_start_date 
-    ? (report as any).period_start_date 
-    : report?.report_date || null;
-  const periodEndDate = reportType !== 'daily' && (report as any)?.period_end_date 
-    ? (report as any).period_end_date 
+  const reportType = (displayReport as any)?.report_type || 'daily';
+  const periodStartDate = reportType !== 'daily' && (displayReport as any)?.period_start_date 
+    ? (displayReport as any).period_start_date 
+    : displayReport?.report_date || null;
+  const periodEndDate = reportType !== 'daily' && (displayReport as any)?.period_end_date 
+    ? (displayReport as any).period_end_date 
     : undefined;
 
   const { adjustments, isLoading } = useDailyMaterialsActivity(periodStartDate, periodEndDate);
 
   if (!report) return null;
 
-  const statusConfig = DAILY_REPORT_STATUSES.find((s) => s.value === report.status);
+  // Show loading state while fetching fresh data
+  if (reportLoading) {
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="max-w-4xl">
+          <div className="flex items-center justify-center py-12">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
+  const statusConfig = DAILY_REPORT_STATUSES.find((s) => s.value === displayReport.status);
   const typeConfig = REPORT_TYPE_CONFIG[reportType as keyof typeof REPORT_TYPE_CONFIG] || REPORT_TYPE_CONFIG.daily;
 
   const formatPeriod = () => {
     if (reportType === 'daily') {
-      return format(new Date(report.report_date), "MMMM d, yyyy");
+      return format(new Date(displayReport.report_date), "MMMM d, yyyy");
     }
-    const periodStart = (report as any).period_start_date;
-    const periodEnd = (report as any).period_end_date;
+    const periodStart = (displayReport as any).period_start_date;
+    const periodEnd = (displayReport as any).period_end_date;
     if (periodStart && periodEnd) {
       return `${format(new Date(periodStart), "MMM d")} - ${format(new Date(periodEnd), "MMM d, yyyy")}`;
     }
-    return format(new Date(report.report_date), "MMMM d, yyyy");
+    return format(new Date(displayReport.report_date), "MMMM d, yyyy");
   };
 
   const handlePrint = () => {
@@ -57,7 +96,7 @@ export function ViewSiteReportDialog({ open, onOpenChange, report }: ViewSiteRep
   };
 
   const handleExportPdf = () => {
-    exportSiteReportToPdf(report as any, { adjustments });
+    exportSiteReportToPdf(displayReport as any, { adjustments });
   };
 
   return (
@@ -67,14 +106,14 @@ export function ViewSiteReportDialog({ open, onOpenChange, report }: ViewSiteRep
           <div className="flex items-center justify-between">
             <div className="space-y-1">
               <DialogTitle className="text-xl font-bold">Site Report</DialogTitle>
-              <p className="text-sm text-muted-foreground">{report.report_number}</p>
+              <p className="text-sm text-muted-foreground">{displayReport.report_number}</p>
             </div>
             <div className="flex items-center gap-2">
               <Badge variant="outline" className={typeConfig.color}>
                 {typeConfig.label}
               </Badge>
               <Badge className={statusConfig?.color || "bg-muted"}>
-                {statusConfig?.label || report.status}
+                {statusConfig?.label || displayReport.status}
               </Badge>
             </div>
           </div>
@@ -86,7 +125,7 @@ export function ViewSiteReportDialog({ open, onOpenChange, report }: ViewSiteRep
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <p className="text-sm text-muted-foreground">Project</p>
-                <p className="font-medium">{report.project?.project_name || "N/A"}</p>
+                <p className="font-medium">{displayReport.project?.project_name || "N/A"}</p>
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Period</p>
@@ -106,7 +145,7 @@ export function ViewSiteReportDialog({ open, onOpenChange, report }: ViewSiteRep
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-lg font-semibold">{report.weather_conditions || "N/A"}</p>
+                  <p className="text-lg font-semibold">{displayReport.weather_conditions || "N/A"}</p>
                 </CardContent>
               </Card>
 
@@ -119,8 +158,8 @@ export function ViewSiteReportDialog({ open, onOpenChange, report }: ViewSiteRep
                 </CardHeader>
                 <CardContent>
                   <p className="text-lg font-semibold">
-                    {report.temperature_high && report.temperature_low
-                      ? `${report.temperature_high}°F / ${report.temperature_low}°F`
+                    {displayReport.temperature_high && displayReport.temperature_low
+                      ? `${displayReport.temperature_high}°F / ${displayReport.temperature_low}°F`
                       : "N/A"}
                   </p>
                 </CardContent>
@@ -134,7 +173,7 @@ export function ViewSiteReportDialog({ open, onOpenChange, report }: ViewSiteRep
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-lg font-semibold">{report.labor_count || 0}</p>
+                  <p className="text-lg font-semibold">{displayReport.labor_count || 0}</p>
                 </CardContent>
               </Card>
 
@@ -145,31 +184,31 @@ export function ViewSiteReportDialog({ open, onOpenChange, report }: ViewSiteRep
                 <CardContent className="text-sm space-y-1">
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Subcontractors:</span>
-                    <span>{report.subcontractor_count || 0}</span>
+                    <span>{displayReport.subcontractor_count || 0}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Visitors:</span>
-                    <span>{report.visitor_count || 0}</span>
+                    <span>{displayReport.visitor_count || 0}</span>
                   </div>
                 </CardContent>
               </Card>
             </div>
 
             {/* Work Summary */}
-            {report.work_summary && (
+            {displayReport.work_summary && (
               <Card>
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm font-medium">Work Summary</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-sm whitespace-pre-wrap">{report.work_summary}</p>
+                  <p className="text-sm whitespace-pre-wrap">{displayReport.work_summary}</p>
                 </CardContent>
               </Card>
             )}
 
             {/* Delays & Safety */}
             <div className="grid md:grid-cols-2 gap-4">
-              {report.delays_issues && (
+              {displayReport.delays_issues && (
                 <Card>
                   <CardHeader className="pb-2">
                     <CardTitle className="text-sm font-medium flex items-center gap-2">
@@ -178,12 +217,12 @@ export function ViewSiteReportDialog({ open, onOpenChange, report }: ViewSiteRep
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <p className="text-sm whitespace-pre-wrap">{report.delays_issues}</p>
+                    <p className="text-sm whitespace-pre-wrap">{displayReport.delays_issues}</p>
                   </CardContent>
                 </Card>
               )}
 
-              {report.safety_observations && (
+              {displayReport.safety_observations && (
                 <Card>
                   <CardHeader className="pb-2">
                     <CardTitle className="text-sm font-medium flex items-center gap-2">
@@ -192,14 +231,14 @@ export function ViewSiteReportDialog({ open, onOpenChange, report }: ViewSiteRep
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <p className="text-sm whitespace-pre-wrap">{report.safety_observations}</p>
+                    <p className="text-sm whitespace-pre-wrap">{displayReport.safety_observations}</p>
                   </CardContent>
                 </Card>
               )}
             </div>
 
             {/* Materials Received */}
-            {report.materials_received && (
+            {displayReport.materials_received && (
               <Card>
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm font-medium flex items-center gap-2">
@@ -208,7 +247,7 @@ export function ViewSiteReportDialog({ open, onOpenChange, report }: ViewSiteRep
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-sm whitespace-pre-wrap">{report.materials_received}</p>
+                  <p className="text-sm whitespace-pre-wrap">{displayReport.materials_received}</p>
                 </CardContent>
               </Card>
             )}
