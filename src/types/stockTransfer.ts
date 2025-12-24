@@ -29,6 +29,13 @@ export interface StockTransferRequest {
   created_by: string | null;
   created_at: string;
   updated_at: string;
+  // Joined location names (optional, from query join)
+  from_location?: { id: string; name: string } | null;
+  from_sublocation?: { id: string; name: string } | null;
+  from_department?: { id: string; name: string } | null;
+  to_location?: { id: string; name: string } | null;
+  to_sublocation?: { id: string; name: string } | null;
+  to_department?: { id: string; name: string } | null;
 }
 
 export interface StockTransferItem {

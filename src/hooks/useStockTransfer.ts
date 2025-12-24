@@ -15,7 +15,15 @@ export const useStockTransferRequests = (status?: TransferStatus) => {
     queryFn: async () => {
       let query = supabase
         .from("stock_transfer_requests")
-        .select("*")
+        .select(`
+          *,
+          from_location:warehouse_locations!stock_transfer_requests_from_location_id_fkey(id, name),
+          from_sublocation:warehouse_locations!stock_transfer_requests_from_sublocation_id_fkey(id, name),
+          from_department:warehouse_locations!stock_transfer_requests_from_department_id_fkey(id, name),
+          to_location:warehouse_locations!stock_transfer_requests_to_location_id_fkey(id, name),
+          to_sublocation:warehouse_locations!stock_transfer_requests_to_sublocation_id_fkey(id, name),
+          to_department:warehouse_locations!stock_transfer_requests_to_department_id_fkey(id, name)
+        `)
         .order("created_at", { ascending: false });
 
       if (status) {

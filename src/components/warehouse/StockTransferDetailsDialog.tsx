@@ -162,12 +162,28 @@ export function StockTransferDetailsDialog({
             <div className="flex items-center gap-4 p-4 border rounded-lg bg-muted/50">
               <div className="flex-1">
                 <p className="text-sm text-muted-foreground mb-1">From</p>
-                <p className="font-medium">Location / Department</p>
+                <p className="font-medium">
+                  {transfer.from_location?.name || transfer.from_department?.name || "Not specified"}
+                </p>
+                {transfer.from_sublocation?.name && (
+                  <p className="text-xs text-muted-foreground">{transfer.from_sublocation.name}</p>
+                )}
+                {transfer.from_department?.name && transfer.from_location?.name && (
+                  <p className="text-xs text-muted-foreground">{transfer.from_department.name}</p>
+                )}
               </div>
               <ArrowRight className="h-6 w-6 text-muted-foreground" />
               <div className="flex-1">
                 <p className="text-sm text-muted-foreground mb-1">To</p>
-                <p className="font-medium">Location / Department</p>
+                <p className="font-medium">
+                  {transfer.to_location?.name || transfer.to_department?.name || "Not specified"}
+                </p>
+                {transfer.to_sublocation?.name && (
+                  <p className="text-xs text-muted-foreground">{transfer.to_sublocation.name}</p>
+                )}
+                {transfer.to_department?.name && transfer.to_location?.name && (
+                  <p className="text-xs text-muted-foreground">{transfer.to_department.name}</p>
+                )}
               </div>
             </div>
 
