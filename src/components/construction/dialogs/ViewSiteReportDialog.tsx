@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Printer, FileDown, X, Cloud, Thermometer, Users, AlertTriangle, Shield, Package, Warehouse, ArrowRightLeft } from "lucide-react";
+import { FileDown, X, Cloud, Thermometer, Users, AlertTriangle, Shield, Package, Warehouse, ArrowRightLeft } from "lucide-react";
 import { format } from "date-fns";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -95,9 +95,6 @@ export function ViewSiteReportDialog({
       return `${format(new Date(periodStart), "MMM d")} - ${format(new Date(periodEnd), "MMM d, yyyy")}`;
     }
     return format(new Date(displayReport.report_date), "MMMM d, yyyy");
-  };
-  const handlePrint = () => {
-    window.print();
   };
   const handleExportPdf = () => {
     exportSiteReportToPdf(displayReport as any, {
@@ -420,10 +417,6 @@ export function ViewSiteReportDialog({
 
         {/* Footer Actions */}
         <div className="flex items-center justify-end gap-2 px-6 py-4 border-t bg-muted/30">
-          <Button variant="outline" onClick={handlePrint}>
-            <Printer className="mr-2 h-4 w-4" />
-            Print
-          </Button>
           <Button variant="outline" onClick={handleExportPdf}>
             <FileDown className="mr-2 h-4 w-4" />
             Export PDF
