@@ -24,6 +24,8 @@ import { useSuppliers } from '@/hooks/useSuppliers';
 import { useItemUnits } from '@/hooks/useItemUnits';
 import { useStockTransactions } from '@/hooks/useStockTransactions';
 import { useWarehouseLocations } from '@/hooks/useWarehouseLocations';
+import { useWarehouseBins } from '@/hooks/useWarehouseBins';
+import { useWarehouseBinAllocations } from '@/hooks/useWarehouseBinAllocations';
 import { useCompany } from '@/contexts/CompanyContext';
 import { WarehouseItem } from '@/types/itemBin';
 import { supabase } from '@/integrations/supabase/client';
@@ -62,6 +64,7 @@ export function CreateItemDialog({ open, onOpenChange, editingItem }: CreateItem
     image_url: '',
   });
   const [initialStock, setInitialStock] = useState('');
+  const [initialBinId, setInitialBinId] = useState('');
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -72,10 +75,17 @@ export function CreateItemDialog({ open, onOpenChange, editingItem }: CreateItem
   const { units } = useItemUnits();
   const { createTransaction } = useStockTransactions();
   const { locations } = useWarehouseLocations();
+  const { bins } = useWarehouseBins();
+  const { createAllocation } = useWarehouseBinAllocations();
   const { companies, selectedCompany } = useCompany();
 
   // Filter locations to only show warehouses (type='location')
   const warehouseLocations = locations.filter(loc => loc.type === 'location');
+
+  // Filter bins by selected warehouse location
+  const filteredBins = formData.location_id 
+    ? bins.filter(bin => bin.location_id === formData.location_id)
+    : bins;
 
   useEffect(() => {
     if (editingItem) {
@@ -104,6 +114,7 @@ export function CreateItemDialog({ open, onOpenChange, editingItem }: CreateItem
         image_url: editingItem.image_url || '',
       });
       setInitialStock('');
+      setInitialBinId('');
       setImagePreview(editingItem.image_url || null);
       setImageFile(null);
     } else {
@@ -132,6 +143,7 @@ export function CreateItemDialog({ open, onOpenChange, editingItem }: CreateItem
         image_url: '',
       });
       setInitialStock('');
+      setInitialBinId('');
       setImagePreview(null);
       setImageFile(null);
     }
@@ -247,6 +259,16 @@ export function CreateItemDialog({ open, onOpenChange, editingItem }: CreateItem
             total_value: unitCostValue > 0 ? unitCostValue * stockQuantity : undefined,
             notes: 'Opening stock balance',
           });
+
+          // Create bin allocation if a bin is selected
+          if (initialBinId) {
+            createAllocation({
+              warehouse_item_id: result.item.id,
+              bin_id: initialBinId,
+              allocated_quantity: stockQuantity,
+              notes: 'Opening stock allocation',
+            });
+          }
         }
         
         onOpenChange(false);
@@ -527,18 +549,45 @@ export function CreateItemDialog({ open, onOpenChange, editingItem }: CreateItem
           </div>
 
           {!editingItem && (
-            <div className="space-y-2">
-              <Label htmlFor="initial_stock">Initial Stock (Opening Balance)</Label>
-              <Input
-                id="initial_stock"
-                type="number"
-                step="0.01"
-                min="0"
-                placeholder="Enter opening stock quantity"
-                value={initialStock}
-                onChange={(e) => setInitialStock(e.target.value)}
-              />
-            </div>
+            <>
+              <div className="space-y-2">
+                <Label htmlFor="initial_stock">Initial Stock (Opening Balance)</Label>
+                <Input
+                  id="initial_stock"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  placeholder="Enter opening stock quantity"
+                  value={initialStock}
+                  onChange={(e) => setInitialStock(e.target.value)}
+                />
+              </div>
+
+              {initialStock && parseFloat(initialStock) > 0 && (
+                <div className="space-y-2">
+                  <Label htmlFor="initial_bin_id">Allocate Initial Stock to Bin</Label>
+                  <Select 
+                    value={initialBinId || "none"} 
+                    onValueChange={(value) => setInitialBinId(value === "none" ? "" : value)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select bin for initial stock" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-background border z-50">
+                      <SelectItem value="none">No Bin Allocation</SelectItem>
+                      {filteredBins.map((bin) => (
+                        <SelectItem key={bin.id} value={bin.id}>
+                          {bin.bin_code} - {bin.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    Optional: Select a bin to allocate the opening stock
+                  </p>
+                </div>
+              )}
+            </>
           )}
 
           <div className="space-y-2">
