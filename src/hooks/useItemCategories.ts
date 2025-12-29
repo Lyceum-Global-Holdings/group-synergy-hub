@@ -150,11 +150,24 @@ export const useItemCategories = (companyId?: string) => {
         description: "Category deleted successfully.",
       });
     },
-    onError: (error) => {
+    onError: (error: any) => {
       console.error('Error deleting category:', error);
+      
+      // Check for foreign key constraint violation
+      let errorMessage = "Failed to delete category. Please try again.";
+      if (error?.code === '23503') {
+        if (error?.details?.includes('warehouse_items')) {
+          errorMessage = "Cannot delete this category because it has items assigned to it. Please reassign or delete those items first.";
+        } else if (error?.details?.includes('product_master')) {
+          errorMessage = "Cannot delete this category because it has products assigned to it. Please reassign or delete those products first.";
+        } else {
+          errorMessage = "Cannot delete this category because it is being used elsewhere. Please remove all references first.";
+        }
+      }
+      
       toast({
-        title: "Error",
-        description: "Failed to delete category. Please try again.",
+        title: "Cannot Delete Category",
+        description: errorMessage,
         variant: "destructive",
       });
     },
