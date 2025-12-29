@@ -34,6 +34,7 @@ export interface DailyStockAdjustment {
   adjustment_notes: string | null;
   item_master_notes: string | null;
   adjusted_by: string | null;
+  issued_to_location_name?: string | null;
 }
 
 export interface CurrentStockBalance {
@@ -155,6 +156,8 @@ export function useDailyMaterialsActivity(startDate: string | null, endDate?: st
     queryFn: async (): Promise<DailyStockAdjustment[]> => {
       if (!selectedCompany?.id || !startDate) return [];
 
+      // Query for non-material_issue/material_return transactions
+      // Plus material_issue transactions with issued_to_location_id (sub-location issues)
       const { data, error } = await supabase
         .from("stock_transactions")
         .select(`
@@ -164,6 +167,10 @@ export function useDailyMaterialsActivity(startDate: string | null, endDate?: st
           quantity_after,
           notes,
           created_by,
+          issued_to_location_id,
+          issued_to_location:issued_to_location_id (
+            name
+          ),
           warehouse_items!inner (
             item_code,
             name,
@@ -172,7 +179,7 @@ export function useDailyMaterialsActivity(startDate: string | null, endDate?: st
           )
         `)
         .eq("warehouse_items.company_id", selectedCompany.id)
-        .not("transaction_type", "in", '("material_issue","material_return")')
+        .or("transaction_type.not.in.(\"material_issue\",\"material_return\"),and(transaction_type.eq.material_issue,issued_to_location_id.not.is.null)")
         .gte("created_at", `${startDate}T00:00:00`)
         .lt("created_at", `${effectiveEndDate}T23:59:59.999`);
 
@@ -197,17 +204,25 @@ export function useDailyMaterialsActivity(startDate: string | null, endDate?: st
         }
       }
 
-      return (data || []).map((adj: any) => ({
-        transaction_type: adj.transaction_type || "adjustment",
-        item_code: adj.warehouse_items?.item_code || null,
-        item_name: adj.warehouse_items?.name || "Unknown Item",
-        quantity_change: adj.quantity_change,
-        quantity_before: adj.quantity_before,
-        quantity_after: adj.quantity_after,
-        adjustment_notes: adj.notes,
-        item_master_notes: adj.warehouse_items?.notes || null,
-        adjusted_by: adj.created_by ? profilesMap[adj.created_by] || null : null,
-      }));
+      return (data || []).map((adj: any) => {
+        // Determine display transaction type - use "sublocation_issue" for material_issue with location
+        const displayType = adj.transaction_type === "material_issue" && adj.issued_to_location_id 
+          ? "sublocation_issue" 
+          : adj.transaction_type || "adjustment";
+        
+        return {
+          transaction_type: displayType,
+          item_code: adj.warehouse_items?.item_code || null,
+          item_name: adj.warehouse_items?.name || "Unknown Item",
+          quantity_change: adj.quantity_change,
+          quantity_before: adj.quantity_before,
+          quantity_after: adj.quantity_after,
+          adjustment_notes: adj.notes,
+          item_master_notes: adj.warehouse_items?.notes || null,
+          adjusted_by: adj.created_by ? profilesMap[adj.created_by] || null : null,
+          issued_to_location_name: adj.issued_to_location?.name || null,
+        };
+      });
     },
     enabled: !!selectedCompany?.id && !!startDate,
   });
