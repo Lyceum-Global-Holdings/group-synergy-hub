@@ -2,13 +2,40 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { ItemCategory, CreateItemCategoryData } from '@/types/itemBin';
 import { useToast } from '@/hooks/use-toast';
+import { useMemo } from 'react';
 
 export const useItemCategories = (companyId?: string) => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
+  // Fetch all categories
+  const {
+    data: allCategories = [],
+    isLoading: isCategoriesLoading,
+    error: categoriesError
+  } = useQuery({
+    queryKey: ['item-categories', companyId],
+    queryFn: async () => {
+      let query = supabase
+        .from('item_categories')
+        .select('*');
+
+      if (companyId) {
+        query = query.or(`company_id.eq.${companyId},company_id.is.null`);
+      }
+
+      const { data, error } = await query.order('created_at', { ascending: true });
+
+      if (error) throw error;
+      return data as ItemCategory[];
+    }
+  });
+
   // Fetch excluded category IDs for this company
-  const { data: excludedCategoryIds = [] } = useQuery({
+  const {
+    data: excludedCategoryIds = [],
+    isLoading: isExcludedLoading
+  } = useQuery({
     queryKey: ['excluded-categories', companyId],
     queryFn: async () => {
       if (!companyId) return [];
@@ -22,34 +49,19 @@ export const useItemCategories = (companyId?: string) => {
     enabled: !!companyId
   });
 
-  const {
-    data: allCategories = [],
-    isLoading,
-    error
-  } = useQuery({
-    queryKey: ['item-categories', companyId],
-    queryFn: async () => {
-      let query = supabase
-        .from('item_categories')
-        .select('*');
-
-      if (companyId) {
-        // Include company-specific AND global categories (company_id is null)
-        query = query.or(`company_id.eq.${companyId},company_id.is.null`);
-      }
-
-      const { data, error } = await query.order('created_at', { ascending: true });
-
-      if (error) throw error;
-      return data as ItemCategory[];
-    }
-  });
-
-  // Filter out excluded categories for visible list
-  const categories = allCategories.filter(cat => !excludedCategoryIds.includes(cat.id));
+  // Filter categories using useMemo to avoid recalculating on every render
+  const categories = useMemo(() => 
+    allCategories.filter(cat => !excludedCategoryIds.includes(cat.id)),
+    [allCategories, excludedCategoryIds]
+  );
   
-  // Get hidden categories (for the "show hidden" section)
-  const hiddenCategories = allCategories.filter(cat => excludedCategoryIds.includes(cat.id));
+  const hiddenCategories = useMemo(() => 
+    allCategories.filter(cat => excludedCategoryIds.includes(cat.id)),
+    [allCategories, excludedCategoryIds]
+  );
+
+  const isLoading = isCategoriesLoading || isExcludedLoading;
+  const error = categoriesError;
 
   const createCategoryMutation = useMutation({
     mutationFn: async (categoryData: CreateItemCategoryData & { company_id?: string }) => {
@@ -90,7 +102,6 @@ export const useItemCategories = (companyId?: string) => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User not authenticated');
 
-      // Group categories by level for hierarchical processing
       const categoriesByLevel = categoriesData.reduce((acc, category) => {
         const level = category.level || 0;
         if (!acc[level]) acc[level] = [];
@@ -98,18 +109,15 @@ export const useItemCategories = (companyId?: string) => {
         return acc;
       }, {} as Record<number, Array<CreateItemCategoryData & { level: number; parentName?: string; company_id?: string }>>);
 
-      // Map to store created category names to their database IDs
       const nameToIdMap = new Map<string, string>();
       const results = [];
 
-      // Process categories level by level (parents first)
       const levels = Object.keys(categoriesByLevel).map(Number).sort();
       
       for (const level of levels) {
         const levelCategories = categoriesByLevel[level];
         
         for (const categoryData of levelCategories) {
-          // Find parent ID if this is a subcategory
           let parent_id: string | undefined;
           if (categoryData.parentName && nameToIdMap.has(categoryData.parentName)) {
             parent_id = nameToIdMap.get(categoryData.parentName);
@@ -130,7 +138,6 @@ export const useItemCategories = (companyId?: string) => {
 
           if (error) throw error;
           
-          // Store the mapping for child categories
           nameToIdMap.set(categoryData.name, data.id);
           results.push(data);
         }
@@ -174,7 +181,6 @@ export const useItemCategories = (companyId?: string) => {
     onError: (error: any) => {
       console.error('Error deleting category:', error);
       
-      // Check for foreign key constraint violation
       let errorMessage = "Failed to delete category. Please try again.";
       if (error?.code === '23503') {
         if (error?.details?.includes('warehouse_items')) {
@@ -194,7 +200,6 @@ export const useItemCategories = (companyId?: string) => {
     },
   });
 
-  // Exclude (hide) a category from this company's view
   const excludeCategoryMutation = useMutation({
     mutationFn: async (categoryId: string) => {
       if (!companyId) throw new Error('No company selected');
@@ -227,7 +232,6 @@ export const useItemCategories = (companyId?: string) => {
     }
   });
 
-  // Restore a hidden category
   const restoreCategoryMutation = useMutation({
     mutationFn: async (categoryId: string) => {
       if (!companyId) throw new Error('No company selected');
