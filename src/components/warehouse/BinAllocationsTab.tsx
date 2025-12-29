@@ -14,17 +14,19 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Plus, AlertCircle, Trash2, Search } from 'lucide-react';
+import { Plus, AlertCircle, Trash2, Search, Undo2 } from 'lucide-react';
 import { useWarehouseBinAllocations } from '@/hooks/useWarehouseBinAllocations';
 import { useCompany } from '@/contexts/CompanyContext';
 import { useIsAdminOrHigher } from '@/hooks/useIsAdminOrHigher';
 import { CreateBinAllocationDialog } from './CreateBinAllocationDialog';
+import { ReturnStockFromSublocationDialog } from './ReturnStockFromSublocationDialog';
 import type { ColumnDef } from '@tanstack/react-table';
 import type { BinAllocationWithDetails } from '@/types/warehouseReservation';
 
 export function BinAllocationsTab() {
   const { isViewingAllCompanies } = useCompany();
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [returnDialogOpen, setReturnDialogOpen] = useState(false);
   const [allocationToDelete, setAllocationToDelete] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const { binAllocations, isLoading, deleteAllocation, isDeleting } = useWarehouseBinAllocations();
@@ -131,6 +133,15 @@ export function BinAllocationsTab() {
             />
           </div>
           <Button 
+            variant="outline"
+            onClick={() => setReturnDialogOpen(true)}
+            disabled={isViewingAllCompanies}
+            title={isViewingAllCompanies ? "Select a specific company" : "Return stock from sub-location"}
+          >
+            <Undo2 className="mr-2 h-4 w-4" />
+            Return Stock
+          </Button>
+          <Button 
             onClick={() => setDialogOpen(true)}
             disabled={isViewingAllCompanies}
             title={isViewingAllCompanies ? "Select a specific company to allocate items" : ""}
@@ -159,6 +170,11 @@ export function BinAllocationsTab() {
       <CreateBinAllocationDialog
         open={dialogOpen}
         onOpenChange={setDialogOpen}
+      />
+
+      <ReturnStockFromSublocationDialog
+        open={returnDialogOpen}
+        onOpenChange={setReturnDialogOpen}
       />
 
       <AlertDialog open={!!allocationToDelete} onOpenChange={() => setAllocationToDelete(null)}>
