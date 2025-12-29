@@ -188,17 +188,31 @@ export function exportSiteReportToPdf(report: ReportData, materials: MaterialsDa
     yPos = 20;
   }
 
-  // Stock Adjustments Table
+  // Stock Transactions Table
   if (materials.adjustments.length > 0) {
     doc.setFontSize(10);
     doc.setFont("helvetica", "bold");
-    doc.text(`Stock Adjustments (${materials.adjustments.length})`, 14, yPos);
+    doc.text(`Stock Transactions (${materials.adjustments.length})`, 14, yPos);
     yPos += 2;
+
+    const getTypeLabel = (type: string): string => {
+      const labels: Record<string, string> = {
+        adjustment: "Adjustment",
+        goods_receipt: "Goods Receipt",
+        opening_stock: "Opening Stock",
+        transfer_in: "Transfer In",
+        transfer_out: "Transfer Out",
+        project_issue: "Project Issue",
+        project_return: "Project Return",
+      };
+      return labels[type] || type.replace(/_/g, ' ');
+    };
 
     autoTable(doc, {
       startY: yPos,
-      head: [["Code", "Item", "Change", "Before", "After", "Notes", "Adjusted By"]],
+      head: [["Type", "Code", "Item", "Change", "Before", "After", "Notes", "By"]],
       body: materials.adjustments.map((item) => [
+        getTypeLabel(item.transaction_type || "adjustment"),
         item.item_code || "-",
         item.item_name,
         item.quantity_change > 0 ? `+${item.quantity_change}` : String(item.quantity_change),

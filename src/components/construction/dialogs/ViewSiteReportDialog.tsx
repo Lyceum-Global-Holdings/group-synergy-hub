@@ -34,6 +34,33 @@ const REPORT_TYPE_CONFIG = {
     color: "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300"
   }
 };
+
+const getTransactionTypeLabel = (type: string): string => {
+  const labels: Record<string, string> = {
+    adjustment: "Adjustment",
+    goods_receipt: "Goods Receipt",
+    opening_stock: "Opening Stock",
+    transfer_in: "Transfer In",
+    transfer_out: "Transfer Out",
+    project_issue: "Project Issue",
+    project_return: "Project Return",
+  };
+  return labels[type] || type.replace(/_/g, ' ');
+};
+
+const getTransactionTypeBadgeColor = (type: string): string => {
+  const colors: Record<string, string> = {
+    adjustment: "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300",
+    goods_receipt: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300",
+    opening_stock: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300",
+    transfer_in: "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300",
+    transfer_out: "bg-pink-100 text-pink-800 dark:bg-pink-900 dark:text-pink-300",
+    project_issue: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300",
+    project_return: "bg-teal-100 text-teal-800 dark:bg-teal-900 dark:text-teal-300",
+  };
+  return colors[type] || "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300";
+};
+
 export function ViewSiteReportDialog({
   open,
   onOpenChange,
@@ -336,19 +363,20 @@ export function ViewSiteReportDialog({
                   {/* Items Issued */}
                   
 
-                  {/* Stock Adjustments */}
+                  {/* Stock Transactions */}
                   <Card>
                     <CardHeader className="pb-2">
                       <CardTitle className="text-sm font-medium">
-                        Stock Adjustments ({adjustments.length})
+                        Stock Transactions ({adjustments.length})
                       </CardTitle>
                     </CardHeader>
                     <CardContent>
                       {adjustments.length === 0 ? <p className="text-sm text-muted-foreground py-4 text-center">
-                          No stock adjustments for this period
+                          No stock transactions for this period
                         </p> : <Table>
                           <TableHeader>
                             <TableRow>
+                              <TableHead>Type</TableHead>
                               <TableHead>Code</TableHead>
                               <TableHead>Item</TableHead>
                               <TableHead>Change</TableHead>
@@ -359,6 +387,11 @@ export function ViewSiteReportDialog({
                           </TableHeader>
                           <TableBody>
                             {adjustments.map((item, idx) => <TableRow key={idx}>
+                                <TableCell>
+                                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${getTransactionTypeBadgeColor(item.transaction_type)}`}>
+                                    {getTransactionTypeLabel(item.transaction_type)}
+                                  </span>
+                                </TableCell>
                                 <TableCell>{item.item_code || "-"}</TableCell>
                                 <TableCell>{item.item_name}</TableCell>
                                 <TableCell className={item.quantity_change > 0 ? "text-green-600" : "text-red-600"}>
