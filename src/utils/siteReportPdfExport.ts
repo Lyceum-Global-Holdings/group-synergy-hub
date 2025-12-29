@@ -204,6 +204,7 @@ export function exportSiteReportToPdf(report: ReportData, materials: MaterialsDa
         transfer_out: "Transfer Out",
         project_issue: "Project Issue",
         project_return: "Project Return",
+        sublocation_issue: "Sub-Location Issue",
       };
       return labels[type] || type.replace(/_/g, ' ');
     };
@@ -211,16 +212,21 @@ export function exportSiteReportToPdf(report: ReportData, materials: MaterialsDa
     autoTable(doc, {
       startY: yPos,
       head: [["Type", "Code", "Item", "Change", "Before", "After", "Notes", "By"]],
-      body: materials.adjustments.map((item) => [
-        getTypeLabel(item.transaction_type || "adjustment"),
-        item.item_code || "-",
-        item.item_name,
-        item.quantity_change > 0 ? `+${item.quantity_change}` : String(item.quantity_change),
-        String(item.quantity_before),
-        String(item.quantity_after),
-        item.adjustment_notes || "-",
-        item.adjusted_by || "-",
-      ]),
+      body: materials.adjustments.map((item) => {
+        const notes = item.issued_to_location_name 
+          ? `To: ${item.issued_to_location_name}${item.adjustment_notes ? ` - ${item.adjustment_notes}` : ""}`
+          : item.adjustment_notes || "-";
+        return [
+          getTypeLabel(item.transaction_type || "adjustment"),
+          item.item_code || "-",
+          item.item_name,
+          item.quantity_change > 0 ? `+${item.quantity_change}` : String(item.quantity_change),
+          String(item.quantity_before),
+          String(item.quantity_after),
+          notes,
+          item.adjusted_by || "-",
+        ];
+      }),
       styles: { fontSize: 8 },
       headStyles: { fillColor: [240, 173, 78] },
       margin: { left: 14, right: 14 },

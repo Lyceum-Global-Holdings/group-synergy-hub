@@ -44,6 +44,7 @@ const getTransactionTypeLabel = (type: string): string => {
     transfer_out: "Transfer Out",
     project_issue: "Project Issue",
     project_return: "Project Return",
+    sublocation_issue: "Sub-Location Issue",
   };
   return labels[type] || type.replace(/_/g, ' ');
 };
@@ -57,6 +58,7 @@ const getTransactionTypeBadgeColor = (type: string): string => {
     transfer_out: "bg-pink-100 text-pink-800 dark:bg-pink-900 dark:text-pink-300",
     project_issue: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300",
     project_return: "bg-teal-100 text-teal-800 dark:bg-teal-900 dark:text-teal-300",
+    sublocation_issue: "bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-300",
   };
   return colors[type] || "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300";
 };
@@ -399,7 +401,11 @@ export function ViewSiteReportDialog({
                                 </TableCell>
                                 <TableCell>{item.quantity_before}</TableCell>
                                 <TableCell>{item.quantity_after}</TableCell>
-                                <TableCell className="max-w-[200px] truncate">{item.adjustment_notes || "-"}</TableCell>
+                                <TableCell className="max-w-[200px] truncate">
+                                  {item.issued_to_location_name 
+                                    ? `To: ${item.issued_to_location_name}${item.adjustment_notes ? ` - ${item.adjustment_notes}` : ""}`
+                                    : item.adjustment_notes || "-"}
+                                </TableCell>
                               </TableRow>)}
                           </TableBody>
                         </Table>}
