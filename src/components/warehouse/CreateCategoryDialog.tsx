@@ -18,9 +18,10 @@ interface CreateCategoryDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   editingCategory?: ItemCategory | null;
+  companyId?: string;
 }
 
-export function CreateCategoryDialog({ open, onOpenChange, editingCategory }: CreateCategoryDialogProps) {
+export function CreateCategoryDialog({ open, onOpenChange, editingCategory, companyId }: CreateCategoryDialogProps) {
   const [formData, setFormData] = useState({
     name: '',
     code: '',
@@ -28,7 +29,7 @@ export function CreateCategoryDialog({ open, onOpenChange, editingCategory }: Cr
     parent_id: 'none'
   });
 
-  const { categories, createCategory, isCreating } = useItemCategories();
+  const { categories, createCategory, isCreating } = useItemCategories(companyId);
 
   useEffect(() => {
     if (editingCategory) {
@@ -55,7 +56,8 @@ export function CreateCategoryDialog({ open, onOpenChange, editingCategory }: Cr
       name: formData.name,
       code: formData.code || null,
       description: formData.description || null,
-      parent_id: formData.parent_id === "none" ? null : formData.parent_id || null
+      parent_id: formData.parent_id === "none" ? null : formData.parent_id || null,
+      company_id: companyId || null
     };
 
     createCategory(categoryData);

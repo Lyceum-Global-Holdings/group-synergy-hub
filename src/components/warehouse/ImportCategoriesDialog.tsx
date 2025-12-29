@@ -21,13 +21,14 @@ import { CreateItemCategoryData } from '@/types/itemBin';
 interface ImportCategoriesDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  companyId?: string;
 }
 
-export function ImportCategoriesDialog({ open, onOpenChange }: ImportCategoriesDialogProps) {
+export function ImportCategoriesDialog({ open, onOpenChange, companyId }: ImportCategoriesDialogProps) {
   const [selectedCategories, setSelectedCategories] = useState<Set<string>>(new Set());
   const [selectedIndustry, setSelectedIndustry] = useState<string>('Apparel');
   
-  const { categories: existingCategories, bulkImportCategories, isImporting } = useItemCategories();
+  const { categories: existingCategories, bulkImportCategories, isImporting } = useItemCategories(companyId);
 
   // Get existing category names to prevent duplicates
   const existingCategoryNames = useMemo(() => {
@@ -96,7 +97,8 @@ export function ImportCategoriesDialog({ open, onOpenChange }: ImportCategoriesD
         code: category.code,
         description: category.description,
         level: category.level,
-        parentName: category.parentName
+        parentName: category.parentName,
+        company_id: companyId
       }));
 
     bulkImportCategories(categoriesToImport);

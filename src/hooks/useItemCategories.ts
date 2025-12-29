@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { ItemCategory, CreateItemCategoryData } from '@/types/itemBin';
 import { useToast } from '@/hooks/use-toast';
 
-export const useItemCategories = () => {
+export const useItemCategories = (companyId?: string) => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -12,12 +12,18 @@ export const useItemCategories = () => {
     isLoading,
     error
   } = useQuery({
-    queryKey: ['item-categories'],
+    queryKey: ['item-categories', companyId],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from('item_categories')
-        .select('*')
-        .order('created_at', { ascending: true });
+        .select('*');
+
+      if (companyId) {
+        // Include company-specific AND global categories (company_id is null)
+        query = query.or(`company_id.eq.${companyId},company_id.is.null`);
+      }
+
+      const { data, error } = await query.order('created_at', { ascending: true });
 
       if (error) throw error;
       return data as ItemCategory[];
@@ -25,7 +31,7 @@ export const useItemCategories = () => {
   });
 
   const createCategoryMutation = useMutation({
-    mutationFn: async (categoryData: CreateItemCategoryData) => {
+    mutationFn: async (categoryData: CreateItemCategoryData & { company_id?: string }) => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User not authenticated');
 
@@ -42,7 +48,7 @@ export const useItemCategories = () => {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['item-categories'] });
+      queryClient.invalidateQueries({ queryKey: ['item-categories', companyId] });
       toast({
         title: "Success",
         description: "Category created successfully",
@@ -59,7 +65,7 @@ export const useItemCategories = () => {
   });
 
   const bulkImportCategoriesMutation = useMutation({
-    mutationFn: async (categoriesData: Array<CreateItemCategoryData & { level: number; parentName?: string }>) => {
+    mutationFn: async (categoriesData: Array<CreateItemCategoryData & { level: number; parentName?: string; company_id?: string }>) => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User not authenticated');
 
@@ -69,7 +75,7 @@ export const useItemCategories = () => {
         if (!acc[level]) acc[level] = [];
         acc[level].push(category);
         return acc;
-      }, {} as Record<number, Array<CreateItemCategoryData & { level: number; parentName?: string }>>);
+      }, {} as Record<number, Array<CreateItemCategoryData & { level: number; parentName?: string; company_id?: string }>>);
 
       // Map to store created category names to their database IDs
       const nameToIdMap = new Map<string, string>();
@@ -95,6 +101,7 @@ export const useItemCategories = () => {
               code: categoryData.code,
               description: categoryData.description,
               parent_id,
+              company_id: categoryData.company_id || null,
               created_by: user.id
             })
             .select()
@@ -111,7 +118,7 @@ export const useItemCategories = () => {
       return results;
     },
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['item-categories'] });
+      queryClient.invalidateQueries({ queryKey: ['item-categories', companyId] });
       toast({
         title: "Success",
         description: `${data.length} categories imported successfully`,
@@ -137,7 +144,7 @@ export const useItemCategories = () => {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['item-categories'] });
+      queryClient.invalidateQueries({ queryKey: ['item-categories', companyId] });
       toast({
         title: "Success",
         description: "Category deleted successfully.",
