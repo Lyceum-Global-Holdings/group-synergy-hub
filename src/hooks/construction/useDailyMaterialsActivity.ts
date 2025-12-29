@@ -25,6 +25,7 @@ export interface DailyMaterialReturn {
 }
 
 export interface DailyStockAdjustment {
+  transaction_type: string;
   item_code: string | null;
   item_name: string;
   quantity_change: number;
@@ -157,6 +158,7 @@ export function useDailyMaterialsActivity(startDate: string | null, endDate?: st
       const { data, error } = await supabase
         .from("stock_transactions")
         .select(`
+          transaction_type,
           quantity_change,
           quantity_before,
           quantity_after,
@@ -170,7 +172,7 @@ export function useDailyMaterialsActivity(startDate: string | null, endDate?: st
           )
         `)
         .eq("warehouse_items.company_id", selectedCompany.id)
-        .eq("transaction_type", "adjustment")
+        .not("transaction_type", "in", '("material_issue","material_return")')
         .gte("created_at", `${startDate}T00:00:00`)
         .lt("created_at", `${effectiveEndDate}T23:59:59.999`);
 
@@ -196,6 +198,7 @@ export function useDailyMaterialsActivity(startDate: string | null, endDate?: st
       }
 
       return (data || []).map((adj: any) => ({
+        transaction_type: adj.transaction_type || "adjustment",
         item_code: adj.warehouse_items?.item_code || null,
         item_name: adj.warehouse_items?.name || "Unknown Item",
         quantity_change: adj.quantity_change,
