@@ -340,6 +340,21 @@ export const ItemDetailsDialog = ({ item, open, onOpenChange }: ItemDetailsDialo
             </CardContent>
           </Card>
 
+          {/* Notes */}
+          {item.notes && (
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <Info className="h-4 w-4" />
+                  Notes
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm whitespace-pre-wrap">{item.notes}</p>
+              </CardContent>
+            </Card>
+          )}
+
           {/* Bin Allocations */}
           {binAllocations && binAllocations.length > 0 && (
             <Card>
