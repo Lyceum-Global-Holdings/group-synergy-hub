@@ -5,13 +5,16 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { FileDown, X, Cloud, Thermometer, Users, AlertTriangle, Shield, Package, Warehouse, ArrowRightLeft } from "lucide-react";
+import { FileDown, X, Cloud, Thermometer, Users, AlertTriangle, Shield, Package, Warehouse, ArrowRightLeft, RefreshCw } from "lucide-react";
 import { format } from "date-fns";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { DailySiteReport, DAILY_REPORT_STATUSES } from "@/types/construction";
 import { useDailyMaterialsActivity, CurrentStockBalance } from "@/hooks/construction/useDailyMaterialsActivity";
 import { exportSiteReportToPdf } from "@/utils/siteReportPdfExport";
+import { useToast } from "@/hooks/use-toast";
+import { useCompany } from "@/contexts/CompanyContext";
+import { cn } from "@/lib/utils";
 interface ViewSiteReportDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -36,10 +39,16 @@ export function ViewSiteReportDialog({
   onOpenChange,
   report
 }: ViewSiteReportDialogProps) {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const { selectedCompany } = useCompany();
+
   // Fetch fresh report data when dialog opens
   const {
     data: freshReport,
-    isLoading: reportLoading
+    isLoading: reportLoading,
+    refetch: refetchReport,
+    isFetching: isRefetching
   } = useQuery({
     queryKey: ["daily-site-report", report?.id],
     queryFn: async () => {
@@ -102,6 +111,37 @@ export function ViewSiteReportDialog({
       issues,
       stockBalances
     });
+  };
+
+  const handleRefresh = async () => {
+    try {
+      // Refetch the report data
+      await refetchReport();
+      
+      // Invalidate and refetch material activity queries
+      await Promise.all([
+        queryClient.invalidateQueries({ 
+          queryKey: ["daily-material-issues", selectedCompany?.id, periodStartDate, periodEndDate] 
+        }),
+        queryClient.invalidateQueries({ 
+          queryKey: ["daily-stock-adjustments", selectedCompany?.id, periodStartDate, periodEndDate] 
+        }),
+        queryClient.invalidateQueries({ 
+          queryKey: ["current-stock-balance", selectedCompany?.id] 
+        }),
+      ]);
+      
+      toast({ 
+        title: "Data refreshed",
+        description: "Report and material activity data have been updated."
+      });
+    } catch (error) {
+      toast({ 
+        title: "Refresh failed",
+        description: "Could not refresh data. Please try again.",
+        variant: "destructive"
+      });
+    }
   };
 
   // Sort stock balances by item name first, then by warehouse
@@ -417,6 +457,14 @@ export function ViewSiteReportDialog({
 
         {/* Footer Actions */}
         <div className="flex items-center justify-end gap-2 px-6 py-4 border-t bg-muted/30">
+          <Button 
+            variant="outline" 
+            onClick={handleRefresh}
+            disabled={isRefetching || isLoading}
+          >
+            <RefreshCw className={cn("mr-2 h-4 w-4", (isRefetching || isLoading) && "animate-spin")} />
+            Refresh
+          </Button>
           <Button variant="outline" onClick={handleExportPdf}>
             <FileDown className="mr-2 h-4 w-4" />
             Export PDF
