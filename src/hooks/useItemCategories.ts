@@ -7,8 +7,23 @@ export const useItemCategories = (companyId?: string) => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
+  // Fetch excluded category IDs for this company
+  const { data: excludedCategoryIds = [] } = useQuery({
+    queryKey: ['excluded-categories', companyId],
+    queryFn: async () => {
+      if (!companyId) return [];
+      const { data, error } = await supabase
+        .from('company_excluded_categories')
+        .select('category_id')
+        .eq('company_id', companyId);
+      if (error) throw error;
+      return data.map(e => e.category_id);
+    },
+    enabled: !!companyId
+  });
+
   const {
-    data: categories = [],
+    data: allCategories = [],
     isLoading,
     error
   } = useQuery({
@@ -29,6 +44,12 @@ export const useItemCategories = (companyId?: string) => {
       return data as ItemCategory[];
     }
   });
+
+  // Filter out excluded categories for visible list
+  const categories = allCategories.filter(cat => !excludedCategoryIds.includes(cat.id));
+  
+  // Get hidden categories (for the "show hidden" section)
+  const hiddenCategories = allCategories.filter(cat => excludedCategoryIds.includes(cat.id));
 
   const createCategoryMutation = useMutation({
     mutationFn: async (categoryData: CreateItemCategoryData & { company_id?: string }) => {
@@ -173,8 +194,72 @@ export const useItemCategories = (companyId?: string) => {
     },
   });
 
+  // Exclude (hide) a category from this company's view
+  const excludeCategoryMutation = useMutation({
+    mutationFn: async (categoryId: string) => {
+      if (!companyId) throw new Error('No company selected');
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      const { error } = await supabase
+        .from('company_excluded_categories')
+        .insert({
+          company_id: companyId,
+          category_id: categoryId,
+          excluded_by: user?.id
+        });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['excluded-categories', companyId] });
+      queryClient.invalidateQueries({ queryKey: ['item-categories', companyId] });
+      toast({
+        title: "Category Hidden",
+        description: "Category has been removed from this company's view.",
+      });
+    },
+    onError: (error) => {
+      console.error('Error hiding category:', error);
+      toast({
+        title: "Error",
+        description: "Failed to hide category. Please try again.",
+        variant: "destructive",
+      });
+    }
+  });
+
+  // Restore a hidden category
+  const restoreCategoryMutation = useMutation({
+    mutationFn: async (categoryId: string) => {
+      if (!companyId) throw new Error('No company selected');
+      
+      const { error } = await supabase
+        .from('company_excluded_categories')
+        .delete()
+        .eq('company_id', companyId)
+        .eq('category_id', categoryId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['excluded-categories', companyId] });
+      queryClient.invalidateQueries({ queryKey: ['item-categories', companyId] });
+      toast({
+        title: "Category Restored",
+        description: "Category is now visible for this company.",
+      });
+    },
+    onError: (error) => {
+      console.error('Error restoring category:', error);
+      toast({
+        title: "Error",
+        description: "Failed to restore category. Please try again.",
+        variant: "destructive",
+      });
+    }
+  });
+
   return {
     categories,
+    hiddenCategories,
     isLoading,
     error,
     createCategory: createCategoryMutation.mutate,
@@ -183,5 +268,9 @@ export const useItemCategories = (companyId?: string) => {
     isImporting: bulkImportCategoriesMutation.isPending,
     deleteCategory: deleteCategoryMutation.mutate,
     isDeleting: deleteCategoryMutation.isPending,
+    excludeCategory: excludeCategoryMutation.mutate,
+    isExcluding: excludeCategoryMutation.isPending,
+    restoreCategory: restoreCategoryMutation.mutate,
+    isRestoring: restoreCategoryMutation.isPending,
   };
 };

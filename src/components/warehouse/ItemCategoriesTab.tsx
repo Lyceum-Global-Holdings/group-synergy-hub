@@ -1,13 +1,14 @@
 import { useState, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Plus, Search, Download, ChevronDown, ChevronRight } from 'lucide-react';
+import { Plus, Search, Download, ChevronDown, ChevronRight, Eye, EyeOff } from 'lucide-react';
 import { useItemCategories } from '@/hooks/useItemCategories';
 import { CreateCategoryDialog } from '@/components/warehouse/CreateCategoryDialog';
 import { ImportCategoriesDialog } from '@/components/warehouse/ImportCategoriesDialog';
 import { CategoryTreeItem } from '@/components/warehouse/CategoryTreeItem';
 import { ItemCategory } from '@/types/itemBin';
 import { useCompany } from '@/contexts/CompanyContext';
+import { Badge } from '@/components/ui/badge';
 
 export function ItemCategoriesTab() {
   const [searchTerm, setSearchTerm] = useState('');
@@ -15,9 +16,20 @@ export function ItemCategoriesTab() {
   const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<ItemCategory | null>(null);
   const [expandedAll, setExpandedAll] = useState(false);
+  const [showHiddenCategories, setShowHiddenCategories] = useState(false);
   
   const { selectedCompany } = useCompany();
-  const { categories, isLoading, deleteCategory, isDeleting } = useItemCategories(selectedCompany?.id);
+  const { 
+    categories, 
+    hiddenCategories,
+    isLoading, 
+    deleteCategory, 
+    isDeleting,
+    excludeCategory,
+    isExcluding,
+    restoreCategory,
+    isRestoring
+  } = useItemCategories(selectedCompany?.id);
 
   // Build category tree structure
   const categoryTree = useMemo(() => {
@@ -41,6 +53,26 @@ export function ItemCategoriesTab() {
     return { rootCategories, getChildren };
   }, [categories]);
 
+  // Build hidden category tree structure
+  const hiddenCategoryTree = useMemo(() => {
+    const rootCategories = hiddenCategories.filter(cat => !cat.parent_id);
+    const childrenMap = new Map<string, ItemCategory[]>();
+    
+    hiddenCategories.forEach(category => {
+      if (category.parent_id) {
+        const children = childrenMap.get(category.parent_id) || [];
+        children.push(category);
+        childrenMap.set(category.parent_id, children);
+      }
+    });
+
+    const getChildren = (parentId: string): ItemCategory[] => {
+      return childrenMap.get(parentId) || [];
+    };
+
+    return { rootCategories, getChildren };
+  }, [hiddenCategories]);
+
   // Filter categories based on search
   const filteredRootCategories = useMemo(() => {
     if (!searchTerm.trim()) {
@@ -62,8 +94,18 @@ export function ItemCategoriesTab() {
     return categoryTree.rootCategories.filter(hasMatchingDescendant);
   }, [categoryTree, searchTerm]);
 
-  const handleDeleteCategory = (categoryId: string) => {
-    deleteCategory(categoryId);
+  const handleDeleteCategory = (category: ItemCategory) => {
+    // If it's a global category (company_id is null), hide it instead of deleting
+    if (!category.company_id && selectedCompany?.id) {
+      excludeCategory(category.id);
+    } else {
+      // Company-specific category - actually delete it
+      deleteCategory(category.id);
+    }
+  };
+
+  const handleRestoreCategory = (categoryId: string) => {
+    restoreCategory(categoryId);
   };
 
   return (
@@ -95,6 +137,28 @@ export function ItemCategoriesTab() {
                 <>
                   <ChevronRight className="mr-2 h-4 w-4" />
                   Expand All
+                </>
+              )}
+            </Button>
+          )}
+          {hiddenCategories.length > 0 && (
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => setShowHiddenCategories(!showHiddenCategories)}
+            >
+              {showHiddenCategories ? (
+                <>
+                  <EyeOff className="mr-2 h-4 w-4" />
+                  Hide Hidden
+                </>
+              ) : (
+                <>
+                  <Eye className="mr-2 h-4 w-4" />
+                  Show Hidden
+                  <Badge variant="secondary" className="ml-2">
+                    {hiddenCategories.length}
+                  </Badge>
                 </>
               )}
             </Button>
@@ -131,13 +195,42 @@ export function ItemCategoriesTab() {
                 children={categoryTree.getChildren(category.id)}
                 level={0}
                 onEdit={setEditingCategory}
-                onDelete={handleDeleteCategory}
-                isDeleting={isDeleting}
+                onDelete={() => handleDeleteCategory(category)}
+                isDeleting={isDeleting || isExcluding}
+                isGlobal={!category.company_id}
               />
             ))}
           </div>
         )}
       </div>
+
+      {/* Hidden Categories Section */}
+      {showHiddenCategories && hiddenCategories.length > 0 && (
+        <div className="space-y-2">
+          <h3 className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+            <EyeOff className="h-4 w-4" />
+            Hidden Categories
+          </h3>
+          <div className="border rounded-lg bg-muted/30">
+            <div className="divide-y">
+              {hiddenCategoryTree.rootCategories.map((category) => (
+                <CategoryTreeItem
+                  key={category.id}
+                  category={category}
+                  children={hiddenCategoryTree.getChildren(category.id)}
+                  level={0}
+                  onEdit={setEditingCategory}
+                  onDelete={() => {}}
+                  onRestore={handleRestoreCategory}
+                  isDeleting={isRestoring}
+                  isHidden={true}
+                  isGlobal={!category.company_id}
+                />
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       <CreateCategoryDialog
         open={isCreateDialogOpen || editingCategory !== null}

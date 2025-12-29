@@ -2216,6 +2216,45 @@ export type Database = {
           },
         ]
       }
+      company_excluded_categories: {
+        Row: {
+          category_id: string
+          company_id: string
+          excluded_at: string | null
+          excluded_by: string | null
+          id: string
+        }
+        Insert: {
+          category_id: string
+          company_id: string
+          excluded_at?: string | null
+          excluded_by?: string | null
+          id?: string
+        }
+        Update: {
+          category_id?: string
+          company_id?: string
+          excluded_at?: string | null
+          excluded_by?: string | null
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "company_excluded_categories_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "item_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "company_excluded_categories_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       company_suppliers: {
         Row: {
           allocated_at: string | null
