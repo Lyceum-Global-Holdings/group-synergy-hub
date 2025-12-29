@@ -261,9 +261,59 @@ export const useItemCategories = (companyId?: string) => {
     }
   });
 
+  const bulkUpdateVisibilityMutation = useMutation({
+    mutationFn: async ({ toExclude, toRestore }: { toExclude: string[], toRestore: string[] }) => {
+      if (!companyId) throw new Error('No company selected');
+      const { data: { user } } = await supabase.auth.getUser();
+
+      // Restore categories (delete exclusions)
+      if (toRestore.length > 0) {
+        const { error: restoreError } = await supabase
+          .from('company_excluded_categories')
+          .delete()
+          .eq('company_id', companyId)
+          .in('category_id', toRestore);
+        if (restoreError) throw restoreError;
+      }
+
+      // Exclude categories (insert exclusions)
+      if (toExclude.length > 0) {
+        const inserts = toExclude.map(id => ({
+          company_id: companyId,
+          category_id: id,
+          excluded_by: user?.id
+        }));
+        
+        const { error: excludeError } = await supabase
+          .from('company_excluded_categories')
+          .upsert(inserts, { onConflict: 'company_id,category_id' });
+        if (excludeError) throw excludeError;
+      }
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['excluded-categories', companyId] });
+      queryClient.invalidateQueries({ queryKey: ['item-categories', companyId] });
+      const totalChanges = variables.toExclude.length + variables.toRestore.length;
+      toast({
+        title: "Visibility Updated",
+        description: `Updated visibility for ${totalChanges} categories.`,
+      });
+    },
+    onError: (error) => {
+      console.error('Error updating category visibility:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update category visibility. Please try again.",
+        variant: "destructive",
+      });
+    }
+  });
+
   return {
     categories,
     hiddenCategories,
+    allCategories,
+    excludedCategoryIds,
     isLoading,
     error,
     createCategory: createCategoryMutation.mutate,
@@ -276,5 +326,7 @@ export const useItemCategories = (companyId?: string) => {
     isExcluding: excludeCategoryMutation.isPending,
     restoreCategory: restoreCategoryMutation.mutate,
     isRestoring: restoreCategoryMutation.isPending,
+    bulkUpdateVisibility: bulkUpdateVisibilityMutation.mutateAsync,
+    isBulkUpdating: bulkUpdateVisibilityMutation.isPending,
   };
 };
