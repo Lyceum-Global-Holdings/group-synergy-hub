@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { ChevronRight, ChevronDown, Edit, Trash2, Tag } from 'lucide-react';
+import { ChevronRight, ChevronDown, Edit, Trash2, Tag, EyeOff, Eye, Globe } from 'lucide-react';
 import {
   Collapsible,
   CollapsibleContent,
@@ -19,6 +19,12 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { ItemCategory } from '@/types/itemBin';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 
 interface CategoryTreeItemProps {
   category: ItemCategory;
@@ -26,8 +32,11 @@ interface CategoryTreeItemProps {
   level: number;
   onEdit: (category: ItemCategory) => void;
   onDelete: (categoryId: string) => void;
+  onRestore?: (categoryId: string) => void;
   isDeleting?: boolean;
   canDelete?: boolean;
+  isGlobal?: boolean;
+  isHidden?: boolean;
 }
 
 export function CategoryTreeItem({ 
@@ -36,8 +45,11 @@ export function CategoryTreeItem({
   level, 
   onEdit, 
   onDelete,
+  onRestore,
   isDeleting = false,
-  canDelete = true
+  canDelete = true,
+  isGlobal = false,
+  isHidden = false
 }: CategoryTreeItemProps) {
   const [isOpen, setIsOpen] = useState(false);
   const hasChildren = children.length > 0;
@@ -45,7 +57,7 @@ export function CategoryTreeItem({
   return (
     <div className="w-full">
       <div 
-        className="flex items-center gap-2 p-3 hover:bg-muted/50 border-b"
+        className={`flex items-center gap-2 p-3 hover:bg-muted/50 border-b ${isHidden ? 'opacity-60' : ''}`}
         style={{ paddingLeft: `${12 + (level * 24)}px` }}
       >
         {/* Expand/Collapse Button */}
@@ -75,6 +87,26 @@ export function CategoryTreeItem({
             <Badge variant="outline" className="text-xs">
               Level {level}
             </Badge>
+            {isGlobal && (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Badge variant="secondary" className="text-xs gap-1">
+                      <Globe className="h-3 w-3" />
+                      Global
+                    </Badge>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>This is a shared category. It can be hidden from this company but not deleted.</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
+            {isHidden && (
+              <Badge variant="outline" className="text-xs text-muted-foreground">
+                Hidden
+              </Badge>
+            )}
           </div>
           <div className="flex items-center gap-4 text-sm text-muted-foreground mt-1">
             <span>Code: {category.code || '-'}</span>
@@ -86,48 +118,99 @@ export function CategoryTreeItem({
 
         {/* Actions */}
         <div className="flex items-center gap-1">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => onEdit(category)}
-            className="h-8 w-8 p-0"
-          >
-            <Edit className="h-4 w-4" />
-          </Button>
+          {!isHidden && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => onEdit(category)}
+              className="h-8 w-8 p-0"
+            >
+              <Edit className="h-4 w-4" />
+            </Button>
+          )}
           
-          {canDelete && (
+          {isHidden && onRestore ? (
+            // Restore button for hidden categories
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    disabled={isDeleting}
+                    onClick={() => onRestore(category.id)}
+                    className="h-8 w-8 p-0 hover:bg-primary/10 hover:text-primary"
+                  >
+                    <Eye className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Restore category</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          ) : canDelete && !isHidden ? (
+            // Delete/Hide button for visible categories
             <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  disabled={isDeleting}
-                  className="h-8 w-8 p-0 hover:bg-destructive/10 hover:text-destructive"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </AlertDialogTrigger>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <AlertDialogTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        disabled={isDeleting}
+                        className={`h-8 w-8 p-0 ${isGlobal ? 'hover:bg-orange-500/10 hover:text-orange-500' : 'hover:bg-destructive/10 hover:text-destructive'}`}
+                      >
+                        {isGlobal ? <EyeOff className="h-4 w-4" /> : <Trash2 className="h-4 w-4" />}
+                      </Button>
+                    </AlertDialogTrigger>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>{isGlobal ? 'Hide from this company' : 'Delete category'}</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
               <AlertDialogContent>
                 <AlertDialogHeader>
-                  <AlertDialogTitle>Delete Category</AlertDialogTitle>
+                  <AlertDialogTitle>
+                    {isGlobal ? 'Hide Category' : 'Delete Category'}
+                  </AlertDialogTitle>
                   <AlertDialogDescription>
-                    Are you sure you want to delete "{category.name}"? 
-                    {hasChildren && " This will also delete all subcategories."}
-                    This action cannot be undone.
+                    {isGlobal ? (
+                      <>
+                        Are you sure you want to hide "{category.name}" from this company? 
+                        {hasChildren && " This will also hide all subcategories."}
+                        <br /><br />
+                        <span className="text-muted-foreground">
+                          This is a shared category used across companies. You can restore it later from the "Show Hidden" menu.
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        Are you sure you want to delete "{category.name}"? 
+                        {hasChildren && " This will also delete all subcategories."}
+                        <br /><br />
+                        <span className="text-destructive font-medium">This action cannot be undone.</span>
+                      </>
+                    )}
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                   <AlertDialogCancel>Cancel</AlertDialogCancel>
                   <AlertDialogAction
                     onClick={() => onDelete(category.id)}
-                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    className={isGlobal 
+                      ? "bg-orange-500 text-white hover:bg-orange-600" 
+                      : "bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    }
                   >
-                    Delete
+                    {isGlobal ? 'Hide' : 'Delete'}
                   </AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
-          )}
+          ) : null}
         </div>
       </div>
 
@@ -145,8 +228,11 @@ export function CategoryTreeItem({
                   level={level + 1}
                   onEdit={onEdit}
                   onDelete={onDelete}
+                  onRestore={onRestore}
                   isDeleting={isDeleting}
                   canDelete={canDelete}
+                  isGlobal={!child.company_id}
+                  isHidden={isHidden}
                 />
               );
             })}
