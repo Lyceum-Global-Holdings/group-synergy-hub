@@ -23,7 +23,6 @@ import { StockTransactionType } from '@/types/stockTransaction';
 import { useWarehouseBins } from '@/hooks/useWarehouseBins';
 import { useWarehouseBinAllocations } from '@/hooks/useWarehouseBinAllocations';
 import { useProjectStorageLocations } from '@/hooks/useProjectStorageLocations';
-import { useWarehouseLocations } from '@/hooks/useWarehouseLocations';
 import { MapPin, Building2 } from 'lucide-react';
 
 interface StockAdjustmentDialogProps {
@@ -54,12 +53,8 @@ export function StockAdjustmentDialog({
   const { createTransaction, isCreating } = useStockTransactions();
   const { bins } = useWarehouseBins();
   const { createAllocation, adjustAllocation, getAllocationsForItem } = useWarehouseBinAllocations();
-  const { projectStorageLocations, isLoading: isLoadingLocations } = useProjectStorageLocations();
-  const { locations, isLoading: isLoadingSubLocations } = useWarehouseLocations();
+  const { projectStorageLocations, projectSubLocations, isLoading: isLoadingLocations, isLoadingSubLocations } = useProjectStorageLocations();
   const [itemAllocations, setItemAllocations] = useState<any[]>([]);
-
-  // Filter sub-locations from warehouse locations
-  const subLocations = locations?.filter(loc => loc.type === 'sublocation' && loc.status === 'active') || [];
 
   // Load allocations for this item when dialog opens
   useEffect(() => {
@@ -146,7 +141,7 @@ export function StockAdjustmentDialog({
 
     // Determine transaction type and notes based on issue destination
     const selectedProjectLocation = projectStorageLocations.find(l => l.warehouse_location_id === selectedLocationId);
-    const selectedSubLocation = subLocations.find(l => l.id === selectedSubLocationId);
+    const selectedSubLocation = projectSubLocations.find(l => l.sublocation_id === selectedSubLocationId);
     const isProjectIssue = issueToProject && selectedProjectLocation && adjustmentType === 'decrease';
     const isSubLocationIssue = issueToSubLocation && selectedSubLocation && adjustmentType === 'decrease';
     
@@ -168,7 +163,7 @@ export function StockAdjustmentDialog({
     if (isProjectIssue) {
       transactionNotes = `Issued to ${selectedProjectLocation.location_name} (${selectedProjectLocation.project_name})${notes ? ' - ' + notes : ''}`;
     } else if (isSubLocationIssue) {
-      transactionNotes = `Issued to ${selectedSubLocation.name} (${selectedSubLocation.location_code})${notes ? ' - ' + notes : ''}`;
+      transactionNotes = `Issued to ${selectedSubLocation.sublocation_name} (${selectedSubLocation.project_name})${notes ? ' - ' + notes : ''}`;
     } else if (!transactionNotes) {
       transactionNotes = `Manual stock ${adjustmentType} - Bin: ${bins.find(b => b.id === binId)?.bin_code}`;
     }
@@ -339,14 +334,14 @@ export function StockAdjustmentDialog({
                       <SelectValue placeholder={isLoadingSubLocations ? "Loading..." : "Select sub-location"} />
                     </SelectTrigger>
                     <SelectContent>
-                      {subLocations.map(location => (
-                        <SelectItem key={location.id} value={location.id}>
-                          {location.location_code} - {location.name}
+                      {projectSubLocations.map(location => (
+                        <SelectItem key={location.sublocation_id} value={location.sublocation_id}>
+                          {location.sublocation_name} ({location.project_name})
                         </SelectItem>
                       ))}
-                      {subLocations.length === 0 && !isLoadingSubLocations && (
+                      {projectSubLocations.length === 0 && !isLoadingSubLocations && (
                         <SelectItem value="none" disabled>
-                          No sub-locations available
+                          No project sub-locations available
                         </SelectItem>
                       )}
                     </SelectContent>
