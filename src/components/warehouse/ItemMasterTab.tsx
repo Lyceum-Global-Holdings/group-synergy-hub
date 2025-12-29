@@ -62,9 +62,9 @@ export function ItemMasterTab() {
     isDeleting, 
     isMarkingInactive 
   } = useWarehouseItems();
-  const { categories } = useItemCategories();
+  const { companies, selectedCompany } = useCompany();
+  const { categories } = useItemCategories(selectedCompany?.id);
   const { units } = useItemUnits();
-  const { companies } = useCompany();
   const { migrateAllocationsToCorrectLocation, isMigrating, reconcileStock, isReconciling } = useWarehouseBinAllocations();
   const { canDelete } = useIsAdminOrHigher();
 

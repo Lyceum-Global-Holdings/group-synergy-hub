@@ -70,14 +70,14 @@ export function CreateItemDialog({ open, onOpenChange, editingItem }: CreateItem
   const [uploading, setUploading] = useState(false);
 
   const { createItem, createItemAsync, updateItem, isCreating, isUpdating } = useWarehouseItems();
-  const { categories } = useItemCategories();
+  const { companies, selectedCompany } = useCompany();
+  const { categories } = useItemCategories(selectedCompany?.id);
   const { data: suppliers = [] } = useSuppliers();
   const { units } = useItemUnits();
   const { createTransaction } = useStockTransactions();
   const { locations } = useWarehouseLocations();
   const { bins } = useWarehouseBins();
   const { createAllocation } = useWarehouseBinAllocations();
-  const { companies, selectedCompany } = useCompany();
 
   // Filter locations to only show warehouses (type='location')
   const warehouseLocations = locations.filter(loc => loc.type === 'location');
