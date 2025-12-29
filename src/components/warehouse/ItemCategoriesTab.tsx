@@ -1,10 +1,11 @@
 import { useState, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Plus, Search, Download, ChevronDown, ChevronRight, Eye, EyeOff } from 'lucide-react';
+import { Plus, Search, Download, ChevronDown, ChevronRight, Eye, EyeOff, Settings } from 'lucide-react';
 import { useItemCategories } from '@/hooks/useItemCategories';
 import { CreateCategoryDialog } from '@/components/warehouse/CreateCategoryDialog';
 import { ImportCategoriesDialog } from '@/components/warehouse/ImportCategoriesDialog';
+import { CategoryVisibilityDialog } from '@/components/warehouse/CategoryVisibilityDialog';
 import { CategoryTreeItem } from '@/components/warehouse/CategoryTreeItem';
 import { ItemCategory } from '@/types/itemBin';
 import { useCompany } from '@/contexts/CompanyContext';
@@ -14,6 +15,7 @@ export function ItemCategoriesTab() {
   const [searchTerm, setSearchTerm] = useState('');
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
+  const [isVisibilityDialogOpen, setIsVisibilityDialogOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<ItemCategory | null>(null);
   const [expandedAll, setExpandedAll] = useState(false);
   const [showHiddenCategories, setShowHiddenCategories] = useState(false);
@@ -22,13 +24,17 @@ export function ItemCategoriesTab() {
   const { 
     categories, 
     hiddenCategories,
+    allCategories,
+    excludedCategoryIds,
     isLoading, 
     deleteCategory, 
     isDeleting,
     excludeCategory,
     isExcluding,
     restoreCategory,
-    isRestoring
+    isRestoring,
+    bulkUpdateVisibility,
+    isBulkUpdating
   } = useItemCategories(selectedCompany?.id);
 
   // Build category tree structure
@@ -165,6 +171,10 @@ export function ItemCategoriesTab() {
           )}
         </div>
         <div className="flex gap-2">
+          <Button variant="outline" onClick={() => setIsVisibilityDialogOpen(true)}>
+            <Settings className="mr-2 h-4 w-4" />
+            Manage Visibility
+          </Button>
           <Button variant="outline" onClick={() => setIsImportDialogOpen(true)}>
             <Download className="mr-2 h-4 w-4" />
             Import Standard Categories
@@ -246,6 +256,15 @@ export function ItemCategoriesTab() {
         open={isImportDialogOpen}
         onOpenChange={setIsImportDialogOpen}
         companyId={selectedCompany?.id}
+      />
+
+      <CategoryVisibilityDialog
+        open={isVisibilityDialogOpen}
+        onOpenChange={setIsVisibilityDialogOpen}
+        allCategories={allCategories}
+        excludedCategoryIds={excludedCategoryIds}
+        onSave={bulkUpdateVisibility}
+        isSaving={isBulkUpdating}
       />
     </div>
   );
