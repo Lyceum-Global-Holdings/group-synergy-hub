@@ -33,6 +33,7 @@ export interface StockTransaction {
   created_by: string | null;
   created_at: string;
   updated_at: string;
+  issued_to_location_id: string | null;
   profiles?: {
     full_name: string | null;
     email: string | null;
@@ -51,6 +52,7 @@ export interface CreateStockTransactionData {
   total_value?: number;
   notes?: string;
   company_id?: string;
+  issued_to_location_id?: string;
 }
 
 export interface MaterialReturnNote {

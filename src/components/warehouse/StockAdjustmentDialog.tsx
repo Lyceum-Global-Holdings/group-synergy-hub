@@ -17,10 +17,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
 import { useStockTransactions } from '@/hooks/useStockTransactions';
 import { StockTransactionType } from '@/types/stockTransaction';
 import { useWarehouseBins } from '@/hooks/useWarehouseBins';
 import { useWarehouseBinAllocations } from '@/hooks/useWarehouseBinAllocations';
+import { useProjectStorageLocations } from '@/hooks/useProjectStorageLocations';
+import { MapPin } from 'lucide-react';
 
 interface StockAdjustmentDialogProps {
   open: boolean;
@@ -42,10 +45,13 @@ export function StockAdjustmentDialog({
   const [binId, setBinId] = useState('');
   const [unitCost, setUnitCost] = useState('');
   const [notes, setNotes] = useState('');
+  const [issueToProject, setIssueToProject] = useState(false);
+  const [selectedLocationId, setSelectedLocationId] = useState('');
 
   const { createTransaction, isCreating } = useStockTransactions();
   const { bins } = useWarehouseBins();
   const { createAllocation, adjustAllocation, getAllocationsForItem } = useWarehouseBinAllocations();
+  const { projectStorageLocations, isLoading: isLoadingLocations } = useProjectStorageLocations();
   const [itemAllocations, setItemAllocations] = useState<any[]>([]);
 
   // Load allocations for this item when dialog opens
@@ -59,6 +65,27 @@ export function StockAdjustmentDialog({
     loadAllocations();
   }, [open, itemId]);
 
+  // Reset issue to project when switching to increase
+  useEffect(() => {
+    if (adjustmentType === 'increase') {
+      setIssueToProject(false);
+      setSelectedLocationId('');
+    }
+  }, [adjustmentType]);
+
+  // Reset form when dialog closes
+  useEffect(() => {
+    if (!open) {
+      setQuantity('');
+      setBinId('');
+      setUnitCost('');
+      setNotes('');
+      setIssueToProject(false);
+      setSelectedLocationId('');
+      setAdjustmentType('increase');
+    }
+  }, [open]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -67,6 +94,12 @@ export function StockAdjustmentDialog({
 
     if (!binId) {
       alert('Please select a bin location');
+      return;
+    }
+
+    // Validate project location if issuing to project
+    if (issueToProject && !selectedLocationId) {
+      alert('Please select a project storage location');
       return;
     }
 
@@ -94,24 +127,34 @@ export function StockAdjustmentDialog({
       return;
     }
 
+    // Determine transaction type and notes based on issue to project
+    const selectedLocation = projectStorageLocations.find(l => l.warehouse_location_id === selectedLocationId);
+    const isProjectIssue = issueToProject && selectedLocation && adjustmentType === 'decrease';
+    
+    const transactionType: StockTransactionType = isProjectIssue ? 'project_issue' : 'adjustment';
+    const referenceType = isProjectIssue ? 'project' : 'adjustment';
+    
+    let transactionNotes = notes;
+    if (isProjectIssue) {
+      transactionNotes = `Issued to ${selectedLocation.location_name} (${selectedLocation.project_name})${notes ? ' - ' + notes : ''}`;
+    } else if (!transactionNotes) {
+      transactionNotes = `Manual stock ${adjustmentType} - Bin: ${bins.find(b => b.id === binId)?.bin_code}`;
+    }
+
     // Create transaction for audit trail
     createTransaction({
       item_id: itemId,
-      transaction_type: 'adjustment' as StockTransactionType,
-      reference_type: 'adjustment',
+      transaction_type: transactionType,
+      reference_type: referenceType,
       quantity_change: quantityChange,
       quantity_before: currentStock,
       quantity_after: currentStock + quantityChange,
       unit_cost: unitCost ? parseFloat(unitCost) : undefined,
       total_value: unitCost ? parseFloat(unitCost) * Math.abs(quantityChange) : undefined,
-      notes: notes || `Manual stock ${adjustmentType} - Bin: ${bins.find(b => b.id === binId)?.bin_code}`,
+      notes: transactionNotes,
+      issued_to_location_id: isProjectIssue ? selectedLocationId : undefined,
     });
 
-    // Reset form
-    setQuantity('');
-    setBinId('');
-    setUnitCost('');
-    setNotes('');
     onOpenChange(false);
   };
 
@@ -173,6 +216,59 @@ export function StockAdjustmentDialog({
             />
           </div>
 
+          {/* Issue to Project Storage Location - Only shown for decrease */}
+          {adjustmentType === 'decrease' && (
+            <div className="space-y-3 p-3 border rounded-lg bg-muted/30">
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="issueToProject"
+                  checked={issueToProject}
+                  onCheckedChange={(checked) => {
+                    setIssueToProject(checked === true);
+                    if (!checked) setSelectedLocationId('');
+                  }}
+                />
+                <Label 
+                  htmlFor="issueToProject" 
+                  className="text-sm font-medium cursor-pointer flex items-center gap-2"
+                >
+                  <MapPin className="h-4 w-4" />
+                  Issue to Project Storage Location
+                </Label>
+              </div>
+
+              {issueToProject && (
+                <div className="space-y-2 pl-6">
+                  <Label htmlFor="projectLocation">Project Location *</Label>
+                  <Select 
+                    value={selectedLocationId} 
+                    onValueChange={setSelectedLocationId}
+                    disabled={isLoadingLocations}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder={isLoadingLocations ? "Loading..." : "Select project location"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {projectStorageLocations.map(location => (
+                        <SelectItem key={location.warehouse_location_id} value={location.warehouse_location_id}>
+                          {location.location_code} - {location.location_name} ({location.project_name})
+                        </SelectItem>
+                      ))}
+                      {projectStorageLocations.length === 0 && !isLoadingLocations && (
+                        <SelectItem value="none" disabled>
+                          No project storage locations available
+                        </SelectItem>
+                      )}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    Stock will be marked as issued to this project location
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+
           <div className="space-y-2">
             <Label htmlFor="unit_cost">Unit Cost</Label>
             <Input
@@ -202,7 +298,7 @@ export function StockAdjustmentDialog({
               Cancel
             </Button>
             <Button type="submit" disabled={isCreating}>
-              {adjustmentType === 'increase' ? 'Increase Stock' : 'Decrease Stock'}
+              {adjustmentType === 'increase' ? 'Increase Stock' : issueToProject ? 'Issue to Project' : 'Decrease Stock'}
             </Button>
           </div>
         </form>
