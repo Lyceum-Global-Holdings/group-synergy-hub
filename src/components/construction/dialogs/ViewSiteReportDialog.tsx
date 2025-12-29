@@ -118,17 +118,13 @@ export function ViewSiteReportDialog({
       // Refetch the report data
       await refetchReport();
       
-      // Invalidate and refetch material activity queries
+      // Invalidate and refetch material activity queries using partial key matching
+      // This matches ALL queries that start with these keys, regardless of parameters
       await Promise.all([
-        queryClient.invalidateQueries({ 
-          queryKey: ["daily-material-issues", selectedCompany?.id, periodStartDate, periodEndDate] 
-        }),
-        queryClient.invalidateQueries({ 
-          queryKey: ["daily-stock-adjustments", selectedCompany?.id, periodStartDate, periodEndDate] 
-        }),
-        queryClient.invalidateQueries({ 
-          queryKey: ["current-stock-balance", selectedCompany?.id] 
-        }),
+        queryClient.invalidateQueries({ queryKey: ["daily-material-issues"] }),
+        queryClient.invalidateQueries({ queryKey: ["daily-material-returns"] }),
+        queryClient.invalidateQueries({ queryKey: ["daily-stock-adjustments"] }),
+        queryClient.invalidateQueries({ queryKey: ["current-stock-balance"] }),
       ]);
       
       toast({ 
