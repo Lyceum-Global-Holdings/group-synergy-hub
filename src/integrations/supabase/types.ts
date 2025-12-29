@@ -9856,6 +9856,7 @@ export type Database = {
           created_at: string
           created_by: string | null
           id: string
+          issued_to_location_id: string | null
           item_id: string
           notes: string | null
           quantity_after: number
@@ -9877,6 +9878,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           id?: string
+          issued_to_location_id?: string | null
           item_id: string
           notes?: string | null
           quantity_after?: number
@@ -9898,6 +9900,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           id?: string
+          issued_to_location_id?: string | null
           item_id?: string
           notes?: string | null
           quantity_after?: number
@@ -9930,6 +9933,13 @@ export type Database = {
             columns: ["batch_id"]
             isOneToOne: false
             referencedRelation: "stock_adjustment_batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_transactions_issued_to_location_id_fkey"
+            columns: ["issued_to_location_id"]
+            isOneToOne: false
+            referencedRelation: "warehouse_locations"
             referencedColumns: ["id"]
           },
         ]
