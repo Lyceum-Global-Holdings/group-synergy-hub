@@ -23,7 +23,8 @@ import { StockTransactionType } from '@/types/stockTransaction';
 import { useWarehouseBins } from '@/hooks/useWarehouseBins';
 import { useWarehouseBinAllocations } from '@/hooks/useWarehouseBinAllocations';
 import { useProjectStorageLocations } from '@/hooks/useProjectStorageLocations';
-import { MapPin } from 'lucide-react';
+import { useWarehouseLocations } from '@/hooks/useWarehouseLocations';
+import { MapPin, Building2 } from 'lucide-react';
 
 interface StockAdjustmentDialogProps {
   open: boolean;
@@ -47,12 +48,18 @@ export function StockAdjustmentDialog({
   const [notes, setNotes] = useState('');
   const [issueToProject, setIssueToProject] = useState(false);
   const [selectedLocationId, setSelectedLocationId] = useState('');
+  const [issueToSubLocation, setIssueToSubLocation] = useState(false);
+  const [selectedSubLocationId, setSelectedSubLocationId] = useState('');
 
   const { createTransaction, isCreating } = useStockTransactions();
   const { bins } = useWarehouseBins();
   const { createAllocation, adjustAllocation, getAllocationsForItem } = useWarehouseBinAllocations();
   const { projectStorageLocations, isLoading: isLoadingLocations } = useProjectStorageLocations();
+  const { locations, isLoading: isLoadingSubLocations } = useWarehouseLocations();
   const [itemAllocations, setItemAllocations] = useState<any[]>([]);
+
+  // Filter sub-locations from warehouse locations
+  const subLocations = locations?.filter(loc => loc.type === 'sublocation' && loc.status === 'active') || [];
 
   // Load allocations for this item when dialog opens
   useEffect(() => {
@@ -65,11 +72,13 @@ export function StockAdjustmentDialog({
     loadAllocations();
   }, [open, itemId]);
 
-  // Reset issue to project when switching to increase
+  // Reset issue options when switching to increase
   useEffect(() => {
     if (adjustmentType === 'increase') {
       setIssueToProject(false);
       setSelectedLocationId('');
+      setIssueToSubLocation(false);
+      setSelectedSubLocationId('');
     }
   }, [adjustmentType]);
 
@@ -82,6 +91,8 @@ export function StockAdjustmentDialog({
       setNotes('');
       setIssueToProject(false);
       setSelectedLocationId('');
+      setIssueToSubLocation(false);
+      setSelectedSubLocationId('');
       setAdjustmentType('increase');
     }
   }, [open]);
@@ -100,6 +111,12 @@ export function StockAdjustmentDialog({
     // Validate project location if issuing to project
     if (issueToProject && !selectedLocationId) {
       alert('Please select a project storage location');
+      return;
+    }
+
+    // Validate sub-location if issuing to sub-location
+    if (issueToSubLocation && !selectedSubLocationId) {
+      alert('Please select a sub-location');
       return;
     }
 
@@ -127,16 +144,31 @@ export function StockAdjustmentDialog({
       return;
     }
 
-    // Determine transaction type and notes based on issue to project
-    const selectedLocation = projectStorageLocations.find(l => l.warehouse_location_id === selectedLocationId);
-    const isProjectIssue = issueToProject && selectedLocation && adjustmentType === 'decrease';
+    // Determine transaction type and notes based on issue destination
+    const selectedProjectLocation = projectStorageLocations.find(l => l.warehouse_location_id === selectedLocationId);
+    const selectedSubLocation = subLocations.find(l => l.id === selectedSubLocationId);
+    const isProjectIssue = issueToProject && selectedProjectLocation && adjustmentType === 'decrease';
+    const isSubLocationIssue = issueToSubLocation && selectedSubLocation && adjustmentType === 'decrease';
     
-    const transactionType: StockTransactionType = isProjectIssue ? 'project_issue' : 'adjustment';
-    const referenceType = isProjectIssue ? 'project' : 'adjustment';
+    let transactionType: StockTransactionType = 'adjustment';
+    let referenceType: 'manual' | 'grn' | 'mrn' | 'adjustment' | 'transfer' | 'project' = 'adjustment';
+    let issuedLocationId: string | undefined = undefined;
+    
+    if (isProjectIssue) {
+      transactionType = 'project_issue';
+      referenceType = 'project';
+      issuedLocationId = selectedLocationId;
+    } else if (isSubLocationIssue) {
+      transactionType = 'material_issue';
+      referenceType = 'transfer';
+      issuedLocationId = selectedSubLocationId;
+    }
     
     let transactionNotes = notes;
     if (isProjectIssue) {
-      transactionNotes = `Issued to ${selectedLocation.location_name} (${selectedLocation.project_name})${notes ? ' - ' + notes : ''}`;
+      transactionNotes = `Issued to ${selectedProjectLocation.location_name} (${selectedProjectLocation.project_name})${notes ? ' - ' + notes : ''}`;
+    } else if (isSubLocationIssue) {
+      transactionNotes = `Issued to ${selectedSubLocation.name} (${selectedSubLocation.location_code})${notes ? ' - ' + notes : ''}`;
     } else if (!transactionNotes) {
       transactionNotes = `Manual stock ${adjustmentType} - Bin: ${bins.find(b => b.id === binId)?.bin_code}`;
     }
@@ -152,7 +184,7 @@ export function StockAdjustmentDialog({
       unit_cost: unitCost ? parseFloat(unitCost) : undefined,
       total_value: unitCost ? parseFloat(unitCost) * Math.abs(quantityChange) : undefined,
       notes: transactionNotes,
-      issued_to_location_id: isProjectIssue ? selectedLocationId : undefined,
+      issued_to_location_id: issuedLocationId,
     });
 
     onOpenChange(false);
@@ -216,15 +248,20 @@ export function StockAdjustmentDialog({
             />
           </div>
 
-          {/* Issue to Project Storage Location - Only shown for decrease */}
+          {/* Issue Options - Only shown for decrease */}
           {adjustmentType === 'decrease' && (
             <div className="space-y-3 p-3 border rounded-lg bg-muted/30">
+              {/* Issue to Project Storage Location */}
               <div className="flex items-center space-x-2">
                 <Checkbox
                   id="issueToProject"
                   checked={issueToProject}
                   onCheckedChange={(checked) => {
                     setIssueToProject(checked === true);
+                    if (checked) {
+                      setIssueToSubLocation(false);
+                      setSelectedSubLocationId('');
+                    }
                     if (!checked) setSelectedLocationId('');
                   }}
                 />
@@ -266,6 +303,59 @@ export function StockAdjustmentDialog({
                   </p>
                 </div>
               )}
+
+              {/* Issue to Sub-Location */}
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="issueToSubLocation"
+                  checked={issueToSubLocation}
+                  onCheckedChange={(checked) => {
+                    setIssueToSubLocation(checked === true);
+                    if (checked) {
+                      setIssueToProject(false);
+                      setSelectedLocationId('');
+                    }
+                    if (!checked) setSelectedSubLocationId('');
+                  }}
+                />
+                <Label 
+                  htmlFor="issueToSubLocation" 
+                  className="text-sm font-medium cursor-pointer flex items-center gap-2"
+                >
+                  <Building2 className="h-4 w-4" />
+                  Issue to Sub-Location
+                </Label>
+              </div>
+
+              {issueToSubLocation && (
+                <div className="space-y-2 pl-6">
+                  <Label htmlFor="subLocation">Sub-Location *</Label>
+                  <Select 
+                    value={selectedSubLocationId} 
+                    onValueChange={setSelectedSubLocationId}
+                    disabled={isLoadingSubLocations}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder={isLoadingSubLocations ? "Loading..." : "Select sub-location"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {subLocations.map(location => (
+                        <SelectItem key={location.id} value={location.id}>
+                          {location.location_code} - {location.name}
+                        </SelectItem>
+                      ))}
+                      {subLocations.length === 0 && !isLoadingSubLocations && (
+                        <SelectItem value="none" disabled>
+                          No sub-locations available
+                        </SelectItem>
+                      )}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    Stock will be marked as issued to this sub-location
+                  </p>
+                </div>
+              )}
             </div>
           )}
 
@@ -298,7 +388,13 @@ export function StockAdjustmentDialog({
               Cancel
             </Button>
             <Button type="submit" disabled={isCreating}>
-              {adjustmentType === 'increase' ? 'Increase Stock' : issueToProject ? 'Issue to Project' : 'Decrease Stock'}
+              {adjustmentType === 'increase' 
+                ? 'Increase Stock' 
+                : issueToProject 
+                  ? 'Issue to Project' 
+                  : issueToSubLocation 
+                    ? 'Issue to Sub-Location'
+                    : 'Decrease Stock'}
             </Button>
           </div>
         </form>
