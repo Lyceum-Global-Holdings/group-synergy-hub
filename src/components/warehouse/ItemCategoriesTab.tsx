@@ -7,6 +7,7 @@ import { CreateCategoryDialog } from '@/components/warehouse/CreateCategoryDialo
 import { ImportCategoriesDialog } from '@/components/warehouse/ImportCategoriesDialog';
 import { CategoryTreeItem } from '@/components/warehouse/CategoryTreeItem';
 import { ItemCategory } from '@/types/itemBin';
+import { useCompany } from '@/contexts/CompanyContext';
 
 export function ItemCategoriesTab() {
   const [searchTerm, setSearchTerm] = useState('');
@@ -15,7 +16,8 @@ export function ItemCategoriesTab() {
   const [editingCategory, setEditingCategory] = useState<ItemCategory | null>(null);
   const [expandedAll, setExpandedAll] = useState(false);
   
-  const { categories, isLoading, deleteCategory, isDeleting } = useItemCategories();
+  const { selectedCompany } = useCompany();
+  const { categories, isLoading, deleteCategory, isDeleting } = useItemCategories(selectedCompany?.id);
 
   // Build category tree structure
   const categoryTree = useMemo(() => {
@@ -144,11 +146,13 @@ export function ItemCategoriesTab() {
           if (!open) setEditingCategory(null);
         }}
         editingCategory={editingCategory}
+        companyId={selectedCompany?.id}
       />
 
       <ImportCategoriesDialog
         open={isImportDialogOpen}
         onOpenChange={setIsImportDialogOpen}
+        companyId={selectedCompany?.id}
       />
     </div>
   );
