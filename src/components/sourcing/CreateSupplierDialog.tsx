@@ -336,12 +336,12 @@ export const CreateSupplierDialog: React.FC<CreateSupplierDialogProps> = ({
 
         const newSupplier = await createSupplierMutation.mutateAsync(submitData);
 
-        // Create company allocations
+        // Create company allocations - auto-approve when user creates and allocates
         const allocations = selectedCompanyIds.map(companyId => {
           const settings = allocationSettings.get(companyId)!;
           return {
             company_id: companyId,
-            status: (settings.auto_approve && isSuperAdmin ? 'approved' : 'pending') as 'pending' | 'approved',
+            status: 'approved' as const,
             is_preferred: settings.is_preferred,
             payment_terms: settings.payment_terms,
             credit_limit: settings.credit_limit,
