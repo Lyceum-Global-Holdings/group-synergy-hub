@@ -29,8 +29,9 @@ import { useWarehouseBinAllocations } from '@/hooks/useWarehouseBinAllocations';
 import { useCompany } from '@/contexts/CompanyContext';
 import { WarehouseItem } from '@/types/itemBin';
 import { supabase } from '@/integrations/supabase/client';
-import { Upload, X } from 'lucide-react';
+import { Upload, X, Plus } from 'lucide-react';
 import { toast } from 'sonner';
+import { QuickCreateSupplierDialog } from './QuickCreateSupplierDialog';
 
 interface CreateItemDialogProps {
   open: boolean;
@@ -68,11 +69,12 @@ export function CreateItemDialog({ open, onOpenChange, editingItem }: CreateItem
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [isQuickSupplierDialogOpen, setIsQuickSupplierDialogOpen] = useState(false);
 
   const { createItem, createItemAsync, updateItem, isCreating, isUpdating } = useWarehouseItems();
   const { companies, selectedCompany } = useCompany();
   const { categories } = useItemCategories(selectedCompany?.id);
-  const { data: suppliers = [] } = useSuppliers();
+  const { data: suppliers = [], refetch: refetchSuppliers } = useSuppliers();
   const { units } = useItemUnits();
   const { createTransaction } = useStockTransactions();
   const { locations } = useWarehouseLocations();
@@ -86,6 +88,11 @@ export function CreateItemDialog({ open, onOpenChange, editingItem }: CreateItem
   const filteredBins = formData.location_id 
     ? bins.filter(bin => bin.location_id === formData.location_id)
     : bins;
+
+  const handleSupplierCreated = async (supplierId: string) => {
+    await refetchSuppliers();
+    setFormData(prev => ({ ...prev, supplier_id: supplierId }));
+  };
 
   useEffect(() => {
     if (editingItem) {
@@ -397,11 +404,26 @@ export function CreateItemDialog({ open, onOpenChange, editingItem }: CreateItem
             </div>
             <div className="space-y-2">
               <Label htmlFor="supplier_id">Supplier</Label>
-              <Select value={formData.supplier_id} onValueChange={(value) => setFormData({ ...formData, supplier_id: value })}>
+              <Select 
+                value={formData.supplier_id} 
+                onValueChange={(value) => {
+                  if (value === '__create_new__') {
+                    setIsQuickSupplierDialogOpen(true);
+                  } else {
+                    setFormData({ ...formData, supplier_id: value });
+                  }
+                }}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Select supplier" />
                 </SelectTrigger>
                 <SelectContent className="bg-background border z-50">
+                  <SelectItem value="__create_new__" className="text-primary font-medium">
+                    <span className="flex items-center gap-2">
+                      <Plus className="h-4 w-4" />
+                      Create New Supplier
+                    </span>
+                  </SelectItem>
                   {suppliers.map((supplier) => (
                     <SelectItem key={supplier.id} value={supplier.id}>
                       {supplier.name}
@@ -642,6 +664,12 @@ export function CreateItemDialog({ open, onOpenChange, editingItem }: CreateItem
             </Button>
           </div>
         </form>
+
+        <QuickCreateSupplierDialog
+          open={isQuickSupplierDialogOpen}
+          onOpenChange={setIsQuickSupplierDialogOpen}
+          onSupplierCreated={handleSupplierCreated}
+        />
       </DialogContent>
     </Dialog>
   );
