@@ -153,6 +153,21 @@ export const useCreateSupplier = () => {
         }
       }
 
+      // Create company_suppliers entry with approved status so supplier is immediately available
+      const { error: allocationError } = await supabase
+        .from('company_suppliers')
+        .insert({
+          company_id: selectedCompany.id,
+          supplier_id: supplier.id,
+          status: 'approved',
+          allocated_by: user.id,
+        });
+
+      if (allocationError) {
+        console.error('Error allocating supplier to company:', allocationError);
+        // Don't throw - supplier was created successfully
+      }
+
       return supplier as Supplier;
     },
     onSuccess: () => {
