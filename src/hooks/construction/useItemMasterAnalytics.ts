@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useCompany } from "@/contexts/CompanyContext";
 
 export interface CategoryDistribution {
   categoryId: string | null;
@@ -36,11 +37,13 @@ export interface ItemMasterAnalytics {
 }
 
 export function useItemMasterAnalytics() {
+  const { selectedCompany } = useCompany();
+
   return useQuery({
-    queryKey: ['item-master-analytics'],
+    queryKey: ['item-master-analytics', selectedCompany?.id],
     queryFn: async (): Promise<ItemMasterAnalytics> => {
-      // Fetch all items with their categories
-      const { data: items, error } = await supabase
+      // Build query with company filter
+      let query = supabase
         .from('warehouse_items')
         .select(`
           id,
@@ -55,6 +58,13 @@ export function useItemMasterAnalytics() {
           )
         `)
         .order('current_stock', { ascending: false });
+
+      // Filter by company if selected
+      if (selectedCompany?.id) {
+        query = query.eq('company_id', selectedCompany.id);
+      }
+
+      const { data: items, error } = await query;
 
       if (error) throw error;
 
