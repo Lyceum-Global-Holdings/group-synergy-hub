@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -53,6 +54,7 @@ export function ItemMasterTab() {
   const [deletingItem, setDeletingItem] = useState<WarehouseItem | null>(null);
   const [transferItem, setTransferItem] = useState<WarehouseItem | null>(null);
   const [stockDetailsItem, setStockDetailsItem] = useState<WarehouseItem | null>(null);
+  const [previewImage, setPreviewImage] = useState<{ url: string; name: string } | null>(null);
   
   const { 
     items, 
@@ -219,7 +221,14 @@ export function ItemMasterTab() {
               filteredItems.map((item) => (
                 <TableRow key={item.id}>
                   <TableCell>
-                    <div className="w-10 h-10 rounded border overflow-hidden bg-muted flex items-center justify-center">
+                    <div 
+                      className={`w-10 h-10 rounded border overflow-hidden bg-muted flex items-center justify-center ${item.image_url ? 'cursor-pointer hover:ring-2 hover:ring-primary transition-all' : ''}`}
+                      onClick={() => {
+                        if (item.image_url) {
+                          setPreviewImage({ url: item.image_url, name: item.name });
+                        }
+                      }}
+                    >
                       {item.image_url ? (
                         <img 
                           src={item.image_url} 
@@ -469,6 +478,22 @@ export function ItemMasterTab() {
         locationStock={stockDetailsItem ? (itemLocationStock[stockDetailsItem.id] || []) : []}
         allLocations={allLocations}
       />
+
+      {/* Image Preview Dialog */}
+      <Dialog open={!!previewImage} onOpenChange={() => setPreviewImage(null)}>
+        <DialogContent className="max-w-2xl p-2">
+          {previewImage && (
+            <div className="flex flex-col items-center pt-6">
+              <img 
+                src={previewImage.url} 
+                alt={previewImage.name}
+                className="max-h-[70vh] w-auto object-contain rounded"
+              />
+              <p className="mt-2 text-sm text-muted-foreground">{previewImage.name}</p>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
