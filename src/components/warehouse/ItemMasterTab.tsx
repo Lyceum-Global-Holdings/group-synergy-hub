@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Plus, Search, Edit, Trash2, History, Settings, Eye, ArrowLeftRight, MapPin, BarChart3, Wrench } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, History, Settings, Eye, ArrowLeftRight, MapPin, BarChart3, Wrench, Image as ImageIcon } from 'lucide-react';
 import { BulkItemImportDialog } from '@/components/warehouse/BulkItemImportDialog';
 import {
   Table,
@@ -189,6 +189,7 @@ export function ItemMasterTab() {
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead className="w-[60px]">Photo</TableHead>
               <TableHead>Item Code</TableHead>
               <TableHead>Name</TableHead>
               <TableHead>Category</TableHead>
@@ -204,19 +205,35 @@ export function ItemMasterTab() {
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={10} className="text-center py-8">
+                <TableCell colSpan={11} className="text-center py-8">
                   Loading items...
                 </TableCell>
               </TableRow>
             ) : filteredItems.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={11} className="text-center py-8 text-muted-foreground">
                   No items found. Create your first item to get started.
                 </TableCell>
               </TableRow>
             ) : (
               filteredItems.map((item) => (
                 <TableRow key={item.id}>
+                  <TableCell>
+                    <div className="w-10 h-10 rounded border overflow-hidden bg-muted flex items-center justify-center">
+                      {item.image_url ? (
+                        <img 
+                          src={item.image_url} 
+                          alt={item.name}
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            e.currentTarget.style.display = 'none';
+                            (e.currentTarget.parentElement?.querySelector('.placeholder-icon') as HTMLElement)?.classList.remove('hidden');
+                          }}
+                        />
+                      ) : null}
+                      <ImageIcon className={`h-5 w-5 text-muted-foreground placeholder-icon ${item.image_url ? 'hidden' : ''}`} />
+                    </div>
+                  </TableCell>
                   <TableCell className="font-medium">{item.item_code}</TableCell>
                   <TableCell>{item.name}</TableCell>
                   <TableCell>
