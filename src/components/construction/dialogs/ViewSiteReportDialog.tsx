@@ -72,6 +72,7 @@ export function ViewSiteReportDialog({
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const { selectedCompany } = useCompany();
+  const [isSendingTelegram, setIsSendingTelegram] = useState(false);
 
   // Fetch fresh report data when dialog opens
   const {
@@ -135,7 +136,6 @@ export function ViewSiteReportDialog({
     }
     return format(new Date(displayReport.report_date), "MMMM d, yyyy");
   };
-  const [isSendingTelegram, setIsSendingTelegram] = useState(false);
 
   const handleExportPdf = () => {
     exportSiteReportToPdf(displayReport as any, {
