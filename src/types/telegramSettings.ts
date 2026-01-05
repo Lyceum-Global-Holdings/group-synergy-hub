@@ -7,6 +7,7 @@ export interface TelegramSettings {
   notify_on_report_create: boolean;
   scheduled_send_enabled: boolean;
   scheduled_send_time: string | null;
+  timezone: string | null;
   last_scheduled_send: string | null;
   created_at: string;
   updated_at: string;
@@ -19,4 +20,5 @@ export interface UpdateTelegramSettingsData {
   notify_on_report_create?: boolean;
   scheduled_send_enabled?: boolean;
   scheduled_send_time?: string | null;
+  timezone?: string | null;
 }
