@@ -16,6 +16,7 @@ import { exportSiteReportToPdf, generateSiteReportPdfBase64 } from "@/utils/site
 import { useToast } from "@/hooks/use-toast";
 import { useCompany } from "@/contexts/CompanyContext";
 import { cn } from "@/lib/utils";
+import { useTelegramSettings } from "@/hooks/useTelegramSettings";
 interface ViewSiteReportDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -72,6 +73,7 @@ export function ViewSiteReportDialog({
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const { selectedCompany } = useCompany();
+  const { settings: telegramSettings } = useTelegramSettings();
   const [isSendingTelegram, setIsSendingTelegram] = useState(false);
 
   // Fetch fresh report data when dialog opens
@@ -146,6 +148,15 @@ export function ViewSiteReportDialog({
   };
 
   const handleSendTelegram = async () => {
+    if (!telegramSettings?.bot_token || !telegramSettings?.chat_id) {
+      toast({
+        title: "Telegram not configured",
+        description: "Please configure Telegram settings in the Settings tab.",
+        variant: "destructive"
+      });
+      return;
+    }
+
     setIsSendingTelegram(true);
     try {
       const pdfBase64 = generateSiteReportPdfBase64(displayReport as any, {
@@ -161,7 +172,9 @@ export function ViewSiteReportDialog({
           report_number: displayReport.report_number,
           project_name: displayReport.project?.project_name || 'N/A',
           report_date: formatPeriod(),
-          report_type: reportType
+          report_type: reportType,
+          bot_token: telegramSettings.bot_token,
+          chat_id: telegramSettings.chat_id
         }
       });
 
@@ -545,14 +558,16 @@ export function ViewSiteReportDialog({
             <FileDown className="mr-2 h-4 w-4" />
             Export PDF
           </Button>
-          <Button 
-            variant="outline" 
-            onClick={handleSendTelegram}
-            disabled={isSendingTelegram}
-          >
-            <Send className={cn("mr-2 h-4 w-4", isSendingTelegram && "animate-pulse")} />
-            {isSendingTelegram ? "Sending..." : "Send via Telegram"}
-          </Button>
+          {telegramSettings?.is_enabled && telegramSettings?.bot_token && telegramSettings?.chat_id && (
+            <Button 
+              variant="outline" 
+              onClick={handleSendTelegram}
+              disabled={isSendingTelegram}
+            >
+              <Send className={cn("mr-2 h-4 w-4", isSendingTelegram && "animate-pulse")} />
+              {isSendingTelegram ? "Sending..." : "Send via Telegram"}
+            </Button>
+          )}
           <Button variant="ghost" onClick={() => onOpenChange(false)}>
             <X className="mr-2 h-4 w-4" />
             Close
