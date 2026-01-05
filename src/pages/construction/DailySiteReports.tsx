@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus, Search, FileText, Calendar, Cloud, Users, Pencil, Trash2, Sparkles, BarChart3, Eye } from "lucide-react";
+import { Plus, Search, FileText, Calendar, Cloud, Users, Pencil, Trash2, Sparkles, BarChart3, Eye, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -26,6 +26,7 @@ import { format } from "date-fns";
 import { DailySiteReportDialog, DeleteConfirmDialog, ViewSiteReportDialog } from "@/components/construction/dialogs";
 import { GenerateReportDialog } from "@/components/construction/dialogs/GenerateReportDialog";
 import { SiteReportAnalytics } from "@/components/construction/reports/SiteReportAnalytics";
+import { TelegramSettingsTab } from "@/components/construction/TelegramSettingsTab";
 
 const REPORT_TYPE_CONFIG = {
   daily: { label: "Daily", color: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300" },
@@ -141,6 +142,10 @@ export default function DailySiteReports() {
           <TabsTrigger value="analytics" className="flex items-center gap-2">
             <BarChart3 className="h-4 w-4" />
             Analytics Dashboard
+          </TabsTrigger>
+          <TabsTrigger value="settings" className="flex items-center gap-2">
+            <Settings className="h-4 w-4" />
+            Settings
           </TabsTrigger>
         </TabsList>
 
@@ -298,6 +303,10 @@ export default function DailySiteReports() {
 
         <TabsContent value="analytics">
           <SiteReportAnalytics />
+        </TabsContent>
+
+        <TabsContent value="settings">
+          <TelegramSettingsTab />
         </TabsContent>
       </Tabs>
 
