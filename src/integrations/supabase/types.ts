@@ -11383,7 +11383,10 @@ export type Database = {
           created_at: string | null
           id: string
           is_enabled: boolean | null
+          last_scheduled_send: string | null
           notify_on_report_create: boolean | null
+          scheduled_send_enabled: boolean | null
+          scheduled_send_time: string | null
           updated_at: string | null
         }
         Insert: {
@@ -11393,7 +11396,10 @@ export type Database = {
           created_at?: string | null
           id?: string
           is_enabled?: boolean | null
+          last_scheduled_send?: string | null
           notify_on_report_create?: boolean | null
+          scheduled_send_enabled?: boolean | null
+          scheduled_send_time?: string | null
           updated_at?: string | null
         }
         Update: {
@@ -11403,7 +11409,10 @@ export type Database = {
           created_at?: string | null
           id?: string
           is_enabled?: boolean | null
+          last_scheduled_send?: string | null
           notify_on_report_create?: boolean | null
+          scheduled_send_enabled?: boolean | null
+          scheduled_send_time?: string | null
           updated_at?: string | null
         }
         Relationships: [
