@@ -60,37 +60,32 @@ const TIMEZONE_OFFSETS: Record<string, number> = {
 function checkTimeMatch(nowUtc: Date, scheduledTime: string, userTimezone: string): boolean {
   const [scheduledHour, scheduledMinute] = scheduledTime.split(':').map(Number);
   
-  // Get offset for the user's timezone (in hours)
+  // Get offset for the user's timezone (in hours, can be fractional like 5.5 for India)
   const offsetHours = TIMEZONE_OFFSETS[userTimezone] ?? 0;
   
-  // Convert scheduled time (in user's timezone) to UTC
-  // If user wants 18:00 in Dubai (UTC+4), that's 14:00 UTC
-  let scheduledUtcHour = scheduledHour - offsetHours;
+  // Convert offset to total minutes for easier calculation
+  const offsetMinutes = Math.round(offsetHours * 60);
+  
+  // Convert scheduled time to total minutes from midnight
+  const scheduledTotalMinutes = scheduledHour * 60 + scheduledMinute;
+  
+  // Convert to UTC by subtracting the offset
+  let utcTotalMinutes = scheduledTotalMinutes - offsetMinutes;
   
   // Handle day wraparound
-  if (scheduledUtcHour < 0) scheduledUtcHour += 24;
-  if (scheduledUtcHour >= 24) scheduledUtcHour -= 24;
+  if (utcTotalMinutes < 0) utcTotalMinutes += 24 * 60;
+  if (utcTotalMinutes >= 24 * 60) utcTotalMinutes -= 24 * 60;
+  
+  // Extract hour and minute
+  const expectedUtcHour = Math.floor(utcTotalMinutes / 60);
+  const expectedUtcMinute = utcTotalMinutes % 60;
   
   const currentUtcHour = nowUtc.getUTCHours();
   const currentUtcMinute = nowUtc.getUTCMinutes();
   
-  // Handle fractional offsets (like India's +5:30)
-  const fractionalMinutes = (offsetHours % 1) * 60;
-  let scheduledUtcMinute = scheduledMinute - fractionalMinutes;
-  let adjustedScheduledUtcHour = Math.floor(scheduledUtcHour);
+  console.log(`Time check: scheduled ${scheduledHour}:${scheduledMinute} (${userTimezone}) = ${expectedUtcHour}:${expectedUtcMinute} UTC, current: ${currentUtcHour}:${currentUtcMinute} UTC`);
   
-  if (scheduledUtcMinute < 0) {
-    scheduledUtcMinute += 60;
-    adjustedScheduledUtcHour -= 1;
-    if (adjustedScheduledUtcHour < 0) adjustedScheduledUtcHour += 24;
-  }
-  if (scheduledUtcMinute >= 60) {
-    scheduledUtcMinute -= 60;
-    adjustedScheduledUtcHour += 1;
-    if (adjustedScheduledUtcHour >= 24) adjustedScheduledUtcHour -= 24;
-  }
-  
-  return currentUtcHour === adjustedScheduledUtcHour && currentUtcMinute === Math.floor(scheduledUtcMinute);
+  return currentUtcHour === expectedUtcHour && currentUtcMinute === expectedUtcMinute;
 }
 
 serve(async (req) => {
