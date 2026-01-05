@@ -4,9 +4,22 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
-import { Send, Eye, EyeOff, Loader2, TestTube, Clock } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Send, Eye, EyeOff, Loader2, TestTube, Clock, Globe } from "lucide-react";
 import { useTelegramSettings } from "@/hooks/useTelegramSettings";
 import { format } from "date-fns";
+
+const TIMEZONES = [
+  { value: "UTC", label: "UTC (Coordinated Universal Time)", offset: 0 },
+  { value: "Asia/Dubai", label: "Dubai (UTC+4)", offset: 4 },
+  { value: "Asia/Kolkata", label: "India (UTC+5:30)", offset: 5.5 },
+  { value: "Asia/Singapore", label: "Singapore (UTC+8)", offset: 8 },
+  { value: "Asia/Tokyo", label: "Tokyo (UTC+9)", offset: 9 },
+  { value: "Europe/London", label: "London (UTC+0/+1)", offset: 0 },
+  { value: "Europe/Paris", label: "Paris (UTC+1/+2)", offset: 1 },
+  { value: "America/New_York", label: "New York (UTC-5/-4)", offset: -5 },
+  { value: "America/Los_Angeles", label: "Los Angeles (UTC-8/-7)", offset: -8 },
+];
 
 export function TelegramSettingsTab() {
   const { settings, isLoading, saveSettings, isSaving, testConnection, testScheduledSend } = useTelegramSettings();
@@ -17,6 +30,7 @@ export function TelegramSettingsTab() {
   const [notifyOnCreate, setNotifyOnCreate] = useState(true);
   const [scheduledSendEnabled, setScheduledSendEnabled] = useState(false);
   const [scheduledSendTime, setScheduledSendTime] = useState("18:00");
+  const [timezone, setTimezone] = useState("UTC");
   const [showToken, setShowToken] = useState(false);
   const [isTesting, setIsTesting] = useState(false);
   const [isTestingSend, setIsTestingSend] = useState(false);
@@ -29,6 +43,7 @@ export function TelegramSettingsTab() {
       setIsEnabled(settings.is_enabled);
       setNotifyOnCreate(settings.notify_on_report_create);
       setScheduledSendEnabled(settings.scheduled_send_enabled || false);
+      setTimezone(settings.timezone || "UTC");
       // Parse time from "HH:MM:SS" format to "HH:MM"
       if (settings.scheduled_send_time) {
         const timeParts = settings.scheduled_send_time.split(':');
@@ -45,6 +60,7 @@ export function TelegramSettingsTab() {
       notify_on_report_create: notifyOnCreate,
       scheduled_send_enabled: scheduledSendEnabled,
       scheduled_send_time: scheduledSendEnabled ? `${scheduledSendTime}:00` : null,
+      timezone: scheduledSendEnabled ? timezone : null,
     });
   };
 
@@ -171,7 +187,24 @@ export function TelegramSettingsTab() {
           {scheduledSendEnabled && (
             <div className="space-y-4 pl-4 border-l-2 border-primary/20">
               <div className="space-y-2">
-                <Label htmlFor="send-time">Send Time (UTC)</Label>
+                <Label htmlFor="timezone">Timezone</Label>
+                <Select value={timezone} onValueChange={setTimezone}>
+                  <SelectTrigger className="w-64">
+                    <Globe className="h-4 w-4 mr-2" />
+                    <SelectValue placeholder="Select timezone" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {TIMEZONES.map((tz) => (
+                      <SelectItem key={tz.value} value={tz.value}>
+                        {tz.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="send-time">Send Time</Label>
                 <Input
                   id="send-time"
                   type="time"
@@ -180,7 +213,7 @@ export function TelegramSettingsTab() {
                   className="w-32"
                 />
                 <p className="text-xs text-muted-foreground">
-                  Reports created today will be sent at this time (UTC timezone)
+                  Reports created today will be sent at this time in your selected timezone
                 </p>
               </div>
 

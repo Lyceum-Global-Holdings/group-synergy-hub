@@ -11387,6 +11387,7 @@ export type Database = {
           notify_on_report_create: boolean | null
           scheduled_send_enabled: boolean | null
           scheduled_send_time: string | null
+          timezone: string | null
           updated_at: string | null
         }
         Insert: {
@@ -11400,6 +11401,7 @@ export type Database = {
           notify_on_report_create?: boolean | null
           scheduled_send_enabled?: boolean | null
           scheduled_send_time?: string | null
+          timezone?: string | null
           updated_at?: string | null
         }
         Update: {
@@ -11413,6 +11415,7 @@ export type Database = {
           notify_on_report_create?: boolean | null
           scheduled_send_enabled?: boolean | null
           scheduled_send_time?: string | null
+          timezone?: string | null
           updated_at?: string | null
         }
         Relationships: [

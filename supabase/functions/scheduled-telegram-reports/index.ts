@@ -43,6 +43,56 @@ interface MaterialsData {
   stockBalances: CurrentStockBalance[];
 }
 
+// Timezone offset mapping (approximate, doesn't handle DST perfectly but good enough)
+const TIMEZONE_OFFSETS: Record<string, number> = {
+  'UTC': 0,
+  'Asia/Dubai': 4,
+  'Asia/Kolkata': 5.5,
+  'Asia/Singapore': 8,
+  'Asia/Tokyo': 9,
+  'Europe/London': 0, // Could be +1 in summer
+  'Europe/Paris': 1, // Could be +2 in summer
+  'America/New_York': -5, // Could be -4 in summer
+  'America/Los_Angeles': -8, // Could be -7 in summer
+};
+
+// Check if current UTC time matches the scheduled time in user's timezone
+function checkTimeMatch(nowUtc: Date, scheduledTime: string, userTimezone: string): boolean {
+  const [scheduledHour, scheduledMinute] = scheduledTime.split(':').map(Number);
+  
+  // Get offset for the user's timezone (in hours)
+  const offsetHours = TIMEZONE_OFFSETS[userTimezone] ?? 0;
+  
+  // Convert scheduled time (in user's timezone) to UTC
+  // If user wants 18:00 in Dubai (UTC+4), that's 14:00 UTC
+  let scheduledUtcHour = scheduledHour - offsetHours;
+  
+  // Handle day wraparound
+  if (scheduledUtcHour < 0) scheduledUtcHour += 24;
+  if (scheduledUtcHour >= 24) scheduledUtcHour -= 24;
+  
+  const currentUtcHour = nowUtc.getUTCHours();
+  const currentUtcMinute = nowUtc.getUTCMinutes();
+  
+  // Handle fractional offsets (like India's +5:30)
+  const fractionalMinutes = (offsetHours % 1) * 60;
+  let scheduledUtcMinute = scheduledMinute - fractionalMinutes;
+  let adjustedScheduledUtcHour = Math.floor(scheduledUtcHour);
+  
+  if (scheduledUtcMinute < 0) {
+    scheduledUtcMinute += 60;
+    adjustedScheduledUtcHour -= 1;
+    if (adjustedScheduledUtcHour < 0) adjustedScheduledUtcHour += 24;
+  }
+  if (scheduledUtcMinute >= 60) {
+    scheduledUtcMinute -= 60;
+    adjustedScheduledUtcHour += 1;
+    if (adjustedScheduledUtcHour >= 24) adjustedScheduledUtcHour -= 24;
+  }
+  
+  return currentUtcHour === adjustedScheduledUtcHour && currentUtcMinute === Math.floor(scheduledUtcMinute);
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -70,11 +120,7 @@ serve(async (req) => {
     console.log('Checking for scheduled Telegram reports...');
 
     const now = new Date();
-    const currentHour = now.getUTCHours();
-    const currentMinute = now.getUTCMinutes();
-    const currentTimeStr = `${currentHour.toString().padStart(2, '0')}:${currentMinute.toString().padStart(2, '0')}`;
-    
-    console.log(`Current UTC time: ${currentTimeStr}`);
+    console.log(`Current UTC time: ${now.toISOString()}`);
 
     const { data: settings, error: settingsError } = await supabase
       .from('telegram_settings')
@@ -110,11 +156,14 @@ serve(async (req) => {
       const scheduledTime = setting.scheduled_send_time;
       if (!scheduledTime) continue;
 
-      const [scheduledHour, scheduledMinute] = scheduledTime.split(':').map(Number);
-      
-      const timeMatches = currentHour === scheduledHour && currentMinute === scheduledMinute;
+      // Convert scheduled time from user's timezone to UTC for comparison
+      const timeMatches = checkTimeMatch(now, scheduledTime, setting.timezone || 'UTC');
       const shouldProcess = forceMode || timeMatches;
       const companyMatches = !targetCompanyId || setting.company_id === targetCompanyId;
+      
+      if (!forceMode) {
+        console.log(`Company ${setting.company_id}: scheduled at ${scheduledTime} (${setting.timezone || 'UTC'}), matches: ${timeMatches}`);
+      }
       
       if (shouldProcess && companyMatches) {
         console.log(`Processing company ${setting.company_id}${forceMode ? ' (forced)' : `: ${scheduledTime}`}`);
