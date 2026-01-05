@@ -13,10 +13,25 @@ serve(async (req) => {
   }
 
   try {
+    // Check for force mode from request body
+    let forceMode = false;
+    let targetCompanyId: string | null = null;
+    
+    try {
+      const body = await req.json();
+      forceMode = body?.force === true;
+      targetCompanyId = body?.company_id || null;
+    } catch {
+      // No body or invalid JSON, proceed normally
+    }
+
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
+    if (forceMode) {
+      console.log('Force mode enabled - bypassing time check');
+    }
     console.log('Checking for scheduled Telegram reports...');
 
     // Get current time in HH:MM format
@@ -65,18 +80,24 @@ serve(async (req) => {
 
       const [scheduledHour, scheduledMinute] = scheduledTime.split(':').map(Number);
       
-      // Check if current time matches scheduled time (within the same minute)
-      if (currentHour === scheduledHour && currentMinute === scheduledMinute) {
-        console.log(`Time match for company ${setting.company_id}: ${scheduledTime}`);
+      // Check if current time matches scheduled time (within the same minute) or force mode
+      const timeMatches = currentHour === scheduledHour && currentMinute === scheduledMinute;
+      const shouldProcess = forceMode || timeMatches;
+      const companyMatches = !targetCompanyId || setting.company_id === targetCompanyId;
+      
+      if (shouldProcess && companyMatches) {
+        console.log(`Processing company ${setting.company_id}${forceMode ? ' (forced)' : `: ${scheduledTime}`}`);
 
-        // Check if we already sent today (prevent duplicate sends)
-        const lastSend = setting.last_scheduled_send ? new Date(setting.last_scheduled_send) : null;
-        const today = new Date();
-        today.setUTCHours(0, 0, 0, 0);
-        
-        if (lastSend && lastSend >= today) {
-          console.log(`Already sent today for company ${setting.company_id}, skipping`);
-          continue;
+        // Check if we already sent today (prevent duplicate sends) - skip this check in force mode
+        if (!forceMode) {
+          const lastSend = setting.last_scheduled_send ? new Date(setting.last_scheduled_send) : null;
+          const today = new Date();
+          today.setUTCHours(0, 0, 0, 0);
+          
+          if (lastSend && lastSend >= today) {
+            console.log(`Already sent today for company ${setting.company_id}, skipping`);
+            continue;
+          }
         }
 
         // Get today's reports for this company

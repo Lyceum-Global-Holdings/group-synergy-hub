@@ -9,7 +9,7 @@ import { useTelegramSettings } from "@/hooks/useTelegramSettings";
 import { format } from "date-fns";
 
 export function TelegramSettingsTab() {
-  const { settings, isLoading, saveSettings, isSaving, testConnection } = useTelegramSettings();
+  const { settings, isLoading, saveSettings, isSaving, testConnection, testScheduledSend } = useTelegramSettings();
   
   const [botToken, setBotToken] = useState("");
   const [chatId, setChatId] = useState("");
@@ -19,6 +19,7 @@ export function TelegramSettingsTab() {
   const [scheduledSendTime, setScheduledSendTime] = useState("18:00");
   const [showToken, setShowToken] = useState(false);
   const [isTesting, setIsTesting] = useState(false);
+  const [isTestingSend, setIsTestingSend] = useState(false);
 
   // Load settings when they're fetched
   useEffect(() => {
@@ -52,6 +53,12 @@ export function TelegramSettingsTab() {
     setIsTesting(true);
     await testConnection(botToken, chatId);
     setIsTesting(false);
+  };
+
+  const handleTestScheduledSend = async () => {
+    setIsTestingSend(true);
+    await testScheduledSend();
+    setIsTestingSend(false);
   };
 
   if (isLoading) {
@@ -183,6 +190,25 @@ export function TelegramSettingsTab() {
                   {format(new Date(settings.last_scheduled_send), "PPp")}
                 </div>
               )}
+
+              <div className="pt-2">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={handleTestScheduledSend}
+                  disabled={isTestingSend || !botToken || !chatId}
+                >
+                  {isTestingSend ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Send className="mr-2 h-4 w-4" />
+                  )}
+                  Test Send Now
+                </Button>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Immediately send today's reports to test the scheduled feature
+                </p>
+              </div>
             </div>
           )}
         </div>
