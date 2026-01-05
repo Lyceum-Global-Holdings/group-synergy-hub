@@ -316,38 +316,54 @@ async function generateReportPdf(report: any, projectName: string, projectCode: 
     const font = options.bold ? helveticaBold : helvetica;
     const size = options.size || 10;
     const color = options.color || rgb(0, 0, 0);
-    
-    if (y < margin + 50) {
-      page = pdfDoc.addPage([pageWidth, pageHeight]);
-      y = pageHeight - margin;
-    }
-    
-    // Handle text wrapping
     const maxWidth = pageWidth - margin * 2;
-    const words = text.split(' ');
-    let line = '';
     
-    for (const word of words) {
-      const testLine = line + (line ? ' ' : '') + word;
-      const width = font.widthOfTextAtSize(testLine, size);
+    // Split by newlines first to handle multi-line text
+    const lines = text.split(/\r?\n/);
+    
+    for (const lineText of lines) {
+      if (y < margin + 50) {
+        page = pdfDoc.addPage([pageWidth, pageHeight]);
+        y = pageHeight - margin;
+      }
       
-      if (width > maxWidth && line) {
+      // Handle empty lines - add spacing
+      if (!lineText.trim()) {
+        y -= lineHeight / 2;
+        continue;
+      }
+      
+      // Clean text of any special characters that WinAnsi cannot encode
+      const cleanedText = lineText.replace(/[\x00-\x1F\x7F-\x9F]/g, ' ').trim();
+      
+      if (!cleanedText) continue;
+      
+      // Handle text wrapping for this line
+      const words = cleanedText.split(' ');
+      let line = '';
+      
+      for (const word of words) {
+        const testLine = line + (line ? ' ' : '') + word;
+        const width = font.widthOfTextAtSize(testLine, size);
+        
+        if (width > maxWidth && line) {
+          page.drawText(line, { x: margin, y, size, font, color });
+          y -= lineHeight;
+          line = word;
+          
+          if (y < margin + 50) {
+            page = pdfDoc.addPage([pageWidth, pageHeight]);
+            y = pageHeight - margin;
+          }
+        } else {
+          line = testLine;
+        }
+      }
+      
+      if (line) {
         page.drawText(line, { x: margin, y, size, font, color });
         y -= lineHeight;
-        line = word;
-        
-        if (y < margin + 50) {
-          page = pdfDoc.addPage([pageWidth, pageHeight]);
-          y = pageHeight - margin;
-        }
-      } else {
-        line = testLine;
       }
-    }
-    
-    if (line) {
-      page.drawText(line, { x: margin, y, size, font, color });
-      y -= lineHeight;
     }
   };
   
