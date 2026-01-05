@@ -8,3 +8,6 @@ verify_jwt = false
 
 [functions.analyze-floor-plan]
 verify_jwt = true
+
+[functions.send-telegram-report]
+verify_jwt = true
