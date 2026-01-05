@@ -1,8 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
-// Fallback to environment variables if not provided in request
-const DEFAULT_BOT_TOKEN = Deno.env.get("TELEGRAM_BOT_TOKEN");
-const DEFAULT_CHAT_ID = Deno.env.get("TELEGRAM_CHAT_ID");
+const TELEGRAM_BOT_TOKEN = Deno.env.get("TELEGRAM_BOT_TOKEN");
+const TELEGRAM_CHAT_ID = Deno.env.get("TELEGRAM_CHAT_ID");
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -16,8 +15,6 @@ interface TelegramReportRequest {
   project_name: string;
   report_date: string;
   report_type: string;
-  bot_token?: string;
-  chat_id?: string;
 }
 
 serve(async (req) => {
@@ -29,27 +26,14 @@ serve(async (req) => {
   try {
     console.log("Received request to send Telegram report");
     
-    const { 
-      pdf_base64, 
-      filename, 
-      report_number, 
-      project_name, 
-      report_date, 
-      report_type,
-      bot_token,
-      chat_id 
-    }: TelegramReportRequest = await req.json();
+    const { pdf_base64, filename, report_number, project_name, report_date, report_type }: TelegramReportRequest = await req.json();
 
-    // Use provided credentials or fall back to environment variables
-    const telegramBotToken = bot_token || DEFAULT_BOT_TOKEN;
-    const telegramChatId = chat_id || DEFAULT_CHAT_ID;
-
-    if (!telegramBotToken || !telegramChatId) {
+    if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID) {
       console.error("Telegram credentials not configured");
-      throw new Error("Telegram credentials not configured. Please configure Telegram settings.");
+      throw new Error("Telegram credentials not configured. Please add TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID secrets.");
     }
 
-    console.log(`Sending report ${report_number} to Telegram chat ${telegramChatId}`);
+    console.log(`Sending report ${report_number} to Telegram chat ${TELEGRAM_CHAT_ID}`);
 
     // Decode base64 PDF
     const binaryString = atob(pdf_base64);
@@ -60,7 +44,7 @@ serve(async (req) => {
     
     // Create form data for Telegram API
     const formData = new FormData();
-    formData.append("chat_id", telegramChatId);
+    formData.append("chat_id", TELEGRAM_CHAT_ID);
     formData.append("document", new Blob([bytes], { type: "application/pdf" }), filename);
     formData.append("caption", 
       `📋 *${report_type.toUpperCase()} SITE REPORT*\n\n` +
@@ -72,7 +56,7 @@ serve(async (req) => {
 
     // Send to Telegram
     const response = await fetch(
-      `https://api.telegram.org/bot${telegramBotToken}/sendDocument`,
+      `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendDocument`,
       { method: "POST", body: formData }
     );
 

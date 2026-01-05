@@ -11375,47 +11375,6 @@ export type Database = {
           },
         ]
       }
-      telegram_settings: {
-        Row: {
-          bot_token: string | null
-          chat_id: string | null
-          company_id: string
-          created_at: string | null
-          id: string
-          is_enabled: boolean | null
-          notify_on_report_create: boolean | null
-          updated_at: string | null
-        }
-        Insert: {
-          bot_token?: string | null
-          chat_id?: string | null
-          company_id: string
-          created_at?: string | null
-          id?: string
-          is_enabled?: boolean | null
-          notify_on_report_create?: boolean | null
-          updated_at?: string | null
-        }
-        Update: {
-          bot_token?: string | null
-          chat_id?: string | null
-          company_id?: string
-          created_at?: string | null
-          id?: string
-          is_enabled?: boolean | null
-          notify_on_report_create?: boolean | null
-          updated_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "telegram_settings_company_id_fkey"
-            columns: ["company_id"]
-            isOneToOne: true
-            referencedRelation: "companies"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       training_manuals: {
         Row: {
           category: string
