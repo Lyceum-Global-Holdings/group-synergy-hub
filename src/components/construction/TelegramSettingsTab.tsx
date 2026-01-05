@@ -4,8 +4,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
-import { Send, Eye, EyeOff, Loader2, TestTube } from "lucide-react";
+import { Send, Eye, EyeOff, Loader2, TestTube, Clock } from "lucide-react";
 import { useTelegramSettings } from "@/hooks/useTelegramSettings";
+import { format } from "date-fns";
 
 export function TelegramSettingsTab() {
   const { settings, isLoading, saveSettings, isSaving, testConnection } = useTelegramSettings();
@@ -14,6 +15,8 @@ export function TelegramSettingsTab() {
   const [chatId, setChatId] = useState("");
   const [isEnabled, setIsEnabled] = useState(false);
   const [notifyOnCreate, setNotifyOnCreate] = useState(true);
+  const [scheduledSendEnabled, setScheduledSendEnabled] = useState(false);
+  const [scheduledSendTime, setScheduledSendTime] = useState("18:00");
   const [showToken, setShowToken] = useState(false);
   const [isTesting, setIsTesting] = useState(false);
 
@@ -24,6 +27,12 @@ export function TelegramSettingsTab() {
       setChatId(settings.chat_id || "");
       setIsEnabled(settings.is_enabled);
       setNotifyOnCreate(settings.notify_on_report_create);
+      setScheduledSendEnabled(settings.scheduled_send_enabled || false);
+      // Parse time from "HH:MM:SS" format to "HH:MM"
+      if (settings.scheduled_send_time) {
+        const timeParts = settings.scheduled_send_time.split(':');
+        setScheduledSendTime(`${timeParts[0]}:${timeParts[1]}`);
+      }
     }
   }, [settings]);
 
@@ -33,6 +42,8 @@ export function TelegramSettingsTab() {
       chat_id: chatId || null,
       is_enabled: isEnabled,
       notify_on_report_create: notifyOnCreate,
+      scheduled_send_enabled: scheduledSendEnabled,
+      scheduled_send_time: scheduledSendEnabled ? `${scheduledSendTime}:00` : null,
     });
   };
 
@@ -128,6 +139,52 @@ export function TelegramSettingsTab() {
             checked={notifyOnCreate}
             onCheckedChange={setNotifyOnCreate}
           />
+        </div>
+
+        <div className="border-t pt-4">
+          <div className="flex items-center gap-2 mb-4">
+            <Clock className="h-5 w-5 text-muted-foreground" />
+            <h4 className="font-medium">Scheduled Reports</h4>
+          </div>
+
+          <div className="flex items-center justify-between mb-4">
+            <div className="space-y-0.5">
+              <Label htmlFor="scheduled-send">Enable Scheduled Sending</Label>
+              <p className="text-sm text-muted-foreground">
+                Automatically send daily report summary at a specific time
+              </p>
+            </div>
+            <Switch
+              id="scheduled-send"
+              checked={scheduledSendEnabled}
+              onCheckedChange={setScheduledSendEnabled}
+            />
+          </div>
+
+          {scheduledSendEnabled && (
+            <div className="space-y-4 pl-4 border-l-2 border-primary/20">
+              <div className="space-y-2">
+                <Label htmlFor="send-time">Send Time (UTC)</Label>
+                <Input
+                  id="send-time"
+                  type="time"
+                  value={scheduledSendTime}
+                  onChange={(e) => setScheduledSendTime(e.target.value)}
+                  className="w-32"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Reports created today will be sent at this time (UTC timezone)
+                </p>
+              </div>
+
+              {settings?.last_scheduled_send && (
+                <div className="text-sm text-muted-foreground">
+                  <span className="font-medium">Last sent:</span>{" "}
+                  {format(new Date(settings.last_scheduled_send), "PPp")}
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="flex gap-2 pt-4">

@@ -5,6 +5,9 @@ export interface TelegramSettings {
   chat_id: string | null;
   is_enabled: boolean;
   notify_on_report_create: boolean;
+  scheduled_send_enabled: boolean;
+  scheduled_send_time: string | null;
+  last_scheduled_send: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -14,4 +17,6 @@ export interface UpdateTelegramSettingsData {
   chat_id?: string | null;
   is_enabled?: boolean;
   notify_on_report_create?: boolean;
+  scheduled_send_enabled?: boolean;
+  scheduled_send_time?: string | null;
 }
