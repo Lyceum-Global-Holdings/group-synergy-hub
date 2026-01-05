@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { PDFDocument, StandardFonts, rgb } from "https://cdn.skypack.dev/pdf-lib@1.17.1";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -123,6 +124,7 @@ serve(async (req) => {
             subcontractor_count,
             visitor_count,
             status,
+            project_id,
             project:construction_projects(project_name, project_code)
           `)
           .eq('company_id', setting.company_id)
@@ -150,25 +152,31 @@ serve(async (req) => {
 
         console.log(`Found ${reports.length} reports for company ${setting.company_id}`);
 
-        // Send each report via Telegram
+        // Send each report via Telegram as PDF
         for (const report of reports) {
           try {
             const projectName = (report.project as any)?.project_name || 'Unknown Project';
             const projectCode = (report.project as any)?.project_code || '';
             
-            // Format the message
-            const message = formatReportMessage(report, projectName, projectCode);
+            // Fetch material data for this report
+            const materialsData = await fetchMaterialsData(supabase, report.project_id, report.report_date);
             
-            // Send to Telegram
-            const telegramUrl = `https://api.telegram.org/bot${setting.bot_token}/sendMessage`;
+            // Generate PDF
+            console.log(`Generating PDF for report ${report.report_number}...`);
+            const pdfBytes = await generateReportPdf(report, projectName, projectCode, materialsData);
+            
+            // Send PDF to Telegram
+            const telegramUrl = `https://api.telegram.org/bot${setting.bot_token}/sendDocument`;
+            
+            const formData = new FormData();
+            formData.append('chat_id', setting.chat_id);
+            formData.append('document', new Blob([pdfBytes], { type: 'application/pdf' }), `${report.report_number}.pdf`);
+            formData.append('caption', formatCaption(report, projectName, projectCode));
+            formData.append('parse_mode', 'HTML');
+            
             const telegramResponse = await fetch(telegramUrl, {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                chat_id: setting.chat_id,
-                text: message,
-                parse_mode: 'HTML',
-              }),
+              body: formData,
             });
 
             const telegramResult = await telegramResponse.json();
@@ -182,7 +190,7 @@ serve(async (req) => {
                 error: telegramResult.description 
               });
             } else {
-              console.log(`Successfully sent report ${report.id} to Telegram`);
+              console.log(`Successfully sent PDF report ${report.id} to Telegram`);
               processedCount++;
               results.push({ 
                 company_id: setting.company_id, 
@@ -231,42 +239,246 @@ serve(async (req) => {
   }
 });
 
-function formatReportMessage(report: any, projectName: string, projectCode: string): string {
-  const weatherEmoji = getWeatherEmoji(report.weather_conditions);
-  const statusEmoji = report.status === 'approved' ? '✅' : report.status === 'submitted' ? '📤' : '📝';
-  
-  let message = `<b>📋 Daily Site Report - Scheduled Summary</b>\n\n`;
-  message += `<b>Report:</b> ${report.report_number}\n`;
-  message += `<b>Project:</b> ${projectName} (${projectCode})\n`;
-  message += `<b>Date:</b> ${report.report_date}\n`;
-  message += `<b>Status:</b> ${statusEmoji} ${report.status?.charAt(0).toUpperCase() + report.status?.slice(1)}\n\n`;
-  
-  message += `<b>🌤 Weather Conditions</b>\n`;
-  message += `${weatherEmoji} ${report.weather_conditions || 'Not recorded'}\n`;
-  if (report.temperature_high) message += `🌡 High: ${report.temperature_high}°C\n`;
-  if (report.temperature_low) message += `🌡 Low: ${report.temperature_low}°C\n`;
-  
-  message += `\n<b>👷 Workforce</b>\n`;
-  message += `Skilled Labor: ${report.skilled_labor_count || 0}\n`;
-  message += `Unskilled Labor: ${report.unskilled_labor_count || 0}\n`;
-  message += `Subcontractors: ${report.subcontractor_count || 0}\n`;
-  message += `Visitors: ${report.visitor_count || 0}\n`;
-  
-  if (report.safety_observations) {
-    message += `\n<b>⚠️ Safety Observations</b>\n${report.safety_observations.substring(0, 300)}${report.safety_observations.length > 300 ? '...' : ''}\n`;
+// Fetch materials data for the report
+async function fetchMaterialsData(supabase: any, projectId: string, reportDate: string) {
+  const materialsData = {
+    issues: [] as any[],
+    adjustments: [] as any[],
+    stockBalances: [] as any[],
+  };
+
+  try {
+    // Fetch material issues for the report date
+    const { data: issues } = await supabase
+      .from('material_issues')
+      .select(`
+        id,
+        issue_date,
+        quantity,
+        notes,
+        warehouse_item:warehouse_items(item_name, item_code, unit_of_measure)
+      `)
+      .eq('project_id', projectId)
+      .eq('issue_date', reportDate);
+    
+    if (issues) materialsData.issues = issues;
+
+    // Fetch stock adjustments for the report date
+    const { data: adjustments } = await supabase
+      .from('stock_adjustments')
+      .select(`
+        id,
+        adjustment_date,
+        quantity_change,
+        adjustment_type,
+        reason,
+        warehouse_item:warehouse_items(item_name, item_code, unit_of_measure)
+      `)
+      .eq('adjustment_date', reportDate);
+    
+    if (adjustments) materialsData.adjustments = adjustments;
+
+    // Fetch current stock balances for project warehouse
+    const { data: inventory } = await supabase
+      .from('inventory_items')
+      .select(`
+        id,
+        quantity,
+        warehouse_item:warehouse_items(item_name, item_code, unit_of_measure)
+      `)
+      .eq('project_id', projectId)
+      .gt('quantity', 0);
+    
+    if (inventory) materialsData.stockBalances = inventory;
+
+  } catch (error) {
+    console.error('Error fetching materials data:', error);
   }
+
+  return materialsData;
+}
+
+// Generate PDF for the report
+async function generateReportPdf(report: any, projectName: string, projectCode: string, materials: any): Promise<Uint8Array> {
+  const pdfDoc = await PDFDocument.create();
+  const helvetica = await pdfDoc.embedFont(StandardFonts.Helvetica);
+  const helveticaBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
   
+  const pageWidth = 595.28; // A4 width in points
+  const pageHeight = 841.89; // A4 height in points
+  const margin = 50;
+  const lineHeight = 14;
+  
+  let page = pdfDoc.addPage([pageWidth, pageHeight]);
+  let y = pageHeight - margin;
+  
+  const addText = (text: string, options: { bold?: boolean; size?: number; color?: any } = {}) => {
+    const font = options.bold ? helveticaBold : helvetica;
+    const size = options.size || 10;
+    const color = options.color || rgb(0, 0, 0);
+    
+    if (y < margin + 50) {
+      page = pdfDoc.addPage([pageWidth, pageHeight]);
+      y = pageHeight - margin;
+    }
+    
+    // Handle text wrapping
+    const maxWidth = pageWidth - margin * 2;
+    const words = text.split(' ');
+    let line = '';
+    
+    for (const word of words) {
+      const testLine = line + (line ? ' ' : '') + word;
+      const width = font.widthOfTextAtSize(testLine, size);
+      
+      if (width > maxWidth && line) {
+        page.drawText(line, { x: margin, y, size, font, color });
+        y -= lineHeight;
+        line = word;
+        
+        if (y < margin + 50) {
+          page = pdfDoc.addPage([pageWidth, pageHeight]);
+          y = pageHeight - margin;
+        }
+      } else {
+        line = testLine;
+      }
+    }
+    
+    if (line) {
+      page.drawText(line, { x: margin, y, size, font, color });
+      y -= lineHeight;
+    }
+  };
+  
+  const addSection = (title: string) => {
+    y -= 10;
+    addText(title, { bold: true, size: 12, color: rgb(0.2, 0.4, 0.6) });
+    y -= 5;
+    // Draw underline
+    page.drawLine({
+      start: { x: margin, y: y + 8 },
+      end: { x: pageWidth - margin, y: y + 8 },
+      thickness: 0.5,
+      color: rgb(0.7, 0.7, 0.7),
+    });
+  };
+  
+  const addKeyValue = (key: string, value: string) => {
+    if (y < margin + 50) {
+      page = pdfDoc.addPage([pageWidth, pageHeight]);
+      y = pageHeight - margin;
+    }
+    page.drawText(key + ':', { x: margin, y, size: 10, font: helveticaBold, color: rgb(0, 0, 0) });
+    const keyWidth = helveticaBold.widthOfTextAtSize(key + ': ', 10);
+    page.drawText(value || 'N/A', { x: margin + keyWidth, y, size: 10, font: helvetica, color: rgb(0.3, 0.3, 0.3) });
+    y -= lineHeight;
+  };
+  
+  // Header
+  addText('DAILY SITE REPORT', { bold: true, size: 18, color: rgb(0.2, 0.4, 0.6) });
+  y -= 10;
+  
+  // Report Info Section
+  addSection('Report Information');
+  addKeyValue('Report Number', report.report_number);
+  addKeyValue('Project', `${projectName} (${projectCode})`);
+  addKeyValue('Date', report.report_date);
+  addKeyValue('Status', report.status?.charAt(0).toUpperCase() + report.status?.slice(1));
+  
+  // Weather Section
+  addSection('Weather Conditions');
+  addKeyValue('Conditions', report.weather_conditions || 'Not recorded');
+  if (report.temperature_high) addKeyValue('High Temperature', `${report.temperature_high}°C`);
+  if (report.temperature_low) addKeyValue('Low Temperature', `${report.temperature_low}°C`);
+  
+  // Workforce Section
+  addSection('Workforce');
+  addKeyValue('Skilled Labor', String(report.skilled_labor_count || 0));
+  addKeyValue('Unskilled Labor', String(report.unskilled_labor_count || 0));
+  addKeyValue('Subcontractors', String(report.subcontractor_count || 0));
+  addKeyValue('Visitors', String(report.visitor_count || 0));
+  const totalWorkforce = (report.skilled_labor_count || 0) + (report.unskilled_labor_count || 0) + 
+                         (report.subcontractor_count || 0) + (report.visitor_count || 0);
+  addKeyValue('Total On Site', String(totalWorkforce));
+  
+  // Work Summary
   if (report.work_summary) {
-    message += `\n<b>📝 Work Summary</b>\n${report.work_summary.substring(0, 500)}${report.work_summary.length > 500 ? '...' : ''}\n`;
+    addSection('Work Summary');
+    addText(report.work_summary);
   }
   
+  // Delays/Issues
   if (report.delays_issues) {
-    message += `\n<b>⏰ Delays/Issues</b>\n${report.delays_issues.substring(0, 300)}${report.delays_issues.length > 300 ? '...' : ''}\n`;
+    addSection('Delays & Issues');
+    addText(report.delays_issues);
   }
   
-  message += `\n<i>⏰ Automated scheduled report</i>`;
+  // Safety Observations
+  if (report.safety_observations) {
+    addSection('Safety Observations');
+    addText(report.safety_observations);
+  }
   
-  return message;
+  // Materials Issued
+  if (materials.issues && materials.issues.length > 0) {
+    addSection('Materials Issued Today');
+    for (const issue of materials.issues) {
+      const itemName = issue.warehouse_item?.item_name || 'Unknown Item';
+      const itemCode = issue.warehouse_item?.item_code || '';
+      const unit = issue.warehouse_item?.unit_of_measure || 'pcs';
+      addText(`• ${itemName} (${itemCode}): ${issue.quantity} ${unit}`);
+    }
+  }
+  
+  // Stock Adjustments
+  if (materials.adjustments && materials.adjustments.length > 0) {
+    addSection('Stock Transactions Today');
+    for (const adj of materials.adjustments) {
+      const itemName = adj.warehouse_item?.item_name || 'Unknown Item';
+      const sign = adj.quantity_change > 0 ? '+' : '';
+      addText(`• ${itemName}: ${sign}${adj.quantity_change} (${adj.adjustment_type})`);
+    }
+  }
+  
+  // Current Stock Balances
+  if (materials.stockBalances && materials.stockBalances.length > 0) {
+    addSection('Current Stock Balances');
+    for (const stock of materials.stockBalances.slice(0, 20)) { // Limit to 20 items
+      const itemName = stock.warehouse_item?.item_name || 'Unknown Item';
+      const unit = stock.warehouse_item?.unit_of_measure || 'pcs';
+      addText(`• ${itemName}: ${stock.quantity} ${unit}`);
+    }
+    if (materials.stockBalances.length > 20) {
+      addText(`... and ${materials.stockBalances.length - 20} more items`);
+    }
+  }
+  
+  // Footer
+  y -= 20;
+  addText(`Generated on ${new Date().toISOString().split('T')[0]} - Automated Scheduled Report`, { size: 8, color: rgb(0.5, 0.5, 0.5) });
+  
+  return await pdfDoc.save();
+}
+
+// Format caption for Telegram message
+function formatCaption(report: any, projectName: string, projectCode: string): string {
+  const statusEmoji = report.status === 'approved' ? '✅' : report.status === 'submitted' ? '📤' : '📝';
+  const weatherEmoji = getWeatherEmoji(report.weather_conditions);
+  
+  const totalWorkforce = (report.skilled_labor_count || 0) + (report.unskilled_labor_count || 0) + 
+                         (report.subcontractor_count || 0);
+  
+  let caption = `<b>📋 Daily Site Report</b>\n\n`;
+  caption += `<b>Report:</b> ${report.report_number}\n`;
+  caption += `<b>Project:</b> ${projectName} (${projectCode})\n`;
+  caption += `<b>Date:</b> ${report.report_date}\n`;
+  caption += `<b>Status:</b> ${statusEmoji} ${report.status?.charAt(0).toUpperCase() + report.status?.slice(1)}\n`;
+  caption += `<b>Weather:</b> ${weatherEmoji} ${report.weather_conditions || 'Not recorded'}\n`;
+  caption += `<b>Workforce:</b> 👷 ${totalWorkforce} workers\n\n`;
+  caption += `<i>⏰ Automated scheduled report</i>`;
+  
+  return caption;
 }
 
 function getWeatherEmoji(condition: string | null): string {
