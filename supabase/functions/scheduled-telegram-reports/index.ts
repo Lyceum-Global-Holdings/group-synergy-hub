@@ -101,11 +101,10 @@ serve(async (req) => {
           }
         }
 
-        // Get today's reports for this company
-        const todayStart = new Date();
-        todayStart.setUTCHours(0, 0, 0, 0);
-        const todayEnd = new Date();
-        todayEnd.setUTCHours(23, 59, 59, 999);
+        // Get today's date in YYYY-MM-DD format for report_date comparison
+        const today = new Date();
+        const todayDateStr = today.toISOString().split('T')[0];
+        console.log(`Looking for reports with report_date: ${todayDateStr}`);
 
         const { data: reports, error: reportsError } = await supabase
           .from('daily_site_reports')
@@ -128,8 +127,7 @@ serve(async (req) => {
             project:construction_projects(project_name, project_code)
           `)
           .eq('company_id', setting.company_id)
-          .gte('created_at', todayStart.toISOString())
-          .lte('created_at', todayEnd.toISOString());
+          .eq('report_date', todayDateStr);
 
         if (reportsError) {
           console.error(`Error fetching reports for company ${setting.company_id}:`, reportsError);
