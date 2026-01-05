@@ -93,6 +93,45 @@ export function useTelegramSettings() {
     }
   };
 
+  const testScheduledSend = async (): Promise<boolean> => {
+    if (!selectedCompany?.id) {
+      toast({
+        title: "No company selected",
+        description: "Please select a company first.",
+        variant: "destructive",
+      });
+      return false;
+    }
+
+    try {
+      const { data, error } = await supabase.functions.invoke('scheduled-telegram-reports', {
+        body: { force: true, company_id: selectedCompany.id }
+      });
+
+      if (error) throw error;
+
+      if (data?.processed > 0) {
+        toast({
+          title: "Reports sent!",
+          description: `Successfully sent ${data.processed} report(s) to Telegram.`,
+        });
+      } else {
+        toast({
+          title: "No reports to send",
+          description: "No reports found for today to send.",
+        });
+      }
+      return true;
+    } catch (error: any) {
+      toast({
+        title: "Failed to send",
+        description: error.message || "Could not send scheduled reports.",
+        variant: "destructive",
+      });
+      return false;
+    }
+  };
+
   return {
     settings,
     isLoading,
@@ -100,5 +139,6 @@ export function useTelegramSettings() {
     saveSettings: upsertMutation.mutateAsync,
     isSaving: upsertMutation.isPending,
     testConnection,
+    testScheduledSend,
   };
 }
