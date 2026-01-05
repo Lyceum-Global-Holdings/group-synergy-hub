@@ -2,6 +2,7 @@ import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { CompanySidebar } from "@/components/layout/CompanySidebar";
 import { CompanySelector } from "@/components/common/CompanySelector";
 import { UserProfile } from "@/components/common/UserProfile";
+import { LiveClock } from "@/components/common/LiveClock";
 import { Badge } from "@/components/ui/badge";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useSuperAdmin } from "@/hooks/useSuperAdmin";
@@ -83,6 +84,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             </div>
             
             <div className="flex items-center gap-4">
+              <LiveClock />
               <CompanySelector />
               {isSuperAdmin && !isViewingAllCompanies && companies.length > 1 && (
                 <Badge variant="outline" className="text-xs">
