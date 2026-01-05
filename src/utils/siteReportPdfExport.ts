@@ -34,11 +34,10 @@ interface MaterialsData {
   stockBalances: CurrentStockBalance[];
 }
 
-export function exportSiteReportToPdf(report: ReportData, materials: MaterialsData) {
+function generatePdfDocument(report: ReportData, materials: MaterialsData): jsPDF {
   const doc = new jsPDF();
   const pageWidth = doc.internal.pageSize.getWidth();
   let yPos = 20;
-
   // Header
   doc.setFontSize(18);
   doc.setFont("helvetica", "bold");
@@ -343,6 +342,17 @@ export function exportSiteReportToPdf(report: ReportData, materials: MaterialsDa
     );
   }
 
-  // Save the PDF
+  return doc;
+}
+
+export function exportSiteReportToPdf(report: ReportData, materials: MaterialsData) {
+  const doc = generatePdfDocument(report, materials);
   doc.save(`${report.report_number}.pdf`);
+}
+
+export function generateSiteReportPdfBase64(report: ReportData, materials: MaterialsData): string {
+  const doc = generatePdfDocument(report, materials);
+  // Get base64 string from data URI (removes "data:application/pdf;base64," prefix)
+  const dataUri = doc.output('datauristring');
+  return dataUri.split(',')[1];
 }

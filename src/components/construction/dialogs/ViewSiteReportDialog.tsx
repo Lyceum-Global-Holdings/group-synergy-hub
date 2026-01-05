@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -5,13 +6,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { FileDown, X, Cloud, Thermometer, Users, AlertTriangle, Shield, Package, Warehouse, ArrowRightLeft, RefreshCw } from "lucide-react";
+import { FileDown, X, Cloud, Thermometer, Users, AlertTriangle, Shield, Package, Warehouse, ArrowRightLeft, RefreshCw, Send } from "lucide-react";
 import { format } from "date-fns";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { DailySiteReport, DAILY_REPORT_STATUSES } from "@/types/construction";
 import { useDailyMaterialsActivity, CurrentStockBalance } from "@/hooks/construction/useDailyMaterialsActivity";
-import { exportSiteReportToPdf } from "@/utils/siteReportPdfExport";
+import { exportSiteReportToPdf, generateSiteReportPdfBase64 } from "@/utils/siteReportPdfExport";
 import { useToast } from "@/hooks/use-toast";
 import { useCompany } from "@/contexts/CompanyContext";
 import { cn } from "@/lib/utils";
@@ -134,12 +135,52 @@ export function ViewSiteReportDialog({
     }
     return format(new Date(displayReport.report_date), "MMMM d, yyyy");
   };
+  const [isSendingTelegram, setIsSendingTelegram] = useState(false);
+
   const handleExportPdf = () => {
     exportSiteReportToPdf(displayReport as any, {
       adjustments,
       issues,
       stockBalances
     });
+  };
+
+  const handleSendTelegram = async () => {
+    setIsSendingTelegram(true);
+    try {
+      const pdfBase64 = generateSiteReportPdfBase64(displayReport as any, {
+        adjustments,
+        issues,
+        stockBalances
+      });
+
+      const { data, error } = await supabase.functions.invoke('send-telegram-report', {
+        body: {
+          pdf_base64: pdfBase64,
+          filename: `${displayReport.report_number}.pdf`,
+          report_number: displayReport.report_number,
+          project_name: displayReport.project?.project_name || 'N/A',
+          report_date: formatPeriod(),
+          report_type: reportType
+        }
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "Report sent!",
+        description: "PDF sent to Telegram successfully."
+      });
+    } catch (error: any) {
+      console.error("Telegram send error:", error);
+      toast({
+        title: "Failed to send",
+        description: error.message || "Could not send report to Telegram.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSendingTelegram(false);
+    }
   };
 
   const handleRefresh = async () => {
@@ -503,6 +544,14 @@ export function ViewSiteReportDialog({
           <Button variant="outline" onClick={handleExportPdf}>
             <FileDown className="mr-2 h-4 w-4" />
             Export PDF
+          </Button>
+          <Button 
+            variant="outline" 
+            onClick={handleSendTelegram}
+            disabled={isSendingTelegram}
+          >
+            <Send className={cn("mr-2 h-4 w-4", isSendingTelegram && "animate-pulse")} />
+            {isSendingTelegram ? "Sending..." : "Send via Telegram"}
           </Button>
           <Button variant="ghost" onClick={() => onOpenChange(false)}>
             <X className="mr-2 h-4 w-4" />
