@@ -91,13 +91,16 @@ serve(async (req) => {
             id,
             report_number,
             report_date,
-            weather_condition,
-            temperature,
-            humidity,
-            wind_speed,
-            safety_incidents,
-            safety_incidents_details,
-            notes,
+            weather_conditions,
+            temperature_high,
+            temperature_low,
+            safety_observations,
+            work_summary,
+            delays_issues,
+            skilled_labor_count,
+            unskilled_labor_count,
+            subcontractor_count,
+            visitor_count,
             status,
             project:construction_projects(project_name, project_code)
           `)
@@ -208,7 +211,7 @@ serve(async (req) => {
 });
 
 function formatReportMessage(report: any, projectName: string, projectCode: string): string {
-  const weatherEmoji = getWeatherEmoji(report.weather_condition);
+  const weatherEmoji = getWeatherEmoji(report.weather_conditions);
   const statusEmoji = report.status === 'approved' ? '✅' : report.status === 'submitted' ? '📤' : '📝';
   
   let message = `<b>📋 Daily Site Report - Scheduled Summary</b>\n\n`;
@@ -218,19 +221,26 @@ function formatReportMessage(report: any, projectName: string, projectCode: stri
   message += `<b>Status:</b> ${statusEmoji} ${report.status?.charAt(0).toUpperCase() + report.status?.slice(1)}\n\n`;
   
   message += `<b>🌤 Weather Conditions</b>\n`;
-  message += `${weatherEmoji} ${report.weather_condition || 'Not recorded'}\n`;
-  if (report.temperature) message += `🌡 Temperature: ${report.temperature}°C\n`;
-  if (report.humidity) message += `💧 Humidity: ${report.humidity}%\n`;
-  if (report.wind_speed) message += `💨 Wind: ${report.wind_speed} km/h\n`;
+  message += `${weatherEmoji} ${report.weather_conditions || 'Not recorded'}\n`;
+  if (report.temperature_high) message += `🌡 High: ${report.temperature_high}°C\n`;
+  if (report.temperature_low) message += `🌡 Low: ${report.temperature_low}°C\n`;
   
-  message += `\n<b>⚠️ Safety</b>\n`;
-  message += `Incidents: ${report.safety_incidents || 0}\n`;
-  if (report.safety_incidents_details) {
-    message += `Details: ${report.safety_incidents_details}\n`;
+  message += `\n<b>👷 Workforce</b>\n`;
+  message += `Skilled Labor: ${report.skilled_labor_count || 0}\n`;
+  message += `Unskilled Labor: ${report.unskilled_labor_count || 0}\n`;
+  message += `Subcontractors: ${report.subcontractor_count || 0}\n`;
+  message += `Visitors: ${report.visitor_count || 0}\n`;
+  
+  if (report.safety_observations) {
+    message += `\n<b>⚠️ Safety Observations</b>\n${report.safety_observations.substring(0, 300)}${report.safety_observations.length > 300 ? '...' : ''}\n`;
   }
   
-  if (report.notes) {
-    message += `\n<b>📝 Notes</b>\n${report.notes.substring(0, 500)}${report.notes.length > 500 ? '...' : ''}\n`;
+  if (report.work_summary) {
+    message += `\n<b>📝 Work Summary</b>\n${report.work_summary.substring(0, 500)}${report.work_summary.length > 500 ? '...' : ''}\n`;
+  }
+  
+  if (report.delays_issues) {
+    message += `\n<b>⏰ Delays/Issues</b>\n${report.delays_issues.substring(0, 300)}${report.delays_issues.length > 300 ? '...' : ''}\n`;
   }
   
   message += `\n<i>⏰ Automated scheduled report</i>`;
