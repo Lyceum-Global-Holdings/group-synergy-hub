@@ -244,14 +244,20 @@ export const useWarehouseAssets = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User not authenticated');
 
-      // Sanitize each asset's UUID fields
+      // Sanitize each asset's UUID fields and date/numeric fields
       const assetsWithUser = assetsData.map(asset => ({
         ...asset,
+        // UUID field sanitization
         category_id: asset.category_id || null,
         subcategory_id: asset.subcategory_id && asset.subcategory_id !== "none" ? asset.subcategory_id : null,
         location_id: asset.location_id && asset.location_id !== "none" ? asset.location_id : null,
         sublocation_id: asset.sublocation_id && asset.sublocation_id !== "none" ? asset.sublocation_id : null,
         department_id: asset.department_id && asset.department_id !== "none" ? asset.department_id : null,
+        // Date field sanitization - convert empty strings to null
+        purchase_date: asset.purchase_date || null,
+        // Numeric field sanitization
+        purchase_price: asset.purchase_price ?? null,
+        current_value: asset.current_value ?? null,
         created_by: user.id
       }));
 
