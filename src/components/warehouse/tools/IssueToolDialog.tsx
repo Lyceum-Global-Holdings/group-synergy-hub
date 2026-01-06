@@ -43,7 +43,6 @@ export function IssueToolDialog({ open, onOpenChange, tools }: IssueToolDialogPr
   });
 
   const selectedTool = tools.find((t) => t.id === formData.tool_id);
-  const availableTools = tools.filter((t) => t.available_quantity > 0);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -88,16 +87,32 @@ export function IssueToolDialog({ open, onOpenChange, tools }: IssueToolDialogPr
                 <SelectValue placeholder="Select a tool to issue" />
               </SelectTrigger>
               <SelectContent>
-                {availableTools.map((tool) => (
-                  <SelectItem key={tool.id} value={tool.id}>
-                    <div className="flex items-center gap-2">
-                      <span>{tool.name}</span>
-                      <Badge variant="secondary" className="text-xs">
-                        {tool.available_quantity} available
-                      </Badge>
-                    </div>
-                  </SelectItem>
-                ))}
+                {tools.map((tool) => {
+                  const isUnavailable = tool.available_quantity <= 0;
+                  return (
+                    <SelectItem 
+                      key={tool.id} 
+                      value={tool.id}
+                      disabled={isUnavailable}
+                      className={isUnavailable ? "opacity-50" : ""}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className={isUnavailable ? "text-muted-foreground" : ""}>
+                          {tool.name}
+                        </span>
+                        {isUnavailable ? (
+                          <Badge variant="destructive" className="text-xs">
+                            Not Available
+                          </Badge>
+                        ) : (
+                          <Badge variant="secondary" className="text-xs">
+                            {tool.available_quantity} available
+                          </Badge>
+                        )}
+                      </div>
+                    </SelectItem>
+                  );
+                })}
               </SelectContent>
             </Select>
             {selectedTool && (

@@ -44,7 +44,7 @@ export function BulkIssueToolDialog({ open, onOpenChange, tools }: BulkIssueTool
     notes: "",
   });
 
-  const availableTools = tools.filter((t) => t.available_quantity > 0);
+  
 
   const toggleTool = (toolId: string) => {
     setSelectedTools((prev) => {
@@ -191,32 +191,49 @@ export function BulkIssueToolDialog({ open, onOpenChange, tools }: BulkIssueTool
           <div className="space-y-2">
             <Label>Select Tools to Issue ({selectedTools.length} selected)</Label>
             <ScrollArea className="h-48 border rounded-md p-2">
-              {availableTools.length === 0 ? (
+              {tools.length === 0 ? (
                 <p className="text-sm text-muted-foreground text-center py-4">
-                  No tools available for issue
+                  No tools in inventory
                 </p>
               ) : (
                 <div className="space-y-2">
-                  {availableTools.map((tool) => {
+                  {tools.map((tool) => {
                     const selected = getSelectedTool(tool.id);
+                    const isUnavailable = tool.available_quantity <= 0;
                     return (
                       <div
                         key={tool.id}
-                        className="flex items-center justify-between p-2 rounded-md hover:bg-muted/50"
+                        className={`flex items-center justify-between p-2 rounded-md ${
+                          isUnavailable ? "opacity-50 bg-muted/30" : "hover:bg-muted/50"
+                        }`}
                       >
                         <div className="flex items-center gap-3">
                           <Checkbox
                             checked={!!selected}
                             onCheckedChange={() => toggleTool(tool.id)}
+                            disabled={isUnavailable}
                           />
                           <div>
-                            <p className="font-medium text-sm">{tool.name}</p>
-                            <p className="text-xs text-muted-foreground">
-                              {tool.tool_code} • Available: {tool.available_quantity}
+                            <p className={`font-medium text-sm ${isUnavailable ? "text-muted-foreground" : ""}`}>
+                              {tool.name}
                             </p>
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-muted-foreground">
+                                {tool.tool_code}
+                              </span>
+                              {isUnavailable ? (
+                                <Badge variant="destructive" className="text-xs">
+                                  Not Available
+                                </Badge>
+                              ) : (
+                                <span className="text-xs text-muted-foreground">
+                                  • Available: {tool.available_quantity}
+                                </span>
+                              )}
+                            </div>
                           </div>
                         </div>
-                        {selected && (
+                        {selected && !isUnavailable && (
                           <div className="flex items-center gap-2">
                             <Button
                               type="button"
