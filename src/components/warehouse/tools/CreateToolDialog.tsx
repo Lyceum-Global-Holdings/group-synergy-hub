@@ -19,6 +19,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useWarehouseTools } from "@/hooks/useWarehouseTools";
+import { useItemUnits } from "@/hooks/useItemUnits";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -29,12 +30,14 @@ interface CreateToolDialogProps {
 
 export function CreateToolDialog({ open, onOpenChange }: CreateToolDialogProps) {
   const { createTool, isCreating } = useWarehouseTools();
+  const { units } = useItemUnits();
   const [formData, setFormData] = useState({
     tool_code: "",
     name: "",
     description: "",
     category_id: "",
     location_id: "",
+    unit_id: "",
     total_quantity: 1,
     condition: "good",
     unit_cost: "",
@@ -71,6 +74,7 @@ export function CreateToolDialog({ open, onOpenChange }: CreateToolDialogProps) 
       ...formData,
       category_id: formData.category_id || undefined,
       location_id: formData.location_id || undefined,
+      unit_id: formData.unit_id || undefined,
       unit_cost: formData.unit_cost ? parseFloat(formData.unit_cost) : undefined,
     }, {
       onSuccess: () => {
@@ -81,6 +85,7 @@ export function CreateToolDialog({ open, onOpenChange }: CreateToolDialogProps) 
           description: "",
           category_id: "",
           location_id: "",
+          unit_id: "",
           total_quantity: 1,
           condition: "good",
           unit_cost: "",
@@ -183,6 +188,25 @@ export function CreateToolDialog({ open, onOpenChange }: CreateToolDialogProps) 
                 </SelectContent>
               </Select>
             </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="unit_id">Unit of Measure</Label>
+            <Select
+              value={formData.unit_id}
+              onValueChange={(value) => setFormData({ ...formData, unit_id: value })}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select unit" />
+              </SelectTrigger>
+              <SelectContent>
+                {units?.map((unit) => (
+                  <SelectItem key={unit.id} value={unit.id}>
+                    {unit.name} ({unit.abbreviation})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="grid grid-cols-2 gap-4">

@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/table";
 import { Download, Upload, FileSpreadsheet, CheckCircle2, XCircle, Loader2 } from "lucide-react";
 import { useWarehouseTools } from "@/hooks/useWarehouseTools";
+import { useItemUnits } from "@/hooks/useItemUnits";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import * as XLSX from "xlsx";
@@ -37,12 +38,14 @@ interface ParsedTool {
   description: string;
   category: string;
   location: string;
+  unit: string;
   total_quantity: number;
   condition: string;
   unit_cost: number | null;
   notes: string;
   category_id?: string;
   location_id?: string;
+  unit_id?: string;
   errors: string[];
   isValid: boolean;
 }
@@ -56,6 +59,7 @@ export function BulkToolImportDialog({ open, onOpenChange }: BulkToolImportDialo
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { createBulkTools, isCreatingBulk } = useWarehouseTools();
+  const { units = [] } = useItemUnits();
 
   // Fetch categories and locations for validation
   const { data: categories = [] } = useQuery({
@@ -81,9 +85,9 @@ export function BulkToolImportDialog({ open, onOpenChange }: BulkToolImportDialo
 
   const downloadTemplate = () => {
     const template = [
-      ["tool_code", "name", "description", "category", "location", "total_quantity", "condition", "unit_cost", "notes"],
-      ["TL-001", "Hammer", "16oz claw hammer", "Hand Tools", "Main Warehouse", "10", "good", "25.99", "Standard issue"],
-      ["", "Drill", "Cordless power drill", "Power Tools", "Workshop", "5", "good", "149.99", ""],
+      ["tool_code", "name", "description", "category", "location", "unit", "total_quantity", "condition", "unit_cost", "notes"],
+      ["TL-001", "Hammer", "16oz claw hammer", "Hand Tools", "Main Warehouse", "Pieces", "10", "good", "25.99", "Standard issue"],
+      ["", "Drill", "Cordless power drill", "Power Tools", "Workshop", "pcs", "5", "good", "149.99", ""],
     ];
 
     const ws = XLSX.utils.aoa_to_sheet(template);
@@ -108,6 +112,7 @@ export function BulkToolImportDialog({ open, onOpenChange }: BulkToolImportDialo
         const description = String(row.description || "").trim();
         const categoryName = String(row.category || "").trim();
         const locationName = String(row.location || "").trim();
+        const unitName = String(row.unit || "").trim();
         const quantityRaw = row.total_quantity;
         const conditionRaw = String(row.condition || "good").trim().toLowerCase();
         const unitCostRaw = row.unit_cost;
@@ -151,6 +156,21 @@ export function BulkToolImportDialog({ open, onOpenChange }: BulkToolImportDialo
           }
         }
 
+        // Validate unit
+        let unitId: string | undefined;
+        if (unitName) {
+          const match = units.find(
+            (u) =>
+              u.name.toLowerCase() === unitName.toLowerCase() ||
+              u.abbreviation.toLowerCase() === unitName.toLowerCase()
+          );
+          if (!match) {
+            errors.push(`Unit "${unitName}" not found`);
+          } else {
+            unitId = match.id;
+          }
+        }
+
         // Validate condition
         const condition = VALID_CONDITIONS.includes(conditionRaw) ? conditionRaw : "good";
         if (conditionRaw && !VALID_CONDITIONS.includes(conditionRaw)) {
@@ -175,12 +195,14 @@ export function BulkToolImportDialog({ open, onOpenChange }: BulkToolImportDialo
           description,
           category: categoryName,
           location: locationName,
+          unit: unitName,
           total_quantity: quantity,
           condition,
           unit_cost: unitCost,
           notes,
           category_id: categoryId,
           location_id: locationId,
+          unit_id: unitId,
           errors,
           isValid: errors.length === 0,
         };
@@ -209,6 +231,7 @@ export function BulkToolImportDialog({ open, onOpenChange }: BulkToolImportDialo
       description: t.description || undefined,
       category_id: t.category_id,
       location_id: t.location_id,
+      unit_id: t.unit_id,
       total_quantity: t.total_quantity,
       condition: t.condition,
       unit_cost: t.unit_cost ?? undefined,

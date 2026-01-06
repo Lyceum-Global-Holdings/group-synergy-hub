@@ -42,6 +42,11 @@ const columns: ColumnDef<WarehouseTool>[] = [
     cell: ({ row }) => row.original.location?.name || "-",
   },
   {
+    accessorKey: "unit",
+    header: "Unit",
+    cell: ({ row }) => row.original.unit?.abbreviation || "-",
+  },
+  {
     accessorKey: "total_quantity",
     header: "Total",
     cell: ({ row }) => row.getValue("total_quantity"),

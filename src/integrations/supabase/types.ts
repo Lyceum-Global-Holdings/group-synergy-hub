@@ -12487,6 +12487,7 @@ export type Database = {
           tool_code: string
           total_quantity: number
           unit_cost: number | null
+          unit_id: string | null
           updated_at: string | null
         }
         Insert: {
@@ -12506,6 +12507,7 @@ export type Database = {
           tool_code: string
           total_quantity?: number
           unit_cost?: number | null
+          unit_id?: string | null
           updated_at?: string | null
         }
         Update: {
@@ -12525,6 +12527,7 @@ export type Database = {
           tool_code?: string
           total_quantity?: number
           unit_cost?: number | null
+          unit_id?: string | null
           updated_at?: string | null
         }
         Relationships: [
@@ -12547,6 +12550,13 @@ export type Database = {
             columns: ["location_id"]
             isOneToOne: false
             referencedRelation: "warehouse_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "warehouse_tools_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "item_units"
             referencedColumns: ["id"]
           },
         ]

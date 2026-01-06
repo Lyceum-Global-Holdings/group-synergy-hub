@@ -18,7 +18,8 @@ export function useWarehouseTools() {
         .select(`
           *,
           category:asset_categories!category_id(id, name),
-          location:warehouse_locations!location_id(id, name)
+          location:warehouse_locations!location_id(id, name),
+          unit:item_units!unit_id(id, name, abbreviation)
         `)
         .order("created_at", { ascending: false });
 
