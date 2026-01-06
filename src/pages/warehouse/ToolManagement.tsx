@@ -7,7 +7,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Plus, Wrench, ArrowRightLeft, RotateCcw, AlertTriangle, ChevronDown, Layers } from "lucide-react";
+import { Plus, Wrench, ArrowRightLeft, RotateCcw, AlertTriangle, ChevronDown, Layers, FileSpreadsheet } from "lucide-react";
 import { useWarehouseTools } from "@/hooks/useWarehouseTools";
 import { useToolIssues } from "@/hooks/useToolIssues";
 import { useToolReturns } from "@/hooks/useToolReturns";
@@ -20,6 +20,7 @@ import { IssueToolDialog } from "@/components/warehouse/tools/IssueToolDialog";
 import { ReturnToolDialog } from "@/components/warehouse/tools/ReturnToolDialog";
 import { BulkIssueToolDialog } from "@/components/warehouse/tools/BulkIssueToolDialog";
 import { BulkReturnToolDialog } from "@/components/warehouse/tools/BulkReturnToolDialog";
+import { BulkToolImportDialog } from "@/components/warehouse/tools/BulkToolImportDialog";
 import { Badge } from "@/components/ui/badge";
 
 export default function ToolManagement() {
@@ -29,6 +30,7 @@ export default function ToolManagement() {
   const [showReturnTool, setShowReturnTool] = useState(false);
   const [showBulkIssueTool, setShowBulkIssueTool] = useState(false);
   const [showBulkReturnTool, setShowBulkReturnTool] = useState(false);
+  const [showBulkImport, setShowBulkImport] = useState(false);
 
   const { tools, isLoading: isLoadingTools } = useWarehouseTools();
   const { issues, activeIssues, overdueIssues, isLoading: isLoadingIssues } = useToolIssues();
@@ -87,10 +89,25 @@ export default function ToolManagement() {
             </DropdownMenuContent>
           </DropdownMenu>
 
-          <Button onClick={() => setShowCreateTool(true)}>
-            <Plus className="h-4 w-4 mr-2" />
-            Add Tool
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button>
+                <Plus className="h-4 w-4 mr-2" />
+                Add Tool
+                <ChevronDown className="h-4 w-4 ml-2" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => setShowCreateTool(true)}>
+                <Plus className="h-4 w-4 mr-2" />
+                Add Single Tool
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setShowBulkImport(true)}>
+                <FileSpreadsheet className="h-4 w-4 mr-2" />
+                Bulk Import from CSV
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 
@@ -142,6 +159,7 @@ export default function ToolManagement() {
       <ReturnToolDialog open={showReturnTool} onOpenChange={setShowReturnTool} activeIssues={activeIssues} />
       <BulkIssueToolDialog open={showBulkIssueTool} onOpenChange={setShowBulkIssueTool} tools={tools} />
       <BulkReturnToolDialog open={showBulkReturnTool} onOpenChange={setShowBulkReturnTool} activeIssues={activeIssues} />
+      <BulkToolImportDialog open={showBulkImport} onOpenChange={setShowBulkImport} />
     </div>
   );
 }

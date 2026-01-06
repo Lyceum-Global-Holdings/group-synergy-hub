@@ -68,6 +68,46 @@ export function useWarehouseTools() {
     },
   });
 
+  const createBulkToolsMutation = useMutation({
+    mutationFn: async (toolsData: CreateWarehouseToolData[]) => {
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData.user) throw new Error("Not authenticated");
+
+      const toolsWithDefaults = toolsData.map((tool, index) => ({
+        ...tool,
+        tool_code: tool.tool_code || `TL-${Date.now().toString(36).toUpperCase()}-${index}`,
+        available_quantity: tool.total_quantity,
+        issued_quantity: 0,
+        category_id: tool.category_id || null,
+        location_id: tool.location_id || null,
+        company_id: selectedCompany?.id || tool.company_id,
+        created_by: userData.user.id,
+      }));
+
+      const { data, error } = await supabase
+        .from("warehouse_tools")
+        .insert(toolsWithDefaults)
+        .select();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["warehouse-tools"] });
+      toast({
+        title: "Success",
+        description: `Successfully imported ${data.length} tools`,
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to import tools",
+        variant: "destructive",
+      });
+    },
+  });
+
   const updateToolMutation = useMutation({
     mutationFn: async ({ id, ...updates }: Partial<WarehouseTool> & { id: string }) => {
       const { data, error } = await supabase
@@ -116,9 +156,11 @@ export function useWarehouseTools() {
     isLoading: toolsQuery.isLoading,
     error: toolsQuery.error,
     createTool: createToolMutation.mutate,
+    createBulkTools: createBulkToolsMutation.mutate,
     updateTool: updateToolMutation.mutate,
     deleteTool: deleteToolMutation.mutate,
     isCreating: createToolMutation.isPending,
+    isCreatingBulk: createBulkToolsMutation.isPending,
     isUpdating: updateToolMutation.isPending,
     isDeleting: deleteToolMutation.isPending,
   };
