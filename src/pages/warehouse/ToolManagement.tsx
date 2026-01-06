@@ -1,7 +1,13 @@
 import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { Plus, Wrench, ArrowRightLeft, RotateCcw, AlertTriangle } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Plus, Wrench, ArrowRightLeft, RotateCcw, AlertTriangle, ChevronDown, Layers } from "lucide-react";
 import { useWarehouseTools } from "@/hooks/useWarehouseTools";
 import { useToolIssues } from "@/hooks/useToolIssues";
 import { useToolReturns } from "@/hooks/useToolReturns";
@@ -12,6 +18,8 @@ import { OverdueToolsTab } from "@/components/warehouse/tools/OverdueToolsTab";
 import { CreateToolDialog } from "@/components/warehouse/tools/CreateToolDialog";
 import { IssueToolDialog } from "@/components/warehouse/tools/IssueToolDialog";
 import { ReturnToolDialog } from "@/components/warehouse/tools/ReturnToolDialog";
+import { BulkIssueToolDialog } from "@/components/warehouse/tools/BulkIssueToolDialog";
+import { BulkReturnToolDialog } from "@/components/warehouse/tools/BulkReturnToolDialog";
 import { Badge } from "@/components/ui/badge";
 
 export default function ToolManagement() {
@@ -19,6 +27,8 @@ export default function ToolManagement() {
   const [showCreateTool, setShowCreateTool] = useState(false);
   const [showIssueTool, setShowIssueTool] = useState(false);
   const [showReturnTool, setShowReturnTool] = useState(false);
+  const [showBulkIssueTool, setShowBulkIssueTool] = useState(false);
+  const [showBulkReturnTool, setShowBulkReturnTool] = useState(false);
 
   const { tools, isLoading: isLoadingTools } = useWarehouseTools();
   const { issues, activeIssues, overdueIssues, isLoading: isLoadingIssues } = useToolIssues();
@@ -37,14 +47,46 @@ export default function ToolManagement() {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={() => setShowReturnTool(true)}>
-            <RotateCcw className="h-4 w-4 mr-2" />
-            Return Tool
-          </Button>
-          <Button variant="outline" onClick={() => setShowIssueTool(true)}>
-            <ArrowRightLeft className="h-4 w-4 mr-2" />
-            Issue Tool
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline">
+                <RotateCcw className="h-4 w-4 mr-2" />
+                Return Tool
+                <ChevronDown className="h-4 w-4 ml-2" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => setShowReturnTool(true)}>
+                <RotateCcw className="h-4 w-4 mr-2" />
+                Single Return
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setShowBulkReturnTool(true)}>
+                <Layers className="h-4 w-4 mr-2" />
+                Bulk Return
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline">
+                <ArrowRightLeft className="h-4 w-4 mr-2" />
+                Issue Tool
+                <ChevronDown className="h-4 w-4 ml-2" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => setShowIssueTool(true)}>
+                <ArrowRightLeft className="h-4 w-4 mr-2" />
+                Single Issue
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setShowBulkIssueTool(true)}>
+                <Layers className="h-4 w-4 mr-2" />
+                Bulk Issue
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
           <Button onClick={() => setShowCreateTool(true)}>
             <Plus className="h-4 w-4 mr-2" />
             Add Tool
@@ -98,6 +140,8 @@ export default function ToolManagement() {
       <CreateToolDialog open={showCreateTool} onOpenChange={setShowCreateTool} />
       <IssueToolDialog open={showIssueTool} onOpenChange={setShowIssueTool} tools={tools} />
       <ReturnToolDialog open={showReturnTool} onOpenChange={setShowReturnTool} activeIssues={activeIssues} />
+      <BulkIssueToolDialog open={showBulkIssueTool} onOpenChange={setShowBulkIssueTool} tools={tools} />
+      <BulkReturnToolDialog open={showBulkReturnTool} onOpenChange={setShowBulkReturnTool} activeIssues={activeIssues} />
     </div>
   );
 }
