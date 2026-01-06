@@ -5,6 +5,7 @@ export interface WarehouseTool {
   description: string | null;
   category_id: string | null;
   location_id: string | null;
+  unit_id: string | null;
   total_quantity: number;
   available_quantity: number;
   issued_quantity: number;
@@ -24,6 +25,11 @@ export interface WarehouseTool {
   location?: {
     id: string;
     name: string;
+  };
+  unit?: {
+    id: string;
+    name: string;
+    abbreviation: string;
   };
 }
 
@@ -76,6 +82,7 @@ export interface CreateWarehouseToolData {
   description?: string;
   category_id?: string;
   location_id?: string;
+  unit_id?: string;
   total_quantity: number;
   condition?: string;
   unit_cost?: number;
