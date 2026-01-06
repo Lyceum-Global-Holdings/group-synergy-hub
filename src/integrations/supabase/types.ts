@@ -11428,6 +11428,153 @@ export type Database = {
           },
         ]
       }
+      tool_issues: {
+        Row: {
+          approved_by: string | null
+          company_id: string | null
+          created_at: string | null
+          created_by: string | null
+          department: string | null
+          expected_return_date: string | null
+          id: string
+          issue_date: string
+          issue_number: string
+          issued_to: string | null
+          issued_to_name: string
+          notes: string | null
+          purpose: string | null
+          quantity_issued: number
+          quantity_returned: number
+          status: string
+          tool_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          approved_by?: string | null
+          company_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          department?: string | null
+          expected_return_date?: string | null
+          id?: string
+          issue_date?: string
+          issue_number: string
+          issued_to?: string | null
+          issued_to_name: string
+          notes?: string | null
+          purpose?: string | null
+          quantity_issued?: number
+          quantity_returned?: number
+          status?: string
+          tool_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          approved_by?: string | null
+          company_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          department?: string | null
+          expected_return_date?: string | null
+          id?: string
+          issue_date?: string
+          issue_number?: string
+          issued_to?: string | null
+          issued_to_name?: string
+          notes?: string | null
+          purpose?: string | null
+          quantity_issued?: number
+          quantity_returned?: number
+          status?: string
+          tool_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tool_issues_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tool_issues_tool_id_fkey"
+            columns: ["tool_id"]
+            isOneToOne: false
+            referencedRelation: "warehouse_tools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tool_returns: {
+        Row: {
+          company_id: string | null
+          condition: string
+          condition_notes: string | null
+          created_at: string | null
+          created_by: string | null
+          id: string
+          issue_id: string
+          notes: string | null
+          quantity_returned: number
+          received_by: string | null
+          return_date: string
+          return_number: string
+          returned_by_name: string | null
+          status: string
+          updated_at: string | null
+        }
+        Insert: {
+          company_id?: string | null
+          condition?: string
+          condition_notes?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          issue_id: string
+          notes?: string | null
+          quantity_returned: number
+          received_by?: string | null
+          return_date?: string
+          return_number: string
+          returned_by_name?: string | null
+          status?: string
+          updated_at?: string | null
+        }
+        Update: {
+          company_id?: string | null
+          condition?: string
+          condition_notes?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          issue_id?: string
+          notes?: string | null
+          quantity_returned?: number
+          received_by?: string | null
+          return_date?: string
+          return_number?: string
+          returned_by_name?: string | null
+          status?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tool_returns_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tool_returns_issue_id_fkey"
+            columns: ["issue_id"]
+            isOneToOne: false
+            referencedRelation: "tool_issues"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       training_manuals: {
         Row: {
           category: string
@@ -12318,6 +12465,88 @@ export type Database = {
             columns: ["warehouse_item_id"]
             isOneToOne: false
             referencedRelation: "warehouse_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      warehouse_tools: {
+        Row: {
+          available_quantity: number
+          category_id: string | null
+          company_id: string | null
+          condition: string
+          created_at: string | null
+          created_by: string | null
+          description: string | null
+          id: string
+          image_url: string | null
+          issued_quantity: number
+          location_id: string | null
+          name: string
+          notes: string | null
+          tool_code: string
+          total_quantity: number
+          unit_cost: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          available_quantity?: number
+          category_id?: string | null
+          company_id?: string | null
+          condition?: string
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          image_url?: string | null
+          issued_quantity?: number
+          location_id?: string | null
+          name: string
+          notes?: string | null
+          tool_code: string
+          total_quantity?: number
+          unit_cost?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          available_quantity?: number
+          category_id?: string | null
+          company_id?: string | null
+          condition?: string
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          image_url?: string | null
+          issued_quantity?: number
+          location_id?: string | null
+          name?: string
+          notes?: string | null
+          tool_code?: string
+          total_quantity?: number
+          unit_cost?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "warehouse_tools_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "asset_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "warehouse_tools_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "warehouse_tools_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "warehouse_locations"
             referencedColumns: ["id"]
           },
         ]

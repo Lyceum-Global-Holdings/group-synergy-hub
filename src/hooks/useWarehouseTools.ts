@@ -1,0 +1,125 @@
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { WarehouseTool, CreateWarehouseToolData } from "@/types/toolManagement";
+import { useToast } from "@/hooks/use-toast";
+import { useCompany } from "@/contexts/CompanyContext";
+
+export function useWarehouseTools() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const { selectedCompany } = useCompany();
+
+  const toolsQuery = useQuery({
+    queryKey: ["warehouse-tools", selectedCompany?.id],
+    queryFn: async () => {
+      let query = supabase
+        .from("warehouse_tools")
+        .select(`
+          *,
+          category:asset_categories!category_id(id, name),
+          location:warehouse_locations!location_id(id, name)
+        `)
+        .order("created_at", { ascending: false });
+
+      if (selectedCompany?.id) {
+        query = query.eq("company_id", selectedCompany.id);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+      return data as WarehouseTool[];
+    },
+  });
+
+  const createToolMutation = useMutation({
+    mutationFn: async (toolData: CreateWarehouseToolData) => {
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData.user) throw new Error("Not authenticated");
+
+      // Generate tool code if not provided
+      const toolCode = toolData.tool_code || `TL-${Date.now().toString(36).toUpperCase()}`;
+
+      const { data, error } = await supabase
+        .from("warehouse_tools")
+        .insert({
+          ...toolData,
+          tool_code: toolCode,
+          available_quantity: toolData.total_quantity,
+          issued_quantity: 0,
+          company_id: selectedCompany?.id || toolData.company_id,
+          created_by: userData.user.id,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["warehouse-tools"] });
+      toast({ title: "Success", description: "Tool created successfully" });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create tool",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const updateToolMutation = useMutation({
+    mutationFn: async ({ id, ...updates }: Partial<WarehouseTool> & { id: string }) => {
+      const { data, error } = await supabase
+        .from("warehouse_tools")
+        .update(updates)
+        .eq("id", id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["warehouse-tools"] });
+      toast({ title: "Success", description: "Tool updated successfully" });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update tool",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteToolMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("warehouse_tools").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["warehouse-tools"] });
+      toast({ title: "Success", description: "Tool deleted successfully" });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete tool",
+        variant: "destructive",
+      });
+    },
+  });
+
+  return {
+    tools: toolsQuery.data || [],
+    isLoading: toolsQuery.isLoading,
+    error: toolsQuery.error,
+    createTool: createToolMutation.mutate,
+    updateTool: updateToolMutation.mutate,
+    deleteTool: deleteToolMutation.mutate,
+    isCreating: createToolMutation.isPending,
+    isUpdating: updateToolMutation.isPending,
+    isDeleting: deleteToolMutation.isPending,
+  };
+}

@@ -44,6 +44,7 @@ import DeliveryOrder from "./pages/warehouse/DeliveryOrder";
 import GoodsReceiptNote from "./pages/warehouse/GoodsReceiptNote";
 import InventoryValuation from "./pages/warehouse/InventoryValuation";
 import PublicAssetView from "./pages/PublicAssetView";
+import ToolManagement from "./pages/warehouse/ToolManagement";
 import PoEmailApproval from "./pages/procurement/PoEmailApproval";
 import GeneralLedger from "./pages/finance/GeneralLedger";
 import Auth from "./pages/Auth";
@@ -136,6 +137,7 @@ function App() {
               <Route path="/sourcing/contracts" element={<Contracts />} />
               <Route path="/sourcing/blacklist" element={<SupplierBlacklist />} />
               <Route path="/warehouse/asset-management" element={<AssetManagement />} />
+              <Route path="/warehouse/tool-management" element={<ToolManagement />} />
               <Route path="/warehouse/item-bin-master" element={<ItemBinMaster />} />
               <Route path="/warehouse/material-issue" element={<MaterialIssueReturn />} />
               <Route path="/tuh-modules/finished-goods" element={<FinishedGoods />} />
