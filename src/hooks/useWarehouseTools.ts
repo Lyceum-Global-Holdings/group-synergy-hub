@@ -4,14 +4,22 @@ import { supabase } from "@/integrations/supabase/client";
 import { WarehouseTool, CreateWarehouseToolData } from "@/types/toolManagement";
 import { useToast } from "@/hooks/use-toast";
 import { useCompany } from "@/contexts/CompanyContext";
+import { useUserLocationAssignments } from "@/hooks/useUserLocationAssignments";
+import { useCurrentUserRoles, getHighestPriorityRole } from "@/hooks/useCurrentUserRoles";
 
 export function useWarehouseTools() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { selectedCompany } = useCompany();
+  const { myLocationIds, isLoadingMyLocations } = useUserLocationAssignments();
+  const { data: userRoles = [], isLoading: isLoadingRoles } = useCurrentUserRoles();
+
+  // Check if user is admin/super_admin
+  const highestRole = getHighestPriorityRole(userRoles);
+  const isAdmin = highestRole?.appRole === 'super_admin' || highestRole?.appRole === 'admin';
 
   const toolsQuery = useQuery({
-    queryKey: ["warehouse-tools", selectedCompany?.id],
+    queryKey: ["warehouse-tools", selectedCompany?.id, myLocationIds, isAdmin],
     queryFn: async () => {
       let query = supabase
         .from("warehouse_tools")
@@ -23,14 +31,21 @@ export function useWarehouseTools() {
         `)
         .order("created_at", { ascending: false });
 
+      // Filter by company if selected
       if (selectedCompany?.id) {
-        query = query.eq("company_id", selectedCompany.id);
+        query = query.or(`company_id.eq.${selectedCompany.id},company_id.is.null`);
+      }
+
+      // For non-admin users, filter by their assigned locations
+      if (!isAdmin && myLocationIds.length > 0) {
+        query = query.in("location_id", myLocationIds);
       }
 
       const { data, error } = await query;
       if (error) throw error;
       return data as WarehouseTool[];
     },
+    enabled: !isLoadingMyLocations && !isLoadingRoles,
   });
 
   const createToolMutation = useMutation({
