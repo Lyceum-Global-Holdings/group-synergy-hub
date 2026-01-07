@@ -115,3 +115,17 @@ export interface CreateToolReturnData {
   notes?: string;
   company_id?: string;
 }
+
+export interface ToolAdjustment {
+  id: string;
+  tool_id: string;
+  adjustment_type: "increase" | "decrease";
+  quantity_change: number;
+  quantity_before: number;
+  quantity_after: number;
+  reason: string | null;
+  notes: string | null;
+  company_id: string | null;
+  created_by: string | null;
+  created_at: string;
+}

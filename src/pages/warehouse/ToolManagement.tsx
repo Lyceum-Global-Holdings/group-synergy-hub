@@ -21,7 +21,9 @@ import { ReturnToolDialog } from "@/components/warehouse/tools/ReturnToolDialog"
 import { BulkIssueToolDialog } from "@/components/warehouse/tools/BulkIssueToolDialog";
 import { BulkReturnToolDialog } from "@/components/warehouse/tools/BulkReturnToolDialog";
 import { BulkToolImportDialog } from "@/components/warehouse/tools/BulkToolImportDialog";
+import { ToolAdjustmentDialog } from "@/components/warehouse/tools/ToolAdjustmentDialog";
 import { Badge } from "@/components/ui/badge";
+import { WarehouseTool } from "@/types/toolManagement";
 
 export default function ToolManagement() {
   const [activeTab, setActiveTab] = useState("inventory");
@@ -31,6 +33,8 @@ export default function ToolManagement() {
   const [showBulkIssueTool, setShowBulkIssueTool] = useState(false);
   const [showBulkReturnTool, setShowBulkReturnTool] = useState(false);
   const [showBulkImport, setShowBulkImport] = useState(false);
+  const [showAdjustTool, setShowAdjustTool] = useState(false);
+  const [selectedToolForAdjustment, setSelectedToolForAdjustment] = useState<WarehouseTool | null>(null);
 
   const { tools, isLoading: isLoadingTools } = useWarehouseTools();
   const { issues, activeIssues, overdueIssues, isLoading: isLoadingIssues } = useToolIssues();
@@ -138,7 +142,14 @@ export default function ToolManagement() {
         </TabsList>
 
         <TabsContent value="inventory" className="mt-6">
-          <ToolsInventoryTab tools={tools} isLoading={isLoadingTools} />
+          <ToolsInventoryTab 
+            tools={tools} 
+            isLoading={isLoadingTools}
+            onAdjustQuantity={(tool) => {
+              setSelectedToolForAdjustment(tool);
+              setShowAdjustTool(true);
+            }}
+          />
         </TabsContent>
 
         <TabsContent value="issues" className="mt-6">
@@ -160,6 +171,11 @@ export default function ToolManagement() {
       <BulkIssueToolDialog open={showBulkIssueTool} onOpenChange={setShowBulkIssueTool} tools={tools} />
       <BulkReturnToolDialog open={showBulkReturnTool} onOpenChange={setShowBulkReturnTool} activeIssues={activeIssues} />
       <BulkToolImportDialog open={showBulkImport} onOpenChange={setShowBulkImport} />
+      <ToolAdjustmentDialog 
+        open={showAdjustTool} 
+        onOpenChange={setShowAdjustTool} 
+        tool={selectedToolForAdjustment}
+      />
     </div>
   );
 }
