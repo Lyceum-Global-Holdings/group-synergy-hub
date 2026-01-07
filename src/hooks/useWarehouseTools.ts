@@ -1,7 +1,7 @@
 // Warehouse Tools Hook - Handles CRUD operations for tool inventory
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { WarehouseTool, CreateWarehouseToolData } from "@/types/toolManagement";
+import type { WarehouseTool, CreateWarehouseToolData } from "@/types/toolManagement";
 import { useToast } from "@/hooks/use-toast";
 import { useCompany } from "@/contexts/CompanyContext";
 
