@@ -245,7 +245,7 @@ function generatePdfDocument(report: ReportData, materials: MaterialsData): jsPD
 
     autoTable(doc, {
       startY: yPos,
-      head: [["Type", "Code", "Item", "Change", "Before", "After", "Notes", "By"]],
+      head: [["Type", "Code", "Item", "Supplier", "Change", "Before", "After", "Notes", "By"]],
       body: materials.adjustments.map((item) => {
         const notes = item.issued_to_location_name 
           ? `To: ${item.issued_to_location_name}${item.adjustment_notes ? ` - ${item.adjustment_notes}` : ""}`
@@ -254,6 +254,7 @@ function generatePdfDocument(report: ReportData, materials: MaterialsData): jsPD
           getTypeLabel(item.transaction_type || "adjustment"),
           item.item_code || "-",
           item.item_name,
+          item.supplier_name || "-",
           item.quantity_change > 0 ? `+${item.quantity_change}` : String(item.quantity_change),
           String(item.quantity_before),
           String(item.quantity_after),
