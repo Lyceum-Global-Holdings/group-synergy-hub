@@ -37,6 +37,8 @@ export interface DailyStockAdjustment {
   item_master_notes: string | null;
   adjusted_by: string | null;
   issued_to_location_name?: string | null;
+  supplier_name: string | null;
+  supplier_type: string | null;
 }
 
 export interface CurrentStockBalance {
@@ -185,7 +187,12 @@ export function useDailyMaterialsActivity(startDate: string | null, endDate?: st
             item_code,
             name,
             notes,
-            company_id
+            company_id,
+            supplier_id,
+            suppliers!warehouse_items_supplier_id_fkey (
+              name,
+              supplier_type
+            )
           )
         `)
         .eq("warehouse_items.company_id", selectedCompany.id)
@@ -231,6 +238,8 @@ export function useDailyMaterialsActivity(startDate: string | null, endDate?: st
           item_master_notes: adj.warehouse_items?.notes || null,
           adjusted_by: adj.created_by ? profilesMap[adj.created_by] || null : null,
           issued_to_location_name: adj.issued_to_location?.name || null,
+          supplier_name: adj.warehouse_items?.suppliers?.name || null,
+          supplier_type: adj.warehouse_items?.suppliers?.supplier_type || null,
         };
       });
     },

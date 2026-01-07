@@ -520,6 +520,7 @@ export function DailySiteReportDialog({ open, onOpenChange, report }: DailySiteR
                       <TableRow>
                         <TableHead>Item Code</TableHead>
                         <TableHead>Item Name</TableHead>
+                        <TableHead>Supplier</TableHead>
                         <TableHead className="text-right">Change</TableHead>
                         <TableHead className="text-right">Before → After</TableHead>
                         <TableHead>Adjustment Notes</TableHead>
@@ -531,6 +532,7 @@ export function DailySiteReportDialog({ open, onOpenChange, report }: DailySiteR
                         <TableRow key={idx}>
                           <TableCell className="font-mono text-xs">{adj.item_code || "-"}</TableCell>
                           <TableCell>{adj.item_name}</TableCell>
+                          <TableCell className="text-sm">{adj.supplier_name || "-"}</TableCell>
                           <TableCell className={`text-right font-medium ${adj.quantity_change > 0 ? "text-green-600" : adj.quantity_change < 0 ? "text-red-600" : ""}`}>
                             {adj.quantity_change > 0 ? "+" : ""}{adj.quantity_change}
                           </TableCell>

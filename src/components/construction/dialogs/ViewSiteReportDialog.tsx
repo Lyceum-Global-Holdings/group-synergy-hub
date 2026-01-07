@@ -523,6 +523,7 @@ export function ViewSiteReportDialog({
                               <TableHead>Type</TableHead>
                               <TableHead>Code</TableHead>
                               <TableHead>Item</TableHead>
+                              <TableHead>Supplier</TableHead>
                               <TableHead>Change</TableHead>
                               <TableHead>Before</TableHead>
                               <TableHead>After</TableHead>
@@ -538,6 +539,7 @@ export function ViewSiteReportDialog({
                                 </TableCell>
                                 <TableCell>{item.item_code || "-"}</TableCell>
                                 <TableCell>{item.item_name}</TableCell>
+                                <TableCell>{item.supplier_name || "-"}</TableCell>
                                 <TableCell className={item.quantity_change > 0 ? "text-green-600" : "text-red-600"}>
                                   {item.quantity_change > 0 ? `+${item.quantity_change}` : item.quantity_change}
                                 </TableCell>
