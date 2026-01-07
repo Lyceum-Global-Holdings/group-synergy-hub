@@ -1,15 +1,25 @@
 import { ColumnDef } from "@tanstack/react-table";
 import { DataTable } from "@/components/ui/data-table";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { WarehouseTool } from "@/types/toolManagement";
-import { format } from "date-fns";
+import { MoreHorizontal, SlidersHorizontal } from "lucide-react";
 
 interface ToolsInventoryTabProps {
   tools: WarehouseTool[];
   isLoading: boolean;
+  onAdjustQuantity?: (tool: WarehouseTool) => void;
 }
 
-const columns: ColumnDef<WarehouseTool>[] = [
+const createColumns = (
+  onAdjustQuantity?: (tool: WarehouseTool) => void
+): ColumnDef<WarehouseTool>[] => [
   {
     accessorKey: "tool_code",
     header: "Code",
@@ -104,9 +114,33 @@ const columns: ColumnDef<WarehouseTool>[] = [
       return cost ? `$${cost.toFixed(2)}` : "-";
     },
   },
+  {
+    id: "actions",
+    header: "",
+    cell: ({ row }) => {
+      const tool = row.original;
+      return (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon" className="h-8 w-8">
+              <MoreHorizontal className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={() => onAdjustQuantity?.(tool)}>
+              <SlidersHorizontal className="h-4 w-4 mr-2" />
+              Adjust Quantity
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      );
+    },
+  },
 ];
 
-export function ToolsInventoryTab({ tools, isLoading }: ToolsInventoryTabProps) {
+export function ToolsInventoryTab({ tools, isLoading, onAdjustQuantity }: ToolsInventoryTabProps) {
+  const columns = createColumns(onAdjustQuantity);
+
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-4 gap-4">

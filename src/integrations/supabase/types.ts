@@ -11428,6 +11428,63 @@ export type Database = {
           },
         ]
       }
+      tool_adjustments: {
+        Row: {
+          adjustment_type: string
+          company_id: string | null
+          created_at: string | null
+          created_by: string | null
+          id: string
+          notes: string | null
+          quantity_after: number
+          quantity_before: number
+          quantity_change: number
+          reason: string | null
+          tool_id: string
+        }
+        Insert: {
+          adjustment_type: string
+          company_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          quantity_after: number
+          quantity_before: number
+          quantity_change: number
+          reason?: string | null
+          tool_id: string
+        }
+        Update: {
+          adjustment_type?: string
+          company_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          quantity_after?: number
+          quantity_before?: number
+          quantity_change?: number
+          reason?: string | null
+          tool_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tool_adjustments_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tool_adjustments_tool_id_fkey"
+            columns: ["tool_id"]
+            isOneToOne: false
+            referencedRelation: "warehouse_tools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tool_issues: {
         Row: {
           approved_by: string | null
