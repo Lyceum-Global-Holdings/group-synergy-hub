@@ -1,7 +1,9 @@
+import { useState, useMemo } from "react";
 import { ColumnDef } from "@tanstack/react-table";
 import { DataTable } from "@/components/ui/data-table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -9,7 +11,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { WarehouseTool } from "@/types/toolManagement";
-import { MoreHorizontal, Pencil, SlidersHorizontal } from "lucide-react";
+import { MoreHorizontal, Pencil, Search, SlidersHorizontal, X } from "lucide-react";
 
 interface ToolsInventoryTabProps {
   tools: WarehouseTool[];
@@ -145,36 +147,71 @@ const createColumns = (
 ];
 
 export function ToolsInventoryTab({ tools, isLoading, onAdjustQuantity, onEditTool }: ToolsInventoryTabProps) {
+  const [searchQuery, setSearchQuery] = useState("");
   const columns = createColumns(onAdjustQuantity, onEditTool);
+
+  const filteredTools = useMemo(() => {
+    if (!searchQuery.trim()) return tools;
+    const query = searchQuery.toLowerCase();
+    return tools.filter((tool) =>
+      tool.tool_code?.toLowerCase().includes(query) ||
+      tool.name?.toLowerCase().includes(query) ||
+      tool.description?.toLowerCase().includes(query) ||
+      tool.category?.name?.toLowerCase().includes(query) ||
+      tool.location?.name?.toLowerCase().includes(query)
+    );
+  }, [tools, searchQuery]);
+
+  const isFiltered = searchQuery.trim() !== "";
 
   return (
     <div className="space-y-4">
+      <div className="flex items-center gap-2">
+        <div className="relative flex-1 max-w-sm">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search by code, name, category, location..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-9"
+          />
+        </div>
+        {searchQuery && (
+          <Button variant="ghost" size="sm" onClick={() => setSearchQuery("")}>
+            <X className="h-4 w-4 mr-1" />
+            Clear
+          </Button>
+        )}
+      </div>
+
       <div className="grid grid-cols-4 gap-4">
         <div className="rounded-lg border bg-card p-4">
           <div className="text-sm text-muted-foreground">Total Tools</div>
-          <div className="text-2xl font-bold">{tools.length}</div>
+          <div className="text-2xl font-bold">
+            {isFiltered ? `${filteredTools.length} / ${tools.length}` : tools.length}
+          </div>
         </div>
         <div className="rounded-lg border bg-card p-4">
           <div className="text-sm text-muted-foreground">Total Quantity</div>
           <div className="text-2xl font-bold">
-            {tools.reduce((sum, t) => sum + t.total_quantity, 0)}
+            {filteredTools.reduce((sum, t) => sum + t.total_quantity, 0)}
           </div>
         </div>
         <div className="rounded-lg border bg-card p-4">
           <div className="text-sm text-muted-foreground">Available</div>
           <div className="text-2xl font-bold text-green-600">
-            {tools.reduce((sum, t) => sum + t.available_quantity, 0)}
+            {filteredTools.reduce((sum, t) => sum + t.available_quantity, 0)}
           </div>
         </div>
         <div className="rounded-lg border bg-card p-4">
           <div className="text-sm text-muted-foreground">Currently Issued</div>
           <div className="text-2xl font-bold text-orange-600">
-            {tools.reduce((sum, t) => sum + t.issued_quantity, 0)}
+            {filteredTools.reduce((sum, t) => sum + t.issued_quantity, 0)}
           </div>
         </div>
       </div>
 
-      <DataTable columns={columns} data={tools} isLoading={isLoading} />
+      <DataTable columns={columns} data={filteredTools} isLoading={isLoading} />
     </div>
   );
 }
