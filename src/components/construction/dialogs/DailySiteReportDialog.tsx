@@ -41,7 +41,7 @@ import { useEffect } from "react";
 import { format } from "date-fns";
 import { useCompany } from "@/contexts/CompanyContext";
 import { toast } from "sonner";
-import { Package, RotateCcw, Loader2, SlidersHorizontal } from "lucide-react";
+import { Package, RotateCcw, Loader2, SlidersHorizontal, Wrench } from "lucide-react";
 
 const formSchema = z.object({
   project_id: z.string().min(1, "Project is required"),
@@ -374,46 +374,94 @@ export function DailySiteReportDialog({ open, onOpenChange, report }: DailySiteR
               )}
             />
 
-            {/* Items Issued Section */}
-            <div className="border rounded-lg p-4 bg-muted/30">
-              <div className="flex items-center gap-2 mb-3">
-                <Package className="h-4 w-4 text-primary" />
-                <h3 className="font-medium">Items Issued on {formattedDate}</h3>
-                {materialsLoading && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
-              </div>
-              {issues.length > 0 ? (
-                <div className="rounded-md border bg-background">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="w-[100px]">Issue #</TableHead>
-                        <TableHead>Item Code</TableHead>
-                        <TableHead>Item Name</TableHead>
-                        <TableHead className="text-right">Qty</TableHead>
-                        <TableHead>Issued To</TableHead>
-                        <TableHead>Item Master Notes</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {issues.map((issue, idx) => (
-                        <TableRow key={`${issue.min_number}-${idx}`}>
-                          <TableCell className="font-mono text-xs">{issue.min_number}</TableCell>
-                          <TableCell className="font-mono text-xs">{issue.item_code || "-"}</TableCell>
-                          <TableCell>{issue.item_name}</TableCell>
-                          <TableCell className="text-right">{issue.quantity_issued}</TableCell>
-                          <TableCell>{issue.issued_to || "-"}</TableCell>
-                          <TableCell className="text-sm text-muted-foreground max-w-[200px] truncate">
-                            {issue.item_master_notes || "-"}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              ) : (
-                <p className="text-sm text-muted-foreground">No items issued on this date</p>
-              )}
-            </div>
+            {/* Items Issued Section - Regular Items (non-contractor) */}
+            {(() => {
+              const regularIssues = issues.filter(i => i.supplier_type !== 'contractor');
+              const contractorIssues = issues.filter(i => i.supplier_type === 'contractor');
+              
+              return (
+                <>
+                  <div className="border rounded-lg p-4 bg-muted/30">
+                    <div className="flex items-center gap-2 mb-3">
+                      <Package className="h-4 w-4 text-primary" />
+                      <h3 className="font-medium">Items Issued on {formattedDate}</h3>
+                      {materialsLoading && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
+                    </div>
+                    {regularIssues.length > 0 ? (
+                      <div className="rounded-md border bg-background">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead className="w-[100px]">Issue #</TableHead>
+                              <TableHead>Item Code</TableHead>
+                              <TableHead>Item Name</TableHead>
+                              <TableHead className="text-right">Qty</TableHead>
+                              <TableHead>Issued To</TableHead>
+                              <TableHead>Item Master Notes</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {regularIssues.map((issue, idx) => (
+                              <TableRow key={`${issue.min_number}-${idx}`}>
+                                <TableCell className="font-mono text-xs">{issue.min_number}</TableCell>
+                                <TableCell className="font-mono text-xs">{issue.item_code || "-"}</TableCell>
+                                <TableCell>{issue.item_name}</TableCell>
+                                <TableCell className="text-right">{issue.quantity_issued}</TableCell>
+                                <TableCell>{issue.issued_to || "-"}</TableCell>
+                                <TableCell className="text-sm text-muted-foreground max-w-[200px] truncate">
+                                  {issue.item_master_notes || "-"}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">No items issued on this date</p>
+                    )}
+                  </div>
+
+                  {/* Contractor Supplied Items Section */}
+                  <div className="border rounded-lg p-4 bg-orange-50 dark:bg-orange-950/20 border-orange-200 dark:border-orange-900">
+                    <div className="flex items-center gap-2 mb-3">
+                      <Wrench className="h-4 w-4 text-orange-600" />
+                      <h3 className="font-medium text-orange-800 dark:text-orange-300">Contractor Supplied Items on {formattedDate}</h3>
+                      {materialsLoading && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
+                    </div>
+                    {contractorIssues.length > 0 ? (
+                      <div className="rounded-md border bg-background">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead className="w-[100px]">Issue #</TableHead>
+                              <TableHead>Item Code</TableHead>
+                              <TableHead>Item Name</TableHead>
+                              <TableHead className="text-right">Qty</TableHead>
+                              <TableHead>Supplier</TableHead>
+                              <TableHead>Issued To</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {contractorIssues.map((issue, idx) => (
+                              <TableRow key={`contractor-${issue.min_number}-${idx}`}>
+                                <TableCell className="font-mono text-xs">{issue.min_number}</TableCell>
+                                <TableCell className="font-mono text-xs">{issue.item_code || "-"}</TableCell>
+                                <TableCell>{issue.item_name}</TableCell>
+                                <TableCell className="text-right">{issue.quantity_issued}</TableCell>
+                                <TableCell className="text-orange-700 dark:text-orange-400">{issue.supplier_name || "-"}</TableCell>
+                                <TableCell>{issue.issued_to || "-"}</TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">No contractor supplied items on this date</p>
+                    )}
+                  </div>
+                </>
+              );
+            })()}
 
             {/* Items Returned Section */}
             <div className="border rounded-lg p-4 bg-muted/30">
