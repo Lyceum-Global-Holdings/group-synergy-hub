@@ -65,11 +65,13 @@ export function useDailyMaterialsActivity(startDate: string | null, endDate?: st
           material_issue_items (
             quantity_issued,
             notes,
-            warehouse_items (
+            item_id,
+            warehouse_items!material_issue_items_item_id_fkey (
               item_code,
               name,
               notes,
-              suppliers:supplier_id (
+              supplier_id,
+              suppliers!warehouse_items_supplier_id_fkey (
                 name,
                 supplier_type
               )
