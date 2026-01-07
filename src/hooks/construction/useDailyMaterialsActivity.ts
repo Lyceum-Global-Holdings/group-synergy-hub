@@ -11,6 +11,8 @@ export interface DailyMaterialIssue {
   quantity_issued: number;
   item_notes: string | null;
   item_master_notes: string | null;
+  supplier_name: string | null;
+  supplier_type: string | null;
 }
 
 export interface DailyMaterialReturn {
@@ -66,7 +68,11 @@ export function useDailyMaterialsActivity(startDate: string | null, endDate?: st
             warehouse_items (
               item_code,
               name,
-              notes
+              notes,
+              suppliers:supplier_id (
+                name,
+                supplier_type
+              )
             )
           )
         `)
@@ -91,6 +97,8 @@ export function useDailyMaterialsActivity(startDate: string | null, endDate?: st
             quantity_issued: item.quantity_issued,
             item_notes: item.notes,
             item_master_notes: item.warehouse_items?.notes || null,
+            supplier_name: item.warehouse_items?.suppliers?.name || null,
+            supplier_type: item.warehouse_items?.suppliers?.supplier_type || null,
           });
         });
       });

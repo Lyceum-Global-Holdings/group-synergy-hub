@@ -156,17 +156,21 @@ function generatePdfDocument(report: ReportData, materials: MaterialsData): jsPD
   doc.text("Material Activity", 14, yPos);
   yPos += 10;
 
-  // Items Issued Table
-  if (materials.issues.length > 0) {
+  // Separate regular items from contractor items
+  const regularIssues = materials.issues.filter(i => i.supplier_type !== 'contractor');
+  const contractorIssues = materials.issues.filter(i => i.supplier_type === 'contractor');
+
+  // Items Issued Table (Regular Items)
+  if (regularIssues.length > 0) {
     doc.setFontSize(10);
     doc.setFont("helvetica", "bold");
-    doc.text(`Items Issued (${materials.issues.length})`, 14, yPos);
+    doc.text(`Items Issued (${regularIssues.length})`, 14, yPos);
     yPos += 2;
 
     autoTable(doc, {
       startY: yPos,
       head: [["MIN#", "Code", "Item", "Qty Issued", "Issued To", "Department"]],
-      body: materials.issues.map((item) => [
+      body: regularIssues.map((item) => [
         item.min_number || "-",
         item.item_code || "-",
         item.item_name,
@@ -176,6 +180,37 @@ function generatePdfDocument(report: ReportData, materials: MaterialsData): jsPD
       ]),
       styles: { fontSize: 8 },
       headStyles: { fillColor: [66, 139, 202] },
+      margin: { left: 14, right: 14 },
+    });
+    yPos = (doc as any).lastAutoTable.finalY + 10;
+  }
+
+  // Contractor Supplied Items Table
+  if (contractorIssues.length > 0) {
+    // Check if we need a new page
+    if (yPos > 230) {
+      doc.addPage();
+      yPos = 20;
+    }
+
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "bold");
+    doc.text(`Contractor Supplied Items (${contractorIssues.length})`, 14, yPos);
+    yPos += 2;
+
+    autoTable(doc, {
+      startY: yPos,
+      head: [["MIN#", "Code", "Item", "Qty Issued", "Supplier", "Issued To"]],
+      body: contractorIssues.map((item) => [
+        item.min_number || "-",
+        item.item_code || "-",
+        item.item_name,
+        String(item.quantity_issued),
+        item.supplier_name || "-",
+        item.issued_to || "-",
+      ]),
+      styles: { fontSize: 8 },
+      headStyles: { fillColor: [230, 126, 34] }, // Orange color for contractor items
       margin: { left: 14, right: 14 },
     });
     yPos = (doc as any).lastAutoTable.finalY + 10;

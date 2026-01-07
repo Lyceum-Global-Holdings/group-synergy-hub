@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { FileDown, X, Cloud, Thermometer, Users, AlertTriangle, Shield, Package, Warehouse, ArrowRightLeft, RefreshCw, Send } from "lucide-react";
+import { FileDown, X, Cloud, Thermometer, Users, AlertTriangle, Shield, Package, Warehouse, ArrowRightLeft, RefreshCw, Send, Wrench } from "lucide-react";
 import { format } from "date-fns";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -416,8 +416,96 @@ export function ViewSiteReportDialog({
               {isLoading ? <div className="flex items-center justify-center py-8">
                   <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary" />
                 </div> : <div className="space-y-4">
-                  {/* Items Issued */}
-                  
+                  {/* Items Issued - Regular Items */}
+                  {(() => {
+                    const regularIssues = issues.filter(i => i.supplier_type !== 'contractor');
+                    const contractorIssues = issues.filter(i => i.supplier_type === 'contractor');
+                    
+                    return (
+                      <>
+                        <Card>
+                          <CardHeader className="pb-2">
+                            <CardTitle className="text-sm font-medium flex items-center gap-2">
+                              <Package className="h-4 w-4" />
+                              Items Issued ({regularIssues.length})
+                            </CardTitle>
+                          </CardHeader>
+                          <CardContent>
+                            {regularIssues.length === 0 ? (
+                              <p className="text-sm text-muted-foreground py-4 text-center">
+                                No items issued for this period
+                              </p>
+                            ) : (
+                              <Table>
+                                <TableHeader>
+                                  <TableRow>
+                                    <TableHead>Issue #</TableHead>
+                                    <TableHead>Code</TableHead>
+                                    <TableHead>Item</TableHead>
+                                    <TableHead>Qty</TableHead>
+                                    <TableHead>Issued To</TableHead>
+                                  </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                  {regularIssues.map((item, idx) => (
+                                    <TableRow key={`${item.min_number}-${idx}`}>
+                                      <TableCell className="font-mono text-xs">{item.min_number}</TableCell>
+                                      <TableCell>{item.item_code || "-"}</TableCell>
+                                      <TableCell>{item.item_name}</TableCell>
+                                      <TableCell>{item.quantity_issued}</TableCell>
+                                      <TableCell>{item.issued_to || "-"}</TableCell>
+                                    </TableRow>
+                                  ))}
+                                </TableBody>
+                              </Table>
+                            )}
+                          </CardContent>
+                        </Card>
+
+                        {/* Contractor Supplied Items */}
+                        <Card className="border-orange-200 dark:border-orange-900 bg-orange-50/50 dark:bg-orange-950/20">
+                          <CardHeader className="pb-2">
+                            <CardTitle className="text-sm font-medium flex items-center gap-2 text-orange-800 dark:text-orange-300">
+                              <Wrench className="h-4 w-4 text-orange-600" />
+                              Contractor Supplied Items ({contractorIssues.length})
+                            </CardTitle>
+                          </CardHeader>
+                          <CardContent>
+                            {contractorIssues.length === 0 ? (
+                              <p className="text-sm text-muted-foreground py-4 text-center">
+                                No contractor supplied items for this period
+                              </p>
+                            ) : (
+                              <Table>
+                                <TableHeader>
+                                  <TableRow>
+                                    <TableHead>Issue #</TableHead>
+                                    <TableHead>Code</TableHead>
+                                    <TableHead>Item</TableHead>
+                                    <TableHead>Qty</TableHead>
+                                    <TableHead>Supplier</TableHead>
+                                    <TableHead>Issued To</TableHead>
+                                  </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                  {contractorIssues.map((item, idx) => (
+                                    <TableRow key={`contractor-${item.min_number}-${idx}`}>
+                                      <TableCell className="font-mono text-xs">{item.min_number}</TableCell>
+                                      <TableCell>{item.item_code || "-"}</TableCell>
+                                      <TableCell>{item.item_name}</TableCell>
+                                      <TableCell>{item.quantity_issued}</TableCell>
+                                      <TableCell className="text-orange-700 dark:text-orange-400">{item.supplier_name || "-"}</TableCell>
+                                      <TableCell>{item.issued_to || "-"}</TableCell>
+                                    </TableRow>
+                                  ))}
+                                </TableBody>
+                              </Table>
+                            )}
+                          </CardContent>
+                        </Card>
+                      </>
+                    );
+                  })()}
 
                   {/* Stock Transactions */}
                   <Card>
