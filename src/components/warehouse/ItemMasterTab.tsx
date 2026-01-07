@@ -197,6 +197,7 @@ export function ItemMasterTab() {
               <TableHead>Category</TableHead>
               <TableHead>Unit</TableHead>
               <TableHead>Brand</TableHead>
+              <TableHead>Supplier</TableHead>
               <TableHead>Company</TableHead>
               <TableHead className="text-right">Current Stock</TableHead>
               <TableHead>Unit Cost</TableHead>
@@ -207,13 +208,13 @@ export function ItemMasterTab() {
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={11} className="text-center py-8">
+              <TableCell colSpan={12} className="text-center py-8">
                   Loading items...
                 </TableCell>
               </TableRow>
             ) : filteredItems.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={11} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={12} className="text-center py-8 text-muted-foreground">
                   No items found. Create your first item to get started.
                 </TableCell>
               </TableRow>
@@ -258,6 +259,7 @@ export function ItemMasterTab() {
                     }
                   </TableCell>
                   <TableCell>{item.brand || '-'}</TableCell>
+                  <TableCell>{item.supplier?.name || '-'}</TableCell>
                   <TableCell>
                     {item.company_id 
                       ? companies.find(c => c.id === item.company_id)?.name || '-'

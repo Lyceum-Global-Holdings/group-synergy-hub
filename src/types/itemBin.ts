@@ -67,6 +67,10 @@ export interface WarehouseItem {
   brand: string | null;
   manufacturer: string | null;
   supplier_id: string | null;
+  supplier?: {
+    id: string;
+    name: string;
+  } | null;
   status: 'active' | 'inactive' | 'discontinued';
   is_serialized: boolean;
   is_batch_tracked: boolean;

@@ -18,7 +18,10 @@ export const useWarehouseItems = () => {
     queryFn: async () => {
       let query = supabase
         .from('warehouse_items')
-        .select('*');
+        .select(`
+          *,
+          supplier:suppliers(id, name)
+        `);
 
       // Filter by company if not viewing all companies
       if (!isViewingAllCompanies && selectedCompany?.id) {
