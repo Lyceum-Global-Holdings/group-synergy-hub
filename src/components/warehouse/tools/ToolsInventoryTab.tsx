@@ -9,16 +9,18 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { WarehouseTool } from "@/types/toolManagement";
-import { MoreHorizontal, SlidersHorizontal } from "lucide-react";
+import { MoreHorizontal, Pencil, SlidersHorizontal } from "lucide-react";
 
 interface ToolsInventoryTabProps {
   tools: WarehouseTool[];
   isLoading: boolean;
   onAdjustQuantity?: (tool: WarehouseTool) => void;
+  onEditTool?: (tool: WarehouseTool) => void;
 }
 
 const createColumns = (
-  onAdjustQuantity?: (tool: WarehouseTool) => void
+  onAdjustQuantity?: (tool: WarehouseTool) => void,
+  onEditTool?: (tool: WarehouseTool) => void
 ): ColumnDef<WarehouseTool>[] => [
   {
     accessorKey: "tool_code",
@@ -127,6 +129,10 @@ const createColumns = (
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={() => onEditTool?.(tool)}>
+              <Pencil className="h-4 w-4 mr-2" />
+              Edit Tool
+            </DropdownMenuItem>
             <DropdownMenuItem onClick={() => onAdjustQuantity?.(tool)}>
               <SlidersHorizontal className="h-4 w-4 mr-2" />
               Adjust Quantity
@@ -138,8 +144,8 @@ const createColumns = (
   },
 ];
 
-export function ToolsInventoryTab({ tools, isLoading, onAdjustQuantity }: ToolsInventoryTabProps) {
-  const columns = createColumns(onAdjustQuantity);
+export function ToolsInventoryTab({ tools, isLoading, onAdjustQuantity, onEditTool }: ToolsInventoryTabProps) {
+  const columns = createColumns(onAdjustQuantity, onEditTool);
 
   return (
     <div className="space-y-4">

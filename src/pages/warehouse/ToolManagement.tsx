@@ -16,6 +16,7 @@ import { ToolIssuesTab } from "@/components/warehouse/tools/ToolIssuesTab";
 import { ToolReturnsTab } from "@/components/warehouse/tools/ToolReturnsTab";
 import { OverdueToolsTab } from "@/components/warehouse/tools/OverdueToolsTab";
 import { CreateToolDialog } from "@/components/warehouse/tools/CreateToolDialog";
+import { EditToolDialog } from "@/components/warehouse/tools/EditToolDialog";
 import { IssueToolDialog } from "@/components/warehouse/tools/IssueToolDialog";
 import { ReturnToolDialog } from "@/components/warehouse/tools/ReturnToolDialog";
 import { BulkIssueToolDialog } from "@/components/warehouse/tools/BulkIssueToolDialog";
@@ -34,7 +35,9 @@ export default function ToolManagement() {
   const [showBulkReturnTool, setShowBulkReturnTool] = useState(false);
   const [showBulkImport, setShowBulkImport] = useState(false);
   const [showAdjustTool, setShowAdjustTool] = useState(false);
+  const [showEditTool, setShowEditTool] = useState(false);
   const [selectedToolForAdjustment, setSelectedToolForAdjustment] = useState<WarehouseTool | null>(null);
+  const [selectedToolForEdit, setSelectedToolForEdit] = useState<WarehouseTool | null>(null);
 
   const { tools, isLoading: isLoadingTools } = useWarehouseTools();
   const { issues, activeIssues, overdueIssues, isLoading: isLoadingIssues } = useToolIssues();
@@ -149,6 +152,10 @@ export default function ToolManagement() {
               setSelectedToolForAdjustment(tool);
               setShowAdjustTool(true);
             }}
+            onEditTool={(tool) => {
+              setSelectedToolForEdit(tool);
+              setShowEditTool(true);
+            }}
           />
         </TabsContent>
 
@@ -176,6 +183,13 @@ export default function ToolManagement() {
         onOpenChange={setShowAdjustTool} 
         tool={selectedToolForAdjustment}
       />
+      {selectedToolForEdit && (
+        <EditToolDialog
+          open={showEditTool}
+          onOpenChange={setShowEditTool}
+          tool={selectedToolForEdit}
+        />
+      )}
     </div>
   );
 }
