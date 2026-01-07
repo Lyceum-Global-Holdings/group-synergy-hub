@@ -12,16 +12,24 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { useToolIssues } from "@/hooks/useToolIssues";
 import { WarehouseTool } from "@/types/toolManagement";
 import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
+import { Check, ChevronsUpDown } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface IssueToolDialogProps {
   open: boolean;
@@ -31,6 +39,7 @@ interface IssueToolDialogProps {
 
 export function IssueToolDialog({ open, onOpenChange, tools }: IssueToolDialogProps) {
   const { createIssue, isCreating } = useToolIssues();
+  const [comboboxOpen, setComboboxOpen] = useState(false);
   const [formData, setFormData] = useState({
     tool_id: "",
     issued_to_name: "",
@@ -79,42 +88,83 @@ export function IssueToolDialog({ open, onOpenChange, tools }: IssueToolDialogPr
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="tool_id">Select Tool *</Label>
-            <Select
-              value={formData.tool_id}
-              onValueChange={(value) => setFormData({ ...formData, tool_id: value, quantity_issued: 1 })}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select a tool to issue" />
-              </SelectTrigger>
-              <SelectContent>
-                {tools.map((tool) => {
-                  const isUnavailable = tool.available_quantity <= 0;
-                  return (
-                    <SelectItem 
-                      key={tool.id} 
-                      value={tool.id}
-                      disabled={isUnavailable}
-                      className={isUnavailable ? "opacity-50" : ""}
-                    >
-                      <div className="flex items-center gap-2">
-                        <span className={isUnavailable ? "text-muted-foreground" : ""}>
-                          {tool.name}
-                        </span>
-                        {isUnavailable ? (
-                          <Badge variant="destructive" className="text-xs">
-                            Not Available
-                          </Badge>
-                        ) : (
-                          <Badge variant="secondary" className="text-xs">
-                            {tool.available_quantity} available
-                          </Badge>
-                        )}
-                      </div>
-                    </SelectItem>
-                  );
-                })}
-              </SelectContent>
-            </Select>
+            <Popover open={comboboxOpen} onOpenChange={setComboboxOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  role="combobox"
+                  aria-expanded={comboboxOpen}
+                  className="w-full justify-between"
+                >
+                  {selectedTool ? (
+                    <div className="flex items-center gap-2">
+                      <span>{selectedTool.name}</span>
+                      <Badge variant="secondary" className="text-xs">
+                        {selectedTool.available_quantity} available
+                      </Badge>
+                    </div>
+                  ) : (
+                    "Search and select a tool..."
+                  )}
+                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[350px] p-0" align="start">
+                <Command>
+                  <CommandInput placeholder="Search by name or code..." />
+                  <CommandList>
+                    <CommandEmpty>No tools found.</CommandEmpty>
+                    <CommandGroup>
+                      {tools.map((tool) => {
+                        const isUnavailable = tool.available_quantity <= 0;
+                        return (
+                          <CommandItem
+                            key={tool.id}
+                            value={`${tool.name} ${tool.tool_code}`}
+                            onSelect={() => {
+                              if (!isUnavailable) {
+                                setFormData({ ...formData, tool_id: tool.id, quantity_issued: 1 });
+                                setComboboxOpen(false);
+                              }
+                            }}
+                            disabled={isUnavailable}
+                            className={cn(
+                              isUnavailable && "opacity-50 cursor-not-allowed"
+                            )}
+                          >
+                            <Check
+                              className={cn(
+                                "mr-2 h-4 w-4",
+                                formData.tool_id === tool.id ? "opacity-100" : "opacity-0"
+                              )}
+                            />
+                            <div className="flex flex-col flex-1">
+                              <div className="flex items-center gap-2">
+                                <span className={isUnavailable ? "text-muted-foreground" : ""}>
+                                  {tool.name}
+                                </span>
+                                {isUnavailable ? (
+                                  <Badge variant="destructive" className="text-xs">
+                                    Not Available
+                                  </Badge>
+                                ) : (
+                                  <Badge variant="secondary" className="text-xs">
+                                    {tool.available_quantity} available
+                                  </Badge>
+                                )}
+                              </div>
+                              <span className="text-xs text-muted-foreground">
+                                {tool.tool_code}
+                              </span>
+                            </div>
+                          </CommandItem>
+                        );
+                      })}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
             {selectedTool && (
               <p className="text-sm text-muted-foreground">
                 Code: {selectedTool.tool_code} | Available: {selectedTool.available_quantity}
