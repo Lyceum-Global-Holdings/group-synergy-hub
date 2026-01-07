@@ -11760,6 +11760,51 @@ export type Database = {
           },
         ]
       }
+      user_location_assignments: {
+        Row: {
+          company_id: string | null
+          created_at: string | null
+          created_by: string | null
+          id: string
+          is_primary: boolean | null
+          location_id: string
+          user_id: string
+        }
+        Insert: {
+          company_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          is_primary?: boolean | null
+          location_id: string
+          user_id: string
+        }
+        Update: {
+          company_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          is_primary?: boolean | null
+          location_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_location_assignments_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_location_assignments_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "warehouse_locations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_modules: {
         Row: {
           access_type: string
@@ -13010,6 +13055,7 @@ export type Database = {
         }[]
       }
       get_user_company_ids: { Args: { _user_id: string }; Returns: string[] }
+      get_user_location_ids: { Args: { _user_id: string }; Returns: string[] }
       has_dashboard_access: {
         Args: { _dashboard_id: string; _user_id: string }
         Returns: boolean
@@ -13071,6 +13117,10 @@ export type Database = {
       update_reservation_on_issue: {
         Args: { p_quantity_issued: number; p_reservation_id: string }
         Returns: undefined
+      }
+      user_has_location_access: {
+        Args: { _location_id: string; _user_id: string }
+        Returns: boolean
       }
       validate_bpo_release: {
         Args: { p_bpo_id: string; p_requested_amount: number }
