@@ -18,7 +18,7 @@ import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "sonner";
-import { Plus, Minus } from "lucide-react";
+import { Plus, Minus, Search } from "lucide-react";
 
 interface BulkIssueToolDialogProps {
   open: boolean;
@@ -35,6 +35,7 @@ export function BulkIssueToolDialog({ open, onOpenChange, tools }: BulkIssueTool
   const { createIssue } = useToolIssues();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedTools, setSelectedTools] = useState<SelectedTool[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
   const [formData, setFormData] = useState({
     issued_to_name: "",
     department: "",
@@ -190,6 +191,15 @@ export function BulkIssueToolDialog({ open, onOpenChange, tools }: BulkIssueTool
 
           <div className="space-y-2">
             <Label>Select Tools to Issue ({selectedTools.length} selected)</Label>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search tools by name or code..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9"
+              />
+            </div>
             <ScrollArea className="h-48 border rounded-md p-2">
               {tools.length === 0 ? (
                 <p className="text-sm text-muted-foreground text-center py-4">
@@ -197,7 +207,16 @@ export function BulkIssueToolDialog({ open, onOpenChange, tools }: BulkIssueTool
                 </p>
               ) : (
                 <div className="space-y-2">
-                  {tools.map((tool) => {
+                  {tools
+                    .filter((tool) => {
+                      if (!searchQuery.trim()) return true;
+                      const query = searchQuery.toLowerCase();
+                      return (
+                        tool.name.toLowerCase().includes(query) ||
+                        tool.tool_code.toLowerCase().includes(query)
+                      );
+                    })
+                    .map((tool) => {
                     const selected = getSelectedTool(tool.id);
                     const isUnavailable = tool.available_quantity <= 0;
                     return (
