@@ -13043,6 +13043,7 @@ export type Database = {
       }
       get_company_hod: { Args: { p_company_id: string }; Returns: string }
       get_company_manager: { Args: { p_company_id: string }; Returns: string }
+      get_current_tenant_id: { Args: never; Returns: string }
       get_public_asset: { Args: { p_id: string }; Returns: Json }
       get_trial_balance: {
         Args: { p_as_of_date: string; p_company_id: string }
