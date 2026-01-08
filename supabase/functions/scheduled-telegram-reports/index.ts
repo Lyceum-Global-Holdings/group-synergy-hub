@@ -57,6 +57,7 @@ const TIMEZONE_OFFSETS: Record<string, number> = {
 };
 
 // Check if current UTC time matches the scheduled time in user's timezone
+// Uses a 5-minute tolerance window to handle timing variations
 function checkTimeMatch(nowUtc: Date, scheduledTime: string, userTimezone: string): boolean {
   const [scheduledHour, scheduledMinute] = scheduledTime.split(':').map(Number);
   
@@ -76,16 +77,23 @@ function checkTimeMatch(nowUtc: Date, scheduledTime: string, userTimezone: strin
   if (utcTotalMinutes < 0) utcTotalMinutes += 24 * 60;
   if (utcTotalMinutes >= 24 * 60) utcTotalMinutes -= 24 * 60;
   
-  // Extract hour and minute
+  // Get current time in total minutes
+  const currentTotalMinutes = nowUtc.getUTCHours() * 60 + nowUtc.getUTCMinutes();
+  
+  // Calculate difference (accounting for day wraparound)
+  let diff = currentTotalMinutes - utcTotalMinutes;
+  if (diff > 720) diff -= 1440; // Handle wraparound (720 = 12 hours, 1440 = 24 hours)
+  if (diff < -720) diff += 1440;
+  
+  // Allow 5-minute window: match if current time is within 0-5 minutes AFTER scheduled time
+  const isWithinWindow = diff >= 0 && diff < 5;
+  
   const expectedUtcHour = Math.floor(utcTotalMinutes / 60);
   const expectedUtcMinute = utcTotalMinutes % 60;
   
-  const currentUtcHour = nowUtc.getUTCHours();
-  const currentUtcMinute = nowUtc.getUTCMinutes();
+  console.log(`Time check: scheduled ${scheduledHour}:${scheduledMinute} (${userTimezone}) = ${expectedUtcHour}:${expectedUtcMinute} UTC, current: ${nowUtc.getUTCHours()}:${nowUtc.getUTCMinutes()} UTC, diff: ${diff} min, match: ${isWithinWindow}`);
   
-  console.log(`Time check: scheduled ${scheduledHour}:${scheduledMinute} (${userTimezone}) = ${expectedUtcHour}:${expectedUtcMinute} UTC, current: ${currentUtcHour}:${currentUtcMinute} UTC`);
-  
-  return currentUtcHour === expectedUtcHour && currentUtcMinute === expectedUtcMinute;
+  return isWithinWindow;
 }
 
 serve(async (req) => {
