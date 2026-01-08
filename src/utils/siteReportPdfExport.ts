@@ -254,31 +254,68 @@ function generatePdfDocument(report: ReportData, materials: MaterialsData): jsPD
     yPos = 20;
   }
 
-  // Stock Transactions Table
-  if (materials.adjustments.length > 0) {
+  // Stock Transactions - Split by Supplier
+  const getTypeLabel = (type: string): string => {
+    const labels: Record<string, string> = {
+      adjustment: "Adjustment",
+      goods_receipt: "Goods Receipt",
+      opening_stock: "Opening Stock",
+      transfer_in: "Transfer In",
+      transfer_out: "Transfer Out",
+      project_issue: "Project Issue",
+      project_return: "Project Return",
+      sublocation_issue: "Sub-Location Issue",
+    };
+    return labels[type] || type.replace(/_/g, ' ');
+  };
+
+  const regularAdjustments = materials.adjustments.filter(a => !a.supplier_name);
+  const supplierLinkedAdjustments = materials.adjustments.filter(a => a.supplier_name && a.supplier_type !== 'contractor');
+  const contractorAdjustments = materials.adjustments.filter(a => a.supplier_type === 'contractor');
+
+  // Regular Stock Transactions (no supplier)
+  if (regularAdjustments.length > 0) {
     doc.setFontSize(10);
     doc.setFont("helvetica", "bold");
-    doc.text(`Stock Transactions (${materials.adjustments.length})`, 14, yPos);
+    doc.text(`Stock Transactions (${regularAdjustments.length})`, 14, yPos);
     yPos += 2;
 
-    const getTypeLabel = (type: string): string => {
-      const labels: Record<string, string> = {
-        adjustment: "Adjustment",
-        goods_receipt: "Goods Receipt",
-        opening_stock: "Opening Stock",
-        transfer_in: "Transfer In",
-        transfer_out: "Transfer Out",
-        project_issue: "Project Issue",
-        project_return: "Project Return",
-        sublocation_issue: "Sub-Location Issue",
-      };
-      return labels[type] || type.replace(/_/g, ' ');
-    };
+    autoTable(doc, {
+      startY: yPos,
+      head: [["Type", "Code", "Item", "Change", "Before", "After", "Notes", "By"]],
+      body: regularAdjustments.map((item) => {
+        const notes = item.issued_to_location_name 
+          ? `To: ${item.issued_to_location_name}${item.adjustment_notes ? ` - ${item.adjustment_notes}` : ""}`
+          : item.adjustment_notes || "-";
+        return [
+          getTypeLabel(item.transaction_type || "adjustment"),
+          item.item_code || "-",
+          item.item_name,
+          item.quantity_change > 0 ? `+${item.quantity_change}` : String(item.quantity_change),
+          String(item.quantity_before),
+          String(item.quantity_after),
+          notes,
+          item.adjusted_by || "-",
+        ];
+      }),
+      styles: { fontSize: 8 },
+      headStyles: { fillColor: [66, 139, 202] },
+      margin: { left: 14, right: 14 },
+    });
+    yPos = (doc as any).lastAutoTable.finalY + 10;
+  }
+
+  // Supplier-Linked Stock Transactions
+  if (supplierLinkedAdjustments.length > 0) {
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "bold");
+    doc.text(`Supplier-Linked Stock Transactions (${supplierLinkedAdjustments.length})`, 14, yPos);
+    yPos += 2;
 
     autoTable(doc, {
       startY: yPos,
       head: [["Type", "Code", "Item", "Supplier", "Change", "Before", "After", "Notes", "By"]],
-      body: materials.adjustments.map((item) => {
+      body: supplierLinkedAdjustments.map((item) => {
         const notes = item.issued_to_location_name 
           ? `To: ${item.issued_to_location_name}${item.adjustment_notes ? ` - ${item.adjustment_notes}` : ""}`
           : item.adjustment_notes || "-";
@@ -295,7 +332,40 @@ function generatePdfDocument(report: ReportData, materials: MaterialsData): jsPD
         ];
       }),
       styles: { fontSize: 8 },
-      headStyles: { fillColor: [240, 173, 78] },
+      headStyles: { fillColor: [52, 152, 219] },
+      margin: { left: 14, right: 14 },
+    });
+    yPos = (doc as any).lastAutoTable.finalY + 10;
+  }
+
+  // Contractor Stock Transactions
+  if (contractorAdjustments.length > 0) {
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "bold");
+    doc.text(`Contractor Stock Transactions (${contractorAdjustments.length})`, 14, yPos);
+    yPos += 2;
+
+    autoTable(doc, {
+      startY: yPos,
+      head: [["Type", "Code", "Item", "Supplier", "Change", "Before", "After", "Notes", "By"]],
+      body: contractorAdjustments.map((item) => {
+        const notes = item.issued_to_location_name 
+          ? `To: ${item.issued_to_location_name}${item.adjustment_notes ? ` - ${item.adjustment_notes}` : ""}`
+          : item.adjustment_notes || "-";
+        return [
+          getTypeLabel(item.transaction_type || "adjustment"),
+          item.item_code || "-",
+          item.item_name,
+          item.supplier_name || "-",
+          item.quantity_change > 0 ? `+${item.quantity_change}` : String(item.quantity_change),
+          String(item.quantity_before),
+          String(item.quantity_after),
+          notes,
+          item.adjusted_by || "-",
+        ];
+      }),
+      styles: { fontSize: 8 },
+      headStyles: { fillColor: [230, 126, 34] },
       margin: { left: 14, right: 14 },
     });
     yPos = (doc as any).lastAutoTable.finalY + 10;
