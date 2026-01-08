@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { FileDown, X, Cloud, Thermometer, Users, AlertTriangle, Shield, Package, Warehouse, ArrowRightLeft, RefreshCw, Send, Wrench } from "lucide-react";
+import { FileDown, X, Cloud, Thermometer, Users, AlertTriangle, Shield, Package, Warehouse, ArrowRightLeft, RefreshCw, Send, Wrench, Truck } from "lucide-react";
 import { format } from "date-fns";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -551,54 +551,121 @@ export function ViewSiteReportDialog({
                     );
                   })()}
 
-                  {/* Stock Transactions */}
-                  <Card>
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-sm font-medium">
-                        Stock Transactions ({adjustments.length})
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      {adjustments.length === 0 ? <p className="text-sm text-muted-foreground py-4 text-center">
-                          No stock transactions for this period
-                        </p> : <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead>Type</TableHead>
-                              <TableHead>Code</TableHead>
-                              <TableHead>Item</TableHead>
-                              <TableHead>Supplier</TableHead>
-                              <TableHead>Change</TableHead>
-                              <TableHead>Before</TableHead>
-                              <TableHead>After</TableHead>
-                              <TableHead>Notes</TableHead>
+                  {/* Stock Transactions - Split by Supplier */}
+                  {(() => {
+                    const regularAdjustments = adjustments.filter(a => !a.supplier_name);
+                    const supplierLinkedAdjustments = adjustments.filter(a => a.supplier_name && a.supplier_type !== 'contractor');
+                    const contractorAdjustments = adjustments.filter(a => a.supplier_type === 'contractor');
+
+                    const renderAdjustmentsTable = (items: typeof adjustments, showSupplier = false) => (
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Type</TableHead>
+                            <TableHead>Code</TableHead>
+                            <TableHead>Item</TableHead>
+                            {showSupplier && <TableHead>Supplier</TableHead>}
+                            <TableHead>Change</TableHead>
+                            <TableHead>Before</TableHead>
+                            <TableHead>After</TableHead>
+                            <TableHead>Notes</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {items.map((item, idx) => (
+                            <TableRow key={idx}>
+                              <TableCell>
+                                <span className={`px-2 py-1 rounded-full text-xs font-medium ${getTransactionTypeBadgeColor(item.transaction_type)}`}>
+                                  {getTransactionTypeLabel(item.transaction_type)}
+                                </span>
+                              </TableCell>
+                              <TableCell>{item.item_code || "-"}</TableCell>
+                              <TableCell>{item.item_name}</TableCell>
+                              {showSupplier && <TableCell>{item.supplier_name || "-"}</TableCell>}
+                              <TableCell className={item.quantity_change > 0 ? "text-green-600" : "text-red-600"}>
+                                {item.quantity_change > 0 ? `+${item.quantity_change}` : item.quantity_change}
+                              </TableCell>
+                              <TableCell>{item.quantity_before}</TableCell>
+                              <TableCell>{item.quantity_after}</TableCell>
+                              <TableCell className="max-w-[200px] truncate">
+                                {item.issued_to_location_name 
+                                  ? `To: ${item.issued_to_location_name}${item.adjustment_notes ? ` - ${item.adjustment_notes}` : ""}`
+                                  : item.adjustment_notes || "-"}
+                              </TableCell>
                             </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {adjustments.map((item, idx) => <TableRow key={idx}>
-                                <TableCell>
-                                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${getTransactionTypeBadgeColor(item.transaction_type)}`}>
-                                    {getTransactionTypeLabel(item.transaction_type)}
-                                  </span>
-                                </TableCell>
-                                <TableCell>{item.item_code || "-"}</TableCell>
-                                <TableCell>{item.item_name}</TableCell>
-                                <TableCell>{item.supplier_name || "-"}</TableCell>
-                                <TableCell className={item.quantity_change > 0 ? "text-green-600" : "text-red-600"}>
-                                  {item.quantity_change > 0 ? `+${item.quantity_change}` : item.quantity_change}
-                                </TableCell>
-                                <TableCell>{item.quantity_before}</TableCell>
-                                <TableCell>{item.quantity_after}</TableCell>
-                                <TableCell className="max-w-[200px] truncate">
-                                  {item.issued_to_location_name 
-                                    ? `To: ${item.issued_to_location_name}${item.adjustment_notes ? ` - ${item.adjustment_notes}` : ""}`
-                                    : item.adjustment_notes || "-"}
-                                </TableCell>
-                              </TableRow>)}
-                          </TableBody>
-                        </Table>}
-                    </CardContent>
-                  </Card>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    );
+
+                    return (
+                      <>
+                        {/* Regular Stock Transactions (no supplier) */}
+                        {regularAdjustments.length > 0 && (
+                          <Card>
+                            <CardHeader className="pb-2">
+                              <CardTitle className="text-sm font-medium">
+                                Stock Transactions ({regularAdjustments.length})
+                              </CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                              {renderAdjustmentsTable(regularAdjustments, false)}
+                            </CardContent>
+                          </Card>
+                        )}
+
+                        {/* Supplier-Linked Stock Transactions */}
+                        {supplierLinkedAdjustments.length > 0 && (
+                          <Card className="border-blue-200 dark:border-blue-900 bg-blue-50/50 dark:bg-blue-950/20">
+                            <CardHeader className="pb-2">
+                              <CardTitle className="text-sm font-medium flex items-center gap-2">
+                                <Package className="h-4 w-4 text-blue-600" />
+                                <span className="text-blue-700 dark:text-blue-400">
+                                  Supplier-Linked Stock Transactions ({supplierLinkedAdjustments.length})
+                                </span>
+                              </CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                              {renderAdjustmentsTable(supplierLinkedAdjustments, true)}
+                            </CardContent>
+                          </Card>
+                        )}
+
+                        {/* Contractor Stock Transactions */}
+                        {contractorAdjustments.length > 0 && (
+                          <Card className="border-orange-200 dark:border-orange-900 bg-orange-50/50 dark:bg-orange-950/20">
+                            <CardHeader className="pb-2">
+                              <CardTitle className="text-sm font-medium flex items-center gap-2">
+                                <Truck className="h-4 w-4 text-orange-600" />
+                                <span className="text-orange-700 dark:text-orange-400">
+                                  Contractor Stock Transactions ({contractorAdjustments.length})
+                                </span>
+                              </CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                              {renderAdjustmentsTable(contractorAdjustments, true)}
+                            </CardContent>
+                          </Card>
+                        )}
+
+                        {/* Show empty state only if ALL are empty */}
+                        {adjustments.length === 0 && (
+                          <Card>
+                            <CardHeader className="pb-2">
+                              <CardTitle className="text-sm font-medium">
+                                Stock Transactions (0)
+                              </CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                              <p className="text-sm text-muted-foreground py-4 text-center">
+                                No stock transactions for this period
+                              </p>
+                            </CardContent>
+                          </Card>
+                        )}
+                      </>
+                    );
+                  })()}
                 </div>}
             </div>
 
