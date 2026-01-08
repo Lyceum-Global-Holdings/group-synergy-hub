@@ -416,13 +416,15 @@ export function ViewSiteReportDialog({
               {isLoading ? <div className="flex items-center justify-center py-8">
                   <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary" />
                 </div> : <div className="space-y-4">
-                  {/* Items Issued - Regular Items */}
+                  {/* Items Issued - Split by supplier type */}
                   {(() => {
-                    const regularIssues = issues.filter(i => i.supplier_type !== 'contractor');
+                    const regularIssues = issues.filter(i => !i.supplier_name);
+                    const supplierLinkedIssues = issues.filter(i => i.supplier_name && i.supplier_type !== 'contractor');
                     const contractorIssues = issues.filter(i => i.supplier_type === 'contractor');
                     
                     return (
                       <>
+                        {/* Regular Items (no supplier) */}
                         <Card>
                           <CardHeader className="pb-2">
                             <CardTitle className="text-sm font-medium flex items-center gap-2">
@@ -453,6 +455,48 @@ export function ViewSiteReportDialog({
                                       <TableCell>{item.item_code || "-"}</TableCell>
                                       <TableCell>{item.item_name}</TableCell>
                                       <TableCell>{item.quantity_issued}</TableCell>
+                                      <TableCell>{item.issued_to || "-"}</TableCell>
+                                    </TableRow>
+                                  ))}
+                                </TableBody>
+                              </Table>
+                            )}
+                          </CardContent>
+                        </Card>
+
+                        {/* Supplier-Linked Items (non-contractor suppliers) */}
+                        <Card className="border-blue-200 dark:border-blue-900 bg-blue-50/50 dark:bg-blue-950/20">
+                          <CardHeader className="pb-2">
+                            <CardTitle className="text-sm font-medium flex items-center gap-2 text-blue-800 dark:text-blue-300">
+                              <Package className="h-4 w-4 text-blue-600" />
+                              Supplier-Linked Items ({supplierLinkedIssues.length})
+                            </CardTitle>
+                          </CardHeader>
+                          <CardContent>
+                            {supplierLinkedIssues.length === 0 ? (
+                              <p className="text-sm text-muted-foreground py-4 text-center">
+                                No supplier-linked items for this period
+                              </p>
+                            ) : (
+                              <Table>
+                                <TableHeader>
+                                  <TableRow>
+                                    <TableHead>Issue #</TableHead>
+                                    <TableHead>Code</TableHead>
+                                    <TableHead>Item</TableHead>
+                                    <TableHead>Qty</TableHead>
+                                    <TableHead>Supplier</TableHead>
+                                    <TableHead>Issued To</TableHead>
+                                  </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                  {supplierLinkedIssues.map((item, idx) => (
+                                    <TableRow key={`supplier-${item.min_number}-${idx}`}>
+                                      <TableCell className="font-mono text-xs">{item.min_number}</TableCell>
+                                      <TableCell>{item.item_code || "-"}</TableCell>
+                                      <TableCell>{item.item_name}</TableCell>
+                                      <TableCell>{item.quantity_issued}</TableCell>
+                                      <TableCell className="text-blue-700 dark:text-blue-400">{item.supplier_name || "-"}</TableCell>
                                       <TableCell>{item.issued_to || "-"}</TableCell>
                                     </TableRow>
                                   ))}
