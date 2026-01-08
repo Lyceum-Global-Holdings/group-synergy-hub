@@ -156,11 +156,12 @@ function generatePdfDocument(report: ReportData, materials: MaterialsData): jsPD
   doc.text("Material Activity", 14, yPos);
   yPos += 10;
 
-  // Separate regular items from contractor items
-  const regularIssues = materials.issues.filter(i => i.supplier_type !== 'contractor');
+  // Separate items by supplier type
+  const regularIssues = materials.issues.filter(i => !i.supplier_name);
+  const supplierLinkedIssues = materials.issues.filter(i => i.supplier_name && i.supplier_type !== 'contractor');
   const contractorIssues = materials.issues.filter(i => i.supplier_type === 'contractor');
 
-  // Items Issued Table (Regular Items)
+  // Items Issued Table (Regular Items - no supplier)
   if (regularIssues.length > 0) {
     doc.setFontSize(10);
     doc.setFont("helvetica", "bold");
@@ -180,6 +181,37 @@ function generatePdfDocument(report: ReportData, materials: MaterialsData): jsPD
       ]),
       styles: { fontSize: 8 },
       headStyles: { fillColor: [66, 139, 202] },
+      margin: { left: 14, right: 14 },
+    });
+    yPos = (doc as any).lastAutoTable.finalY + 10;
+  }
+
+  // Supplier-Linked Items Table (non-contractor suppliers)
+  if (supplierLinkedIssues.length > 0) {
+    // Check if we need a new page
+    if (yPos > 230) {
+      doc.addPage();
+      yPos = 20;
+    }
+
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "bold");
+    doc.text(`Supplier-Linked Items (${supplierLinkedIssues.length})`, 14, yPos);
+    yPos += 2;
+
+    autoTable(doc, {
+      startY: yPos,
+      head: [["MIN#", "Code", "Item", "Qty Issued", "Supplier", "Issued To"]],
+      body: supplierLinkedIssues.map((item) => [
+        item.min_number || "-",
+        item.item_code || "-",
+        item.item_name,
+        String(item.quantity_issued),
+        item.supplier_name || "-",
+        item.issued_to || "-",
+      ]),
+      styles: { fontSize: 8 },
+      headStyles: { fillColor: [52, 152, 219] }, // Blue color for supplier-linked items
       margin: { left: 14, right: 14 },
     });
     yPos = (doc as any).lastAutoTable.finalY + 10;
