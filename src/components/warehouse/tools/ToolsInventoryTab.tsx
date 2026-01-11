@@ -5,6 +5,13 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -148,36 +155,137 @@ const createColumns = (
 
 export function ToolsInventoryTab({ tools, isLoading, onAdjustQuantity, onEditTool }: ToolsInventoryTabProps) {
   const [searchQuery, setSearchQuery] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState<string>("all");
+  const [locationFilter, setLocationFilter] = useState<string>("all");
+  const [conditionFilter, setConditionFilter] = useState<string>("all");
+  const [availabilityFilter, setAvailabilityFilter] = useState<string>("all");
+
   const columns = createColumns(onAdjustQuantity, onEditTool);
 
-  const filteredTools = useMemo(() => {
-    if (!searchQuery.trim()) return tools;
-    const query = searchQuery.toLowerCase();
-    return tools.filter((tool) =>
-      tool.tool_code?.toLowerCase().includes(query) ||
-      tool.name?.toLowerCase().includes(query) ||
-      tool.description?.toLowerCase().includes(query) ||
-      tool.category?.name?.toLowerCase().includes(query) ||
-      tool.location?.name?.toLowerCase().includes(query)
-    );
-  }, [tools, searchQuery]);
+  // Extract unique categories and locations from the data
+  const categories = useMemo(() => {
+    const uniqueCategories = [...new Set(tools.map(t => t.category?.name).filter(Boolean))] as string[];
+    return uniqueCategories.sort();
+  }, [tools]);
 
-  const isFiltered = searchQuery.trim() !== "";
+  const locations = useMemo(() => {
+    const uniqueLocations = [...new Set(tools.map(t => t.location?.name).filter(Boolean))] as string[];
+    return uniqueLocations.sort();
+  }, [tools]);
+
+  const filteredTools = useMemo(() => {
+    return tools.filter((tool) => {
+      // Text search
+      const query = searchQuery.toLowerCase();
+      const matchesSearch = !searchQuery.trim() ||
+        tool.tool_code?.toLowerCase().includes(query) ||
+        tool.name?.toLowerCase().includes(query) ||
+        tool.description?.toLowerCase().includes(query) ||
+        tool.category?.name?.toLowerCase().includes(query) ||
+        tool.location?.name?.toLowerCase().includes(query);
+
+      // Category filter
+      const matchesCategory = categoryFilter === "all" || 
+        tool.category?.name === categoryFilter;
+
+      // Location filter
+      const matchesLocation = locationFilter === "all" || 
+        tool.location?.name === locationFilter;
+
+      // Condition filter
+      const matchesCondition = conditionFilter === "all" || 
+        tool.condition === conditionFilter;
+
+      // Availability filter
+      const matchesAvailability = availabilityFilter === "all" ||
+        (availabilityFilter === "in_stock" && tool.available_quantity > 0) ||
+        (availabilityFilter === "out_of_stock" && tool.available_quantity === 0) ||
+        (availabilityFilter === "partially_available" && 
+          tool.available_quantity > 0 && tool.available_quantity < tool.total_quantity);
+
+      return matchesSearch && matchesCategory && matchesLocation && 
+             matchesCondition && matchesAvailability;
+    });
+  }, [tools, searchQuery, categoryFilter, locationFilter, conditionFilter, availabilityFilter]);
+
+  const clearAllFilters = () => {
+    setSearchQuery("");
+    setCategoryFilter("all");
+    setLocationFilter("all");
+    setConditionFilter("all");
+    setAvailabilityFilter("all");
+  };
+
+  const isFiltered = searchQuery.trim() !== "" || 
+    categoryFilter !== "all" || 
+    locationFilter !== "all" || 
+    conditionFilter !== "all" || 
+    availabilityFilter !== "all";
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-2">
-        <div className="relative flex-1 max-w-sm">
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="relative flex-1 min-w-[200px] max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Search by code, name, category, location..."
+            placeholder="Search by code, name..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-9"
           />
         </div>
-        {searchQuery && (
-          <Button variant="ghost" size="sm" onClick={() => setSearchQuery("")}>
+
+        <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+          <SelectTrigger className="w-[160px]">
+            <SelectValue placeholder="Category" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Categories</SelectItem>
+            {categories.map(cat => (
+              <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <Select value={locationFilter} onValueChange={setLocationFilter}>
+          <SelectTrigger className="w-[160px]">
+            <SelectValue placeholder="Location" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Locations</SelectItem>
+            {locations.map(loc => (
+              <SelectItem key={loc} value={loc}>{loc}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <Select value={conditionFilter} onValueChange={setConditionFilter}>
+          <SelectTrigger className="w-[140px]">
+            <SelectValue placeholder="Condition" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Conditions</SelectItem>
+            <SelectItem value="good">Good</SelectItem>
+            <SelectItem value="fair">Fair</SelectItem>
+            <SelectItem value="poor">Poor</SelectItem>
+            <SelectItem value="needs_repair">Needs Repair</SelectItem>
+          </SelectContent>
+        </Select>
+
+        <Select value={availabilityFilter} onValueChange={setAvailabilityFilter}>
+          <SelectTrigger className="w-[160px]">
+            <SelectValue placeholder="Availability" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All</SelectItem>
+            <SelectItem value="in_stock">In Stock</SelectItem>
+            <SelectItem value="out_of_stock">Out of Stock</SelectItem>
+            <SelectItem value="partially_available">Partial</SelectItem>
+          </SelectContent>
+        </Select>
+
+        {isFiltered && (
+          <Button variant="ghost" size="sm" onClick={clearAllFilters}>
             <X className="h-4 w-4 mr-1" />
             Clear
           </Button>
