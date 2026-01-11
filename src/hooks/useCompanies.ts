@@ -158,7 +158,8 @@ export function useCompanies() {
 
   return {
     companies,
-    isLoading: isQueryLoading || isSuperAdminLoading || isProfileLoading,
+    // Fixed: Ensure loading is true when dependencies aren't ready OR when query is running
+    isLoading: !dependenciesReady || isQueryLoading,
     error,
     createCompany: createCompanyMutation.mutateAsync,
     updateCompany: updateCompanyMutation.mutateAsync,
