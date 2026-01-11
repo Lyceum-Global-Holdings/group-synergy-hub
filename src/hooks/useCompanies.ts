@@ -8,15 +8,19 @@ import { useCurrentUserProfile } from '@/hooks/useCurrentUserProfile';
 export function useCompanies() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { data: isSuperAdmin } = useSuperAdmin();
-  const { data: userProfile } = useCurrentUserProfile();
+  const { data: isSuperAdmin, isLoading: isSuperAdminLoading } = useSuperAdmin();
+  const { data: userProfile, isLoading: isProfileLoading } = useCurrentUserProfile();
+
+  // Wait until dependencies are loaded before running the query
+  const dependenciesReady = !isSuperAdminLoading && !isProfileLoading;
 
   const {
     data: companies = [],
-    isLoading,
+    isLoading: isQueryLoading,
     error
   } = useQuery({
     queryKey: ['companies', isSuperAdmin, userProfile?.company_id],
+    enabled: dependenciesReady,
     queryFn: async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return [];
@@ -154,7 +158,7 @@ export function useCompanies() {
 
   return {
     companies,
-    isLoading,
+    isLoading: isQueryLoading || isSuperAdminLoading || isProfileLoading,
     error,
     createCompany: createCompanyMutation.mutateAsync,
     updateCompany: updateCompanyMutation.mutateAsync,
