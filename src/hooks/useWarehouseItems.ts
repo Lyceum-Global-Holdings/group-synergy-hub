@@ -31,6 +31,51 @@ export const useWarehouseItems = () => {
       const { data, error } = await query.order('created_at', { ascending: false });
 
       if (error) throw error;
+
+      // Fetch bin allocations for all items
+      const itemIds = data?.map((item: any) => item.id) || [];
+      if (itemIds.length > 0) {
+        const { data: allocations, error: allocError } = await supabase
+          .from('warehouse_bin_allocations')
+          .select(`
+            warehouse_item_id,
+            available_quantity,
+            warehouse_bins!inner (
+              id,
+              bin_code,
+              name
+            )
+          `)
+          .in('warehouse_item_id', itemIds)
+          .gt('available_quantity', 0);
+
+        if (!allocError && allocations) {
+          // Group allocations by item_id
+          const binsByItem: Record<string, Array<{ id: string; bin_code: string; name: string; quantity: number }>> = {};
+          allocations.forEach((alloc: any) => {
+            const itemId = alloc.warehouse_item_id;
+            if (!binsByItem[itemId]) binsByItem[itemId] = [];
+            
+            const existingBin = binsByItem[itemId].find(b => b.id === alloc.warehouse_bins.id);
+            if (existingBin) {
+              existingBin.quantity += Number(alloc.available_quantity);
+            } else {
+              binsByItem[itemId].push({
+                id: alloc.warehouse_bins.id,
+                bin_code: alloc.warehouse_bins.bin_code,
+                name: alloc.warehouse_bins.name,
+                quantity: Number(alloc.available_quantity)
+              });
+            }
+          });
+
+          // Attach bins to items
+          data?.forEach((item: any) => {
+            item.bins = binsByItem[item.id] || null;
+          });
+        }
+      }
+
       return data as WarehouseItem[];
     },
     enabled: !!(isViewingAllCompanies || selectedCompany?.id),

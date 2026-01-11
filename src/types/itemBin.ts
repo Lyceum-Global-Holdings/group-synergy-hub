@@ -71,6 +71,12 @@ export interface WarehouseItem {
     id: string;
     name: string;
   } | null;
+  bins?: Array<{
+    id: string;
+    bin_code: string;
+    name: string;
+    quantity: number;
+  }> | null;
   status: 'active' | 'inactive' | 'discontinued';
   is_serialized: boolean;
   is_batch_tracked: boolean;
