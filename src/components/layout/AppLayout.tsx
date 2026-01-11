@@ -8,8 +8,11 @@ import { useCompany } from "@/contexts/CompanyContext";
 import { useSuperAdmin } from "@/hooks/useSuperAdmin";
 import { useCurrentUserProfile } from "@/hooks/useCurrentUserProfile";
 import { Loader2 } from "lucide-react";
+import { useState, useEffect } from "react";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
+  const [hasTimedOut, setHasTimedOut] = useState(false);
+  
   // Try-catch to debug the context issue
   let isViewingAllCompanies = false;
   let companies: any[] = [];
@@ -17,6 +20,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   let isSuperAdmin = false;
   let isSuperAdminLoading = true;
   let isProfileLoading = true;
+  let hasError = false;
 
   try {
     const companyContext = useCompany();
@@ -25,34 +29,39 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     isCompaniesLoading = companyContext.isLoading;
   } catch (error) {
     console.error('CompanyContext error:', error);
-    // Return loading state if context is not available
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="flex flex-col items-center space-y-4">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          <p className="text-sm text-muted-foreground">Loading...</p>
-        </div>
-      </div>
-    );
+    hasError = true;
   }
 
   try {
     const superAdminQuery = useSuperAdmin();
     isSuperAdmin = superAdminQuery.data || false;
-    isSuperAdminLoading = superAdminQuery.isLoading;
+    isSuperAdminLoading = superAdminQuery.isLoading && !superAdminQuery.isError;
   } catch (error) {
     console.error('SuperAdmin query error:', error);
+    hasError = true;
   }
 
   try {
     const profileQuery = useCurrentUserProfile();
-    isProfileLoading = profileQuery.isLoading;
+    isProfileLoading = profileQuery.isLoading && !profileQuery.isError;
   } catch (error) {
     console.error('Profile query error:', error);
+    hasError = true;
   }
+
+  // Add a timeout fallback to prevent infinite loading
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setHasTimedOut(true);
+    }, 5000); // 5 second timeout
+    
+    return () => clearTimeout(timer);
+  }, []);
+
+  const isStillLoading = isProfileLoading || isCompaniesLoading || isSuperAdminLoading;
   
-  // Wait for initial data to load
-  if (isProfileLoading || isCompaniesLoading || isSuperAdminLoading) {
+  // Show loading only if still loading and hasn't timed out, and no errors
+  if (isStillLoading && !hasTimedOut && !hasError) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="flex flex-col items-center space-y-4">
