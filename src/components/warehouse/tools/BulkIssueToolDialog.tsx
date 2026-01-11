@@ -135,7 +135,7 @@ export function BulkIssueToolDialog({ open, onOpenChange, tools }: BulkIssueTool
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh]">
+      <DialogContent className="w-[95vw] max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Bulk Issue Tools</DialogTitle>
           <DialogDescription>
@@ -144,7 +144,7 @@ export function BulkIssueToolDialog({ open, onOpenChange, tools }: BulkIssueTool
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="issued_to_name">Issue To (Name) *</Label>
               <Input
@@ -166,7 +166,7 @@ export function BulkIssueToolDialog({ open, onOpenChange, tools }: BulkIssueTool
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="issue_date">Issue Date *</Label>
               <Input
