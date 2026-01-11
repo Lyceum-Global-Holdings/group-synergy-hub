@@ -12,54 +12,34 @@ import { useState, useEffect } from "react";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [hasTimedOut, setHasTimedOut] = useState(false);
+
+  // Call ALL hooks unconditionally at the top level (React Rules of Hooks)
+  const companyContext = useCompany();
+  const superAdminQuery = useSuperAdmin();
+  const profileQuery = useCurrentUserProfile();
+
+  // Extract values with safe fallbacks
+  const isViewingAllCompanies = companyContext.isViewingAllCompanies;
+  const companies = companyContext.companies;
+  const isCompaniesLoading = companyContext.isLoading;
+  const isSuperAdmin = superAdminQuery.data ?? false;
+  const isSuperAdminLoading = superAdminQuery.isLoading && !superAdminQuery.isError;
+  const isProfileLoading = profileQuery.isLoading && !profileQuery.isError;
   
-  // Try-catch to debug the context issue
-  let isViewingAllCompanies = false;
-  let companies: any[] = [];
-  let isCompaniesLoading = true;
-  let isSuperAdmin = false;
-  let isSuperAdminLoading = true;
-  let isProfileLoading = true;
-  let hasError = false;
-
-  try {
-    const companyContext = useCompany();
-    isViewingAllCompanies = companyContext.isViewingAllCompanies;
-    companies = companyContext.companies;
-    isCompaniesLoading = companyContext.isLoading;
-  } catch (error) {
-    console.error('CompanyContext error:', error);
-    hasError = true;
-  }
-
-  try {
-    const superAdminQuery = useSuperAdmin();
-    isSuperAdmin = superAdminQuery.data || false;
-    isSuperAdminLoading = superAdminQuery.isLoading && !superAdminQuery.isError;
-  } catch (error) {
-    console.error('SuperAdmin query error:', error);
-    hasError = true;
-  }
-
-  try {
-    const profileQuery = useCurrentUserProfile();
-    isProfileLoading = profileQuery.isLoading && !profileQuery.isError;
-  } catch (error) {
-    console.error('Profile query error:', error);
-    hasError = true;
-  }
+  // Check for errors using query error states
+  const hasError = superAdminQuery.isError || profileQuery.isError;
 
   // Add a timeout fallback to prevent infinite loading
   useEffect(() => {
     const timer = setTimeout(() => {
       setHasTimedOut(true);
-    }, 5000); // 5 second timeout
+    }, 5000);
     
     return () => clearTimeout(timer);
   }, []);
 
   const isStillLoading = isProfileLoading || isCompaniesLoading || isSuperAdminLoading;
-  
+
   // Show loading only if still loading and hasn't timed out, and no errors
   if (isStillLoading && !hasTimedOut && !hasError) {
     return (
