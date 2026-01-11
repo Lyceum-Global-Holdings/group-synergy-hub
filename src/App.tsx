@@ -1,4 +1,4 @@
-// Preview sync - v3
+// App version: 1.0.1 - Clean rebuild trigger
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -70,7 +70,15 @@ import ProjectDocuments from "./pages/construction/ProjectDocuments";
 import ProjectBudgeting from "./pages/construction/ProjectBudgeting";
 import ReportsAnalytics from "./pages/construction/ReportsAnalytics";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: 1,
+      staleTime: 5 * 60 * 1000,
+      refetchOnWindowFocus: false,
+    },
+  },
+});
 
 // Protected layout wrapper component
 const ProtectedLayout = () => (
