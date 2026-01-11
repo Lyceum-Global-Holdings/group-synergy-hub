@@ -1,9 +1,16 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Plus, Search, Edit, Trash2, History, Settings, Eye, ArrowLeftRight, MapPin, BarChart3, Wrench, Image as ImageIcon } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, History, Settings, Eye, ArrowLeftRight, MapPin, BarChart3, Wrench, Image as ImageIcon, X, Package } from 'lucide-react';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { BulkItemImportDialog } from '@/components/warehouse/BulkItemImportDialog';
 import {
   Table,
@@ -54,6 +61,12 @@ export function ItemMasterTab() {
   const [deletingItem, setDeletingItem] = useState<WarehouseItem | null>(null);
   const [transferItem, setTransferItem] = useState<WarehouseItem | null>(null);
   const [stockDetailsItem, setStockDetailsItem] = useState<WarehouseItem | null>(null);
+  
+  // Filter states
+  const [categoryFilter, setCategoryFilter] = useState<string>("all");
+  const [binFilter, setBinFilter] = useState<string>("all");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [supplierFilter, setSupplierFilter] = useState<string>("all");
   const [previewImage, setPreviewImage] = useState<{ url: string; name: string } | null>(null);
   
   const { 
@@ -129,11 +142,53 @@ export function ItemMasterTab() {
     },
   });
 
-  const filteredItems = items.filter(item =>
-    item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    item.item_code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    item.brand?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // Extract unique values for filters
+  const uniqueBins = useMemo(() => {
+    const binMap = new Map<string, string>();
+    items.forEach(item => {
+      item.bins?.forEach(bin => {
+        binMap.set(bin.bin_code, bin.name);
+      });
+    });
+    return Array.from(binMap.entries()).map(([code, name]) => ({ code, name }));
+  }, [items]);
+
+  const uniqueSuppliers = useMemo(() => {
+    const suppliers = new Set<string>();
+    items.forEach(item => {
+      if (item.supplier?.name) suppliers.add(item.supplier.name);
+    });
+    return Array.from(suppliers).sort();
+  }, [items]);
+
+  const hasActiveFilters = categoryFilter !== "all" || binFilter !== "all" || statusFilter !== "all" || supplierFilter !== "all";
+
+  const clearFilters = () => {
+    setCategoryFilter("all");
+    setBinFilter("all");
+    setStatusFilter("all");
+    setSupplierFilter("all");
+  };
+
+  const filteredItems = items.filter(item => {
+    const matchesSearch = 
+      item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      item.item_code.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      item.brand?.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    const matchesCategory = categoryFilter === "all" || 
+      categories.find(c => c.id === item.category_id)?.name === categoryFilter;
+    
+    const matchesBin = binFilter === "all" || 
+      item.bins?.some(b => b.bin_code === binFilter);
+    
+    const matchesStatus = statusFilter === "all" || item.status === statusFilter;
+    
+    const matchesSupplier = supplierFilter === "all" || 
+      item.supplier?.name === supplierFilter;
+    
+    return matchesSearch && matchesCategory && matchesBin && matchesStatus && matchesSupplier;
+  });
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -146,44 +201,107 @@ export function ItemMasterTab() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-2">
-          <div className="relative">
-            <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search items..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-8 w-64"
-            />
+      <div className="flex flex-col gap-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="relative">
+              <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search items..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-8 w-48"
+              />
+            </div>
+            
+            <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+              <SelectTrigger className="w-[140px]">
+                <SelectValue placeholder="Category" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Categories</SelectItem>
+                {categories.map(category => (
+                  <SelectItem key={category.id} value={category.name}>
+                    {category.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select value={binFilter} onValueChange={setBinFilter}>
+              <SelectTrigger className="w-[140px]">
+                <SelectValue placeholder="Bin" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Bins</SelectItem>
+                {uniqueBins.map(bin => (
+                  <SelectItem key={bin.code} value={bin.code}>
+                    {bin.code}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-[120px]">
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Status</SelectItem>
+                <SelectItem value="active">Active</SelectItem>
+                <SelectItem value="inactive">Inactive</SelectItem>
+                <SelectItem value="discontinued">Discontinued</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Select value={supplierFilter} onValueChange={setSupplierFilter}>
+              <SelectTrigger className="w-[140px]">
+                <SelectValue placeholder="Supplier" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Suppliers</SelectItem>
+                {uniqueSuppliers.map(supplier => (
+                  <SelectItem key={supplier} value={supplier}>
+                    {supplier}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            {hasActiveFilters && (
+              <Button variant="ghost" size="sm" onClick={clearFilters}>
+                <X className="h-4 w-4 mr-1" />
+                Clear
+              </Button>
+            )}
           </div>
-        </div>
-        <div className="flex items-center gap-2">
-          {canDelete && (
-            <>
-              <Button 
-                variant="outline" 
-                onClick={() => reconcileStock()}
-                disabled={isReconciling}
-              >
-                <BarChart3 className="mr-2 h-4 w-4" />
-                {isReconciling ? 'Reconciling...' : 'Reconcile Stock'}
-              </Button>
-              <Button 
-                variant="outline" 
-                onClick={() => migrateAllocationsToCorrectLocation()}
-                disabled={isMigrating}
-              >
-                <Wrench className="mr-2 h-4 w-4" />
-                {isMigrating ? 'Fixing...' : 'Fix Allocations'}
-              </Button>
-            </>
-          )}
-          <BulkItemImportDialog />
-          <Button onClick={() => setIsCreateDialogOpen(true)}>
-            <Plus className="mr-2 h-4 w-4" />
-            Add Item
-          </Button>
+          <div className="flex items-center gap-2">
+            {canDelete && (
+              <>
+                <Button 
+                  variant="outline" 
+                  onClick={() => reconcileStock()}
+                  disabled={isReconciling}
+                >
+                  <BarChart3 className="mr-2 h-4 w-4" />
+                  {isReconciling ? 'Reconciling...' : 'Reconcile Stock'}
+                </Button>
+                <Button 
+                  variant="outline" 
+                  onClick={() => migrateAllocationsToCorrectLocation()}
+                  disabled={isMigrating}
+                >
+                  <Wrench className="mr-2 h-4 w-4" />
+                  {isMigrating ? 'Fixing...' : 'Fix Allocations'}
+                </Button>
+              </>
+            )}
+            <BulkItemImportDialog />
+            <Button onClick={() => setIsCreateDialogOpen(true)}>
+              <Plus className="mr-2 h-4 w-4" />
+              Add Item
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -198,6 +316,7 @@ export function ItemMasterTab() {
               <TableHead>Unit</TableHead>
               <TableHead>Brand</TableHead>
               <TableHead>Supplier</TableHead>
+              <TableHead>Bin</TableHead>
               <TableHead>Company</TableHead>
               <TableHead className="text-right">Current Stock</TableHead>
               <TableHead>Unit Cost</TableHead>
@@ -208,13 +327,13 @@ export function ItemMasterTab() {
           <TableBody>
             {isLoading ? (
               <TableRow>
-              <TableCell colSpan={12} className="text-center py-8">
+              <TableCell colSpan={13} className="text-center py-8">
                   Loading items...
                 </TableCell>
               </TableRow>
             ) : filteredItems.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={12} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={13} className="text-center py-8 text-muted-foreground">
                   No items found. Create your first item to get started.
                 </TableCell>
               </TableRow>
@@ -260,6 +379,25 @@ export function ItemMasterTab() {
                   </TableCell>
                   <TableCell>{item.brand || '-'}</TableCell>
                   <TableCell>{item.supplier?.name || '-'}</TableCell>
+                  <TableCell>
+                    {item.bins && item.bins.length > 0 ? (
+                      <div className="flex flex-wrap gap-1">
+                        {item.bins.slice(0, 2).map(bin => (
+                          <Badge key={bin.id} variant="outline" className="text-xs">
+                            <Package className="h-3 w-3 mr-1" />
+                            {bin.bin_code}
+                          </Badge>
+                        ))}
+                        {item.bins.length > 2 && (
+                          <span className="text-xs text-muted-foreground">
+                            +{item.bins.length - 2} more
+                          </span>
+                        )}
+                      </div>
+                    ) : (
+                      <span className="text-muted-foreground">-</span>
+                    )}
+                  </TableCell>
                   <TableCell>
                     {item.company_id 
                       ? companies.find(c => c.id === item.company_id)?.name || '-'
