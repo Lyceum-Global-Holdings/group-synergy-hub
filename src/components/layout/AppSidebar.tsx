@@ -62,6 +62,7 @@ const departments = [
       { title: "Delivery Order", url: "/warehouse/delivery-order" },
       { title: "Inventory Valuation", url: "/warehouse/inventory-valuation" },
       { title: "Asset Management", url: "/warehouse/asset-management" },
+      { title: "Tool Management", url: "/warehouse/tool-management" },
     ],
   },
   {
