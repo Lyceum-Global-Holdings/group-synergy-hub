@@ -13081,6 +13081,7 @@ export type Database = {
         Args: { p_company_id: string; p_user_id: string }
         Returns: boolean
       }
+      is_same_company: { Args: { _target_user_id: string }; Returns: boolean }
       is_super_admin: { Args: { _user_id: string }; Returns: boolean }
       process_material_issue_stock_update: {
         Args: {
