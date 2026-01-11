@@ -142,7 +142,7 @@ export function BulkReturnToolDialog({ open, onOpenChange, activeIssues }: BulkR
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh]">
+      <DialogContent className="w-[95vw] max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Bulk Return Tools</DialogTitle>
           <DialogDescription>
@@ -156,7 +156,7 @@ export function BulkReturnToolDialog({ open, onOpenChange, activeIssues }: BulkR
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="return_date">Return Date *</Label>
                 <Input
@@ -192,8 +192,8 @@ export function BulkReturnToolDialog({ open, onOpenChange, activeIssues }: BulkR
                         key={issue.id}
                         className={`p-3 rounded-md border ${selected ? "border-primary bg-primary/5" : "hover:bg-muted/50"}`}
                       >
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="flex items-start gap-3">
+                    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                      <div className="flex items-start gap-3">
                             <Checkbox
                               checked={!!selected}
                               onCheckedChange={() => toggleIssue(issue.id)}
@@ -220,8 +220,8 @@ export function BulkReturnToolDialog({ open, onOpenChange, activeIssues }: BulkR
                             </div>
                           </div>
 
-                          {selected && (
-                            <div className="flex flex-col gap-2 items-end">
+                      {selected && (
+                        <div className="flex flex-col sm:flex-row gap-2 items-start sm:items-end ml-7 sm:ml-0">
                               <div className="flex items-center gap-2">
                                 <Button
                                   type="button"
