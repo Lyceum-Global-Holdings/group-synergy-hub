@@ -40,7 +40,7 @@ export const useWarehouseItems = () => {
           .select(`
             warehouse_item_id,
             available_quantity,
-            warehouse_bins!inner (
+            warehouse_bins:bin_id (
               id,
               bin_code,
               name
