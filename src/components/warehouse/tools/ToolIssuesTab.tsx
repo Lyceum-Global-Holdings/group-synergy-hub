@@ -52,6 +52,7 @@ const columns: ColumnDef<ToolIssue>[] = [
     header: "Expected Return",
     cell: ({ row }) => {
       const date = row.getValue("expected_return_date") as string | null;
+      const time = row.original.expected_return_time as string | null;
       if (!date) return <span className="text-muted-foreground">Not set</span>;
       
       const returnDate = new Date(date);
@@ -59,13 +60,28 @@ const columns: ColumnDef<ToolIssue>[] = [
       const daysRemaining = differenceInDays(returnDate, today);
       const status = row.original.status;
       
+      // Format time for display (convert 24h to 12h format)
+      const formatTime = (timeStr: string) => {
+        const [hours, minutes] = timeStr.split(':');
+        const hour = parseInt(hours, 10);
+        const ampm = hour >= 12 ? 'PM' : 'AM';
+        const displayHour = hour % 12 || 12;
+        return `${displayHour}:${minutes} ${ampm}`;
+      };
+      
       if (status === "returned") {
-        return <span className="text-muted-foreground">{format(returnDate, "MMM d, yyyy")}</span>;
+        return (
+          <div className="text-muted-foreground">
+            <div>{format(returnDate, "MMM d, yyyy")}</div>
+            {time && <div className="text-xs">{formatTime(time)}</div>}
+          </div>
+        );
       }
       
       return (
         <div>
           <div>{format(returnDate, "MMM d, yyyy")}</div>
+          {time && <div className="text-xs text-muted-foreground">{formatTime(time)}</div>}
           {daysRemaining < 0 ? (
             <Badge variant="destructive" className="text-xs">
               {Math.abs(daysRemaining)} days overdue

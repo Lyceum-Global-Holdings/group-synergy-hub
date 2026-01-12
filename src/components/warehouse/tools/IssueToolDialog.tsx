@@ -46,6 +46,7 @@ export function IssueToolDialog({ open, onOpenChange, tools }: IssueToolDialogPr
     department: "",
     issue_date: format(new Date(), "yyyy-MM-dd"),
     expected_return_date: "",
+    expected_return_time: "",
     quantity_issued: 1,
     purpose: "",
     notes: "",
@@ -58,6 +59,7 @@ export function IssueToolDialog({ open, onOpenChange, tools }: IssueToolDialogPr
     createIssue({
       ...formData,
       expected_return_date: formData.expected_return_date || undefined,
+      expected_return_time: formData.expected_return_time || undefined,
     }, {
       onSuccess: () => {
         onOpenChange(false);
@@ -67,6 +69,7 @@ export function IssueToolDialog({ open, onOpenChange, tools }: IssueToolDialogPr
           department: "",
           issue_date: format(new Date(), "yyyy-MM-dd"),
           expected_return_date: "",
+          expected_return_time: "",
           quantity_issued: 1,
           purpose: "",
           notes: "",
@@ -219,7 +222,7 @@ export function IssueToolDialog({ open, onOpenChange, tools }: IssueToolDialogPr
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="expected_return_date">Expected Return</Label>
+              <Label htmlFor="expected_return_date">Expected Return Date</Label>
               <Input
                 id="expected_return_date"
                 type="date"
@@ -228,6 +231,17 @@ export function IssueToolDialog({ open, onOpenChange, tools }: IssueToolDialogPr
                 min={formData.issue_date}
               />
             </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="expected_return_time">Expected Return Time</Label>
+            <Input
+              id="expected_return_time"
+              type="time"
+              value={formData.expected_return_time}
+              onChange={(e) => setFormData({ ...formData, expected_return_time: e.target.value })}
+              placeholder="e.g., 17:00"
+            />
           </div>
 
           <div className="space-y-2">

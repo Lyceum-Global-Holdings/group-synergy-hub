@@ -42,6 +42,7 @@ export interface ToolIssue {
   department: string | null;
   issue_date: string;
   expected_return_date: string | null;
+  expected_return_time: string | null;
   quantity_issued: number;
   quantity_returned: number;
   purpose: string | null;
@@ -98,6 +99,7 @@ export interface CreateToolIssueData {
   department?: string;
   issue_date: string;
   expected_return_date?: string;
+  expected_return_time?: string;
   quantity_issued: number;
   purpose?: string;
   notes?: string;
