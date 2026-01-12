@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Company, CreateCompanyData, UpdateCompanyData } from '@/types/company';
 import { useToast } from '@/hooks/use-toast';
@@ -11,8 +12,15 @@ export function useCompanies() {
   const { data: isSuperAdmin, isLoading: isSuperAdminLoading } = useSuperAdmin();
   const { data: userProfile, isLoading: isProfileLoading } = useCurrentUserProfile();
 
-  // Wait until dependencies are loaded before running the query
-  const dependenciesReady = !isSuperAdminLoading && !isProfileLoading;
+  // Wait until dependencies are loaded AND super admin status is definitively known
+  const dependenciesReady = !isSuperAdminLoading && !isProfileLoading && isSuperAdmin !== undefined;
+
+  // Invalidate companies cache when super admin status changes to ensure fresh data
+  useEffect(() => {
+    if (isSuperAdmin !== undefined && !isSuperAdminLoading) {
+      queryClient.invalidateQueries({ queryKey: ['companies'] });
+    }
+  }, [isSuperAdmin, isSuperAdminLoading, queryClient]);
 
   const {
     data: companies = [],
@@ -30,8 +38,11 @@ export function useCompanies() {
         .select('*')
         .order('created_at', { ascending: false });
 
-      // If not super admin and has company_id, filter to only their company
-      if (!isSuperAdmin && userProfile?.company_id) {
+      // Super admins see ALL companies (no filter applied)
+      // Non-super admins with a company_id see only their company
+      const shouldFilterByCompany = isSuperAdmin !== true && userProfile?.company_id;
+      
+      if (shouldFilterByCompany) {
         query = query.eq('id', userProfile.company_id);
       }
 
