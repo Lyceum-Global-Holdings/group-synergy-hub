@@ -11,7 +11,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { BulkItemImportDialog } from '@/components/warehouse/BulkItemImportDialog';
 import {
   Table,
   TableBody,
@@ -26,7 +25,7 @@ import { useWarehouseItems } from '@/hooks/useWarehouseItems';
 import { useItemCategories } from '@/hooks/useItemCategories';
 import { useItemUnits } from '@/hooks/useItemUnits';
 import { useCompany } from '@/contexts/CompanyContext';
-import { CreateItemDialog } from '@/components/warehouse/CreateItemDialog';
+import { AddItemsDialog } from '@/components/warehouse/AddItemsDialog';
 import { StockMovementDialog } from '@/components/warehouse/StockMovementDialog';
 import { StockAdjustmentDialog } from '@/components/warehouse/StockAdjustmentDialog';
 import { DeleteItemConfirmationDialog } from '@/components/warehouse/DeleteItemConfirmationDialog';
@@ -304,10 +303,9 @@ export function ItemMasterTab() {
                 </Button>
               </>
             )}
-            <BulkItemImportDialog />
             <Button onClick={() => setIsCreateDialogOpen(true)}>
               <Plus className="mr-2 h-4 w-4" />
-              Add Item
+              Add Items
             </Button>
           </div>
         </div>
@@ -557,7 +555,7 @@ export function ItemMasterTab() {
         </Table>
       </div>
 
-      <CreateItemDialog
+      <AddItemsDialog
         open={isCreateDialogOpen || editingItem !== null}
         onOpenChange={(open) => {
           setIsCreateDialogOpen(open);
