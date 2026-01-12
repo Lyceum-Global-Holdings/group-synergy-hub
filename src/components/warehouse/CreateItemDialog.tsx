@@ -20,7 +20,7 @@ import {
 import { Checkbox } from '@/components/ui/checkbox';
 import { useWarehouseItems } from '@/hooks/useWarehouseItems';
 import { useItemCategories } from '@/hooks/useItemCategories';
-import { useSuppliers } from '@/hooks/useSuppliers';
+import { useApprovedCompanySuppliers } from '@/hooks/useCompanySuppliers';
 import { useItemUnits } from '@/hooks/useItemUnits';
 import { useStockTransactions } from '@/hooks/useStockTransactions';
 import { useWarehouseLocations } from '@/hooks/useWarehouseLocations';
@@ -74,7 +74,8 @@ export function CreateItemDialog({ open, onOpenChange, editingItem }: CreateItem
   const { createItem, createItemAsync, updateItem, isCreating, isUpdating } = useWarehouseItems();
   const { companies, selectedCompany } = useCompany();
   const { categories } = useItemCategories(selectedCompany?.id);
-  const { data: suppliers = [], refetch: refetchSuppliers } = useSuppliers();
+  const { data: companySuppliers = [], refetch: refetchSuppliers } = useApprovedCompanySuppliers(selectedCompany?.id);
+  const suppliers = companySuppliers.map(cs => cs.supplier).filter(Boolean);
   const { units } = useItemUnits();
   const { createTransaction } = useStockTransactions();
   const { locations } = useWarehouseLocations();
