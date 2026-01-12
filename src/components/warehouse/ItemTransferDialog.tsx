@@ -117,7 +117,7 @@ export function ItemTransferDialog({
           id,
           allocated_quantity,
           available_quantity,
-          warehouse_bins!inner (
+          warehouse_bins:bin_id (
             id,
             bin_code,
             name,
