@@ -1,3 +1,4 @@
+// v1.0.2 - Clean rebuild
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Company } from '@/types/company';
