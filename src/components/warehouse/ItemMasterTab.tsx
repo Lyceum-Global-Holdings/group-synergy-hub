@@ -107,9 +107,9 @@ export function ItemMasterTab() {
         .select(`
           warehouse_item_id,
           available_quantity,
-          warehouse_bins!inner (
+          warehouse_bins:bin_id (
             location_id,
-            warehouse_locations!inner (id, name)
+            warehouse_locations:location_id (id, name)
           )
         `)
         .gt('available_quantity', 0);
