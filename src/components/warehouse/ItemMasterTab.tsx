@@ -80,7 +80,7 @@ export function ItemMasterTab() {
   const { companies, selectedCompany } = useCompany();
   const { categories } = useItemCategories(selectedCompany?.id);
   const { units } = useItemUnits();
-  const { migrateAllocationsToCorrectLocation, isMigrating, reconcileStock, isReconciling } = useWarehouseBinAllocations();
+  const { migrateAllocationsToCorrectLocation, isMigrating, reconcileStock, isReconciling, fixAllocationsFromHistory, isFixingFromHistory } = useWarehouseBinAllocations();
   const { canDelete } = useIsAdminOrHigher();
 
   // Fetch all top-level warehouse locations
@@ -285,6 +285,14 @@ export function ItemMasterTab() {
                 >
                   <BarChart3 className="mr-2 h-4 w-4" />
                   {isReconciling ? 'Reconciling...' : 'Reconcile Stock'}
+                </Button>
+                <Button 
+                  variant="outline" 
+                  onClick={() => fixAllocationsFromHistory()}
+                  disabled={isFixingFromHistory}
+                >
+                  <History className="mr-2 h-4 w-4" />
+                  {isFixingFromHistory ? 'Fixing...' : 'Fix from History'}
                 </Button>
                 <Button 
                   variant="outline" 
