@@ -13058,6 +13058,7 @@ export type Database = {
           debit_balance: number
         }[]
       }
+      get_user_company_id: { Args: { _user_id: string }; Returns: string }
       get_user_company_ids: { Args: { _user_id: string }; Returns: string[] }
       get_user_location_ids: { Args: { _user_id: string }; Returns: string[] }
       has_dashboard_access: {
