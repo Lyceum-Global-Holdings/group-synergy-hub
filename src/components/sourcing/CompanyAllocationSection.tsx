@@ -262,7 +262,7 @@ export function CompanyAllocationSection({
                 {mode === 'edit' ? 'Add New Allocations' : 'Company Allocation'}
               </h3>
             </div>
-            {isSuperAdmin && mode === 'create' && (
+            {isSuperAdmin && (
               <div className="flex items-center gap-2">
                 <Checkbox
                   id="auto-approve-all"

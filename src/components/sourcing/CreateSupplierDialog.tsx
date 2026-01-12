@@ -250,7 +250,7 @@ export const CreateSupplierDialog: React.FC<CreateSupplierDialogProps> = ({
               const settings = allocationSettings.get(companyId);
               return {
                 company_id: companyId,
-                status: (settings?.auto_approve && isSuperAdmin ? 'approved' : 'pending') as 'pending' | 'approved',
+                status: (isSuperAdmin ? 'approved' : 'pending') as 'pending' | 'approved',
                 is_preferred: settings?.is_preferred ?? false,
                 payment_terms: settings?.payment_terms,
                 credit_limit: settings?.credit_limit,
