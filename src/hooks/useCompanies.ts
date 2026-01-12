@@ -1,5 +1,4 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Company, CreateCompanyData, UpdateCompanyData } from '@/types/company';
 import { useToast } from '@/hooks/use-toast';
@@ -14,13 +13,6 @@ export function useCompanies() {
 
   // Wait until dependencies are loaded AND super admin status is definitively known
   const dependenciesReady = !isSuperAdminLoading && !isProfileLoading && isSuperAdmin !== undefined;
-
-  // Invalidate companies cache when super admin status changes to ensure fresh data
-  useEffect(() => {
-    if (isSuperAdmin !== undefined && !isSuperAdminLoading) {
-      queryClient.invalidateQueries({ queryKey: ['companies'] });
-    }
-  }, [isSuperAdmin, isSuperAdminLoading, queryClient]);
 
   const {
     data: companies = [],
