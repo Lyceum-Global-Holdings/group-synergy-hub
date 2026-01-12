@@ -448,6 +448,195 @@ export function useWarehouseBinAllocations() {
     },
   });
 
+  // Fix allocations based on transfer history - creates proper allocations at destination locations
+  const fixAllocationsFromHistoryMutation = useMutation({
+    mutationFn: async () => {
+      console.log('=== Starting Fix Allocations from Transfer History ===');
+      toast.info('Analyzing transfer history...');
+      
+      if (!selectedCompany?.id) {
+        throw new Error('Please select a company first');
+      }
+
+      const { data: user } = await supabase.auth.getUser();
+
+      // Step 1: Get all completed transfer items with their transfer details
+      const { data: transferItems, error: transferError } = await supabase
+        .from('stock_transfer_items')
+        .select(`
+          id,
+          warehouse_item_id,
+          item_name,
+          quantity_requested,
+          status,
+          stock_transfer_requests!inner (
+            id,
+            transfer_number,
+            from_location_id,
+            to_location_id,
+            status,
+            company_id
+          )
+        `)
+        .eq('status', 'completed')
+        .eq('stock_transfer_requests.status', 'completed')
+        .eq('stock_transfer_requests.company_id', selectedCompany.id);
+
+      if (transferError) {
+        console.error('Failed to fetch transfers:', transferError);
+        throw transferError;
+      }
+
+      console.log(`Found ${transferItems?.length || 0} completed transfer items`);
+
+      if (!transferItems || transferItems.length === 0) {
+        return { fixed: 0, created: 0, updated: 0 };
+      }
+
+      // Step 2: Build a map of item -> location -> net quantity transferred IN
+      const locationStockMap = new Map<string, Map<string, number>>();
+      
+      for (const item of transferItems) {
+        const transfer = item.stock_transfer_requests as any;
+        const itemId = item.warehouse_item_id;
+        const qty = item.quantity_requested || 0;
+        
+        if (!locationStockMap.has(itemId)) {
+          locationStockMap.set(itemId, new Map());
+        }
+        
+        const itemLocations = locationStockMap.get(itemId)!;
+        
+        // Add to destination location
+        const destId = transfer.to_location_id;
+        itemLocations.set(destId, (itemLocations.get(destId) || 0) + qty);
+        
+        console.log(`Transfer ${transfer.transfer_number}: ${item.item_name} +${qty} to ${destId}`);
+      }
+
+      let createdCount = 0;
+      let updatedCount = 0;
+
+      // Step 3: For each item+location, ensure proper allocation exists
+      for (const [itemId, locations] of locationStockMap) {
+        for (const [locationId, expectedQty] of locations) {
+          if (expectedQty <= 0) continue;
+          
+          console.log(`\nProcessing: Item ${itemId} at location ${locationId}, expected: ${expectedQty}`);
+
+          // Get bin at this location
+          const { data: bins } = await supabase
+            .from('warehouse_bins')
+            .select('id, bin_code, location_id')
+            .eq('location_id', locationId)
+            .limit(1);
+
+          let binId: string;
+
+          if (bins && bins.length > 0) {
+            binId = bins[0].id;
+            console.log(`Found existing bin: ${bins[0].bin_code}`);
+          } else {
+            // Create a default bin at this location
+            const { data: location } = await supabase
+              .from('warehouse_locations')
+              .select('name')
+              .eq('id', locationId)
+              .single();
+            
+            const locationName = location?.name || 'Unknown';
+            
+            const { data: newBin, error: createBinError } = await supabase
+              .from('warehouse_bins')
+              .insert({
+                location_id: locationId,
+                bin_code: locationName.substring(0, 10).toUpperCase().replace(/\s/g, '-'),
+                name: `${locationName} - Default Bin`,
+                company_id: selectedCompany.id,
+                current_quantity: 0,
+                max_capacity: 10000,
+              })
+              .select()
+              .single();
+
+            if (createBinError) {
+              console.error(`Failed to create bin at location ${locationId}:`, createBinError);
+              continue;
+            }
+            
+            binId = newBin.id;
+            console.log(`Created new bin: ${newBin.bin_code}`);
+          }
+
+          // Check if allocation exists
+          const { data: existingAlloc } = await supabase
+            .from('warehouse_bin_allocations')
+            .select('id, allocated_quantity')
+            .eq('warehouse_item_id', itemId)
+            .eq('bin_id', binId)
+            .maybeSingle();
+
+          if (existingAlloc) {
+            // Check if it needs updating (if current allocation is less than expected from transfers)
+            if ((existingAlloc.allocated_quantity || 0) < expectedQty) {
+              const { error: updateError } = await supabase
+                .from('warehouse_bin_allocations')
+                .update({ allocated_quantity: expectedQty })
+                .eq('id', existingAlloc.id);
+
+              if (updateError) {
+                console.error(`Failed to update allocation:`, updateError);
+              } else {
+                console.log(`✓ Updated allocation: ${existingAlloc.allocated_quantity} -> ${expectedQty}`);
+                updatedCount++;
+              }
+            } else {
+              console.log(`Allocation already sufficient: ${existingAlloc.allocated_quantity} >= ${expectedQty}`);
+            }
+          } else {
+            // Create new allocation
+            const { error: insertError } = await supabase
+              .from('warehouse_bin_allocations')
+              .insert({
+                warehouse_item_id: itemId,
+                bin_id: binId,
+                allocated_quantity: expectedQty,
+                reserved_quantity: 0,
+                company_id: selectedCompany.id,
+                created_by: user.user?.id,
+              });
+
+            if (insertError) {
+              console.error(`Failed to create allocation:`, insertError);
+            } else {
+              console.log(`✓ Created allocation: ${expectedQty} units`);
+              createdCount++;
+            }
+          }
+        }
+      }
+
+      console.log(`\n=== Fix from history complete ===`);
+      console.log(`Created: ${createdCount}, Updated: ${updatedCount}`);
+
+      return { fixed: createdCount + updatedCount, created: createdCount, updated: updatedCount };
+    },
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: ['warehouse-bin-allocations'] });
+      queryClient.invalidateQueries({ queryKey: ['all-items-location-stock'] });
+      queryClient.invalidateQueries({ queryKey: ['warehouse-items'] });
+      if (result.fixed === 0) {
+        toast.info('All allocations from transfer history are already correct');
+      } else {
+        toast.success(`Fixed ${result.fixed} allocations from history (${result.created} created, ${result.updated} updated)`);
+      }
+    },
+    onError: (error: Error) => {
+      console.error('Fix from history failed:', error);
+      toast.error(`Fix from history failed: ${error.message}`);
+    },
+  });
+
   // Migration function to fix bin allocations based on item's location_id
   const migrateAllocationsMutation = useMutation({
     mutationFn: async () => {
@@ -582,11 +771,13 @@ export function useWarehouseBinAllocations() {
     adjustAllocation: adjustAllocationMutation.mutate,
     migrateAllocationsToCorrectLocation: migrateAllocationsMutation.mutate,
     reconcileStock: reconcileStockMutation.mutate,
+    fixAllocationsFromHistory: fixAllocationsFromHistoryMutation.mutate,
     isCreating: createAllocationMutation.isPending,
     isUpdating: updateAllocationMutation.isPending,
     isDeleting: deleteAllocationMutation.isPending,
     isAdjusting: adjustAllocationMutation.isPending,
     isMigrating: migrateAllocationsMutation.isPending,
     isReconciling: reconcileStockMutation.isPending,
+    isFixingFromHistory: fixAllocationsFromHistoryMutation.isPending,
   };
 }
