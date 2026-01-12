@@ -11493,6 +11493,7 @@ export type Database = {
           created_by: string | null
           department: string | null
           expected_return_date: string | null
+          expected_return_time: string | null
           id: string
           issue_date: string
           issue_number: string
@@ -11513,6 +11514,7 @@ export type Database = {
           created_by?: string | null
           department?: string | null
           expected_return_date?: string | null
+          expected_return_time?: string | null
           id?: string
           issue_date?: string
           issue_number: string
@@ -11533,6 +11535,7 @@ export type Database = {
           created_by?: string | null
           department?: string | null
           expected_return_date?: string | null
+          expected_return_time?: string | null
           id?: string
           issue_date?: string
           issue_number?: string
