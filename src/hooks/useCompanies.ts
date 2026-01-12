@@ -21,20 +21,25 @@ export function useCompanies() {
   } = useQuery({
     queryKey: ['companies', isSuperAdmin, userProfile?.company_id],
     enabled: dependenciesReady,
+    staleTime: 0, // Always consider data stale to ensure fresh fetch
+    refetchOnMount: 'always', // Force refetch when component mounts
     queryFn: async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return [];
+
+      console.log('[useCompanies] Fetching - isSuperAdmin:', isSuperAdmin, 'company_id:', userProfile?.company_id);
 
       let query = supabase
         .from('companies')
         .select('*')
         .order('created_at', { ascending: false });
 
-      // Super admins see ALL companies (no filter applied)
-      // Non-super admins with a company_id see only their company
-      const shouldFilterByCompany = isSuperAdmin !== true && userProfile?.company_id;
-      
-      if (shouldFilterByCompany) {
+      // EXPLICIT check: Super admins see ALL companies (no filter)
+      if (isSuperAdmin === true) {
+        console.log('[useCompanies] Super admin - fetching ALL companies');
+        // No filter applied
+      } else if (userProfile?.company_id) {
+        console.log('[useCompanies] Regular user - filtering to company:', userProfile.company_id);
         query = query.eq('id', userProfile.company_id);
       }
 
