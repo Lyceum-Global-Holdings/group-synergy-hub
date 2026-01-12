@@ -51,13 +51,19 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
 
   // Auto-select company based on user's access
   useEffect(() => {
-    if (safeCompanies.length > 0 && !selectedCompany && !isViewingAllCompanies && !isSuperAdminLoading) {
-      if (safeCompanies.length === 1) {
+    // Wait until super admin status is definitively known
+    if (isSuperAdminLoading) return;
+    
+    if (safeCompanies.length > 0 && !selectedCompany && !isViewingAllCompanies) {
+      console.log('[CompanyContext] Auto-select - companies:', safeCompanies.length, 'isSuperAdmin:', isSuperAdmin);
+      
+      if (isSuperAdmin === true && safeCompanies.length > 1) {
+        // Super admin with multiple companies: default to "All Companies" view
+        console.log('[CompanyContext] Setting super admin to view all companies');
+        setIsViewingAllCompanies(true);
+      } else if (safeCompanies.length === 1) {
         // Single company: auto-select it
         setSelectedCompany(safeCompanies[0]);
-      } else if (isSuperAdmin) {
-        // Super admin with multiple companies: default to "All Companies" view
-        setIsViewingAllCompanies(true);
       }
       // Non-super-admin with multiple companies: leave unselected (must choose manually)
     }
