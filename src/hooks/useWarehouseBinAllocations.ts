@@ -227,7 +227,78 @@ export function useWarehouseBinAllocations() {
         throw new Error('Please select a company first');
       }
 
-      // Step 1: Get all warehouse items with their current_stock and location_id
+      const { data: user } = await supabase.auth.getUser();
+      let consolidatedCount = 0;
+
+      // ============ STEP 0: Consolidate duplicate allocations ============
+      console.log('=== Step 0: Consolidating duplicate allocations ===');
+      
+      // Get all allocations for this company
+      const { data: allAllocations, error: allAllocError } = await supabase
+        .from('warehouse_bin_allocations')
+        .select('id, warehouse_item_id, bin_id, allocated_quantity, reserved_quantity')
+        .eq('company_id', selectedCompany.id);
+
+      if (allAllocError) {
+        console.error('Failed to fetch all allocations:', allAllocError);
+        throw allAllocError;
+      }
+
+      // Group by (warehouse_item_id + bin_id)
+      const allocationsByKey = new Map<string, typeof allAllocations>();
+      allAllocations?.forEach(alloc => {
+        const key = `${alloc.warehouse_item_id}|${alloc.bin_id}`;
+        if (!allocationsByKey.has(key)) {
+          allocationsByKey.set(key, []);
+        }
+        allocationsByKey.get(key)!.push(alloc);
+      });
+
+      // Find and consolidate duplicates
+      for (const [key, allocations] of allocationsByKey) {
+        if (allocations.length <= 1) continue;
+        
+        // Sum all quantities
+        const totalAllocated = allocations.reduce((sum, a) => sum + (a.allocated_quantity || 0), 0);
+        const totalReserved = allocations.reduce((sum, a) => sum + (a.reserved_quantity || 0), 0);
+        
+        console.log(`Consolidating ${allocations.length} duplicates for key ${key}: total=${totalAllocated}`);
+        
+        // Update first allocation with totals
+        const { error: updateError } = await supabase
+          .from('warehouse_bin_allocations')
+          .update({ 
+            allocated_quantity: totalAllocated,
+            reserved_quantity: totalReserved
+          })
+          .eq('id', allocations[0].id);
+        
+        if (updateError) {
+          console.error(`Error updating allocation ${allocations[0].id}:`, updateError);
+          continue;
+        }
+        
+        // Delete duplicate records
+        const duplicateIds = allocations.slice(1).map(a => a.id);
+        const { error: deleteError } = await supabase
+          .from('warehouse_bin_allocations')
+          .delete()
+          .in('id', duplicateIds);
+        
+        if (deleteError) {
+          console.error(`Error deleting duplicates:`, deleteError);
+        } else {
+          consolidatedCount += duplicateIds.length;
+          console.log(`✓ Consolidated ${duplicateIds.length} duplicates into allocation ${allocations[0].id}`);
+        }
+      }
+
+      if (consolidatedCount > 0) {
+        console.log(`=== Consolidated ${consolidatedCount} duplicate allocations ===`);
+        toast.info(`Consolidated ${consolidatedCount} duplicate allocations`);
+      }
+
+      // ============ STEP 1: Get all warehouse items ============
       const { data: items, error: itemsError } = await supabase
         .from('warehouse_items')
         .select('id, item_code, name, current_stock, location_id, company_id')
@@ -242,14 +313,12 @@ export function useWarehouseBinAllocations() {
       console.log(`Found ${items?.length || 0} active items`);
 
       if (!items || items.length === 0) {
-        return { reconciled: 0, created: 0, updated: 0, skipped: 0 };
+        return { reconciled: 0, created: 0, updated: 0, skipped: 0, consolidated: consolidatedCount };
       }
 
       let createdCount = 0;
       let updatedCount = 0;
       let skippedCount = 0;
-
-      const { data: user } = await supabase.auth.getUser();
 
       for (const item of items) {
         const currentStock = item.current_stock || 0;
@@ -353,18 +422,21 @@ export function useWarehouseBinAllocations() {
       }
 
       console.log(`\n=== Reconciliation complete ===`);
-      console.log(`Created: ${createdCount}, Updated: ${updatedCount}, Skipped: ${skippedCount}`);
+      console.log(`Created: ${createdCount}, Updated: ${updatedCount}, Skipped: ${skippedCount}, Consolidated: ${consolidatedCount}`);
 
-      return { reconciled: createdCount + updatedCount, created: createdCount, updated: updatedCount, skipped: skippedCount };
+      return { reconciled: createdCount + updatedCount, created: createdCount, updated: updatedCount, skipped: skippedCount, consolidated: consolidatedCount };
     },
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ['warehouse-bin-allocations'] });
       queryClient.invalidateQueries({ queryKey: ['all-items-location-stock'] });
       queryClient.invalidateQueries({ queryKey: ['warehouse-items'] });
-      if (result.reconciled === 0 && result.skipped === 0) {
+      if (result.reconciled === 0 && result.skipped === 0 && result.consolidated === 0) {
         toast.info('All stock is already reconciled');
       } else {
-        toast.success(`Reconciled ${result.reconciled} items (${result.created} created, ${result.updated} updated)`);
+        const messages: string[] = [];
+        if (result.consolidated > 0) messages.push(`${result.consolidated} duplicates consolidated`);
+        if (result.reconciled > 0) messages.push(`${result.reconciled} items reconciled`);
+        toast.success(messages.join(', ') || 'Stock reconciliation complete');
       }
       if (result.skipped > 0) {
         toast.warning(`${result.skipped} items skipped`);
