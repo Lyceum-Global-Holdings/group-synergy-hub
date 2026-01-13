@@ -426,6 +426,7 @@ export function CreatePrDialog({ open, onOpenChange }: CreatePrDialogProps) {
                         <TableHead className="min-w-[180px]">Item</TableHead>
                         <TableHead className="w-[100px]">Code</TableHead>
                         <TableHead className="min-w-[140px]">Name *</TableHead>
+                        <TableHead className="min-w-[160px]">Description</TableHead>
                         <TableHead className="w-[80px]">Qty *</TableHead>
                         <TableHead className="w-[100px]">UoM *</TableHead>
                         <TableHead className="w-[100px]">Unit Price</TableHead>
@@ -499,6 +500,26 @@ export function CreatePrDialog({ open, onOpenChange }: CreatePrDialogProps) {
                                     <Input 
                                       placeholder="Item name" 
                                       {...field} 
+                                      className="h-8 text-sm"
+                                    />
+                                  </FormControl>
+                                </FormItem>
+                              )}
+                            />
+                          </TableCell>
+
+                          {/* Item Description */}
+                          <TableCell>
+                            <FormField
+                              control={form.control}
+                              name={`items.${index}.description`}
+                              render={({ field }) => (
+                                <FormItem className="space-y-0">
+                                  <FormControl>
+                                    <Input 
+                                      placeholder="Description" 
+                                      {...field} 
+                                      value={field.value || ''}
                                       className="h-8 text-sm"
                                     />
                                   </FormControl>
@@ -663,7 +684,7 @@ export function CreatePrDialog({ open, onOpenChange }: CreatePrDialogProps) {
                     </TableBody>
                     <TableFooter>
                       <TableRow>
-                        <TableCell colSpan={7} className="text-right font-medium">
+                        <TableCell colSpan={8} className="text-right font-medium">
                           Total Estimated Amount:
                         </TableCell>
                         <TableCell className="font-bold">
