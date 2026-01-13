@@ -59,7 +59,7 @@ import { WarehouseItem } from '@/types/itemBin';
 import { FinishedGood } from '@/hooks/useFinishedGoods';
 
 const createPrSchema = z.object({
-  title: z.string().min(1, 'Title is required'),
+  title: z.string().optional(),
   description: z.string().optional(),
   company: z.string().optional(),
   priority: z.enum(['low', 'medium', 'high', 'urgent']),
@@ -263,19 +263,17 @@ export function CreatePrDialog({ open, onOpenChange }: CreatePrDialogProps) {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="title"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Title *</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Enter PR title" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                  <FormItem>
+                    <FormLabel>PR Number</FormLabel>
+                    <FormControl>
+                      <Input 
+                        value="Auto-generated" 
+                        readOnly 
+                        disabled
+                        className="bg-muted text-muted-foreground"
+                      />
+                    </FormControl>
+                  </FormItem>
 
                   <FormField
                     control={form.control}
