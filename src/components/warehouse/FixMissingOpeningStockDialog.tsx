@@ -44,29 +44,32 @@ export function FixMissingOpeningStockDialog({
   const { data: missingItems = [], isLoading, refetch } = useQuery({
     queryKey: ['missing-opening-stock', selectedCompany?.id],
     queryFn: async () => {
-      // First get items with stock
+      // First get items for this company
       const { data: items, error: itemsError } = await supabase
         .from('warehouse_items')
         .select('id, item_code, name, current_stock, company_id')
-        .gt('current_stock', 0)
         .eq('company_id', selectedCompany?.id || '');
 
       if (itemsError) throw itemsError;
       if (!items || items.length === 0) return [];
+
+      // Filter for items with stock > 0 in JavaScript to avoid ambiguous column reference
+      const itemsWithStock = items.filter(item => item.current_stock > 0);
+      if (itemsWithStock.length === 0) return [];
 
       // Get items that have opening_stock transactions
       const { data: existingTransactions, error: txError } = await supabase
         .from('stock_transactions')
         .select('item_id')
         .eq('transaction_type', 'opening_stock')
-        .in('item_id', items.map(i => i.id));
+        .in('item_id', itemsWithStock.map(i => i.id));
 
       if (txError) throw txError;
 
       const itemsWithOpeningStock = new Set(existingTransactions?.map(t => t.item_id) || []);
 
       // Filter to only items without opening stock
-      return items.filter(item => !itemsWithOpeningStock.has(item.id)) as MissingOpeningStockItem[];
+      return itemsWithStock.filter(item => !itemsWithOpeningStock.has(item.id)) as MissingOpeningStockItem[];
     },
     enabled: open && !!selectedCompany?.id,
   });
