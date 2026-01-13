@@ -3,7 +3,7 @@ import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { format } from 'date-fns';
-import { CalendarIcon, Plus, Trash2 } from 'lucide-react';
+import { CalendarIcon, Plus, Trash2, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -39,6 +39,15 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+  TableFooter,
+} from '@/components/ui/table';
 import { useCreatePurchaseRequisition } from '@/hooks/usePurchaseRequisitions';
 import { useBillOfMaterials } from '@/hooks/useBillOfMaterials';
 import { useCompany } from '@/contexts/CompanyContext';
@@ -408,263 +417,265 @@ export function CreatePrDialog({ open, onOpenChange }: CreatePrDialogProps) {
                   Add Item
                 </Button>
               </CardHeader>
-              <CardContent className="space-y-4">
-                {fields.map((field, index) => (
-                  <Card key={field.id} className="p-4">
-                    <div className="flex justify-between items-center mb-4">
-                      <h4 className="font-medium">Item {index + 1}</h4>
-                      {fields.length > 1 && (
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => remove(index)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      )}
-                    </div>
+              <CardContent>
+                <div className="border rounded-lg overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-[50px]">#</TableHead>
+                        <TableHead className="min-w-[180px]">Item</TableHead>
+                        <TableHead className="w-[100px]">Code</TableHead>
+                        <TableHead className="min-w-[140px]">Name *</TableHead>
+                        <TableHead className="w-[80px]">Qty *</TableHead>
+                        <TableHead className="w-[100px]">UoM *</TableHead>
+                        <TableHead className="w-[100px]">Unit Price</TableHead>
+                        <TableHead className="w-[100px]">Total</TableHead>
+                        <TableHead className="w-[80px]">Notes</TableHead>
+                        <TableHead className="w-[50px]"></TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {fields.map((field, index) => (
+                        <TableRow key={field.id}>
+                          {/* Row number */}
+                          <TableCell className="font-medium text-muted-foreground">
+                            {index + 1}
+                          </TableCell>
 
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                      {/* Show different selectors based on company */}
-                      {selectedCompany?.code === 'TUH' ? (
-                        <>
-                          <FormField
-                            control={form.control}
-                            name={`items.${index}.warehouse_item_id`}
-                            render={({ field }) => (
-                              <FormItem className="md:col-span-1">
-                                <FormLabel>Select from Warehouse Items</FormLabel>
-                                <FormControl>
-                                  <ItemSelector
-                                    value={field.value}
-                                    onSelect={(item) => handleItemSelect(index, item)}
-                                    placeholder="Search warehouse items..."
-                                  />
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                          
-                          <div className="md:col-span-1 flex items-center justify-center">
-                            <span className="text-sm text-muted-foreground">OR</span>
-                          </div>
-                          
-                          <FormField
-                            control={form.control}
-                            name={`items.${index}.finished_good_id`}
-                            render={({ field }) => (
-                              <FormItem className="md:col-span-1">
-                                <FormLabel>Select from Product Master</FormLabel>
-                                <FormControl>
-                                  <FinishedGoodsItemSelector
-                                    value={field.value}
-                                    onSelect={(product) => handleFinishedGoodSelect(index, product)}
-                                    placeholder="Search finished goods..."
-                                  />
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                        </>
-                      ) : (
-                        <FormField
-                          control={form.control}
-                          name={`items.${index}.warehouse_item_id`}
-                          render={({ field }) => (
-                            <FormItem className="md:col-span-3">
-                              <FormLabel>Select Item *</FormLabel>
-                              <FormControl>
+                          {/* Item Selector */}
+                          <TableCell>
+                            {selectedCompany?.code === 'TUH' ? (
+                              <div className="space-y-1">
                                 <ItemSelector
-                                  value={field.value}
+                                  value={form.watch(`items.${index}.warehouse_item_id`)}
                                   onSelect={(item) => handleItemSelect(index, item)}
-                                  placeholder="Search and select item..."
+                                  placeholder="Warehouse..."
+                                  className="h-8"
                                 />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                      )}
-                      
-                      {(form.watch(`items.${index}.warehouse_item_id`) || form.watch(`items.${index}.finished_good_id`)) && (
-                        <div className="md:col-span-3 text-sm text-muted-foreground bg-muted/50 p-2 rounded">
-                          <strong>Selected:</strong> {form.watch(`items.${index}.item_code`)} - {form.watch(`items.${index}.item_name`)}
-                          {form.watch(`items.${index}.finished_good_id`) && (
-                            <span className="ml-2 text-xs bg-primary/10 text-primary px-2 py-1 rounded">
-                              From Product Master
-                            </span>
-                          )}
-                        </div>
-                      )}
-
-                      <FormField
-                        control={form.control}
-                        name={`items.${index}.item_code`}
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Item Code</FormLabel>
-                            <FormControl>
-                              <Input placeholder="Enter item code" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-
-                      <FormField
-                        control={form.control}
-                        name={`items.${index}.item_name`}
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Item Name *</FormLabel>
-                            <FormControl>
-                              <Input placeholder="Enter item name" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-
-                      <FormField
-                        control={form.control}
-                        name={`items.${index}.quantity`}
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Quantity *</FormLabel>
-                            <FormControl>
-                              <Input
-                                type="number"
-                                step="0.01"
-                                {...field}
-                                onChange={(e) => {
-                                  field.onChange(parseFloat(e.target.value) || 0);
-                                  setTimeout(() => calculateTotalPrice(index), 0);
-                                }}
+                                <FinishedGoodsItemSelector
+                                  value={form.watch(`items.${index}.finished_good_id`)}
+                                  onSelect={(product) => handleFinishedGoodSelect(index, product)}
+                                  placeholder="Product..."
+                                  className="h-8"
+                                />
+                              </div>
+                            ) : (
+                              <ItemSelector
+                                value={form.watch(`items.${index}.warehouse_item_id`)}
+                                onSelect={(item) => handleItemSelect(index, item)}
+                                placeholder="Select item..."
+                                className="h-8"
                               />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
+                            )}
+                          </TableCell>
 
-                      <FormField
-                        control={form.control}
-                        name={`items.${index}.unit_of_measure`}
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Unit of Measure *</FormLabel>
-                            <Select onValueChange={field.onChange} defaultValue={field.value}>
-                              <FormControl>
-                                <SelectTrigger>
-                                  <SelectValue />
-                                </SelectTrigger>
-                              </FormControl>
-                              <SelectContent>
-                                {unitsOfMeasure.map((unit) => (
-                                  <SelectItem key={unit} value={unit}>
-                                    {unit}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    </div>
+                          {/* Item Code */}
+                          <TableCell>
+                            <FormField
+                              control={form.control}
+                              name={`items.${index}.item_code`}
+                              render={({ field }) => (
+                                <FormItem className="space-y-0">
+                                  <FormControl>
+                                    <Input 
+                                      placeholder="Code" 
+                                      {...field} 
+                                      className="h-8 text-sm"
+                                    />
+                                  </FormControl>
+                                </FormItem>
+                              )}
+                            />
+                          </TableCell>
 
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                      <FormField
-                        control={form.control}
-                        name={`items.${index}.estimated_unit_price`}
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Unit Price *</FormLabel>
-                            <FormControl>
-                              <Input
-                                type="number"
-                                step="0.01"
-                                placeholder="0.00"
-                                {...field}
-                                onChange={(e) => {
-                                  field.onChange(parseFloat(e.target.value) || 0);
-                                  setTimeout(() => calculateTotalPrice(index), 0);
-                                }}
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
+                          {/* Item Name */}
+                          <TableCell>
+                            <FormField
+                              control={form.control}
+                              name={`items.${index}.item_name`}
+                              render={({ field }) => (
+                                <FormItem className="space-y-0">
+                                  <FormControl>
+                                    <Input 
+                                      placeholder="Item name" 
+                                      {...field} 
+                                      className="h-8 text-sm"
+                                    />
+                                  </FormControl>
+                                </FormItem>
+                              )}
+                            />
+                          </TableCell>
 
-                      <FormField
-                        control={form.control}
-                        name={`items.${index}.estimated_total_price`}
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Total Price</FormLabel>
-                            <FormControl>
-                              <Input
-                                type="number"
-                                step="0.01"
-                                placeholder="0.00"
-                                {...field}
-                                readOnly
-                                className="bg-muted"
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
+                          {/* Quantity */}
+                          <TableCell>
+                            <FormField
+                              control={form.control}
+                              name={`items.${index}.quantity`}
+                              render={({ field }) => (
+                                <FormItem className="space-y-0">
+                                  <FormControl>
+                                    <Input
+                                      type="number"
+                                      step="0.01"
+                                      {...field}
+                                      onChange={(e) => {
+                                        field.onChange(parseFloat(e.target.value) || 0);
+                                        setTimeout(() => calculateTotalPrice(index), 0);
+                                      }}
+                                      className="h-8 text-sm"
+                                    />
+                                  </FormControl>
+                                </FormItem>
+                              )}
+                            />
+                          </TableCell>
 
-                      <div /> {/* Spacer */}
-                    </div>
+                          {/* Unit of Measure */}
+                          <TableCell>
+                            <FormField
+                              control={form.control}
+                              name={`items.${index}.unit_of_measure`}
+                              render={({ field }) => (
+                                <FormItem className="space-y-0">
+                                  <Select onValueChange={field.onChange} value={field.value}>
+                                    <FormControl>
+                                      <SelectTrigger className="h-8 text-sm">
+                                        <SelectValue />
+                                      </SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent>
+                                      {unitsOfMeasure.map((unit) => (
+                                        <SelectItem key={unit} value={unit}>
+                                          {unit}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                </FormItem>
+                              )}
+                            />
+                          </TableCell>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <FormField
-                        control={form.control}
-                        name={`items.${index}.specifications`}
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Specifications</FormLabel>
-                            <FormControl>
-                              <Textarea
-                                placeholder="Enter specifications"
-                                className="resize-none"
-                                rows={2}
-                                {...field}
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
+                          {/* Unit Price */}
+                          <TableCell>
+                            <FormField
+                              control={form.control}
+                              name={`items.${index}.estimated_unit_price`}
+                              render={({ field }) => (
+                                <FormItem className="space-y-0">
+                                  <FormControl>
+                                    <Input
+                                      type="number"
+                                      step="0.01"
+                                      placeholder="0.00"
+                                      {...field}
+                                      onChange={(e) => {
+                                        field.onChange(parseFloat(e.target.value) || 0);
+                                        setTimeout(() => calculateTotalPrice(index), 0);
+                                      }}
+                                      className="h-8 text-sm"
+                                    />
+                                  </FormControl>
+                                </FormItem>
+                              )}
+                            />
+                          </TableCell>
 
-                      <FormField
-                        control={form.control}
-                        name={`items.${index}.notes`}
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Notes</FormLabel>
-                            <FormControl>
-                              <Textarea
-                                placeholder="Enter additional notes"
-                                className="resize-none"
-                                rows={2}
-                                {...field}
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    </div>
-                  </Card>
-                ))}
+                          {/* Total Price */}
+                          <TableCell>
+                            <FormField
+                              control={form.control}
+                              name={`items.${index}.estimated_total_price`}
+                              render={({ field }) => (
+                                <FormItem className="space-y-0">
+                                  <FormControl>
+                                    <Input
+                                      type="number"
+                                      step="0.01"
+                                      placeholder="0.00"
+                                      {...field}
+                                      readOnly
+                                      className="h-8 text-sm bg-muted"
+                                    />
+                                  </FormControl>
+                                </FormItem>
+                              )}
+                            />
+                          </TableCell>
+
+                          {/* Notes with Popover */}
+                          <TableCell>
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <Button 
+                                  variant="ghost" 
+                                  size="sm" 
+                                  className={cn(
+                                    "h-8 w-8 p-0",
+                                    (form.watch(`items.${index}.notes`) || form.watch(`items.${index}.specifications`)) && "text-primary"
+                                  )}
+                                >
+                                  <FileText className="h-4 w-4" />
+                                </Button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-80" align="end">
+                                <div className="space-y-4">
+                                  <div className="space-y-2">
+                                    <Label>Specifications</Label>
+                                    <Textarea
+                                      placeholder="Enter specifications..."
+                                      rows={2}
+                                      value={form.watch(`items.${index}.specifications`) || ''}
+                                      onChange={(e) => form.setValue(`items.${index}.specifications`, e.target.value)}
+                                    />
+                                  </div>
+                                  <div className="space-y-2">
+                                    <Label>Notes</Label>
+                                    <Textarea
+                                      placeholder="Enter notes..."
+                                      rows={2}
+                                      value={form.watch(`items.${index}.notes`) || ''}
+                                      onChange={(e) => form.setValue(`items.${index}.notes`, e.target.value)}
+                                    />
+                                  </div>
+                                </div>
+                              </PopoverContent>
+                            </Popover>
+                          </TableCell>
+
+                          {/* Delete */}
+                          <TableCell>
+                            {fields.length > 1 && (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => remove(index)}
+                                className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                    <TableFooter>
+                      <TableRow>
+                        <TableCell colSpan={7} className="text-right font-medium">
+                          Total Estimated Amount:
+                        </TableCell>
+                        <TableCell className="font-bold">
+                          {fields.reduce((sum, _, index) => 
+                            sum + (form.watch(`items.${index}.estimated_total_price`) || 0), 0
+                          ).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </TableCell>
+                        <TableCell colSpan={2}></TableCell>
+                      </TableRow>
+                    </TableFooter>
+                  </Table>
+                </div>
               </CardContent>
             </Card>
 
