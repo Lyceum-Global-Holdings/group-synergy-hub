@@ -268,6 +268,9 @@ export function ViewSiteReportDialog({
             <div className="space-y-1">
               <DialogTitle className="text-xl font-bold">Site Report</DialogTitle>
               <p className="text-sm text-muted-foreground">{displayReport.report_number}</p>
+              <p className="text-xs text-muted-foreground">
+                Created: {format(new Date(displayReport.created_at), "MMM d, yyyy 'at' h:mm a")}
+              </p>
             </div>
             <div className="flex items-center gap-2">
               <Badge variant="outline" className={typeConfig.color}>

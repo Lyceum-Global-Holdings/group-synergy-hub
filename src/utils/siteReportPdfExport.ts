@@ -7,6 +7,7 @@ interface ReportData {
   report_number: string;
   report_type: string;
   report_date: string;
+  created_at: string;
   period_start_date?: string;
   period_end_date?: string;
   status: string;
@@ -62,7 +63,14 @@ function generatePdfDocument(report: ReportData, materials: MaterialsData): jsPD
       ? `${format(new Date(report.period_start_date), "MMM d")} - ${format(new Date(report.period_end_date), "MMM d, yyyy")}`
       : format(new Date(report.report_date), "MMMM d, yyyy");
   doc.text(`Period: ${periodText}`, 14, yPos);
-  yPos += 12;
+  yPos += 7;
+
+  // Created timestamp
+  if (report.created_at) {
+    doc.text(`Created: ${format(new Date(report.created_at), "MMM d, yyyy 'at' h:mm a")}`, 14, yPos);
+    yPos += 7;
+  }
+  yPos += 5;
 
   // Divider
   doc.setDrawColor(200);

@@ -257,7 +257,14 @@ export default function DailySiteReports() {
                     ) : (
                       filteredReports?.map((report) => (
                         <TableRow key={report.id}>
-                          <TableCell className="font-medium">{report.report_number}</TableCell>
+                          <TableCell className="font-medium">
+                            <div>
+                              <span>{report.report_number}</span>
+                              <span className="block text-xs text-muted-foreground">
+                                {format(new Date(report.created_at), "MMM d 'at' h:mm a")}
+                              </span>
+                            </div>
+                          </TableCell>
                           <TableCell>{getTypeBadge(report.report_type || 'daily')}</TableCell>
                           <TableCell>{report.project?.project_name || "-"}</TableCell>
                           <TableCell>{formatPeriod(report)}</TableCell>
