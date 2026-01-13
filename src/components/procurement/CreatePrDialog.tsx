@@ -268,7 +268,7 @@ export function CreatePrDialog({ open, onOpenChange }: CreatePrDialogProps) {
                 <CardTitle className="text-base">Basic Information</CardTitle>
               </CardHeader>
               <CardContent className="space-y-2">
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
+                <div className="grid grid-cols-1 md:grid-cols-5 gap-2">
                   <FormItem>
                     <FormLabel className="text-xs">PR Number</FormLabel>
                     <FormControl>
@@ -349,9 +349,7 @@ export function CreatePrDialog({ open, onOpenChange }: CreatePrDialogProps) {
                       </FormItem>
                     )}
                   />
-                </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
                   <FormField
                     control={form.control}
                     name="required_date"
@@ -364,7 +362,7 @@ export function CreatePrDialog({ open, onOpenChange }: CreatePrDialogProps) {
                               <Button
                                 variant={'outline'}
                                 className={cn(
-                                  'pl-3 text-left font-normal h-7 text-sm',
+                                  'pl-3 text-left font-normal h-8 text-sm',
                                   !field.value && 'text-muted-foreground'
                                 )}
                               >
