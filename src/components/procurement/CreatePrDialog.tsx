@@ -51,6 +51,8 @@ import {
 import { useCreatePurchaseRequisition } from '@/hooks/usePurchaseRequisitions';
 import { useBillOfMaterials } from '@/hooks/useBillOfMaterials';
 import { useCompany } from '@/contexts/CompanyContext';
+import { useUsers } from '@/hooks/useUsers';
+import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
 import type { CreatePrData, PrPriority } from '@/types/procurement';
 import { ItemSelector } from '@/components/common/ItemSelector';
@@ -62,6 +64,7 @@ const createPrSchema = z.object({
   title: z.string().optional(),
   description: z.string().optional(),
   company: z.string().optional(),
+  requester_id: z.string().optional(),
   priority: z.enum(['low', 'medium', 'high', 'urgent']),
   required_date: z.date({
     required_error: 'Required date is required',
@@ -117,6 +120,8 @@ export function CreatePrDialog({ open, onOpenChange }: CreatePrDialogProps) {
   const createPrMutation = useCreatePurchaseRequisition();
   const { selectedCompany } = useCompany();
   const { boms } = useBillOfMaterials(selectedCompany?.id);
+  const { data: users = [] } = useUsers();
+  const { user } = useAuth();
   
   const form = useForm<CreatePrFormData>({
     resolver: zodResolver(createPrSchema),
@@ -124,6 +129,7 @@ export function CreatePrDialog({ open, onOpenChange }: CreatePrDialogProps) {
       title: '',
       description: '',
       company: selectedCompany?.name || '',
+      requester_id: user?.id || '',
       priority: 'medium',
       justification: '',
       bom_id: '',
@@ -261,16 +267,16 @@ export function CreatePrDialog({ open, onOpenChange }: CreatePrDialogProps) {
               <CardHeader>
                 <CardTitle className="text-lg">Basic Information</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <CardContent className="space-y-3">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
                   <FormItem>
-                    <FormLabel>PR Number</FormLabel>
+                    <FormLabel className="text-xs">PR Number</FormLabel>
                     <FormControl>
                       <Input 
                         value="Auto-generated" 
                         readOnly 
                         disabled
-                        className="bg-muted text-muted-foreground"
+                        className="bg-muted text-muted-foreground h-9"
                       />
                     </FormControl>
                   </FormItem>
@@ -280,13 +286,13 @@ export function CreatePrDialog({ open, onOpenChange }: CreatePrDialogProps) {
                     name="company"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Company</FormLabel>
+                        <FormLabel className="text-xs">Company</FormLabel>
                         <FormControl>
                           <Input 
                             {...field} 
                             value={selectedCompany?.name || ''} 
                             readOnly 
-                            className="bg-muted"
+                            className="bg-muted h-9"
                             placeholder="No company selected"
                           />
                         </FormControl>
@@ -294,18 +300,41 @@ export function CreatePrDialog({ open, onOpenChange }: CreatePrDialogProps) {
                       </FormItem>
                     )}
                   />
-                </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="requester_id"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-xs">Requester</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value || user?.id}>
+                          <FormControl>
+                            <SelectTrigger className="h-9">
+                              <SelectValue placeholder="Select requester" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {users.map((u) => (
+                              <SelectItem key={u.id} value={u.id}>
+                                {u.full_name || u.email}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
                   <FormField
                     control={form.control}
                     name="priority"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Priority *</FormLabel>
+                        <FormLabel className="text-xs">Priority *</FormLabel>
                         <Select onValueChange={field.onChange} defaultValue={field.value}>
                           <FormControl>
-                            <SelectTrigger>
+                            <SelectTrigger className="h-9">
                               <SelectValue placeholder="Select priority" />
                             </SelectTrigger>
                           </FormControl>
@@ -320,20 +349,22 @@ export function CreatePrDialog({ open, onOpenChange }: CreatePrDialogProps) {
                       </FormItem>
                     )}
                   />
+                </div>
 
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
                   <FormField
                     control={form.control}
                     name="required_date"
                     render={({ field }) => (
                       <FormItem className="flex flex-col">
-                        <FormLabel>Required Date *</FormLabel>
+                        <FormLabel className="text-xs">Required Date *</FormLabel>
                         <Popover>
                           <PopoverTrigger asChild>
                             <FormControl>
                               <Button
                                 variant={'outline'}
                                 className={cn(
-                                  'pl-3 text-left font-normal',
+                                  'pl-3 text-left font-normal h-9',
                                   !field.value && 'text-muted-foreground'
                                 )}
                               >
@@ -365,17 +396,17 @@ export function CreatePrDialog({ open, onOpenChange }: CreatePrDialogProps) {
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <FormField
                     control={form.control}
                     name="description"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Description</FormLabel>
+                        <FormLabel className="text-xs">Description</FormLabel>
                         <FormControl>
                           <Textarea
                             placeholder="Enter PR description"
-                            className="resize-none h-16"
+                            className="resize-none h-14"
                             {...field}
                           />
                         </FormControl>
@@ -389,11 +420,11 @@ export function CreatePrDialog({ open, onOpenChange }: CreatePrDialogProps) {
                     name="justification"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Justification</FormLabel>
+                        <FormLabel className="text-xs">Justification</FormLabel>
                         <FormControl>
                           <Textarea
                             placeholder="Why is this purchase necessary?"
-                            className="resize-none h-16"
+                            className="resize-none h-14"
                             {...field}
                           />
                         </FormControl>
