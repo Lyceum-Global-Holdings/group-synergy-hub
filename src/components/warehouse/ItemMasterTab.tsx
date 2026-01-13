@@ -3,7 +3,13 @@ import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Plus, Search, Edit, Trash2, History, Settings, Eye, ArrowLeftRight, MapPin, BarChart3, Wrench, Image as ImageIcon, X, Package, FileWarning } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, History, Settings, Eye, ArrowLeftRight, MapPin, BarChart3, Wrench, Image as ImageIcon, X, Package, FileWarning, ChevronDown } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import {
   Select,
   SelectContent,
@@ -278,39 +284,44 @@ export function ItemMasterTab() {
           </div>
           <div className="flex items-center gap-2">
             {canDelete && (
-              <>
-                <Button 
-                  variant="outline" 
-                  onClick={() => reconcileStock()}
-                  disabled={isReconciling}
-                >
-                  <BarChart3 className="mr-2 h-4 w-4" />
-                  {isReconciling ? 'Reconciling...' : 'Reconcile Stock'}
-                </Button>
-                <Button 
-                  variant="outline" 
-                  onClick={() => fixAllocationsFromHistory()}
-                  disabled={isFixingFromHistory}
-                >
-                  <History className="mr-2 h-4 w-4" />
-                  {isFixingFromHistory ? 'Fixing...' : 'Fix from History'}
-                </Button>
-                <Button 
-                  variant="outline" 
-                  onClick={() => migrateAllocationsToCorrectLocation()}
-                  disabled={isMigrating}
-                >
-                  <Wrench className="mr-2 h-4 w-4" />
-                  {isMigrating ? 'Fixing...' : 'Fix Allocations'}
-                </Button>
-                <Button 
-                  variant="outline" 
-                  onClick={() => setIsFixOpeningStockDialogOpen(true)}
-                >
-                  <FileWarning className="mr-2 h-4 w-4" />
-                  Fix Opening Stock
-                </Button>
-              </>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline">
+                    <Settings className="mr-2 h-4 w-4" />
+                    Admin Tools
+                    <ChevronDown className="ml-2 h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem
+                    onClick={() => reconcileStock()}
+                    disabled={isReconciling}
+                  >
+                    <BarChart3 className="mr-2 h-4 w-4" />
+                    {isReconciling ? 'Reconciling...' : 'Reconcile Stock'}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => fixAllocationsFromHistory()}
+                    disabled={isFixingFromHistory}
+                  >
+                    <History className="mr-2 h-4 w-4" />
+                    {isFixingFromHistory ? 'Fixing...' : 'Fix from History'}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => migrateAllocationsToCorrectLocation()}
+                    disabled={isMigrating}
+                  >
+                    <Wrench className="mr-2 h-4 w-4" />
+                    {isMigrating ? 'Fixing...' : 'Fix Allocations'}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => setIsFixOpeningStockDialogOpen(true)}
+                  >
+                    <FileWarning className="mr-2 h-4 w-4" />
+                    Fix Opening Stock
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             )}
             <Button onClick={() => setIsCreateDialogOpen(true)}>
               <Plus className="mr-2 h-4 w-4" />
