@@ -367,44 +367,43 @@ export function CreatePrDialog({ open, onOpenChange }: CreatePrDialogProps) {
                   />
                 </div>
 
-                <FormField
-                  control={form.control}
-                  name="description"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Description</FormLabel>
-                      <FormControl>
-                        <Textarea
-                          placeholder="Enter PR description"
-                          className="resize-none"
-                          {...field}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="description"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Description</FormLabel>
+                        <FormControl>
+                          <Textarea
+                            placeholder="Enter PR description"
+                            className="resize-none h-16"
+                            {...field}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
 
-                <FormField
-                  control={form.control}
-                  name="justification"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Justification</FormLabel>
-                      <FormControl>
-                        <Textarea
-                          placeholder="Provide justification for this purchase"
-                          className="resize-none"
-                          {...field}
-                        />
-                      </FormControl>
-                      <FormDescription>
-                        Explain why this purchase is necessary for business operations.
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                  <FormField
+                    control={form.control}
+                    name="justification"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Justification</FormLabel>
+                        <FormControl>
+                          <Textarea
+                            placeholder="Why is this purchase necessary?"
+                            className="resize-none h-16"
+                            {...field}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
               </CardContent>
             </Card>
 
