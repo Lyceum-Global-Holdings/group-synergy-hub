@@ -264,11 +264,11 @@ export function CreatePrDialog({ open, onOpenChange }: CreatePrDialogProps) {
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
             {/* Basic Information */}
             <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Basic Information</CardTitle>
+              <CardHeader className="py-3">
+                <CardTitle className="text-base">Basic Information</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+              <CardContent className="space-y-2">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
                   <FormItem>
                     <FormLabel className="text-xs">PR Number</FormLabel>
                     <FormControl>
@@ -276,7 +276,7 @@ export function CreatePrDialog({ open, onOpenChange }: CreatePrDialogProps) {
                         value="Auto-generated" 
                         readOnly 
                         disabled
-                        className="bg-muted text-muted-foreground h-9"
+                        className="bg-muted text-muted-foreground h-8 text-sm"
                       />
                     </FormControl>
                   </FormItem>
@@ -292,7 +292,7 @@ export function CreatePrDialog({ open, onOpenChange }: CreatePrDialogProps) {
                             {...field} 
                             value={selectedCompany?.name || ''} 
                             readOnly 
-                            className="bg-muted h-9"
+                            className="bg-muted h-8 text-sm"
                             placeholder="No company selected"
                           />
                         </FormControl>
@@ -309,7 +309,7 @@ export function CreatePrDialog({ open, onOpenChange }: CreatePrDialogProps) {
                         <FormLabel className="text-xs">Requester</FormLabel>
                         <Select onValueChange={field.onChange} value={field.value || user?.id}>
                           <FormControl>
-                            <SelectTrigger className="h-9">
+                            <SelectTrigger className="h-8 text-sm">
                               <SelectValue placeholder="Select requester" />
                             </SelectTrigger>
                           </FormControl>
@@ -334,7 +334,7 @@ export function CreatePrDialog({ open, onOpenChange }: CreatePrDialogProps) {
                         <FormLabel className="text-xs">Priority *</FormLabel>
                         <Select onValueChange={field.onChange} defaultValue={field.value}>
                           <FormControl>
-                            <SelectTrigger className="h-9">
+                            <SelectTrigger className="h-8 text-sm">
                               <SelectValue placeholder="Select priority" />
                             </SelectTrigger>
                           </FormControl>
@@ -351,7 +351,7 @@ export function CreatePrDialog({ open, onOpenChange }: CreatePrDialogProps) {
                   />
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
                   <FormField
                     control={form.control}
                     name="required_date"
@@ -364,7 +364,7 @@ export function CreatePrDialog({ open, onOpenChange }: CreatePrDialogProps) {
                               <Button
                                 variant={'outline'}
                                 className={cn(
-                                  'pl-3 text-left font-normal h-9',
+                                  'pl-3 text-left font-normal h-8 text-sm',
                                   !field.value && 'text-muted-foreground'
                                 )}
                               >
@@ -396,7 +396,7 @@ export function CreatePrDialog({ open, onOpenChange }: CreatePrDialogProps) {
                   />
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                   <FormField
                     control={form.control}
                     name="description"
@@ -406,7 +406,7 @@ export function CreatePrDialog({ open, onOpenChange }: CreatePrDialogProps) {
                         <FormControl>
                           <Textarea
                             placeholder="Enter PR description"
-                            className="resize-none h-14"
+                            className="resize-none h-12 text-sm"
                             {...field}
                           />
                         </FormControl>
@@ -424,7 +424,7 @@ export function CreatePrDialog({ open, onOpenChange }: CreatePrDialogProps) {
                         <FormControl>
                           <Textarea
                             placeholder="Why is this purchase necessary?"
-                            className="resize-none h-14"
+                            className="resize-none h-12 text-sm"
                             {...field}
                           />
                         </FormControl>
