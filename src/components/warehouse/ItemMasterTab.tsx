@@ -370,7 +370,16 @@ export function ItemMasterTab() {
                     </div>
                   </TableCell>
                   <TableCell className="font-medium">{item.item_code}</TableCell>
-                  <TableCell>{item.name}</TableCell>
+                  <TableCell>
+                    <div className="space-y-0.5">
+                      <div className="font-medium">{item.name}</div>
+                      {item.description && (
+                        <div className="text-xs text-muted-foreground line-clamp-1">
+                          {item.description}
+                        </div>
+                      )}
+                    </div>
+                  </TableCell>
                   <TableCell>
                     {item.category_id 
                       ? categories.find(c => c.id === item.category_id)?.name || '-'
