@@ -252,41 +252,65 @@ serve(async (req) => {
             console.log(`Generating PDF for report ${report.report_number}...`);
             const pdfBytes = await generateReportPdf(report, projectName, projectCode, materialsData);
             
-            // Send PDF to Telegram
+            // Send PDF to Telegram - support multiple chat IDs
             const telegramUrl = `https://api.telegram.org/bot${setting.bot_token}/sendDocument`;
             
-            const formData = new FormData();
-            formData.append('chat_id', setting.chat_id);
-            formData.append('document', new Blob([pdfBytes], { type: 'application/pdf' }), `${report.report_number}.pdf`);
-            formData.append('caption', formatCaption(report, projectName, projectCode));
-            formData.append('parse_mode', 'HTML');
+            // Parse comma-separated chat IDs
+            const chatIds = setting.chat_id.split(',').map((id: string) => id.trim()).filter(Boolean);
+            console.log(`Sending report ${report.report_number} to ${chatIds.length} chat(s): ${chatIds.join(', ')}`);
             
-            const telegramResponse = await fetch(telegramUrl, {
-              method: 'POST',
-              body: formData,
-            });
+            let sentToAny = false;
+            for (const chatId of chatIds) {
+              try {
+                const formData = new FormData();
+                formData.append('chat_id', chatId);
+                formData.append('document', new Blob([pdfBytes], { type: 'application/pdf' }), `${report.report_number}.pdf`);
+                formData.append('caption', formatCaption(report, projectName, projectCode));
+                formData.append('parse_mode', 'HTML');
+                
+                const telegramResponse = await fetch(telegramUrl, {
+                  method: 'POST',
+                  body: formData,
+                });
 
-            const telegramResult = await telegramResponse.json();
+                const telegramResult = await telegramResponse.json();
+                
+                if (!telegramResult.ok) {
+                  console.error(`Telegram error for report ${report.id} to chat ${chatId}:`, telegramResult);
+                  results.push({ 
+                    company_id: setting.company_id, 
+                    report_id: report.id,
+                    chat_id: chatId,
+                    success: false, 
+                    error: telegramResult.description 
+                  });
+                } else {
+                  console.log(`Successfully sent PDF report ${report.id} to chat ${chatId}`);
+                  sentToAny = true;
+                  results.push({ 
+                    company_id: setting.company_id, 
+                    report_id: report.id,
+                    chat_id: chatId,
+                    success: true 
+                  });
+                }
+              } catch (chatError) {
+                console.error(`Error sending report ${report.id} to chat ${chatId}:`, chatError);
+                results.push({ 
+                  company_id: setting.company_id, 
+                  report_id: report.id,
+                  chat_id: chatId,
+                  success: false, 
+                  error: String(chatError) 
+                });
+              }
+            }
             
-            if (!telegramResult.ok) {
-              console.error(`Telegram error for report ${report.id}:`, telegramResult);
-              results.push({ 
-                company_id: setting.company_id, 
-                report_id: report.id, 
-                success: false, 
-                error: telegramResult.description 
-              });
-            } else {
-              console.log(`Successfully sent PDF report ${report.id} to Telegram`);
+            if (sentToAny) {
               processedCount++;
-              results.push({ 
-                company_id: setting.company_id, 
-                report_id: report.id, 
-                success: true 
-              });
             }
           } catch (sendError) {
-            console.error(`Error sending report ${report.id}:`, sendError);
+            console.error(`Error processing report ${report.id}:`, sendError);
             results.push({ 
               company_id: setting.company_id, 
               report_id: report.id, 

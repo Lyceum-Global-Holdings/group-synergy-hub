@@ -61,28 +61,61 @@ export function useTelegramSettings() {
     },
   });
 
-  const testConnection = async (botToken: string, chatId: string): Promise<boolean> => {
-    try {
-      const response = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          chat_id: chatId,
-          text: "✅ Test connection successful! Your Telegram settings are configured correctly.",
-        }),
+  const testConnection = async (botToken: string, chatIdsString: string): Promise<boolean> => {
+    const chatIds = chatIdsString.split(',').map(id => id.trim()).filter(Boolean);
+    
+    if (chatIds.length === 0) {
+      toast({
+        title: "No chat IDs",
+        description: "Please add at least one chat ID.",
+        variant: "destructive",
       });
+      return false;
+    }
 
-      const result = await response.json();
-      
-      if (!result.ok) {
-        throw new Error(result.description || "Failed to send test message");
+    try {
+      let successCount = 0;
+      const failedIds: string[] = [];
+
+      for (const chatId of chatIds) {
+        const response = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            chat_id: chatId,
+            text: "✅ Test connection successful! Your Telegram settings are configured correctly.",
+          }),
+        });
+
+        const result = await response.json();
+        
+        if (result.ok) {
+          successCount++;
+        } else {
+          failedIds.push(chatId);
+        }
       }
 
-      toast({
-        title: "Connection successful!",
-        description: "Test message sent to Telegram.",
-      });
-      return true;
+      if (successCount === chatIds.length) {
+        toast({
+          title: "All connections successful!",
+          description: `Test message sent to ${successCount} chat(s).`,
+        });
+      } else if (successCount > 0) {
+        toast({
+          title: "Partial success",
+          description: `Sent to ${successCount}/${chatIds.length} chats. Failed: ${failedIds.join(', ')}`,
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Connection failed",
+          description: `Could not send to any chats. Check your chat IDs.`,
+          variant: "destructive",
+        });
+      }
+
+      return successCount > 0;
     } catch (error: any) {
       toast({
         title: "Connection failed",

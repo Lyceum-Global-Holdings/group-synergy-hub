@@ -5,7 +5,8 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Send, Eye, EyeOff, Loader2, TestTube, Clock, Globe } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Send, Eye, EyeOff, Loader2, TestTube, Clock, Globe, Plus, X } from "lucide-react";
 import { useTelegramSettings } from "@/hooks/useTelegramSettings";
 import { format } from "date-fns";
 
@@ -25,7 +26,8 @@ export function TelegramSettingsTab() {
   const { settings, isLoading, saveSettings, isSaving, testConnection, testScheduledSend } = useTelegramSettings();
   
   const [botToken, setBotToken] = useState("");
-  const [chatId, setChatId] = useState("");
+  const [chatIds, setChatIds] = useState<string[]>([]);
+  const [newChatId, setNewChatId] = useState("");
   const [isEnabled, setIsEnabled] = useState(false);
   const [notifyOnCreate, setNotifyOnCreate] = useState(true);
   const [scheduledSendEnabled, setScheduledSendEnabled] = useState(false);
@@ -39,7 +41,12 @@ export function TelegramSettingsTab() {
   useEffect(() => {
     if (settings) {
       setBotToken(settings.bot_token || "");
-      setChatId(settings.chat_id || "");
+      // Parse comma-separated chat IDs
+      if (settings.chat_id) {
+        setChatIds(settings.chat_id.split(',').map(id => id.trim()).filter(Boolean));
+      } else {
+        setChatIds([]);
+      }
       setIsEnabled(settings.is_enabled);
       setNotifyOnCreate(settings.notify_on_report_create);
       setScheduledSendEnabled(settings.scheduled_send_enabled || false);
@@ -52,10 +59,29 @@ export function TelegramSettingsTab() {
     }
   }, [settings]);
 
+  const handleAddChatId = () => {
+    const trimmedId = newChatId.trim();
+    if (trimmedId && !chatIds.includes(trimmedId)) {
+      setChatIds([...chatIds, trimmedId]);
+      setNewChatId("");
+    }
+  };
+
+  const handleRemoveChatId = (idToRemove: string) => {
+    setChatIds(chatIds.filter(id => id !== idToRemove));
+  };
+
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleAddChatId();
+    }
+  };
+
   const handleSave = async () => {
     await saveSettings({
       bot_token: botToken || null,
-      chat_id: chatId || null,
+      chat_id: chatIds.length > 0 ? chatIds.join(',') : null,
       is_enabled: isEnabled,
       notify_on_report_create: notifyOnCreate,
       scheduled_send_enabled: scheduledSendEnabled,
@@ -65,9 +91,9 @@ export function TelegramSettingsTab() {
   };
 
   const handleTest = async () => {
-    if (!botToken || !chatId) return;
+    if (!botToken || chatIds.length === 0) return;
     setIsTesting(true);
-    await testConnection(botToken, chatId);
+    await testConnection(botToken, chatIds.join(','));
     setIsTesting(false);
   };
 
@@ -138,15 +164,43 @@ export function TelegramSettingsTab() {
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="chat-id">Chat ID</Label>
-          <Input
-            id="chat-id"
-            placeholder="Enter your Telegram chat ID"
-            value={chatId}
-            onChange={(e) => setChatId(e.target.value)}
-          />
+          <Label>Chat IDs</Label>
+          {chatIds.length > 0 && (
+            <div className="flex flex-wrap gap-2 mb-2">
+              {chatIds.map((id) => (
+                <Badge key={id} variant="secondary" className="flex items-center gap-1 px-2 py-1">
+                  <span className="font-mono text-xs">{id}</span>
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveChatId(id)}
+                    className="ml-1 hover:bg-destructive/20 rounded-full p-0.5"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </Badge>
+              ))}
+            </div>
+          )}
+          <div className="flex gap-2">
+            <Input
+              placeholder="Enter chat ID..."
+              value={newChatId}
+              onChange={(e) => setNewChatId(e.target.value)}
+              onKeyPress={handleKeyPress}
+              className="flex-1"
+            />
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              onClick={handleAddChatId}
+              disabled={!newChatId.trim()}
+            >
+              <Plus className="h-4 w-4" />
+            </Button>
+          </div>
           <p className="text-xs text-muted-foreground">
-            Your personal or group chat ID (numeric)
+            Add multiple chat IDs to send reports to different chats/groups
           </p>
         </div>
 
@@ -229,7 +283,7 @@ export function TelegramSettingsTab() {
                   variant="secondary"
                   size="sm"
                   onClick={handleTestScheduledSend}
-                  disabled={isTestingSend || !botToken || !chatId}
+                  disabled={isTestingSend || !botToken || chatIds.length === 0}
                 >
                   {isTestingSend ? (
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -250,7 +304,7 @@ export function TelegramSettingsTab() {
           <Button
             variant="outline"
             onClick={handleTest}
-            disabled={!botToken || !chatId || isTesting}
+            disabled={!botToken || chatIds.length === 0 || isTesting}
           >
             {isTesting ? (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
