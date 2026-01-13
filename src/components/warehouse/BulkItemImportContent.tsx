@@ -430,7 +430,16 @@ export function BulkItemImportContent({ onSuccess, onCancel }: BulkItemImportCon
     try {
       const createdItems = await bulkCreateItemsAsync(validData);
       
-      const { data: user } = await supabase.auth.getUser();
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        toast({
+          title: "Error",
+          description: "You must be logged in to import items",
+          variant: "destructive",
+        });
+        return;
+      }
       
       const binAllocations: Array<{
         warehouse_item_id: string;
@@ -452,7 +461,7 @@ export function BulkItemImportContent({ onSuccess, onCancel }: BulkItemImportCon
             bin_id: originalItem.bin_id,
             allocated_quantity: originalItem.initial_stock,
             company_id: selectedCompany?.id,
-            created_by: user.user?.id,
+            created_by: user.id,
           });
         }
       }
@@ -514,7 +523,7 @@ export function BulkItemImportContent({ onSuccess, onCancel }: BulkItemImportCon
             total_value: unitCost > 0 ? unitCost * originalItem.initial_stock : undefined,
             notes: 'Opening stock balance (bulk import)',
             company_id: selectedCompany?.id,
-            created_by: user.user?.id,
+            created_by: user.id,
           });
         }
       }
@@ -527,6 +536,11 @@ export function BulkItemImportContent({ onSuccess, onCancel }: BulkItemImportCon
         
         if (txnError) {
           console.error('Error creating stock transactions:', txnError);
+          toast({
+            title: "Warning",
+            description: "Items imported but opening stock transactions could not be created: " + txnError.message,
+            variant: "destructive",
+          });
         }
         
         queryClient.invalidateQueries({ queryKey: ['stock-transactions'] });
