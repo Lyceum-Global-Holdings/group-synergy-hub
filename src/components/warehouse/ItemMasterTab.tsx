@@ -3,7 +3,7 @@ import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Plus, Search, Edit, Trash2, History, Settings, Eye, ArrowLeftRight, MapPin, BarChart3, Wrench, Image as ImageIcon, X, Package } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, History, Settings, Eye, ArrowLeftRight, MapPin, BarChart3, Wrench, Image as ImageIcon, X, Package, FileWarning } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -32,6 +32,7 @@ import { DeleteItemConfirmationDialog } from '@/components/warehouse/DeleteItemC
 import { ItemDetailsDialog } from '@/components/warehouse/ItemDetailsDialog';
 import { ItemTransferDialog } from '@/components/warehouse/ItemTransferDialog';
 import { ItemStockDetailsDialog } from '@/components/warehouse/ItemStockDetailsDialog';
+import { FixMissingOpeningStockDialog } from '@/components/warehouse/FixMissingOpeningStockDialog';
 import { WarehouseItem } from '@/types/itemBin';
 import { supabase } from '@/integrations/supabase/client';
 import { useRealtimeStockUpdates } from '@/hooks/useRealtimeStockUpdates';
@@ -60,6 +61,7 @@ export function ItemMasterTab() {
   const [deletingItem, setDeletingItem] = useState<WarehouseItem | null>(null);
   const [transferItem, setTransferItem] = useState<WarehouseItem | null>(null);
   const [stockDetailsItem, setStockDetailsItem] = useState<WarehouseItem | null>(null);
+  const [isFixOpeningStockDialogOpen, setIsFixOpeningStockDialogOpen] = useState(false);
   
   // Filter states
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
@@ -300,6 +302,13 @@ export function ItemMasterTab() {
                 >
                   <Wrench className="mr-2 h-4 w-4" />
                   {isMigrating ? 'Fixing...' : 'Fix Allocations'}
+                </Button>
+                <Button 
+                  variant="outline" 
+                  onClick={() => setIsFixOpeningStockDialogOpen(true)}
+                >
+                  <FileWarning className="mr-2 h-4 w-4" />
+                  Fix Opening Stock
                 </Button>
               </>
             )}
@@ -649,6 +658,11 @@ export function ItemMasterTab() {
           )}
         </DialogContent>
       </Dialog>
+
+      <FixMissingOpeningStockDialog
+        open={isFixOpeningStockDialogOpen}
+        onOpenChange={setIsFixOpeningStockDialogOpen}
+      />
     </div>
   );
 }
