@@ -473,6 +473,21 @@ export function BulkItemImportContent({ onSuccess, onCancel }: BulkItemImportCon
         queryClient.invalidateQueries({ queryKey: ['warehouse-bin-allocations'] });
       }
 
+      // Create opening stock transactions for items with initial stock
+      const stockTransactions: Array<{
+        item_id: string;
+        transaction_type: 'opening_stock';
+        reference_type: 'manual';
+        quantity_change: number;
+        quantity_before: number;
+        quantity_after: number;
+        unit_cost?: number;
+        total_value?: number;
+        notes: string;
+        company_id?: string;
+        created_by?: string;
+      }> = [];
+
       for (const createdItem of createdItems) {
         const originalItem = parsedData.find(p => 
           p.item_code === createdItem.item_code && 
@@ -480,11 +495,41 @@ export function BulkItemImportContent({ onSuccess, onCancel }: BulkItemImportCon
         );
         
         if (originalItem?.initial_stock && originalItem.initial_stock > 0) {
+          // Update current_stock on the item
           await supabase
             .from('warehouse_items')
             .update({ current_stock: originalItem.initial_stock })
             .eq('id', createdItem.id);
+
+          // Prepare stock transaction for opening balance
+          const unitCost = originalItem.unit_cost || 0;
+          stockTransactions.push({
+            item_id: createdItem.id,
+            transaction_type: 'opening_stock',
+            reference_type: 'manual',
+            quantity_change: originalItem.initial_stock,
+            quantity_before: 0,
+            quantity_after: originalItem.initial_stock,
+            unit_cost: unitCost > 0 ? unitCost : undefined,
+            total_value: unitCost > 0 ? unitCost * originalItem.initial_stock : undefined,
+            notes: 'Opening stock balance (bulk import)',
+            company_id: selectedCompany?.id,
+            created_by: user.user?.id,
+          });
         }
+      }
+
+      // Insert all stock transactions
+      if (stockTransactions.length > 0) {
+        const { error: txnError } = await supabase
+          .from('stock_transactions')
+          .insert(stockTransactions);
+        
+        if (txnError) {
+          console.error('Error creating stock transactions:', txnError);
+        }
+        
+        queryClient.invalidateQueries({ queryKey: ['stock-transactions'] });
       }
 
       queryClient.invalidateQueries({ queryKey: ['warehouse-items'] });
