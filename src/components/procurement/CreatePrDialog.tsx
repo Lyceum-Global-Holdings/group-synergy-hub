@@ -364,7 +364,7 @@ export function CreatePrDialog({ open, onOpenChange }: CreatePrDialogProps) {
                               <Button
                                 variant={'outline'}
                                 className={cn(
-                                  'pl-3 text-left font-normal h-8 text-sm',
+                                  'pl-3 text-left font-normal h-7 text-sm',
                                   !field.value && 'text-muted-foreground'
                                 )}
                               >
