@@ -97,7 +97,7 @@ export function CreateToolDialog({ open, onOpenChange }: CreateToolDialogProps) 
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[95vw] max-w-md max-h-[90vh] overflow-y-auto">
+      <DialogContent className="w-[95vw] max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Add New Tool</DialogTitle>
           <DialogDescription>
@@ -106,14 +106,25 @@ export function CreateToolDialog({ open, onOpenChange }: CreateToolDialogProps) 
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {/* Row 1: Tool Code, Tool Name, Quantity */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="space-y-2">
               <Label htmlFor="tool_code">Tool Code</Label>
               <Input
                 id="tool_code"
                 value={formData.tool_code}
                 onChange={(e) => setFormData({ ...formData, tool_code: e.target.value })}
-                placeholder="Auto-generated if empty"
+                placeholder="Auto-generated"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="name">Tool Name *</Label>
+              <Input
+                id="name"
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                placeholder="e.g., Power Drill"
+                required
               />
             </div>
             <div className="space-y-2">
@@ -129,29 +140,8 @@ export function CreateToolDialog({ open, onOpenChange }: CreateToolDialogProps) 
             </div>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="name">Tool Name *</Label>
-            <Input
-              id="name"
-              value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              placeholder="e.g., Power Drill"
-              required
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="description">Description</Label>
-            <Textarea
-              id="description"
-              value={formData.description}
-              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              placeholder="Optional description..."
-              rows={2}
-            />
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {/* Row 2: Category, Location, Unit of Measure */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="space-y-2">
               <Label htmlFor="category_id">Category</Label>
               <Select
@@ -188,27 +178,27 @@ export function CreateToolDialog({ open, onOpenChange }: CreateToolDialogProps) 
                 </SelectContent>
               </Select>
             </div>
+            <div className="space-y-2">
+              <Label htmlFor="unit_id">Unit of Measure</Label>
+              <Select
+                value={formData.unit_id}
+                onValueChange={(value) => setFormData({ ...formData, unit_id: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select unit" />
+                </SelectTrigger>
+                <SelectContent>
+                  {units?.map((unit) => (
+                    <SelectItem key={unit.id} value={unit.id}>
+                      {unit.name} ({unit.abbreviation})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="unit_id">Unit of Measure</Label>
-            <Select
-              value={formData.unit_id}
-              onValueChange={(value) => setFormData({ ...formData, unit_id: value })}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select unit" />
-              </SelectTrigger>
-              <SelectContent>
-                {units?.map((unit) => (
-                  <SelectItem key={unit.id} value={unit.id}>
-                    {unit.name} ({unit.abbreviation})
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
+          {/* Row 3: Condition, Unit Cost */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="condition">Condition</Label>
@@ -241,6 +231,19 @@ export function CreateToolDialog({ open, onOpenChange }: CreateToolDialogProps) 
             </div>
           </div>
 
+          {/* Description */}
+          <div className="space-y-2">
+            <Label htmlFor="description">Description</Label>
+            <Textarea
+              id="description"
+              value={formData.description}
+              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              placeholder="Optional description..."
+              rows={2}
+            />
+          </div>
+
+          {/* Notes */}
           <div className="space-y-2">
             <Label htmlFor="notes">Notes</Label>
             <Textarea
