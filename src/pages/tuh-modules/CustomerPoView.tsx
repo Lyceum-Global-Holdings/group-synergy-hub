@@ -1,10 +1,15 @@
+import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useCpoView } from "@/hooks/useCpoView";
+import { useCustomerPurchaseOrders } from "@/hooks/useCustomerPurchaseOrders";
+import { useCpoWorkflow } from "@/hooks/useCpoWorkflow";
+import { useIsAdmin, useSuperAdmin } from "@/hooks/useSuperAdmin";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import CpoApprovalDialog from "@/components/tuh-modules/customer-po/CpoApprovalDialog";
 import {
   ArrowLeft,
   FileText,
@@ -23,15 +28,64 @@ import {
   Download,
   Edit,
   MoreVertical,
+  Send,
+  Ban,
+  TrendingUp,
 } from "lucide-react";
 import { format } from "date-fns";
 import { DataTable } from "@/components/ui/data-table";
 import { ColumnDef } from "@tanstack/react-table";
+import { toast } from "sonner";
 
 export default function CustomerPoView() {
   const { cpoId } = useParams<{ cpoId: string }>();
   const navigate = useNavigate();
   const { cpo, reservations, materialIssues, activityLog, isLoading, error } = useCpoView(cpoId!);
+  
+  // Approval state and hooks
+  const [approvalDialogOpen, setApprovalDialogOpen] = useState(false);
+  const [approvalAction, setApprovalAction] = useState<'approve' | 'reject'>('approve');
+  
+  const { approveCPO, submitForApproval, cancelCPO, isApproving, isSubmitting, isCancelling } = useCustomerPurchaseOrders();
+  const { createMaterialDemandFromCPO, isCreatingMaterialDemand } = useCpoWorkflow(cpoId!);
+  const { data: isAdmin } = useIsAdmin();
+  const { data: isSuperAdmin } = useSuperAdmin();
+  
+  // Determine available actions based on status and role
+  const canSubmitForApproval = cpo?.status === 'draft';
+  const canApprove = cpo?.status === 'pending_approval' && (isAdmin || isSuperAdmin);
+  const canProceedToNextStage = cpo?.status === 'confirmed';
+  const canCancel = ['draft', 'pending_approval', 'confirmed'].includes(cpo?.status || '') && cpo?.status !== 'cancelled';
+  
+  const handleSubmitForApproval = () => {
+    if (!cpoId) return;
+    submitForApproval.mutate(cpoId, {
+      onSuccess: () => toast.success("CPO submitted for approval"),
+    });
+  };
+  
+  const handleApprovalSubmit = (action: 'approved' | 'rejected', comments?: string) => {
+    if (!cpoId) return;
+    approveCPO.mutate(
+      { id: cpoId, action, comments },
+      { onSuccess: () => setApprovalDialogOpen(false) }
+    );
+  };
+  
+  const handleCancel = () => {
+    if (!cpoId) return;
+    if (confirm("Are you sure you want to cancel this Customer PO?")) {
+      cancelCPO.mutate({ id: cpoId, reason: "Cancelled by user" });
+    }
+  };
+  
+  const handleMaterialDemandPlanning = () => {
+    if (!cpoId) return;
+    createMaterialDemandFromCPO.mutate({
+      cpoId,
+      analysisDate: new Date().toISOString().split('T')[0]
+    });
+  };
 
   if (isLoading) {
     return (
@@ -349,6 +403,72 @@ export default function CustomerPoView() {
         </Card>
       </div>
 
+      {/* Action Buttons Card */}
+      {(canSubmitForApproval || canApprove || canProceedToNextStage || canCancel) && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg">Actions</CardTitle>
+            <CardDescription>Available actions for this Customer PO</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-wrap gap-2">
+              {/* Submit for Approval - for draft CPOs */}
+              {canSubmitForApproval && (
+                <Button onClick={handleSubmitForApproval} disabled={isSubmitting}>
+                  <Send className="h-4 w-4 mr-2" />
+                  {isSubmitting ? 'Submitting...' : 'Submit for Approval'}
+                </Button>
+              )}
+              
+              {/* Approve - for managers on pending_approval CPOs */}
+              {canApprove && (
+                <Button 
+                  onClick={() => { 
+                    setApprovalAction('approve'); 
+                    setApprovalDialogOpen(true); 
+                  }}
+                  disabled={isApproving}
+                >
+                  <CheckCircle2 className="h-4 w-4 mr-2" />
+                  Approve
+                </Button>
+              )}
+              
+              {/* Reject - for managers on pending_approval CPOs */}
+              {canApprove && (
+                <Button 
+                  variant="destructive" 
+                  onClick={() => { 
+                    setApprovalAction('reject'); 
+                    setApprovalDialogOpen(true); 
+                  }}
+                  disabled={isApproving}
+                >
+                  <XCircle className="h-4 w-4 mr-2" />
+                  Reject
+                </Button>
+              )}
+              
+              {/* Next stage actions - for confirmed CPOs */}
+              {canProceedToNextStage && (
+                <Button variant="outline" onClick={handleMaterialDemandPlanning} disabled={isCreatingMaterialDemand}>
+                  <TrendingUp className="h-4 w-4 mr-2" />
+                  {isCreatingMaterialDemand ? 'Processing...' : 'Material Demand Planning'}
+                </Button>
+              )}
+              
+              {/* Cancel - for appropriate statuses */}
+              {canCancel && (
+                <Button variant="outline" className="text-destructive hover:text-destructive" onClick={handleCancel} disabled={isCancelling}>
+                  <Ban className="h-4 w-4 mr-2" />
+                  {isCancelling ? 'Cancelling...' : 'Cancel Order'}
+                </Button>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Tabs */}
       <Tabs defaultValue="overview" className="space-y-4">
         <TabsList>
@@ -583,6 +703,17 @@ export default function CustomerPoView() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* CPO Approval Dialog */}
+      <CpoApprovalDialog
+        open={approvalDialogOpen}
+        onOpenChange={setApprovalDialogOpen}
+        onApprove={(comments) => handleApprovalSubmit('approved', comments)}
+        onReject={(comments) => handleApprovalSubmit('rejected', comments)}
+        isLoading={isApproving}
+        action={approvalAction}
+        cpoNumber={cpo?.cpo_number || ''}
+      />
     </div>
   );
 }
