@@ -31,7 +31,9 @@ import { useToast } from "@/hooks/use-toast";
 import { useCompanies } from "@/hooks/useCompanies";
 import { useRoles, useCreateUser } from "@/hooks/useUsers";
 import { useRoleModules, useAssignModulesToUser } from "@/hooks/useModuleAccess";
+import { useAssignCompaniesToUser } from "@/hooks/useUserCompanyAccess";
 import { ModuleAccessEditor, ModuleAccessState } from "./ModuleAccessEditor";
+import { CompanyAccessSelector } from "./CompanyAccessSelector";
 
 const userSchema = z.object({
   firstName: z.string().min(1, "First name is required"),
@@ -57,6 +59,7 @@ export const AddUserDialog: React.FC<AddUserDialogProps> = ({
   onUserAdded,
 }) => {
   const [selectedRole, setSelectedRole] = useState<string>("");
+  const [additionalCompanyIds, setAdditionalCompanyIds] = useState<string[]>([]);
   const [moduleAccessState, setModuleAccessState] = useState<ModuleAccessState>({
     inheritedModules: {},
     grantedSubmodules: {},
@@ -69,6 +72,7 @@ export const AddUserDialog: React.FC<AddUserDialogProps> = ({
   const { data: roleModules = [] } = useRoleModules(selectedRole || undefined);
   const createUserMutation = useCreateUser();
   const assignModulesToUser = useAssignModulesToUser();
+  const assignCompaniesToUser = useAssignCompaniesToUser();
 
   const form = useForm<UserFormData>({
     resolver: zodResolver(userSchema),
@@ -82,6 +86,10 @@ export const AddUserDialog: React.FC<AddUserDialogProps> = ({
       department: "",
     },
   });
+
+  // Check if the selected role is admin or super_admin
+  const selectedRoleData = roles?.find(r => r.id === selectedRole);
+  const isAdminRole = selectedRoleData?.app_role === 'admin' || selectedRoleData?.app_role === 'super_admin';
 
   // Update inherited modules when role changes
   useEffect(() => {
@@ -115,6 +123,14 @@ export const AddUserDialog: React.FC<AddUserDialogProps> = ({
 
       const userId = result?.id;
       if (userId) {
+        // Save additional company access for admin users
+        if (isAdminRole && additionalCompanyIds.length > 0) {
+          await assignCompaniesToUser.mutateAsync({
+            userId,
+            companyIds: additionalCompanyIds,
+          });
+        }
+
         // Save granted submodules
         for (const [moduleKey, submodules] of Object.entries(moduleAccessState.grantedSubmodules)) {
           if (submodules.length > 0) {
@@ -147,6 +163,7 @@ export const AddUserDialog: React.FC<AddUserDialogProps> = ({
 
       form.reset();
       setSelectedRole("");
+      setAdditionalCompanyIds([]);
       setModuleAccessState({
         inheritedModules: {},
         grantedSubmodules: {},
@@ -172,6 +189,11 @@ export const AddUserDialog: React.FC<AddUserDialogProps> = ({
       grantedSubmodules: {},
       deniedSubmodules: {},
     }));
+    // Reset additional companies if switching away from admin role
+    const newRoleData = roles?.find(r => r.id === roleId);
+    if (newRoleData?.app_role !== 'admin' && newRoleData?.app_role !== 'super_admin') {
+      setAdditionalCompanyIds([]);
+    }
   };
 
   const handleGrantChange = (moduleKey: string, submoduleKey: string, granted: boolean) => {
@@ -229,6 +251,8 @@ export const AddUserDialog: React.FC<AddUserDialogProps> = ({
       return { ...prev, grantedSubmodules: newGranted, deniedSubmodules: newDenied };
     });
   };
+
+  const primaryCompanyId = form.watch("company");
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -314,31 +338,6 @@ export const AddUserDialog: React.FC<AddUserDialogProps> = ({
 
             <FormField
               control={form.control}
-              name="company"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Company</FormLabel>
-                  <FormControl>
-                    <Select value={field.value} onValueChange={field.onChange}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select company" />
-                      </SelectTrigger>
-                      <SelectContent className="bg-background border shadow-md z-50">
-                        {companies?.map((company) => (
-                          <SelectItem key={company.id} value={company.id}>
-                            {company.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
               name="role"
               render={({ field }) => (
                 <FormItem>
@@ -364,6 +363,53 @@ export const AddUserDialog: React.FC<AddUserDialogProps> = ({
                 </FormItem>
               )}
             />
+
+            <FormField
+              control={form.control}
+              name="company"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Primary Company</FormLabel>
+                  <FormControl>
+                    <Select value={field.value} onValueChange={field.onChange}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select primary company" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-background border shadow-md z-50">
+                        {companies?.map((company) => (
+                          <SelectItem key={company.id} value={company.id}>
+                            {company.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </FormControl>
+                  <FormDescription>
+                    The user's main company affiliation.
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            {/* Additional Company Access - Only shown for admin roles */}
+            {isAdminRole && companies && companies.length > 1 && (
+              <div className="space-y-3">
+                <div>
+                  <FormLabel>Additional Company Access</FormLabel>
+                  <FormDescription>
+                    Grant this admin user access to additional companies beyond their primary company.
+                  </FormDescription>
+                </div>
+                
+                <CompanyAccessSelector
+                  companies={companies}
+                  primaryCompanyId={primaryCompanyId}
+                  selectedCompanyIds={additionalCompanyIds}
+                  onSelectionChange={setAdditionalCompanyIds}
+                />
+              </div>
+            )}
 
             <div className="space-y-3">
               <div>
