@@ -21,7 +21,7 @@ export function useCompanies() {
     isLoading: isQueryLoading,
     error
   } = useQuery({
-    queryKey: ['companies', isSuperAdmin, isAdmin, userProfile?.company_id],
+    queryKey: ['companies', isSuperAdmin, isAdmin, userProfile?.company_id, userProfile?.user_id],
     enabled: dependenciesReady,
     staleTime: 0, // Always consider data stale to ensure fresh fetch
     refetchOnMount: 'always', // Force refetch when component mounts
@@ -36,11 +36,45 @@ export function useCompanies() {
         .select('*')
         .order('created_at', { ascending: false });
 
-      // Admins (both super_admin and admin) see ALL companies
-      if (isSuperAdmin === true || isAdmin === true) {
-        console.log('[useCompanies] Admin user - fetching ALL companies');
+      // Super admins see ALL companies
+      if (isSuperAdmin === true) {
+        console.log('[useCompanies] Super admin - fetching ALL companies');
         // No filter applied
-      } else if (userProfile?.company_id) {
+      } 
+      // Regular admins see only their approved companies (primary + user_company_access)
+      else if (isAdmin === true) {
+        console.log('[useCompanies] Admin user - fetching approved companies');
+        
+        // Fetch user's additional company access
+        const { data: accessData } = await supabase
+          .from('user_company_access')
+          .select('company_id')
+          .eq('user_id', user.id);
+        
+        // Build list of accessible company IDs
+        const accessibleCompanyIds = new Set<string>();
+        
+        // Add primary company
+        if (userProfile?.company_id) {
+          accessibleCompanyIds.add(userProfile.company_id);
+        }
+        
+        // Add additional companies from user_company_access
+        accessData?.forEach(access => {
+          accessibleCompanyIds.add(access.company_id);
+        });
+        
+        console.log('[useCompanies] Admin accessible companies:', Array.from(accessibleCompanyIds));
+        
+        if (accessibleCompanyIds.size > 0) {
+          query = query.in('id', Array.from(accessibleCompanyIds));
+        } else if (userProfile?.company_id) {
+          // Fallback to primary company only
+          query = query.eq('id', userProfile.company_id);
+        }
+      } 
+      // Regular users see only their company
+      else if (userProfile?.company_id) {
         console.log('[useCompanies] Regular user - filtering to company:', userProfile.company_id);
         query = query.eq('id', userProfile.company_id);
       }
