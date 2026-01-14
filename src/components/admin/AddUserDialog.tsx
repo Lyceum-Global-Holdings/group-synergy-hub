@@ -91,6 +91,9 @@ export const AddUserDialog: React.FC<AddUserDialogProps> = ({
   const selectedRoleData = roles?.find(r => r.id === selectedRole);
   const isAdminRole = selectedRoleData?.app_role === 'admin' || selectedRoleData?.app_role === 'super_admin';
 
+  // Create a stable key for roleModules to prevent infinite loops
+  const roleModulesKey = JSON.stringify(roleModules.map(rm => ({ key: rm.module_key, subs: rm.submodules })));
+
   // Update inherited modules when role changes
   useEffect(() => {
     if (roleModules.length > 0) {
@@ -98,17 +101,26 @@ export const AddUserDialog: React.FC<AddUserDialogProps> = ({
       roleModules.forEach(rm => {
         inherited[rm.module_key] = rm.submodules || [];
       });
-      setModuleAccessState(prev => ({
-        ...prev,
-        inheritedModules: inherited,
-      }));
+      setModuleAccessState(prev => {
+        // Only update if actually different to prevent unnecessary re-renders
+        const prevKey = JSON.stringify(prev.inheritedModules);
+        const newKey = JSON.stringify(inherited);
+        if (prevKey === newKey) return prev;
+        return {
+          ...prev,
+          inheritedModules: inherited,
+        };
+      });
     } else {
-      setModuleAccessState(prev => ({
-        ...prev,
-        inheritedModules: {},
-      }));
+      setModuleAccessState(prev => {
+        if (Object.keys(prev.inheritedModules).length === 0) return prev;
+        return {
+          ...prev,
+          inheritedModules: {},
+        };
+      });
     }
-  }, [roleModules]);
+  }, [roleModulesKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const onSubmit = async (data: UserFormData) => {
     try {
