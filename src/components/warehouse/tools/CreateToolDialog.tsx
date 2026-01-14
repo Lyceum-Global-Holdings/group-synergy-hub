@@ -97,7 +97,7 @@ export function CreateToolDialog({ open, onOpenChange }: CreateToolDialogProps) 
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="w-[95vw] max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Add New Tool</DialogTitle>
           <DialogDescription>
@@ -106,7 +106,7 @@ export function CreateToolDialog({ open, onOpenChange }: CreateToolDialogProps) 
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="tool_code">Tool Code</Label>
               <Input
@@ -151,7 +151,7 @@ export function CreateToolDialog({ open, onOpenChange }: CreateToolDialogProps) 
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="category_id">Category</Label>
               <Select
@@ -209,7 +209,7 @@ export function CreateToolDialog({ open, onOpenChange }: CreateToolDialogProps) 
             </Select>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="condition">Condition</Label>
               <Select
