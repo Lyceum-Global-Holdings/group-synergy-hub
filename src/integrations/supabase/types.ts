@@ -11763,6 +11763,41 @@ export type Database = {
           },
         ]
       }
+      user_company_access: {
+        Row: {
+          access_type: string
+          company_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          user_id: string
+        }
+        Insert: {
+          access_type?: string
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          user_id: string
+        }
+        Update: {
+          access_type?: string
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_company_access_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_location_assignments: {
         Row: {
           company_id: string | null
@@ -13123,6 +13158,10 @@ export type Database = {
       update_reservation_on_issue: {
         Args: { p_quantity_issued: number; p_reservation_id: string }
         Returns: undefined
+      }
+      user_has_company_access: {
+        Args: { _company_id: string; _user_id: string }
+        Returns: boolean
       }
       user_has_location_access: {
         Args: { _location_id: string; _user_id: string }
