@@ -2,24 +2,26 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Company, CreateCompanyData, UpdateCompanyData } from '@/types/company';
 import { useToast } from '@/hooks/use-toast';
-import { useSuperAdmin } from '@/hooks/useSuperAdmin';
+import { useSuperAdmin, useIsAdmin } from '@/hooks/useSuperAdmin';
 import { useCurrentUserProfile } from '@/hooks/useCurrentUserProfile';
 
 export function useCompanies() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { data: isSuperAdmin, isLoading: isSuperAdminLoading } = useSuperAdmin();
+  const { data: isAdmin, isLoading: isAdminLoading } = useIsAdmin();
   const { data: userProfile, isLoading: isProfileLoading } = useCurrentUserProfile();
 
-  // Wait until dependencies are loaded AND super admin status is definitively known
-  const dependenciesReady = !isSuperAdminLoading && !isProfileLoading && isSuperAdmin !== undefined;
+  // Wait until dependencies are loaded AND admin status is definitively known
+  const dependenciesReady = !isSuperAdminLoading && !isAdminLoading && !isProfileLoading && 
+    isSuperAdmin !== undefined && isAdmin !== undefined;
 
   const {
     data: companies = [],
     isLoading: isQueryLoading,
     error
   } = useQuery({
-    queryKey: ['companies', isSuperAdmin, userProfile?.company_id],
+    queryKey: ['companies', isSuperAdmin, isAdmin, userProfile?.company_id],
     enabled: dependenciesReady,
     staleTime: 0, // Always consider data stale to ensure fresh fetch
     refetchOnMount: 'always', // Force refetch when component mounts
@@ -27,16 +29,16 @@ export function useCompanies() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return [];
 
-      console.log('[useCompanies] Fetching - isSuperAdmin:', isSuperAdmin, 'company_id:', userProfile?.company_id);
+      console.log('[useCompanies] Fetching - isSuperAdmin:', isSuperAdmin, 'isAdmin:', isAdmin, 'company_id:', userProfile?.company_id);
 
       let query = supabase
         .from('companies')
         .select('*')
         .order('created_at', { ascending: false });
 
-      // EXPLICIT check: Super admins see ALL companies (no filter)
-      if (isSuperAdmin === true) {
-        console.log('[useCompanies] Super admin - fetching ALL companies');
+      // Admins (both super_admin and admin) see ALL companies
+      if (isSuperAdmin === true || isAdmin === true) {
+        console.log('[useCompanies] Admin user - fetching ALL companies');
         // No filter applied
       } else if (userProfile?.company_id) {
         console.log('[useCompanies] Regular user - filtering to company:', userProfile.company_id);
