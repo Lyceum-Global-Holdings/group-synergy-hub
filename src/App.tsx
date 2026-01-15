@@ -1,4 +1,5 @@
-// App version: 1.0.1 - Clean rebuild trigger
+// App version: 1.0.2 - Code splitting for performance
+import { Suspense, lazy } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -9,66 +10,69 @@ import { CompanyProvider } from "@/contexts/CompanyContext";
 import ProtectedRoute from "./components/common/ProtectedRoute";
 import { AdminRoute } from "./components/auth/AdminRoute";
 import AppLayout from "./components/layout/AppLayout";
-import Dashboard from "./pages/Dashboard";
-import CompanyManagement from "./pages/admin/CompanyManagement";
-import UserRoleManagement from "./pages/admin/UserRoleManagement";
-import ModuleAllocation from "./pages/admin/ModuleAllocation";
-import WarehouseManagement from "./pages/admin/WarehouseManagement";
-import PurchaseRequisition from "./pages/procurement/PurchaseRequisition";
-import PurchaseOrder from "./pages/procurement/PurchaseOrder";
-import BillOfMaterials from "./pages/procurement/BillOfMaterials";
-import CustomerMaster from "./pages/tuh-modules/CustomerMaster";
-import CustomerPO from "./pages/tuh-modules/CustomerPO";
-import CustomerPoView from "./pages/tuh-modules/CustomerPoView";
-import MaterialDemandPlanning from "./pages/procurement/MaterialDemandPlanning";
-import RfqRfp from "./pages/procurement/RfqRfp";
-import BlanketPurchaseOrder from "./pages/procurement/BlanketPurchaseOrder";
-import StockAdjustment from "./pages/warehouse/StockAdjustment";
-import { SupplierMaster } from "./pages/sourcing/SupplierMaster";
-import SupplierAllocation from "./pages/sourcing/SupplierAllocation";
-import SupplierScorecard from "./pages/sourcing/SupplierScorecard";
-import SupplierEvaluation from "./pages/sourcing/SupplierEvaluation";
-import SupplierRegistration from "./pages/sourcing/SupplierRegistration";
-import PublicSupplierRegistration from "./pages/PublicSupplierRegistration";
-import Contracts from "./pages/sourcing/Contracts";
-import SupplierBlacklist from "./pages/sourcing/SupplierBlacklist";
-import AssetManagement from "./pages/warehouse/AssetManagement";
-import ItemBinMaster from "./pages/warehouse/ItemBinMaster";
-import MaterialIssueReturn from "./pages/warehouse/MaterialIssueReturn";
-import FinishedGoods from "./pages/tuh-modules/FinishedGoods";
-import PickPackDispatch from "./pages/warehouse/PickPackDispatch";
-import Putaway from "./pages/warehouse/Putaway";
-import StockTransfer from "./pages/warehouse/StockTransfer";
-import CycleCount from "./pages/warehouse/CycleCount";
-import DeliveryOrder from "./pages/warehouse/DeliveryOrder";
-import GoodsReceiptNote from "./pages/warehouse/GoodsReceiptNote";
-import InventoryValuation from "./pages/warehouse/InventoryValuation";
-import PublicAssetView from "./pages/PublicAssetView";
-import ToolManagement from "./pages/warehouse/ToolManagement";
-import PoEmailApproval from "./pages/procurement/PoEmailApproval";
-import GeneralLedger from "./pages/finance/GeneralLedger";
-import Auth from "./pages/Auth";
-import NotFound from "./pages/NotFound";
-import Training from "./pages/admin/Training";
-import ModuleTrainings from "./pages/admin/training/ModuleTrainings";
-import VideoLibrary from "./pages/admin/training/VideoLibrary";
-import Documentation from "./pages/admin/training/Documentation";
-import TrainingProgress from "./pages/admin/training/TrainingProgress";
-import DashboardsKPIs from "./pages/management/DashboardsKPIs";
-import DashboardView from "./pages/management/DashboardView";
-import DashboardEdit from "./pages/management/DashboardEdit";
-import ApprovalConsole from "./pages/management/ApprovalConsole";
-import ProjectMaster from "./pages/construction/ProjectMaster";
-import WorkOrders from "./pages/construction/WorkOrders";
-import SiteManagement from "./pages/construction/SiteManagement";
-import ProgressTracking from "./pages/construction/ProgressTracking";
-import DailySiteReports from "./pages/construction/DailySiteReports";
-import ResourceAllocation from "./pages/construction/ResourceAllocation";
-import QualityControl from "./pages/construction/QualityControl";
-import SafetyManagement from "./pages/construction/SafetyManagement";
-import ProjectDocuments from "./pages/construction/ProjectDocuments";
-import ProjectBudgeting from "./pages/construction/ProjectBudgeting";
-import ReportsAnalytics from "./pages/construction/ReportsAnalytics";
+import { Loader2 } from "lucide-react";
+
+// Lazy load all page components for code splitting
+const Dashboard = lazy(() => import("./pages/Dashboard"));
+const CompanyManagement = lazy(() => import("./pages/admin/CompanyManagement"));
+const UserRoleManagement = lazy(() => import("./pages/admin/UserRoleManagement"));
+const ModuleAllocation = lazy(() => import("./pages/admin/ModuleAllocation"));
+const WarehouseManagement = lazy(() => import("./pages/admin/WarehouseManagement"));
+const PurchaseRequisition = lazy(() => import("./pages/procurement/PurchaseRequisition"));
+const PurchaseOrder = lazy(() => import("./pages/procurement/PurchaseOrder"));
+const BillOfMaterials = lazy(() => import("./pages/procurement/BillOfMaterials"));
+const CustomerMaster = lazy(() => import("./pages/tuh-modules/CustomerMaster"));
+const CustomerPO = lazy(() => import("./pages/tuh-modules/CustomerPO"));
+const CustomerPoView = lazy(() => import("./pages/tuh-modules/CustomerPoView"));
+const MaterialDemandPlanning = lazy(() => import("./pages/procurement/MaterialDemandPlanning"));
+const RfqRfp = lazy(() => import("./pages/procurement/RfqRfp"));
+const BlanketPurchaseOrder = lazy(() => import("./pages/procurement/BlanketPurchaseOrder"));
+const StockAdjustment = lazy(() => import("./pages/warehouse/StockAdjustment"));
+const SupplierMaster = lazy(() => import("./pages/sourcing/SupplierMaster").then(m => ({ default: m.SupplierMaster })));
+const SupplierAllocation = lazy(() => import("./pages/sourcing/SupplierAllocation"));
+const SupplierScorecard = lazy(() => import("./pages/sourcing/SupplierScorecard"));
+const SupplierEvaluation = lazy(() => import("./pages/sourcing/SupplierEvaluation"));
+const SupplierRegistration = lazy(() => import("./pages/sourcing/SupplierRegistration"));
+const PublicSupplierRegistration = lazy(() => import("./pages/PublicSupplierRegistration"));
+const Contracts = lazy(() => import("./pages/sourcing/Contracts"));
+const SupplierBlacklist = lazy(() => import("./pages/sourcing/SupplierBlacklist"));
+const AssetManagement = lazy(() => import("./pages/warehouse/AssetManagement"));
+const ItemBinMaster = lazy(() => import("./pages/warehouse/ItemBinMaster"));
+const MaterialIssueReturn = lazy(() => import("./pages/warehouse/MaterialIssueReturn"));
+const FinishedGoods = lazy(() => import("./pages/tuh-modules/FinishedGoods"));
+const PickPackDispatch = lazy(() => import("./pages/warehouse/PickPackDispatch"));
+const Putaway = lazy(() => import("./pages/warehouse/Putaway"));
+const StockTransfer = lazy(() => import("./pages/warehouse/StockTransfer"));
+const CycleCount = lazy(() => import("./pages/warehouse/CycleCount"));
+const DeliveryOrder = lazy(() => import("./pages/warehouse/DeliveryOrder"));
+const GoodsReceiptNote = lazy(() => import("./pages/warehouse/GoodsReceiptNote"));
+const InventoryValuation = lazy(() => import("./pages/warehouse/InventoryValuation"));
+const PublicAssetView = lazy(() => import("./pages/PublicAssetView"));
+const ToolManagement = lazy(() => import("./pages/warehouse/ToolManagement"));
+const PoEmailApproval = lazy(() => import("./pages/procurement/PoEmailApproval"));
+const GeneralLedger = lazy(() => import("./pages/finance/GeneralLedger"));
+const Auth = lazy(() => import("./pages/Auth"));
+const NotFound = lazy(() => import("./pages/NotFound"));
+const Training = lazy(() => import("./pages/admin/Training"));
+const ModuleTrainings = lazy(() => import("./pages/admin/training/ModuleTrainings"));
+const VideoLibrary = lazy(() => import("./pages/admin/training/VideoLibrary"));
+const Documentation = lazy(() => import("./pages/admin/training/Documentation"));
+const TrainingProgress = lazy(() => import("./pages/admin/training/TrainingProgress"));
+const DashboardsKPIs = lazy(() => import("./pages/management/DashboardsKPIs"));
+const DashboardView = lazy(() => import("./pages/management/DashboardView"));
+const DashboardEdit = lazy(() => import("./pages/management/DashboardEdit"));
+const ApprovalConsole = lazy(() => import("./pages/management/ApprovalConsole"));
+const ProjectMaster = lazy(() => import("./pages/construction/ProjectMaster"));
+const WorkOrders = lazy(() => import("./pages/construction/WorkOrders"));
+const SiteManagement = lazy(() => import("./pages/construction/SiteManagement"));
+const ProgressTracking = lazy(() => import("./pages/construction/ProgressTracking"));
+const DailySiteReports = lazy(() => import("./pages/construction/DailySiteReports"));
+const ResourceAllocation = lazy(() => import("./pages/construction/ResourceAllocation"));
+const QualityControl = lazy(() => import("./pages/construction/QualityControl"));
+const SafetyManagement = lazy(() => import("./pages/construction/SafetyManagement"));
+const ProjectDocuments = lazy(() => import("./pages/construction/ProjectDocuments"));
+const ProjectBudgeting = lazy(() => import("./pages/construction/ProjectBudgeting"));
+const ReportsAnalytics = lazy(() => import("./pages/construction/ReportsAnalytics"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -80,13 +84,22 @@ const queryClient = new QueryClient({
   },
 });
 
+// Loading fallback component
+const PageLoader = () => (
+  <div className="flex items-center justify-center min-h-screen">
+    <Loader2 className="h-8 w-8 animate-spin text-primary" />
+  </div>
+);
+
 // Protected layout wrapper component
 const ProtectedLayout = () => (
   <AuthProvider>
     <ProtectedRoute>
       <CompanyProvider>
         <AppLayout>
-          <Outlet />
+          <Suspense fallback={<PageLoader />}>
+            <Outlet />
+          </Suspense>
         </AppLayout>
       </CompanyProvider>
     </ProtectedRoute>
@@ -100,84 +113,86 @@ function App() {
         <Toaster />
         <Sonner />
         <BrowserRouter>
-          <Routes>
-            {/* Public routes - no auth required */}
-            <Route path="/auth" element={
-              <AuthProvider>
-                <Auth />
-              </AuthProvider>
-            } />
-            <Route path="/asset/:assetId" element={<PublicAssetView />} />
-            <Route path="/register-supplier" element={<PublicSupplierRegistration />} />
-            <Route path="/procurement/po-email-approval" element={<PoEmailApproval />} />
-            
-            {/* Protected routes - all wrapped with auth/company context */}
-            <Route element={<ProtectedLayout />}>
-              <Route path="/" element={<Dashboard />} />
+          <Suspense fallback={<PageLoader />}>
+            <Routes>
+              {/* Public routes - no auth required */}
+              <Route path="/auth" element={
+                <AuthProvider>
+                  <Auth />
+                </AuthProvider>
+              } />
+              <Route path="/asset/:assetId" element={<PublicAssetView />} />
+              <Route path="/register-supplier" element={<PublicSupplierRegistration />} />
+              <Route path="/procurement/po-email-approval" element={<PoEmailApproval />} />
               
-              {/* Admin routes - protected by AdminRoute */}
-              <Route path="/admin/companies" element={<AdminRoute><CompanyManagement /></AdminRoute>} />
-              <Route path="/admin/users-roles" element={<AdminRoute><UserRoleManagement /></AdminRoute>} />
-              <Route path="/admin/modules" element={<AdminRoute><ModuleAllocation /></AdminRoute>} />
-              <Route path="/admin/warehouse-management" element={<AdminRoute><WarehouseManagement /></AdminRoute>} />
-              <Route path="/admin/training" element={<Training />} />
-              <Route path="/admin/training/module-trainings" element={<ModuleTrainings />} />
-              <Route path="/admin/training/video-library" element={<VideoLibrary />} />
-              <Route path="/admin/training/documentation" element={<Documentation />} />
-              <Route path="/admin/training/training-progress" element={<TrainingProgress />} />
-              <Route path="/procurement/purchase-requisition" element={<PurchaseRequisition />} />
-              <Route path="/procurement/purchase-order" element={<PurchaseOrder />} />
-              <Route path="/tuh-modules/bill-of-materials" element={<BillOfMaterials />} />
-              <Route path="/tuh-modules/customer-master" element={<CustomerMaster />} />
-          <Route path="/tuh-modules/customer-po" element={<CustomerPO />} />
-          <Route path="/tuh-modules/customer-po/:cpoId" element={<CustomerPoView />} />
-              <Route path="/procurement/bill-of-materials" element={<BillOfMaterials />} />
-              <Route path="/procurement/material-demand" element={<MaterialDemandPlanning />} />
-              <Route path="/procurement/rfq-rfp" element={<RfqRfp />} />
-              <Route path="/procurement/blanket-po" element={<BlanketPurchaseOrder />} />
-              <Route path="/warehouse/stock-adjustment" element={<StockAdjustment />} />
-              <Route path="/warehouse/grn" element={<GoodsReceiptNote />} />
-              <Route path="/sourcing/supplier-master" element={<SupplierMaster />} />
-              <Route path="/sourcing/supplier-allocation" element={<SupplierAllocation />} />
-              <Route path="/sourcing/supplier-scorecard" element={<SupplierScorecard />} />
-              <Route path="/sourcing/supplier-evaluation" element={<SupplierEvaluation />} />
-              <Route path="/sourcing/supplier-registration" element={<SupplierRegistration />} />
-              <Route path="/sourcing/contracts" element={<Contracts />} />
-              <Route path="/sourcing/blacklist" element={<SupplierBlacklist />} />
-              <Route path="/warehouse/asset-management" element={<AssetManagement />} />
-              <Route path="/warehouse/tool-management" element={<ToolManagement />} />
-              <Route path="/warehouse/item-bin-master" element={<ItemBinMaster />} />
-              <Route path="/warehouse/material-issue" element={<MaterialIssueReturn />} />
-              <Route path="/tuh-modules/finished-goods" element={<FinishedGoods />} />
-              <Route path="/warehouse/pick-pack" element={<PickPackDispatch />} />
-              <Route path="/warehouse/putaway" element={<Putaway />} />
-              <Route path="/warehouse/stock-transfer" element={<StockTransfer />} />
-              <Route path="/warehouse/cycle-count" element={<CycleCount />} />
-              <Route path="/warehouse/delivery-order" element={<DeliveryOrder />} />
-              <Route path="/warehouse/inventory-valuation" element={<InventoryValuation />} />
-              <Route path="/finance/general-ledger" element={<GeneralLedger />} />
-              <Route path="/management/dashboards" element={<DashboardsKPIs />} />
-              <Route path="/management/dashboards/:id/edit" element={<DashboardEdit />} />
-              <Route path="/management/dashboards/:id" element={<DashboardView />} />
-              <Route path="/management/approvals" element={<ApprovalConsole />} />
+              {/* Protected routes - all wrapped with auth/company context */}
+              <Route element={<ProtectedLayout />}>
+                <Route path="/" element={<Dashboard />} />
+                
+                {/* Admin routes - protected by AdminRoute */}
+                <Route path="/admin/companies" element={<AdminRoute><CompanyManagement /></AdminRoute>} />
+                <Route path="/admin/users-roles" element={<AdminRoute><UserRoleManagement /></AdminRoute>} />
+                <Route path="/admin/modules" element={<AdminRoute><ModuleAllocation /></AdminRoute>} />
+                <Route path="/admin/warehouse-management" element={<AdminRoute><WarehouseManagement /></AdminRoute>} />
+                <Route path="/admin/training" element={<Training />} />
+                <Route path="/admin/training/module-trainings" element={<ModuleTrainings />} />
+                <Route path="/admin/training/video-library" element={<VideoLibrary />} />
+                <Route path="/admin/training/documentation" element={<Documentation />} />
+                <Route path="/admin/training/training-progress" element={<TrainingProgress />} />
+                <Route path="/procurement/purchase-requisition" element={<PurchaseRequisition />} />
+                <Route path="/procurement/purchase-order" element={<PurchaseOrder />} />
+                <Route path="/tuh-modules/bill-of-materials" element={<BillOfMaterials />} />
+                <Route path="/tuh-modules/customer-master" element={<CustomerMaster />} />
+                <Route path="/tuh-modules/customer-po" element={<CustomerPO />} />
+                <Route path="/tuh-modules/customer-po/:cpoId" element={<CustomerPoView />} />
+                <Route path="/procurement/bill-of-materials" element={<BillOfMaterials />} />
+                <Route path="/procurement/material-demand" element={<MaterialDemandPlanning />} />
+                <Route path="/procurement/rfq-rfp" element={<RfqRfp />} />
+                <Route path="/procurement/blanket-po" element={<BlanketPurchaseOrder />} />
+                <Route path="/warehouse/stock-adjustment" element={<StockAdjustment />} />
+                <Route path="/warehouse/grn" element={<GoodsReceiptNote />} />
+                <Route path="/sourcing/supplier-master" element={<SupplierMaster />} />
+                <Route path="/sourcing/supplier-allocation" element={<SupplierAllocation />} />
+                <Route path="/sourcing/supplier-scorecard" element={<SupplierScorecard />} />
+                <Route path="/sourcing/supplier-evaluation" element={<SupplierEvaluation />} />
+                <Route path="/sourcing/supplier-registration" element={<SupplierRegistration />} />
+                <Route path="/sourcing/contracts" element={<Contracts />} />
+                <Route path="/sourcing/blacklist" element={<SupplierBlacklist />} />
+                <Route path="/warehouse/asset-management" element={<AssetManagement />} />
+                <Route path="/warehouse/tool-management" element={<ToolManagement />} />
+                <Route path="/warehouse/item-bin-master" element={<ItemBinMaster />} />
+                <Route path="/warehouse/material-issue" element={<MaterialIssueReturn />} />
+                <Route path="/tuh-modules/finished-goods" element={<FinishedGoods />} />
+                <Route path="/warehouse/pick-pack" element={<PickPackDispatch />} />
+                <Route path="/warehouse/putaway" element={<Putaway />} />
+                <Route path="/warehouse/stock-transfer" element={<StockTransfer />} />
+                <Route path="/warehouse/cycle-count" element={<CycleCount />} />
+                <Route path="/warehouse/delivery-order" element={<DeliveryOrder />} />
+                <Route path="/warehouse/inventory-valuation" element={<InventoryValuation />} />
+                <Route path="/finance/general-ledger" element={<GeneralLedger />} />
+                <Route path="/management/dashboards" element={<DashboardsKPIs />} />
+                <Route path="/management/dashboards/:id/edit" element={<DashboardEdit />} />
+                <Route path="/management/dashboards/:id" element={<DashboardView />} />
+                <Route path="/management/approvals" element={<ApprovalConsole />} />
+                
+                {/* Construction routes */}
+                <Route path="/construction/project-master" element={<ProjectMaster />} />
+                <Route path="/construction/work-orders" element={<WorkOrders />} />
+                <Route path="/construction/site-management" element={<SiteManagement />} />
+                <Route path="/construction/progress-tracking" element={<ProgressTracking />} />
+                <Route path="/construction/daily-reports" element={<DailySiteReports />} />
+                <Route path="/construction/resource-allocation" element={<ResourceAllocation />} />
+                <Route path="/construction/quality-control" element={<QualityControl />} />
+                <Route path="/construction/safety-management" element={<SafetyManagement />} />
+                <Route path="/construction/project-documents" element={<ProjectDocuments />} />
+                <Route path="/construction/project-budgeting" element={<ProjectBudgeting />} />
+                <Route path="/construction/reports-analytics" element={<ReportsAnalytics />} />
+              </Route>
               
-              {/* Construction routes */}
-              <Route path="/construction/project-master" element={<ProjectMaster />} />
-              <Route path="/construction/work-orders" element={<WorkOrders />} />
-              <Route path="/construction/site-management" element={<SiteManagement />} />
-              <Route path="/construction/progress-tracking" element={<ProgressTracking />} />
-              <Route path="/construction/daily-reports" element={<DailySiteReports />} />
-              <Route path="/construction/resource-allocation" element={<ResourceAllocation />} />
-              <Route path="/construction/quality-control" element={<QualityControl />} />
-              <Route path="/construction/safety-management" element={<SafetyManagement />} />
-              <Route path="/construction/project-documents" element={<ProjectDocuments />} />
-              <Route path="/construction/project-budgeting" element={<ProjectBudgeting />} />
-              <Route path="/construction/reports-analytics" element={<ReportsAnalytics />} />
-            </Route>
-            
-            {/* Catch-all 404 route */}
-            <Route path="*" element={<NotFound />} />
-          </Routes>
+              {/* Catch-all 404 route */}
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </Suspense>
         </BrowserRouter>
       </TooltipProvider>
     </QueryClientProvider>
