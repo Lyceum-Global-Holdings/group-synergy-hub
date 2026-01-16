@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCreateInventoryMaster, useUpdateInventoryMaster } from "@/hooks/construction/useInventoryMaster";
-import type { InventoryMaster } from "@/types/construction";
+import type { InventoryMaster, CreateInventoryMasterData } from "@/types/construction";
 import { useEffect } from "react";
 
 const formSchema = z.object({
@@ -51,7 +51,7 @@ export function InventoryMasterDialog({ open, onOpenChange, item }: InventoryMas
     if (item) {
       await updateMutation.mutateAsync({ id: item.id, ...data });
     } else {
-      await createMutation.mutateAsync(data);
+      await createMutation.mutateAsync(data as CreateInventoryMasterData);
     }
     onOpenChange(false);
   };
