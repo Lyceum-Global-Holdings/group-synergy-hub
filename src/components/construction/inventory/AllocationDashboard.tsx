@@ -1,0 +1,204 @@
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Package, MapPin, ArrowRightLeft, Wrench, AlertTriangle } from "lucide-react";
+import { useConstructionResources } from "@/hooks/construction/useConstructionResources";
+import { useInventoryMaster } from "@/hooks/construction/useInventoryMaster";
+
+export function AllocationDashboard() {
+  const { data: resources } = useConstructionResources();
+  const { data: inventoryMaster } = useInventoryMaster();
+
+  // Filter for material resources only
+  const materialResources = resources?.filter((r) => r.resource_type === "material") || [];
+  
+  // Calculate KPIs
+  const totalAllocated = materialResources.reduce((sum, r) => sum + (r.quantity_allocated || 0), 0);
+  const totalUsed = materialResources.reduce((sum, r) => sum + (r.quantity_used || 0), 0);
+  const activeAllocations = materialResources.filter(r => r.status === "active").length;
+  const totalMasterItems = inventoryMaster?.length || 0;
+
+  const kpiCards = [
+    {
+      title: "Total Items Allocated",
+      value: totalAllocated.toLocaleString(),
+      icon: Package,
+      description: "Across all projects",
+      color: "text-blue-500",
+    },
+    {
+      title: "Total Items Used",
+      value: totalUsed.toLocaleString(),
+      icon: Package,
+      description: "Consumed from allocation",
+      color: "text-green-500",
+    },
+    {
+      title: "Active Allocations",
+      value: activeAllocations.toString(),
+      icon: ArrowRightLeft,
+      description: "Currently allocated",
+      color: "text-purple-500",
+    },
+    {
+      title: "Master Items",
+      value: totalMasterItems.toString(),
+      icon: Package,
+      description: "In inventory catalog",
+      color: "text-orange-500",
+    },
+  ];
+
+  // Recent allocations
+  const recentAllocations = materialResources.slice(0, 5);
+
+  // Low stock alerts (items where used > 80% of allocated)
+  const lowStockItems = materialResources.filter(r => {
+    const allocated = r.quantity_allocated || 0;
+    const used = r.quantity_used || 0;
+    return allocated > 0 && (used / allocated) > 0.8;
+  });
+
+  return (
+    <div className="space-y-6">
+      {/* KPI Cards */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        {kpiCards.map((kpi) => (
+          <Card key={kpi.title}>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">{kpi.title}</CardTitle>
+              <kpi.icon className={`h-4 w-4 ${kpi.color}`} />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{kpi.value}</div>
+              <p className="text-xs text-muted-foreground">{kpi.description}</p>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      <div className="grid gap-6 md:grid-cols-2">
+        {/* Recent Allocations */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Package className="h-5 w-5" />
+              Recent Allocations
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {recentAllocations.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-4">
+                No allocations found
+              </p>
+            ) : (
+              <div className="space-y-3">
+                {recentAllocations.map((allocation) => (
+                  <div
+                    key={allocation.id}
+                    className="flex items-center justify-between p-3 rounded-lg border bg-card"
+                  >
+                    <div>
+                      <p className="font-medium text-sm">{allocation.resource_name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {allocation.project?.project_name || "Unassigned"}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm font-medium">
+                        {allocation.quantity_used || 0} / {allocation.quantity_allocated || 0}
+                      </p>
+                      <Badge variant="outline" className="text-xs">
+                        {allocation.status}
+                      </Badge>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Low Stock Alerts */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-amber-500" />
+              Low Stock Alerts
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {lowStockItems.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-4">
+                No low stock alerts
+              </p>
+            ) : (
+              <div className="space-y-3">
+                {lowStockItems.map((item) => {
+                  const allocated = item.quantity_allocated || 0;
+                  const used = item.quantity_used || 0;
+                  const percentage = allocated > 0 ? Math.round((used / allocated) * 100) : 0;
+                  
+                  return (
+                    <div
+                      key={item.id}
+                      className="flex items-center justify-between p-3 rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-900 dark:bg-amber-950"
+                    >
+                      <div>
+                        <p className="font-medium text-sm">{item.resource_name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {item.project?.project_name || "Unassigned"}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm font-medium text-amber-600 dark:text-amber-400">
+                          {percentage}% used
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {allocated - used} remaining
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Quick Stats */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Inventory Overview</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-4 md:grid-cols-3">
+            <div className="flex items-center gap-3 p-4 rounded-lg bg-muted/50">
+              <MapPin className="h-8 w-8 text-muted-foreground" />
+              <div>
+                <p className="text-2xl font-bold">
+                  {new Set(materialResources.map(r => r.project_id).filter(Boolean)).size}
+                </p>
+                <p className="text-sm text-muted-foreground">Projects with Inventory</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 p-4 rounded-lg bg-muted/50">
+              <ArrowRightLeft className="h-8 w-8 text-muted-foreground" />
+              <div>
+                <p className="text-2xl font-bold">0</p>
+                <p className="text-sm text-muted-foreground">Pending Transfers</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 p-4 rounded-lg bg-muted/50">
+              <Wrench className="h-8 w-8 text-muted-foreground" />
+              <div>
+                <p className="text-2xl font-bold">0</p>
+                <p className="text-sm text-muted-foreground">Items in Repair</p>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
