@@ -225,10 +225,6 @@ export function InventoryWiseView() {
             <div className="flex items-center justify-center py-8">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
             </div>
-          ) : filteredData.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              No inventory items found
-            </div>
           ) : (
             <Table>
               <TableHeader>
@@ -243,46 +239,54 @@ export function InventoryWiseView() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredData.map((row) => (
-                  <TableRow key={row.id}>
-                    <TableCell className="font-medium">{row.itemName}</TableCell>
-                    <TableCell>
-                      <Badge variant="outline">
-                        {INVENTORY_SECTIONS.find(s => s.value === row.section)?.label || row.section}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="secondary">
-                        {INVENTORY_CATEGORIES.find(c => c.value === row.category)?.label || row.category}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right font-medium">
-                      {row.totalQty.toLocaleString()}
-                    </TableCell>
-                    <TableCell>{getStatusBadge(row.status)}</TableCell>
-                    <TableCell>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-auto p-1 text-sm"
-                        onClick={() => handleViewLocations(row.itemName, row.locations)}
-                      >
-                        <MapPin className="h-3 w-3 mr-1" />
-                        {row.locations.length} location{row.locations.length !== 1 ? "s" : ""}
-                      </Button>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleViewLocations(row.itemName, row.locations)}
-                      >
-                        <Eye className="h-4 w-4 mr-1" />
-                        View Details
-                      </Button>
+                {filteredData.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                      No inventory items found
                     </TableCell>
                   </TableRow>
-                ))}
+                ) : (
+                  filteredData.map((row) => (
+                    <TableRow key={row.id}>
+                      <TableCell className="font-medium">{row.itemName}</TableCell>
+                      <TableCell>
+                        <Badge variant="outline">
+                          {INVENTORY_SECTIONS.find(s => s.value === row.section)?.label || row.section}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="secondary">
+                          {INVENTORY_CATEGORIES.find(c => c.value === row.category)?.label || row.category}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right font-medium">
+                        {row.totalQty.toLocaleString()}
+                      </TableCell>
+                      <TableCell>{getStatusBadge(row.status)}</TableCell>
+                      <TableCell>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-auto p-1 text-sm"
+                          onClick={() => handleViewLocations(row.itemName, row.locations)}
+                        >
+                          <MapPin className="h-3 w-3 mr-1" />
+                          {row.locations.length} location{row.locations.length !== 1 ? "s" : ""}
+                        </Button>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleViewLocations(row.itemName, row.locations)}
+                        >
+                          <Eye className="h-4 w-4 mr-1" />
+                          View Details
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
               </TableBody>
             </Table>
           )}
