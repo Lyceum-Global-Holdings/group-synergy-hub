@@ -233,6 +233,7 @@ export function InventoryWiseView() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead>Item Name</TableHead>
                   <TableHead>Section</TableHead>
                   <TableHead>Category</TableHead>
                   <TableHead className="text-right">Total Qty</TableHead>
@@ -244,6 +245,7 @@ export function InventoryWiseView() {
               <TableBody>
                 {filteredData.map((row) => (
                   <TableRow key={row.id}>
+                    <TableCell className="font-medium">{row.itemName}</TableCell>
                     <TableCell>
                       <Badge variant="outline">
                         {INVENTORY_SECTIONS.find(s => s.value === row.section)?.label || row.section}
