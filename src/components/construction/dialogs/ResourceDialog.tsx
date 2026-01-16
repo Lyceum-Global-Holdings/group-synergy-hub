@@ -51,9 +51,10 @@ interface ResourceDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   resource?: ConstructionResource | null;
+  defaultResourceType?: string;
 }
 
-export function ResourceDialog({ open, onOpenChange, resource }: ResourceDialogProps) {
+export function ResourceDialog({ open, onOpenChange, resource, defaultResourceType }: ResourceDialogProps) {
   const { data: projects } = useProjects();
   const { selectedCompany } = useCompany();
   const createResource = useCreateConstructionResource();
@@ -92,7 +93,7 @@ export function ResourceDialog({ open, onOpenChange, resource }: ResourceDialogP
     } else {
       form.reset({
         project_id: "",
-        resource_type: "",
+        resource_type: defaultResourceType || "",
         resource_name: "",
         description: "",
         unit: "",
