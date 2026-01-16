@@ -2425,6 +2425,121 @@ export type Database = {
           },
         ]
       }
+      construction_inventory_master: {
+        Row: {
+          category: string | null
+          company_id: string | null
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          item_code: string | null
+          item_name: string
+          notes: string | null
+          status: string
+          unit: string | null
+          unit_cost: number | null
+          updated_at: string
+        }
+        Insert: {
+          category?: string | null
+          company_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          item_code?: string | null
+          item_name: string
+          notes?: string | null
+          status?: string
+          unit?: string | null
+          unit_cost?: number | null
+          updated_at?: string
+        }
+        Update: {
+          category?: string | null
+          company_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          item_code?: string | null
+          item_name?: string
+          notes?: string | null
+          status?: string
+          unit?: string | null
+          unit_cost?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "construction_inventory_master_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      construction_labour_master: {
+        Row: {
+          company_id: string | null
+          contact_number: string | null
+          created_at: string
+          created_by: string | null
+          daily_rate: number | null
+          email: string | null
+          hourly_rate: number | null
+          id: string
+          name: string
+          notes: string | null
+          skill_level: string | null
+          status: string
+          trade: string | null
+          updated_at: string
+        }
+        Insert: {
+          company_id?: string | null
+          contact_number?: string | null
+          created_at?: string
+          created_by?: string | null
+          daily_rate?: number | null
+          email?: string | null
+          hourly_rate?: number | null
+          id?: string
+          name: string
+          notes?: string | null
+          skill_level?: string | null
+          status?: string
+          trade?: string | null
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string | null
+          contact_number?: string | null
+          created_at?: string
+          created_by?: string | null
+          daily_rate?: number | null
+          email?: string | null
+          hourly_rate?: number | null
+          id?: string
+          name?: string
+          notes?: string | null
+          skill_level?: string | null
+          status?: string
+          trade?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "construction_labour_master_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       construction_projects: {
         Row: {
           actual_cost: number | null
@@ -2610,6 +2725,68 @@ export type Database = {
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "construction_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      construction_subcontractor_master: {
+        Row: {
+          address: string | null
+          company_id: string | null
+          contact_person: string | null
+          created_at: string
+          created_by: string | null
+          email: string | null
+          id: string
+          insurance_expiry: string | null
+          license_number: string | null
+          name: string
+          notes: string | null
+          phone: string | null
+          status: string
+          trade: string | null
+          updated_at: string
+        }
+        Insert: {
+          address?: string | null
+          company_id?: string | null
+          contact_person?: string | null
+          created_at?: string
+          created_by?: string | null
+          email?: string | null
+          id?: string
+          insurance_expiry?: string | null
+          license_number?: string | null
+          name: string
+          notes?: string | null
+          phone?: string | null
+          status?: string
+          trade?: string | null
+          updated_at?: string
+        }
+        Update: {
+          address?: string | null
+          company_id?: string | null
+          contact_person?: string | null
+          created_at?: string
+          created_by?: string | null
+          email?: string | null
+          id?: string
+          insurance_expiry?: string | null
+          license_number?: string | null
+          name?: string
+          notes?: string | null
+          phone?: string | null
+          status?: string
+          trade?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "construction_subcontractor_master_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
             referencedColumns: ["id"]
           },
         ]

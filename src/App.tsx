@@ -68,11 +68,11 @@ const SiteManagement = lazy(() => import("./pages/construction/SiteManagement"))
 const ProgressTracking = lazy(() => import("./pages/construction/ProgressTracking"));
 const DailySiteReports = lazy(() => import("./pages/construction/DailySiteReports"));
 const ResourceAllocation = lazy(() => import("./pages/construction/ResourceAllocation"));
+const LabourResources = lazy(() => import("./pages/construction/resources/LabourResources"));
+const InventoryItems = lazy(() => import("./pages/construction/resources/InventoryItems"));
+const SubcontractorResources = lazy(() => import("./pages/construction/resources/SubcontractorResources"));
 const QualityControl = lazy(() => import("./pages/construction/QualityControl"));
 const SafetyManagement = lazy(() => import("./pages/construction/SafetyManagement"));
-const ProjectDocuments = lazy(() => import("./pages/construction/ProjectDocuments"));
-const ProjectBudgeting = lazy(() => import("./pages/construction/ProjectBudgeting"));
-const ReportsAnalytics = lazy(() => import("./pages/construction/ReportsAnalytics"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -182,11 +182,11 @@ function App() {
                 <Route path="/construction/progress-tracking" element={<ProgressTracking />} />
                 <Route path="/construction/daily-reports" element={<DailySiteReports />} />
                 <Route path="/construction/resource-allocation" element={<ResourceAllocation />} />
+                <Route path="/construction/resource-allocation/labour" element={<LabourResources />} />
+                <Route path="/construction/resource-allocation/inventory" element={<InventoryItems />} />
+                <Route path="/construction/resource-allocation/subcontractors" element={<SubcontractorResources />} />
                 <Route path="/construction/quality-control" element={<QualityControl />} />
                 <Route path="/construction/safety-management" element={<SafetyManagement />} />
-                <Route path="/construction/project-documents" element={<ProjectDocuments />} />
-                <Route path="/construction/project-budgeting" element={<ProjectBudgeting />} />
-                <Route path="/construction/reports-analytics" element={<ReportsAnalytics />} />
               </Route>
               
               {/* Catch-all 404 route */}

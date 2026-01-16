@@ -875,3 +875,100 @@ export const BUDGET_TRANSACTION_TYPES: { value: BudgetTransactionType; label: st
   { value: 'actual', label: 'Actual', color: 'bg-green-100 text-green-800' },
   { value: 'adjustment', label: 'Adjustment', color: 'bg-yellow-100 text-yellow-800' },
 ];
+
+// =====================================================
+// CONSTRUCTION MASTER LISTS
+// =====================================================
+
+export interface LabourMaster {
+  id: string;
+  company_id: string | null;
+  name: string;
+  trade: string | null;
+  skill_level: string | null;
+  contact_number: string | null;
+  email: string | null;
+  hourly_rate: number | null;
+  daily_rate: number | null;
+  status: string;
+  notes: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateLabourMasterData {
+  name: string;
+  trade?: string;
+  skill_level?: string;
+  contact_number?: string;
+  email?: string;
+  hourly_rate?: number;
+  daily_rate?: number;
+  status?: string;
+  notes?: string;
+}
+
+export type UpdateLabourMasterData = Partial<CreateLabourMasterData>;
+
+export interface InventoryMaster {
+  id: string;
+  company_id: string | null;
+  item_code: string | null;
+  item_name: string;
+  category: string | null;
+  unit: string | null;
+  unit_cost: number | null;
+  description: string | null;
+  status: string;
+  notes: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateInventoryMasterData {
+  item_code?: string;
+  item_name: string;
+  category?: string;
+  unit?: string;
+  unit_cost?: number;
+  description?: string;
+  status?: string;
+  notes?: string;
+}
+
+export type UpdateInventoryMasterData = Partial<CreateInventoryMasterData>;
+
+export interface SubcontractorMaster {
+  id: string;
+  company_id: string | null;
+  name: string;
+  trade: string | null;
+  contact_person: string | null;
+  phone: string | null;
+  email: string | null;
+  address: string | null;
+  license_number: string | null;
+  insurance_expiry: string | null;
+  status: string;
+  notes: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateSubcontractorMasterData {
+  name: string;
+  trade?: string;
+  contact_person?: string;
+  phone?: string;
+  email?: string;
+  address?: string;
+  license_number?: string;
+  insurance_expiry?: string;
+  status?: string;
+  notes?: string;
+}
+
+export type UpdateSubcontractorMasterData = Partial<CreateSubcontractorMasterData>;
