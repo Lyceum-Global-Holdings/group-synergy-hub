@@ -2433,9 +2433,11 @@ export type Database = {
           created_by: string | null
           description: string | null
           id: string
+          image_url: string | null
           item_code: string | null
           item_name: string
           notes: string | null
+          section: string | null
           status: string
           unit: string | null
           unit_cost: number | null
@@ -2448,9 +2450,11 @@ export type Database = {
           created_by?: string | null
           description?: string | null
           id?: string
+          image_url?: string | null
           item_code?: string | null
           item_name: string
           notes?: string | null
+          section?: string | null
           status?: string
           unit?: string | null
           unit_cost?: number | null
@@ -2463,9 +2467,11 @@ export type Database = {
           created_by?: string | null
           description?: string | null
           id?: string
+          image_url?: string | null
           item_code?: string | null
           item_name?: string
           notes?: string | null
+          section?: string | null
           status?: string
           unit?: string | null
           unit_cost?: number | null
