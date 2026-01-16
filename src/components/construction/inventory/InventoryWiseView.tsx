@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Eye, MapPin, Search } from "lucide-react";
+import { Eye, MapPin, Search, Image as ImageIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
@@ -26,6 +26,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useConstructionResources } from "@/hooks/construction/useConstructionResources";
+import { useInventoryMaster } from "@/hooks/construction/useInventoryMaster";
 
 // Predefined Section values
 export const INVENTORY_SECTIONS = [
@@ -61,12 +62,13 @@ const COMPUTED_STATUSES: { value: ComputedStatus; label: string; color: string }
 
 interface InventoryWiseRow {
   id: string;
-  section: InventorySection;
-  category: InventoryCategory;
+  section: string;
+  category: string;
   totalQty: number;
   status: ComputedStatus;
   locations: string[];
   itemName: string;
+  imageUrl?: string | null;
 }
 
 interface LocationDetailsDialogProps {
@@ -115,44 +117,51 @@ export function InventoryWiseView() {
     locations: [],
   });
 
-  const { data: resources, isLoading } = useConstructionResources();
+  // Fetch from Item Master (source of truth)
+  const { data: inventoryMaster, isLoading: isLoadingMaster } = useInventoryMaster();
+  // Fetch allocation data for quantities and locations
+  const { data: resources, isLoading: isLoadingResources } = useConstructionResources();
+
+  const isLoading = isLoadingMaster || isLoadingResources;
 
   // Filter for material resources only
   const materialResources = resources?.filter((r) => r.resource_type === "material") || [];
 
-  // Transform resources into inventory-wise rows
-  // Group by item name and aggregate data
-  const inventoryData: InventoryWiseRow[] = Object.entries(
-    materialResources.reduce((acc, resource) => {
-      const key = resource.resource_name;
-      if (!acc[key]) {
-        acc[key] = {
-          id: resource.id,
-          itemName: resource.resource_name,
-          totalQty: 0,
-          locations: new Set<string>(),
-          statuses: [] as string[],
-          // Derive section and category from description or notes (could be enhanced)
-          section: deriveSection(resource.description || resource.notes || ""),
-          category: deriveCategory(resource.description || resource.notes || ""),
-        };
-      }
-      acc[key].totalQty += resource.quantity_allocated || 0;
-      if (resource.project?.project_name) {
-        acc[key].locations.add(resource.project.project_name);
-      }
-      acc[key].statuses.push(resource.status);
-      return acc;
-    }, {} as Record<string, { id: string; itemName: string; totalQty: number; locations: Set<string>; statuses: string[]; section: InventorySection; category: InventoryCategory }>)
-  ).map(([_, data]) => ({
-    id: data.id,
-    section: data.section,
-    category: data.category,
-    totalQty: data.totalQty,
-    status: computeStatus(data.statuses, data.totalQty),
-    locations: Array.from(data.locations),
-    itemName: data.itemName,
-  }));
+  // Build allocation data map by item name for lookup
+  const allocationDataMap = materialResources.reduce((acc, resource) => {
+    const key = resource.resource_name.toLowerCase().trim();
+    if (!acc[key]) {
+      acc[key] = {
+        totalQty: 0,
+        locations: new Set<string>(),
+        statuses: [] as string[],
+      };
+    }
+    acc[key].totalQty += resource.quantity_allocated || 0;
+    if (resource.project?.project_name) {
+      acc[key].locations.add(resource.project.project_name);
+    }
+    acc[key].statuses.push(resource.status);
+    return acc;
+  }, {} as Record<string, { totalQty: number; locations: Set<string>; statuses: string[] }>);
+
+  // Transform Item Master data into inventory-wise rows
+  // Item Master is the single source of truth
+  const inventoryData: InventoryWiseRow[] = (inventoryMaster || []).map((item) => {
+    const allocationKey = item.item_name.toLowerCase().trim();
+    const allocation = allocationDataMap[allocationKey];
+
+    return {
+      id: item.id,
+      itemName: item.item_name,
+      section: item.section || "unassigned",
+      category: item.category || "unassigned",
+      totalQty: allocation?.totalQty || 0,
+      status: allocation ? computeStatus(allocation.statuses, allocation.totalQty) : "available",
+      locations: allocation ? Array.from(allocation.locations) : [],
+      imageUrl: item.image_url,
+    };
+  });
 
   // Apply filters
   const filteredData = inventoryData.filter((row) => {
@@ -173,6 +182,16 @@ export function InventoryWiseView() {
 
   const handleViewLocations = (itemName: string, locations: string[]) => {
     setLocationDialog({ open: true, itemName, locations });
+  };
+
+  const getSectionLabel = (section: string) => {
+    const found = INVENTORY_SECTIONS.find(s => s.value === section);
+    return found?.label || (section === "unassigned" ? "Unassigned" : section);
+  };
+
+  const getCategoryLabel = (category: string) => {
+    const found = INVENTORY_CATEGORIES.find(c => c.value === category);
+    return found?.label || (category === "unassigned" ? "Unassigned" : category);
   };
 
   return (
@@ -229,6 +248,7 @@ export function InventoryWiseView() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-[60px]">Image</TableHead>
                   <TableHead>Item Name</TableHead>
                   <TableHead>Section</TableHead>
                   <TableHead>Category</TableHead>
@@ -241,22 +261,35 @@ export function InventoryWiseView() {
               <TableBody>
                 {filteredData.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
-                      No inventory items found
+                    <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                      No inventory items found. Add items from Item Master.
                     </TableCell>
                   </TableRow>
                 ) : (
                   filteredData.map((row) => (
                     <TableRow key={row.id}>
+                      <TableCell>
+                        {row.imageUrl ? (
+                          <img
+                            src={row.imageUrl}
+                            alt={row.itemName}
+                            className="h-10 w-10 rounded object-cover"
+                          />
+                        ) : (
+                          <div className="h-10 w-10 rounded bg-muted flex items-center justify-center">
+                            <ImageIcon className="h-5 w-5 text-muted-foreground" />
+                          </div>
+                        )}
+                      </TableCell>
                       <TableCell className="font-medium">{row.itemName}</TableCell>
                       <TableCell>
                         <Badge variant="outline">
-                          {INVENTORY_SECTIONS.find(s => s.value === row.section)?.label || row.section}
+                          {getSectionLabel(row.section)}
                         </Badge>
                       </TableCell>
                       <TableCell>
                         <Badge variant="secondary">
-                          {INVENTORY_CATEGORIES.find(c => c.value === row.category)?.label || row.category}
+                          {getCategoryLabel(row.category)}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right font-medium">
@@ -302,44 +335,6 @@ export function InventoryWiseView() {
       />
     </div>
   );
-}
-
-// Helper function to derive section from text (can be enhanced with actual data mapping)
-function deriveSection(text: string): InventorySection {
-  const lowerText = text.toLowerCase();
-  if (lowerText.includes("civil")) return "civil";
-  if (lowerText.includes("mechanical")) return "mechanical";
-  if (lowerText.includes("carpenter") || lowerText.includes("wood")) return "carpenter";
-  if (lowerText.includes("mep") || lowerText.includes("electrical") || lowerText.includes("plumbing")) return "mep";
-  if (lowerText.includes("aluminium") || lowerText.includes("aluminum")) return "aluminium";
-  // Default based on hash for demo variety
-  const sections = INVENTORY_SECTIONS.map(s => s.value);
-  return sections[Math.abs(hashCode(text)) % sections.length];
-}
-
-// Helper function to derive category from text (can be enhanced with actual data mapping)
-function deriveCategory(text: string): InventoryCategory {
-  const lowerText = text.toLowerCase();
-  if (lowerText.includes("machine")) return "machines";
-  if (lowerText.includes("tool")) return "tools";
-  if (lowerText.includes("equipment")) return "equipments";
-  if (lowerText.includes("scaffold")) return "scaffolding";
-  if (lowerText.includes("material")) return "materials";
-  if (lowerText.includes("safety") || lowerText.includes("ppe")) return "safety";
-  // Default based on hash for demo variety
-  const categories = INVENTORY_CATEGORIES.map(c => c.value);
-  return categories[Math.abs(hashCode(text)) % categories.length];
-}
-
-// Simple hash function for consistent pseudo-random assignment
-function hashCode(str: string): number {
-  let hash = 0;
-  for (let i = 0; i < str.length; i++) {
-    const char = str.charCodeAt(i);
-    hash = ((hash << 5) - hash) + char;
-    hash = hash & hash;
-  }
-  return hash;
 }
 
 // Compute status based on resource statuses and quantities
