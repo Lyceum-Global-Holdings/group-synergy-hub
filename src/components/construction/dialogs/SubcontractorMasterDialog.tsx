@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCreateSubcontractorMaster, useUpdateSubcontractorMaster } from "@/hooks/construction/useSubcontractorMaster";
-import type { SubcontractorMaster } from "@/types/construction";
+import type { SubcontractorMaster, CreateSubcontractorMasterData } from "@/types/construction";
 import { useEffect } from "react";
 
 const formSchema = z.object({
@@ -53,7 +53,7 @@ export function SubcontractorMasterDialog({ open, onOpenChange, subcontractor }:
     if (subcontractor) {
       await updateMutation.mutateAsync({ id: subcontractor.id, ...data });
     } else {
-      await createMutation.mutateAsync(data);
+      await createMutation.mutateAsync(data as CreateSubcontractorMasterData);
     }
     onOpenChange(false);
   };

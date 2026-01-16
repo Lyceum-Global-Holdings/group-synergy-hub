@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCreateLabourMaster, useUpdateLabourMaster } from "@/hooks/construction/useLabourMaster";
-import type { LabourMaster } from "@/types/construction";
+import type { LabourMaster, CreateLabourMasterData } from "@/types/construction";
 import { useEffect } from "react";
 
 const formSchema = z.object({
@@ -52,7 +52,7 @@ export function LabourMasterDialog({ open, onOpenChange, labour }: LabourMasterD
     if (labour) {
       await updateMutation.mutateAsync({ id: labour.id, ...data });
     } else {
-      await createMutation.mutateAsync(data);
+      await createMutation.mutateAsync(data as CreateLabourMasterData);
     }
     onOpenChange(false);
   };
