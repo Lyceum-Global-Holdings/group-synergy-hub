@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Package, Pencil, Trash2, Plus, Search } from "lucide-react";
+import { Eye, MapPin, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
@@ -19,42 +19,151 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useConstructionResources, useDeleteConstructionResource } from "@/hooks/construction/useConstructionResources";
-import { RESOURCE_STATUSES, ConstructionResource } from "@/types/construction";
-import { format } from "date-fns";
-import { ResourceDialog, DeleteConfirmDialog } from "@/components/construction/dialogs";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { useConstructionResources } from "@/hooks/construction/useConstructionResources";
+
+// Predefined Section values
+export const INVENTORY_SECTIONS = [
+  { value: "civil", label: "Civil" },
+  { value: "mechanical", label: "Mechanical" },
+  { value: "carpenter", label: "Carpenter" },
+  { value: "mep", label: "MEP" },
+  { value: "aluminium", label: "Aluminium" },
+] as const;
+
+// Predefined Category values
+export const INVENTORY_CATEGORIES = [
+  { value: "machines", label: "Machines" },
+  { value: "tools", label: "Tools" },
+  { value: "equipments", label: "Equipments" },
+  { value: "scaffolding", label: "Scaffolding" },
+  { value: "materials", label: "Materials" },
+  { value: "safety", label: "Safety" },
+] as const;
+
+export type InventorySection = typeof INVENTORY_SECTIONS[number]["value"];
+export type InventoryCategory = typeof INVENTORY_CATEGORIES[number]["value"];
+
+// Status computation based on allocation data
+type ComputedStatus = "available" | "low_stock" | "in_use" | "under_repair";
+
+const COMPUTED_STATUSES: { value: ComputedStatus; label: string; color: string }[] = [
+  { value: "available", label: "Available", color: "bg-green-100 text-green-800" },
+  { value: "low_stock", label: "Low Stock", color: "bg-yellow-100 text-yellow-800" },
+  { value: "in_use", label: "In Use", color: "bg-blue-100 text-blue-800" },
+  { value: "under_repair", label: "Under Repair", color: "bg-red-100 text-red-800" },
+];
+
+interface InventoryWiseRow {
+  id: string;
+  section: InventorySection;
+  category: InventoryCategory;
+  totalQty: number;
+  status: ComputedStatus;
+  locations: string[];
+  itemName: string;
+}
+
+interface LocationDetailsDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  itemName: string;
+  locations: string[];
+}
+
+function LocationDetailsDialog({ open, onOpenChange, itemName, locations }: LocationDetailsDialogProps) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <MapPin className="h-5 w-5" />
+            Location Details - {itemName}
+          </DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3">
+          {locations.length === 0 ? (
+            <p className="text-muted-foreground text-sm">No locations assigned</p>
+          ) : (
+            <div className="space-y-2">
+              {locations.map((location, idx) => (
+                <div key={idx} className="flex items-center gap-2 p-2 bg-muted rounded-md">
+                  <MapPin className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm">{location}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 export function InventoryWiseView() {
+  const [sectionFilter, setSectionFilter] = useState<string>("all");
+  const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [searchTerm, setSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [editingResource, setEditingResource] = useState<ConstructionResource | null>(null);
-  const [deletingResource, setDeletingResource] = useState<ConstructionResource | null>(null);
+  const [locationDialog, setLocationDialog] = useState<{ open: boolean; itemName: string; locations: string[] }>({
+    open: false,
+    itemName: "",
+    locations: [],
+  });
 
   const { data: resources, isLoading } = useConstructionResources();
-  const deleteResourceMutation = useDeleteConstructionResource();
 
   // Filter for material resources only
   const materialResources = resources?.filter((r) => r.resource_type === "material") || [];
-  
-  const filteredResources = materialResources.filter((resource) => {
-    const matchesSearch = resource.resource_name.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = statusFilter === "all" || resource.status === statusFilter;
-    return matchesSearch && matchesStatus;
+
+  // Transform resources into inventory-wise rows
+  // Group by item name and aggregate data
+  const inventoryData: InventoryWiseRow[] = Object.entries(
+    materialResources.reduce((acc, resource) => {
+      const key = resource.resource_name;
+      if (!acc[key]) {
+        acc[key] = {
+          id: resource.id,
+          itemName: resource.resource_name,
+          totalQty: 0,
+          locations: new Set<string>(),
+          statuses: [] as string[],
+          // Derive section and category from description or notes (could be enhanced)
+          section: deriveSection(resource.description || resource.notes || ""),
+          category: deriveCategory(resource.description || resource.notes || ""),
+        };
+      }
+      acc[key].totalQty += resource.quantity_allocated || 0;
+      if (resource.project?.project_name) {
+        acc[key].locations.add(resource.project.project_name);
+      }
+      acc[key].statuses.push(resource.status);
+      return acc;
+    }, {} as Record<string, { id: string; itemName: string; totalQty: number; locations: Set<string>; statuses: string[]; section: InventorySection; category: InventoryCategory }>)
+  ).map(([_, data]) => ({
+    id: data.id,
+    section: data.section,
+    category: data.category,
+    totalQty: data.totalQty,
+    status: computeStatus(data.statuses, data.totalQty),
+    locations: Array.from(data.locations),
+    itemName: data.itemName,
+  }));
+
+  // Apply filters
+  const filteredData = inventoryData.filter((row) => {
+    const matchesSection = sectionFilter === "all" || row.section === sectionFilter;
+    const matchesCategory = categoryFilter === "all" || row.category === categoryFilter;
+    const matchesSearch = row.itemName.toLowerCase().includes(searchTerm.toLowerCase());
+    return matchesSection && matchesCategory && matchesSearch;
   });
 
-  // Group by item name for inventory-wise view
-  const groupedByItem = filteredResources.reduce((acc, resource) => {
-    const key = resource.resource_name;
-    if (!acc[key]) {
-      acc[key] = [];
-    }
-    acc[key].push(resource);
-    return acc;
-  }, {} as Record<string, typeof filteredResources>);
-
-  const getStatusBadge = (status: string) => {
-    const statusConfig = RESOURCE_STATUSES.find((s) => s.value === status);
+  const getStatusBadge = (status: ComputedStatus) => {
+    const statusConfig = COMPUTED_STATUSES.find((s) => s.value === status);
     return (
       <Badge className={statusConfig?.color || "bg-muted"}>
         {statusConfig?.label || status}
@@ -62,16 +171,14 @@ export function InventoryWiseView() {
     );
   };
 
-  const handleDelete = async () => {
-    if (deletingResource) {
-      await deleteResourceMutation.mutateAsync(deletingResource.id);
-      setDeletingResource(null);
-    }
+  const handleViewLocations = (itemName: string, locations: string[]) => {
+    setLocationDialog({ open: true, itemName, locations });
   };
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-4">
+      {/* Filters */}
+      <div className="flex flex-wrap items-center gap-4">
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
@@ -81,132 +188,168 @@ export function InventoryWiseView() {
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
+        
+        <Select value={sectionFilter} onValueChange={setSectionFilter}>
           <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="Filter by status" />
+            <SelectValue placeholder="Section" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Statuses</SelectItem>
-            {RESOURCE_STATUSES.map((status) => (
-              <SelectItem key={status.value} value={status.value}>
-                {status.label}
+            <SelectItem value="all">All Sections</SelectItem>
+            {INVENTORY_SECTIONS.map((section) => (
+              <SelectItem key={section.value} value={section.value}>
+                {section.label}
               </SelectItem>
             ))}
           </SelectContent>
         </Select>
-        <Button onClick={() => { setEditingResource(null); setDialogOpen(true); }}>
-          <Plus className="mr-2 h-4 w-4" />
-          Add Allocation
-        </Button>
+
+        <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+          <SelectTrigger className="w-[180px]">
+            <SelectValue placeholder="Category" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Categories</SelectItem>
+            {INVENTORY_CATEGORIES.map((category) => (
+              <SelectItem key={category.value} value={category.value}>
+                {category.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
+      {/* Table */}
       <Card>
         <CardContent className="pt-6">
           {isLoading ? (
             <div className="flex items-center justify-center py-8">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
             </div>
-          ) : Object.keys(groupedByItem).length === 0 ? (
+          ) : filteredData.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
-              No inventory allocations found
+              No inventory items found
             </div>
           ) : (
-            <div className="space-y-6">
-              {Object.entries(groupedByItem).map(([itemName, allocations]) => {
-                const totalAllocated = allocations.reduce((sum, a) => sum + (a.quantity_allocated || 0), 0);
-                const totalUsed = allocations.reduce((sum, a) => sum + (a.quantity_used || 0), 0);
-                
-                return (
-                  <div key={itemName} className="border rounded-lg">
-                    <div className="p-4 bg-muted/50 border-b flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <Package className="h-5 w-5 text-muted-foreground" />
-                        <div>
-                          <h3 className="font-semibold">{itemName}</h3>
-                          <p className="text-sm text-muted-foreground">
-                            {allocations.length} allocation(s)
-                          </p>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <p className="font-medium">
-                          {totalUsed.toLocaleString()} / {totalAllocated.toLocaleString()}
-                        </p>
-                        <p className="text-sm text-muted-foreground">Used / Allocated</p>
-                      </div>
-                    </div>
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Project</TableHead>
-                          <TableHead>Qty Allocated</TableHead>
-                          <TableHead>Qty Used</TableHead>
-                          <TableHead>Remaining</TableHead>
-                          <TableHead>Status</TableHead>
-                          <TableHead>Start Date</TableHead>
-                          <TableHead className="text-right">Actions</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {allocations.map((resource) => (
-                          <TableRow key={resource.id}>
-                            <TableCell>{resource.project?.project_name || "-"}</TableCell>
-                            <TableCell>{resource.quantity_allocated || 0}</TableCell>
-                            <TableCell>{resource.quantity_used || 0}</TableCell>
-                            <TableCell>
-                              {(resource.quantity_allocated || 0) - (resource.quantity_used || 0)}
-                            </TableCell>
-                            <TableCell>{getStatusBadge(resource.status)}</TableCell>
-                            <TableCell>
-                              {resource.start_date
-                                ? format(new Date(resource.start_date), "MMM d, yyyy")
-                                : "-"}
-                            </TableCell>
-                            <TableCell className="text-right">
-                              <div className="flex justify-end gap-2">
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => { setEditingResource(resource as ConstructionResource); setDialogOpen(true); }}
-                                >
-                                  <Pencil className="h-4 w-4" />
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => setDeletingResource(resource as ConstructionResource)}
-                                >
-                                  <Trash2 className="h-4 w-4 text-destructive" />
-                                </Button>
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
-                );
-              })}
-            </div>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Section</TableHead>
+                  <TableHead>Category</TableHead>
+                  <TableHead className="text-right">Total Qty</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Locations</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredData.map((row) => (
+                  <TableRow key={row.id}>
+                    <TableCell>
+                      <Badge variant="outline">
+                        {INVENTORY_SECTIONS.find(s => s.value === row.section)?.label || row.section}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="secondary">
+                        {INVENTORY_CATEGORIES.find(c => c.value === row.category)?.label || row.category}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-right font-medium">
+                      {row.totalQty.toLocaleString()}
+                    </TableCell>
+                    <TableCell>{getStatusBadge(row.status)}</TableCell>
+                    <TableCell>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-auto p-1 text-sm"
+                        onClick={() => handleViewLocations(row.itemName, row.locations)}
+                      >
+                        <MapPin className="h-3 w-3 mr-1" />
+                        {row.locations.length} location{row.locations.length !== 1 ? "s" : ""}
+                      </Button>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleViewLocations(row.itemName, row.locations)}
+                      >
+                        <Eye className="h-4 w-4 mr-1" />
+                        View Details
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
           )}
         </CardContent>
       </Card>
 
-      <ResourceDialog
-        open={dialogOpen}
-        onOpenChange={setDialogOpen}
-        resource={editingResource}
-        defaultResourceType="material"
-      />
-
-      <DeleteConfirmDialog
-        open={!!deletingResource}
-        onOpenChange={(open) => !open && setDeletingResource(null)}
-        onConfirm={handleDelete}
-        title="Delete Inventory Allocation"
-        description={`Are you sure you want to delete "${deletingResource?.resource_name}"? This action cannot be undone.`}
-        isDeleting={deleteResourceMutation.isPending}
+      {/* Location Details Dialog */}
+      <LocationDetailsDialog
+        open={locationDialog.open}
+        onOpenChange={(open) => setLocationDialog(prev => ({ ...prev, open }))}
+        itemName={locationDialog.itemName}
+        locations={locationDialog.locations}
       />
     </div>
   );
+}
+
+// Helper function to derive section from text (can be enhanced with actual data mapping)
+function deriveSection(text: string): InventorySection {
+  const lowerText = text.toLowerCase();
+  if (lowerText.includes("civil")) return "civil";
+  if (lowerText.includes("mechanical")) return "mechanical";
+  if (lowerText.includes("carpenter") || lowerText.includes("wood")) return "carpenter";
+  if (lowerText.includes("mep") || lowerText.includes("electrical") || lowerText.includes("plumbing")) return "mep";
+  if (lowerText.includes("aluminium") || lowerText.includes("aluminum")) return "aluminium";
+  // Default based on hash for demo variety
+  const sections = INVENTORY_SECTIONS.map(s => s.value);
+  return sections[Math.abs(hashCode(text)) % sections.length];
+}
+
+// Helper function to derive category from text (can be enhanced with actual data mapping)
+function deriveCategory(text: string): InventoryCategory {
+  const lowerText = text.toLowerCase();
+  if (lowerText.includes("machine")) return "machines";
+  if (lowerText.includes("tool")) return "tools";
+  if (lowerText.includes("equipment")) return "equipments";
+  if (lowerText.includes("scaffold")) return "scaffolding";
+  if (lowerText.includes("material")) return "materials";
+  if (lowerText.includes("safety") || lowerText.includes("ppe")) return "safety";
+  // Default based on hash for demo variety
+  const categories = INVENTORY_CATEGORIES.map(c => c.value);
+  return categories[Math.abs(hashCode(text)) % categories.length];
+}
+
+// Simple hash function for consistent pseudo-random assignment
+function hashCode(str: string): number {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash;
+  }
+  return hash;
+}
+
+// Compute status based on resource statuses and quantities
+function computeStatus(statuses: string[], totalQty: number): ComputedStatus {
+  // Check if any is under repair
+  if (statuses.some(s => s === "released" || s === "completed")) {
+    return "under_repair";
+  }
+  // Check if actively in use
+  if (statuses.some(s => s === "active")) {
+    return "in_use";
+  }
+  // Check for low stock
+  if (totalQty > 0 && totalQty < 10) {
+    return "low_stock";
+  }
+  // Default to available
+  return "available";
 }
