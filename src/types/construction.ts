@@ -916,26 +916,29 @@ export interface InventoryMaster {
   company_id: string | null;
   item_code: string | null;
   item_name: string;
+  section: string | null;
   category: string | null;
   unit: string | null;
   unit_cost: number | null;
   description: string | null;
   status: string;
   notes: string | null;
+  image_url: string | null;
   created_by: string | null;
   created_at: string;
   updated_at: string;
 }
 
 export interface CreateInventoryMasterData {
-  item_code?: string;
   item_name: string;
-  category?: string;
+  section: string;
+  category: string;
   unit?: string;
   unit_cost?: number;
   description?: string;
   status?: string;
   notes?: string;
+  image_url?: string;
 }
 
 export type UpdateInventoryMasterData = Partial<CreateInventoryMasterData>;
