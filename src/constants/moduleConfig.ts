@@ -11,17 +11,26 @@ import {
   HardHat
 } from "lucide-react";
 
+export interface SubModuleChild {
+  key: string;
+  name: string;
+  url: string;
+}
+
+export interface SubModule {
+  key: string;
+  name: string;
+  description: string;
+  url: string;
+  children?: SubModuleChild[];
+}
+
 export interface ModuleConfig {
   key: string;
   name: string;
   description: string;
   icon: any;
-  subModules: {
-    key: string;
-    name: string;
-    description: string;
-    url: string;
-  }[];
+  subModules: SubModule[];
 }
 
 export const moduleConfig: Record<string, ModuleConfig> = {
@@ -155,7 +164,17 @@ export const moduleConfig: Record<string, ModuleConfig> = {
       { key: 'progress-tracking', name: 'Progress Tracking', description: 'Track project progress and milestones', url: '/construction/progress-tracking' },
       { key: 'daily-reports', name: 'Daily Site Reports', description: 'Daily site activity reports', url: '/construction/daily-reports' },
       { key: 'reports-analytics', name: 'Reports Analytics', description: 'Analytics dashboard for site reports', url: '/construction/reports-analytics' },
-      { key: 'resource-allocation', name: 'Resource Allocation', description: 'Allocate resources to projects', url: '/construction/resource-allocation' },
+      { 
+        key: 'resource-allocation', 
+        name: 'Resource Allocation', 
+        description: 'Allocate resources to projects', 
+        url: '/construction/resource-allocation',
+        children: [
+          { key: 'labour', name: 'Labour', url: '/construction/resource-allocation/labour' },
+          { key: 'inventory', name: 'Inventory', url: '/construction/resource-allocation/inventory' },
+          { key: 'subcontractors', name: 'Subcontractor', url: '/construction/resource-allocation/subcontractors' }
+        ]
+      },
       { key: 'quality-control', name: 'Quality Control', description: 'Quality inspections and checklists', url: '/construction/quality-control' },
       { key: 'safety-management', name: 'Safety Management', description: 'Safety incidents and compliance', url: '/construction/safety-management' },
       { key: 'project-documents', name: 'Project Documents', description: 'Project document management', url: '/construction/project-documents' },

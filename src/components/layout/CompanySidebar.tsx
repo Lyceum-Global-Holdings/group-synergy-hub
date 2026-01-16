@@ -34,11 +34,24 @@ import { useSuperAdmin } from "@/hooks/useSuperAdmin";
 import { useAuth } from "@/contexts/AuthContext";
 import { useUserEffectiveModules } from "@/hooks/useModuleAccess";
 
+type SubModuleChild = {
+  key: string;
+  name: string;
+  url: string;
+};
+
+type SidebarItem = {
+  title: string;
+  url: string;
+  key: string;
+  children?: SubModuleChild[];
+};
+
 type ModuleWithCompanies = {
   key: string;
   title: string;
   icon: any;
-  items: { title: string; url: string; key: string }[];
+  items: SidebarItem[];
   companiesUsing?: Company[];
 };
 
@@ -108,10 +121,11 @@ export function CompanySidebar() {
       if (!config) return null;
       
       // Filter enabled sub-modules for the selected company
-      let enabledItems = config.subModules.map(sub => ({
+      let enabledItems: SidebarItem[] = config.subModules.map(sub => ({
         title: sub.name,
         url: sub.url,
-        key: sub.key
+        key: sub.key,
+        children: sub.children
       }));
 
       // When viewing a specific company, filter sub-modules based on company settings
@@ -233,14 +247,51 @@ export function CompanySidebar() {
                       <CollapsibleContent>
                         <SidebarMenuSub>
                           {dept.items.map((item) => (
-                            <SidebarMenuSubItem key={item.url}>
-                              <SidebarMenuSubButton
-                                asChild
-                                isActive={isActive(item.url)}
+                            item.children && item.children.length > 0 ? (
+                              <Collapsible
+                                key={item.url}
+                                defaultOpen={item.children.some(child => currentPath.startsWith(child.url))}
+                                className="group/nested"
                               >
-                                <NavLink to={item.url}>{item.title}</NavLink>
-                              </SidebarMenuSubButton>
-                            </SidebarMenuSubItem>
+                                <SidebarMenuSubItem>
+                                  <CollapsibleTrigger asChild>
+                                    <SidebarMenuSubButton
+                                      className="w-full justify-between cursor-pointer"
+                                      isActive={isActive(item.url) || item.children.some(child => currentPath.startsWith(child.url))}
+                                    >
+                                      <span>{item.title}</span>
+                                      <ChevronDown className="h-3 w-3 transition-transform group-data-[state=open]/nested:rotate-180" />
+                                    </SidebarMenuSubButton>
+                                  </CollapsibleTrigger>
+                                  <CollapsibleContent>
+                                    <div className="ml-4 mt-1 space-y-1 border-l border-border pl-2">
+                                      {item.children.map((child) => (
+                                        <NavLink
+                                          key={child.url}
+                                          to={child.url}
+                                          className={`block text-xs py-1 px-2 rounded-sm transition-colors ${
+                                            isActive(child.url)
+                                              ? 'bg-primary/10 text-primary font-medium'
+                                              : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                                          }`}
+                                        >
+                                          {child.name}
+                                        </NavLink>
+                                      ))}
+                                    </div>
+                                  </CollapsibleContent>
+                                </SidebarMenuSubItem>
+                              </Collapsible>
+                            ) : (
+                              <SidebarMenuSubItem key={item.url}>
+                                <SidebarMenuSubButton
+                                  asChild
+                                  isActive={isActive(item.url)}
+                                >
+                                  <NavLink to={item.url}>{item.title}</NavLink>
+                                </SidebarMenuSubButton>
+                              </SidebarMenuSubItem>
+                            )
                           ))}
                           {isViewingAllCompanies && dept.companiesUsing && dept.companiesUsing.length > 0 && (
                             <SidebarMenuSubItem>
