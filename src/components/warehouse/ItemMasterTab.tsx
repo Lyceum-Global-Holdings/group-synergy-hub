@@ -105,31 +105,61 @@ export function ItemMasterTab() {
     },
   });
 
-  // Fetch stock by location for all items
+  // Fetch stock by location for all items - using separate queries to avoid nested join issues
   const { data: itemLocationStock = {} } = useQuery<ItemLocationStockMap>({
     queryKey: ['all-items-location-stock'],
     queryFn: async () => {
-      const { data, error } = await supabase
+      // Step 1: Fetch all allocations with stock
+      const { data: allocations, error: allocError } = await supabase
         .from('warehouse_bin_allocations')
-        .select(`
-          warehouse_item_id,
-          available_quantity,
-          warehouse_bins:bin_id (
-            location_id,
-            warehouse_locations:location_id (id, name)
-          )
-        `)
+        .select('warehouse_item_id, bin_id, available_quantity')
         .gt('available_quantity', 0);
       
-      if (error) throw error;
+      if (allocError) throw allocError;
+      if (!allocations || allocations.length === 0) return {};
       
-      // Group by item_id and location_id
+      // Step 2: Get unique bin IDs
+      const binIds = [...new Set(allocations.map(a => a.bin_id).filter(Boolean))];
+      if (binIds.length === 0) return {};
+      
+      // Step 3: Fetch bins with their location_id
+      const { data: bins, error: binsError } = await supabase
+        .from('warehouse_bins')
+        .select('id, location_id')
+        .in('id', binIds);
+      
+      if (binsError) throw binsError;
+      if (!bins || bins.length === 0) return {};
+      
+      // Step 4: Get unique location IDs (filter out nulls)
+      const locationIds = [...new Set(bins.map(b => b.location_id).filter(Boolean))] as string[];
+      if (locationIds.length === 0) return {};
+      
+      // Step 5: Fetch locations
+      const { data: locations, error: locError } = await supabase
+        .from('warehouse_locations')
+        .select('id, name')
+        .in('id', locationIds);
+      
+      if (locError) throw locError;
+      
+      // Step 6: Create lookup maps
+      const binLocationMap = new Map(bins.map(b => [b.id, b.location_id]));
+      const locationNameMap = new Map(locations?.map(l => [l.id, l.name]) || []);
+      
+      // Step 7: Group by item_id and location_id
       const grouped: ItemLocationStockMap = {};
       
-      data?.forEach((alloc: any) => {
+      allocations.forEach((alloc) => {
         const itemId = alloc.warehouse_item_id;
-        const locationId = alloc.warehouse_bins.location_id;
-        const locationName = alloc.warehouse_bins.warehouse_locations.name;
+        const binId = alloc.bin_id;
+        if (!binId) return;
+        
+        const locationId = binLocationMap.get(binId);
+        if (!locationId) return;
+        
+        const locationName = locationNameMap.get(locationId);
+        if (!locationName) return;
         
         if (!grouped[itemId]) grouped[itemId] = [];
         
