@@ -32,44 +32,52 @@ export const useWarehouseItems = () => {
 
       if (error) throw error;
 
-      // Fetch bin allocations for all items
+      // Fetch bin allocations for all items using separate queries (more reliable than nested syntax)
       const itemIds = data?.map((item: any) => item.id) || [];
       if (itemIds.length > 0) {
+        // Fetch all bins first
+        const { data: bins } = await supabase
+          .from('warehouse_bins')
+          .select('id, bin_code, name');
+
+        // Fetch allocations with just the bin_id reference
         const { data: allocations, error: allocError } = await supabase
           .from('warehouse_bin_allocations')
-          .select(`
-            warehouse_item_id,
-            available_quantity,
-            warehouse_bins:bin_id (
-              id,
-              bin_code,
-              name
-            )
-          `)
+          .select('warehouse_item_id, bin_id, available_quantity')
           .in('warehouse_item_id', itemIds);
 
-        if (!allocError && allocations) {
+        console.log('Bins fetched:', bins?.length);
+        console.log('Allocations fetched:', allocations?.length);
+
+        if (!allocError && allocations && bins) {
+          // Create a bin lookup map for O(1) access
+          const binLookup = new Map(bins.map(b => [b.id, b]));
+
           // Group allocations by item_id
           const binsByItem: Record<string, Array<{ id: string; bin_code: string; name: string; quantity: number }>> = {};
           allocations.forEach((alloc: any) => {
             const itemId = alloc.warehouse_item_id;
-            // Skip if warehouse_bins is null (orphaned allocation or deleted bin)
-            if (!alloc.warehouse_bins) return;
+            const bin = binLookup.get(alloc.bin_id);
+            
+            // Skip if bin not found (orphaned allocation)
+            if (!bin) return;
             
             if (!binsByItem[itemId]) binsByItem[itemId] = [];
             
-            const existingBin = binsByItem[itemId].find(b => b.id === alloc.warehouse_bins.id);
+            const existingBin = binsByItem[itemId].find(b => b.id === bin.id);
             if (existingBin) {
               existingBin.quantity += Number(alloc.available_quantity);
             } else {
               binsByItem[itemId].push({
-                id: alloc.warehouse_bins.id,
-                bin_code: alloc.warehouse_bins.bin_code,
-                name: alloc.warehouse_bins.name,
+                id: bin.id,
+                bin_code: bin.bin_code,
+                name: bin.name,
                 quantity: Number(alloc.available_quantity)
               });
             }
           });
+
+          console.log('Items with bins:', Object.keys(binsByItem).length);
 
           // Attach bins to items
           data?.forEach((item: any) => {
