@@ -74,7 +74,7 @@ export function BudgetList() {
                 <TableRow key={budget.id}>
                   <TableCell className="font-medium">{budget.budget_name}</TableCell>
                   <TableCell className="capitalize">{budget.budget_type}</TableCell>
-                  <TableCell>{budget.fiscal_year_id || "-"}</TableCell>
+                  <TableCell>{budget.fiscal_year || "-"}</TableCell>
                   <TableCell>v{budget.version}</TableCell>
                   <TableCell>{getStatusBadge(budget.status || "draft")}</TableCell>
                   <TableCell className="text-right">

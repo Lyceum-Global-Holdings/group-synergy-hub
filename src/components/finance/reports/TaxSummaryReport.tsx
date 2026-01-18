@@ -77,8 +77,8 @@ export function TaxSummaryReport() {
                 {taxSummary.map((tax) => (
                   <TableRow key={tax.id}>
                     <TableCell className="font-mono">{tax.tax_code}</TableCell>
-                    <TableCell>{tax.description}</TableCell>
-                    <TableCell>{Number(tax.rate)}%</TableCell>
+                    <TableCell>{tax.tax_name}</TableCell>
+                    <TableCell>{Number(tax.tax_rate)}%</TableCell>
                     <TableCell className="text-right">{formatCurrency(tax.taxableAmount)}</TableCell>
                     <TableCell className="text-right text-green-600">{formatCurrency(tax.taxCollected)}</TableCell>
                     <TableCell className="text-right text-destructive">{formatCurrency(tax.taxPaid)}</TableCell>
