@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -23,7 +23,8 @@ import {
   useCompleteStockTransfer,
   useDeleteStockTransfer,
 } from "@/hooks/useStockTransfer";
-import type { StockTransferRequest } from "@/types/stockTransfer";
+import { useWarehouseBins } from "@/hooks/useWarehouseBins";
+import type { StockTransferRequest, StockTransferItem } from "@/types/stockTransfer";
 import { format } from "date-fns";
 import { 
   CheckCircle, 
@@ -57,10 +58,23 @@ export function StockTransferDetailsDialog({
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const { data: items = [] } = useStockTransferItems(transfer.id);
+  const { bins = [] } = useWarehouseBins();
   const updateTransfer = useUpdateStockTransfer();
   const approveTransfer = useApproveStockTransfer();
   const completeTransfer = useCompleteStockTransfer();
   const deleteTransfer = useDeleteStockTransfer();
+
+  // Get bin names for display
+  const getBinName = (binId: string | null) => {
+    if (!binId) return "Not specified";
+    const bin = bins.find(b => b.id === binId);
+    return bin ? `${bin.bin_code} - ${bin.name}` : "Unknown bin";
+  };
+
+  // Get from/to bins from the first item (all items have same bins)
+  const firstItem = items[0] as StockTransferItem | undefined;
+  const fromBinId = firstItem?.from_bin_id;
+  const toBinId = firstItem?.to_bin_id;
 
   const handleSubmitForApproval = async () => {
     await updateTransfer.mutateAsync({
@@ -161,29 +175,17 @@ export function StockTransferDetailsDialog({
 
             <div className="flex items-center gap-4 p-4 border rounded-lg bg-muted/50">
               <div className="flex-1">
-                <p className="text-sm text-muted-foreground mb-1">From</p>
+                <p className="text-sm text-muted-foreground mb-1">From Bin</p>
                 <p className="font-medium">
-                  {transfer.from_location?.name || transfer.from_department?.name || "Not specified"}
+                  {getBinName(fromBinId || null)}
                 </p>
-                {transfer.from_sublocation?.name && (
-                  <p className="text-xs text-muted-foreground">{transfer.from_sublocation.name}</p>
-                )}
-                {transfer.from_department?.name && transfer.from_location?.name && (
-                  <p className="text-xs text-muted-foreground">{transfer.from_department.name}</p>
-                )}
               </div>
               <ArrowRight className="h-6 w-6 text-muted-foreground" />
               <div className="flex-1">
-                <p className="text-sm text-muted-foreground mb-1">To</p>
+                <p className="text-sm text-muted-foreground mb-1">To Bin</p>
                 <p className="font-medium">
-                  {transfer.to_location?.name || transfer.to_department?.name || "Not specified"}
+                  {getBinName(toBinId || null)}
                 </p>
-                {transfer.to_sublocation?.name && (
-                  <p className="text-xs text-muted-foreground">{transfer.to_sublocation.name}</p>
-                )}
-                {transfer.to_department?.name && transfer.to_location?.name && (
-                  <p className="text-xs text-muted-foreground">{transfer.to_department.name}</p>
-                )}
               </div>
             </div>
 

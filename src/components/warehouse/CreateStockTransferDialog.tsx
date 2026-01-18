@@ -29,23 +29,23 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useCreateStockTransfer, useCreateStockTransferItem } from "@/hooks/useStockTransfer";
-import { useWarehouseLocations } from "@/hooks/useWarehouseLocations";
+import { useWarehouseBins } from "@/hooks/useWarehouseBins";
 import { useWarehouseItems } from "@/hooks/useWarehouseItems";
+import { useWarehouseLocations } from "@/hooks/useWarehouseLocations";
 import { ItemSelector } from "@/components/common/ItemSelector";
 
 const formSchema = z.object({
   transfer_date: z.string(),
   transfer_type: z.enum(["location", "department", "emergency"]),
   priority: z.enum(["low", "normal", "high", "urgent"]),
-  from_location_id: z.string().optional(),
-  from_sublocation_id: z.string().optional(),
-  from_department_id: z.string().optional(),
-  to_location_id: z.string().optional(),
-  to_sublocation_id: z.string().optional(),
-  to_department_id: z.string().optional(),
+  from_bin_id: z.string().min(1, "Source bin is required"),
+  to_bin_id: z.string().min(1, "Destination bin is required"),
   expected_completion_date: z.string().optional(),
   reason: z.string().optional(),
   notes: z.string().optional(),
+}).refine((data) => data.from_bin_id !== data.to_bin_id, {
+  message: "Source and destination bins must be different",
+  path: ["to_bin_id"],
 });
 
 interface TransferItemForm {
@@ -53,8 +53,8 @@ interface TransferItemForm {
   item_name: string;
   quantity_requested: number;
   unit_of_measure: string;
-  from_bin_id?: string;
-  to_bin_id?: string;
+  from_bin_id: string;
+  to_bin_id: string;
   notes?: string;
 }
 
@@ -77,19 +77,36 @@ export function CreateStockTransferDialog({
       transfer_date: new Date().toISOString().split("T")[0],
       transfer_type: "location",
       priority: "normal",
+      from_bin_id: "",
+      to_bin_id: "",
     },
   });
 
   const createTransfer = useCreateStockTransfer();
   const createItem = useCreateStockTransferItem();
-  const { locations = [] } = useWarehouseLocations();
+  const { bins = [] } = useWarehouseBins();
   const { items: warehouseItems = [] } = useWarehouseItems();
+  const { locations = [] } = useWarehouseLocations();
 
-  const mainLocations = locations.filter((l) => l.type === "location");
-  const departments = locations.filter((l) => l.type === "department");
+  // Group bins by location for easier selection
+  const getBinDisplayName = (bin: typeof bins[0]) => {
+    const location = locations.find(l => l.id === bin.location_id);
+    const locationName = location?.name || "Unassigned";
+    return `${bin.bin_code} - ${bin.name} (${locationName})`;
+  };
 
   const handleAddItem = () => {
     if (!selectedItem || !itemQuantity) return;
+
+    const fromBinId = form.getValues("from_bin_id");
+    const toBinId = form.getValues("to_bin_id");
+
+    if (!fromBinId || !toBinId) {
+      form.setError("root", {
+        message: "Please select source and destination bins first",
+      });
+      return;
+    }
 
     setTransferItems([
       ...transferItems,
@@ -98,6 +115,8 @@ export function CreateStockTransferDialog({
         item_name: selectedItem.name,
         quantity_requested: parseFloat(itemQuantity),
         unit_of_measure: selectedItem.unit_of_measure,
+        from_bin_id: fromBinId,
+        to_bin_id: toBinId,
       },
     ]);
 
@@ -118,9 +137,15 @@ export function CreateStockTransferDialog({
     }
 
     try {
-      const transferData: any = {
-        ...values,
+      const transferData = {
         transfer_date: values.transfer_date || new Date().toISOString().split("T")[0],
+        transfer_type: values.transfer_type,
+        priority: values.priority,
+        from_bin_id: values.from_bin_id,
+        to_bin_id: values.to_bin_id,
+        expected_completion_date: values.expected_completion_date,
+        reason: values.reason,
+        notes: values.notes,
       };
       
       const transfer = await createTransfer.mutateAsync(transferData);
@@ -129,7 +154,13 @@ export function CreateStockTransferDialog({
       for (const item of transferItems) {
         await createItem.mutateAsync({
           transfer_id: transfer.id,
-          ...item,
+          warehouse_item_id: item.warehouse_item_id,
+          item_name: item.item_name,
+          quantity_requested: item.quantity_requested,
+          unit_of_measure: item.unit_of_measure,
+          from_bin_id: item.from_bin_id,
+          to_bin_id: item.to_bin_id,
+          notes: item.notes,
         });
       }
 
@@ -141,13 +172,16 @@ export function CreateStockTransferDialog({
     }
   };
 
+  const selectedFromBin = bins.find(b => b.id === form.watch("from_bin_id"));
+  const selectedToBin = bins.find(b => b.id === form.watch("to_bin_id"));
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Create Stock Transfer</DialogTitle>
           <DialogDescription>
-            Create a new stock transfer request between locations or departments
+            Create a new stock transfer request between bins
           </DialogDescription>
         </DialogHeader>
 
@@ -230,25 +264,25 @@ export function CreateStockTransferDialog({
               />
             </div>
 
-            <div className="space-y-4">
-              <h3 className="font-semibold">Source Location</h3>
-              <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-6">
+              <div className="space-y-4">
+                <h3 className="font-semibold">Source Bin</h3>
                 <FormField
                   control={form.control}
-                  name="from_location_id"
+                  name="from_bin_id"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>From Location</FormLabel>
+                      <FormLabel>From Bin *</FormLabel>
                       <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl>
                           <SelectTrigger>
-                            <SelectValue placeholder="Select location" />
+                            <SelectValue placeholder="Select source bin" />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {mainLocations.map((loc) => (
-                            <SelectItem key={loc.id} value={loc.id}>
-                              {loc.name}
+                          {bins.map((bin) => (
+                            <SelectItem key={bin.id} value={bin.id}>
+                              {getBinDisplayName(bin)}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -257,53 +291,31 @@ export function CreateStockTransferDialog({
                     </FormItem>
                   )}
                 />
-
-                <FormField
-                  control={form.control}
-                  name="from_department_id"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>From Department</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select department" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {departments.map((dept) => (
-                            <SelectItem key={dept.id} value={dept.id}>
-                              {dept.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                {selectedFromBin && (
+                  <p className="text-xs text-muted-foreground">
+                    Current Qty: {selectedFromBin.current_quantity || 0}
+                  </p>
+                )}
               </div>
-            </div>
 
-            <div className="space-y-4">
-              <h3 className="font-semibold">Destination Location</h3>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-4">
+                <h3 className="font-semibold">Destination Bin</h3>
                 <FormField
                   control={form.control}
-                  name="to_location_id"
+                  name="to_bin_id"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>To Location</FormLabel>
+                      <FormLabel>To Bin *</FormLabel>
                       <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl>
                           <SelectTrigger>
-                            <SelectValue placeholder="Select location" />
+                            <SelectValue placeholder="Select destination bin" />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {mainLocations.map((loc) => (
-                            <SelectItem key={loc.id} value={loc.id}>
-                              {loc.name}
+                          {bins.map((bin) => (
+                            <SelectItem key={bin.id} value={bin.id}>
+                              {getBinDisplayName(bin)}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -312,31 +324,11 @@ export function CreateStockTransferDialog({
                     </FormItem>
                   )}
                 />
-
-                <FormField
-                  control={form.control}
-                  name="to_department_id"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>To Department</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select department" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {departments.map((dept) => (
-                            <SelectItem key={dept.id} value={dept.id}>
-                              {dept.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                {selectedToBin && (
+                  <p className="text-xs text-muted-foreground">
+                    Current Qty: {selectedToBin.current_quantity || 0}
+                  </p>
+                )}
               </div>
             </div>
 
