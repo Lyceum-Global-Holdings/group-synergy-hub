@@ -59,6 +59,7 @@ const Budgeting = lazy(() => import("./pages/finance/Budgeting"));
 const CostCenters = lazy(() => import("./pages/finance/CostCenters"));
 const FinancialReporting = lazy(() => import("./pages/finance/FinancialReporting"));
 const BankReconciliation = lazy(() => import("./pages/finance/BankReconciliation"));
+const Payments = lazy(() => import("./pages/finance/Payments"));
 const Auth = lazy(() => import("./pages/Auth"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const Training = lazy(() => import("./pages/admin/Training"));
@@ -186,6 +187,7 @@ function App() {
                 <Route path="/finance/cost-centers" element={<CostCenters />} />
                 <Route path="/finance/reporting" element={<FinancialReporting />} />
                 <Route path="/finance/bank-reconciliation" element={<BankReconciliation />} />
+                <Route path="/finance/payments" element={<Payments />} />
                 <Route path="/management/dashboards" element={<DashboardsKPIs />} />
                 <Route path="/management/dashboards/:id/edit" element={<DashboardEdit />} />
                 <Route path="/management/dashboards/:id" element={<DashboardView />} />
