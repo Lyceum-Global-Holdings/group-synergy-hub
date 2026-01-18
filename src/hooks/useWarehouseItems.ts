@@ -46,8 +46,7 @@ export const useWarehouseItems = () => {
               name
             )
           `)
-          .in('warehouse_item_id', itemIds)
-          .gt('available_quantity', 0);
+          .in('warehouse_item_id', itemIds);
 
         if (!allocError && allocations) {
           // Group allocations by item_id
