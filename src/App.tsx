@@ -47,6 +47,7 @@ const CycleCount = lazy(() => import("./pages/warehouse/CycleCount"));
 const DeliveryOrder = lazy(() => import("./pages/warehouse/DeliveryOrder"));
 const GoodsReceiptNote = lazy(() => import("./pages/warehouse/GoodsReceiptNote"));
 const InventoryValuation = lazy(() => import("./pages/warehouse/InventoryValuation"));
+const BatchManagement = lazy(() => import("./pages/warehouse/BatchManagement"));
 const PublicAssetView = lazy(() => import("./pages/PublicAssetView"));
 const ToolManagement = lazy(() => import("./pages/warehouse/ToolManagement"));
 const PoEmailApproval = lazy(() => import("./pages/procurement/PoEmailApproval"));
@@ -189,6 +190,7 @@ function App() {
                 <Route path="/warehouse/cycle-count" element={<CycleCount />} />
                 <Route path="/warehouse/delivery-order" element={<DeliveryOrder />} />
                 <Route path="/warehouse/inventory-valuation" element={<InventoryValuation />} />
+                <Route path="/warehouse/batch-management" element={<BatchManagement />} />
                 <Route path="/finance/general-ledger" element={<GeneralLedger />} />
                 <Route path="/finance/accounts-payable" element={<AccountsPayable />} />
                 <Route path="/finance/accounts-receivable" element={<AccountsReceivable />} />

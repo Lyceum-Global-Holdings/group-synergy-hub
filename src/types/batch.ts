@@ -66,3 +66,17 @@ export interface CreateBatchData {
   company_id?: string;
   notes?: string;
 }
+
+export interface BatchFilters {
+  status?: BatchStatus | 'all';
+  expiryFilter?: 'all' | 'expiring_soon' | 'expired' | 'not_set';
+  warehouseItemId?: string;
+  searchTerm?: string;
+}
+
+export interface BatchSummary {
+  total_active: number;
+  expiring_soon: number;
+  expired: number;
+  low_stock: number;
+}
