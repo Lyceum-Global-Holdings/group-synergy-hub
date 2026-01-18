@@ -11,7 +11,7 @@ import { useState } from "react";
 
 export function GeneralLedgerReport() {
   const { selectedCompany } = useCompany();
-  const [selectedAccount, setSelectedAccount] = useState<string>("");
+  const [selectedAccount, setSelectedAccount] = useState<string>("all");
 
   const { data: accounts } = useQuery({
     queryKey: ["chart-of-accounts", selectedCompany?.id],
@@ -51,7 +51,7 @@ export function GeneralLedgerReport() {
         .order("created_at", { ascending: false })
         .limit(100);
 
-      if (selectedAccount) {
+      if (selectedAccount && selectedAccount !== "all") {
         query = query.eq("account_id", selectedAccount);
       }
 
@@ -77,7 +77,7 @@ export function GeneralLedgerReport() {
             <SelectValue placeholder="All Accounts" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">All Accounts</SelectItem>
+            <SelectItem value="all">All Accounts</SelectItem>
             {accounts?.map((account) => (
               <SelectItem key={account.id} value={account.id}>
                 {account.account_code} - {account.account_name}
