@@ -33,7 +33,10 @@ export const useWarehouseItems = () => {
       if (error) throw error;
 
       // Fetch bin allocations for all items using separate queries (more reliable than nested syntax)
+      // Fetch bin allocations for all items
       const itemIds = data?.map((item: any) => item.id) || [];
+      let itemsWithBins = data || [];
+
       if (itemIds.length > 0) {
         // Fetch all bins first
         const { data: bins } = await supabase
@@ -79,14 +82,15 @@ export const useWarehouseItems = () => {
 
           console.log('Items with bins:', Object.keys(binsByItem).length);
 
-          // Attach bins to items
-          data?.forEach((item: any) => {
-            item.bins = binsByItem[item.id] || null;
-          });
+          // Create new array with bins attached (immutable update for React)
+          itemsWithBins = data?.map((item: any) => ({
+            ...item,
+            bins: binsByItem[item.id] || null
+          })) || [];
         }
       }
 
-      return data as WarehouseItem[];
+      return itemsWithBins as WarehouseItem[];
     },
     enabled: !!(isViewingAllCompanies || selectedCompany?.id),
   });
