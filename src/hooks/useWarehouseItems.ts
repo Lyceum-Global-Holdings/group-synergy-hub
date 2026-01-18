@@ -53,6 +53,9 @@ export const useWarehouseItems = () => {
           const binsByItem: Record<string, Array<{ id: string; bin_code: string; name: string; quantity: number }>> = {};
           allocations.forEach((alloc: any) => {
             const itemId = alloc.warehouse_item_id;
+            // Skip if warehouse_bins is null (orphaned allocation or deleted bin)
+            if (!alloc.warehouse_bins) return;
+            
             if (!binsByItem[itemId]) binsByItem[itemId] = [];
             
             const existingBin = binsByItem[itemId].find(b => b.id === alloc.warehouse_bins.id);
