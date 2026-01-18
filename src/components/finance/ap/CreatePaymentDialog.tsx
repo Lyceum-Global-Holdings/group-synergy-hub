@@ -14,7 +14,13 @@ interface Props { open: boolean; onOpenChange: (open: boolean) => void; }
 export function CreatePaymentDialog({ open, onOpenChange }: Props) {
   const { selectedCompany } = useCompany();
   const queryClient = useQueryClient();
-  const [form, setForm] = useState({ payment_number: '', supplier_id: '', payment_date: '', payment_method: '', total_amount: '' });
+  const [form, setForm] = useState<{
+    payment_number: string;
+    supplier_id: string | undefined;
+    payment_date: string;
+    payment_method: string | undefined;
+    total_amount: string;
+  }>({ payment_number: '', supplier_id: undefined, payment_date: '', payment_method: undefined, total_amount: '' });
 
   const { data: suppliers } = useQuery({
     queryKey: ['suppliers', selectedCompany?.id],

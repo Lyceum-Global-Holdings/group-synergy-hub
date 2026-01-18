@@ -14,7 +14,13 @@ interface Props { open: boolean; onOpenChange: (open: boolean) => void; }
 export function CreateReceiptDialog({ open, onOpenChange }: Props) {
   const { selectedCompany } = useCompany();
   const queryClient = useQueryClient();
-  const [form, setForm] = useState({ receipt_number: '', customer_id: '', receipt_date: '', payment_method: '', total_amount: '' });
+  const [form, setForm] = useState<{
+    receipt_number: string;
+    customer_id: string | undefined;
+    receipt_date: string;
+    payment_method: string | undefined;
+    total_amount: string;
+  }>({ receipt_number: '', customer_id: undefined, receipt_date: '', payment_method: undefined, total_amount: '' });
 
   const { data: customers } = useQuery({
     queryKey: ['customers', selectedCompany?.id],
