@@ -39,6 +39,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useCreateStockTransfer, useCreateStockTransferItem, useCompleteStockTransfer } from "@/hooks/useStockTransfer";
+import { useWarehouseBins } from "@/hooks/useWarehouseBins";
 import { useWarehouseLocations } from "@/hooks/useWarehouseLocations";
 import { WarehouseItem } from "@/types/itemBin";
 import { useItemUnits } from "@/hooks/useItemUnits";
@@ -49,13 +50,14 @@ import { ArrowRight, CheckCircle2, Loader2 } from "lucide-react";
 const formSchema = z.object({
   transfer_date: z.string(),
   priority: z.enum(["low", "normal", "high", "urgent"]),
-  from_location_id: z.string().min(1, "Source location is required"),
-  from_department_id: z.string().optional(),
-  to_location_id: z.string().min(1, "Destination location is required"),
-  to_department_id: z.string().optional(),
+  from_bin_id: z.string().min(1, "Source bin is required"),
+  to_bin_id: z.string().min(1, "Destination bin is required"),
   quantity: z.number().min(1, "Quantity must be at least 1"),
   reason: z.string().optional(),
   notes: z.string().optional(),
+}).refine((data) => data.from_bin_id !== data.to_bin_id, {
+  message: "Source and destination bins must be different",
+  path: ["to_bin_id"],
 });
 
 interface ItemTransferDialogProps {
@@ -74,10 +76,8 @@ export function ItemTransferDialog({
     defaultValues: {
       transfer_date: new Date().toISOString().split("T")[0],
       priority: "normal",
-      from_location_id: "",
-      from_department_id: "",
-      to_location_id: "",
-      to_department_id: "",
+      from_bin_id: "",
+      to_bin_id: "",
       quantity: 1,
       reason: "",
       notes: "",
@@ -87,6 +87,7 @@ export function ItemTransferDialog({
   const createTransfer = useCreateStockTransfer();
   const createItem = useCreateStockTransferItem();
   const completeTransfer = useCompleteStockTransfer();
+  const { bins = [] } = useWarehouseBins();
   const { locations = [] } = useWarehouseLocations();
   const { units } = useItemUnits();
 
@@ -98,14 +99,11 @@ export function ItemTransferDialog({
   } | null>(null);
   const [isCompleting, setIsCompleting] = useState(false);
 
-  const mainLocations = locations.filter((l) => l.type === "location");
-  const departments = locations.filter((l) => l.type === "department");
-
   const unitName = item?.unit_id 
     ? units.find(u => u.id === item.unit_id)?.abbreviation || "units"
     : "units";
 
-  // Fetch bin allocations with location info for this item
+  // Fetch bin allocations for this item
   const { data: itemBinAllocations = [] } = useQuery({
     queryKey: ['item-bin-allocations-for-transfer', item?.id],
     queryFn: async () => {
@@ -115,6 +113,7 @@ export function ItemTransferDialog({
         .from('warehouse_bin_allocations')
         .select(`
           id,
+          bin_id,
           allocated_quantity,
           available_quantity,
           warehouse_bins:bin_id (
@@ -133,78 +132,59 @@ export function ItemTransferDialog({
     enabled: !!item?.id && open,
   });
 
-  // Aggregate stock by location
-  const itemLocationsWithStock = useMemo(() => {
-    const locationMap = new Map<string, { locationId: string; locationName: string; totalStock: number }>();
-    
-    itemBinAllocations.forEach((allocation: any) => {
-      const locationId = allocation.warehouse_bins?.location_id;
-      if (locationId) {
-        const location = mainLocations.find(l => l.id === locationId);
-        if (location) {
-          const existing = locationMap.get(locationId);
-          if (existing) {
-            existing.totalStock += Number(allocation.available_quantity) || 0;
-          } else {
-            locationMap.set(locationId, {
-              locationId,
-              locationName: location.name,
-              totalStock: Number(allocation.available_quantity) || 0,
-            });
-          }
-        }
-      }
-    });
+  // Get bins with stock for this item
+  const binsWithStock = useMemo(() => {
+    return itemBinAllocations.map((allocation: any) => {
+      const bin = allocation.warehouse_bins;
+      const location = locations.find(l => l.id === bin?.location_id);
+      return {
+        binId: bin?.id,
+        binCode: bin?.bin_code,
+        binName: bin?.name,
+        locationName: location?.name || "Unassigned",
+        availableQty: Number(allocation.available_quantity) || 0,
+      };
+    }).filter(b => b.binId);
+  }, [itemBinAllocations, locations]);
 
-    // Also include the item's primary location if it has stock there
-    if (item?.location_id && item.current_stock && item.current_stock > 0) {
-      const primaryLocation = mainLocations.find(l => l.id === item.location_id);
-      if (primaryLocation && !locationMap.has(item.location_id)) {
-        locationMap.set(item.location_id, {
-          locationId: item.location_id,
-          locationName: primaryLocation.name,
-          totalStock: item.current_stock,
-        });
-      }
-    }
+  const getBinDisplayName = (bin: typeof bins[0]) => {
+    const location = locations.find(l => l.id === bin.location_id);
+    const locationName = location?.name || "Unassigned";
+    return `${bin.bin_code} - ${bin.name} (${locationName})`;
+  };
 
-    return Array.from(locationMap.values());
-  }, [itemBinAllocations, mainLocations, item]);
+  const selectedFromBinId = form.watch('from_bin_id');
+  const selectedBinStock = binsWithStock.find(b => b.binId === selectedFromBinId)?.availableQty || 0;
 
-  const selectedFromLocation = form.watch('from_location_id');
-  const selectedLocationStock = itemLocationsWithStock.find(l => l.locationId === selectedFromLocation)?.totalStock || 0;
+  const hasBinsWithStock = binsWithStock.length > 0;
 
-  const hasLocationsWithStock = itemLocationsWithStock.length > 0;
-
-  // Auto-set from_location_id when item changes
+  // Auto-set from_bin_id when item changes
   useEffect(() => {
     if (item && open) {
-      const defaultLocationId = itemLocationsWithStock.length > 0 
-        ? itemLocationsWithStock[0].locationId 
-        : item.location_id || "";
+      const defaultBinId = binsWithStock.length > 0 
+        ? binsWithStock[0].binId 
+        : "";
       
       form.reset({
         transfer_date: new Date().toISOString().split("T")[0],
         priority: "normal",
-        from_location_id: defaultLocationId,
-        from_department_id: "",
-        to_location_id: "",
-        to_department_id: "",
+        from_bin_id: defaultBinId,
+        to_bin_id: "",
         quantity: 1,
         reason: "",
         notes: "",
       });
     }
-  }, [item, open, form, itemLocationsWithStock.length]);
+  }, [item, open, binsWithStock.length]);
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     if (!item) return;
 
-    // Validate quantity against available stock at selected location
-    const availableAtLocation = itemLocationsWithStock.find(l => l.locationId === values.from_location_id)?.totalStock || 0;
-    if (values.quantity > availableAtLocation) {
+    // Validate quantity against available stock at selected bin
+    const availableAtBin = binsWithStock.find(b => b.binId === values.from_bin_id)?.availableQty || 0;
+    if (values.quantity > availableAtBin) {
       form.setError("quantity", {
-        message: `Cannot transfer more than available stock at this location (${availableAtLocation})`,
+        message: `Cannot transfer more than available stock at this bin (${availableAtBin})`,
       });
       return;
     }
@@ -214,31 +194,25 @@ export function ItemTransferDialog({
         transfer_date: values.transfer_date,
         transfer_type: "location" as const,
         priority: values.priority,
-        from_location_id: values.from_location_id,
-        from_department_id: values.from_department_id || undefined,
-        to_location_id: values.to_location_id,
-        to_department_id: values.to_department_id || undefined,
+        from_bin_id: values.from_bin_id,
+        to_bin_id: values.to_bin_id,
         reason: values.reason || undefined,
         notes: values.notes || undefined,
         status: 'approved' as const, // Auto-approve transfers from Item Master
-        company_id: item.company_id, // Include company_id from the item being transferred
+        company_id: item.company_id,
       };
 
       const transfer = await createTransfer.mutateAsync(transferData);
 
-      // Find the source bin allocation for the selected location
-      const sourceBinAllocation = itemBinAllocations.find((alloc: any) => 
-        alloc.warehouse_bins?.location_id === values.from_location_id
-      );
-
-      // Create the transfer item with source bin
+      // Create the transfer item with bin IDs
       await createItem.mutateAsync({
         transfer_id: transfer.id,
         warehouse_item_id: item.id,
         item_name: item.name,
         quantity_requested: values.quantity,
         unit_of_measure: unitName,
-        from_bin_id: sourceBinAllocation?.warehouse_bins?.id,
+        from_bin_id: values.from_bin_id,
+        to_bin_id: values.to_bin_id,
       });
 
       // Show verification dialog instead of closing
@@ -277,16 +251,23 @@ export function ItemTransferDialog({
     onOpenChange(false);
   };
 
-  // Get location names for verification dialog
-  const fromLocationName = useMemo(() => {
-    if (!pendingTransferData) return "";
-    return itemLocationsWithStock.find(l => l.locationId === pendingTransferData.values.from_location_id)?.locationName || "";
-  }, [pendingTransferData, itemLocationsWithStock]);
+  // Get bin names for verification dialog
+  const fromBinInfo = useMemo(() => {
+    if (!pendingTransferData) return null;
+    return binsWithStock.find(b => b.binId === pendingTransferData.values.from_bin_id);
+  }, [pendingTransferData, binsWithStock]);
 
-  const toLocationName = useMemo(() => {
-    if (!pendingTransferData) return "";
-    return mainLocations.find(l => l.id === pendingTransferData.values.to_location_id)?.name || "";
-  }, [pendingTransferData, mainLocations]);
+  const toBinInfo = useMemo(() => {
+    if (!pendingTransferData) return null;
+    const bin = bins.find(b => b.id === pendingTransferData.values.to_bin_id);
+    if (!bin) return null;
+    const location = locations.find(l => l.id === bin.location_id);
+    return {
+      binCode: bin.bin_code,
+      binName: bin.name,
+      locationName: location?.name || "Unassigned",
+    };
+  }, [pendingTransferData, bins, locations]);
 
   const handleClose = () => {
     if (showVerificationDialog) return; // Don't close if verification is showing
@@ -301,9 +282,9 @@ export function ItemTransferDialog({
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Transfer Item Between Warehouses</DialogTitle>
+          <DialogTitle>Transfer Item Between Bins</DialogTitle>
           <DialogDescription>
-            Transfer "{item.name}" ({item.item_code}) to a different location
+            Transfer "{item.name}" ({item.item_code}) to a different bin
           </DialogDescription>
         </DialogHeader>
 
@@ -322,14 +303,14 @@ export function ItemTransferDialog({
               <p className="font-medium">{item.current_stock || 0} {unitName}</p>
             </div>
           </div>
-          {itemLocationsWithStock.length > 0 && (
+          {binsWithStock.length > 0 && (
             <div className="mt-3 pt-3 border-t">
-              <p className="text-xs text-muted-foreground mb-2">Stock by Location:</p>
+              <p className="text-xs text-muted-foreground mb-2">Stock by Bin:</p>
               <div className="flex flex-wrap gap-2">
-                {itemLocationsWithStock.map((loc) => (
-                  <span key={loc.locationId} className="inline-flex items-center gap-1 px-2 py-1 bg-background rounded text-xs">
-                    <span className="font-medium">{loc.locationName}:</span>
-                    <span>{loc.totalStock} {unitName}</span>
+                {binsWithStock.map((bin) => (
+                  <span key={bin.binId} className="inline-flex items-center gap-1 px-2 py-1 bg-background rounded text-xs">
+                    <span className="font-medium">{bin.binCode} ({bin.locationName}):</span>
+                    <span>{bin.availableQty} {unitName}</span>
                   </span>
                 ))}
               </div>
@@ -337,9 +318,9 @@ export function ItemTransferDialog({
           )}
         </div>
 
-        {!hasLocationsWithStock && (
+        {!hasBinsWithStock && (
           <div className="bg-destructive/10 text-destructive p-3 rounded-lg mb-4 text-sm">
-            This item has no stock in any location. Cannot transfer items without available stock.
+            This item has no stock in any bin. Cannot transfer items without available stock.
           </div>
         )}
 
@@ -385,110 +366,58 @@ export function ItemTransferDialog({
               />
             </div>
 
-            <div className="space-y-4">
-              <h3 className="font-semibold text-sm">Source Location</h3>
-              <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-6">
+              <div className="space-y-4">
+                <h3 className="font-semibold text-sm">Source Bin</h3>
                 <FormField
                   control={form.control}
-                  name="from_location_id"
+                  name="from_bin_id"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>From Location *</FormLabel>
+                      <FormLabel>From Bin *</FormLabel>
                       <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl>
                           <SelectTrigger>
-                            <SelectValue placeholder="Select source location" />
+                            <SelectValue placeholder="Select source bin" />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {itemLocationsWithStock.map((loc) => (
-                            <SelectItem key={loc.locationId} value={loc.locationId}>
-                              {loc.locationName} ({loc.totalStock} {unitName} available)
+                          {binsWithStock.map((bin) => (
+                            <SelectItem key={bin.binId} value={bin.binId}>
+                              {bin.binCode} - {bin.binName} ({bin.locationName}) - {bin.availableQty} {unitName}
                             </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
-                      {selectedFromLocation && (
+                      {selectedFromBinId && (
                         <p className="text-xs text-muted-foreground">
-                          Available: {selectedLocationStock} {unitName}
+                          Available: {selectedBinStock} {unitName}
                         </p>
                       )}
                       <FormMessage />
                     </FormItem>
                   )}
                 />
-
-                <FormField
-                  control={form.control}
-                  name="from_department_id"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>From Department</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select department" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {departments.map((dept) => (
-                            <SelectItem key={dept.id} value={dept.id}>
-                              {dept.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
               </div>
-            </div>
 
-            <div className="space-y-4">
-              <h3 className="font-semibold text-sm">Destination Location</h3>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-4">
+                <h3 className="font-semibold text-sm">Destination Bin</h3>
                 <FormField
                   control={form.control}
-                  name="to_location_id"
+                  name="to_bin_id"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>To Location *</FormLabel>
+                      <FormLabel>To Bin *</FormLabel>
                       <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl>
                           <SelectTrigger>
-                            <SelectValue placeholder="Select location" />
+                            <SelectValue placeholder="Select destination bin" />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {mainLocations.map((loc) => (
-                            <SelectItem key={loc.id} value={loc.id}>
-                              {loc.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="to_department_id"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>To Department</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select department" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {departments.map((dept) => (
-                            <SelectItem key={dept.id} value={dept.id}>
-                              {dept.name}
+                          {bins.map((bin) => (
+                            <SelectItem key={bin.id} value={bin.id}>
+                              {getBinDisplayName(bin)}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -510,7 +439,7 @@ export function ItemTransferDialog({
                     <Input
                       type="number"
                       min={1}
-                      max={selectedLocationStock || 0}
+                      max={selectedBinStock || 0}
                       {...field}
                       onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
                     />
@@ -554,7 +483,7 @@ export function ItemTransferDialog({
               </Button>
               <Button 
                 type="submit" 
-                disabled={createTransfer.isPending || createItem.isPending || !hasLocationsWithStock}
+                disabled={createTransfer.isPending || createItem.isPending || !hasBinsWithStock}
               >
                 {createTransfer.isPending ? "Creating Transfer..." : "Create Transfer"}
               </Button>
@@ -594,13 +523,15 @@ export function ItemTransferDialog({
 
               <div className="flex items-center gap-3 justify-center">
                 <div className="text-center flex-1 bg-muted/50 rounded-lg p-3">
-                  <p className="text-xs text-muted-foreground mb-1">From</p>
-                  <p className="font-medium">{fromLocationName}</p>
+                  <p className="text-xs text-muted-foreground mb-1">From Bin</p>
+                  <p className="font-medium">{fromBinInfo?.binCode} - {fromBinInfo?.binName}</p>
+                  <p className="text-xs text-muted-foreground">{fromBinInfo?.locationName}</p>
                 </div>
                 <ArrowRight className="h-5 w-5 text-muted-foreground flex-shrink-0" />
                 <div className="text-center flex-1 bg-muted/50 rounded-lg p-3">
-                  <p className="text-xs text-muted-foreground mb-1">To</p>
-                  <p className="font-medium">{toLocationName}</p>
+                  <p className="text-xs text-muted-foreground mb-1">To Bin</p>
+                  <p className="font-medium">{toBinInfo?.binCode} - {toBinInfo?.binName}</p>
+                  <p className="text-xs text-muted-foreground">{toBinInfo?.locationName}</p>
                 </div>
               </div>
 

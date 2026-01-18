@@ -57,12 +57,8 @@ export interface StockTransferItem {
 
 export interface CreateStockTransferData {
   transfer_date: string;
-  from_location_id?: string;
-  from_sublocation_id?: string;
-  from_department_id?: string;
-  to_location_id?: string;
-  to_sublocation_id?: string;
-  to_department_id?: string;
+  from_bin_id: string;
+  to_bin_id: string;
   transfer_type: TransferType;
   priority: TransferPriority;
   expected_completion_date?: string;
@@ -79,7 +75,7 @@ export interface CreateStockTransferItemData {
   item_name: string;
   quantity_requested: number;
   unit_of_measure?: string;
-  from_bin_id?: string;
-  to_bin_id?: string;
+  from_bin_id: string;
+  to_bin_id: string;
   notes?: string;
 }
