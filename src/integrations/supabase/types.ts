@@ -1332,6 +1332,97 @@ export type Database = {
           },
         ]
       }
+      batch_issue_details: {
+        Row: {
+          batch_id: string
+          created_at: string | null
+          id: string
+          issue_item_id: string
+          quantity_from_batch: number
+        }
+        Insert: {
+          batch_id: string
+          created_at?: string | null
+          id?: string
+          issue_item_id: string
+          quantity_from_batch: number
+        }
+        Update: {
+          batch_id?: string
+          created_at?: string | null
+          id?: string
+          issue_item_id?: string
+          quantity_from_batch?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "batch_issue_details_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "item_batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "batch_issue_details_issue_item_id_fkey"
+            columns: ["issue_item_id"]
+            isOneToOne: false
+            referencedRelation: "material_issue_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      batch_stock_allocations: {
+        Row: {
+          allocated_quantity: number
+          batch_id: string
+          bin_id: string
+          company_id: string | null
+          created_at: string | null
+          id: string
+          updated_at: string | null
+        }
+        Insert: {
+          allocated_quantity?: number
+          batch_id: string
+          bin_id: string
+          company_id?: string | null
+          created_at?: string | null
+          id?: string
+          updated_at?: string | null
+        }
+        Update: {
+          allocated_quantity?: number
+          batch_id?: string
+          bin_id?: string
+          company_id?: string | null
+          created_at?: string | null
+          id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "batch_stock_allocations_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "item_batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "batch_stock_allocations_bin_id_fkey"
+            columns: ["bin_id"]
+            isOneToOne: false
+            referencedRelation: "warehouse_bins"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "batch_stock_allocations_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       bill_of_materials: {
         Row: {
           bom_number: string
@@ -6686,12 +6777,15 @@ export type Database = {
       }
       grn_items: {
         Row: {
+          batch_number: string | null
           created_at: string
           description: string | null
+          expiry_date: string | null
           grn_id: string
           id: string
           item_code: string | null
           item_name: string
+          manufacturing_date: string | null
           po_item_id: string | null
           quality_status: string | null
           quantity_ordered: number | null
@@ -6704,12 +6798,15 @@ export type Database = {
           warehouse_item_id: string | null
         }
         Insert: {
+          batch_number?: string | null
           created_at?: string
           description?: string | null
+          expiry_date?: string | null
           grn_id: string
           id?: string
           item_code?: string | null
           item_name: string
+          manufacturing_date?: string | null
           po_item_id?: string | null
           quality_status?: string | null
           quantity_ordered?: number | null
@@ -6722,12 +6819,15 @@ export type Database = {
           warehouse_item_id?: string | null
         }
         Update: {
+          batch_number?: string | null
           created_at?: string
           description?: string | null
+          expiry_date?: string | null
           grn_id?: string
           id?: string
           item_code?: string | null
           item_name?: string
+          manufacturing_date?: string | null
           po_item_id?: string | null
           quality_status?: string | null
           quantity_ordered?: number | null
@@ -6889,6 +6989,86 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      item_batches: {
+        Row: {
+          batch_number: string
+          company_id: string | null
+          created_at: string | null
+          expiry_date: string | null
+          grn_item_id: string | null
+          id: string
+          manufacturing_date: string | null
+          notes: string | null
+          quantity_received: number
+          quantity_remaining: number
+          status: string | null
+          unit_cost: number | null
+          updated_at: string | null
+          warehouse_item_id: string
+        }
+        Insert: {
+          batch_number: string
+          company_id?: string | null
+          created_at?: string | null
+          expiry_date?: string | null
+          grn_item_id?: string | null
+          id?: string
+          manufacturing_date?: string | null
+          notes?: string | null
+          quantity_received?: number
+          quantity_remaining?: number
+          status?: string | null
+          unit_cost?: number | null
+          updated_at?: string | null
+          warehouse_item_id: string
+        }
+        Update: {
+          batch_number?: string
+          company_id?: string | null
+          created_at?: string | null
+          expiry_date?: string | null
+          grn_item_id?: string | null
+          id?: string
+          manufacturing_date?: string | null
+          notes?: string | null
+          quantity_received?: number
+          quantity_remaining?: number
+          status?: string | null
+          unit_cost?: number | null
+          updated_at?: string | null
+          warehouse_item_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "item_batches_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "item_batches_grn_item_id_fkey"
+            columns: ["grn_item_id"]
+            isOneToOne: false
+            referencedRelation: "grn_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "item_batches_warehouse_item_id_fkey"
+            columns: ["warehouse_item_id"]
+            isOneToOne: false
+            referencedRelation: "v_adjustment_summary_by_item"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "item_batches_warehouse_item_id_fkey"
+            columns: ["warehouse_item_id"]
+            isOneToOne: false
+            referencedRelation: "warehouse_items"
             referencedColumns: ["id"]
           },
         ]
@@ -7437,6 +7617,7 @@ export type Database = {
       }
       material_issue_items: {
         Row: {
+          batch_allocation_mode: string | null
           created_at: string
           description: string | null
           from_reservation: boolean | null
@@ -7460,6 +7641,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          batch_allocation_mode?: string | null
           created_at?: string
           description?: string | null
           from_reservation?: boolean | null
@@ -7483,6 +7665,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          batch_allocation_mode?: string | null
           created_at?: string
           description?: string | null
           from_reservation?: boolean | null
