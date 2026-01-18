@@ -83,6 +83,17 @@ const SubcontractorResources = lazy(() => import("./pages/construction/resources
 const QualityControl = lazy(() => import("./pages/construction/QualityControl"));
 const SafetyManagement = lazy(() => import("./pages/construction/SafetyManagement"));
 
+// Missing module pages
+const RfqManagement = lazy(() => import("./pages/sourcing/RfqManagement"));
+const QuotationComparison = lazy(() => import("./pages/sourcing/QuotationComparison"));
+const PoAmendment = lazy(() => import("./pages/procurement/PoAmendment"));
+const ThreeWayMatch = lazy(() => import("./pages/procurement/ThreeWayMatch"));
+const Catalogs = lazy(() => import("./pages/procurement/Catalogs"));
+const PriceLists = lazy(() => import("./pages/procurement/PriceLists"));
+const AuditLogs = lazy(() => import("./pages/management/AuditLogs"));
+const BudgetVsActual = lazy(() => import("./pages/management/BudgetVsActual"));
+const Exceptions = lazy(() => import("./pages/management/Exceptions"));
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -192,6 +203,19 @@ function App() {
                 <Route path="/management/dashboards/:id/edit" element={<DashboardEdit />} />
                 <Route path="/management/dashboards/:id" element={<DashboardView />} />
                 <Route path="/management/approvals" element={<ApprovalConsole />} />
+                <Route path="/management/audit-logs" element={<AuditLogs />} />
+                <Route path="/management/budget-actual" element={<BudgetVsActual />} />
+                <Route path="/management/exceptions" element={<Exceptions />} />
+                
+                {/* Additional Sourcing routes */}
+                <Route path="/sourcing/rfq-management" element={<RfqManagement />} />
+                <Route path="/sourcing/quotation-comparison" element={<QuotationComparison />} />
+                
+                {/* Additional Procurement routes */}
+                <Route path="/procurement/po-amendment" element={<PoAmendment />} />
+                <Route path="/procurement/three-way-match" element={<ThreeWayMatch />} />
+                <Route path="/procurement/catalogs" element={<Catalogs />} />
+                <Route path="/procurement/price-lists" element={<PriceLists />} />
                 
                 {/* Construction routes */}
                 <Route path="/construction/project-master" element={<ProjectMaster />} />
