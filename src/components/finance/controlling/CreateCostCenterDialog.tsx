@@ -1,14 +1,25 @@
-import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useCompany } from "@/contexts/CompanyContext";
 import { toast } from "sonner";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+
+const costCenterSchema = z.object({
+  code: z.string().min(1, "Cost center code is required").max(20, "Code is too long"),
+  name: z.string().min(1, "Name is required").max(100, "Name is too long"),
+  description: z.string().max(500, "Description is too long").optional(),
+  parent_id: z.string().optional(),
+});
+
+type CostCenterFormValues = z.infer<typeof costCenterSchema>;
 
 interface CreateCostCenterDialogProps {
   open: boolean;
@@ -18,11 +29,15 @@ interface CreateCostCenterDialogProps {
 export function CreateCostCenterDialog({ open, onOpenChange }: CreateCostCenterDialogProps) {
   const { selectedCompany } = useCompany();
   const queryClient = useQueryClient();
-  const [formData, setFormData] = useState({
-    code: "",
-    name: "",
-    description: "",
-    parent_id: "",
+
+  const form = useForm<CostCenterFormValues>({
+    resolver: zodResolver(costCenterSchema),
+    defaultValues: {
+      code: '',
+      name: '',
+      description: '',
+      parent_id: '',
+    },
   });
 
   const { data: existingCostCenters } = useQuery({
@@ -41,12 +56,12 @@ export function CreateCostCenterDialog({ open, onOpenChange }: CreateCostCenterD
   });
 
   const createCostCenter = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (values: CostCenterFormValues) => {
       const { error } = await supabase.from("cost_centers").insert({
-        code: formData.code,
-        name: formData.name,
-        description: formData.description || null,
-        parent_id: formData.parent_id && formData.parent_id !== "none" ? formData.parent_id : null,
+        code: values.code,
+        name: values.name,
+        description: values.description || null,
+        parent_id: values.parent_id && values.parent_id !== "none" ? values.parent_id : null,
         company_id: selectedCompany?.id,
         is_active: true,
       });
@@ -55,13 +70,17 @@ export function CreateCostCenterDialog({ open, onOpenChange }: CreateCostCenterD
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["cost-centers"] });
       toast.success("Cost center created successfully");
+      form.reset();
       onOpenChange(false);
-      setFormData({ code: "", name: "", description: "", parent_id: "" });
     },
     onError: (error) => {
       toast.error("Failed to create cost center: " + error.message);
     },
   });
+
+  const onSubmit = (values: CostCenterFormValues) => {
+    createCostCenter.mutate(values);
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -69,68 +88,84 @@ export function CreateCostCenterDialog({ open, onOpenChange }: CreateCostCenterD
         <DialogHeader>
           <DialogTitle>Create Cost Center</DialogTitle>
         </DialogHeader>
-        <div className="space-y-4 py-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="code">Cost Center Code</Label>
-              <Input
-                id="code"
-                value={formData.code}
-                onChange={(e) => setFormData({ ...formData, code: e.target.value })}
-                placeholder="e.g., CC-001"
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 py-4">
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="code"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Cost Center Code</FormLabel>
+                    <FormControl>
+                      <Input {...field} placeholder="e.g., CC-001" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="parent_id"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Parent Cost Center</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="None (Top Level)" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="none">None (Top Level)</SelectItem>
+                        {existingCostCenters?.map((cc) => (
+                          <SelectItem key={cc.id} value={cc.id}>
+                            {cc.code} - {cc.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="parent">Parent Cost Center</Label>
-              <Select
-                value={formData.parent_id}
-                onValueChange={(value) => setFormData({ ...formData, parent_id: value })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="None (Top Level)" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">None (Top Level)</SelectItem>
-                  {existingCostCenters?.map((cc) => (
-                    <SelectItem key={cc.id} value={cc.id}>
-                      {cc.code} - {cc.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="name">Name</Label>
-            <Input
-              id="name"
-              value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              placeholder="e.g., Production Department"
+            <FormField
+              control={form.control}
+              name="name"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Name</FormLabel>
+                  <FormControl>
+                    <Input {...field} placeholder="e.g., Production Department" />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
             />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="description">Description</Label>
-            <Textarea
-              id="description"
-              value={formData.description}
-              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              placeholder="Cost center description..."
-              rows={3}
+            <FormField
+              control={form.control}
+              name="description"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Description</FormLabel>
+                  <FormControl>
+                    <Textarea {...field} placeholder="Cost center description..." rows={3} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
             />
-          </div>
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Cancel
-          </Button>
-          <Button 
-            onClick={() => createCostCenter.mutate()} 
-            disabled={!formData.code || !formData.name}
-          >
-            Create
-          </Button>
-        </DialogFooter>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={createCostCenter.isPending}>
+                {createCostCenter.isPending ? "Creating..." : "Create"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </Form>
       </DialogContent>
     </Dialog>
   );

@@ -1,14 +1,27 @@
-import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useCompany } from "@/contexts/CompanyContext";
 import { toast } from "sonner";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+
+const transactionSchema = z.object({
+  bank_account_id: z.string().min(1, "Bank account is required"),
+  transaction_date: z.string().min(1, "Transaction date is required"),
+  transaction_type: z.string().min(1, "Transaction type is required"),
+  amount: z.number().positive("Amount must be greater than zero"),
+  reference_number: z.string().max(50, "Reference number is too long").optional(),
+  description: z.string().max(500, "Description is too long").optional(),
+});
+
+type TransactionFormValues = z.infer<typeof transactionSchema>;
 
 interface CreateBankTransactionDialogProps {
   open: boolean;
@@ -18,20 +31,17 @@ interface CreateBankTransactionDialogProps {
 export function CreateBankTransactionDialog({ open, onOpenChange }: CreateBankTransactionDialogProps) {
   const { selectedCompany } = useCompany();
   const queryClient = useQueryClient();
-  const [formData, setFormData] = useState<{
-    bank_account_id: string | undefined;
-    transaction_date: string;
-    transaction_type: string;
-    amount: number;
-    reference_number: string;
-    description: string;
-  }>({
-    bank_account_id: undefined,
-    transaction_date: new Date().toISOString().split("T")[0],
-    transaction_type: "deposit",
-    amount: 0,
-    reference_number: "",
-    description: "",
+
+  const form = useForm<TransactionFormValues>({
+    resolver: zodResolver(transactionSchema),
+    defaultValues: {
+      bank_account_id: '',
+      transaction_date: new Date().toISOString().split("T")[0],
+      transaction_type: 'deposit',
+      amount: 0,
+      reference_number: '',
+      description: '',
+    },
   });
 
   const { data: accounts } = useQuery({
@@ -49,16 +59,16 @@ export function CreateBankTransactionDialog({ open, onOpenChange }: CreateBankTr
   });
 
   const createTransaction = useMutation({
-    mutationFn: async () => {
-      const isDebit = ["withdrawal", "payment", "fee"].includes(formData.transaction_type);
+    mutationFn: async (values: TransactionFormValues) => {
+      const isDebit = ["withdrawal", "payment", "fee"].includes(values.transaction_type);
       const { error } = await supabase.from("bank_transactions").insert({
-        bank_account_id: formData.bank_account_id,
-        transaction_date: formData.transaction_date,
-        transaction_type: formData.transaction_type,
-        debit_amount: isDebit ? formData.amount : 0,
-        credit_amount: !isDebit ? formData.amount : 0,
-        reference_number: formData.reference_number,
-        description: formData.description,
+        bank_account_id: values.bank_account_id,
+        transaction_date: values.transaction_date,
+        transaction_type: values.transaction_type,
+        debit_amount: isDebit ? values.amount : 0,
+        credit_amount: !isDebit ? values.amount : 0,
+        reference_number: values.reference_number || null,
+        description: values.description || null,
         company_id: selectedCompany?.id,
         is_reconciled: false,
       });
@@ -67,20 +77,17 @@ export function CreateBankTransactionDialog({ open, onOpenChange }: CreateBankTr
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["bank-transactions"] });
       toast.success("Transaction recorded successfully");
+      form.reset();
       onOpenChange(false);
-      setFormData({
-        bank_account_id: undefined,
-        transaction_date: new Date().toISOString().split("T")[0],
-        transaction_type: "deposit",
-        amount: 0,
-        reference_number: "",
-        description: "",
-      });
     },
     onError: (error) => {
       toast.error("Failed to record transaction: " + error.message);
     },
   });
+
+  const onSubmit = (values: TransactionFormValues) => {
+    createTransaction.mutate(values);
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -88,93 +95,129 @@ export function CreateBankTransactionDialog({ open, onOpenChange }: CreateBankTr
         <DialogHeader>
           <DialogTitle>Record Bank Transaction</DialogTitle>
         </DialogHeader>
-        <div className="space-y-4 py-4">
-          <div className="space-y-2">
-            <Label>Bank Account</Label>
-            <Select
-              value={formData.bank_account_id}
-              onValueChange={(value) => setFormData({ ...formData, bank_account_id: value })}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select account" />
-              </SelectTrigger>
-              <SelectContent>
-                {accounts?.map((account) => (
-                  <SelectItem key={account.id} value={account.id}>
-                    {account.bank_name} - {account.account_name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Transaction Date</Label>
-              <Input
-                type="date"
-                value={formData.transaction_date}
-                onChange={(e) => setFormData({ ...formData, transaction_date: e.target.value })}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Type</Label>
-              <Select
-                value={formData.transaction_type}
-                onValueChange={(value) => setFormData({ ...formData, transaction_type: value })}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="deposit">Deposit</SelectItem>
-                  <SelectItem value="withdrawal">Withdrawal</SelectItem>
-                  <SelectItem value="transfer">Transfer</SelectItem>
-                  <SelectItem value="payment">Payment</SelectItem>
-                  <SelectItem value="fee">Bank Fee</SelectItem>
-                  <SelectItem value="interest">Interest</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Amount</Label>
-              <Input
-                type="number"
-                value={formData.amount}
-                onChange={(e) => setFormData({ ...formData, amount: Number(e.target.value) })}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Reference Number</Label>
-              <Input
-                value={formData.reference_number}
-                onChange={(e) => setFormData({ ...formData, reference_number: e.target.value })}
-                placeholder="e.g., CHQ-001234"
-              />
-            </div>
-          </div>
-          <div className="space-y-2">
-            <Label>Description</Label>
-            <Textarea
-              value={formData.description}
-              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              placeholder="Transaction description..."
-              rows={2}
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 py-4">
+            <FormField
+              control={form.control}
+              name="bank_account_id"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Bank Account</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select account" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {accounts?.map((account) => (
+                        <SelectItem key={account.id} value={account.id}>
+                          {account.bank_name} - {account.account_name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
             />
-          </div>
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Cancel
-          </Button>
-          <Button 
-            onClick={() => createTransaction.mutate()} 
-            disabled={!formData.bank_account_id || !formData.amount}
-          >
-            Record Transaction
-          </Button>
-        </DialogFooter>
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="transaction_date"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Transaction Date</FormLabel>
+                    <FormControl>
+                      <Input type="date" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="transaction_type"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Type</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="deposit">Deposit</SelectItem>
+                        <SelectItem value="withdrawal">Withdrawal</SelectItem>
+                        <SelectItem value="transfer">Transfer</SelectItem>
+                        <SelectItem value="payment">Payment</SelectItem>
+                        <SelectItem value="fee">Bank Fee</SelectItem>
+                        <SelectItem value="interest">Interest</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="amount"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Amount</FormLabel>
+                    <FormControl>
+                      <Input 
+                        type="number" 
+                        step="0.01"
+                        {...field}
+                        onChange={(e) => field.onChange(Number(e.target.value))}
+                        placeholder="0.00"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="reference_number"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Reference Number</FormLabel>
+                    <FormControl>
+                      <Input {...field} placeholder="e.g., CHQ-001234" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+            <FormField
+              control={form.control}
+              name="description"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Description</FormLabel>
+                  <FormControl>
+                    <Textarea {...field} placeholder="Transaction description..." rows={2} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={createTransaction.isPending}>
+                {createTransaction.isPending ? "Recording..." : "Record Transaction"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </Form>
       </DialogContent>
     </Dialog>
   );
