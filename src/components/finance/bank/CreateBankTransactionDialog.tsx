@@ -18,8 +18,15 @@ interface CreateBankTransactionDialogProps {
 export function CreateBankTransactionDialog({ open, onOpenChange }: CreateBankTransactionDialogProps) {
   const { selectedCompany } = useCompany();
   const queryClient = useQueryClient();
-  const [formData, setFormData] = useState({
-    bank_account_id: "",
+  const [formData, setFormData] = useState<{
+    bank_account_id: string | undefined;
+    transaction_date: string;
+    transaction_type: string;
+    amount: number;
+    reference_number: string;
+    description: string;
+  }>({
+    bank_account_id: undefined,
     transaction_date: new Date().toISOString().split("T")[0],
     transaction_type: "deposit",
     amount: 0,
@@ -62,7 +69,7 @@ export function CreateBankTransactionDialog({ open, onOpenChange }: CreateBankTr
       toast.success("Transaction recorded successfully");
       onOpenChange(false);
       setFormData({
-        bank_account_id: "",
+        bank_account_id: undefined,
         transaction_date: new Date().toISOString().split("T")[0],
         transaction_type: "deposit",
         amount: 0,

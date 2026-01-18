@@ -14,7 +14,13 @@ interface Props { open: boolean; onOpenChange: (open: boolean) => void; }
 export function CreateSupplierInvoiceDialog({ open, onOpenChange }: Props) {
   const { selectedCompany } = useCompany();
   const queryClient = useQueryClient();
-  const [form, setForm] = useState({ invoice_number: '', supplier_id: '', invoice_date: '', due_date: '', gross_amount: '' });
+  const [form, setForm] = useState<{
+    invoice_number: string;
+    supplier_id: string | undefined;
+    invoice_date: string;
+    due_date: string;
+    gross_amount: string;
+  }>({ invoice_number: '', supplier_id: undefined, invoice_date: '', due_date: '', gross_amount: '' });
 
   const { data: suppliers } = useQuery({
     queryKey: ['suppliers', selectedCompany?.id],
@@ -37,7 +43,7 @@ export function CreateSupplierInvoiceDialog({ open, onOpenChange }: Props) {
       queryClient.invalidateQueries({ queryKey: ['supplier-invoices'] });
       toast.success('Invoice created');
       onOpenChange(false);
-      setForm({ invoice_number: '', supplier_id: '', invoice_date: '', due_date: '', gross_amount: '' });
+      setForm({ invoice_number: '', supplier_id: undefined, invoice_date: '', due_date: '', gross_amount: '' });
     },
     onError: (e: Error) => toast.error(e.message),
   });
