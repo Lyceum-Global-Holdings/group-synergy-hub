@@ -1,13 +1,27 @@
-import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useCompany } from "@/contexts/CompanyContext";
 import { toast } from "sonner";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+
+const bankAccountSchema = z.object({
+  bank_name: z.string().min(1, "Bank name is required").max(100, "Bank name is too long"),
+  account_name: z.string().min(1, "Account name is required").max(100, "Account name is too long"),
+  account_number: z.string().min(1, "Account number is required").max(50, "Account number is too long"),
+  branch_name: z.string().max(100, "Branch name is too long").optional(),
+  swift_code: z.string().max(20, "SWIFT code is too long").optional(),
+  currency: z.string().min(1, "Currency is required"),
+  opening_balance: z.number().min(0, "Opening balance cannot be negative"),
+});
+
+type BankAccountFormValues = z.infer<typeof bankAccountSchema>;
 
 interface CreateBankAccountDialogProps {
   open: boolean;
@@ -17,22 +31,32 @@ interface CreateBankAccountDialogProps {
 export function CreateBankAccountDialog({ open, onOpenChange }: CreateBankAccountDialogProps) {
   const { selectedCompany } = useCompany();
   const queryClient = useQueryClient();
-  const [formData, setFormData] = useState({
-    bank_name: "",
-    account_name: "",
-    account_number: "",
-    branch_name: "",
-    swift_code: "",
-    currency: "LKR",
-    opening_balance: 0,
+
+  const form = useForm<BankAccountFormValues>({
+    resolver: zodResolver(bankAccountSchema),
+    defaultValues: {
+      bank_name: '',
+      account_name: '',
+      account_number: '',
+      branch_name: '',
+      swift_code: '',
+      currency: 'LKR',
+      opening_balance: 0,
+    },
   });
 
   const createAccount = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (values: BankAccountFormValues) => {
       const { error } = await supabase.from("bank_accounts").insert({
-        ...formData,
+        bank_name: values.bank_name,
+        account_name: values.account_name,
+        account_number: values.account_number,
+        branch_name: values.branch_name || null,
+        swift_code: values.swift_code || null,
+        currency: values.currency,
+        opening_balance: values.opening_balance,
         company_id: selectedCompany?.id,
-        current_balance: formData.opening_balance,
+        current_balance: values.opening_balance,
         is_active: true,
       });
       if (error) throw error;
@@ -40,21 +64,17 @@ export function CreateBankAccountDialog({ open, onOpenChange }: CreateBankAccoun
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["bank-accounts"] });
       toast.success("Bank account created successfully");
+      form.reset();
       onOpenChange(false);
-      setFormData({
-        bank_name: "",
-        account_name: "",
-        account_number: "",
-        branch_name: "",
-        swift_code: "",
-        currency: "LKR",
-        opening_balance: 0,
-      });
     },
     onError: (error) => {
       toast.error("Failed to create bank account: " + error.message);
     },
   });
+
+  const onSubmit = (values: BankAccountFormValues) => {
+    createAccount.mutate(values);
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -62,94 +82,128 @@ export function CreateBankAccountDialog({ open, onOpenChange }: CreateBankAccoun
         <DialogHeader>
           <DialogTitle>Add Bank Account</DialogTitle>
         </DialogHeader>
-        <div className="space-y-4 py-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="bank_name">Bank Name</Label>
-              <Input
-                id="bank_name"
-                value={formData.bank_name}
-                onChange={(e) => setFormData({ ...formData, bank_name: e.target.value })}
-                placeholder="e.g., Commercial Bank"
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 py-4">
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="bank_name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Bank Name</FormLabel>
+                    <FormControl>
+                      <Input {...field} placeholder="e.g., Commercial Bank" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="branch_name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Branch</FormLabel>
+                    <FormControl>
+                      <Input {...field} placeholder="e.g., Main Branch" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="branch_name">Branch</Label>
-              <Input
-                id="branch_name"
-                value={formData.branch_name}
-                onChange={(e) => setFormData({ ...formData, branch_name: e.target.value })}
-                placeholder="e.g., Main Branch"
+            <FormField
+              control={form.control}
+              name="account_name"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Account Name</FormLabel>
+                  <FormControl>
+                    <Input {...field} placeholder="e.g., Operating Account" />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="account_number"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Account Number</FormLabel>
+                  <FormControl>
+                    <Input {...field} placeholder="Enter account number" />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="currency"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Currency</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="LKR">LKR</SelectItem>
+                        <SelectItem value="USD">USD</SelectItem>
+                        <SelectItem value="EUR">EUR</SelectItem>
+                        <SelectItem value="GBP">GBP</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="opening_balance"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Opening Balance</FormLabel>
+                    <FormControl>
+                      <Input 
+                        type="number"
+                        step="0.01"
+                        {...field}
+                        onChange={(e) => field.onChange(Number(e.target.value))}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
             </div>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="account_name">Account Name</Label>
-            <Input
-              id="account_name"
-              value={formData.account_name}
-              onChange={(e) => setFormData({ ...formData, account_name: e.target.value })}
-              placeholder="e.g., Operating Account"
+            <FormField
+              control={form.control}
+              name="swift_code"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>SWIFT Code (Optional)</FormLabel>
+                  <FormControl>
+                    <Input {...field} placeholder="e.g., CABORXXX" />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
             />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="account_number">Account Number</Label>
-            <Input
-              id="account_number"
-              value={formData.account_number}
-              onChange={(e) => setFormData({ ...formData, account_number: e.target.value })}
-              placeholder="Enter account number"
-            />
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="currency">Currency</Label>
-              <Select
-                value={formData.currency}
-                onValueChange={(value) => setFormData({ ...formData, currency: value })}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="LKR">LKR</SelectItem>
-                  <SelectItem value="USD">USD</SelectItem>
-                  <SelectItem value="EUR">EUR</SelectItem>
-                  <SelectItem value="GBP">GBP</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="opening_balance">Opening Balance</Label>
-              <Input
-                id="opening_balance"
-                type="number"
-                value={formData.opening_balance}
-                onChange={(e) => setFormData({ ...formData, opening_balance: Number(e.target.value) })}
-              />
-            </div>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="swift_code">SWIFT Code (Optional)</Label>
-            <Input
-              id="swift_code"
-              value={formData.swift_code}
-              onChange={(e) => setFormData({ ...formData, swift_code: e.target.value })}
-              placeholder="e.g., CABORXXX"
-            />
-          </div>
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Cancel
-          </Button>
-          <Button 
-            onClick={() => createAccount.mutate()} 
-            disabled={!formData.bank_name || !formData.account_name || !formData.account_number}
-          >
-            Add Account
-          </Button>
-        </DialogFooter>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={createAccount.isPending}>
+                {createAccount.isPending ? "Creating..." : "Add Account"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </Form>
       </DialogContent>
     </Dialog>
   );
