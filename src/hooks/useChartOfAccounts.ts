@@ -26,9 +26,12 @@ export const useChartOfAccounts = () => {
 
   const createAccount = useMutation({
     mutationFn: async (accountData: CreateAccountData) => {
+      if (!selectedCompany?.id) {
+        throw new Error("Please select a company before creating an account");
+      }
+      
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
-
       const { data, error } = await supabase
         .from("chart_of_accounts")
         .insert({
