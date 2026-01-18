@@ -46,7 +46,7 @@ export function CreateCostCenterDialog({ open, onOpenChange }: CreateCostCenterD
         code: formData.code,
         name: formData.name,
         description: formData.description || null,
-        parent_id: formData.parent_id || null,
+        parent_id: formData.parent_id && formData.parent_id !== "none" ? formData.parent_id : null,
         company_id: selectedCompany?.id,
         is_active: true,
       });
@@ -90,7 +90,7 @@ export function CreateCostCenterDialog({ open, onOpenChange }: CreateCostCenterD
                   <SelectValue placeholder="None (Top Level)" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">None (Top Level)</SelectItem>
+                  <SelectItem value="none">None (Top Level)</SelectItem>
                   {existingCostCenters?.map((cc) => (
                     <SelectItem key={cc.id} value={cc.id}>
                       {cc.code} - {cc.name}
