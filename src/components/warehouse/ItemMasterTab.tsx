@@ -416,19 +416,29 @@ export function ItemMasterTab() {
                   <TableCell>{item.supplier?.name || '-'}</TableCell>
                   <TableCell>
                     {item.bins && item.bins.length > 0 ? (
-                      <div className="flex flex-wrap gap-1">
-                        {item.bins.slice(0, 2).map(bin => (
-                          <Badge key={bin.id} variant="outline" className="text-xs">
-                            <Package className="h-3 w-3 mr-1" />
-                            {bin.bin_code}
-                          </Badge>
-                        ))}
-                        {item.bins.length > 2 && (
-                          <span className="text-xs text-muted-foreground">
-                            +{item.bins.length - 2} more
-                          </span>
-                        )}
-                      </div>
+                      <TooltipProvider>
+                        <div className="flex flex-wrap gap-1">
+                          {item.bins.slice(0, 2).map(bin => (
+                            <Tooltip key={bin.id}>
+                              <TooltipTrigger asChild>
+                                <Badge variant="outline" className="text-xs cursor-help">
+                                  <Package className="h-3 w-3 mr-1" />
+                                  {bin.bin_code}
+                                  <span className="ml-1 text-muted-foreground">({bin.quantity})</span>
+                                </Badge>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p>{bin.name} - Qty: {bin.quantity}</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          ))}
+                          {item.bins.length > 2 && (
+                            <span className="text-xs text-muted-foreground">
+                              +{item.bins.length - 2} more
+                            </span>
+                          )}
+                        </div>
+                      </TooltipProvider>
                     ) : (
                       <span className="text-muted-foreground">-</span>
                     )}
