@@ -43,23 +43,30 @@ export const useWarehouseItems = () => {
           .from('warehouse_bins')
           .select('id, bin_code, name');
 
-        // Fetch allocations with just the bin_id reference
+        // Fetch ALL allocations with stock (avoid .in() URL limit with 665+ items)
         const { data: allocations, error: allocError } = await supabase
           .from('warehouse_bin_allocations')
           .select('warehouse_item_id, bin_id, available_quantity')
-          .in('warehouse_item_id', itemIds);
+          .gt('available_quantity', 0);
 
         console.log('Bins fetched:', bins?.length);
         console.log('Allocations fetched:', allocations?.length);
+        
+        // Create Set of item IDs for fast O(1) lookup
+        const itemIdSet = new Set(itemIds);
 
         if (!allocError && allocations && bins) {
           // Create a bin lookup map for O(1) access
           const binLookup = new Map(bins.map(b => [b.id, b]));
 
-          // Group allocations by item_id
+          // Group allocations by item_id (only for items in our list)
           const binsByItem: Record<string, Array<{ id: string; bin_code: string; name: string; quantity: number }>> = {};
           allocations.forEach((alloc: any) => {
             const itemId = alloc.warehouse_item_id;
+            
+            // Only process if this allocation belongs to one of our items
+            if (!itemIdSet.has(itemId)) return;
+            
             const bin = binLookup.get(alloc.bin_id);
             
             // Skip if bin not found (orphaned allocation)
