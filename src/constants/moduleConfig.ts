@@ -69,7 +69,8 @@ export const moduleConfig: Record<string, ModuleConfig> = {
       { key: 'delivery-order', name: 'Delivery Order', description: 'Outbound delivery management', url: '/warehouse/delivery-order' },
       { key: 'inventory-valuation', name: 'Inventory Valuation', description: 'Stock value calculations', url: '/warehouse/inventory-valuation' },
       { key: 'asset-management', name: 'Asset Management', description: 'Track and manage assets', url: '/warehouse/asset-management' },
-      { key: 'tool-management', name: 'Tool Management', description: 'Issue and return tools', url: '/warehouse/tool-management' }
+      { key: 'tool-management', name: 'Tool Management', description: 'Issue and return tools', url: '/warehouse/tool-management' },
+      { key: 'batch-management', name: 'Batch Management', description: 'Track and manage item batches with FIFO', url: '/warehouse/batch-management' }
     ]
   },
   sourcing: {
