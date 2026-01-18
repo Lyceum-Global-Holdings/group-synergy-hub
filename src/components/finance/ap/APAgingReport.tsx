@@ -46,8 +46,9 @@ export function APAgingReport() {
     return acc;
   }, {});
 
-  const agingData = Object.values(aging || {});
-  const totals = agingData.reduce((t: any, a: any) => ({
+  interface AgingTotals { current: number; days30: number; days60: number; days90: number; over90: number; total: number; }
+  const agingData = Object.values(aging || {}) as Array<AgingTotals & { name: string }>;
+  const totals = agingData.reduce<AgingTotals>((t, a) => ({
     current: t.current + a.current, days30: t.days30 + a.days30,
     days60: t.days60 + a.days60, days90: t.days90 + a.days90,
     over90: t.over90 + a.over90, total: t.total + a.total

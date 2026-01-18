@@ -22,6 +22,7 @@ export function CreateBudgetDialog({ open, onOpenChange }: CreateBudgetDialogPro
     budget_name: "",
     budget_type: "operating",
     description: "",
+    fiscal_year: new Date().getFullYear(),
   });
 
   const createBudget = useMutation({
@@ -39,7 +40,7 @@ export function CreateBudgetDialog({ open, onOpenChange }: CreateBudgetDialogPro
       queryClient.invalidateQueries({ queryKey: ["budgets"] });
       toast.success("Budget created successfully");
       onOpenChange(false);
-      setFormData({ budget_name: "", budget_type: "operating", description: "" });
+      setFormData({ budget_name: "", budget_type: "operating", description: "", fiscal_year: new Date().getFullYear() });
     },
     onError: (error) => {
       toast.error("Failed to create budget: " + error.message);

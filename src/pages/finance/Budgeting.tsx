@@ -55,11 +55,11 @@ export default function Budgeting() {
         </TabsList>
 
         <TabsContent value="budgets">
-          <BudgetList onEditBudget={handleEditBudget} />
+          <BudgetList />
         </TabsContent>
 
         <TabsContent value="entry">
-          <BudgetEntryGrid budgetId={selectedBudgetId} />
+          <BudgetEntryGrid />
         </TabsContent>
 
         <TabsContent value="variance">
