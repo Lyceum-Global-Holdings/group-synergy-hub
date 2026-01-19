@@ -1,12 +1,40 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Package, MapPin, ArrowRightLeft, Wrench, AlertTriangle } from "lucide-react";
+import { Package, MapPin, ArrowRightLeft, Wrench, AlertTriangle, Clock, ArrowRight } from "lucide-react";
 import { useConstructionResources } from "@/hooks/construction/useConstructionResources";
 import { useInventoryMaster } from "@/hooks/construction/useInventoryMaster";
+import { useRecentTransactions } from "@/hooks/construction/useRecentTransactions";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { format } from "date-fns";
+
+// Helper to format transaction type for display
+function formatTransactionType(type: string): string {
+  const typeMap: Record<string, string> = {
+    'opening_stock': 'Opening Stock',
+    'goods_receipt': 'Stock Addition',
+    'material_issue': 'Material Issue',
+    'material_return': 'Material Return',
+    'adjustment': 'Adjustment',
+    'transfer_in': 'Transfer In',
+    'transfer_out': 'Transfer Out',
+    'project_issue': 'Project Issue',
+    'project_return': 'Project Return',
+  };
+  return typeMap[type] || type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+}
+
+// Helper to get badge variant based on transaction type
+function getTransactionBadgeVariant(type: string): "default" | "secondary" | "destructive" | "outline" {
+  if (type.includes('issue') || type.includes('out')) return 'destructive';
+  if (type.includes('receipt') || type.includes('in') || type.includes('return')) return 'default';
+  if (type.includes('adjustment')) return 'secondary';
+  return 'outline';
+}
 
 export function AllocationDashboard() {
   const { data: resources } = useConstructionResources();
   const { data: inventoryMaster } = useInventoryMaster();
+  const { data: recentTransactions, isLoading: transactionsLoading } = useRecentTransactions(10);
 
   // Filter for material resources only
   const materialResources = resources?.filter((r) => r.resource_type === "material") || [];
@@ -165,6 +193,77 @@ export function AllocationDashboard() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Recent Transactions Table */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Clock className="h-5 w-5" />
+            Recent Transactions
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {transactionsLoading ? (
+            <p className="text-sm text-muted-foreground text-center py-4">
+              Loading transactions...
+            </p>
+          ) : !recentTransactions || recentTransactions.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-4">
+              No transactions found
+            </p>
+          ) : (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Date & Time</TableHead>
+                    <TableHead>Type</TableHead>
+                    <TableHead>Item Name</TableHead>
+                    <TableHead>From</TableHead>
+                    <TableHead>To</TableHead>
+                    <TableHead className="text-right">Quantity</TableHead>
+                    <TableHead>Performed By</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {recentTransactions.map((transaction) => (
+                    <TableRow key={transaction.id}>
+                      <TableCell className="whitespace-nowrap">
+                        {format(new Date(transaction.created_at), 'yyyy-MM-dd HH:mm')}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={getTransactionBadgeVariant(transaction.transaction_type)}>
+                          {formatTransactionType(transaction.transaction_type)}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="font-medium">
+                        {transaction.item_name || 'Unknown Item'}
+                      </TableCell>
+                      <TableCell>
+                        {transaction.from_location || '-'}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-1">
+                          {transaction.from_location && transaction.to_location && (
+                            <ArrowRight className="h-3 w-3 text-muted-foreground" />
+                          )}
+                          {transaction.to_location || '-'}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right font-medium">
+                        {Math.abs(transaction.quantity_change)}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {transaction.performed_by || 'System'}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Quick Stats */}
       <Card>
