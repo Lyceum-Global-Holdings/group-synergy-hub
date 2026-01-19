@@ -16,11 +16,11 @@ export interface RecentTransaction {
 
 export function useRecentTransactions(limit: number = 10) {
   return useQuery({
-    queryKey: ['recent-transactions', limit],
+    queryKey: ['construction-recent-transactions', limit],
     queryFn: async () => {
-      // Fetch stock transactions with item details
+      // Fetch construction inventory transactions
       const { data: transactionsData, error } = await supabase
-        .from('stock_transactions')
+        .from('construction_inventory_transactions')
         .select(`
           id,
           item_id,
@@ -29,7 +29,8 @@ export function useRecentTransactions(limit: number = 10) {
           notes,
           created_at,
           created_by,
-          issued_to_location_id
+          from_location_id,
+          to_location_id
         `)
         .order('created_at', { ascending: false })
         .limit(limit);
@@ -42,20 +43,22 @@ export function useRecentTransactions(limit: number = 10) {
       // Get unique user IDs
       const userIds = [...new Set(transactionsData?.map(t => t.created_by).filter(Boolean))] as string[];
       
-      // Get unique location IDs
-      const locationIds = [...new Set(transactionsData?.map(t => t.issued_to_location_id).filter(Boolean))] as string[];
+      // Get unique location IDs (both from and to)
+      const fromLocationIds = transactionsData?.map(t => t.from_location_id).filter(Boolean) || [];
+      const toLocationIds = transactionsData?.map(t => t.to_location_id).filter(Boolean) || [];
+      const locationIds = [...new Set([...fromLocationIds, ...toLocationIds])] as string[];
 
-      // Fetch item names from warehouse_items
+      // Fetch item names from construction_inventory_master
       let itemsMap: Record<string, string> = {};
       if (itemIds.length > 0) {
         const { data: itemsData } = await supabase
-          .from('warehouse_items')
-          .select('id, name')
+          .from('construction_inventory_master')
+          .select('id, item_name')
           .in('id', itemIds);
         
         if (itemsData) {
           itemsMap = itemsData.reduce((acc, item) => {
-            acc[item.id] = item.name;
+            acc[item.id] = item.item_name;
             return acc;
           }, {} as Record<string, string>);
         }
@@ -95,31 +98,13 @@ export function useRecentTransactions(limit: number = 10) {
 
       // Map transactions with enriched data
       const enrichedTransactions: RecentTransaction[] = (transactionsData || []).map(t => {
-        let fromLocation: string | null = null;
-        let toLocation: string | null = null;
-
-        // Determine from/to locations based on transaction type
-        if (t.transaction_type === 'transfer_out') {
-          fromLocation = 'Main Warehouse';
-          toLocation = t.issued_to_location_id ? locationsMap[t.issued_to_location_id] || null : null;
-        } else if (t.transaction_type === 'transfer_in') {
-          fromLocation = t.issued_to_location_id ? locationsMap[t.issued_to_location_id] || null : null;
-          toLocation = 'Main Warehouse';
-        } else if (t.transaction_type === 'project_issue' || t.transaction_type === 'material_issue') {
-          fromLocation = 'Main Warehouse';
-          toLocation = t.issued_to_location_id ? locationsMap[t.issued_to_location_id] || 'Project' : 'Project';
-        } else if (t.transaction_type === 'project_return' || t.transaction_type === 'material_return') {
-          fromLocation = t.issued_to_location_id ? locationsMap[t.issued_to_location_id] || 'Project' : 'Project';
-          toLocation = 'Main Warehouse';
-        } else if (t.transaction_type === 'goods_receipt') {
-          fromLocation = 'Supplier';
-          toLocation = 'Main Warehouse';
-        }
+        const fromLocation = t.from_location_id ? locationsMap[t.from_location_id] || null : null;
+        const toLocation = t.to_location_id ? locationsMap[t.to_location_id] || null : null;
 
         return {
           id: t.id,
           transaction_type: t.transaction_type,
-          quantity_change: t.quantity_change,
+          quantity_change: Number(t.quantity_change) || 0,
           notes: t.notes,
           created_at: t.created_at,
           item_id: t.item_id,
