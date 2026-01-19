@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Eye, MapPin, Search, Image as ImageIcon, ChevronDown, Edit, ArrowRightLeft, Package } from "lucide-react";
+import { Eye, MapPin, Search, Image as ImageIcon, ChevronDown, Edit, ArrowRightLeft, Package, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
@@ -35,6 +35,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useConstructionResources } from "@/hooks/construction/useConstructionResources";
 import { useInventoryMaster } from "@/hooks/construction/useInventoryMaster";
+import { AddStockDialog } from "@/components/construction/dialogs/AddStockDialog";
 
 // Predefined Section values
 export const INVENTORY_SECTIONS = [
@@ -175,6 +176,7 @@ export function InventoryWiseView() {
   const [sectionFilter, setSectionFilter] = useState<string>("all");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [searchTerm, setSearchTerm] = useState("");
+  const [addStockDialogOpen, setAddStockDialogOpen] = useState(false);
   const [locationDialog, setLocationDialog] = useState<{ 
     open: boolean; 
     itemName: string; 
@@ -393,6 +395,12 @@ export function InventoryWiseView() {
             ))}
           </SelectContent>
         </Select>
+
+        {/* Add Stock Button */}
+        <Button onClick={() => setAddStockDialogOpen(true)} className="ml-auto">
+          <Plus className="h-4 w-4 mr-2" />
+          Add Stock
+        </Button>
       </div>
 
       {/* Table */}
@@ -522,6 +530,12 @@ export function InventoryWiseView() {
         onEditItem={handleEditItem}
         onTransferItem={handleTransferItem}
         onAllocateItem={handleAllocateItem}
+      />
+
+      {/* Add Stock Dialog */}
+      <AddStockDialog
+        open={addStockDialogOpen}
+        onOpenChange={setAddStockDialogOpen}
       />
     </div>
   );
