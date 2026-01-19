@@ -16,14 +16,17 @@ function formatTransactionType(type: string): string {
     'adjustment': 'Adjustment',
     'allocation': 'Allocation',
     'return': 'Return',
+    'repair_sent': 'Sent for Repair',
+    'repair_returned': 'Returned from Repair',
+    'new_item': 'New Item Added',
   };
   return typeMap[type] || type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
 }
 
 // Helper to get badge variant based on transaction type
 function getTransactionBadgeVariant(type: string): "default" | "secondary" | "destructive" | "outline" {
-  if (type === 'stock_removal' || type === 'allocation') return 'destructive';
-  if (type === 'stock_addition' || type === 'return') return 'default';
+  if (type === 'stock_removal' || type === 'allocation' || type === 'repair_sent') return 'destructive';
+  if (type === 'stock_addition' || type === 'return' || type === 'repair_returned' || type === 'new_item') return 'default';
   if (type === 'adjustment') return 'secondary';
   if (type === 'transfer') return 'outline';
   return 'outline';
