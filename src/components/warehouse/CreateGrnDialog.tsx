@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { Plus, Trash2 } from 'lucide-react';
+import { Plus, Trash2, Package, CalendarDays, Hash } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -28,6 +28,11 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
 import { useCompany } from '@/contexts/CompanyContext';
 import { usePurchaseOrders } from '@/hooks/usePurchaseOrders';
 import { useCreateGoodsReceiptNote } from '@/hooks/useGoodsReceiptNotes';
@@ -118,22 +123,53 @@ export function CreateGrnDialog({ open, onOpenChange, poId }: CreateGrnDialogPro
         return acc;
       }, {} as Record<string, number>) || {};
 
+      // Fetch warehouse item tracking flags
+      const warehouseItemIds = selectedPo.items
+        ?.filter((item: any) => item.warehouse_item_id)
+        .map((item: any) => item.warehouse_item_id) || [];
+      
+      let trackingFlags: Record<string, { is_batch_tracked: boolean; is_serialized: boolean }> = {};
+      if (warehouseItemIds.length > 0) {
+        const { data: warehouseItems } = await supabase
+          .from('warehouse_items')
+          .select('id, is_batch_tracked, is_serialized')
+          .in('id', warehouseItemIds);
+        
+        trackingFlags = (warehouseItems || []).reduce((acc, item) => {
+          acc[item.id] = { 
+            is_batch_tracked: item.is_batch_tracked || false, 
+            is_serialized: item.is_serialized || false 
+          };
+          return acc;
+        }, {} as Record<string, { is_batch_tracked: boolean; is_serialized: boolean }>);
+      }
+
       const poItems: CreateGrnItemData[] =
-        selectedPo.items?.map((item: any) => ({
-          po_item_id: item.id,
-          warehouse_item_id: item.warehouse_item_id,
-          item_code: item.item_code,
-          item_name: item.item_name,
-          description: item.description,
-          unit_of_measure: item.unit_of_measure,
-          quantity_ordered: item.quantity_ordered,
-          quantity_already_received: item.quantity_received || 0,
-          quantity_pending_approval: pendingQuantities[item.id] || 0,
-          quantity_received: 0,
-          unit_price: item.unit_price,
-          total_cost: 0,
-          quality_status: 'good' as QualityStatus,
-        })) || [];
+        selectedPo.items?.map((item: any) => {
+          const flags = item.warehouse_item_id ? trackingFlags[item.warehouse_item_id] : null;
+          return {
+            po_item_id: item.id,
+            warehouse_item_id: item.warehouse_item_id,
+            item_code: item.item_code,
+            item_name: item.item_name,
+            description: item.description,
+            unit_of_measure: item.unit_of_measure,
+            quantity_ordered: item.quantity_ordered,
+            quantity_already_received: item.quantity_received || 0,
+            quantity_pending_approval: pendingQuantities[item.id] || 0,
+            quantity_received: 0,
+            unit_price: item.unit_price,
+            total_cost: 0,
+            quality_status: 'good' as QualityStatus,
+            // Batch/Serial tracking
+            is_batch_tracked: flags?.is_batch_tracked || false,
+            is_serialized: flags?.is_serialized || false,
+            batch_number: '',
+            expiry_date: '',
+            manufacturing_date: '',
+            serial_numbers: [],
+          };
+        }) || [];
 
       setItems(poItems);
     };
@@ -151,6 +187,12 @@ export function CreateGrnDialog({ open, onOpenChange, poId }: CreateGrnDialogPro
         unit_price: 0,
         total_cost: 0,
         quality_status: 'good',
+        is_batch_tracked: false,
+        is_serialized: false,
+        batch_number: '',
+        expiry_date: '',
+        manufacturing_date: '',
+        serial_numbers: [],
       },
     ]);
   };
@@ -321,13 +363,12 @@ export function CreateGrnDialog({ open, onOpenChange, poId }: CreateGrnDialogPro
                   <TableHead>Item Name</TableHead>
                   <TableHead>UOM</TableHead>
                   <TableHead>Qty Ordered</TableHead>
-                  <TableHead>Qty Already Received</TableHead>
-                  <TableHead>Qty Pending Approval</TableHead>
                   <TableHead>Qty Remaining</TableHead>
                   <TableHead>Qty Receiving</TableHead>
                   <TableHead>Unit Price</TableHead>
                   <TableHead>Total</TableHead>
                   <TableHead>Quality</TableHead>
+                  <TableHead>Batch/Serial</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead></TableHead>
                 </TableRow>
@@ -337,7 +378,25 @@ export function CreateGrnDialog({ open, onOpenChange, poId }: CreateGrnDialogPro
                   <TableRow key={index}>
                     <TableCell>
                       {item.po_item_id ? (
-                        item.item_name
+                        <div className="flex flex-col">
+                          <span>{item.item_name}</span>
+                          {(item.is_batch_tracked || item.is_serialized) && (
+                            <div className="flex gap-1 mt-1">
+                              {item.is_batch_tracked && (
+                                <Badge variant="outline" className="text-xs">
+                                  <Package className="h-3 w-3 mr-1" />
+                                  Batch
+                                </Badge>
+                              )}
+                              {item.is_serialized && (
+                                <Badge variant="outline" className="text-xs">
+                                  <Hash className="h-3 w-3 mr-1" />
+                                  Serial
+                                </Badge>
+                              )}
+                            </div>
+                          )}
+                        </div>
                       ) : (
                         <Input
                           value={item.item_name}
@@ -350,20 +409,6 @@ export function CreateGrnDialog({ open, onOpenChange, poId }: CreateGrnDialogPro
                     </TableCell>
                     <TableCell>{item.unit_of_measure}</TableCell>
                     <TableCell>{item.quantity_ordered || '-'}</TableCell>
-                    <TableCell>
-                      {item.quantity_ordered ? (
-                        <span className="text-muted-foreground">
-                          {item.quantity_already_received || 0}
-                        </span>
-                      ) : '-'}
-                    </TableCell>
-                    <TableCell>
-                      {item.quantity_ordered ? (
-                        <span className="text-amber-600">
-                          {item.quantity_pending_approval || 0}
-                        </span>
-                      ) : '-'}
-                    </TableCell>
                     <TableCell>
                       {item.quantity_ordered ? (
                         (() => {
@@ -418,7 +463,7 @@ export function CreateGrnDialog({ open, onOpenChange, poId }: CreateGrnDialogPro
                           handleItemChange(index, 'quality_status', value)
                         }
                       >
-                        <SelectTrigger className="w-32">
+                        <SelectTrigger className="w-28">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -427,6 +472,97 @@ export function CreateGrnDialog({ open, onOpenChange, poId }: CreateGrnDialogPro
                           <SelectItem value="rejected">Rejected</SelectItem>
                         </SelectContent>
                       </Select>
+                    </TableCell>
+                    <TableCell>
+                      {(item.is_batch_tracked || item.is_serialized) ? (
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button variant="outline" size="sm" className="w-full">
+                              {item.batch_number || item.serial_numbers?.length ? (
+                                <span className="text-xs truncate max-w-[80px]">
+                                  {item.batch_number || `${item.serial_numbers?.length} SN`}
+                                </span>
+                              ) : (
+                                <span className="text-muted-foreground text-xs">Enter</span>
+                              )}
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-80" align="start">
+                            <div className="space-y-4">
+                              <h4 className="font-medium text-sm">
+                                Batch & Serial Information
+                              </h4>
+                              
+                              {item.is_batch_tracked && (
+                                <>
+                                  <div className="space-y-2">
+                                    <Label className="text-xs">Batch Number</Label>
+                                    <Input
+                                      value={item.batch_number || ''}
+                                      onChange={(e) =>
+                                        handleItemChange(index, 'batch_number', e.target.value)
+                                      }
+                                      placeholder="Enter batch number"
+                                    />
+                                  </div>
+                                  
+                                  <div className="space-y-2">
+                                    <Label className="text-xs">Manufacturing Date</Label>
+                                    <Input
+                                      type="date"
+                                      value={item.manufacturing_date || ''}
+                                      onChange={(e) =>
+                                        handleItemChange(index, 'manufacturing_date', e.target.value)
+                                      }
+                                    />
+                                  </div>
+                                  
+                                  <div className="space-y-2">
+                                    <Label className="text-xs">Expiry Date</Label>
+                                    <Input
+                                      type="date"
+                                      value={item.expiry_date || ''}
+                                      onChange={(e) =>
+                                        handleItemChange(index, 'expiry_date', e.target.value)
+                                      }
+                                    />
+                                  </div>
+                                </>
+                              )}
+                              
+                              {item.is_serialized && (
+                                <div className="space-y-2">
+                                  <Label className="text-xs">
+                                    Serial Numbers (one per line)
+                                  </Label>
+                                  <Textarea
+                                    value={item.serial_numbers?.join('\n') || ''}
+                                    onChange={(e) => {
+                                      const serials = e.target.value
+                                        .split('\n')
+                                        .map(s => s.trim())
+                                        .filter(s => s.length > 0);
+                                      handleItemChange(index, 'serial_numbers', serials);
+                                    }}
+                                    placeholder="Enter serial numbers, one per line"
+                                    rows={4}
+                                  />
+                                  <p className="text-xs text-muted-foreground">
+                                    {item.serial_numbers?.length || 0} serial(s) entered
+                                    {item.quantity_received > 0 && item.serial_numbers?.length !== item.quantity_received && (
+                                      <span className="text-amber-600 ml-2">
+                                        (should match qty: {item.quantity_received})
+                                      </span>
+                                    )}
+                                  </p>
+                                </div>
+                              )}
+                            </div>
+                          </PopoverContent>
+                        </Popover>
+                      ) : (
+                        <span className="text-muted-foreground text-xs">N/A</span>
+                      )}
                     </TableCell>
                     <TableCell>
                       <Badge variant={getItemStatus(item).variant}>
