@@ -22,6 +22,8 @@ const formSchema = z.object({
   item_name: z.string().min(1, "Item name is required"),
   quantity: z.coerce.number().min(1, "Quantity must be at least 1"),
   location_id: z.string().min(1, "Location is required"),
+  unit: z.string().min(1, "Unit is required"),
+  unit_cost: z.coerce.number().min(0, "Unit cost must be 0 or greater"),
   notes: z.string().optional(),
 });
 
@@ -90,6 +92,8 @@ export function AddStockDialog({ open, onOpenChange }: AddStockDialogProps) {
       item_name: "",
       quantity: 1,
       location_id: "",
+      unit: "",
+      unit_cost: 0,
       notes: "",
     },
   });
@@ -100,6 +104,8 @@ export function AddStockDialog({ open, onOpenChange }: AddStockDialogProps) {
         item_name: "",
         quantity: 1,
         location_id: "",
+        unit: "",
+        unit_cost: 0,
         notes: "",
       });
       setSelectedItemImage(null);
@@ -118,6 +124,10 @@ export function AddStockDialog({ open, onOpenChange }: AddStockDialogProps) {
     if (masterItem) {
       setSelectedMasterItem(masterItem);
       setSelectedItemImage(masterItem.image_url || null);
+      // Pre-fill unit if available from master
+      if (masterItem.unit) {
+        form.setValue("unit", masterItem.unit);
+      }
     } else {
       setSelectedMasterItem(null);
       setSelectedItemImage(null);
@@ -131,15 +141,15 @@ export function AddStockDialog({ open, onOpenChange }: AddStockDialogProps) {
       return;
     }
 
-    // Create a new inventory record with the existing item's details
+    // Create a new inventory record with the existing item's details + stock data
     const createData: CreateInventoryMasterData = {
       item_name: selectedMasterItem.item_name,
       section: selectedMasterItem.section,
       category: selectedMasterItem.category,
       quantity: data.quantity,
       location_id: data.location_id,
-      unit: selectedMasterItem.unit,
-      unit_cost: selectedMasterItem.unit_cost,
+      unit: data.unit,
+      unit_cost: data.unit_cost,
       image_url: selectedMasterItem.image_url || undefined,
       status: selectedMasterItem.status,
       notes: data.notes,
@@ -262,12 +272,10 @@ export function AddStockDialog({ open, onOpenChange }: AddStockDialogProps) {
             {/* Selected Item Details */}
             {selectedMasterItem && (
               <div className="p-3 bg-muted/50 rounded-md space-y-1">
-                <p className="text-sm font-medium">Item Details</p>
+                <p className="text-sm font-medium">Item Details (from Item Master)</p>
                 <div className="grid grid-cols-2 gap-2 text-sm text-muted-foreground">
                   <span>Section: {selectedMasterItem.section || "—"}</span>
                   <span>Category: {selectedMasterItem.category || "—"}</span>
-                  <span>Unit: {selectedMasterItem.unit || "—"}</span>
-                  <span>Unit Cost: {selectedMasterItem.unit_cost ? `$${selectedMasterItem.unit_cost}` : "—"}</span>
                 </div>
               </div>
             )}
@@ -279,7 +287,7 @@ export function AddStockDialog({ open, onOpenChange }: AddStockDialogProps) {
                 name="quantity"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Quantity to Add *</FormLabel>
+                    <FormLabel>Quantity *</FormLabel>
                     <FormControl>
                       <Input type="number" step="0.01" min="1" placeholder="1" {...field} />
                     </FormControl>
@@ -307,6 +315,36 @@ export function AddStockDialog({ open, onOpenChange }: AddStockDialogProps) {
                         ))}
                       </SelectContent>
                     </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            {/* Unit and Unit Cost */}
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="unit"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Unit *</FormLabel>
+                    <FormControl>
+                      <Input placeholder="e.g., pcs, kg, m" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="unit_cost"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Unit Cost *</FormLabel>
+                    <FormControl>
+                      <Input type="number" step="0.01" min="0" placeholder="0.00" {...field} />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
