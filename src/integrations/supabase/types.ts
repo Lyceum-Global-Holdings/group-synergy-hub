@@ -3383,6 +3383,88 @@ export type Database = {
           },
         ]
       }
+      construction_repair_records: {
+        Row: {
+          actual_return_date: string | null
+          company_id: string | null
+          created_at: string
+          created_by: string | null
+          expected_return_date: string | null
+          id: string
+          item_id: string
+          item_name: string
+          location_id: string | null
+          quantity: number
+          remarks: string | null
+          repair_status: string
+          sent_date: string
+          service_provider: string | null
+          unit: string | null
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          actual_return_date?: string | null
+          company_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          expected_return_date?: string | null
+          id?: string
+          item_id: string
+          item_name: string
+          location_id?: string | null
+          quantity?: number
+          remarks?: string | null
+          repair_status?: string
+          sent_date?: string
+          service_provider?: string | null
+          unit?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          actual_return_date?: string | null
+          company_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          expected_return_date?: string | null
+          id?: string
+          item_id?: string
+          item_name?: string
+          location_id?: string | null
+          quantity?: number
+          remarks?: string | null
+          repair_status?: string
+          sent_date?: string
+          service_provider?: string | null
+          unit?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "construction_repair_records_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "construction_repair_records_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "construction_inventory_master"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "construction_repair_records_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "warehouse_locations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       construction_resources: {
         Row: {
           assigned_site_id: string | null
