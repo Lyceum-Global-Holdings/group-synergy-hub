@@ -35,17 +35,13 @@ const INVENTORY_CATEGORIES = [
   { value: "safety", label: "Safety" },
 ];
 
+// Item Master schema - only item definition fields, no stock fields
 const formSchema = z.object({
   item_name: z.string().min(1, "Item name is required"),
   section: z.string().min(1, "Section is required"),
   category: z.string().min(1, "Item category is required"),
-  quantity: z.coerce.number().min(0, "Quantity must be 0 or greater"),
-  location_id: z.string().min(1, "Location is required"),
-  unit: z.string().optional(),
-  unit_cost: z.coerce.number().optional(),
   description: z.string().optional(),
   status: z.string().default("active"),
-  notes: z.string().optional(),
   image_url: z.string().optional(),
 });
 
@@ -76,32 +72,14 @@ export function InventoryMasterDialog({ open, onOpenChange, item }: InventoryMas
     );
   }, [inventoryMaster, item]);
 
-  // Fetch warehouse locations
-  const { data: locations = [] } = useQuery({
-    queryKey: ["warehouse-locations-select"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("warehouse_locations")
-        .select("id, name")
-        .order("name");
-      if (error) throw error;
-      return data;
-    },
-  });
-
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       item_name: "",
       section: "",
       category: "",
-      quantity: 0,
-      location_id: "",
-      unit: "",
-      unit_cost: 0,
       description: "",
       status: "active",
-      notes: "",
       image_url: "",
     },
   });
@@ -112,13 +90,8 @@ export function InventoryMasterDialog({ open, onOpenChange, item }: InventoryMas
         item_name: item.item_name,
         section: item.section || "",
         category: item.category || "",
-        quantity: item.quantity || 0,
-        location_id: item.location_id || "",
-        unit: item.unit || "",
-        unit_cost: item.unit_cost || 0,
         description: item.description || "",
         status: item.status,
-        notes: item.notes || "",
         image_url: item.image_url || "",
       });
       setImagePreview(item.image_url || null);
@@ -128,13 +101,8 @@ export function InventoryMasterDialog({ open, onOpenChange, item }: InventoryMas
         item_name: "",
         section: "",
         category: "",
-        quantity: 0,
-        location_id: "",
-        unit: "",
-        unit_cost: 0,
         description: "",
         status: "active",
-        notes: "",
         image_url: "",
       });
       setImagePreview(null);
@@ -335,76 +303,6 @@ export function InventoryMasterDialog({ open, onOpenChange, item }: InventoryMas
               />
             </div>
 
-            {/* Quantity and Location */}
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="quantity"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Quantity *</FormLabel>
-                    <FormControl>
-                      <Input type="number" step="0.01" min="0" placeholder="0" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="location_id"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Location *</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select location" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {locations.map((location) => (
-                          <SelectItem key={location.id} value={location.id}>
-                            {location.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-
-            {/* Unit and Unit Cost */}
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="unit"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Unit</FormLabel>
-                    <FormControl>
-                      <Input placeholder="e.g., pcs, kg, m" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="unit_cost"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Unit Cost</FormLabel>
-                    <FormControl>
-                      <Input type="number" step="0.01" placeholder="0.00" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
 
             {/* Description */}
             <FormField
@@ -502,21 +400,6 @@ export function InventoryMasterDialog({ open, onOpenChange, item }: InventoryMas
                       <SelectItem value="inactive">Inactive</SelectItem>
                     </SelectContent>
                   </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            {/* Notes */}
-            <FormField
-              control={form.control}
-              name="notes"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Notes</FormLabel>
-                  <FormControl>
-                    <Textarea placeholder="Additional notes" {...field} />
-                  </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
