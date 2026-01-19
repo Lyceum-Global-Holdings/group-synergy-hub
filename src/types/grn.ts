@@ -100,6 +100,15 @@ export interface CreateGrnItemData {
   total_cost: number;
   quality_status: QualityStatus;
   remarks?: string;
+  // Batch tracking fields
+  batch_number?: string;
+  manufacturing_date?: string;
+  expiry_date?: string;
+  // Serial tracking fields
+  serial_numbers?: string[];
+  // Item tracking flags (from warehouse_items)
+  is_batch_tracked?: boolean;
+  is_serialized?: boolean;
 }
 
 export interface GrnSummary {

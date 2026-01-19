@@ -188,6 +188,10 @@ export const useCreateGoodsReceiptNote = () => {
             total_cost: item.total_cost,
             quality_status: item.quality_status,
             remarks: item.remarks,
+            // Batch tracking fields
+            batch_number: item.batch_number || null,
+            manufacturing_date: item.manufacturing_date || null,
+            expiry_date: item.expiry_date || null,
           };
         })
       );
