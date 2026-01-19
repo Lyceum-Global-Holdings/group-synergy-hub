@@ -236,18 +236,25 @@ export function NewRepairDialog({ open, onOpenChange }: NewRepairDialogProps) {
                       field.onChange(value);
                       handleItemChange(value);
                     }}
+                    disabled={isLoadingItems}
                   >
                     <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder={isLoadingItems ? "Loading..." : "Select an item"} />
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder={isLoadingItems ? "Loading items..." : "Select an item"} />
                       </SelectTrigger>
                     </FormControl>
-                    <SelectContent>
-                      {consolidatedItems.map((item) => (
-                        <SelectItem key={item.id} value={item.id}>
-                          {item.item_name} - {item.location_name || "Unknown"} (Qty: {item.quantity})
-                        </SelectItem>
-                      ))}
+                    <SelectContent className="bg-background z-[9999] max-h-60">
+                      {consolidatedItems.length === 0 ? (
+                        <div className="py-6 text-center text-sm text-muted-foreground">
+                          No items with available stock
+                        </div>
+                      ) : (
+                        consolidatedItems.map((item) => (
+                          <SelectItem key={`${item.id}-${item.location_id}`} value={item.id}>
+                            {item.item_name} - {item.location_name || "Unknown"} (Qty: {item.quantity})
+                          </SelectItem>
+                        ))
+                      )}
                     </SelectContent>
                   </Select>
                   <FormMessage />
