@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Eye, MapPin, Search, Image as ImageIcon } from "lucide-react";
+import { Eye, MapPin, Search, Image as ImageIcon, ChevronDown, Edit, ArrowRightLeft, Package } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
@@ -25,6 +25,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useConstructionResources } from "@/hooks/construction/useConstructionResources";
 import { useInventoryMaster } from "@/hooks/construction/useInventoryMaster";
 
@@ -60,44 +68,99 @@ const COMPUTED_STATUSES: { value: ComputedStatus; label: string; color: string }
   { value: "under_repair", label: "Under Repair", color: "bg-red-100 text-red-800" },
 ];
 
-interface InventoryWiseRow {
+// Individual item record with location info
+interface LocationItemRecord {
   id: string;
+  quantity: number;
+  locationId?: string;
+  locationName?: string;
+  imageUrl?: string | null;
+}
+
+// Aggregated inventory row grouped by item name
+interface AggregatedInventoryRow {
+  itemName: string;
   section: string;
   category: string;
   totalQty: number;
   status: ComputedStatus;
-  locations: string[];
-  itemName: string;
-  imageUrl?: string | null;
-  locationName?: string | null;
+  locationCount: number;
+  locationRecords: LocationItemRecord[];
+  primaryImageUrl?: string | null;
 }
 
-interface LocationDetailsDialogProps {
+interface LocationActionsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   itemName: string;
-  locations: string[];
+  locationRecords: LocationItemRecord[];
+  onEditItem: (itemId: string) => void;
+  onTransferItem: (itemId: string) => void;
+  onAllocateItem: (itemId: string) => void;
 }
 
-function LocationDetailsDialog({ open, onOpenChange, itemName, locations }: LocationDetailsDialogProps) {
+function LocationActionsDialog({ 
+  open, 
+  onOpenChange, 
+  itemName, 
+  locationRecords,
+  onEditItem,
+  onTransferItem,
+  onAllocateItem
+}: LocationActionsDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <MapPin className="h-5 w-5" />
-            Location Details - {itemName}
+            {itemName} - Location Actions
           </DialogTitle>
         </DialogHeader>
         <div className="space-y-3">
-          {locations.length === 0 ? (
+          {locationRecords.length === 0 ? (
             <p className="text-muted-foreground text-sm">No locations assigned</p>
           ) : (
             <div className="space-y-2">
-              {locations.map((location, idx) => (
-                <div key={idx} className="flex items-center gap-2 p-2 bg-muted rounded-md">
-                  <MapPin className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm">{location}</span>
+              {locationRecords.map((record, idx) => (
+                <div key={record.id} className="flex items-center justify-between p-3 bg-muted rounded-md">
+                  <div className="flex items-center gap-3">
+                    <MapPin className="h-4 w-4 text-muted-foreground" />
+                    <div>
+                      <span className="text-sm font-medium">
+                        {record.locationName || `Location ${idx + 1}`}
+                      </span>
+                      <p className="text-xs text-muted-foreground">
+                        Qty: {record.quantity}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => onEditItem(record.id)}
+                      title="Edit"
+                    >
+                      <Edit className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => onTransferItem(record.id)}
+                      title="Transfer"
+                    >
+                      <ArrowRightLeft className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => onAllocateItem(record.id)}
+                      title="Allocate"
+                    >
+                      <Package className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -112,10 +175,14 @@ export function InventoryWiseView() {
   const [sectionFilter, setSectionFilter] = useState<string>("all");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [searchTerm, setSearchTerm] = useState("");
-  const [locationDialog, setLocationDialog] = useState<{ open: boolean; itemName: string; locations: string[] }>({
+  const [locationDialog, setLocationDialog] = useState<{ 
+    open: boolean; 
+    itemName: string; 
+    locationRecords: LocationItemRecord[];
+  }>({
     open: false,
     itemName: "",
-    locations: [],
+    locationRecords: [],
   });
 
   // Fetch from Item Master (source of truth)
@@ -146,48 +213,101 @@ export function InventoryWiseView() {
     return acc;
   }, {} as Record<string, { totalQty: number; locations: Set<string>; statuses: string[] }>);
 
-  // Transform Item Master data into inventory-wise rows
-  // Item Master is the single source of truth for quantity and location
-  const inventoryData: InventoryWiseRow[] = (inventoryMaster || []).map((item) => {
-    const allocationKey = item.item_name.toLowerCase().trim();
-    const allocation = allocationDataMap[allocationKey];
+  // Group items by item name (case-insensitive, trimmed)
+  const aggregatedInventory: AggregatedInventoryRow[] = (() => {
+    const groupedMap = new Map<string, {
+      items: Array<{
+        id: string;
+        quantity: number;
+        locationId?: string;
+        locationName?: string;
+        section: string;
+        category: string;
+        imageUrl?: string | null;
+      }>;
+    }>();
 
-    // Use Item Master quantity as primary, but fall back to allocation data if no quantity
-    const primaryQty = item.quantity ?? 0;
-    const allocationQty = allocation?.totalQty || 0;
-    const totalQty = primaryQty > 0 ? primaryQty : allocationQty;
-
-    // Get location from Item Master first, then from allocations
-    const itemMasterLocation = item.warehouse_location?.name;
-    const allocationLocations = allocation ? Array.from(allocation.locations) : [];
-    
-    // Build locations array - include Item Master location first if exists
-    const locations: string[] = [];
-    if (itemMasterLocation) {
-      locations.push(itemMasterLocation);
-    }
-    // Add allocation locations that aren't already included
-    allocationLocations.forEach(loc => {
-      if (!locations.includes(loc)) {
-        locations.push(loc);
+    // Group all inventory items by normalized item name
+    (inventoryMaster || []).forEach((item) => {
+      const normalizedName = item.item_name.toLowerCase().trim();
+      
+      if (!groupedMap.has(normalizedName)) {
+        groupedMap.set(normalizedName, { items: [] });
       }
+      
+      groupedMap.get(normalizedName)!.items.push({
+        id: item.id,
+        quantity: item.quantity ?? 0,
+        locationId: item.location_id || undefined,
+        locationName: item.warehouse_location?.name || undefined,
+        section: item.section || "unassigned",
+        category: item.category || "unassigned",
+        imageUrl: item.image_url,
+      });
     });
 
-    return {
-      id: item.id,
-      itemName: item.item_name,
-      section: item.section || "unassigned",
-      category: item.category || "unassigned",
-      totalQty,
-      status: allocation ? computeStatus(allocation.statuses, totalQty) : (totalQty > 0 ? "available" : "low_stock"),
-      locations,
-      imageUrl: item.image_url,
-      locationName: itemMasterLocation,
-    };
-  });
+    // Convert grouped map to aggregated rows
+    const result: AggregatedInventoryRow[] = [];
+    
+    groupedMap.forEach((group, normalizedName) => {
+      const items = group.items;
+      
+      // Calculate total quantity across all locations
+      const totalQty = items.reduce((sum, item) => sum + item.quantity, 0);
+      
+      // Get unique locations
+      const uniqueLocations = new Map<string | undefined, LocationItemRecord>();
+      items.forEach((item) => {
+        const locationKey = item.locationId || `no-location-${item.id}`;
+        if (!uniqueLocations.has(locationKey)) {
+          uniqueLocations.set(locationKey, {
+            id: item.id,
+            quantity: item.quantity,
+            locationId: item.locationId,
+            locationName: item.locationName,
+            imageUrl: item.imageUrl,
+          });
+        } else {
+          // Same location, add quantity
+          const existing = uniqueLocations.get(locationKey)!;
+          existing.quantity += item.quantity;
+        }
+      });
+      
+      const locationRecords = Array.from(uniqueLocations.values());
+      
+      // Use the first item's section/category (they should be the same for same item name)
+      const firstItem = items[0];
+      
+      // Get allocation data for status computation
+      const allocation = allocationDataMap[normalizedName];
+      const allStatuses = allocation?.statuses || [];
+      
+      // Find primary image (first non-null image)
+      const primaryImageUrl = items.find(i => i.imageUrl)?.imageUrl;
+      
+      // Use original case from first item
+      const originalItemName = (inventoryMaster || []).find(
+        i => i.item_name.toLowerCase().trim() === normalizedName
+      )?.item_name || normalizedName;
+      
+      result.push({
+        itemName: originalItemName,
+        section: firstItem.section,
+        category: firstItem.category,
+        totalQty,
+        status: computeStatus(allStatuses, totalQty),
+        locationCount: locationRecords.filter(r => r.locationName).length,
+        locationRecords,
+        primaryImageUrl,
+      });
+    });
+    
+    return result;
+  })();
 
   // Apply filters
-  const filteredData = inventoryData.filter((row) => {
+  const filteredData = aggregatedInventory.filter((row) => {
     const matchesSection = sectionFilter === "all" || row.section === sectionFilter;
     const matchesCategory = categoryFilter === "all" || row.category === categoryFilter;
     const matchesSearch = row.itemName.toLowerCase().includes(searchTerm.toLowerCase());
@@ -203,8 +323,23 @@ export function InventoryWiseView() {
     );
   };
 
-  const handleViewLocations = (itemName: string, locations: string[]) => {
-    setLocationDialog({ open: true, itemName, locations });
+  const handleViewLocations = (itemName: string, locationRecords: LocationItemRecord[]) => {
+    setLocationDialog({ open: true, itemName, locationRecords });
+  };
+
+  const handleEditItem = (itemId: string) => {
+    console.log("Edit item:", itemId);
+    // TODO: Navigate to edit or open edit dialog
+  };
+
+  const handleTransferItem = (itemId: string) => {
+    console.log("Transfer item:", itemId);
+    // TODO: Navigate to transfer or open transfer dialog
+  };
+
+  const handleAllocateItem = (itemId: string) => {
+    console.log("Allocate item:", itemId);
+    // TODO: Navigate to allocate or open allocate dialog
   };
 
   const getSectionLabel = (section: string) => {
@@ -290,11 +425,11 @@ export function InventoryWiseView() {
                   </TableRow>
                 ) : (
                   filteredData.map((row) => (
-                    <TableRow key={row.id}>
+                    <TableRow key={row.itemName}>
                       <TableCell>
-                        {row.imageUrl ? (
+                        {row.primaryImageUrl ? (
                           <img
-                            src={row.imageUrl}
+                            src={row.primaryImageUrl}
                             alt={row.itemName}
                             className="h-10 w-10 rounded object-cover"
                           />
@@ -324,21 +459,50 @@ export function InventoryWiseView() {
                           variant="ghost"
                           size="sm"
                           className="h-auto p-1 text-sm"
-                          onClick={() => handleViewLocations(row.itemName, row.locations)}
+                          onClick={() => handleViewLocations(row.itemName, row.locationRecords)}
                         >
                           <MapPin className="h-3 w-3 mr-1" />
-                          {row.locations.length} location{row.locations.length !== 1 ? "s" : ""}
+                          {row.locationCount} location{row.locationCount !== 1 ? "s" : ""}
                         </Button>
                       </TableCell>
                       <TableCell className="text-right">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleViewLocations(row.itemName, row.locations)}
-                        >
-                          <Eye className="h-4 w-4 mr-1" />
-                          View Details
-                        </Button>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="outline" size="sm">
+                              Actions <ChevronDown className="h-4 w-4 ml-1" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-56">
+                            <DropdownMenuLabel>Actions by Location</DropdownMenuLabel>
+                            <DropdownMenuSeparator />
+                            {row.locationRecords.length === 0 ? (
+                              <DropdownMenuItem disabled>
+                                No locations available
+                              </DropdownMenuItem>
+                            ) : (
+                              row.locationRecords.map((record, idx) => (
+                                <div key={record.id}>
+                                  <DropdownMenuLabel className="text-xs text-muted-foreground font-normal py-1">
+                                    {record.locationName || `Location ${idx + 1}`} (Qty: {record.quantity})
+                                  </DropdownMenuLabel>
+                                  <DropdownMenuItem onClick={() => handleEditItem(record.id)}>
+                                    <Edit className="h-4 w-4 mr-2" />
+                                    Edit
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => handleTransferItem(record.id)}>
+                                    <ArrowRightLeft className="h-4 w-4 mr-2" />
+                                    Transfer
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => handleAllocateItem(record.id)}>
+                                    <Package className="h-4 w-4 mr-2" />
+                                    Allocate
+                                  </DropdownMenuItem>
+                                  {idx < row.locationRecords.length - 1 && <DropdownMenuSeparator />}
+                                </div>
+                              ))
+                            )}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </TableCell>
                     </TableRow>
                   ))
@@ -349,12 +513,15 @@ export function InventoryWiseView() {
         </CardContent>
       </Card>
 
-      {/* Location Details Dialog */}
-      <LocationDetailsDialog
+      {/* Location Actions Dialog */}
+      <LocationActionsDialog
         open={locationDialog.open}
         onOpenChange={(open) => setLocationDialog(prev => ({ ...prev, open }))}
         itemName={locationDialog.itemName}
-        locations={locationDialog.locations}
+        locationRecords={locationDialog.locationRecords}
+        onEditItem={handleEditItem}
+        onTransferItem={handleTransferItem}
+        onAllocateItem={handleAllocateItem}
       />
     </div>
   );
@@ -371,6 +538,9 @@ function computeStatus(statuses: string[], totalQty: number): ComputedStatus {
     return "in_use";
   }
   // Check for low stock
+  if (totalQty === 0) {
+    return "low_stock";
+  }
   if (totalQty > 0 && totalQty < 10) {
     return "low_stock";
   }
