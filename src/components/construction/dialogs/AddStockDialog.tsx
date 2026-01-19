@@ -142,7 +142,7 @@ export function AddStockDialog({ open, onOpenChange }: AddStockDialogProps) {
     }
 
     // Create a new inventory record with the existing item's details + stock data
-    const createData: CreateInventoryMasterData = {
+    const createData: CreateInventoryMasterData & { transactionType: 'stock_addition' } = {
       item_name: selectedMasterItem.item_name,
       section: selectedMasterItem.section,
       category: selectedMasterItem.category,
@@ -153,6 +153,7 @@ export function AddStockDialog({ open, onOpenChange }: AddStockDialogProps) {
       image_url: selectedMasterItem.image_url || undefined,
       status: selectedMasterItem.status,
       notes: data.notes,
+      transactionType: 'stock_addition',
     };
 
     await createMutation.mutateAsync(createData);

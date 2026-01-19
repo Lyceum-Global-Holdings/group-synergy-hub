@@ -40,13 +40,17 @@ export function useCreateInventoryMaster() {
   const { selectedCompany } = useCompany();
 
   return useMutation({
-    mutationFn: async (data: CreateInventoryMasterData) => {
+    mutationFn: async (data: CreateInventoryMasterData & { transactionType?: 'stock_addition' | 'new_item' }) => {
       const { data: user } = await supabase.auth.getUser();
+      const transactionType = data.transactionType || 'new_item';
+      
+      // Remove transactionType from data before inserting
+      const { transactionType: _, ...insertData } = data;
       
       const { data: result, error } = await supabase
         .from("construction_inventory_master")
         .insert({
-          ...data,
+          ...insertData,
           company_id: selectedCompany?.id,
           created_by: user.user?.id,
         })
@@ -54,10 +58,27 @@ export function useCreateInventoryMaster() {
         .single();
 
       if (error) throw error;
+
+      // Log the transaction
+      await supabase
+        .from("construction_inventory_transactions")
+        .insert({
+          item_id: result.id,
+          transaction_type: transactionType,
+          quantity_change: data.quantity || 0,
+          quantity_before: 0,
+          quantity_after: data.quantity || 0,
+          to_location_id: data.location_id,
+          notes: data.notes || `${transactionType === 'stock_addition' ? 'Stock added' : 'New item created'}: ${data.item_name}`,
+          company_id: selectedCompany?.id,
+          created_by: user.user?.id,
+        });
+
       return result;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["inventory-master"] });
+      queryClient.invalidateQueries({ queryKey: ["construction-recent-transactions"] });
       toast({ title: "Inventory item created successfully" });
     },
     onError: (error: Error) => {
@@ -69,9 +90,19 @@ export function useCreateInventoryMaster() {
 export function useUpdateInventoryMaster() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const { selectedCompany } = useCompany();
 
   return useMutation({
     mutationFn: async ({ id, ...data }: UpdateInventoryMasterData & { id: string }) => {
+      const { data: user } = await supabase.auth.getUser();
+      
+      // Fetch current item to get quantity_before
+      const { data: currentItem } = await supabase
+        .from("construction_inventory_master")
+        .select("quantity, location_id")
+        .eq("id", id)
+        .single();
+
       const { data: result, error } = await supabase
         .from("construction_inventory_master")
         .update(data)
@@ -80,10 +111,34 @@ export function useUpdateInventoryMaster() {
         .single();
 
       if (error) throw error;
+
+      // Log adjustment transaction if quantity changed
+      const oldQuantity = currentItem?.quantity || 0;
+      const newQuantity = data.quantity ?? oldQuantity;
+      const quantityChange = newQuantity - oldQuantity;
+
+      if (quantityChange !== 0) {
+        await supabase
+          .from("construction_inventory_transactions")
+          .insert({
+            item_id: id,
+            transaction_type: 'adjustment',
+            quantity_change: quantityChange,
+            quantity_before: oldQuantity,
+            quantity_after: newQuantity,
+            from_location_id: currentItem?.location_id,
+            to_location_id: data.location_id || currentItem?.location_id,
+            notes: data.notes || `Quantity adjusted from ${oldQuantity} to ${newQuantity}`,
+            company_id: selectedCompany?.id,
+            created_by: user.user?.id,
+          });
+      }
+
       return result;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["inventory-master"] });
+      queryClient.invalidateQueries({ queryKey: ["construction-recent-transactions"] });
       toast({ title: "Inventory item updated successfully" });
     },
     onError: (error: Error) => {
