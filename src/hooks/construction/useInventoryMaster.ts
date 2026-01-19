@@ -12,7 +12,10 @@ export function useInventoryMaster() {
     queryFn: async () => {
       let query = supabase
         .from("construction_inventory_master")
-        .select("*")
+        .select(`
+          *,
+          warehouse_location:warehouse_locations(id, name)
+        `)
         .order("created_at", { ascending: false });
 
       // If a specific company is selected, filter by it
