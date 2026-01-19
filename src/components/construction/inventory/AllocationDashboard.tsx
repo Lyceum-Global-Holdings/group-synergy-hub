@@ -3,9 +3,10 @@ import { Badge } from "@/components/ui/badge";
 import { Package, MapPin, ArrowRightLeft, Wrench, AlertTriangle, Clock, ArrowRight } from "lucide-react";
 import { useConstructionResources } from "@/hooks/construction/useConstructionResources";
 import { useInventoryMaster } from "@/hooks/construction/useInventoryMaster";
-import { useRecentTransactions } from "@/hooks/construction/useRecentTransactions";
+import { useRecentTransactions, useTransferTransactions } from "@/hooks/construction/useRecentTransactions";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { format } from "date-fns";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 // Helper to format transaction type for display
 function formatTransactionType(type: string): string {
@@ -31,10 +32,12 @@ function getTransactionBadgeVariant(type: string): "default" | "secondary" | "de
   if (type === 'transfer') return 'outline';
   return 'outline';
 }
+
 export function AllocationDashboard() {
   const { data: resources } = useConstructionResources();
   const { data: inventoryMaster } = useInventoryMaster();
   const { data: recentTransactions, isLoading: transactionsLoading } = useRecentTransactions(10);
+  const { data: transferTransactions, isLoading: transfersLoading } = useTransferTransactions(50);
 
   // Filter for material resources only
   const materialResources = resources?.filter((r) => r.resource_type === "material") || [];
@@ -194,74 +197,146 @@ export function AllocationDashboard() {
         </Card>
       </div>
 
-      {/* Recent Transactions Table */}
+      {/* Transactions Tabs - Recent Transactions and Transfer History */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Clock className="h-5 w-5" />
-            Recent Transactions
+            Transaction History
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {transactionsLoading ? (
-            <p className="text-sm text-muted-foreground text-center py-4">
-              Loading transactions...
-            </p>
-          ) : !recentTransactions || recentTransactions.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-4">
-              No transactions found
-            </p>
-          ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Date & Time</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Item Name</TableHead>
-                    <TableHead>From</TableHead>
-                    <TableHead>To</TableHead>
-                    <TableHead className="text-right">Quantity</TableHead>
-                    <TableHead>Performed By</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {recentTransactions.map((transaction) => (
-                    <TableRow key={transaction.id}>
-                      <TableCell className="whitespace-nowrap">
-                        {format(new Date(transaction.created_at), 'yyyy-MM-dd HH:mm')}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={getTransactionBadgeVariant(transaction.transaction_type)}>
-                          {formatTransactionType(transaction.transaction_type)}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="font-medium">
-                        {transaction.item_name || 'Unknown Item'}
-                      </TableCell>
-                      <TableCell>
-                        {transaction.from_location || '-'}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-1">
-                          {transaction.from_location && transaction.to_location && (
-                            <ArrowRight className="h-3 w-3 text-muted-foreground" />
-                          )}
-                          {transaction.to_location || '-'}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right font-medium">
-                        {Math.abs(transaction.quantity_change)}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {transaction.performed_by || 'System'}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
+          <Tabs defaultValue="recent" className="w-full">
+            <TabsList className="mb-4">
+              <TabsTrigger value="recent">Recent Transactions</TabsTrigger>
+              <TabsTrigger value="transfers">Transfers History</TabsTrigger>
+            </TabsList>
+            
+            {/* Recent Transactions Tab */}
+            <TabsContent value="recent">
+              {transactionsLoading ? (
+                <p className="text-sm text-muted-foreground text-center py-4">
+                  Loading transactions...
+                </p>
+              ) : !recentTransactions || recentTransactions.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-4">
+                  No transactions found
+                </p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Date & Time</TableHead>
+                        <TableHead>Type</TableHead>
+                        <TableHead>Item Name</TableHead>
+                        <TableHead>From</TableHead>
+                        <TableHead>To</TableHead>
+                        <TableHead className="text-right">Quantity</TableHead>
+                        <TableHead>Performed By</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {recentTransactions.map((transaction) => (
+                        <TableRow key={transaction.id}>
+                          <TableCell className="whitespace-nowrap">
+                            {format(new Date(transaction.created_at), 'yyyy-MM-dd HH:mm')}
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant={getTransactionBadgeVariant(transaction.transaction_type)}>
+                              {formatTransactionType(transaction.transaction_type)}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="font-medium">
+                            {transaction.item_name || 'Unknown Item'}
+                          </TableCell>
+                          <TableCell>
+                            {transaction.from_location || '-'}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-1">
+                              {transaction.from_location && transaction.to_location && (
+                                <ArrowRight className="h-3 w-3 text-muted-foreground" />
+                              )}
+                              {transaction.to_location || '-'}
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-right font-medium">
+                            {Math.abs(transaction.quantity_change)}
+                          </TableCell>
+                          <TableCell className="text-muted-foreground">
+                            {transaction.performed_by || 'System'}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </TabsContent>
+
+            {/* Transfers History Tab */}
+            <TabsContent value="transfers">
+              {transfersLoading ? (
+                <p className="text-sm text-muted-foreground text-center py-4">
+                  Loading transfer history...
+                </p>
+              ) : !transferTransactions || transferTransactions.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-4">
+                  No transfer history found
+                </p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Date & Time</TableHead>
+                        <TableHead>Item Name</TableHead>
+                        <TableHead className="text-right">Quantity</TableHead>
+                        <TableHead>Unit</TableHead>
+                        <TableHead>From Location</TableHead>
+                        <TableHead>To Location</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Performed By</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {transferTransactions.map((transfer) => (
+                        <TableRow key={transfer.id}>
+                          <TableCell className="whitespace-nowrap">
+                            {format(new Date(transfer.created_at), 'yyyy-MM-dd HH:mm')}
+                          </TableCell>
+                          <TableCell className="font-medium">
+                            {transfer.item_name || 'Unknown Item'}
+                          </TableCell>
+                          <TableCell className="text-right font-medium">
+                            {Math.abs(transfer.quantity_change)}
+                          </TableCell>
+                          <TableCell>
+                            {transfer.unit || '-'}
+                          </TableCell>
+                          <TableCell>
+                            {transfer.from_location || '-'}
+                          </TableCell>
+                          <TableCell>
+                            {transfer.to_location || '-'}
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="default" className="bg-green-500">
+                              Completed
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-muted-foreground">
+                            {transfer.performed_by || 'System'}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </TabsContent>
+          </Tabs>
         </CardContent>
       </Card>
 
@@ -284,8 +359,8 @@ export function AllocationDashboard() {
             <div className="flex items-center gap-3 p-4 rounded-lg bg-muted/50">
               <ArrowRightLeft className="h-8 w-8 text-muted-foreground" />
               <div>
-                <p className="text-2xl font-bold">0</p>
-                <p className="text-sm text-muted-foreground">Pending Transfers</p>
+                <p className="text-2xl font-bold">{transferTransactions?.length || 0}</p>
+                <p className="text-sm text-muted-foreground">Total Transfers</p>
               </div>
             </div>
             <div className="flex items-center gap-3 p-4 rounded-lg bg-muted/50">
