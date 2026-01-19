@@ -83,22 +83,24 @@ export function LocationWiseView() {
   }
 
   const groupedByLocation = filteredItems.reduce((acc, item) => {
-    const key = item.location_id || "unassigned";
+    const locationKey = item.location_id || "unassigned";
     const locationName = item.warehouse_location?.name || "Unknown Location";
-    if (!acc[key]) {
-      acc[key] = {
+    
+    if (!acc[locationKey]) {
+      acc[locationKey] = {
         locationName,
-        locationId: key,
+        locationId: locationKey,
         items: [] as typeof filteredItems,
         aggregatedItems: {} as Record<string, AggregatedItem>,
       };
     }
-    acc[key].items.push(item);
+    acc[locationKey].items.push(item);
     
-    // Aggregate by item name (case-insensitive, trimmed)
-    const normalizedName = item.item_name.trim().toLowerCase();
-    if (!acc[key].aggregatedItems[normalizedName]) {
-      acc[key].aggregatedItems[normalizedName] = {
+    // Aggregate by item name (case-insensitive, trimmed) within the same location
+    const normalizedItemName = (item.item_name || "").trim().toLowerCase();
+    
+    if (!acc[locationKey].aggregatedItems[normalizedItemName]) {
+      acc[locationKey].aggregatedItems[normalizedItemName] = {
         itemName: item.item_name,
         section: item.section,
         category: item.category,
@@ -108,10 +110,14 @@ export function LocationWiseView() {
         imageUrl: item.image_url,
       };
     }
-    acc[key].aggregatedItems[normalizedName].totalQuantity += (item.quantity || 0);
+    
+    // Sum quantities for items with the same name at the same location
+    const qty = Number(item.quantity) || 0;
+    acc[locationKey].aggregatedItems[normalizedItemName].totalQuantity += qty;
+    
     // Keep the first non-null image
-    if (!acc[key].aggregatedItems[normalizedName].imageUrl && item.image_url) {
-      acc[key].aggregatedItems[normalizedName].imageUrl = item.image_url;
+    if (!acc[locationKey].aggregatedItems[normalizedItemName].imageUrl && item.image_url) {
+      acc[locationKey].aggregatedItems[normalizedItemName].imageUrl = item.image_url;
     }
     
     return acc;
