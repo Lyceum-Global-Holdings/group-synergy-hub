@@ -1,8 +1,9 @@
 import { useState } from "react";
-import { ArrowRightLeft, Search, ArrowRight, Clock, CheckCircle2, XCircle } from "lucide-react";
+import { ArrowRightLeft, Search, ArrowRight, Clock, CheckCircle2, XCircle, Plus } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   Table,
   TableBody,
@@ -18,6 +19,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { NewTransferDialog } from "@/components/construction/dialogs/NewTransferDialog";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { useCompany } from "@/contexts/CompanyContext";
+import { format } from "date-fns";
 
 // Transfer status configuration
 const TRANSFER_STATUSES = [
@@ -27,8 +33,7 @@ const TRANSFER_STATUSES = [
   { value: "cancelled", label: "Cancelled", color: "bg-red-500", icon: XCircle },
 ];
 
-// Placeholder transfer data (would come from database in production)
-const mockTransfers: Array<{
+interface TransferTransaction {
   id: string;
   item_name: string;
   quantity: number;
@@ -38,13 +43,95 @@ const mockTransfers: Array<{
   initiated_date: string;
   completed_date: string | null;
   initiated_by: string;
-}> = [];
+}
 
 export function TransfersView() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [isNewTransferOpen, setIsNewTransferOpen] = useState(false);
+  const { selectedCompany } = useCompany();
 
-  const filteredTransfers = mockTransfers.filter((transfer) => {
+  // Fetch transfer transactions from the database
+  const { data: transfers = [], isLoading } = useQuery({
+    queryKey: ["construction-transfers", selectedCompany?.id],
+    queryFn: async () => {
+      let query = supabase
+        .from("construction_inventory_transactions")
+        .select(`
+          id,
+          item_id,
+          quantity_change,
+          from_location_id,
+          to_location_id,
+          created_at,
+          created_by
+        `)
+        .eq("transaction_type", "transfer")
+        .order("created_at", { ascending: false });
+
+      if (selectedCompany?.id) {
+        query = query.eq("company_id", selectedCompany.id);
+      }
+
+      const { data: transactions, error } = await query;
+      if (error) throw error;
+
+      // Enrich with item names, location names, and user names
+      const enrichedTransfers: TransferTransaction[] = await Promise.all(
+        (transactions || []).map(async (tx) => {
+          // Fetch item name
+          const { data: item } = await supabase
+            .from("construction_inventory_master")
+            .select("item_name")
+            .eq("id", tx.item_id)
+            .single();
+
+          // Fetch from location
+          const { data: fromLoc } = tx.from_location_id
+            ? await supabase
+                .from("warehouse_locations")
+                .select("name")
+                .eq("id", tx.from_location_id)
+                .single()
+            : { data: null };
+
+          // Fetch to location
+          const { data: toLoc } = tx.to_location_id
+            ? await supabase
+                .from("warehouse_locations")
+                .select("name")
+                .eq("id", tx.to_location_id)
+                .single()
+            : { data: null };
+
+          // Fetch user name
+          const { data: profile } = tx.created_by
+            ? await supabase
+                .from("profiles")
+                .select("full_name, email")
+                .eq("id", tx.created_by)
+                .single()
+            : { data: null };
+
+          return {
+            id: tx.id,
+            item_name: item?.item_name || "Unknown Item",
+            quantity: tx.quantity_change,
+            from_location: fromLoc?.name || "—",
+            to_location: toLoc?.name || "—",
+            status: "completed", // All logged transfers are completed
+            initiated_date: tx.created_at,
+            completed_date: tx.created_at,
+            initiated_by: profile?.full_name || profile?.email || "Unknown",
+          };
+        })
+      );
+
+      return enrichedTransfers;
+    },
+  });
+
+  const filteredTransfers = transfers.filter((transfer) => {
     const matchesSearch = 
       transfer.item_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       transfer.from_location.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -65,9 +152,9 @@ export function TransfersView() {
   };
 
   // Summary stats
-  const pendingCount = mockTransfers.filter(t => t.status === "pending").length;
-  const inTransitCount = mockTransfers.filter(t => t.status === "in_transit").length;
-  const completedCount = mockTransfers.filter(t => t.status === "completed").length;
+  const pendingCount = transfers.filter(t => t.status === "pending").length;
+  const inTransitCount = transfers.filter(t => t.status === "in_transit").length;
+  const completedCount = transfers.filter(t => t.status === "completed").length;
 
   return (
     <div className="space-y-4">
@@ -105,7 +192,7 @@ export function TransfersView() {
         </Card>
       </div>
 
-      {/* Filters */}
+      {/* Filters and New Transfer Button */}
       <div className="flex items-center gap-4">
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -129,6 +216,10 @@ export function TransfersView() {
             ))}
           </SelectContent>
         </Select>
+        <Button onClick={() => setIsNewTransferOpen(true)}>
+          <Plus className="h-4 w-4 mr-2" />
+          New Transfer
+        </Button>
       </div>
 
       {/* Transfer History Table */}
@@ -140,14 +231,21 @@ export function TransfersView() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {filteredTransfers.length === 0 ? (
+          {isLoading ? (
+            <div className="text-center py-12">
+              <p className="text-muted-foreground">Loading transfers...</p>
+            </div>
+          ) : filteredTransfers.length === 0 ? (
             <div className="text-center py-12">
               <ArrowRightLeft className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
               <h3 className="text-lg font-medium mb-2">No Transfers Found</h3>
-              <p className="text-sm text-muted-foreground max-w-md mx-auto">
-                Inter-location inventory transfers will appear here. Transfer functionality
-                can be initiated from the Location Wise view.
+              <p className="text-sm text-muted-foreground max-w-md mx-auto mb-4">
+                Inter-location inventory transfers will appear here. Click "New Transfer" to create one.
               </p>
+              <Button onClick={() => setIsNewTransferOpen(true)}>
+                <Plus className="h-4 w-4 mr-2" />
+                Create First Transfer
+              </Button>
             </div>
           ) : (
             <Table>
@@ -175,8 +273,14 @@ export function TransfersView() {
                       </div>
                     </TableCell>
                     <TableCell>{getStatusBadge(transfer.status)}</TableCell>
-                    <TableCell>{transfer.initiated_date}</TableCell>
-                    <TableCell>{transfer.completed_date || "-"}</TableCell>
+                    <TableCell>
+                      {format(new Date(transfer.initiated_date), "MMM dd, yyyy HH:mm")}
+                    </TableCell>
+                    <TableCell>
+                      {transfer.completed_date
+                        ? format(new Date(transfer.completed_date), "MMM dd, yyyy HH:mm")
+                        : "-"}
+                    </TableCell>
                     <TableCell>{transfer.initiated_by}</TableCell>
                   </TableRow>
                 ))}
@@ -185,6 +289,12 @@ export function TransfersView() {
           )}
         </CardContent>
       </Card>
+
+      {/* New Transfer Dialog */}
+      <NewTransferDialog 
+        open={isNewTransferOpen} 
+        onOpenChange={setIsNewTransferOpen} 
+      />
     </div>
   );
 }
