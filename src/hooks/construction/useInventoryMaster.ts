@@ -15,6 +15,8 @@ export function useInventoryMaster() {
         .select("*")
         .order("created_at", { ascending: false });
 
+      // If a specific company is selected, filter by it
+      // Otherwise (All Companies), show all items
       if (selectedCompany?.id) {
         query = query.eq("company_id", selectedCompany.id);
       }
@@ -24,7 +26,8 @@ export function useInventoryMaster() {
       if (error) throw error;
       return data as InventoryMaster[];
     },
-    enabled: !!selectedCompany?.id,
+    // Enable the query even when no company is selected (All Companies mode)
+    enabled: true,
   });
 }
 
