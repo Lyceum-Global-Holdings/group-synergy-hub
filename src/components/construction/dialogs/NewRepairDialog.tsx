@@ -2,10 +2,8 @@ import { useState, useEffect, useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
-import { useCompany } from "@/contexts/CompanyContext";
-import { useCreateRepairRecord } from "@/hooks/construction/useRepairRecords";
+import { useInventoryMaster } from "@/hooks/construction/useInventoryMaster";
+import { useCreateRepairRecord, useRepairRecords } from "@/hooks/construction/useRepairRecords";
 import {
   Dialog,
   DialogContent,
@@ -33,6 +31,8 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Package, Loader2 } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 
 const formSchema = z.object({
   item_id: z.string().min(1, "Please select an item"),
@@ -52,7 +52,6 @@ interface NewRepairDialogProps {
 }
 
 export function NewRepairDialog({ open, onOpenChange }: NewRepairDialogProps) {
-  const { selectedCompany } = useCompany();
   const createRepair = useCreateRepairRecord();
   const [selectedItem, setSelectedItem] = useState<{
     id: string;
@@ -76,30 +75,27 @@ export function NewRepairDialog({ open, onOpenChange }: NewRepairDialogProps) {
     },
   });
 
-  // Fetch inventory items that have stock
-  const { data: inventoryItems = [], isLoading: isLoadingItems } = useQuery({
-    queryKey: ["inventory-master-with-stock", selectedCompany?.id],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("construction_inventory_master")
-        .select(`
-          id,
-          item_name,
-          unit,
-          image_url,
-          quantity,
-          location_id,
-          warehouse_location:warehouse_locations(id, name)
-        `)
-        .eq("company_id", selectedCompany?.id)
-        .gt("quantity", 0)
-        .order("item_name");
+  // Use the shared useInventoryMaster hook (single source of truth)
+  const { data: inventoryMaster = [], isLoading: isLoadingMaster } = useInventoryMaster();
+  
+  // Fetch active repair records to exclude items under repair
+  const { data: repairRecords = [] } = useRepairRecords();
 
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!selectedCompany?.id && open,
-  });
+  // Get IDs of items currently under active repair
+  const itemsUnderRepairIds = useMemo(() => {
+    return new Set(
+      repairRecords
+        .filter((r) => !["returned", "discarded"].includes(r.repair_status))
+        .map((r) => r.item_id)
+    );
+  }, [repairRecords]);
+
+  // Filter items with available stock and not under active repair
+  const availableItems = useMemo(() => {
+    return inventoryMaster.filter(
+      (item) => item.quantity > 0 && !itemsUnderRepairIds.has(item.id)
+    );
+  }, [inventoryMaster, itemsUnderRepairIds]);
 
   // Consolidate items by item_name + location_id (sum quantities)
   const consolidatedItems = useMemo(() => {
@@ -113,7 +109,7 @@ export function NewRepairDialog({ open, onOpenChange }: NewRepairDialogProps) {
       location_name: string | null;
     }>();
 
-    inventoryItems.forEach((item) => {
+    availableItems.forEach((item) => {
       const key = `${item.item_name}__${item.location_id}`;
       const existing = itemMap.get(key);
       
@@ -133,7 +129,7 @@ export function NewRepairDialog({ open, onOpenChange }: NewRepairDialogProps) {
     });
 
     return Array.from(itemMap.values());
-  }, [inventoryItems]);
+  }, [availableItems]);
 
   // Fetch warehouse locations
   const { data: locations = [] } = useQuery({
@@ -236,11 +232,11 @@ export function NewRepairDialog({ open, onOpenChange }: NewRepairDialogProps) {
                       field.onChange(value);
                       handleItemChange(value);
                     }}
-                    disabled={isLoadingItems}
+                    disabled={isLoadingMaster}
                   >
                     <FormControl>
                       <SelectTrigger className="w-full">
-                        <SelectValue placeholder={isLoadingItems ? "Loading items..." : "Select an item"} />
+                        <SelectValue placeholder={isLoadingMaster ? "Loading items..." : "Select an item"} />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent className="bg-background z-[9999] max-h-60">
