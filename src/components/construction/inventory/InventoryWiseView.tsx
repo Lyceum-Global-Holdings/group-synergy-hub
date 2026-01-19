@@ -69,6 +69,7 @@ interface InventoryWiseRow {
   locations: string[];
   itemName: string;
   imageUrl?: string | null;
+  locationName?: string | null;
 }
 
 interface LocationDetailsDialogProps {
@@ -146,20 +147,42 @@ export function InventoryWiseView() {
   }, {} as Record<string, { totalQty: number; locations: Set<string>; statuses: string[] }>);
 
   // Transform Item Master data into inventory-wise rows
-  // Item Master is the single source of truth
+  // Item Master is the single source of truth for quantity and location
   const inventoryData: InventoryWiseRow[] = (inventoryMaster || []).map((item) => {
     const allocationKey = item.item_name.toLowerCase().trim();
     const allocation = allocationDataMap[allocationKey];
+
+    // Use Item Master quantity as primary, but fall back to allocation data if no quantity
+    const primaryQty = item.quantity ?? 0;
+    const allocationQty = allocation?.totalQty || 0;
+    const totalQty = primaryQty > 0 ? primaryQty : allocationQty;
+
+    // Get location from Item Master first, then from allocations
+    const itemMasterLocation = item.warehouse_location?.name;
+    const allocationLocations = allocation ? Array.from(allocation.locations) : [];
+    
+    // Build locations array - include Item Master location first if exists
+    const locations: string[] = [];
+    if (itemMasterLocation) {
+      locations.push(itemMasterLocation);
+    }
+    // Add allocation locations that aren't already included
+    allocationLocations.forEach(loc => {
+      if (!locations.includes(loc)) {
+        locations.push(loc);
+      }
+    });
 
     return {
       id: item.id,
       itemName: item.item_name,
       section: item.section || "unassigned",
       category: item.category || "unassigned",
-      totalQty: allocation?.totalQty || 0,
-      status: allocation ? computeStatus(allocation.statuses, allocation.totalQty) : "available",
-      locations: allocation ? Array.from(allocation.locations) : [],
+      totalQty,
+      status: allocation ? computeStatus(allocation.statuses, totalQty) : (totalQty > 0 ? "available" : "low_stock"),
+      locations,
       imageUrl: item.image_url,
+      locationName: itemMasterLocation,
     };
   });
 

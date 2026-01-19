@@ -924,15 +924,21 @@ export interface InventoryMaster {
   status: string;
   notes: string | null;
   image_url: string | null;
+  quantity: number;
+  location_id: string | null;
   created_by: string | null;
   created_at: string;
   updated_at: string;
+  // Joined field for location name
+  warehouse_location?: { id: string; name: string };
 }
 
 export interface CreateInventoryMasterData {
   item_name: string;
   section: string;
   category: string;
+  quantity: number;
+  location_id: string;
   unit?: string;
   unit_cost?: number;
   description?: string;

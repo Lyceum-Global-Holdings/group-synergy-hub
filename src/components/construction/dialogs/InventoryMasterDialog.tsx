@@ -1,6 +1,7 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { useQuery } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
@@ -10,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useCreateInventoryMaster, useUpdateInventoryMaster } from "@/hooks/construction/useInventoryMaster";
 import type { InventoryMaster, CreateInventoryMasterData } from "@/types/construction";
 import { useEffect, useState, useRef } from "react";
-import { Upload, X, Image as ImageIcon } from "lucide-react";
+import { X, Image as ImageIcon } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
@@ -37,6 +38,8 @@ const formSchema = z.object({
   item_name: z.string().min(1, "Item name is required"),
   section: z.string().min(1, "Section is required"),
   category: z.string().min(1, "Item category is required"),
+  quantity: z.coerce.number().min(0, "Quantity must be 0 or greater"),
+  location_id: z.string().min(1, "Location is required"),
   unit: z.string().optional(),
   unit_cost: z.coerce.number().optional(),
   description: z.string().optional(),
@@ -61,12 +64,27 @@ export function InventoryMasterDialog({ open, onOpenChange, item }: InventoryMas
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
 
+  // Fetch warehouse locations
+  const { data: locations = [] } = useQuery({
+    queryKey: ["warehouse-locations-select"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("warehouse_locations")
+        .select("id, name")
+        .order("name");
+      if (error) throw error;
+      return data;
+    },
+  });
+
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       item_name: "",
       section: "",
       category: "",
+      quantity: 0,
+      location_id: "",
       unit: "",
       unit_cost: 0,
       description: "",
@@ -82,6 +100,8 @@ export function InventoryMasterDialog({ open, onOpenChange, item }: InventoryMas
         item_name: item.item_name,
         section: item.section || "",
         category: item.category || "",
+        quantity: item.quantity || 0,
+        location_id: item.location_id || "",
         unit: item.unit || "",
         unit_cost: item.unit_cost || 0,
         description: item.description || "",
@@ -95,6 +115,8 @@ export function InventoryMasterDialog({ open, onOpenChange, item }: InventoryMas
         item_name: "",
         section: "",
         category: "",
+        quantity: 0,
+        location_id: "",
         unit: "",
         unit_cost: 0,
         description: "",
@@ -245,6 +267,47 @@ export function InventoryMasterDialog({ open, onOpenChange, item }: InventoryMas
                         {INVENTORY_CATEGORIES.map((category) => (
                           <SelectItem key={category.value} value={category.value}>
                             {category.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            {/* Quantity and Location */}
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="quantity"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Quantity *</FormLabel>
+                    <FormControl>
+                      <Input type="number" step="0.01" min="0" placeholder="0" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="location_id"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Location *</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select location" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {locations.map((location) => (
+                          <SelectItem key={location.id} value={location.id}>
+                            {location.name}
                           </SelectItem>
                         ))}
                       </SelectContent>

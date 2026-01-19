@@ -3073,7 +3073,9 @@ export type Database = {
           image_url: string | null
           item_code: string | null
           item_name: string
+          location_id: string | null
           notes: string | null
+          quantity: number
           section: string | null
           status: string
           unit: string | null
@@ -3090,7 +3092,9 @@ export type Database = {
           image_url?: string | null
           item_code?: string | null
           item_name: string
+          location_id?: string | null
           notes?: string | null
+          quantity?: number
           section?: string | null
           status?: string
           unit?: string | null
@@ -3107,7 +3111,9 @@ export type Database = {
           image_url?: string | null
           item_code?: string | null
           item_name?: string
+          location_id?: string | null
           notes?: string | null
+          quantity?: number
           section?: string | null
           status?: string
           unit?: string | null
@@ -3120,6 +3126,13 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "construction_inventory_master_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "warehouse_locations"
             referencedColumns: ["id"]
           },
         ]

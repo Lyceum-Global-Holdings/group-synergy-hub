@@ -214,6 +214,8 @@ export default function InventoryItems() {
                       <TableHead>Item Name</TableHead>
                       <TableHead>Section</TableHead>
                       <TableHead>Item Category</TableHead>
+                      <TableHead>Quantity</TableHead>
+                      <TableHead>Location</TableHead>
                       <TableHead>Unit</TableHead>
                       <TableHead>Unit Cost</TableHead>
                       <TableHead>Status</TableHead>
@@ -223,7 +225,7 @@ export default function InventoryItems() {
                   <TableBody>
                     {filteredMaster?.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                        <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
                           No inventory items found
                         </TableCell>
                       </TableRow>
@@ -253,6 +255,10 @@ export default function InventoryItems() {
                             <Badge variant="secondary">
                               {getCategoryLabel(item.category)}
                             </Badge>
+                          </TableCell>
+                          <TableCell>{item.quantity ?? 0}</TableCell>
+                          <TableCell>
+                            {item.warehouse_location?.name || "-"}
                           </TableCell>
                           <TableCell>{item.unit || "-"}</TableCell>
                           <TableCell>{item.unit_cost ? `$${item.unit_cost.toFixed(2)}` : "-"}</TableCell>
