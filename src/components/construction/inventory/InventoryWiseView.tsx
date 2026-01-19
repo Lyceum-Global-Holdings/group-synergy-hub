@@ -1,8 +1,8 @@
 import { useState } from "react";
-import { Eye, MapPin, Search, Image as ImageIcon, ChevronDown, Edit, ArrowRightLeft, Package, Plus } from "lucide-react";
+import { Eye, MapPin, Search, Image as ImageIcon, ChevronDown, Edit, ArrowRightLeft, Package, Plus, Wrench } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
   Table,
@@ -35,6 +35,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useConstructionResources } from "@/hooks/construction/useConstructionResources";
 import { useInventoryMaster } from "@/hooks/construction/useInventoryMaster";
+import { useRepairRecords } from "@/hooks/construction/useRepairRecords";
 import { AddStockDialog } from "@/components/construction/dialogs/AddStockDialog";
 
 // Predefined Section values
@@ -191,8 +192,15 @@ export function InventoryWiseView() {
   const { data: inventoryMaster, isLoading: isLoadingMaster } = useInventoryMaster();
   // Fetch allocation data for quantities and locations
   const { data: resources, isLoading: isLoadingResources } = useConstructionResources();
+  // Fetch repair records for items under repair
+  const { data: repairRecords = [], isLoading: isLoadingRepairs } = useRepairRecords();
 
-  const isLoading = isLoadingMaster || isLoadingResources;
+  const isLoading = isLoadingMaster || isLoadingResources || isLoadingRepairs;
+
+  // Get active repair items (not returned or discarded)
+  const activeRepairRecords = repairRecords.filter(r => 
+    !['returned', 'discarded'].includes(r.repair_status)
+  );
 
   // Filter for material resources only
   const materialResources = resources?.filter((r) => r.resource_type === "material") || [];
@@ -521,6 +529,69 @@ export function InventoryWiseView() {
         </CardContent>
       </Card>
 
+      {/* Items Under Repair Section */}
+      {activeRepairRecords.length > 0 && (
+        <Card className="border-orange-200 bg-orange-50/30">
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <Wrench className="h-5 w-5 text-orange-600" />
+              Items Under Repair
+              <Badge variant="outline" className="ml-2 bg-orange-100 text-orange-700 border-orange-300">
+                {activeRepairRecords.length} item{activeRepairRecords.length !== 1 ? 's' : ''}
+              </Badge>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-[60px]">Image</TableHead>
+                  <TableHead>Item Name</TableHead>
+                  <TableHead className="text-right">Quantity</TableHead>
+                  <TableHead>Unit</TableHead>
+                  <TableHead>Location</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Service Provider</TableHead>
+                  <TableHead>Sent Date</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {activeRepairRecords.map((record) => (
+                  <TableRow key={record.id}>
+                    <TableCell>
+                      {record.inventory_item?.image_url ? (
+                        <img
+                          src={record.inventory_item.image_url}
+                          alt={record.item_name}
+                          className="h-10 w-10 rounded object-cover"
+                        />
+                      ) : (
+                        <div className="h-10 w-10 rounded bg-muted flex items-center justify-center">
+                          <ImageIcon className="h-5 w-5 text-muted-foreground" />
+                        </div>
+                      )}
+                    </TableCell>
+                    <TableCell className="font-medium">{record.item_name}</TableCell>
+                    <TableCell className="text-right font-medium">{record.quantity}</TableCell>
+                    <TableCell>{record.unit || '-'}</TableCell>
+                    <TableCell>{record.warehouse_location?.name || '-'}</TableCell>
+                    <TableCell>
+                      <Badge className={getRepairStatusColor(record.repair_status)}>
+                        {record.repair_status.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>{record.service_provider || '-'}</TableCell>
+                    <TableCell>
+                      {new Date(record.sent_date).toLocaleDateString()}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Location Actions Dialog */}
       <LocationActionsDialog
         open={locationDialog.open}
@@ -539,6 +610,20 @@ export function InventoryWiseView() {
       />
     </div>
   );
+}
+
+// Helper function for repair status badge colors
+function getRepairStatusColor(status: string): string {
+  switch (status) {
+    case 'sent_for_repair':
+      return 'bg-orange-100 text-orange-800';
+    case 'in_repair':
+      return 'bg-blue-100 text-blue-800';
+    case 'repaired':
+      return 'bg-green-100 text-green-800';
+    default:
+      return 'bg-muted text-muted-foreground';
+  }
 }
 
 // Compute status based on resource statuses and quantities

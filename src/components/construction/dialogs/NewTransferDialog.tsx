@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useInventoryMaster } from "@/hooks/construction/useInventoryMaster";
+import { useRepairRecords } from "@/hooks/construction/useRepairRecords";
 import { useEffect, useState, useMemo } from "react";
 import { Image as ImageIcon, ArrowRightLeft, AlertCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -55,10 +56,21 @@ export function NewTransferDialog({ open, onOpenChange }: NewTransferDialogProps
   const queryClient = useQueryClient();
   const { selectedCompany } = useCompany();
   const { data: inventoryMaster = [] } = useInventoryMaster();
+  const { data: repairRecords = [] } = useRepairRecords();
   const [selectedItemImage, setSelectedItemImage] = useState<string | null>(null);
   const [selectedItem, setSelectedItem] = useState<ItemWithLocation | null>(null);
   const [itemComboOpen, setItemComboOpen] = useState(false);
   const [availableStock, setAvailableStock] = useState<number>(0);
+
+  // Get item IDs that are currently under repair (not returned or discarded)
+  const itemsUnderRepairIds = useMemo(() => {
+    const activeRepairStatuses = ['sent_for_repair', 'in_repair', 'repaired'];
+    return new Set(
+      repairRecords
+        .filter(r => activeRepairStatuses.includes(r.repair_status))
+        .map(r => r.item_id)
+    );
+  }, [repairRecords]);
 
   // Fetch warehouse locations
   const { data: locations = [] } = useQuery({
@@ -74,8 +86,11 @@ export function NewTransferDialog({ open, onOpenChange }: NewTransferDialogProps
   });
 
   // Get items with their location information for transfer - CONSOLIDATED by item_name + location
+  // Exclude items that are currently under repair
   const itemsWithLocations = useMemo(() => {
-    const itemsWithStock = inventoryMaster.filter(item => item.quantity > 0);
+    const itemsWithStock = inventoryMaster.filter(item => 
+      item.quantity > 0 && !itemsUnderRepairIds.has(item.id)
+    );
     
     // Create a map to consolidate quantities by item_name + location_id
     const consolidatedMap = new Map<string, ItemWithLocation>();
@@ -104,7 +119,7 @@ export function NewTransferDialog({ open, onOpenChange }: NewTransferDialogProps
     });
     
     return Array.from(consolidatedMap.values());
-  }, [inventoryMaster]);
+  }, [inventoryMaster, itemsUnderRepairIds]);
 
   // Get unique item names for selection
   const uniqueItemNames = useMemo(() => {
