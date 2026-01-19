@@ -3153,6 +3153,7 @@ export type Database = {
           reference_type: string | null
           to_location_id: string | null
           transaction_type: string
+          unit: string | null
           updated_at: string
         }
         Insert: {
@@ -3170,6 +3171,7 @@ export type Database = {
           reference_type?: string | null
           to_location_id?: string | null
           transaction_type: string
+          unit?: string | null
           updated_at?: string
         }
         Update: {
@@ -3187,6 +3189,7 @@ export type Database = {
           reference_type?: string | null
           to_location_id?: string | null
           transaction_type?: string
+          unit?: string | null
           updated_at?: string
         }
         Relationships: [

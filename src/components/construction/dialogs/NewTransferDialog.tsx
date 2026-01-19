@@ -73,22 +73,37 @@ export function NewTransferDialog({ open, onOpenChange }: NewTransferDialogProps
     },
   });
 
-  // Get items with their location information for transfer
+  // Get items with their location information for transfer - CONSOLIDATED by item_name + location
   const itemsWithLocations = useMemo(() => {
-    return inventoryMaster
-      .filter(item => item.quantity > 0) // Only show items with stock
-      .map(item => ({
-        id: item.id,
-        item_name: item.item_name,
-        section: item.section,
-        category: item.category,
-        unit: item.unit,
-        unit_cost: item.unit_cost,
-        image_url: item.image_url,
-        quantity: item.quantity,
-        location_id: item.location_id,
-        location_name: item.warehouse_location?.name || null,
-      }));
+    const itemsWithStock = inventoryMaster.filter(item => item.quantity > 0);
+    
+    // Create a map to consolidate quantities by item_name + location_id
+    const consolidatedMap = new Map<string, ItemWithLocation>();
+    
+    itemsWithStock.forEach(item => {
+      const key = `${item.item_name}__${item.location_id}`;
+      const existing = consolidatedMap.get(key);
+      
+      if (existing) {
+        // Add quantities together for the same item at the same location
+        existing.quantity += item.quantity;
+      } else {
+        consolidatedMap.set(key, {
+          id: item.id, // Keep the first item's ID as reference
+          item_name: item.item_name,
+          section: item.section,
+          category: item.category,
+          unit: item.unit,
+          unit_cost: item.unit_cost,
+          image_url: item.image_url,
+          quantity: item.quantity,
+          location_id: item.location_id,
+          location_name: item.warehouse_location?.name || null,
+        });
+      }
+    });
+    
+    return Array.from(consolidatedMap.values());
   }, [inventoryMaster]);
 
   // Get unique item names for selection
@@ -98,7 +113,7 @@ export function NewTransferDialog({ open, onOpenChange }: NewTransferDialogProps
     return Array.from(names);
   }, [itemsWithLocations]);
 
-  // Get available locations for selected item (locations where item has stock)
+  // Get available locations for selected item (locations where item has stock) - Already consolidated
   const availableFromLocations = useMemo(() => {
     if (!selectedItem) return [];
     return itemsWithLocations
@@ -125,7 +140,7 @@ export function NewTransferDialog({ open, onOpenChange }: NewTransferDialogProps
   const fromLocationId = form.watch("from_location_id");
   const quantityValue = form.watch("quantity");
 
-  // Update available stock when from_location changes
+  // Update available stock when from_location changes - use consolidated quantity
   useEffect(() => {
     if (selectedItem && fromLocationId) {
       const locationItem = itemsWithLocations.find(
@@ -196,7 +211,7 @@ export function NewTransferDialog({ open, onOpenChange }: NewTransferDialogProps
         if (createError) throw createError;
       }
 
-      // 3. Log the transfer transaction
+      // 3. Log the transfer transaction with unit
       const { error: transactionError } = await supabase
         .from("construction_inventory_transactions")
         .insert({
@@ -207,6 +222,7 @@ export function NewTransferDialog({ open, onOpenChange }: NewTransferDialogProps
           quantity_after: newSourceQty,
           from_location_id: data.from_location_id,
           to_location_id: data.to_location_id,
+          unit: data.unit,
           notes: `Transferred ${data.quantity} ${data.unit} of ${data.item_name}`,
           company_id: selectedCompany?.id,
           created_by: user.user?.id,
