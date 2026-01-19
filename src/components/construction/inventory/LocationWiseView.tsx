@@ -71,7 +71,17 @@ export function LocationWiseView() {
     return matchesSearch && matchesLocation;
   });
 
-  // Group items by location
+  // Group items by location, then aggregate by item name within each location
+  interface AggregatedItem {
+    itemName: string;
+    section: string | null;
+    category: string | null;
+    status: string;
+    totalQuantity: number;
+    unitCost: number | null;
+    imageUrl: string | null;
+  }
+
   const groupedByLocation = filteredItems.reduce((acc, item) => {
     const key = item.location_id || "unassigned";
     const locationName = item.warehouse_location?.name || "Unknown Location";
@@ -79,12 +89,33 @@ export function LocationWiseView() {
       acc[key] = {
         locationName,
         locationId: key,
-        items: [],
+        items: [] as typeof filteredItems,
+        aggregatedItems: {} as Record<string, AggregatedItem>,
       };
     }
     acc[key].items.push(item);
+    
+    // Aggregate by item name (case-insensitive, trimmed)
+    const normalizedName = item.item_name.trim().toLowerCase();
+    if (!acc[key].aggregatedItems[normalizedName]) {
+      acc[key].aggregatedItems[normalizedName] = {
+        itemName: item.item_name,
+        section: item.section,
+        category: item.category,
+        status: item.status,
+        totalQuantity: 0,
+        unitCost: item.unit_cost,
+        imageUrl: item.image_url,
+      };
+    }
+    acc[key].aggregatedItems[normalizedName].totalQuantity += (item.quantity || 0);
+    // Keep the first non-null image
+    if (!acc[key].aggregatedItems[normalizedName].imageUrl && item.image_url) {
+      acc[key].aggregatedItems[normalizedName].imageUrl = item.image_url;
+    }
+    
     return acc;
-  }, {} as Record<string, { locationName: string; locationId: string; items: typeof filteredItems }>);
+  }, {} as Record<string, { locationName: string; locationId: string; items: typeof filteredItems; aggregatedItems: Record<string, AggregatedItem> }>);
 
   const getSectionLabel = (value: string | null) => {
     if (!value) return "-";
@@ -159,7 +190,7 @@ export function LocationWiseView() {
                     </CardTitle>
                     <div className="flex items-center gap-4">
                       <div className="text-right">
-                        <p className="text-sm font-medium">{location.items.length} Items</p>
+                        <p className="text-sm font-medium">{Object.keys(location.aggregatedItems).length} Items</p>
                         <p className="text-xs text-muted-foreground">At this location</p>
                       </div>
                       <div className="text-right">
@@ -183,13 +214,13 @@ export function LocationWiseView() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {location.items.map((item) => (
-                        <TableRow key={item.id}>
+                      {Object.values(location.aggregatedItems).map((aggItem, idx) => (
+                        <TableRow key={`${locationId}-${aggItem.itemName}-${idx}`}>
                           <TableCell>
-                            {item.image_url ? (
+                            {aggItem.imageUrl ? (
                               <img
-                                src={item.image_url}
-                                alt={item.item_name}
+                                src={aggItem.imageUrl}
+                                alt={aggItem.itemName}
                                 className="w-8 h-8 object-cover rounded"
                               />
                             ) : (
@@ -201,20 +232,20 @@ export function LocationWiseView() {
                           <TableCell className="font-medium">
                             <div className="flex items-center gap-2">
                               <Package className="h-4 w-4 text-muted-foreground" />
-                              {item.item_name}
+                              {aggItem.itemName}
                             </div>
                           </TableCell>
                           <TableCell>
-                            <Badge variant="outline">{getSectionLabel(item.section)}</Badge>
+                            <Badge variant="outline">{getSectionLabel(aggItem.section)}</Badge>
                           </TableCell>
                           <TableCell>
-                            <Badge variant="secondary">{getCategoryLabel(item.category)}</Badge>
+                            <Badge variant="secondary">{getCategoryLabel(aggItem.category)}</Badge>
                           </TableCell>
-                          <TableCell className="text-right">{item.quantity || 0}</TableCell>
+                          <TableCell className="text-right">{aggItem.totalQuantity}</TableCell>
                           <TableCell className="text-right">
-                            {item.unit_cost ? `$${item.unit_cost.toFixed(2)}` : "-"}
+                            {aggItem.unitCost ? `$${aggItem.unitCost.toFixed(2)}` : "-"}
                           </TableCell>
-                          <TableCell>{getStatusBadge(item.status)}</TableCell>
+                          <TableCell>{getStatusBadge(aggItem.status)}</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
