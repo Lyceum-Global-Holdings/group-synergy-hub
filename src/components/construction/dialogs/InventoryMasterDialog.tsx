@@ -2,18 +2,19 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useQuery } from "@tanstack/react-query";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useCreateInventoryMaster, useUpdateInventoryMaster } from "@/hooks/construction/useInventoryMaster";
+import { useCreateInventoryMaster, useUpdateInventoryMaster, useInventoryMaster } from "@/hooks/construction/useInventoryMaster";
 import type { InventoryMaster, CreateInventoryMasterData } from "@/types/construction";
-import { useEffect, useState, useRef } from "react";
-import { X, Image as ImageIcon } from "lucide-react";
+import { useEffect, useState, useRef, useMemo } from "react";
+import { X, Image as ImageIcon, AlertCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 // Predefined Section values
 const INVENTORY_SECTIONS = [
@@ -59,10 +60,21 @@ interface InventoryMasterDialogProps {
 export function InventoryMasterDialog({ open, onOpenChange, item }: InventoryMasterDialogProps) {
   const createMutation = useCreateInventoryMaster();
   const updateMutation = useUpdateInventoryMaster();
+  const { data: inventoryMaster = [] } = useInventoryMaster();
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [duplicateWarning, setDuplicateWarning] = useState<string | null>(null);
+
+  // Get existing item names for duplicate check (excluding current item when editing)
+  const existingItemNames = useMemo(() => {
+    return new Set(
+      inventoryMaster
+        .filter((i) => !item || i.id !== item.id) // Exclude current item when editing
+        .map((i) => i.item_name.toLowerCase().trim())
+    );
+  }, [inventoryMaster, item]);
 
   // Fetch warehouse locations
   const { data: locations = [] } = useQuery({
@@ -110,6 +122,7 @@ export function InventoryMasterDialog({ open, onOpenChange, item }: InventoryMas
         image_url: item.image_url || "",
       });
       setImagePreview(item.image_url || null);
+      setDuplicateWarning(null);
     } else {
       form.reset({
         item_name: "",
@@ -125,8 +138,25 @@ export function InventoryMasterDialog({ open, onOpenChange, item }: InventoryMas
         image_url: "",
       });
       setImagePreview(null);
+      setDuplicateWarning(null);
     }
   }, [item, form]);
+
+  // Check for duplicate item name
+  const checkDuplicateName = (name: string) => {
+    const normalizedName = name.toLowerCase().trim();
+    if (existingItemNames.has(normalizedName)) {
+      setDuplicateWarning(`Item "${name}" already exists. Use Allocation View to add stock to existing items.`);
+      return true;
+    }
+    setDuplicateWarning(null);
+    return false;
+  };
+
+  const handleItemNameChange = (value: string) => {
+    form.setValue("item_name", value);
+    checkDuplicateName(value);
+  };
 
   const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -194,6 +224,16 @@ export function InventoryMasterDialog({ open, onOpenChange, item }: InventoryMas
   };
 
   const onSubmit = async (data: FormData) => {
+    // Check for duplicates before creating (not when editing)
+    if (!item && checkDuplicateName(data.item_name)) {
+      toast({
+        title: "Duplicate item name",
+        description: "This item already exists. Use Allocation View to add stock to existing items.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     if (item) {
       await updateMutation.mutateAsync({ id: item.id, ...data });
     } else {
@@ -206,8 +246,22 @@ export function InventoryMasterDialog({ open, onOpenChange, item }: InventoryMas
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{item ? "Edit Inventory Item" : "Add Inventory Item"}</DialogTitle>
+          <DialogTitle>{item ? "Edit Inventory Item" : "Add New Item to Item Master"}</DialogTitle>
+          {!item && (
+            <DialogDescription>
+              Create a new item in Item Master. To add stock to existing items, use the "Add Stock" button in Allocation View.
+            </DialogDescription>
+          )}
         </DialogHeader>
+        
+        {/* Duplicate Warning */}
+        {duplicateWarning && !item && (
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>{duplicateWarning}</AlertDescription>
+          </Alert>
+        )}
+        
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             {/* Item Name */}
@@ -218,7 +272,11 @@ export function InventoryMasterDialog({ open, onOpenChange, item }: InventoryMas
                 <FormItem>
                   <FormLabel>Item Name *</FormLabel>
                   <FormControl>
-                    <Input placeholder="Enter item name" {...field} />
+                    <Input 
+                      placeholder="Enter item name" 
+                      {...field}
+                      onChange={(e) => handleItemNameChange(e.target.value)}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
