@@ -46,15 +46,21 @@ export function useRepairRecords() {
   return useQuery({
     queryKey: ["construction-repair-records", selectedCompany?.id],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from("construction_repair_records")
         .select(`
           *,
           warehouse_location:warehouse_locations(id, name),
           inventory_item:construction_inventory_master!item_id(image_url)
         `)
-        .eq("company_id", selectedCompany?.id)
         .order("created_at", { ascending: false });
+
+      // Filter by company if selected, otherwise fetch records with null company_id
+      if (selectedCompany?.id) {
+        query = query.or(`company_id.eq.${selectedCompany.id},company_id.is.null`);
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
       
