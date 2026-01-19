@@ -10,27 +10,24 @@ import { format } from "date-fns";
 // Helper to format transaction type for display
 function formatTransactionType(type: string): string {
   const typeMap: Record<string, string> = {
-    'opening_stock': 'Opening Stock',
-    'goods_receipt': 'Stock Addition',
-    'material_issue': 'Material Issue',
-    'material_return': 'Material Return',
+    'stock_addition': 'Stock Addition',
+    'stock_removal': 'Stock Removal',
+    'transfer': 'Transfer',
     'adjustment': 'Adjustment',
-    'transfer_in': 'Transfer In',
-    'transfer_out': 'Transfer Out',
-    'project_issue': 'Project Issue',
-    'project_return': 'Project Return',
+    'allocation': 'Allocation',
+    'return': 'Return',
   };
   return typeMap[type] || type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
 }
 
 // Helper to get badge variant based on transaction type
 function getTransactionBadgeVariant(type: string): "default" | "secondary" | "destructive" | "outline" {
-  if (type.includes('issue') || type.includes('out')) return 'destructive';
-  if (type.includes('receipt') || type.includes('in') || type.includes('return')) return 'default';
-  if (type.includes('adjustment')) return 'secondary';
+  if (type === 'stock_removal' || type === 'allocation') return 'destructive';
+  if (type === 'stock_addition' || type === 'return') return 'default';
+  if (type === 'adjustment') return 'secondary';
+  if (type === 'transfer') return 'outline';
   return 'outline';
 }
-
 export function AllocationDashboard() {
   const { data: resources } = useConstructionResources();
   const { data: inventoryMaster } = useInventoryMaster();
