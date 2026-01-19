@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { MapPin, Package, Search } from "lucide-react";
+import { MapPin, Package, Search, Image as ImageIcon } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -18,48 +18,87 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useConstructionResources } from "@/hooks/construction/useConstructionResources";
-import { useProjects } from "@/hooks/construction/useProjects";
-import { RESOURCE_STATUSES } from "@/types/construction";
+import { useInventoryMaster } from "@/hooks/construction/useInventoryMaster";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+
+// Section and Category labels
+const INVENTORY_SECTIONS = [
+  { value: "civil", label: "Civil" },
+  { value: "mechanical", label: "Mechanical" },
+  { value: "carpenter", label: "Carpenter" },
+  { value: "mep", label: "MEP" },
+  { value: "aluminium", label: "Aluminium" },
+];
+
+const INVENTORY_CATEGORIES = [
+  { value: "machines", label: "Machines" },
+  { value: "tools", label: "Tools" },
+  { value: "equipments", label: "Equipments" },
+  { value: "scaffolding", label: "Scaffolding" },
+  { value: "materials", label: "Materials" },
+  { value: "safety", label: "Safety" },
+];
 
 export function LocationWiseView() {
   const [searchTerm, setSearchTerm] = useState("");
-  const [projectFilter, setProjectFilter] = useState<string>("all");
+  const [locationFilter, setLocationFilter] = useState<string>("all");
 
-  const { data: resources, isLoading } = useConstructionResources();
-  const { data: projects } = useProjects();
-
-  // Filter for material resources only
-  const materialResources = resources?.filter((r) => r.resource_type === "material") || [];
+  const { data: inventoryItems, isLoading: isLoadingItems } = useInventoryMaster();
   
-  const filteredResources = materialResources.filter((resource) => {
-    const matchesSearch = resource.resource_name.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesProject = projectFilter === "all" || resource.project_id === projectFilter;
-    return matchesSearch && matchesProject;
+  // Fetch all warehouse locations for the dropdown
+  const { data: locations = [], isLoading: isLoadingLocations } = useQuery({
+    queryKey: ["warehouse-locations-list"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("warehouse_locations")
+        .select("id, name")
+        .order("name");
+      if (error) throw error;
+      return data;
+    },
   });
 
-  // Group by project/location
-  const groupedByLocation = filteredResources.reduce((acc, resource) => {
-    const key = resource.project_id || "unassigned";
-    const projectName = resource.project?.project_name || "Unassigned";
+  const isLoading = isLoadingItems || isLoadingLocations;
+
+  // Filter items that have a location assigned
+  const itemsWithLocation = (inventoryItems || []).filter(item => item.location_id);
+  
+  // Apply search and location filters
+  const filteredItems = itemsWithLocation.filter((item) => {
+    const matchesSearch = item.item_name.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesLocation = locationFilter === "all" || item.location_id === locationFilter;
+    return matchesSearch && matchesLocation;
+  });
+
+  // Group items by location
+  const groupedByLocation = filteredItems.reduce((acc, item) => {
+    const key = item.location_id || "unassigned";
+    const locationName = item.warehouse_location?.name || "Unknown Location";
     if (!acc[key]) {
       acc[key] = {
-        projectName,
-        projectId: key,
+        locationName,
+        locationId: key,
         items: [],
       };
     }
-    acc[key].items.push(resource);
+    acc[key].items.push(item);
     return acc;
-  }, {} as Record<string, { projectName: string; projectId: string; items: typeof filteredResources }>);
+  }, {} as Record<string, { locationName: string; locationId: string; items: typeof filteredItems }>);
+
+  const getSectionLabel = (value: string | null) => {
+    if (!value) return "-";
+    return INVENTORY_SECTIONS.find(s => s.value === value)?.label || value;
+  };
+
+  const getCategoryLabel = (value: string | null) => {
+    if (!value) return "-";
+    return INVENTORY_CATEGORIES.find(c => c.value === value)?.label || value;
+  };
 
   const getStatusBadge = (status: string) => {
-    const statusConfig = RESOURCE_STATUSES.find((s) => s.value === status);
-    return (
-      <Badge className={statusConfig?.color || "bg-muted"}>
-        {statusConfig?.label || status}
-      </Badge>
-    );
+    const variant = status === "active" ? "default" : "secondary";
+    return <Badge variant={variant}>{status}</Badge>;
   };
 
   return (
@@ -74,15 +113,15 @@ export function LocationWiseView() {
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
-        <Select value={projectFilter} onValueChange={setProjectFilter}>
+        <Select value={locationFilter} onValueChange={setLocationFilter}>
           <SelectTrigger className="w-[250px]">
-            <SelectValue placeholder="Filter by project/location" />
+            <SelectValue placeholder="Filter by location" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Locations</SelectItem>
-            {projects?.map((project) => (
-              <SelectItem key={project.id} value={project.id}>
-                {project.project_name}
+            {locations.map((location) => (
+              <SelectItem key={location.id} value={location.id}>
+                {location.name}
               </SelectItem>
             ))}
           </SelectContent>
@@ -96,15 +135,19 @@ export function LocationWiseView() {
       ) : Object.keys(groupedByLocation).length === 0 ? (
         <Card>
           <CardContent className="py-8 text-center text-muted-foreground">
-            No inventory allocations found
+            {itemsWithLocation.length === 0 
+              ? "No inventory items with locations found. Add items with locations from Item Master."
+              : "No inventory items match your search criteria."
+            }
           </CardContent>
         </Card>
       ) : (
         <div className="grid gap-6">
           {Object.entries(groupedByLocation).map(([locationId, location]) => {
-            const totalAllocated = location.items.reduce((sum, a) => sum + (a.quantity_allocated || 0), 0);
-            const totalUsed = location.items.reduce((sum, a) => sum + (a.quantity_used || 0), 0);
-            const utilizationRate = totalAllocated > 0 ? Math.round((totalUsed / totalAllocated) * 100) : 0;
+            const totalQuantity = location.items.reduce((sum, item) => sum + (item.quantity || 0), 0);
+            const totalValue = location.items.reduce((sum, item) => {
+              return sum + ((item.quantity || 0) * (item.unit_cost || 0));
+            }, 0);
 
             return (
               <Card key={locationId}>
@@ -112,16 +155,16 @@ export function LocationWiseView() {
                   <div className="flex items-center justify-between">
                     <CardTitle className="flex items-center gap-2">
                       <MapPin className="h-5 w-5 text-primary" />
-                      {location.projectName}
+                      {location.locationName}
                     </CardTitle>
                     <div className="flex items-center gap-4">
                       <div className="text-right">
                         <p className="text-sm font-medium">{location.items.length} Items</p>
-                        <p className="text-xs text-muted-foreground">Allocated here</p>
+                        <p className="text-xs text-muted-foreground">At this location</p>
                       </div>
                       <div className="text-right">
-                        <p className="text-sm font-medium">{utilizationRate}%</p>
-                        <p className="text-xs text-muted-foreground">Utilization</p>
+                        <p className="text-sm font-medium">{totalQuantity.toLocaleString()}</p>
+                        <p className="text-xs text-muted-foreground">Total Qty</p>
                       </div>
                     </div>
                   </div>
@@ -130,35 +173,50 @@ export function LocationWiseView() {
                   <Table>
                     <TableHeader>
                       <TableRow>
+                        <TableHead className="w-[50px]">Image</TableHead>
                         <TableHead>Item Name</TableHead>
-                        <TableHead>Qty Allocated</TableHead>
-                        <TableHead>Qty Used</TableHead>
-                        <TableHead>Available</TableHead>
+                        <TableHead>Section</TableHead>
+                        <TableHead>Category</TableHead>
+                        <TableHead className="text-right">Quantity</TableHead>
+                        <TableHead className="text-right">Unit Cost</TableHead>
                         <TableHead>Status</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {location.items.map((resource) => {
-                        const available = (resource.quantity_allocated || 0) - (resource.quantity_used || 0);
-                        return (
-                          <TableRow key={resource.id}>
-                            <TableCell className="font-medium">
-                              <div className="flex items-center gap-2">
-                                <Package className="h-4 w-4 text-muted-foreground" />
-                                {resource.resource_name}
+                      {location.items.map((item) => (
+                        <TableRow key={item.id}>
+                          <TableCell>
+                            {item.image_url ? (
+                              <img
+                                src={item.image_url}
+                                alt={item.item_name}
+                                className="w-8 h-8 object-cover rounded"
+                              />
+                            ) : (
+                              <div className="w-8 h-8 bg-muted rounded flex items-center justify-center">
+                                <ImageIcon className="h-3 w-3 text-muted-foreground" />
                               </div>
-                            </TableCell>
-                            <TableCell>{resource.quantity_allocated || 0}</TableCell>
-                            <TableCell>{resource.quantity_used || 0}</TableCell>
-                            <TableCell>
-                              <span className={available < 10 ? "text-amber-600 font-medium" : ""}>
-                                {available}
-                              </span>
-                            </TableCell>
-                            <TableCell>{getStatusBadge(resource.status)}</TableCell>
-                          </TableRow>
-                        );
-                      })}
+                            )}
+                          </TableCell>
+                          <TableCell className="font-medium">
+                            <div className="flex items-center gap-2">
+                              <Package className="h-4 w-4 text-muted-foreground" />
+                              {item.item_name}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline">{getSectionLabel(item.section)}</Badge>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="secondary">{getCategoryLabel(item.category)}</Badge>
+                          </TableCell>
+                          <TableCell className="text-right">{item.quantity || 0}</TableCell>
+                          <TableCell className="text-right">
+                            {item.unit_cost ? `$${item.unit_cost.toFixed(2)}` : "-"}
+                          </TableCell>
+                          <TableCell>{getStatusBadge(item.status)}</TableCell>
+                        </TableRow>
+                      ))}
                     </TableBody>
                   </Table>
                   
@@ -167,13 +225,10 @@ export function LocationWiseView() {
                     <span className="text-muted-foreground">Location Total:</span>
                     <div className="flex gap-6">
                       <span>
-                        <strong>{totalAllocated.toLocaleString()}</strong> Allocated
+                        <strong>{totalQuantity.toLocaleString()}</strong> Total Qty
                       </span>
                       <span>
-                        <strong>{totalUsed.toLocaleString()}</strong> Used
-                      </span>
-                      <span>
-                        <strong>{(totalAllocated - totalUsed).toLocaleString()}</strong> Available
+                        <strong>${totalValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong> Total Value
                       </span>
                     </div>
                   </div>
