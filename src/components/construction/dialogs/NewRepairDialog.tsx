@@ -191,7 +191,7 @@ export function NewRepairDialog({ open, onOpenChange }: NewRepairDialogProps) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Send Item for Repair</DialogTitle>
           <DialogDescription>
@@ -207,14 +207,14 @@ export function NewRepairDialog({ open, onOpenChange }: NewRepairDialogProps) {
                 <img
                   src={selectedItem.image_url}
                   alt={selectedItem.item_name}
-                  className="h-24 w-24 object-cover rounded-lg border"
+                  className="h-20 w-20 sm:h-24 sm:w-24 object-cover rounded-lg border"
                 />
               </div>
             )}
             {selectedItem && !selectedItem.image_url && (
               <div className="flex justify-center">
-                <div className="h-24 w-24 bg-muted rounded-lg flex items-center justify-center">
-                  <Package className="h-8 w-8 text-muted-foreground" />
+                <div className="h-20 w-20 sm:h-24 sm:w-24 bg-muted rounded-lg flex items-center justify-center">
+                  <Package className="h-6 w-6 sm:h-8 sm:w-8 text-muted-foreground" />
                 </div>
               </div>
             )}
@@ -258,7 +258,8 @@ export function NewRepairDialog({ open, onOpenChange }: NewRepairDialogProps) {
               )}
             />
 
-            <div className="grid grid-cols-2 gap-4">
+            {/* Quantity and Unit - Responsive Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {/* Quantity */}
               <FormField
                 control={form.control}
@@ -300,7 +301,7 @@ export function NewRepairDialog({ open, onOpenChange }: NewRepairDialogProps) {
               />
             </div>
 
-            {/* Location (Read-only, from selected item) */}
+            {/* Location */}
             <FormField
               control={form.control}
               name="location_id"
@@ -309,11 +310,11 @@ export function NewRepairDialog({ open, onOpenChange }: NewRepairDialogProps) {
                   <FormLabel>Location *</FormLabel>
                   <Select value={field.value} onValueChange={field.onChange}>
                     <FormControl>
-                      <SelectTrigger>
+                      <SelectTrigger className="w-full">
                         <SelectValue placeholder="Select location" />
                       </SelectTrigger>
                     </FormControl>
-                    <SelectContent>
+                    <SelectContent className="bg-background z-[9999]">
                       {locations.map((loc) => (
                         <SelectItem key={loc.id} value={loc.id}>
                           {loc.name}
@@ -326,35 +327,38 @@ export function NewRepairDialog({ open, onOpenChange }: NewRepairDialogProps) {
               )}
             />
 
-            {/* Service Provider */}
-            <FormField
-              control={form.control}
-              name="service_provider"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Service Provider (Optional)</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Enter service provider name" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            {/* Service Provider and Expected Return Date - Responsive Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Service Provider */}
+              <FormField
+                control={form.control}
+                name="service_provider"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Service Provider</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Enter provider name" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
-            {/* Expected Return Date */}
-            <FormField
-              control={form.control}
-              name="expected_return_date"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Expected Return Date (Optional)</FormLabel>
-                  <FormControl>
-                    <Input type="date" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+              {/* Expected Return Date */}
+              <FormField
+                control={form.control}
+                name="expected_return_date"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Expected Return Date</FormLabel>
+                    <FormControl>
+                      <Input type="date" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
 
             {/* Remarks */}
             <FormField
@@ -362,7 +366,7 @@ export function NewRepairDialog({ open, onOpenChange }: NewRepairDialogProps) {
               name="remarks"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Remarks (Optional)</FormLabel>
+                  <FormLabel>Remarks</FormLabel>
                   <FormControl>
                     <Textarea
                       placeholder="Describe the issue or reason for repair..."
@@ -376,15 +380,20 @@ export function NewRepairDialog({ open, onOpenChange }: NewRepairDialogProps) {
               )}
             />
 
-            <DialogFooter>
+            <DialogFooter className="flex-col sm:flex-row gap-2 pt-4">
               <Button
                 type="button"
                 variant="outline"
                 onClick={() => onOpenChange(false)}
+                className="w-full sm:w-auto"
               >
                 Cancel
               </Button>
-              <Button type="submit" disabled={createRepair.isPending}>
+              <Button 
+                type="submit" 
+                disabled={createRepair.isPending}
+                className="w-full sm:w-auto"
+              >
                 {createRepair.isPending && (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 )}
