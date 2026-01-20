@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Plus, Search, Pencil, Trash2, Users } from "lucide-react";
+import { ArrowLeft, Plus, Search, Pencil, Trash2, Users, LayoutDashboard, UserSquare2, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
@@ -22,10 +22,12 @@ import { format } from "date-fns";
 import { ResourceDialog } from "@/components/construction/dialogs/ResourceDialog";
 import { DeleteConfirmDialog } from "@/components/construction/dialogs/DeleteConfirmDialog";
 import { LabourMasterDialog } from "@/components/construction/dialogs/LabourMasterDialog";
+import { LabourDashboard, LabourWiseView, LabourLocationWiseView } from "@/components/construction/labour";
 
 export default function LabourResources() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("allocation");
+  const [allocationSubTab, setAllocationSubTab] = useState("dashboard");
   const [searchTerm, setSearchTerm] = useState("");
   
   // Allocation state
@@ -104,92 +106,41 @@ export default function LabourResources() {
         </TabsList>
 
         <TabsContent value="allocation" className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="relative flex-1 max-w-sm">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search labour allocations..."
-                className="pl-8"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-            </div>
-            <Button onClick={() => { setEditingResource(null); setDialogOpen(true); }}>
-              <Plus className="mr-2 h-4 w-4" />
-              Add Allocation
+          {/* Sub-tabs for Allocation View */}
+          <div className="flex items-center gap-2 border-b pb-2">
+            <Button
+              variant={allocationSubTab === "dashboard" ? "secondary" : "ghost"}
+              size="sm"
+              onClick={() => setAllocationSubTab("dashboard")}
+              className="gap-2"
+            >
+              <LayoutDashboard className="h-4 w-4" />
+              Dashboard
+            </Button>
+            <Button
+              variant={allocationSubTab === "labour-wise" ? "secondary" : "ghost"}
+              size="sm"
+              onClick={() => setAllocationSubTab("labour-wise")}
+              className="gap-2"
+            >
+              <UserSquare2 className="h-4 w-4" />
+              Labour Wise
+            </Button>
+            <Button
+              variant={allocationSubTab === "location-wise" ? "secondary" : "ghost"}
+              size="sm"
+              onClick={() => setAllocationSubTab("location-wise")}
+              className="gap-2"
+            >
+              <MapPin className="h-4 w-4" />
+              Location Wise
             </Button>
           </div>
 
-          <Card>
-            <CardContent className="pt-6">
-              {resourcesLoading ? (
-                <div className="flex items-center justify-center py-8">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
-                </div>
-              ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Resource Name</TableHead>
-                      <TableHead>Project</TableHead>
-                      <TableHead>Qty Allocated</TableHead>
-                      <TableHead>Qty Used</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Start Date</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredResources?.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
-                          No labour allocations found
-                        </TableCell>
-                      </TableRow>
-                    ) : (
-                      filteredResources?.map((resource) => (
-                        <TableRow key={resource.id}>
-                          <TableCell className="font-medium">
-                            <div className="flex items-center gap-2">
-                              <Users className="h-4 w-4 text-muted-foreground" />
-                              {resource.resource_name}
-                            </div>
-                          </TableCell>
-                          <TableCell>{resource.project?.project_name || "-"}</TableCell>
-                          <TableCell>{resource.quantity_allocated || 0}</TableCell>
-                          <TableCell>{resource.quantity_used || 0}</TableCell>
-                          <TableCell>{getStatusBadge(resource.status)}</TableCell>
-                          <TableCell>
-                            {resource.start_date
-                              ? format(new Date(resource.start_date), "MMM d, yyyy")
-                              : "-"}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <div className="flex justify-end gap-2">
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => { setEditingResource(resource as ConstructionResource); setDialogOpen(true); }}
-                              >
-                                <Pencil className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => setDeletingResource(resource as ConstructionResource)}
-                              >
-                                <Trash2 className="h-4 w-4 text-destructive" />
-                              </Button>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))
-                    )}
-                  </TableBody>
-                </Table>
-              )}
-            </CardContent>
-          </Card>
+          {/* Sub-tab Content */}
+          {allocationSubTab === "dashboard" && <LabourDashboard />}
+          {allocationSubTab === "labour-wise" && <LabourWiseView />}
+          {allocationSubTab === "location-wise" && <LabourLocationWiseView />}
         </TabsContent>
 
         <TabsContent value="master" className="space-y-4">
