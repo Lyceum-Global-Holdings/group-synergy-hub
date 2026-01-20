@@ -3223,16 +3223,102 @@ export type Database = {
           },
         ]
       }
+      construction_labour_categories: {
+        Row: {
+          company_id: string | null
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          is_default: boolean | null
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          company_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_default?: boolean | null
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_default?: boolean | null
+          name?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "construction_labour_categories_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      construction_labour_companies: {
+        Row: {
+          company_id: string | null
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          is_default: boolean | null
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          company_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_default?: boolean | null
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_default?: boolean | null
+          name?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "construction_labour_companies_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       construction_labour_master: {
         Row: {
+          category: string | null
           company_id: string | null
           contact_number: string | null
           created_at: string
           created_by: string | null
           daily_rate: number | null
           email: string | null
+          employee_id: string | null
+          epf_no: string | null
           hourly_rate: number | null
           id: string
+          labour_company: string | null
           name: string
           notes: string | null
           skill_level: string | null
@@ -3241,14 +3327,18 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          category?: string | null
           company_id?: string | null
           contact_number?: string | null
           created_at?: string
           created_by?: string | null
           daily_rate?: number | null
           email?: string | null
+          employee_id?: string | null
+          epf_no?: string | null
           hourly_rate?: number | null
           id?: string
+          labour_company?: string | null
           name: string
           notes?: string | null
           skill_level?: string | null
@@ -3257,14 +3347,18 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          category?: string | null
           company_id?: string | null
           contact_number?: string | null
           created_at?: string
           created_by?: string | null
           daily_rate?: number | null
           email?: string | null
+          employee_id?: string | null
+          epf_no?: string | null
           hourly_rate?: number | null
           id?: string
+          labour_company?: string | null
           name?: string
           notes?: string | null
           skill_level?: string | null
