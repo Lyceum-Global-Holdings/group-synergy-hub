@@ -3321,6 +3321,7 @@ export type Database = {
           labour_company: string | null
           name: string
           notes: string | null
+          project_id: string | null
           skill_level: string | null
           status: string
           trade: string | null
@@ -3341,6 +3342,7 @@ export type Database = {
           labour_company?: string | null
           name: string
           notes?: string | null
+          project_id?: string | null
           skill_level?: string | null
           status?: string
           trade?: string | null
@@ -3361,6 +3363,7 @@ export type Database = {
           labour_company?: string | null
           name?: string
           notes?: string | null
+          project_id?: string | null
           skill_level?: string | null
           status?: string
           trade?: string | null
@@ -3372,6 +3375,13 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "construction_labour_master_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "construction_projects"
             referencedColumns: ["id"]
           },
         ]
