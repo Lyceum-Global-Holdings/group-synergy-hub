@@ -24,7 +24,7 @@ import { useWarehouseTools } from "@/hooks/useWarehouseTools";
 import { useItemUnits } from "@/hooks/useItemUnits";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import * as XLSX from "xlsx";
+import { readExcelFile, writeExcelFromAOA } from "@/utils/excelUtils";
 
 interface BulkToolImportDialogProps {
   open: boolean;
@@ -83,27 +83,20 @@ export function BulkToolImportDialog({ open, onOpenChange }: BulkToolImportDialo
   const validTools = parsedData.filter((t) => t.isValid);
   const invalidTools = parsedData.filter((t) => !t.isValid);
 
-  const downloadTemplate = () => {
+  const downloadTemplate = async () => {
     const template = [
       ["tool_code", "name", "description", "category", "location", "unit", "total_quantity", "condition", "unit_cost", "notes"],
       ["TL-001", "Hammer", "16oz claw hammer", "Hand Tools", "Main Warehouse", "Pieces", "10", "good", "25.99", "Standard issue"],
       ["", "Drill", "Cordless power drill", "Power Tools", "Workshop", "pcs", "5", "good", "149.99", ""],
     ];
 
-    const ws = XLSX.utils.aoa_to_sheet(template);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Tools Template");
-    XLSX.writeFile(wb, "tools_import_template.xlsx");
+    await writeExcelFromAOA(template, "tools_import_template.xlsx", "Tools Template");
   };
 
   const parseFile = async (file: File) => {
     setIsParsing(true);
     try {
-      const data = await file.arrayBuffer();
-      const workbook = XLSX.read(data);
-      const sheetName = workbook.SheetNames[0];
-      const worksheet = workbook.Sheets[sheetName];
-      const jsonData = XLSX.utils.sheet_to_json<Record<string, any>>(worksheet, { defval: "" });
+      const jsonData = await readExcelFile(file);
 
       const parsed: ParsedTool[] = jsonData.map((row, index) => {
         const errors: string[] = [];

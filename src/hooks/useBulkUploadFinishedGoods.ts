@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import * as XLSX from 'xlsx';
+import { readExcelFile, writeExcelFromAOA } from '@/utils/excelUtils';
 
 export interface BulkUploadError {
   row: number;
@@ -34,28 +34,9 @@ export const useBulkUploadFinishedGoods = (companyId: string) => {
   const queryClient = useQueryClient();
   const [progress, setProgress] = useState(0);
 
-  const parseCSV = (file: File): Promise<ParsedRow[]> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      
-      reader.onload = (e) => {
-        try {
-          const data = e.target?.result;
-          const workbook = XLSX.read(data, { type: 'binary' });
-          const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-          const jsonData = XLSX.utils.sheet_to_json(worksheet, { 
-            raw: false,
-            defval: null 
-          });
-          resolve(jsonData as ParsedRow[]);
-        } catch (error) {
-          reject(error);
-        }
-      };
-      
-      reader.onerror = () => reject(new Error('Failed to read file'));
-      reader.readAsBinaryString(file);
-    });
+  const parseCSV = async (file: File): Promise<ParsedRow[]> => {
+    const jsonData = await readExcelFile(file);
+    return jsonData as ParsedRow[];
   };
 
   const validateRow = (row: ParsedRow, index: number, existingCodes: Set<string>): BulkUploadError[] => {
@@ -293,7 +274,7 @@ export const useBulkUploadFinishedGoods = (companyId: string) => {
   };
 };
 
-export const downloadCSVTemplate = () => {
+export const downloadCSVTemplate = async () => {
   const headers = [
     'product_code',
     'product_name',
@@ -338,8 +319,5 @@ export const downloadCSVTemplate = () => {
     '',
   ];
 
-  const worksheet = XLSX.utils.aoa_to_sheet([headers, exampleRow]);
-  const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, worksheet, 'Template');
-  XLSX.writeFile(workbook, 'finished_goods_template.csv');
+  await writeExcelFromAOA([headers, exampleRow], 'finished_goods_template.xlsx', 'Template');
 };

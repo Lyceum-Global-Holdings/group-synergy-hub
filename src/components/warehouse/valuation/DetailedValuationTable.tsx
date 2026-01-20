@@ -7,7 +7,7 @@ import { Download, Search } from 'lucide-react';
 import { useInventoryValuation } from '@/hooks/useInventoryValuation';
 import { ValuationFilters } from '@/types/inventoryValuation';
 import { format } from 'date-fns';
-import * as XLSX from 'xlsx';
+import { writeExcelFromJSON } from '@/utils/excelUtils';
 
 interface DetailedValuationTableProps {
   filters: ValuationFilters;
@@ -32,7 +32,7 @@ export function DetailedValuationTable({ filters }: DetailedValuationTableProps)
     return 'destructive';
   };
 
-  const handleExport = () => {
+  const handleExport = async () => {
     const exportData = filteredData.map(item => ({
       'Item Code': item.item_code,
       'Item Name': item.item_name,
@@ -48,10 +48,7 @@ export function DetailedValuationTable({ filters }: DetailedValuationTableProps)
       'Last Movement': format(new Date(item.last_movement_date), 'yyyy-MM-dd'),
     }));
 
-    const ws = XLSX.utils.json_to_sheet(exportData);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Inventory Valuation');
-    XLSX.writeFile(wb, `inventory-valuation-${format(new Date(), 'yyyy-MM-dd')}.xlsx`);
+    await writeExcelFromJSON(exportData, `inventory-valuation-${format(new Date(), 'yyyy-MM-dd')}.xlsx`);
   };
 
   if (isLoading) {

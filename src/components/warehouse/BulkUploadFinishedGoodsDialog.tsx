@@ -23,7 +23,7 @@ import {
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useBulkUploadFinishedGoods, downloadCSVTemplate, BulkUploadResult } from '@/hooks/useBulkUploadFinishedGoods';
-import * as XLSX from 'xlsx';
+import { writeExcelFromJSON } from '@/utils/excelUtils';
 
 interface BulkUploadFinishedGoodsDialogProps {
   open: boolean;
@@ -91,7 +91,7 @@ export function BulkUploadFinishedGoodsDialog({
     }
   };
 
-  const handleDownloadErrors = () => {
+  const handleDownloadErrors = async () => {
     if (!uploadResult || uploadResult.errors.length === 0) return;
 
     const errorData = uploadResult.errors.map(err => ({
@@ -101,10 +101,7 @@ export function BulkUploadFinishedGoodsDialog({
       Value: err.value || '',
     }));
 
-    const worksheet = XLSX.utils.json_to_sheet(errorData);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Errors');
-    XLSX.writeFile(workbook, 'upload_errors.csv');
+    await writeExcelFromJSON(errorData, 'upload_errors.xlsx');
   };
 
   const handleClose = () => {
