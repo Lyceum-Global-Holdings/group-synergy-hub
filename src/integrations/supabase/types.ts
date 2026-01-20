@@ -15245,8 +15245,6 @@ export type Database = {
         }
         Returns: undefined
       }
-      show_limit: { Args: never; Returns: number }
-      show_trgm: { Args: { "": string }; Returns: string[] }
       transfer_assets_to_department: {
         Args: { p_request_id: string }
         Returns: Json
