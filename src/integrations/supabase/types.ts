@@ -15189,6 +15189,7 @@ export type Database = {
         Returns: boolean
       }
       has_finance_access: { Args: { _user_id: string }; Returns: boolean }
+      has_hr_access: { Args: { _user_id: string }; Returns: boolean }
       has_po_approval_role: {
         Args: { _role_name: string; _user_id: string }
         Returns: boolean
@@ -15202,6 +15203,7 @@ export type Database = {
         Returns: boolean
       }
       has_sales_access: { Args: { _user_id: string }; Returns: boolean }
+      has_warehouse_access: { Args: { _user_id: string }; Returns: boolean }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
       is_company_hod: {
         Args: { p_company_id: string; p_user_id: string }
