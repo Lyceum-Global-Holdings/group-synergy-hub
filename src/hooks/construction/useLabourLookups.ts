@@ -10,15 +10,22 @@ export function useLabourCategories() {
   return useQuery({
     queryKey: ["labour-categories", selectedCompany?.id],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from("construction_labour_categories")
-        .select("*")
-        .or(`company_id.eq.${selectedCompany?.id},company_id.is.null,is_default.eq.true`)
-        .order("name");
+        .select("*");
+
+      if (selectedCompany?.id) {
+        query = query.or(`company_id.eq.${selectedCompany.id},company_id.is.null,is_default.eq.true`);
+      } else {
+        query = query.or("company_id.is.null,is_default.eq.true");
+      }
+
+      const { data, error } = await query.order("name");
 
       if (error) throw error;
       return data as LabourCategory[];
     },
+    enabled: true,
   });
 }
 
@@ -61,15 +68,22 @@ export function useLabourCompanies() {
   return useQuery({
     queryKey: ["labour-companies", selectedCompany?.id],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from("construction_labour_companies")
-        .select("*")
-        .or(`company_id.eq.${selectedCompany?.id},company_id.is.null,is_default.eq.true`)
-        .order("name");
+        .select("*");
+
+      if (selectedCompany?.id) {
+        query = query.or(`company_id.eq.${selectedCompany.id},company_id.is.null,is_default.eq.true`);
+      } else {
+        query = query.or("company_id.is.null,is_default.eq.true");
+      }
+
+      const { data, error } = await query.order("name");
 
       if (error) throw error;
       return data as LabourCompany[];
     },
+    enabled: true,
   });
 }
 

@@ -52,7 +52,11 @@ export default function LabourResources() {
 
   const filteredMaster = labourMaster?.filter((item) =>
     item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    item.trade?.toLowerCase().includes(searchTerm.toLowerCase())
+    item.trade?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    item.category?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    item.labour_company?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    item.employee_id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    item.epf_no?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const getStatusBadge = (status: string) => {
@@ -211,59 +215,65 @@ export default function LabourResources() {
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
                 </div>
               ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Name</TableHead>
-                      <TableHead>Trade / Skill</TableHead>
-                      <TableHead>Contact</TableHead>
-                      <TableHead>Hourly Rate</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredMaster?.length === 0 ? (
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
                       <TableRow>
-                        <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                          No labour records found
-                        </TableCell>
+                        <TableHead>Employee ID</TableHead>
+                        <TableHead>Name</TableHead>
+                        <TableHead>EPF No</TableHead>
+                        <TableHead>Category</TableHead>
+                        <TableHead>Company</TableHead>
+                        <TableHead>Contact</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
                       </TableRow>
-                    ) : (
-                      filteredMaster?.map((item) => (
-                        <TableRow key={item.id}>
-                          <TableCell className="font-medium">{item.name}</TableCell>
-                          <TableCell>{item.trade || "-"}</TableCell>
-                          <TableCell>{item.contact_number || "-"}</TableCell>
-                          <TableCell>{item.hourly_rate ? `$${item.hourly_rate.toFixed(2)}` : "-"}</TableCell>
-                          <TableCell>
-                            <Badge variant={item.status === "active" ? "default" : "secondary"}>
-                              {item.status}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <div className="flex justify-end gap-2">
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => { setEditingMaster(item); setMasterDialogOpen(true); }}
-                              >
-                                <Pencil className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => setDeletingMaster(item)}
-                              >
-                                <Trash2 className="h-4 w-4 text-destructive" />
-                              </Button>
-                            </div>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredMaster?.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                            No labour records found
                           </TableCell>
                         </TableRow>
-                      ))
-                    )}
-                  </TableBody>
-                </Table>
+                      ) : (
+                        filteredMaster?.map((item) => (
+                          <TableRow key={item.id}>
+                            <TableCell className="font-mono text-sm">{item.employee_id || "-"}</TableCell>
+                            <TableCell className="font-medium">{item.name}</TableCell>
+                            <TableCell>{item.epf_no || "-"}</TableCell>
+                            <TableCell>{item.category || "-"}</TableCell>
+                            <TableCell>{item.labour_company || "-"}</TableCell>
+                            <TableCell>{item.contact_number || "-"}</TableCell>
+                            <TableCell>
+                              <Badge variant={item.status === "active" ? "default" : "secondary"}>
+                                {item.status}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <div className="flex justify-end gap-2">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => { setEditingMaster(item); setMasterDialogOpen(true); }}
+                                >
+                                  <Pencil className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => setDeletingMaster(item)}
+                                >
+                                  <Trash2 className="h-4 w-4 text-destructive" />
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
               )}
             </CardContent>
           </Card>
