@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Plus, Search, Pencil, Trash2, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
   Table,
@@ -16,11 +16,12 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useConstructionResources, useDeleteConstructionResource } from "@/hooks/construction/useConstructionResources";
 import { useLabourMaster, useDeleteLabourMaster } from "@/hooks/construction/useLabourMaster";
-import { RESOURCE_STATUSES, ConstructionResource } from "@/types/construction";
+import { RESOURCE_STATUSES } from "@/types/construction";
+import type { ConstructionResource, LabourMaster } from "@/types/construction";
 import { format } from "date-fns";
-import { ResourceDialog, DeleteConfirmDialog } from "@/components/construction/dialogs";
+import { ResourceDialog } from "@/components/construction/dialogs/ResourceDialog";
+import { DeleteConfirmDialog } from "@/components/construction/dialogs/DeleteConfirmDialog";
 import { LabourMasterDialog } from "@/components/construction/dialogs/LabourMasterDialog";
-import type { LabourMaster } from "@/types/construction";
 
 export default function LabourResources() {
   const navigate = useNavigate();
