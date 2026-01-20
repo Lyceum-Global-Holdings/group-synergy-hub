@@ -15033,14 +15033,17 @@ export type Database = {
       get_user_company_id: { Args: { _user_id: string }; Returns: string }
       get_user_company_ids: { Args: { _user_id: string }; Returns: string[] }
       get_user_location_ids: { Args: { _user_id: string }; Returns: string[] }
+      has_construction_access: { Args: { _user_id: string }; Returns: boolean }
       has_dashboard_access: {
         Args: { _dashboard_id: string; _user_id: string }
         Returns: boolean
       }
+      has_finance_access: { Args: { _user_id: string }; Returns: boolean }
       has_po_approval_role: {
         Args: { _role_name: string; _user_id: string }
         Returns: boolean
       }
+      has_procurement_access: { Args: { _user_id: string }; Returns: boolean }
       has_role: {
         Args: {
           _app_role: Database["public"]["Enums"]["app_role"]
