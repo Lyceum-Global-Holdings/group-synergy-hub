@@ -15190,6 +15190,7 @@ export type Database = {
       }
       has_finance_access: { Args: { _user_id: string }; Returns: boolean }
       has_hr_access: { Args: { _user_id: string }; Returns: boolean }
+      has_manager_access: { Args: { _user_id: string }; Returns: boolean }
       has_po_approval_role: {
         Args: { _role_name: string; _user_id: string }
         Returns: boolean
