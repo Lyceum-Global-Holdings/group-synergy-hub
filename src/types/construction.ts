@@ -883,8 +883,12 @@ export const BUDGET_TRANSACTION_TYPES: { value: BudgetTransactionType; label: st
 export interface LabourMaster {
   id: string;
   company_id: string | null;
+  employee_id: string | null;
+  epf_no: string | null;
   name: string;
   trade: string | null;
+  category: string | null;
+  labour_company: string | null;
   skill_level: string | null;
   contact_number: string | null;
   email: string | null;
@@ -899,7 +903,10 @@ export interface LabourMaster {
 
 export interface CreateLabourMasterData {
   name: string;
+  epf_no?: string;
   trade?: string;
+  category?: string;
+  labour_company?: string;
   skill_level?: string;
   contact_number?: string;
   email?: string;
@@ -910,6 +917,28 @@ export interface CreateLabourMasterData {
 }
 
 export type UpdateLabourMasterData = Partial<CreateLabourMasterData>;
+
+export interface LabourCategory {
+  id: string;
+  company_id: string | null;
+  name: string;
+  description: string | null;
+  is_default: boolean;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface LabourCompany {
+  id: string;
+  company_id: string | null;
+  name: string;
+  description: string | null;
+  is_default: boolean;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
 
 export interface InventoryMaster {
   id: string;
