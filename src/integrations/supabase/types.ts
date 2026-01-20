@@ -15051,6 +15051,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      has_sales_access: { Args: { _user_id: string }; Returns: boolean }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
       is_company_hod: {
         Args: { p_company_id: string; p_user_id: string }
