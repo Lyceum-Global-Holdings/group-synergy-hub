@@ -23,7 +23,17 @@ export function useLabourCategories() {
       const { data, error } = await query.order("name");
 
       if (error) throw error;
-      return data as LabourCategory[];
+      
+      // Remove duplicates by name (case-insensitive), keeping the first occurrence
+      const uniqueCategories = data?.reduce((acc: LabourCategory[], current) => {
+        const exists = acc.find(item => item.name.toLowerCase() === current.name.toLowerCase());
+        if (!exists) {
+          acc.push(current);
+        }
+        return acc;
+      }, []) || [];
+      
+      return uniqueCategories;
     },
     enabled: true,
   });
@@ -38,10 +48,20 @@ export function useCreateLabourCategory() {
     mutationFn: async (name: string) => {
       const { data: user } = await supabase.auth.getUser();
       
+      // Check for duplicate (case-insensitive)
+      const { data: existing } = await supabase
+        .from("construction_labour_categories")
+        .select("id, name")
+        .ilike("name", name.trim());
+
+      if (existing && existing.length > 0) {
+        throw new Error("Category name already exists");
+      }
+      
       const { data, error } = await supabase
         .from("construction_labour_categories")
         .insert({
-          name,
+          name: name.trim(),
           company_id: selectedCompany?.id,
           created_by: user.user?.id,
           is_default: false,
@@ -81,7 +101,17 @@ export function useLabourCompanies() {
       const { data, error } = await query.order("name");
 
       if (error) throw error;
-      return data as LabourCompany[];
+      
+      // Remove duplicates by name (case-insensitive), keeping the first occurrence
+      const uniqueCompanies = data?.reduce((acc: LabourCompany[], current) => {
+        const exists = acc.find(item => item.name.toLowerCase() === current.name.toLowerCase());
+        if (!exists) {
+          acc.push(current);
+        }
+        return acc;
+      }, []) || [];
+      
+      return uniqueCompanies;
     },
     enabled: true,
   });
@@ -96,10 +126,20 @@ export function useCreateLabourCompany() {
     mutationFn: async (name: string) => {
       const { data: user } = await supabase.auth.getUser();
       
+      // Check for duplicate (case-insensitive)
+      const { data: existing } = await supabase
+        .from("construction_labour_companies")
+        .select("id, name")
+        .ilike("name", name.trim());
+
+      if (existing && existing.length > 0) {
+        throw new Error("Company name already exists");
+      }
+      
       const { data, error } = await supabase
         .from("construction_labour_companies")
         .insert({
-          name,
+          name: name.trim(),
           company_id: selectedCompany?.id,
           created_by: user.user?.id,
           is_default: false,

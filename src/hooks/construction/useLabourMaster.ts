@@ -15,8 +15,11 @@ export function useLabourMaster() {
         .select("*")
         .order("created_at", { ascending: false });
 
+      // Include records for the selected company OR records with null company_id
       if (selectedCompany?.id) {
-        query = query.eq("company_id", selectedCompany.id);
+        query = query.or(`company_id.eq.${selectedCompany.id},company_id.is.null`);
+      } else {
+        query = query.is("company_id", null);
       }
 
       const { data, error } = await query;
@@ -24,7 +27,7 @@ export function useLabourMaster() {
       if (error) throw error;
       return data as LabourMaster[];
     },
-    enabled: !!selectedCompany?.id,
+    enabled: true,
   });
 }
 
