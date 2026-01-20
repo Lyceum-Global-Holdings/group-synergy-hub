@@ -11429,6 +11429,156 @@ export type Database = {
           },
         ]
       }
+      sap_configurations: {
+        Row: {
+          company_id: string
+          created_at: string | null
+          id: string
+          is_enabled: boolean | null
+          last_sync_at: string | null
+          sap_system_type: string | null
+          sync_frequency: string | null
+          sync_settings: Json | null
+          updated_at: string | null
+        }
+        Insert: {
+          company_id: string
+          created_at?: string | null
+          id?: string
+          is_enabled?: boolean | null
+          last_sync_at?: string | null
+          sap_system_type?: string | null
+          sync_frequency?: string | null
+          sync_settings?: Json | null
+          updated_at?: string | null
+        }
+        Update: {
+          company_id?: string
+          created_at?: string | null
+          id?: string
+          is_enabled?: boolean | null
+          last_sync_at?: string | null
+          sap_system_type?: string | null
+          sync_frequency?: string | null
+          sync_settings?: Json | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sap_configurations_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: true
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sap_entity_mappings: {
+        Row: {
+          company_id: string | null
+          created_at: string | null
+          entity_type: string
+          id: string
+          last_synced_at: string | null
+          local_id: string
+          sap_code: string
+          sap_type: string | null
+          sync_direction: string | null
+          sync_status: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          company_id?: string | null
+          created_at?: string | null
+          entity_type: string
+          id?: string
+          last_synced_at?: string | null
+          local_id: string
+          sap_code: string
+          sap_type?: string | null
+          sync_direction?: string | null
+          sync_status?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          company_id?: string | null
+          created_at?: string | null
+          entity_type?: string
+          id?: string
+          last_synced_at?: string | null
+          local_id?: string
+          sap_code?: string
+          sap_type?: string | null
+          sync_direction?: string | null
+          sync_status?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sap_entity_mappings_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sap_sync_logs: {
+        Row: {
+          action: string
+          company_id: string | null
+          created_at: string | null
+          created_by: string | null
+          direction: string
+          entity_id: string | null
+          entity_type: string
+          error_message: string | null
+          id: string
+          request_payload: Json | null
+          response_payload: Json | null
+          sap_code: string | null
+          status: string | null
+        }
+        Insert: {
+          action: string
+          company_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          direction: string
+          entity_id?: string | null
+          entity_type: string
+          error_message?: string | null
+          id?: string
+          request_payload?: Json | null
+          response_payload?: Json | null
+          sap_code?: string | null
+          status?: string | null
+        }
+        Update: {
+          action?: string
+          company_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          direction?: string
+          entity_id?: string | null
+          entity_type?: string
+          error_message?: string | null
+          id?: string
+          request_payload?: Json | null
+          response_payload?: Json | null
+          sap_code?: string | null
+          status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sap_sync_logs_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       site_report_activities: {
         Row: {
           activity_type: string
