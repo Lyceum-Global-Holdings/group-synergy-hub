@@ -46,16 +46,24 @@ export function useRepairRecords() {
   return useQuery({
     queryKey: ["construction-repair-records", selectedCompany?.id],
     queryFn: async () => {
-      // Query all repair records - include both company-specific and legacy null company records
-      const { data, error } = await supabase
+      // Build query - include both company-specific and legacy null company records
+      let query = supabase
         .from("construction_repair_records")
         .select(`
           *,
           warehouse_location:warehouse_locations(id, name),
           inventory_item:construction_inventory_master!item_id(image_url)
         `)
-        .or(`company_id.eq.${selectedCompany?.id},company_id.is.null`)
         .order("created_at", { ascending: false });
+
+      // Apply company filter - include records where company_id matches OR is null
+      if (selectedCompany?.id) {
+        query = query.or(`company_id.eq.${selectedCompany.id},company_id.is.null`);
+      } else {
+        query = query.is("company_id", null);
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
       
@@ -80,7 +88,7 @@ export function useRepairRecords() {
         profiles: profilesMap[record.updated_by || record.created_by || ""] || null,
       })) as RepairRecord[];
     },
-    enabled: !!selectedCompany?.id,
+    enabled: true, // Always enabled - will show null company records if no company selected
   });
 }
 
