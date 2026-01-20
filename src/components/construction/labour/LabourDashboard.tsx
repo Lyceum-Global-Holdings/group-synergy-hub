@@ -1,14 +1,21 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Users, Building2, MapPin, FolderOpen, UserCheck, UserX } from "lucide-react";
+import { Users, Building2, MapPin, FolderOpen, UserCheck, UserX, Briefcase } from "lucide-react";
 import { useLabourMaster } from "@/hooks/construction/useLabourMaster";
+import { useProjects } from "@/hooks/construction/useProjects";
 
 export function LabourDashboard() {
   const { data: labourMaster, isLoading } = useLabourMaster();
+  const { data: projects = [] } = useProjects();
+
+  // Create a project lookup map
+  const projectMap = new Map(projects.map(p => [p.id, p]));
 
   // Calculate dashboard metrics
   const totalLabour = labourMaster?.length || 0;
   const activeLabour = labourMaster?.filter(l => l.status === "active").length || 0;
   const inactiveLabour = labourMaster?.filter(l => l.status !== "active").length || 0;
+  const assignedToProject = labourMaster?.filter(l => l.project_id).length || 0;
+  const unassignedLabour = labourMaster?.filter(l => !l.project_id).length || 0;
 
   // Category-wise count
   const categoryCount = labourMaster?.reduce((acc, labour) => {
@@ -31,6 +38,16 @@ export function LabourDashboard() {
     return acc;
   }, {} as Record<string, number>) || {};
 
+  // Project-wise count
+  const projectCount = labourMaster?.reduce((acc, labour) => {
+    if (labour.project_id) {
+      const project = projectMap.get(labour.project_id);
+      const projectName = project ? project.project_code : "Unknown";
+      acc[projectName] = (acc[projectName] || 0) + 1;
+    }
+    return acc;
+  }, {} as Record<string, number>) || {};
+
   const kpiCards = [
     {
       title: "Total Labour",
@@ -40,20 +57,6 @@ export function LabourDashboard() {
       color: "text-blue-500",
     },
     {
-      title: "Categories",
-      value: Object.keys(categoryCount).length.toString(),
-      icon: FolderOpen,
-      description: `${Object.values(categoryCount)[0] || 0} in largest category`,
-      color: "text-purple-500",
-    },
-    {
-      title: "Companies",
-      value: Object.keys(companyCount).length.toString(),
-      icon: Building2,
-      description: `${Object.values(companyCount)[0] || 0} in largest company`,
-      color: "text-orange-500",
-    },
-    {
       title: "Active Labour",
       value: activeLabour.toString(),
       icon: UserCheck,
@@ -61,11 +64,25 @@ export function LabourDashboard() {
       color: "text-green-500",
     },
     {
-      title: "Inactive Labour",
-      value: inactiveLabour.toString(),
-      icon: UserX,
-      description: "Currently inactive",
-      color: "text-red-500",
+      title: "Assigned to Projects",
+      value: assignedToProject.toString(),
+      icon: Briefcase,
+      description: `${unassignedLabour} unassigned`,
+      color: "text-purple-500",
+    },
+    {
+      title: "Categories",
+      value: Object.keys(categoryCount).length.toString(),
+      icon: FolderOpen,
+      description: `${Object.values(categoryCount)[0] || 0} in largest category`,
+      color: "text-indigo-500",
+    },
+    {
+      title: "Companies",
+      value: Object.keys(companyCount).length.toString(),
+      icon: Building2,
+      description: `${Object.values(companyCount)[0] || 0} in largest company`,
+      color: "text-orange-500",
     },
     {
       title: "Locations/Trades",
@@ -171,34 +188,64 @@ export function LabourDashboard() {
         </Card>
       </div>
 
-      {/* Location/Trade Breakdown */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <MapPin className="h-5 w-5 text-primary" />
-            Trade/Location Distribution
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-            {Object.entries(locationCount).length === 0 ? (
-              <p className="text-muted-foreground text-sm">No trades/locations found</p>
-            ) : (
-              Object.entries(locationCount)
-                .sort((a, b) => b[1] - a[1])
-                .map(([location, count]) => (
-                  <div key={location} className="flex items-center justify-between p-3 bg-muted rounded-lg">
-                    <div className="flex items-center gap-2">
-                      <MapPin className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-sm font-medium">{location}</span>
+      {/* Project-wise and Location/Trade Breakdown */}
+      <div className="grid gap-4 md:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Briefcase className="h-5 w-5 text-primary" />
+              Project-wise Distribution
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {Object.entries(projectCount).length === 0 ? (
+                <p className="text-muted-foreground text-sm">No project assignments found</p>
+              ) : (
+                Object.entries(projectCount)
+                  .sort((a, b) => b[1] - a[1])
+                  .map(([project, count]) => (
+                    <div key={project} className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                      <div className="flex items-center gap-2">
+                        <Briefcase className="h-4 w-4 text-muted-foreground" />
+                        <span className="text-sm font-medium">{project}</span>
+                      </div>
+                      <span className="text-sm font-bold">{count}</span>
                     </div>
-                    <span className="text-sm font-bold">{count}</span>
-                  </div>
-                ))
-            )}
-          </div>
-        </CardContent>
-      </Card>
+                  ))
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <MapPin className="h-5 w-5 text-primary" />
+              Trade/Location Distribution
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {Object.entries(locationCount).length === 0 ? (
+                <p className="text-muted-foreground text-sm">No trades/locations found</p>
+              ) : (
+                Object.entries(locationCount)
+                  .sort((a, b) => b[1] - a[1])
+                  .map(([location, count]) => (
+                    <div key={location} className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                      <div className="flex items-center gap-2">
+                        <MapPin className="h-4 w-4 text-muted-foreground" />
+                        <span className="text-sm font-medium">{location}</span>
+                      </div>
+                      <span className="text-sm font-bold">{count}</span>
+                    </div>
+                  ))
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }

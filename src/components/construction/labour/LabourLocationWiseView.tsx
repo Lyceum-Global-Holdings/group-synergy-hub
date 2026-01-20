@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Search, MapPin, Users, Building2, Filter } from "lucide-react";
+import { Search, MapPin, Users, Building2, Filter, Briefcase } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -19,6 +19,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useLabourMaster } from "@/hooks/construction/useLabourMaster";
+import { useProjects } from "@/hooks/construction/useProjects";
 
 interface AggregatedLocation {
   locationName: string;
@@ -27,12 +28,14 @@ interface AggregatedLocation {
   inactiveCount: number;
   categories: Record<string, number>;
   companies: Record<string, number>;
+  projects: Record<string, number>;
   labours: Array<{
     id: string;
     employee_id: string | null;
     name: string;
     category: string | null;
     labour_company: string | null;
+    project_id: string | null;
     status: string;
   }>;
 }
@@ -43,6 +46,10 @@ export function LabourLocationWiseView() {
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
 
   const { data: labourMaster, isLoading } = useLabourMaster();
+  const { data: projects = [] } = useProjects();
+
+  // Create a project lookup map
+  const projectMap = new Map(projects.map(p => [p.id, p]));
 
   // Group by trade/location
   const groupedByLocation = labourMaster?.reduce((acc, labour) => {
@@ -56,6 +63,7 @@ export function LabourLocationWiseView() {
         inactiveCount: 0,
         categories: {},
         companies: {},
+        projects: {},
         labours: [],
       };
     }
@@ -75,12 +83,20 @@ export function LabourLocationWiseView() {
     const company = labour.labour_company || "Unassigned";
     acc[location].companies[company] = (acc[location].companies[company] || 0) + 1;
 
+    // Track project distribution
+    if (labour.project_id) {
+      const project = projectMap.get(labour.project_id);
+      const projectName = project ? project.project_code : "Unknown";
+      acc[location].projects[projectName] = (acc[location].projects[projectName] || 0) + 1;
+    }
+
     acc[location].labours.push({
       id: labour.id,
       employee_id: labour.employee_id,
       name: labour.name,
       category: labour.category,
       labour_company: labour.labour_company,
+      project_id: labour.project_id,
       status: labour.status,
     });
 
@@ -210,6 +226,17 @@ export function LabourLocationWiseView() {
                       </Badge>
                     ))}
                   </div>
+                  {/* Project breakdown badges */}
+                  {Object.keys(location.projects).length > 0 && (
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      <span className="text-xs text-muted-foreground">Projects:</span>
+                      {Object.entries(location.projects).map(([project, count]) => (
+                        <Badge key={project} variant="default" className="text-xs font-normal">
+                          {project}: {count}
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
                 </CardHeader>
                 
                 <CardContent>
@@ -221,43 +248,54 @@ export function LabourLocationWiseView() {
                           <TableHead>Name</TableHead>
                           <TableHead>Category</TableHead>
                           <TableHead>Company</TableHead>
+                          <TableHead>Project</TableHead>
                           <TableHead>Status</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {filteredLabours.length === 0 ? (
                           <TableRow>
-                            <TableCell colSpan={5} className="text-center py-4 text-muted-foreground">
+                            <TableCell colSpan={6} className="text-center py-4 text-muted-foreground">
                               No labour matching filter
                             </TableCell>
                           </TableRow>
                         ) : (
-                          filteredLabours.map((labour) => (
-                            <TableRow key={labour.id}>
-                              <TableCell className="font-mono text-sm">
-                                <div className="flex items-center gap-2">
-                                  <Users className="h-4 w-4 text-muted-foreground" />
-                                  {labour.employee_id || "-"}
-                                </div>
-                              </TableCell>
-                              <TableCell className="font-medium">{labour.name}</TableCell>
-                              <TableCell>
-                                {labour.category ? (
-                                  <Badge variant="outline">{labour.category}</Badge>
-                                ) : "-"}
-                              </TableCell>
-                              <TableCell>
-                                {labour.labour_company ? (
-                                  <Badge variant="secondary">{labour.labour_company}</Badge>
-                                ) : "-"}
-                              </TableCell>
-                              <TableCell>
-                                <Badge variant={labour.status === "active" ? "default" : "secondary"}>
-                                  {labour.status}
-                                </Badge>
-                              </TableCell>
-                            </TableRow>
-                          ))
+                          filteredLabours.map((labour) => {
+                            const project = labour.project_id ? projectMap.get(labour.project_id) : null;
+                            return (
+                              <TableRow key={labour.id}>
+                                <TableCell className="font-mono text-sm">
+                                  <div className="flex items-center gap-2">
+                                    <Users className="h-4 w-4 text-muted-foreground" />
+                                    {labour.employee_id || "-"}
+                                  </div>
+                                </TableCell>
+                                <TableCell className="font-medium">{labour.name}</TableCell>
+                                <TableCell>
+                                  {labour.category ? (
+                                    <Badge variant="outline">{labour.category}</Badge>
+                                  ) : "-"}
+                                </TableCell>
+                                <TableCell>
+                                  {labour.labour_company ? (
+                                    <Badge variant="secondary">{labour.labour_company}</Badge>
+                                  ) : "-"}
+                                </TableCell>
+                                <TableCell>
+                                  {project ? (
+                                    <Badge variant="default" className="font-normal">{project.project_code}</Badge>
+                                  ) : (
+                                    <span className="text-muted-foreground text-sm">-</span>
+                                  )}
+                                </TableCell>
+                                <TableCell>
+                                  <Badge variant={labour.status === "active" ? "default" : "secondary"}>
+                                    {labour.status}
+                                  </Badge>
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })
                         )}
                       </TableBody>
                     </Table>
