@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Search, Pencil, Trash2, Users, Filter, Building2 } from "lucide-react";
+import { Search, Pencil, Trash2, Users, Filter, Building2, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
@@ -22,6 +22,7 @@ import {
 import { useLabourMaster, useDeleteLabourMaster } from "@/hooks/construction/useLabourMaster";
 import { useProjects } from "@/hooks/construction/useProjects";
 import { LabourAllocationDialog } from "@/components/construction/dialogs/LabourAllocationDialog";
+import { LabourDetailsDialog } from "@/components/construction/dialogs/LabourDetailsDialog";
 import { DeleteConfirmDialog } from "@/components/construction/dialogs/DeleteConfirmDialog";
 import type { LabourMaster } from "@/types/construction";
 
@@ -35,6 +36,7 @@ export function LabourWiseView() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingLabour, setEditingLabour] = useState<LabourMaster | null>(null);
   const [deletingLabour, setDeletingLabour] = useState<LabourMaster | null>(null);
+  const [viewingLabour, setViewingLabour] = useState<LabourMaster | null>(null);
 
   const { data: labourMaster, isLoading } = useLabourMaster();
   const { data: projects = [] } = useProjects();
@@ -229,6 +231,14 @@ export function LabourWiseView() {
                             <Button
                               variant="ghost"
                               size="icon"
+                              onClick={() => setViewingLabour(labour)}
+                              title="View Details"
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
                               onClick={() => handleEdit(labour)}
                               title="Edit Allocation"
                             >
@@ -253,6 +263,12 @@ export function LabourWiseView() {
           </div>
         </CardContent>
       </Card>
+
+      <LabourDetailsDialog
+        open={!!viewingLabour}
+        onOpenChange={(open) => !open && setViewingLabour(null)}
+        labour={viewingLabour}
+      />
 
       <LabourAllocationDialog
         open={dialogOpen}
