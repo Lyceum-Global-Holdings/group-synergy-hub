@@ -1014,3 +1014,39 @@ export interface CreateSubcontractorMasterData {
 }
 
 export type UpdateSubcontractorMasterData = Partial<CreateSubcontractorMasterData>;
+
+// Labour Attendance Types
+export type LabourAttendanceStatus = 'present' | 'absent' | 'half_day' | 'leave';
+
+export interface LabourAttendance {
+  id: string;
+  site_report_id: string;
+  labour_id: string;
+  location_id: string | null;
+  company_id: string | null;
+  attendance_date: string;
+  attendance_status: LabourAttendanceStatus;
+  in_time: string | null;
+  out_time: string | null;
+  category: string | null;
+  notes: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+  // Joined fields
+  labour?: LabourMaster;
+}
+
+export interface CreateLabourAttendanceData {
+  site_report_id: string;
+  labour_id: string;
+  location_id?: string | null;
+  attendance_date: string;
+  attendance_status?: LabourAttendanceStatus;
+  in_time?: string | null;
+  out_time?: string | null;
+  category?: string | null;
+  notes?: string | null;
+}
+
+export type UpdateLabourAttendanceData = Partial<CreateLabourAttendanceData>;
