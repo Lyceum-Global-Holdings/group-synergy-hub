@@ -4,13 +4,14 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { Loader2, Package, MapPin, Calendar, Info, Tag } from 'lucide-react';
+import { Loader2, Package, MapPin, Calendar, Info, Tag, Clock, Building2 } from 'lucide-react';
 import { format } from 'date-fns';
 
 interface PublicAssetData {
   id: string;
   name: string;
   category: string;
+  subcategory: string | null;
   brand: string | null;
   asset_id: string | null;
   serial_number: string | null;
@@ -20,6 +21,11 @@ interface PublicAssetData {
   purchase_date: string | null;
   description: string | null;
   notes: string | null;
+  location: string | null;
+  sublocation: string | null;
+  department: string | null;
+  asset_age_years: number | null;
+  asset_age_months: number | null;
 }
 
 const getConditionBadge = (condition: string) => {
@@ -40,6 +46,24 @@ const getStatusBadge = (status: string) => {
     case 'disposed': return 'bg-red-100 text-red-800 hover:bg-red-100';
     default: return 'bg-gray-100 text-gray-800 hover:bg-gray-100';
   }
+};
+
+const formatCondition = (condition: string) => {
+  return condition
+    .split('_')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+};
+
+const formatAssetAge = (years: number | null, months: number | null) => {
+  if (years === null || months === null) return 'Unknown';
+  
+  const parts = [];
+  if (years > 0) parts.push(`${years} year${years !== 1 ? 's' : ''}`);
+  if (months > 0) parts.push(`${months} month${months !== 1 ? 's' : ''}`);
+  
+  if (parts.length === 0) return 'Less than a month';
+  return parts.join(', ');
 };
 
 export default function PublicAssetView() {
@@ -153,14 +177,21 @@ export default function PublicAssetView() {
               <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
                 <div>
                   <CardTitle className="text-2xl">{asset.name}</CardTitle>
-                  <p className="text-muted-foreground mt-1">{asset.category}</p>
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {asset.category && (
+                      <span className="text-muted-foreground">{asset.category}</span>
+                    )}
+                    {asset.subcategory && (
+                      <span className="text-muted-foreground">/ {asset.subcategory}</span>
+                    )}
+                  </div>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex gap-2 flex-wrap">
                   <Badge className={getStatusBadge(asset.status)}>
                     {asset.status.charAt(0).toUpperCase() + asset.status.slice(1)}
                   </Badge>
                   <Badge className={getConditionBadge(asset.condition)}>
-                    {asset.condition.charAt(0).toUpperCase() + asset.condition.slice(1)}
+                    {formatCondition(asset.condition)}
                   </Badge>
                 </div>
               </div>
@@ -192,12 +223,16 @@ export default function PublicAssetView() {
                         <span className="font-mono">{asset.asset_tag}</span>
                       </>
                     )}
-                    {asset.brand && (
+                    <span className="text-muted-foreground">Category:</span>
+                    <span>{asset.category || 'Not specified'}</span>
+                    {asset.subcategory && (
                       <>
-                        <span className="text-muted-foreground">Brand:</span>
-                        <span>{asset.brand}</span>
+                        <span className="text-muted-foreground">Subcategory:</span>
+                        <span>{asset.subcategory}</span>
                       </>
                     )}
+                    <span className="text-muted-foreground">Brand:</span>
+                    <span>{asset.brand || 'Not specified'}</span>
                   </div>
                 </div>
 
@@ -208,54 +243,79 @@ export default function PublicAssetView() {
                   </div>
                   <div className="grid grid-cols-2 gap-4 text-sm">
                     <span className="text-muted-foreground">Location:</span>
-                    <span>Not specified</span>
+                    <span>{asset.location || 'Not specified'}</span>
+                    <span className="text-muted-foreground">Sublocation:</span>
+                    <span>{asset.sublocation || 'Not specified'}</span>
+                    <span className="text-muted-foreground">Department:</span>
+                    <span>{asset.department || 'Not specified'}</span>
                   </div>
                 </div>
               </div>
 
               <Separator />
 
-              {/* Purchase Date Only (no financial info) */}
-              {asset.purchase_date && (
-                <>
-                  <div className="space-y-4">
-                    <div className="flex items-center gap-2">
-                      <Calendar className="h-4 w-4 text-muted-foreground" />
-                      <span className="font-medium">Purchase Information</span>
-                    </div>
-                    <div className="grid grid-cols-1 gap-4 text-sm">
-                      <div>
-                        <span className="text-muted-foreground block">Purchase Date</span>
-                        <span className="text-lg font-semibold">
-                          {format(new Date(asset.purchase_date), 'MMM dd, yyyy')}
-                        </span>
-                      </div>
-                    </div>
+              {/* Status & Condition */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2">
+                    <Building2 className="h-4 w-4 text-muted-foreground" />
+                    <span className="font-medium">Status & Condition</span>
                   </div>
-                  <Separator />
-                </>
-              )}
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <span className="text-muted-foreground">Status:</span>
+                    <Badge className={getStatusBadge(asset.status)}>
+                      {asset.status.charAt(0).toUpperCase() + asset.status.slice(1)}
+                    </Badge>
+                    <span className="text-muted-foreground">Condition:</span>
+                    <Badge className={getConditionBadge(asset.condition)}>
+                      {formatCondition(asset.condition)}
+                    </Badge>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2">
+                    <Clock className="h-4 w-4 text-muted-foreground" />
+                    <span className="font-medium">Asset Age</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <span className="text-muted-foreground">Age:</span>
+                    <span className="font-semibold">
+                      {formatAssetAge(asset.asset_age_years, asset.asset_age_months)}
+                    </span>
+                    {asset.purchase_date && (
+                      <>
+                        <span className="text-muted-foreground">Purchase Date:</span>
+                        <span>{format(new Date(asset.purchase_date), 'MMM dd, yyyy')}</span>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
 
               {/* Description & Notes */}
               {(asset.description || asset.notes) && (
-                <div className="space-y-4">
-                  <div className="flex items-center gap-2">
-                    <Info className="h-4 w-4 text-muted-foreground" />
-                    <span className="font-medium">Additional Information</span>
+                <>
+                  <Separator />
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-2">
+                      <Info className="h-4 w-4 text-muted-foreground" />
+                      <span className="font-medium">Additional Information</span>
+                    </div>
+                    {asset.description && (
+                      <div>
+                        <span className="text-sm text-muted-foreground block mb-1">Description</span>
+                        <p className="text-sm leading-relaxed">{asset.description}</p>
+                      </div>
+                    )}
+                    {asset.notes && (
+                      <div>
+                        <span className="text-sm text-muted-foreground block mb-1">Notes</span>
+                        <p className="text-sm leading-relaxed">{asset.notes}</p>
+                      </div>
+                    )}
                   </div>
-                  {asset.description && (
-                    <div>
-                      <span className="text-sm text-muted-foreground block mb-1">Description</span>
-                      <p className="text-sm leading-relaxed">{asset.description}</p>
-                    </div>
-                  )}
-                  {asset.notes && (
-                    <div>
-                      <span className="text-sm text-muted-foreground block mb-1">Notes</span>
-                      <p className="text-sm leading-relaxed">{asset.notes}</p>
-                    </div>
-                  )}
-                </div>
+                </>
               )}
             </CardContent>
           </Card>
