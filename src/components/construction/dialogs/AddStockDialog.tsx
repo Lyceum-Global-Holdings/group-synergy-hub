@@ -20,6 +20,7 @@ import { cn } from "@/lib/utils";
 
 const formSchema = z.object({
   item_name: z.string().min(1, "Item name is required"),
+  serial_number: z.string().optional(),
   quantity: z.coerce.number().min(1, "Quantity must be at least 1"),
   location_id: z.string().min(1, "Location is required"),
   unit: z.string().min(1, "Unit is required"),
@@ -90,6 +91,7 @@ export function AddStockDialog({ open, onOpenChange }: AddStockDialogProps) {
     resolver: zodResolver(formSchema),
     defaultValues: {
       item_name: "",
+      serial_number: "",
       quantity: 1,
       location_id: "",
       unit: "",
@@ -102,6 +104,7 @@ export function AddStockDialog({ open, onOpenChange }: AddStockDialogProps) {
     if (open) {
       form.reset({
         item_name: "",
+        serial_number: "",
         quantity: 1,
         location_id: "",
         unit: "",
@@ -144,6 +147,7 @@ export function AddStockDialog({ open, onOpenChange }: AddStockDialogProps) {
     // Create a new inventory record with the existing item's details + stock data
     const createData: CreateInventoryMasterData & { transactionType: 'stock_addition' } = {
       item_name: selectedMasterItem.item_name,
+      serial_number: data.serial_number,
       section: selectedMasterItem.section,
       category: selectedMasterItem.category,
       quantity: data.quantity,
@@ -280,6 +284,21 @@ export function AddStockDialog({ open, onOpenChange }: AddStockDialogProps) {
                 </div>
               </div>
             )}
+
+            {/* Serial Number */}
+            <FormField
+              control={form.control}
+              name="serial_number"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Serial Number</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Enter serial number (optional)" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
             {/* Quantity and Location */}
             <div className="grid grid-cols-2 gap-4">

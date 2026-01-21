@@ -949,6 +949,7 @@ export interface InventoryMaster {
   company_id: string | null;
   item_code: string | null;
   item_name: string;
+  serial_number: string | null;
   section: string | null;
   category: string | null;
   unit: string | null;
@@ -969,6 +970,7 @@ export interface InventoryMaster {
 export interface CreateInventoryMasterData {
   item_code?: string;
   item_name: string;
+  serial_number?: string;
   section: string;
   category: string;
   quantity?: number;

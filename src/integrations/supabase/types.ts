@@ -3077,6 +3077,7 @@ export type Database = {
           notes: string | null
           quantity: number
           section: string | null
+          serial_number: string | null
           status: string
           unit: string | null
           unit_cost: number | null
@@ -3096,6 +3097,7 @@ export type Database = {
           notes?: string | null
           quantity?: number
           section?: string | null
+          serial_number?: string | null
           status?: string
           unit?: string | null
           unit_cost?: number | null
@@ -3115,6 +3117,7 @@ export type Database = {
           notes?: string | null
           quantity?: number
           section?: string | null
+          serial_number?: string | null
           status?: string
           unit?: string | null
           unit_cost?: number | null
