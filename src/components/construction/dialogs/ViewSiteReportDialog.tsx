@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { FileDown, X, Cloud, Thermometer, Users, AlertTriangle, Shield, Package, Warehouse, ArrowRightLeft, RefreshCw, Send, Wrench, Truck } from "lucide-react";
+import { FileDown, X, Cloud, Thermometer, Users, AlertTriangle, Shield, Package, Warehouse, ArrowRightLeft, RefreshCw, Send, Wrench, Truck, Clock } from "lucide-react";
 import { format } from "date-fns";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -17,6 +17,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useCompany } from "@/contexts/CompanyContext";
 import { cn } from "@/lib/utils";
 import { useTelegramSettings } from "@/hooks/useTelegramSettings";
+import { useLabourAttendance } from "@/hooks/construction/useLabourAttendance";
 interface ViewSiteReportDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -113,6 +114,15 @@ export function ViewSiteReportDialog({
     stockBalances,
     isLoading
   } = useDailyMaterialsActivity(periodStartDate, periodEndDate);
+
+  // Fetch labour attendance for this report
+  const { data: attendanceRecords, isLoading: attendanceLoading } = useLabourAttendance(report?.id);
+
+  // Calculate attendance summary
+  const presentLabours = attendanceRecords?.filter(a => a.attendance_status === 'present') || [];
+  const skilledPresent = presentLabours.filter(a => a.labour?.category === 'skilled');
+  const unskilledPresent = presentLabours.filter(a => a.labour?.category === 'unskilled');
+
   if (!report) return null;
 
   // Show loading state while fetching fresh data
@@ -406,6 +416,105 @@ export function ViewSiteReportDialog({
 
             {/* Materials Received */}
             {displayReport.materials_received}
+
+            <Separator />
+
+            {/* Labour Attendance Section */}
+            {attendanceRecords && attendanceRecords.length > 0 && (
+              <div className="space-y-4">
+                <h3 className="font-semibold text-lg flex items-center gap-2">
+                  <Users className="h-5 w-5" />
+                  Labour Attendance Summary
+                </h3>
+
+                {/* Summary Cards */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  <Card>
+                    <CardContent className="p-3 text-center">
+                      <div className="text-2xl font-bold">{presentLabours.length}</div>
+                      <div className="text-xs text-muted-foreground">Present</div>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="p-3 text-center">
+                      <div className="text-2xl font-bold">{skilledPresent.length}</div>
+                      <div className="text-xs text-muted-foreground">Skilled</div>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="p-3 text-center">
+                      <div className="text-2xl font-bold">{unskilledPresent.length}</div>
+                      <div className="text-xs text-muted-foreground">Unskilled</div>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="p-3 text-center">
+                      <div className="text-2xl font-bold">{attendanceRecords.length}</div>
+                      <div className="text-xs text-muted-foreground">Total Records</div>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* Attendance Table */}
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium flex items-center gap-2">
+                      <Clock className="h-4 w-4" />
+                      Attendance Details ({presentLabours.length} present)
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Employee ID</TableHead>
+                          <TableHead>Name</TableHead>
+                          <TableHead>Category</TableHead>
+                          <TableHead>Company</TableHead>
+                          <TableHead>In Time</TableHead>
+                          <TableHead>Out Time</TableHead>
+                          <TableHead>Status</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {attendanceRecords.map((record) => (
+                          <TableRow key={record.id}>
+                            <TableCell className="font-mono text-xs">
+                              {record.labour?.employee_id || "-"}
+                            </TableCell>
+                            <TableCell>{record.labour?.name || "-"}</TableCell>
+                            <TableCell>
+                              <Badge variant="outline" className="capitalize">
+                                {record.labour?.category || "-"}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>{record.labour?.labour_company || "-"}</TableCell>
+                            <TableCell>
+                              {record.in_time ? format(new Date(`2000-01-01T${record.in_time}`), "hh:mm a") : "-"}
+                            </TableCell>
+                            <TableCell>
+                              {record.out_time ? format(new Date(`2000-01-01T${record.out_time}`), "hh:mm a") : "-"}
+                            </TableCell>
+                            <TableCell>
+                              <Badge 
+                                variant={record.attendance_status === 'present' ? 'default' : 'secondary'}
+                                className={cn(
+                                  record.attendance_status === 'present' 
+                                    ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300" 
+                                    : ""
+                                )}
+                              >
+                                {record.attendance_status === 'present' ? 'Present' : 'Absent'}
+                              </Badge>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </CardContent>
+                </Card>
+              </div>
+            )}
 
             <Separator />
 
