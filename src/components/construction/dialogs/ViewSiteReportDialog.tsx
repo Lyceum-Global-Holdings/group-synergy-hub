@@ -115,13 +115,28 @@ export function ViewSiteReportDialog({
     isLoading
   } = useDailyMaterialsActivity(periodStartDate, periodEndDate);
 
-  // Fetch labour attendance for this report
-  const { data: attendanceRecords, isLoading: attendanceLoading } = useLabourAttendance(report?.id);
+  // Fetch labour attendance for this report - use freshReport ID for proper data fetching
+  const reportIdToFetch = freshReport?.id || report?.id;
+  const { data: attendanceRecords, isLoading: attendanceLoading } = useLabourAttendance(reportIdToFetch);
 
-  // Calculate attendance summary
+  // Calculate attendance summary with proper category matching
   const presentLabours = attendanceRecords?.filter(a => a.attendance_status === 'present') || [];
-  const skilledPresent = presentLabours.filter(a => a.labour?.category === 'skilled');
-  const unskilledPresent = presentLabours.filter(a => a.labour?.category === 'unskilled');
+  const absentLabours = attendanceRecords?.filter(a => a.attendance_status === 'absent') || [];
+  
+  // Match category names from Labour Master (Civil Skill, Civil Labour (Unskill), MEP, Aluminium, Officer)
+  const categoryBreakdown = presentLabours.reduce((acc, a) => {
+    const category = a.category || a.labour?.category || 'Other';
+    acc[category] = (acc[category] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
+  
+  // For backward compatibility with existing cards
+  const skilledPresent = presentLabours.filter(a => 
+    (a.category || a.labour?.category) === 'Civil Skill'
+  );
+  const unskilledPresent = presentLabours.filter(a => 
+    (a.category || a.labour?.category) === 'Civil Labour (Unskill)'
+  );
 
   if (!report) return null;
 
@@ -427,30 +442,52 @@ export function ViewSiteReportDialog({
                   Labour Attendance Summary
                 </h3>
 
-                {/* Summary Cards */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                  <Card>
+                {/* Status Summary Cards */}
+                <div className="grid grid-cols-2 gap-3">
+                  <Card className="border-green-200 bg-green-50/50 dark:bg-green-900/20 dark:border-green-800">
                     <CardContent className="p-3 text-center">
-                      <div className="text-2xl font-bold">{presentLabours.length}</div>
+                      <div className="text-2xl font-bold text-green-600 dark:text-green-400">{presentLabours.length}</div>
                       <div className="text-xs text-muted-foreground">Present</div>
                     </CardContent>
                   </Card>
+                  <Card className="border-red-200 bg-red-50/50 dark:bg-red-900/20 dark:border-red-800">
+                    <CardContent className="p-3 text-center">
+                      <div className="text-2xl font-bold text-red-600 dark:text-red-400">{absentLabours.length}</div>
+                      <div className="text-xs text-muted-foreground">Absent</div>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* Category-wise Cards (Only Present Labours) */}
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
                   <Card>
                     <CardContent className="p-3 text-center">
-                      <div className="text-2xl font-bold">{skilledPresent.length}</div>
-                      <div className="text-xs text-muted-foreground">Skilled</div>
+                      <div className="text-xl font-bold">{categoryBreakdown["Civil Skill"] || 0}</div>
+                      <div className="text-xs text-muted-foreground">Civil Skill</div>
                     </CardContent>
                   </Card>
                   <Card>
                     <CardContent className="p-3 text-center">
-                      <div className="text-2xl font-bold">{unskilledPresent.length}</div>
-                      <div className="text-xs text-muted-foreground">Unskilled</div>
+                      <div className="text-xl font-bold">{categoryBreakdown["Civil Labour (Unskill)"] || 0}</div>
+                      <div className="text-xs text-muted-foreground">Civil Labour</div>
                     </CardContent>
                   </Card>
                   <Card>
                     <CardContent className="p-3 text-center">
-                      <div className="text-2xl font-bold">{attendanceRecords.length}</div>
-                      <div className="text-xs text-muted-foreground">Total Records</div>
+                      <div className="text-xl font-bold">{categoryBreakdown["MEP"] || 0}</div>
+                      <div className="text-xs text-muted-foreground">MEP</div>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="p-3 text-center">
+                      <div className="text-xl font-bold">{categoryBreakdown["Aluminium"] || 0}</div>
+                      <div className="text-xs text-muted-foreground">Aluminium</div>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="p-3 text-center">
+                      <div className="text-xl font-bold">{categoryBreakdown["Officer"] || 0}</div>
+                      <div className="text-xs text-muted-foreground">Officer</div>
                     </CardContent>
                   </Card>
                 </div>
