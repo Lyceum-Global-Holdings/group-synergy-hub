@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -16,15 +16,26 @@ export default function Auth() {
   const { signIn, user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const [searchParams] = useSearchParams();
   const { toast } = useToast();
+
+  // Get redirect URL from query params (for QR code transfer flow)
+  const redirectUrl = searchParams.get('redirect');
+  const action = searchParams.get('action');
 
   // Redirect if already authenticated
   useEffect(() => {
     if (user) {
-      const from = location.state?.from?.pathname || '/';
-      navigate(from, { replace: true });
+      // Priority: query param redirect > location state > default
+      if (redirectUrl) {
+        const fullRedirect = action ? `${redirectUrl}?action=${action}` : redirectUrl;
+        navigate(fullRedirect, { replace: true });
+      } else {
+        const from = location.state?.from?.pathname || '/';
+        navigate(from, { replace: true });
+      }
     }
-  }, [user, navigate, location]);
+  }, [user, navigate, location, redirectUrl, action]);
 
   const getErrorMessage = (error: any) => {
     const message = error?.message || '';

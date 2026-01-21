@@ -1,11 +1,15 @@
-import { useParams } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { Loader2, Package, MapPin, Calendar, Info, Tag, Clock, Building2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Loader2, Package, MapPin, Calendar, Info, Tag, Clock, Building2, ArrowRightLeft, LogIn } from 'lucide-react';
 import { format } from 'date-fns';
+import { PublicAssetTransferDialog } from '@/components/warehouse/PublicAssetTransferDialog';
+import { useToast } from '@/hooks/use-toast';
 
 interface PublicAssetData {
   id: string;
@@ -24,6 +28,9 @@ interface PublicAssetData {
   location: string | null;
   sublocation: string | null;
   department: string | null;
+  location_id: string | null;
+  sublocation_id: string | null;
+  department_id: string | null;
   asset_age_years: number | null;
   asset_age_months: number | null;
 }
@@ -68,8 +75,42 @@ const formatAssetAge = (years: number | null, months: number | null) => {
 
 export default function PublicAssetView() {
   const { assetId } = useParams<{ assetId: string }>();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const { toast } = useToast();
+  
+  const [showTransferDialog, setShowTransferDialog] = useState(false);
+  const [isCheckingAuth, setIsCheckingAuth] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
 
-  const { data: asset, isLoading, error } = useQuery({
+  // Check if user is authenticated
+  useEffect(() => {
+    const checkAuth = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      setIsAuthenticated(!!session);
+    };
+    checkAuth();
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      setIsAuthenticated(!!session);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  // Handle action param after login redirect
+  useEffect(() => {
+    const action = searchParams.get('action');
+    if (action === 'transfer' && isAuthenticated === true) {
+      // User just logged in and wants to transfer, open dialog
+      setShowTransferDialog(true);
+      // Clean up URL
+      navigate(`/asset/${assetId}`, { replace: true });
+    }
+  }, [searchParams, isAuthenticated, assetId, navigate]);
+
+  const { data: asset, isLoading, error, refetch } = useQuery({
     queryKey: ['public-asset', assetId],
     queryFn: async () => {
       if (!assetId) return null;
@@ -95,6 +136,36 @@ export default function PublicAssetView() {
     },
     enabled: !!assetId,
   });
+
+  const handleTransferClick = async () => {
+    setIsCheckingAuth(true);
+    
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (session) {
+        // User is logged in - open transfer dialog
+        setShowTransferDialog(true);
+      } else {
+        // User not logged in - redirect to auth with return URL
+        toast({
+          title: "Login Required",
+          description: "Please sign in to transfer this asset.",
+        });
+        navigate(`/auth?redirect=/asset/${assetId}&action=transfer`);
+      }
+    } finally {
+      setIsCheckingAuth(false);
+    }
+  };
+
+  const handleTransferSuccess = () => {
+    toast({
+      title: "Transfer Complete",
+      description: "Asset has been transferred successfully.",
+    });
+    refetch(); // Refresh asset data to show new location
+  };
 
   if (isLoading) {
     return (
@@ -317,6 +388,32 @@ export default function PublicAssetView() {
                   </div>
                 </>
               )}
+
+              <Separator />
+
+              {/* Transfer Action */}
+              <div className="flex flex-col sm:flex-row gap-4 items-center justify-between">
+                <div className="text-sm text-muted-foreground">
+                  {isAuthenticated 
+                    ? "You can transfer this asset to a different location."
+                    : "Sign in to transfer this asset to a different location."
+                  }
+                </div>
+                <Button 
+                  onClick={handleTransferClick}
+                  disabled={isCheckingAuth}
+                  className="w-full sm:w-auto"
+                >
+                  {isCheckingAuth ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : isAuthenticated ? (
+                    <ArrowRightLeft className="mr-2 h-4 w-4" />
+                  ) : (
+                    <LogIn className="mr-2 h-4 w-4" />
+                  )}
+                  {isAuthenticated ? 'Transfer Asset' : 'Sign In to Transfer'}
+                </Button>
+              </div>
             </CardContent>
           </Card>
 
@@ -326,6 +423,23 @@ export default function PublicAssetView() {
           </div>
         </div>
       </div>
+
+      {/* Transfer Dialog */}
+      {asset && (
+        <PublicAssetTransferDialog
+          assetId={asset.id}
+          assetName={asset.name}
+          currentLocation={asset.location}
+          currentSublocation={asset.sublocation}
+          currentDepartment={asset.department}
+          currentLocationId={asset.location_id}
+          currentSublocationId={asset.sublocation_id}
+          currentDepartmentId={asset.department_id}
+          open={showTransferDialog}
+          onOpenChange={setShowTransferDialog}
+          onSuccess={handleTransferSuccess}
+        />
+      )}
     </div>
   );
 }
