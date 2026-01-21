@@ -80,7 +80,7 @@ export function DailySiteReportDialog({ open, onOpenChange, report }: DailySiteR
   const [attendanceSummary, setAttendanceSummary] = useState<AttendanceSummary | null>(null);
 
   // Filter locations to show only project sites
-  const siteLocations = locations?.filter(loc => loc.category === 'project_site') || [];
+  const siteLocations = locations?.filter(loc => loc.type === 'location') || [];
   const updateReport = useUpdateDailySiteReport();
 
   const form = useForm<FormData>({
@@ -257,7 +257,7 @@ export function DailySiteReportDialog({ open, onOpenChange, report }: DailySiteR
                       <SelectContent>
                         {siteLocations.map((location) => (
                           <SelectItem key={location.id} value={location.id}>
-                            {location.name} {location.code ? `(${location.code})` : ""}
+                            {location.name} {location.location_code ? `(${location.location_code})` : ""}
                           </SelectItem>
                         ))}
                       </SelectContent>
