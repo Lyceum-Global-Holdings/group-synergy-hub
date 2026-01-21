@@ -14,6 +14,7 @@ import { Image as ImageIcon, Save, Package } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
 const formSchema = z.object({
+  serial_number: z.string().optional(),
   quantity: z.coerce.number().min(0, "Quantity must be 0 or greater"),
   location_id: z.string().min(1, "Location is required"),
   unit: z.string().min(1, "Unit is required"),
@@ -55,6 +56,7 @@ export function EditStockDialog({ open, onOpenChange, itemId }: EditStockDialogP
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
     defaultValues: {
+      serial_number: "",
       quantity: 1,
       location_id: "",
       unit: "",
@@ -67,6 +69,7 @@ export function EditStockDialog({ open, onOpenChange, itemId }: EditStockDialogP
   useEffect(() => {
     if (open && item) {
       form.reset({
+        serial_number: item.serial_number || "",
         quantity: item.quantity ?? 1,
         location_id: item.location_id || "",
         unit: item.unit || "",
@@ -81,6 +84,7 @@ export function EditStockDialog({ open, onOpenChange, itemId }: EditStockDialogP
 
     await updateMutation.mutateAsync({
       id: itemId,
+      serial_number: data.serial_number,
       quantity: data.quantity,
       location_id: data.location_id,
       unit: data.unit,
@@ -134,6 +138,21 @@ export function EditStockDialog({ open, onOpenChange, itemId }: EditStockDialogP
                 )}
               </div>
             </div>
+
+            {/* Serial Number */}
+            <FormField
+              control={form.control}
+              name="serial_number"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Serial Number</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Enter serial number (optional)" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
             {/* Quantity and Location */}
             <div className="grid grid-cols-2 gap-4">

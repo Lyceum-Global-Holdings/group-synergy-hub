@@ -78,11 +78,13 @@ interface LocationItemRecord {
   locationId?: string;
   locationName?: string;
   imageUrl?: string | null;
+  serialNumber?: string | null;
 }
 
 // Aggregated inventory row grouped by item name
 interface AggregatedInventoryRow {
   itemName: string;
+  serialNumber?: string | null;
   section: string;
   category: string;
   totalQty: number;
@@ -239,6 +241,7 @@ export function InventoryWiseView() {
         section: string;
         category: string;
         imageUrl?: string | null;
+        serialNumber?: string | null;
       }>;
     }>();
 
@@ -258,6 +261,7 @@ export function InventoryWiseView() {
         section: item.section || "unassigned",
         category: item.category || "unassigned",
         imageUrl: item.image_url,
+        serialNumber: item.serial_number,
       });
     });
 
@@ -281,6 +285,7 @@ export function InventoryWiseView() {
             locationId: item.locationId,
             locationName: item.locationName,
             imageUrl: item.imageUrl,
+            serialNumber: item.serialNumber,
           });
         } else {
           // Same location, add quantity
@@ -301,6 +306,9 @@ export function InventoryWiseView() {
       // Find primary image (first non-null image)
       const primaryImageUrl = items.find(i => i.imageUrl)?.imageUrl;
       
+      // Get serial number from first item (if exists)
+      const serialNumber = items.find(i => i.serialNumber)?.serialNumber;
+      
       // Use original case from first item
       const originalItemName = (inventoryMaster || []).find(
         i => i.item_name.toLowerCase().trim() === normalizedName
@@ -308,6 +316,7 @@ export function InventoryWiseView() {
       
       result.push({
         itemName: originalItemName,
+        serialNumber,
         section: firstItem.section,
         category: firstItem.category,
         totalQty,
@@ -427,6 +436,7 @@ export function InventoryWiseView() {
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-[60px]">Image</TableHead>
+                  <TableHead>Serial No</TableHead>
                   <TableHead>Item Name</TableHead>
                   <TableHead>Section</TableHead>
                   <TableHead>Category</TableHead>
@@ -439,7 +449,7 @@ export function InventoryWiseView() {
               <TableBody>
                 {filteredData.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
                       No inventory items found. Add items from Item Master.
                     </TableCell>
                   </TableRow>
@@ -458,6 +468,9 @@ export function InventoryWiseView() {
                             <ImageIcon className="h-5 w-5 text-muted-foreground" />
                           </div>
                         )}
+                      </TableCell>
+                      <TableCell className="font-mono text-sm text-muted-foreground">
+                        {row.serialNumber || '—'}
                       </TableCell>
                       <TableCell className="font-medium">{row.itemName}</TableCell>
                       <TableCell>
