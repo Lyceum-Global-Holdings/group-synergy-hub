@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Plus, Search, Pencil, Trash2, Package, LayoutDashboard, Boxes, MapPin, ArrowRightLeft, Wrench, Image as ImageIcon, Upload } from "lucide-react";
+import { ArrowLeft, Plus, Search, Pencil, Trash2, Package, LayoutDashboard, Boxes, MapPin, ArrowRightLeft, Wrench, Image as ImageIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
@@ -16,12 +16,11 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useConstructionResources, useDeleteConstructionResource } from "@/hooks/construction/useConstructionResources";
-import { useInventoryMaster, useDeleteInventoryMaster, useBulkCreateInventoryMaster } from "@/hooks/construction/useInventoryMaster";
+import { useInventoryMaster, useDeleteInventoryMaster } from "@/hooks/construction/useInventoryMaster";
 import { RESOURCE_STATUSES, ConstructionResource } from "@/types/construction";
 import { format } from "date-fns";
 import { ResourceDialog, DeleteConfirmDialog } from "@/components/construction/dialogs";
 import { InventoryMasterDialog } from "@/components/construction/dialogs/InventoryMasterDialog";
-import { ImportInventoryMasterDialog } from "@/components/construction/dialogs/ImportInventoryMasterDialog";
 import type { InventoryMaster } from "@/types/construction";
 import {
   AllocationDashboard,
@@ -69,7 +68,6 @@ export default function InventoryItems() {
   
   // Master list state
   const [masterDialogOpen, setMasterDialogOpen] = useState(false);
-  const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [editingMaster, setEditingMaster] = useState<InventoryMaster | null>(null);
   const [deletingMaster, setDeletingMaster] = useState<InventoryMaster | null>(null);
 
@@ -80,7 +78,6 @@ export default function InventoryItems() {
   const filteredMaster = inventoryMaster?.filter((item) => {
     const matchesSearch = 
       item.item_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.item_code?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       item.section?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       item.category?.toLowerCase().includes(searchTerm.toLowerCase());
     
@@ -197,10 +194,6 @@ export default function InventoryItems() {
                 ))}
               </SelectContent>
             </Select>
-            <Button variant="outline" onClick={() => setImportDialogOpen(true)}>
-              <Upload className="mr-2 h-4 w-4" />
-              Import
-            </Button>
             <Button onClick={() => { setEditingMaster(null); setMasterDialogOpen(true); }}>
               <Plus className="mr-2 h-4 w-4" />
               Add Item
@@ -218,7 +211,6 @@ export default function InventoryItems() {
                   <TableHeader>
                     <TableRow>
                       <TableHead className="w-[60px]">Image</TableHead>
-                      <TableHead>Item ID</TableHead>
                       <TableHead>Item Name</TableHead>
                       <TableHead>Section</TableHead>
                       <TableHead>Item Category</TableHead>
@@ -229,7 +221,7 @@ export default function InventoryItems() {
                   <TableBody>
                     {filteredMaster?.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                        <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                           No inventory items found
                         </TableCell>
                       </TableRow>
@@ -249,7 +241,6 @@ export default function InventoryItems() {
                               </div>
                             )}
                           </TableCell>
-                          <TableCell className="font-mono text-sm">{item.item_code || '-'}</TableCell>
                           <TableCell className="font-medium">{item.item_name}</TableCell>
                           <TableCell>
                             <Badge variant="outline">
@@ -299,11 +290,6 @@ export default function InventoryItems() {
         open={masterDialogOpen}
         onOpenChange={setMasterDialogOpen}
         item={editingMaster}
-      />
-
-      <ImportInventoryMasterDialog
-        open={importDialogOpen}
-        onOpenChange={setImportDialogOpen}
       />
 
       <DeleteConfirmDialog

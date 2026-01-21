@@ -30,17 +30,10 @@ export default function AssetQRCode({ assetId, assetName, assetIdentifier }: Ass
     setIsGenerated(false);
     
     try {
-      // 2x1 inch label at 300 DPI for print quality
-      const DPI = 300;
-      const labelWidth = 2 * DPI;   // 600 pixels (2 inches)
-      const labelHeight = 1 * DPI;  // 300 pixels (1 inch)
-      const padding = 10;
-      const qrSize = labelHeight - (padding * 2); // 280px square QR code
-
-      // Generate QR code at print quality
+      // Generate QR code as data URL first
       const qrDataUrl = await QRCode.toDataURL(publicUrl, {
-        width: qrSize,
-        margin: 1,
+        width: 256,
+        margin: 2,
         color: {
           dark: '#000000',
           light: '#FFFFFF'
@@ -48,52 +41,54 @@ export default function AssetQRCode({ assetId, assetName, assetIdentifier }: Ass
         errorCorrectionLevel: 'M'
       });
 
-      // Create canvas for 2x1 inch horizontal label
+      // Create canvas to combine QR code with asset ID text
       const canvas = canvasRef.current;
       if (canvas) {
         const ctx = canvas.getContext('2d');
         if (ctx) {
+          // Set canvas size to accommodate QR code + text
+          const qrSize = 256;
           const label = assetIdentifier || assetId;
+          const textHeight = label ? 50 : 0;
+          const padding = 20;
+          const totalHeight = qrSize + textHeight + padding;
           
-          // Set canvas to 2x1 inch at 300 DPI
-          canvas.width = labelWidth;
-          canvas.height = labelHeight;
+          canvas.width = qrSize + (padding * 2);
+          canvas.height = totalHeight + padding;
           
           // Fill white background
           ctx.fillStyle = '#FFFFFF';
           ctx.fillRect(0, 0, canvas.width, canvas.height);
           
-          // Draw border for cutting guide
-          ctx.strokeStyle = '#E5E7EB';
-          ctx.lineWidth = 2;
-          ctx.strokeRect(1, 1, canvas.width - 2, canvas.height - 2);
-          
-          // Draw QR code on LEFT side
+          // Draw QR code
           const qrImg = new Image();
           qrImg.onload = () => {
             ctx.drawImage(qrImg, padding, padding, qrSize, qrSize);
             
-            // Draw asset ID on RIGHT side
+            // Add asset ID text below QR code if available
             if (label) {
-              const textX = qrSize + padding + 20;
-              const textAreaWidth = labelWidth - qrSize - padding - 30;
-              
-              // Calculate font size based on text length
-              let fontSize = 36;
-              ctx.font = `bold ${fontSize}px monospace`;
-              let textMetrics = ctx.measureText(label);
-              
-              // Reduce font size if text is too wide
-              while (textMetrics.width > textAreaWidth && fontSize > 16) {
-                fontSize -= 2;
-                ctx.font = `bold ${fontSize}px monospace`;
-                textMetrics = ctx.measureText(label);
-              }
-              
               ctx.fillStyle = '#000000';
-              ctx.textAlign = 'left';
+              ctx.font = 'bold 24px monospace';
+              ctx.textAlign = 'center';
               ctx.textBaseline = 'middle';
-              ctx.fillText(label, textX, labelHeight / 2);
+              
+              const textX = canvas.width / 2;
+              const textY = padding + qrSize + (textHeight / 2);
+              
+              // Add white background rectangle for text
+              const textMetrics = ctx.measureText(label);
+              const textWidth = textMetrics.width + 20;
+              const textBgHeight = 35;
+              
+              ctx.fillStyle = '#F8F9FA';
+              ctx.strokeStyle = '#E5E7EB';
+              ctx.lineWidth = 1;
+              ctx.fillRect(textX - textWidth/2, textY - textBgHeight/2, textWidth, textBgHeight);
+              ctx.strokeRect(textX - textWidth/2, textY - textBgHeight/2, textWidth, textBgHeight);
+              
+              // Draw text
+              ctx.fillStyle = '#000000';
+              ctx.fillText(label, textX, textY);
             }
             
             // Convert canvas to data URL
@@ -188,8 +183,8 @@ export default function AssetQRCode({ assetId, assetName, assetIdentifier }: Ass
                 <canvas
                   ref={canvasRef}
                   className="hidden"
-                  width={600}
-                  height={300}
+                  width={296}
+                  height={326}
                 />
               </div>
             </div>

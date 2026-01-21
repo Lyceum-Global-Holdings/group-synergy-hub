@@ -967,12 +967,11 @@ export interface InventoryMaster {
 }
 
 export interface CreateInventoryMasterData {
-  item_code?: string;
   item_name: string;
   section: string;
   category: string;
-  quantity?: number;
-  location_id?: string;
+  quantity: number;
+  location_id: string;
   unit?: string;
   unit_cost?: number;
   description?: string;

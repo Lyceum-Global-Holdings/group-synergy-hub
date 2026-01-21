@@ -37,7 +37,6 @@ const INVENTORY_CATEGORIES = [
 
 // Item Master schema - only item definition fields, no stock fields
 const formSchema = z.object({
-  item_code: z.string().optional(),
   item_name: z.string().min(1, "Item name is required"),
   section: z.string().min(1, "Section is required"),
   category: z.string().min(1, "Item category is required"),
@@ -76,7 +75,6 @@ export function InventoryMasterDialog({ open, onOpenChange, item }: InventoryMas
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      item_code: "",
       item_name: "",
       section: "",
       category: "",
@@ -89,7 +87,6 @@ export function InventoryMasterDialog({ open, onOpenChange, item }: InventoryMas
   useEffect(() => {
     if (item) {
       form.reset({
-        item_code: item.item_code || "",
         item_name: item.item_name,
         section: item.section || "",
         category: item.category || "",
@@ -101,7 +98,6 @@ export function InventoryMasterDialog({ open, onOpenChange, item }: InventoryMas
       setDuplicateWarning(null);
     } else {
       form.reset({
-        item_code: "",
         item_name: "",
         section: "",
         category: "",
@@ -236,43 +232,24 @@ export function InventoryMasterDialog({ open, onOpenChange, item }: InventoryMas
         
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            {/* Item Code and Item Name */}
-            <div className="grid grid-cols-3 gap-4">
-              <FormField
-                control={form.control}
-                name="item_code"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Item ID</FormLabel>
-                    <FormControl>
-                      <Input 
-                        placeholder="e.g., MAC001" 
-                        {...field}
-                        className="font-mono"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="item_name"
-                render={({ field }) => (
-                  <FormItem className="col-span-2">
-                    <FormLabel>Item Name *</FormLabel>
-                    <FormControl>
-                      <Input 
-                        placeholder="Enter item name" 
-                        {...field}
-                        onChange={(e) => handleItemNameChange(e.target.value)}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
+            {/* Item Name */}
+            <FormField
+              control={form.control}
+              name="item_name"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Item Name *</FormLabel>
+                  <FormControl>
+                    <Input 
+                      placeholder="Enter item name" 
+                      {...field}
+                      onChange={(e) => handleItemNameChange(e.target.value)}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
             {/* Section and Category */}
             <div className="grid grid-cols-2 gap-4">
