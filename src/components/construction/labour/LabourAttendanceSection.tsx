@@ -1,8 +1,14 @@
 import { useState, useEffect, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { 
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { 
   Table, 
   TableBody, 
@@ -11,20 +17,18 @@ import {
   TableHeader, 
   TableRow 
 } from "@/components/ui/table";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
 import { 
   Users, 
   Clock, 
-  LogIn, 
-  LogOut, 
   Loader2, 
   AlertCircle,
   UserCheck,
-  HardHat
+  UserX,
+  HardHat,
+  Wrench,
+  Zap,
+  Building2,
+  Briefcase
 } from "lucide-react";
 import { format } from "date-fns";
 import { 
@@ -34,7 +38,7 @@ import {
   useUpdateLabourAttendance,
   type LabourAttendanceWithLabour
 } from "@/hooks/construction/useLabourAttendance";
-import type { DailySiteReport, LabourMaster } from "@/types/construction";
+import type { DailySiteReport } from "@/types/construction";
 
 interface LabourAttendanceSectionProps {
   report: DailySiteReport;
@@ -46,10 +50,18 @@ interface LabourAttendanceSectionProps {
 export interface AttendanceSummary {
   total: number;
   present: number;
-  skilled: number;
-  unskilled: number;
+  absent: number;
   categoryBreakdown: Record<string, number>;
 }
+
+// Define the specific categories we want to track
+const TRACKED_CATEGORIES = [
+  { key: "Civil Skill", label: "Civil Skill", icon: HardHat },
+  { key: "Civil Labour (Unskill)", label: "Civil Labour", icon: Users },
+  { key: "MEP", label: "MEP", icon: Zap },
+  { key: "Aluminium", label: "Aluminium", icon: Building2 },
+  { key: "Officer", label: "Officer", icon: Briefcase },
+];
 
 export function LabourAttendanceSection({ 
   report, 
@@ -93,31 +105,22 @@ export function LabourAttendanceSection({
 
   // Calculate and emit summary
   const summary = useMemo<AttendanceSummary>(() => {
-    if (!attendance) return { total: 0, present: 0, skilled: 0, unskilled: 0, categoryBreakdown: {} };
+    if (!attendance) return { total: 0, present: 0, absent: 0, categoryBreakdown: {} };
 
-    const present = attendance.filter(a => a.attendance_status === 'present' || a.in_time);
+    const present = attendance.filter(a => a.attendance_status === 'present');
+    const absent = attendance.filter(a => a.attendance_status === 'absent');
     const categoryBreakdown: Record<string, number> = {};
 
+    // Only count present labours for category breakdown
     present.forEach(a => {
       const cat = a.category || a.labour?.category || 'Other';
       categoryBreakdown[cat] = (categoryBreakdown[cat] || 0) + 1;
     });
 
-    const skilled = present.filter(a => {
-      const cat = (a.category || a.labour?.category || '').toLowerCase();
-      return cat.includes('skilled') && !cat.includes('unskilled');
-    }).length;
-
-    const unskilled = present.filter(a => {
-      const cat = (a.category || a.labour?.category || '').toLowerCase();
-      return cat.includes('unskilled') || cat.includes('non-skilled');
-    }).length;
-
     return {
       total: attendance.length,
       present: present.length,
-      skilled,
-      unskilled,
+      absent: absent.length,
       categoryBreakdown,
     };
   }, [attendance]);
@@ -126,29 +129,26 @@ export function LabourAttendanceSection({
     onAttendanceChange?.(summary);
   }, [summary, onAttendanceChange]);
 
-  const handleMarkIn = async (attendanceRecord: LabourAttendanceWithLabour) => {
-    const currentTime = format(new Date(), "HH:mm:ss");
-    await updateAttendance.mutateAsync({
-      id: attendanceRecord.id,
-      in_time: currentTime,
-      attendance_status: 'present',
-    });
-    setTimeInputs(prev => ({
-      ...prev,
-      [attendanceRecord.id]: { ...prev[attendanceRecord.id], in: currentTime },
-    }));
-  };
-
-  const handleMarkOut = async (attendanceRecord: LabourAttendanceWithLabour) => {
-    const currentTime = format(new Date(), "HH:mm:ss");
-    await updateAttendance.mutateAsync({
-      id: attendanceRecord.id,
-      out_time: currentTime,
-    });
-    setTimeInputs(prev => ({
-      ...prev,
-      [attendanceRecord.id]: { ...prev[attendanceRecord.id], out: currentTime },
-    }));
+  const handleStatusChange = async (attendanceRecord: LabourAttendanceWithLabour, status: 'present' | 'absent') => {
+    if (status === 'absent') {
+      // Clear times when marking absent
+      await updateAttendance.mutateAsync({
+        id: attendanceRecord.id,
+        attendance_status: 'absent',
+        in_time: null,
+        out_time: null,
+      });
+      setTimeInputs(prev => ({
+        ...prev,
+        [attendanceRecord.id]: { in: "", out: "" },
+      }));
+    } else {
+      // Just update status to present
+      await updateAttendance.mutateAsync({
+        id: attendanceRecord.id,
+        attendance_status: 'present',
+      });
+    }
   };
 
   const handleTimeChange = async (
@@ -161,13 +161,12 @@ export function LabourAttendanceSection({
       [attendanceRecord.id]: { ...prev[attendanceRecord.id], [field]: value },
     }));
 
-    // Debounce the update
+    // Format time value for database
     const timeValue = value ? `${value}:00` : null;
     if (field === 'in') {
       await updateAttendance.mutateAsync({
         id: attendanceRecord.id,
         in_time: timeValue,
-        attendance_status: timeValue ? 'present' : 'absent',
       });
     } else {
       await updateAttendance.mutateAsync({
@@ -213,24 +212,12 @@ export function LabourAttendanceSection({
 
   return (
     <div className="space-y-4">
-      {/* Summary Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card>
+      {/* Status Summary Cards */}
+      <div className="grid grid-cols-2 gap-4">
+        <Card className="border-green-200 bg-green-50/50">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <Users className="h-4 w-4 text-blue-500" />
-              Total Labours
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold">{summary.total}</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <UserCheck className="h-4 w-4 text-green-500" />
+              <UserCheck className="h-4 w-4 text-green-600" />
               Present
             </CardTitle>
           </CardHeader>
@@ -239,48 +226,38 @@ export function LabourAttendanceSection({
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="border-red-200 bg-red-50/50">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <HardHat className="h-4 w-4 text-orange-500" />
-              Skilled
+              <UserX className="h-4 w-4 text-red-600" />
+              Absent
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold text-orange-600">{summary.skilled}</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <Users className="h-4 w-4 text-purple-500" />
-              Non-Skilled
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold text-purple-600">{summary.unskilled}</p>
+            <p className="text-2xl font-bold text-red-600">{summary.absent}</p>
           </CardContent>
         </Card>
       </div>
 
-      {/* Category Breakdown */}
-      {Object.keys(summary.categoryBreakdown).length > 0 && (
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Category Breakdown (Present)</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex flex-wrap gap-2">
-              {Object.entries(summary.categoryBreakdown).map(([category, count]) => (
-                <Badge key={category} variant="secondary">
-                  {category}: {count}
-                </Badge>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
+      {/* Category-wise Cards (Only Present Labours) */}
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+        {TRACKED_CATEGORIES.map(({ key, label, icon: Icon }) => {
+          const count = summary.categoryBreakdown[key] || 0;
+          return (
+            <Card key={key} className="border">
+              <CardHeader className="pb-1 pt-3 px-3">
+                <CardTitle className="text-xs font-medium flex items-center gap-1.5 text-muted-foreground">
+                  <Icon className="h-3.5 w-3.5" />
+                  {label}
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="pt-0 pb-3 px-3">
+                <p className="text-xl font-bold">{count}</p>
+              </CardContent>
+            </Card>
+          );
+        })}
+      </div>
 
       {/* Attendance Table */}
       <Card>
@@ -300,90 +277,93 @@ export function LabourAttendanceSection({
                     <TableHead>Name</TableHead>
                     <TableHead>Category</TableHead>
                     <TableHead>Company</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-center">In Time</TableHead>
-                    <TableHead className="text-center">Out Time</TableHead>
-                    {isEditing && <TableHead className="text-center">Actions</TableHead>}
+                    <TableHead className="w-[120px]">Status</TableHead>
+                    <TableHead className="text-center w-[130px]">In Time</TableHead>
+                    <TableHead className="text-center w-[130px]">Out Time</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {attendance.map((att) => (
-                    <TableRow key={att.id}>
-                      <TableCell className="font-mono text-xs">
-                        {att.labour?.employee_id || "-"}
-                      </TableCell>
-                      <TableCell className="font-medium">
-                        {att.labour?.name || "-"}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline">
-                          {att.category || att.labour?.category || "N/A"}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        {att.labour?.labour_company || "-"}
-                      </TableCell>
-                      <TableCell>
-                        <Badge 
-                          variant={att.attendance_status === 'present' ? 'default' : 'secondary'}
-                          className={att.attendance_status === 'present' ? 'bg-green-100 text-green-800' : ''}
-                        >
-                          {att.attendance_status === 'present' ? 'Present' : 'Absent'}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        {isEditing ? (
-                          <Input
-                            type="time"
-                            value={(timeInputs[att.id]?.in || "").substring(0, 5)}
-                            onChange={(e) => handleTimeChange(att, 'in', e.target.value)}
-                            className="w-24 mx-auto"
-                          />
-                        ) : (
-                          formatTimeDisplay(att.in_time)
-                        )}
-                      </TableCell>
-                      <TableCell className="text-center">
-                        {isEditing ? (
-                          <Input
-                            type="time"
-                            value={(timeInputs[att.id]?.out || "").substring(0, 5)}
-                            onChange={(e) => handleTimeChange(att, 'out', e.target.value)}
-                            className="w-24 mx-auto"
-                            disabled={!att.in_time}
-                          />
-                        ) : (
-                          formatTimeDisplay(att.out_time)
-                        )}
-                      </TableCell>
-                      {isEditing && (
-                        <TableCell className="text-center">
-                          <div className="flex items-center justify-center gap-1">
-                            <Button
-                              size="sm"
-                              variant={att.in_time ? "secondary" : "default"}
-                              className="h-7 px-2"
-                              onClick={() => handleMarkIn(att)}
+                  {attendance.map((att) => {
+                    const isPresent = att.attendance_status === 'present';
+                    return (
+                      <TableRow key={att.id}>
+                        <TableCell className="font-mono text-xs">
+                          {att.labour?.employee_id || "-"}
+                        </TableCell>
+                        <TableCell className="font-medium">
+                          {att.labour?.name || "-"}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline">
+                            {att.category || att.labour?.category || "N/A"}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground">
+                          {att.labour?.labour_company || "-"}
+                        </TableCell>
+                        <TableCell>
+                          {isEditing ? (
+                            <Select
+                              value={att.attendance_status || 'absent'}
+                              onValueChange={(value: 'present' | 'absent') => handleStatusChange(att, value)}
                               disabled={updateAttendance.isPending}
                             >
-                              <LogIn className="h-3 w-3 mr-1" />
-                              IN
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant={att.out_time ? "secondary" : "outline"}
-                              className="h-7 px-2"
-                              onClick={() => handleMarkOut(att)}
-                              disabled={!att.in_time || updateAttendance.isPending}
+                              <SelectTrigger className="w-[110px] h-8">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="present">
+                                  <span className="flex items-center gap-1.5">
+                                    <span className="h-2 w-2 rounded-full bg-green-500" />
+                                    Present
+                                  </span>
+                                </SelectItem>
+                                <SelectItem value="absent">
+                                  <span className="flex items-center gap-1.5">
+                                    <span className="h-2 w-2 rounded-full bg-red-500" />
+                                    Absent
+                                  </span>
+                                </SelectItem>
+                              </SelectContent>
+                            </Select>
+                          ) : (
+                            <Badge 
+                              variant={isPresent ? 'default' : 'secondary'}
+                              className={isPresent ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}
                             >
-                              <LogOut className="h-3 w-3 mr-1" />
-                              OUT
-                            </Button>
-                          </div>
+                              {isPresent ? 'Present' : 'Absent'}
+                            </Badge>
+                          )}
                         </TableCell>
-                      )}
-                    </TableRow>
-                  ))}
+                        <TableCell className="text-center">
+                          {isEditing ? (
+                            <Input
+                              type="time"
+                              value={(timeInputs[att.id]?.in || "").substring(0, 5)}
+                              onChange={(e) => handleTimeChange(att, 'in', e.target.value)}
+                              className="w-[110px] mx-auto h-8"
+                              disabled={!isPresent}
+                            />
+                          ) : (
+                            formatTimeDisplay(att.in_time)
+                          )}
+                        </TableCell>
+                        <TableCell className="text-center">
+                          {isEditing ? (
+                            <Input
+                              type="time"
+                              value={(timeInputs[att.id]?.out || "").substring(0, 5)}
+                              onChange={(e) => handleTimeChange(att, 'out', e.target.value)}
+                              className="w-[110px] mx-auto h-8"
+                              disabled={!isPresent}
+                            />
+                          ) : (
+                            formatTimeDisplay(att.out_time)
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
             </div>
