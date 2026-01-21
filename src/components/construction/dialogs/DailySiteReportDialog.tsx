@@ -33,19 +33,23 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Separator } from "@/components/ui/separator";
 import { useProjects } from "@/hooks/construction/useProjects";
 import { useCreateDailySiteReport, useUpdateDailySiteReport } from "@/hooks/construction/useDailySiteReports";
 import { useDailyMaterialsActivity } from "@/hooks/construction/useDailyMaterialsActivity";
+import { useWarehouseLocations } from "@/hooks/useWarehouseLocations";
 import { DailySiteReport, WEATHER_CONDITIONS } from "@/types/construction";
-import { useEffect } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { format } from "date-fns";
 import { useCompany } from "@/contexts/CompanyContext";
 import { toast } from "sonner";
-import { Package, RotateCcw, Loader2, SlidersHorizontal, Wrench } from "lucide-react";
+import { Package, RotateCcw, Loader2, SlidersHorizontal, Wrench, Users } from "lucide-react";
+import { LabourAttendanceSection, type AttendanceSummary } from "@/components/construction/labour/LabourAttendanceSection";
 
 const formSchema = z.object({
   project_id: z.string().min(1, "Project is required"),
   report_date: z.string().min(1, "Report date is required"),
+  location_id: z.string().optional(),
   weather_conditions: z.string().optional(),
   temperature_high: z.coerce.number().optional(),
   temperature_low: z.coerce.number().optional(),
@@ -71,7 +75,12 @@ interface DailySiteReportDialogProps {
 export function DailySiteReportDialog({ open, onOpenChange, report }: DailySiteReportDialogProps) {
   const { data: projects } = useProjects();
   const { selectedCompany } = useCompany();
+  const { locations } = useWarehouseLocations();
   const createReport = useCreateDailySiteReport();
+  const [attendanceSummary, setAttendanceSummary] = useState<AttendanceSummary | null>(null);
+
+  // Filter locations to show only project sites
+  const siteLocations = locations?.filter(loc => loc.category === 'project_site') || [];
   const updateReport = useUpdateDailySiteReport();
 
   const form = useForm<FormData>({
@@ -79,6 +88,7 @@ export function DailySiteReportDialog({ open, onOpenChange, report }: DailySiteR
     defaultValues: {
       project_id: "",
       report_date: format(new Date(), "yyyy-MM-dd"),
+      location_id: "",
       weather_conditions: "",
       skilled_labor_count: 0,
       unskilled_labor_count: 0,
@@ -92,6 +102,17 @@ export function DailySiteReportDialog({ open, onOpenChange, report }: DailySiteR
     },
   });
 
+  const watchedLocationId = form.watch("location_id");
+
+  const handleAttendanceChange = useCallback((summary: AttendanceSummary) => {
+    setAttendanceSummary(summary);
+    // Auto-update labour counts from attendance
+    if (summary.present > 0) {
+      form.setValue("skilled_labor_count", summary.skilled);
+      form.setValue("unskilled_labor_count", summary.unskilled);
+    }
+  }, [form]);
+
   const watchedDate = form.watch("report_date");
   const { issues, returns, adjustments, isLoading: materialsLoading } = useDailyMaterialsActivity(watchedDate);
 
@@ -100,6 +121,7 @@ export function DailySiteReportDialog({ open, onOpenChange, report }: DailySiteR
       form.reset({
         project_id: report.project_id,
         report_date: report.report_date,
+        location_id: (report as any).location_id || "",
         weather_conditions: report.weather_conditions || "",
         temperature_high: report.temperature_high || undefined,
         temperature_low: report.temperature_low || undefined,
@@ -117,6 +139,7 @@ export function DailySiteReportDialog({ open, onOpenChange, report }: DailySiteR
       form.reset({
         project_id: "",
         report_date: format(new Date(), "yyyy-MM-dd"),
+        location_id: "",
         weather_conditions: "",
         skilled_labor_count: 0,
         unskilled_labor_count: 0,
@@ -141,6 +164,7 @@ export function DailySiteReportDialog({ open, onOpenChange, report }: DailySiteR
       const payload = {
         project_id: data.project_id,
         report_date: data.report_date,
+        location_id: data.location_id || undefined,
         weather_conditions: data.weather_conditions || undefined,
         temperature_high: data.temperature_high || undefined,
         temperature_low: data.temperature_low || undefined,
@@ -213,6 +237,31 @@ export function DailySiteReportDialog({ open, onOpenChange, report }: DailySiteR
                     <FormControl>
                       <Input type="date" {...field} />
                     </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="location_id"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Location / Site</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select location" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {siteLocations.map((location) => (
+                          <SelectItem key={location.id} value={location.id}>
+                            {location.name} {location.code ? `(${location.code})` : ""}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                     <FormMessage />
                   </FormItem>
                 )}

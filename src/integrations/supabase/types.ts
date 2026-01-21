@@ -5290,6 +5290,7 @@ export type Database = {
           equipment_on_site: string | null
           id: string
           labor_count: number | null
+          location_id: string | null
           materials_received: string | null
           period_end_date: string | null
           period_start_date: string | null
@@ -5320,6 +5321,7 @@ export type Database = {
           equipment_on_site?: string | null
           id?: string
           labor_count?: number | null
+          location_id?: string | null
           materials_received?: string | null
           period_end_date?: string | null
           period_start_date?: string | null
@@ -5350,6 +5352,7 @@ export type Database = {
           equipment_on_site?: string | null
           id?: string
           labor_count?: number | null
+          location_id?: string | null
           materials_received?: string | null
           period_end_date?: string | null
           period_start_date?: string | null
@@ -5378,6 +5381,13 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "daily_site_reports_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "warehouse_locations"
             referencedColumns: ["id"]
           },
           {
@@ -11627,6 +11637,86 @@ export type Database = {
           {
             foreignKeyName: "site_report_activities_report_id_fkey"
             columns: ["report_id"]
+            isOneToOne: false
+            referencedRelation: "daily_site_reports"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      site_report_labour_attendance: {
+        Row: {
+          attendance_date: string
+          attendance_status: string
+          category: string | null
+          company_id: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          in_time: string | null
+          labour_id: string
+          location_id: string | null
+          notes: string | null
+          out_time: string | null
+          site_report_id: string
+          updated_at: string
+        }
+        Insert: {
+          attendance_date: string
+          attendance_status?: string
+          category?: string | null
+          company_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          in_time?: string | null
+          labour_id: string
+          location_id?: string | null
+          notes?: string | null
+          out_time?: string | null
+          site_report_id: string
+          updated_at?: string
+        }
+        Update: {
+          attendance_date?: string
+          attendance_status?: string
+          category?: string | null
+          company_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          in_time?: string | null
+          labour_id?: string
+          location_id?: string | null
+          notes?: string | null
+          out_time?: string | null
+          site_report_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "site_report_labour_attendance_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "site_report_labour_attendance_labour_id_fkey"
+            columns: ["labour_id"]
+            isOneToOne: false
+            referencedRelation: "construction_labour_master"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "site_report_labour_attendance_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "warehouse_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "site_report_labour_attendance_site_report_id_fkey"
+            columns: ["site_report_id"]
             isOneToOne: false
             referencedRelation: "daily_site_reports"
             referencedColumns: ["id"]
