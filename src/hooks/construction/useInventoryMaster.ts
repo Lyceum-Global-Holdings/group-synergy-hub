@@ -169,3 +169,58 @@ export function useDeleteInventoryMaster() {
     },
   });
 }
+
+export function useBulkCreateInventoryMaster() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const { selectedCompany } = useCompany();
+
+  return useMutation({
+    mutationFn: async (items: CreateInventoryMasterData[]) => {
+      const { data: user } = await supabase.auth.getUser();
+      
+      const itemsWithCompany = items.map(item => ({
+        ...item,
+        company_id: selectedCompany?.id,
+        created_by: user.user?.id,
+        quantity: item.quantity || 1,
+        status: item.status || 'active',
+      }));
+
+      const { data: results, error } = await supabase
+        .from("construction_inventory_master")
+        .insert(itemsWithCompany)
+        .select();
+
+      if (error) throw error;
+
+      // Log transactions for each item
+      if (results && results.length > 0) {
+        const transactions = results.map(result => ({
+          item_id: result.id,
+          transaction_type: 'new_item',
+          quantity_change: result.quantity || 1,
+          quantity_before: 0,
+          quantity_after: result.quantity || 1,
+          notes: `Bulk import: ${result.item_name}`,
+          company_id: selectedCompany?.id,
+          created_by: user.user?.id,
+        }));
+
+        await supabase
+          .from("construction_inventory_transactions")
+          .insert(transactions);
+      }
+
+      return results;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["inventory-master"] });
+      queryClient.invalidateQueries({ queryKey: ["construction-recent-transactions"] });
+      toast({ title: `${data?.length || 0} inventory items imported successfully` });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error importing inventory items", description: error.message, variant: "destructive" });
+    },
+  });
+}
