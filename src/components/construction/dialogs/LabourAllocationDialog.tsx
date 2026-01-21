@@ -9,12 +9,14 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useUpdateLabourMaster } from "@/hooks/construction/useLabourMaster";
 import { useProjects } from "@/hooks/construction/useProjects";
+import { useWarehouseLocations } from "@/hooks/useWarehouseLocations";
 import type { LabourMaster } from "@/types/construction";
 import { useEffect } from "react";
 import { Badge } from "@/components/ui/badge";
 
 const formSchema = z.object({
   project_id: z.string().optional().nullable(),
+  location_id: z.string().optional().nullable(),
   trade: z.string().optional(),
   skill_level: z.string().optional(),
   hourly_rate: z.coerce.number().optional(),
@@ -34,14 +36,21 @@ interface LabourAllocationDialogProps {
 export function LabourAllocationDialog({ open, onOpenChange, labour }: LabourAllocationDialogProps) {
   const updateMutation = useUpdateLabourMaster();
   const { data: projects = [] } = useProjects();
+  const { locations: warehouseLocations = [] } = useWarehouseLocations();
 
   // Filter to only active projects
   const activeProjects = projects.filter(p => p.status === 'active' || p.status === 'planning');
+  
+  // Filter to active top-level locations
+  const activeLocations = warehouseLocations.filter(loc => 
+    loc.type === 'location' && loc.status === 'active'
+  );
 
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
     defaultValues: { 
       project_id: undefined,
+      location_id: undefined,
       trade: "",
       skill_level: "", 
       hourly_rate: 0, 
@@ -55,6 +64,7 @@ export function LabourAllocationDialog({ open, onOpenChange, labour }: LabourAll
     if (labour) {
       form.reset({ 
         project_id: labour.project_id || undefined,
+        location_id: labour.location_id || undefined,
         trade: labour.trade || "",
         skill_level: labour.skill_level || "", 
         hourly_rate: labour.hourly_rate || 0, 
@@ -65,6 +75,7 @@ export function LabourAllocationDialog({ open, onOpenChange, labour }: LabourAll
     } else {
       form.reset({ 
         project_id: undefined,
+        location_id: undefined,
         trade: "",
         skill_level: "", 
         hourly_rate: 0, 
@@ -81,6 +92,7 @@ export function LabourAllocationDialog({ open, onOpenChange, labour }: LabourAll
     await updateMutation.mutateAsync({ 
       id: labour.id, 
       project_id: data.project_id || null,
+      location_id: data.location_id || null,
       trade: data.trade,
       skill_level: data.skill_level,
       hourly_rate: data.hourly_rate,
@@ -179,13 +191,43 @@ export function LabourAllocationDialog({ open, onOpenChange, labour }: LabourAll
                 )} 
               />
 
+              {/* Location Dropdown */}
+              <FormField 
+                control={form.control} 
+                name="location_id" 
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Location</FormLabel>
+                    <Select 
+                      onValueChange={(val) => field.onChange(val === "__none__" ? null : val)} 
+                      value={field.value || "__none__"}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select location" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="__none__">No Location Assigned</SelectItem>
+                        {activeLocations.map((location) => (
+                          <SelectItem key={location.id} value={location.id}>
+                            {location.location_code ? `${location.location_code} - ` : ''}{location.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )} 
+              />
+
               <FormField 
                 control={form.control} 
                 name="trade" 
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Trade / Location</FormLabel>
-                    <FormControl><Input {...field} placeholder="e.g., Electrician, Site A" /></FormControl>
+                    <FormLabel>Trade</FormLabel>
+                    <FormControl><Input {...field} placeholder="e.g., Electrician, Mason" /></FormControl>
                     <FormMessage />
                   </FormItem>
                 )} 

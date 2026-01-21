@@ -897,6 +897,7 @@ export interface LabourMaster {
   status: string;
   notes: string | null;
   project_id: string | null;
+  location_id: string | null;
   created_by: string | null;
   created_at: string;
   updated_at: string;
@@ -916,6 +917,7 @@ export interface CreateLabourMasterData {
   status?: string;
   notes?: string;
   project_id?: string | null;
+  location_id?: string | null;
 }
 
 export type UpdateLabourMasterData = Partial<CreateLabourMasterData>;
