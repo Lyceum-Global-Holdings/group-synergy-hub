@@ -37,6 +37,7 @@ import { useConstructionResources } from "@/hooks/construction/useConstructionRe
 import { useInventoryMaster } from "@/hooks/construction/useInventoryMaster";
 import { useRepairRecords } from "@/hooks/construction/useRepairRecords";
 import { AddStockDialog } from "@/components/construction/dialogs/AddStockDialog";
+import { EditStockDialog } from "@/components/construction/dialogs/EditStockDialog";
 
 // Predefined Section values
 export const INVENTORY_SECTIONS = [
@@ -178,6 +179,10 @@ export function InventoryWiseView() {
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [searchTerm, setSearchTerm] = useState("");
   const [addStockDialogOpen, setAddStockDialogOpen] = useState(false);
+  const [editStockDialog, setEditStockDialog] = useState<{ open: boolean; itemId: string | null }>({
+    open: false,
+    itemId: null,
+  });
   const [locationDialog, setLocationDialog] = useState<{ 
     open: boolean; 
     itemName: string; 
@@ -338,8 +343,7 @@ export function InventoryWiseView() {
   };
 
   const handleEditItem = (itemId: string) => {
-    console.log("Edit item:", itemId);
-    // TODO: Navigate to edit or open edit dialog
+    setEditStockDialog({ open: true, itemId });
   };
 
   const handleTransferItem = (itemId: string) => {
@@ -607,6 +611,13 @@ export function InventoryWiseView() {
       <AddStockDialog
         open={addStockDialogOpen}
         onOpenChange={setAddStockDialogOpen}
+      />
+
+      {/* Edit Stock Dialog */}
+      <EditStockDialog
+        open={editStockDialog.open}
+        onOpenChange={(open) => setEditStockDialog({ open, itemId: open ? editStockDialog.itemId : null })}
+        itemId={editStockDialog.itemId}
       />
     </div>
   );
