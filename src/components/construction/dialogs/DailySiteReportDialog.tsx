@@ -108,8 +108,11 @@ export function DailySiteReportDialog({ open, onOpenChange, report }: DailySiteR
     setAttendanceSummary(summary);
     // Auto-update labour counts from attendance
     if (summary.present > 0) {
-      form.setValue("skilled_labor_count", summary.skilled);
-      form.setValue("unskilled_labor_count", summary.unskilled);
+      // Calculate skilled/unskilled from category breakdown
+      const skilledCount = summary.categoryBreakdown["Civil Skill"] || 0;
+      const unskilledCount = summary.categoryBreakdown["Civil Labour (Unskill)"] || 0;
+      form.setValue("skilled_labor_count", skilledCount);
+      form.setValue("unskilled_labor_count", unskilledCount);
     }
   }, [form]);
 
