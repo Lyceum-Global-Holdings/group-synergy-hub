@@ -18,7 +18,9 @@ export default function AssetQRCode({ assetId, assetName, assetIdentifier }: Ass
   const [copied, setCopied] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  const publicUrl = `${window.location.origin}/asset/${assetId}`;
+  // Use the published URL so QR codes work publicly without Lovable login
+  const PUBLISHED_APP_URL = 'https://group-synergy-hub.lovable.app';
+  const publicUrl = `${PUBLISHED_APP_URL}/asset/${assetId}`;
 
   const generateQRCode = async () => {
     if (!publicUrl || !assetId) {
