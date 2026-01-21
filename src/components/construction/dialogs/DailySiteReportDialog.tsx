@@ -604,6 +604,22 @@ export function DailySiteReportDialog({ open, onOpenChange, report }: DailySiteR
               )}
             </div>
 
+            {/* Labour Attendance Section - Only shown when editing */}
+            {report && (
+              <div className="border rounded-lg p-4 bg-muted/30">
+                <div className="flex items-center gap-2 mb-3">
+                  <Users className="h-4 w-4 text-primary" />
+                  <h3 className="font-medium">Labour Attendance</h3>
+                </div>
+                <LabourAttendanceSection
+                  report={report}
+                  locationId={watchedLocationId || null}
+                  isEditing={true}
+                  onAttendanceChange={handleAttendanceChange}
+                />
+              </div>
+            )}
+
             <div className="flex justify-end gap-3 pt-4">
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
                 Cancel
