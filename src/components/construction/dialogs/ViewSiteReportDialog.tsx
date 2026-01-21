@@ -115,9 +115,10 @@ export function ViewSiteReportDialog({
     isLoading
   } = useDailyMaterialsActivity(periodStartDate, periodEndDate);
 
-  // Fetch labour attendance for this report - use freshReport ID for proper data fetching
-  const reportIdToFetch = freshReport?.id || report?.id;
-  const { data: attendanceRecords, isLoading: attendanceLoading } = useLabourAttendance(reportIdToFetch);
+  // Fetch labour attendance for this report - use report ID directly since it's available immediately
+  // Also use freshReport.id when available for refresh scenarios
+  const reportIdForAttendance = report?.id;
+  const { data: attendanceRecords, isLoading: attendanceLoading, refetch: refetchAttendance } = useLabourAttendance(reportIdForAttendance);
 
   // Calculate attendance summary with proper category matching
   const presentLabours = attendanceRecords?.filter(a => a.attendance_status === 'present') || [];
@@ -435,123 +436,132 @@ export function ViewSiteReportDialog({
             <Separator />
 
             {/* Labour Attendance Section */}
-            {attendanceRecords && attendanceRecords.length > 0 && (
-              <div className="space-y-4">
-                <h3 className="font-semibold text-lg flex items-center gap-2">
-                  <Users className="h-5 w-5" />
-                  Labour Attendance Summary
-                </h3>
+            <div className="space-y-4">
+              <h3 className="font-semibold text-lg flex items-center gap-2">
+                <Users className="h-5 w-5" />
+                Labour Attendance Summary
+              </h3>
 
-                {/* Status Summary Cards */}
-                <div className="grid grid-cols-2 gap-3">
-                  <Card className="border-green-200 bg-green-50/50 dark:bg-green-900/20 dark:border-green-800">
-                    <CardContent className="p-3 text-center">
-                      <div className="text-2xl font-bold text-green-600 dark:text-green-400">{presentLabours.length}</div>
-                      <div className="text-xs text-muted-foreground">Present</div>
-                    </CardContent>
-                  </Card>
-                  <Card className="border-red-200 bg-red-50/50 dark:bg-red-900/20 dark:border-red-800">
-                    <CardContent className="p-3 text-center">
-                      <div className="text-2xl font-bold text-red-600 dark:text-red-400">{absentLabours.length}</div>
-                      <div className="text-xs text-muted-foreground">Absent</div>
-                    </CardContent>
-                  </Card>
+              {attendanceLoading ? (
+                <div className="flex items-center justify-center py-4">
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary" />
+                  <span className="ml-2 text-muted-foreground">Loading attendance...</span>
                 </div>
+              ) : attendanceRecords && attendanceRecords.length > 0 ? (
+                <>
+                  {/* Status Summary Cards */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <Card className="border-green-200 bg-green-50/50 dark:bg-green-900/20 dark:border-green-800">
+                      <CardContent className="p-3 text-center">
+                        <div className="text-2xl font-bold text-green-600 dark:text-green-400">{presentLabours.length}</div>
+                        <div className="text-xs text-muted-foreground">Present</div>
+                      </CardContent>
+                    </Card>
+                    <Card className="border-red-200 bg-red-50/50 dark:bg-red-900/20 dark:border-red-800">
+                      <CardContent className="p-3 text-center">
+                        <div className="text-2xl font-bold text-red-600 dark:text-red-400">{absentLabours.length}</div>
+                        <div className="text-xs text-muted-foreground">Absent</div>
+                      </CardContent>
+                    </Card>
+                  </div>
 
-                {/* Category-wise Cards (Only Present Labours) */}
-                <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-                  <Card>
-                    <CardContent className="p-3 text-center">
-                      <div className="text-xl font-bold">{categoryBreakdown["Civil Skill"] || 0}</div>
-                      <div className="text-xs text-muted-foreground">Civil Skill</div>
-                    </CardContent>
-                  </Card>
-                  <Card>
-                    <CardContent className="p-3 text-center">
-                      <div className="text-xl font-bold">{categoryBreakdown["Civil Labour (Unskill)"] || 0}</div>
-                      <div className="text-xs text-muted-foreground">Civil Labour</div>
-                    </CardContent>
-                  </Card>
-                  <Card>
-                    <CardContent className="p-3 text-center">
-                      <div className="text-xl font-bold">{categoryBreakdown["MEP"] || 0}</div>
-                      <div className="text-xs text-muted-foreground">MEP</div>
-                    </CardContent>
-                  </Card>
-                  <Card>
-                    <CardContent className="p-3 text-center">
-                      <div className="text-xl font-bold">{categoryBreakdown["Aluminium"] || 0}</div>
-                      <div className="text-xs text-muted-foreground">Aluminium</div>
-                    </CardContent>
-                  </Card>
-                  <Card>
-                    <CardContent className="p-3 text-center">
-                      <div className="text-xl font-bold">{categoryBreakdown["Officer"] || 0}</div>
-                      <div className="text-xs text-muted-foreground">Officer</div>
-                    </CardContent>
-                  </Card>
-                </div>
+                  {/* Category-wise Cards (Only Present Labours) */}
+                  <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                    <Card>
+                      <CardContent className="p-3 text-center">
+                        <div className="text-xl font-bold">{categoryBreakdown["Civil Skill"] || 0}</div>
+                        <div className="text-xs text-muted-foreground">Civil Skill</div>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardContent className="p-3 text-center">
+                        <div className="text-xl font-bold">{categoryBreakdown["Civil Labour (Unskill)"] || 0}</div>
+                        <div className="text-xs text-muted-foreground">Civil Labour</div>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardContent className="p-3 text-center">
+                        <div className="text-xl font-bold">{categoryBreakdown["MEP"] || 0}</div>
+                        <div className="text-xs text-muted-foreground">MEP</div>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardContent className="p-3 text-center">
+                        <div className="text-xl font-bold">{categoryBreakdown["Aluminium"] || 0}</div>
+                        <div className="text-xs text-muted-foreground">Aluminium</div>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardContent className="p-3 text-center">
+                        <div className="text-xl font-bold">{categoryBreakdown["Officer"] || 0}</div>
+                        <div className="text-xs text-muted-foreground">Officer</div>
+                      </CardContent>
+                    </Card>
+                  </div>
 
-                {/* Attendance Table */}
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-medium flex items-center gap-2">
-                      <Clock className="h-4 w-4" />
-                      Attendance Details ({presentLabours.length} present)
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Employee ID</TableHead>
-                          <TableHead>Name</TableHead>
-                          <TableHead>Category</TableHead>
-                          <TableHead>Company</TableHead>
-                          <TableHead>In Time</TableHead>
-                          <TableHead>Out Time</TableHead>
-                          <TableHead>Status</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {attendanceRecords.map((record) => (
-                          <TableRow key={record.id}>
-                            <TableCell className="font-mono text-xs">
-                              {record.labour?.employee_id || "-"}
-                            </TableCell>
-                            <TableCell>{record.labour?.name || "-"}</TableCell>
-                            <TableCell>
-                              <Badge variant="outline" className="capitalize">
-                                {record.labour?.category || "-"}
-                              </Badge>
-                            </TableCell>
-                            <TableCell>{record.labour?.labour_company || "-"}</TableCell>
-                            <TableCell>
-                              {record.in_time ? format(new Date(`2000-01-01T${record.in_time}`), "hh:mm a") : "-"}
-                            </TableCell>
-                            <TableCell>
-                              {record.out_time ? format(new Date(`2000-01-01T${record.out_time}`), "hh:mm a") : "-"}
-                            </TableCell>
-                            <TableCell>
-                              <Badge 
-                                variant={record.attendance_status === 'present' ? 'default' : 'secondary'}
-                                className={cn(
-                                  record.attendance_status === 'present' 
-                                    ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300" 
-                                    : ""
-                                )}
-                              >
-                                {record.attendance_status === 'present' ? 'Present' : 'Absent'}
-                              </Badge>
-                            </TableCell>
+                  {/* Attendance Table */}
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm font-medium flex items-center gap-2">
+                        <Clock className="h-4 w-4" />
+                        Attendance Details ({attendanceRecords.length} total)
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Employee ID</TableHead>
+                            <TableHead>Name</TableHead>
+                            <TableHead>Category</TableHead>
+                            <TableHead>Company</TableHead>
+                            <TableHead>In Time</TableHead>
+                            <TableHead>Out Time</TableHead>
+                            <TableHead>Status</TableHead>
                           </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </CardContent>
-                </Card>
-              </div>
-            )}
+                        </TableHeader>
+                        <TableBody>
+                          {attendanceRecords.map((record) => (
+                            <TableRow key={record.id}>
+                              <TableCell className="font-mono text-xs">
+                                {record.labour?.employee_id || "-"}
+                              </TableCell>
+                              <TableCell>{record.labour?.name || "-"}</TableCell>
+                              <TableCell>
+                                <Badge variant="outline" className="capitalize">
+                                  {record.labour?.category || "-"}
+                                </Badge>
+                              </TableCell>
+                              <TableCell>{record.labour?.labour_company || "-"}</TableCell>
+                              <TableCell>
+                                {record.in_time ? format(new Date(`2000-01-01T${record.in_time}`), "hh:mm a") : "-"}
+                              </TableCell>
+                              <TableCell>
+                                {record.out_time ? format(new Date(`2000-01-01T${record.out_time}`), "hh:mm a") : "-"}
+                              </TableCell>
+                              <TableCell>
+                                <Badge 
+                                  variant={record.attendance_status === 'present' ? 'default' : 'secondary'}
+                                  className={cn(
+                                    record.attendance_status === 'present' 
+                                      ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300" 
+                                      : ""
+                                  )}
+                                >
+                                  {record.attendance_status === 'present' ? 'Present' : 'Absent'}
+                                </Badge>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </CardContent>
+                  </Card>
+                </>
+              ) : (
+                <p className="text-muted-foreground text-sm">No attendance records for this report</p>
+              )}
+            </div>
 
             <Separator />
 
