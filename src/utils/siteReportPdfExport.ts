@@ -34,8 +34,8 @@ export interface LabourAttendanceRecord {
   id: string;
   labour_id: string;
   attendance_status: string;
-  time_in?: string | null;
-  time_out?: string | null;
+  in_time?: string | null;
+  out_time?: string | null;
   category?: string | null;
   labour?: {
     id: string;
@@ -591,8 +591,8 @@ function generatePdfDocument(report: ReportData, materials: MaterialsData): jsPD
         record.category || record.labour?.category || "-",
         record.labour?.labour_company || "-",
         record.attendance_status === 'present' ? "Present" : "Absent",
-        record.attendance_status === 'present' && record.time_in ? record.time_in : "-",
-        record.attendance_status === 'present' && record.time_out ? record.time_out : "-",
+        record.attendance_status === 'present' && record.in_time ? record.in_time : "-",
+        record.attendance_status === 'present' && record.out_time ? record.out_time : "-",
       ]),
       styles: { fontSize: 7 },
       headStyles: { fillColor: [155, 89, 182] },
