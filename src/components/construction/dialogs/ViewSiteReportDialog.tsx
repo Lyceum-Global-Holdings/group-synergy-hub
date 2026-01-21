@@ -169,7 +169,8 @@ export function ViewSiteReportDialog({
     exportSiteReportToPdf(displayReport as any, {
       adjustments,
       issues,
-      stockBalances
+      stockBalances,
+      attendanceRecords: attendanceRecords || []
     });
   };
 
@@ -188,7 +189,8 @@ export function ViewSiteReportDialog({
       const pdfBase64 = generateSiteReportPdfBase64(displayReport as any, {
         adjustments,
         issues,
-        stockBalances
+        stockBalances,
+        attendanceRecords: attendanceRecords || []
       });
 
       const { data, error } = await supabase.functions.invoke('send-telegram-report', {

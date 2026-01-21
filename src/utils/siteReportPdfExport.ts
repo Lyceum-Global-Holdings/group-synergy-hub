@@ -29,10 +29,28 @@ interface ReportData {
   };
 }
 
+// Labour attendance record interface for PDF export - compatible with LabourAttendanceWithLabour
+export interface LabourAttendanceRecord {
+  id: string;
+  labour_id: string;
+  attendance_status: string;
+  time_in?: string | null;
+  time_out?: string | null;
+  category?: string | null;
+  labour?: {
+    id: string;
+    employee_id?: string | null;
+    name?: string | null;
+    category?: string | null;
+    labour_company?: string | null;
+  };
+}
+
 interface MaterialsData {
   adjustments: DailyStockAdjustment[];
   issues: DailyMaterialIssue[];
   stockBalances: CurrentStockBalance[];
+  attendanceRecords?: LabourAttendanceRecord[];
 }
 
 function generatePdfDocument(report: ReportData, materials: MaterialsData): jsPDF {
@@ -471,6 +489,123 @@ function generatePdfDocument(report: ReportData, materials: MaterialsData): jsPD
       styles: { fontSize: 8 },
       headStyles: { fillColor: [91, 192, 222] },
       margin: { left: 14, right: 14 },
+    });
+  }
+
+  // Labour Attendance Section
+  if (materials.attendanceRecords && materials.attendanceRecords.length > 0) {
+    // Get current position after stock balances, or use a fresh page
+    yPos = (doc as any).lastAutoTable?.finalY || yPos;
+    if (yPos > 200) {
+      doc.addPage();
+      yPos = 20;
+    } else {
+      yPos += 10;
+    }
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(12);
+    doc.setTextColor(0);
+    doc.text("Labour Attendance", 14, yPos);
+    yPos += 8;
+
+    // Calculate attendance summary
+    const attendanceRecords = materials.attendanceRecords;
+    const presentCount = attendanceRecords.filter(a => a.attendance_status === 'present').length;
+    const absentCount = attendanceRecords.filter(a => a.attendance_status === 'absent').length;
+    
+    // Calculate category breakdown (only for present workers)
+    const presentRecords = attendanceRecords.filter(a => a.attendance_status === 'present');
+    const categories = ['Civil Skill', 'Civil Labour (Unskill)', 'MEP', 'Aluminium', 'Officer'];
+    const categoryBreakdown = categories.map(cat => {
+      const count = presentRecords.filter(a => 
+        (a.category || a.labour?.category) === cat
+      ).length;
+      return { category: cat, count };
+    });
+
+    // Attendance Summary Table
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "bold");
+    doc.text("Attendance Summary", 14, yPos);
+    yPos += 2;
+
+    const summaryData = [
+      ["Present", String(presentCount)],
+      ["Absent", String(absentCount)],
+      ["Total", String(attendanceRecords.length)],
+    ];
+
+    autoTable(doc, {
+      startY: yPos,
+      head: [["Status", "Count"]],
+      body: summaryData,
+      styles: { fontSize: 8 },
+      headStyles: { fillColor: [46, 204, 113] },
+      margin: { left: 14, right: 100 },
+      tableWidth: 80,
+    });
+    
+    yPos = (doc as any).lastAutoTable.finalY + 8;
+
+    // Category Breakdown Table (Present only)
+    if (yPos > 230) {
+      doc.addPage();
+      yPos = 20;
+    }
+
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "bold");
+    doc.text("Category Breakdown (Present)", 14, yPos);
+    yPos += 2;
+
+    autoTable(doc, {
+      startY: yPos,
+      head: [["Category", "Present Count"]],
+      body: categoryBreakdown.map(item => [item.category, String(item.count)]),
+      styles: { fontSize: 8 },
+      headStyles: { fillColor: [52, 152, 219] },
+      margin: { left: 14, right: 100 },
+      tableWidth: 100,
+    });
+    
+    yPos = (doc as any).lastAutoTable.finalY + 8;
+
+    // Detailed Attendance Table
+    if (yPos > 200) {
+      doc.addPage();
+      yPos = 20;
+    }
+
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "bold");
+    doc.text(`Detailed Attendance (${attendanceRecords.length} records)`, 14, yPos);
+    yPos += 2;
+
+    autoTable(doc, {
+      startY: yPos,
+      head: [["Emp ID", "Name", "Category", "Company", "Status", "In Time", "Out Time"]],
+      body: attendanceRecords.map((record) => [
+        record.labour?.employee_id || "-",
+        record.labour?.name || "-",
+        record.category || record.labour?.category || "-",
+        record.labour?.labour_company || "-",
+        record.attendance_status === 'present' ? "Present" : "Absent",
+        record.attendance_status === 'present' && record.time_in ? record.time_in : "-",
+        record.attendance_status === 'present' && record.time_out ? record.time_out : "-",
+      ]),
+      styles: { fontSize: 7 },
+      headStyles: { fillColor: [155, 89, 182] },
+      margin: { left: 14, right: 14 },
+      columnStyles: {
+        0: { cellWidth: 20 },
+        1: { cellWidth: 35 },
+        2: { cellWidth: 30 },
+        3: { cellWidth: 30 },
+        4: { cellWidth: 18 },
+        5: { cellWidth: 22 },
+        6: { cellWidth: 22 },
+      },
     });
   }
 
