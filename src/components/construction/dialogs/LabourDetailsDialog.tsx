@@ -8,8 +8,9 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { useProjects } from "@/hooks/construction/useProjects";
+import { useWarehouseLocations } from "@/hooks/useWarehouseLocations";
 import type { LabourMaster } from "@/types/construction";
-import { User, Briefcase, Building2, MapPin, Phone, FileText, Calendar, FolderKanban, DollarSign } from "lucide-react";
+import { User, Briefcase, Building2, MapPin, Phone, FileText, FolderKanban, DollarSign } from "lucide-react";
 import { format } from "date-fns";
 
 interface LabourDetailsDialogProps {
@@ -24,10 +25,12 @@ export function LabourDetailsDialog({
   labour,
 }: LabourDetailsDialogProps) {
   const { data: projects } = useProjects();
+  const { locations: warehouseLocations = [] } = useWarehouseLocations();
 
   if (!labour) return null;
 
   const project = projects?.find((p) => p.id === labour.project_id);
+  const location = warehouseLocations.find((l) => l.id === labour.location_id);
 
   const DetailRow = ({ label, value, icon: Icon }: { label: string; value: string | number | null | undefined; icon?: React.ElementType }) => (
     <div className="flex items-start gap-3 py-2">
@@ -83,38 +86,64 @@ export function LabourDetailsDialog({
             <CardContent className="grid grid-cols-2 gap-x-6">
               <DetailRow label="Category" value={labour.category} icon={Briefcase} />
               <DetailRow label="Company" value={labour.labour_company} icon={Building2} />
-              <DetailRow label="Trade" value={labour.trade} icon={MapPin} />
+              <DetailRow label="Trade" value={labour.trade} />
               <DetailRow label="Skill Level" value={labour.skill_level} />
             </CardContent>
           </Card>
 
-          {/* Project Assignment */}
+          {/* Project & Location Assignment */}
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium flex items-center gap-2">
                 <FolderKanban className="h-4 w-4" />
-                Project Assignment
+                Project & Location Assignment
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              {project ? (
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <Badge variant="outline" className="bg-primary/10">
-                      {project.project_code}
-                    </Badge>
-                    <span className="font-medium">{project.project_name}</span>
+            <CardContent className="space-y-4">
+              {/* Project */}
+              <div>
+                <p className="text-xs text-muted-foreground mb-1">Assigned Project</p>
+                {project ? (
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline" className="bg-primary/10">
+                        {project.project_code}
+                      </Badge>
+                      <span className="font-medium">{project.project_name}</span>
+                    </div>
+                    {project.address && (
+                      <p className="text-sm text-muted-foreground flex items-center gap-1">
+                        <MapPin className="h-3 w-3" />
+                        {project.address}
+                      </p>
+                    )}
                   </div>
-                  {project.address && (
-                    <p className="text-sm text-muted-foreground flex items-center gap-1">
-                      <MapPin className="h-3 w-3" />
-                      {project.address}
-                    </p>
-                  )}
-                </div>
-              ) : (
-                <p className="text-sm text-muted-foreground">No project assigned</p>
-              )}
+                ) : (
+                  <p className="text-sm text-muted-foreground">No project assigned</p>
+                )}
+              </div>
+
+              <Separator />
+
+              {/* Location */}
+              <div>
+                <p className="text-xs text-muted-foreground mb-1">Assigned Location</p>
+                {location ? (
+                  <div className="flex items-center gap-2">
+                    <MapPin className="h-4 w-4 text-primary" />
+                    <div>
+                      {location.location_code && (
+                        <Badge variant="outline" className="mr-2">
+                          {location.location_code}
+                        </Badge>
+                      )}
+                      <span className="font-medium">{location.name}</span>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">No location assigned</p>
+                )}
+              </div>
             </CardContent>
           </Card>
 

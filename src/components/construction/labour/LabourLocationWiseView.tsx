@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Search, MapPin, Users, Building2, Filter, Briefcase } from "lucide-react";
+import { Search, MapPin, Users, Filter } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -20,9 +20,12 @@ import {
 } from "@/components/ui/select";
 import { useLabourMaster } from "@/hooks/construction/useLabourMaster";
 import { useProjects } from "@/hooks/construction/useProjects";
+import { useWarehouseLocations } from "@/hooks/useWarehouseLocations";
 
 interface AggregatedLocation {
+  locationId: string | null;
   locationName: string;
+  locationCode: string | null;
   totalCount: number;
   activeCount: number;
   inactiveCount: number;
@@ -47,17 +50,24 @@ export function LabourLocationWiseView() {
 
   const { data: labourMaster, isLoading } = useLabourMaster();
   const { data: projects = [] } = useProjects();
+  const { locations: warehouseLocations = [] } = useWarehouseLocations();
 
-  // Create a project lookup map
+  // Create lookup maps
   const projectMap = new Map(projects.map(p => [p.id, p]));
+  const locationMap = new Map(warehouseLocations.map(l => [l.id, l]));
 
-  // Group by trade/location
+  // Group by location_id from warehouse_locations
   const groupedByLocation = labourMaster?.reduce((acc, labour) => {
-    const location = labour.trade || "Unassigned";
+    const locationId = labour.location_id || "__unassigned__";
+    const warehouseLocation = labour.location_id ? locationMap.get(labour.location_id) : null;
+    const locationName = warehouseLocation?.name || "Unassigned";
+    const locationCode = warehouseLocation?.location_code || null;
     
-    if (!acc[location]) {
-      acc[location] = {
-        locationName: location,
+    if (!acc[locationId]) {
+      acc[locationId] = {
+        locationId: labour.location_id,
+        locationName,
+        locationCode,
         totalCount: 0,
         activeCount: 0,
         inactiveCount: 0,
@@ -68,29 +78,29 @@ export function LabourLocationWiseView() {
       };
     }
 
-    acc[location].totalCount++;
+    acc[locationId].totalCount++;
     if (labour.status === "active") {
-      acc[location].activeCount++;
+      acc[locationId].activeCount++;
     } else {
-      acc[location].inactiveCount++;
+      acc[locationId].inactiveCount++;
     }
 
     // Track category distribution
     const category = labour.category || "Uncategorized";
-    acc[location].categories[category] = (acc[location].categories[category] || 0) + 1;
+    acc[locationId].categories[category] = (acc[locationId].categories[category] || 0) + 1;
 
     // Track company distribution
     const company = labour.labour_company || "Unassigned";
-    acc[location].companies[company] = (acc[location].companies[company] || 0) + 1;
+    acc[locationId].companies[company] = (acc[locationId].companies[company] || 0) + 1;
 
     // Track project distribution
     if (labour.project_id) {
       const project = projectMap.get(labour.project_id);
       const projectName = project ? project.project_code : "Unknown";
-      acc[location].projects[projectName] = (acc[location].projects[projectName] || 0) + 1;
+      acc[locationId].projects[projectName] = (acc[locationId].projects[projectName] || 0) + 1;
     }
 
-    acc[location].labours.push({
+    acc[locationId].labours.push({
       id: labour.id,
       employee_id: labour.employee_id,
       name: labour.name,
@@ -103,15 +113,20 @@ export function LabourLocationWiseView() {
     return acc;
   }, {} as Record<string, AggregatedLocation>) || {};
 
-  // Get unique locations and categories for filters
-  const uniqueLocations = Object.keys(groupedByLocation);
+  // Get unique locations (with actual location_id values) and categories for filters
+  const uniqueLocations = Object.values(groupedByLocation).map(loc => ({
+    id: loc.locationId || "__unassigned__",
+    name: loc.locationName,
+    code: loc.locationCode,
+  }));
   const uniqueCategories = [...new Set(labourMaster?.map(l => l.category).filter(Boolean))];
 
   // Filter locations
-  const filteredLocations = Object.entries(groupedByLocation).filter(([location, data]) => {
-    const matchesLocation = locationFilter === "all" || location === locationFilter;
+  const filteredLocations = Object.entries(groupedByLocation).filter(([locationId, data]) => {
+    const matchesLocation = locationFilter === "all" || locationId === locationFilter;
     const matchesSearch = 
-      location.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      data.locationName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (data.locationCode?.toLowerCase().includes(searchTerm.toLowerCase())) ||
       data.labours.some(l => 
         l.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         l.employee_id?.toLowerCase().includes(searchTerm.toLowerCase())
@@ -156,7 +171,9 @@ export function LabourLocationWiseView() {
           <SelectContent>
             <SelectItem value="all">All Locations</SelectItem>
             {uniqueLocations.map((loc) => (
-              <SelectItem key={loc} value={loc}>{loc}</SelectItem>
+              <SelectItem key={loc.id} value={loc.id}>
+                {loc.code ? `${loc.code} - ` : ''}{loc.name}
+              </SelectItem>
             ))}
           </SelectContent>
         </Select>
@@ -191,16 +208,23 @@ export function LabourLocationWiseView() {
         </Card>
       ) : (
         <div className="space-y-4">
-          {filteredLocations.map(([locationName, location]) => {
+          {filteredLocations.map(([locationId, location]) => {
             const filteredLabours = getFilteredLabours(location.labours);
             
             return (
-              <Card key={locationName}>
+              <Card key={locationId}>
                 <CardHeader className="pb-3">
                   <div className="flex items-center justify-between">
                     <CardTitle className="flex items-center gap-2">
                       <MapPin className="h-5 w-5 text-primary" />
-                      {locationName}
+                      <div className="flex items-center gap-2">
+                        {location.locationCode && (
+                          <Badge variant="outline" className="font-mono">
+                            {location.locationCode}
+                          </Badge>
+                        )}
+                        <span>{location.locationName}</span>
+                      </div>
                     </CardTitle>
                     <div className="flex items-center gap-6">
                       <div className="text-right">
