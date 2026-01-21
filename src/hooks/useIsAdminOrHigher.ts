@@ -2,9 +2,10 @@ import { useCurrentUserRoles } from '@/hooks/useCurrentUserRoles';
 import { useSuperAdmin, useIsAdmin } from '@/hooks/useSuperAdmin';
 
 export const useIsAdminOrHigher = () => {
+  // All hooks must be called unconditionally at top level
   const { data: userRoles = [], isLoading: rolesLoading } = useCurrentUserRoles();
-  const { data: isSuperAdmin, isLoading: superAdminLoading } = useSuperAdmin();
-  const { data: isAdmin, isLoading: adminLoading } = useIsAdmin();
+  const { data: isSuperAdmin = false, isLoading: superAdminLoading } = useSuperAdmin();
+  const { data: isAdmin = false, isLoading: adminLoading } = useIsAdmin();
   
   const isLoading = rolesLoading || superAdminLoading || adminLoading;
   
@@ -16,7 +17,7 @@ export const useIsAdminOrHigher = () => {
   );
   
   // Also check via RPC functions (these use SECURITY DEFINER and bypass RLS)
-  const canDelete = hasRoleFromTable || isSuperAdmin === true || isAdmin === true;
+  const canDelete = hasRoleFromTable || isSuperAdmin || isAdmin;
   
   return { canDelete, isLoading };
 };
