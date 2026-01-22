@@ -1,11 +1,30 @@
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Package, Wrench, MapPin, ArrowRightLeft, LayoutDashboard, Boxes } from "lucide-react";
+import { ArrowLeft, LayoutDashboard, Boxes, MapPin, ArrowRightLeft, Wrench, Package } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ITEM_CATEGORIES, ITEM_SECTIONS } from "@/types/construction-inventory";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  AllocationDashboard,
+  InventoryWiseView,
+  LocationWiseView,
+  TransfersView,
+  ServiceRepairView,
+  ItemMasterView,
+} from "@/components/construction/inventory";
+
+// Allocation sub-tabs
+const ALLOCATION_TABS = [
+  { value: "dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { value: "inventory-wise", label: "Inventory Wise", icon: Boxes },
+  { value: "location-wise", label: "Location Wise", icon: MapPin },
+  { value: "transfers", label: "Transfers", icon: ArrowRightLeft },
+  { value: "service-repair", label: "Service & Repair", icon: Wrench },
+];
 
 export default function InventoryItems() {
   const navigate = useNavigate();
+  const [activeTab, setActiveTab] = useState("allocation");
+  const [allocationSubTab, setAllocationSubTab] = useState("dashboard");
 
   return (
     <div className="space-y-6">
@@ -21,112 +40,54 @@ export default function InventoryItems() {
         </div>
       </div>
 
-      {/* Schema Ready Notice */}
-      <Card className="border-primary/20 bg-primary/5">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Package className="h-5 w-5 text-primary" />
-            Database Schema Ready
-          </CardTitle>
-          <CardDescription>
-            The new inventory system structure has been created with the following tables:
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            <div className="rounded-lg border p-3">
-              <h4 className="font-medium flex items-center gap-2">
-                <Boxes className="h-4 w-4" /> Item Master
-              </h4>
-              <p className="text-sm text-muted-foreground mt-1">
-                Central registry for all items with category, section, and serial tracking flag
-              </p>
-            </div>
-            <div className="rounded-lg border p-3">
-              <h4 className="font-medium flex items-center gap-2">
-                <Package className="h-4 w-4" /> Serial Numbers
-              </h4>
-              <p className="text-sm text-muted-foreground mt-1">
-                Individual tracking for machines with location, condition, and availability
-              </p>
-            </div>
-            <div className="rounded-lg border p-3">
-              <h4 className="font-medium flex items-center gap-2">
-                <MapPin className="h-4 w-4" /> Stock Balances
-              </h4>
-              <p className="text-sm text-muted-foreground mt-1">
-                Quantity tracking per item per location for non-serial items
-              </p>
-            </div>
-            <div className="rounded-lg border p-3">
-              <h4 className="font-medium flex items-center gap-2">
-                <ArrowRightLeft className="h-4 w-4" /> Transfers
-              </h4>
-              <p className="text-sm text-muted-foreground mt-1">
-                Transfer records with line items (quantity or serial number)
-              </p>
-            </div>
-            <div className="rounded-lg border p-3">
-              <h4 className="font-medium flex items-center gap-2">
-                <Wrench className="h-4 w-4" /> Repair Records
-              </h4>
-              <p className="text-sm text-muted-foreground mt-1">
-                Service tracking with status, cost, and downtime
-              </p>
-            </div>
-            <div className="rounded-lg border p-3">
-              <h4 className="font-medium flex items-center gap-2">
-                <LayoutDashboard className="h-4 w-4" /> Transaction Log
-              </h4>
-              <p className="text-sm text-muted-foreground mt-1">
-                Full audit trail of all inventory movements
-              </p>
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+        <TabsList>
+          <TabsTrigger value="allocation" className="gap-2">
+            <LayoutDashboard className="h-4 w-4" />
+            Allocation View
+          </TabsTrigger>
+          <TabsTrigger value="master" className="gap-2">
+            <Package className="h-4 w-4" />
+            Item Master
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="allocation" className="space-y-4">
+          {/* Allocation Sub-Tabs */}
+          <div className="border-b">
+            <div className="flex gap-1 overflow-x-auto">
+              {ALLOCATION_TABS.map((tab) => {
+                const Icon = tab.icon;
+                return (
+                  <button
+                    key={tab.value}
+                    onClick={() => setAllocationSubTab(tab.value)}
+                    className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
+                      allocationSubTab === tab.value
+                        ? "border-primary text-primary"
+                        : "border-transparent text-muted-foreground hover:text-foreground hover:border-muted"
+                    }`}
+                  >
+                    <Icon className="h-4 w-4" />
+                    {tab.label}
+                  </button>
+                );
+              })}
             </div>
           </div>
-        </CardContent>
-      </Card>
 
-      {/* Categories & Sections */}
-      <div className="grid gap-6 md:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>Item Categories</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex flex-wrap gap-2">
-              {ITEM_CATEGORIES.map(cat => (
-                <span key={cat.value} className="px-3 py-1 rounded-full bg-muted text-sm">
-                  {cat.label}
-                </span>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle>Business Sections</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex flex-wrap gap-2">
-              {ITEM_SECTIONS.map(sec => (
-                <span key={sec.value} className="px-3 py-1 rounded-full bg-muted text-sm">
-                  {sec.label}
-                </span>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+          {/* Allocation Sub-Tab Content */}
+          {allocationSubTab === "dashboard" && <AllocationDashboard />}
+          {allocationSubTab === "inventory-wise" && <InventoryWiseView />}
+          {allocationSubTab === "location-wise" && <LocationWiseView />}
+          {allocationSubTab === "transfers" && <TransfersView />}
+          {allocationSubTab === "service-repair" && <ServiceRepairView />}
+        </TabsContent>
 
-      <Card className="border-dashed">
-        <CardHeader className="text-center">
-          <CardTitle>Ready for UI Implementation</CardTitle>
-          <CardDescription>
-            Share your interface design or wireframes to build the 5 allocation views:
-            Dashboard, Inventory-Wise, Location-Wise, Transfers, and Service & Repair.
-          </CardDescription>
-        </CardHeader>
-      </Card>
+        <TabsContent value="master" className="space-y-4">
+          <ItemMasterView />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
