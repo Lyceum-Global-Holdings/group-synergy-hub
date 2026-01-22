@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, LayoutDashboard, Boxes, MapPin, ArrowRightLeft, Wrench } from "lucide-react";
+// Inventory Items page - manages Allocation View and Item Master with 6 category sheets
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
