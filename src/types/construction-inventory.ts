@@ -148,6 +148,13 @@ export const SERIAL_CONDITIONS: { value: SerialCondition; label: string }[] = [
   { value: 'scrap', label: 'Scrap' },
 ];
 
+export const SERIAL_AVAILABILITIES: { value: SerialAvailability; label: string }[] = [
+  { value: 'available', label: 'Available' },
+  { value: 'in_use', label: 'In Use' },
+  { value: 'in_transit', label: 'In Transit' },
+  { value: 'reserved', label: 'Reserved' },
+];
+
 export const TRANSFER_STATUSES: { value: TransferStatus; label: string }[] = [
   { value: 'pending', label: 'Pending' },
   { value: 'in_transit', label: 'In Transit' },

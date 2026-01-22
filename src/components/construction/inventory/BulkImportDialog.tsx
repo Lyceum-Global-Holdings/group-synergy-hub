@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useCallback } from "react";
 import {
   Dialog,
   DialogContent,
@@ -19,6 +19,13 @@ import {
 } from "@/components/ui/table";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Upload,
   Download,
   FileSpreadsheet,
@@ -27,6 +34,7 @@ import {
   Loader2,
   X,
   Hash,
+  Pencil,
 } from "lucide-react";
 import { readExcelFile, writeExcelFromAOA } from "@/utils/excelUtils";
 import { useBulkCreateItemMasterWithSerials } from "@/hooks/construction/useConstructionInventory";
@@ -38,6 +46,7 @@ import {
   ITEM_CATEGORIES,
   ITEM_SECTIONS,
   SERIAL_CONDITIONS,
+  SERIAL_AVAILABILITIES,
 } from "@/types/construction-inventory";
 import { useToast } from "@/hooks/use-toast";
 
@@ -71,6 +80,7 @@ export function BulkImportDialog({ open, onOpenChange, category }: BulkImportDia
   const [parsedItems, setParsedItems] = useState<ParsedItem[]>([]);
   const [isParsing, setIsParsing] = useState(false);
   const [importResult, setImportResult] = useState<{ success: number; failed: number } | null>(null);
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
@@ -78,6 +88,47 @@ export function BulkImportDialog({ open, onOpenChange, category }: BulkImportDia
 
   const categoryLabel = ITEM_CATEGORIES.find(c => c.value === category)?.label || "Items";
   const isMachineCategory = category === "machines";
+
+  const validSections = ITEM_SECTIONS.map(s => s.value);
+  const validConditions = SERIAL_CONDITIONS.map(c => c.value);
+  const validAvailabilities = SERIAL_AVAILABILITIES.map(a => a.value);
+
+  // Revalidate a single item
+  const revalidateItem = useCallback((item: ParsedItem): ParsedItem => {
+    const errors: string[] = [];
+    
+    if (!item.item_code) errors.push("Missing item code");
+    if (!item.item_name) errors.push("Missing item name");
+    if (!validSections.includes(item.section)) {
+      errors.push(`Invalid section: ${item.section}`);
+    }
+    
+    if (isMachineCategory) {
+      if (!item.serial_number) errors.push("Missing serial number");
+      if (item.condition && !validConditions.includes(item.condition)) {
+        errors.push(`Invalid condition: ${item.condition}`);
+      }
+      if (item.availability && !validAvailabilities.includes(item.availability)) {
+        errors.push(`Invalid availability: ${item.availability}`);
+      }
+    }
+    
+    return {
+      ...item,
+      is_valid: errors.length === 0,
+      errors,
+    };
+  }, [isMachineCategory, validSections, validConditions, validAvailabilities]);
+
+  // Update item field and revalidate
+  const updateItemField = useCallback((index: number, field: keyof ParsedItem, value: any) => {
+    setParsedItems(prev => {
+      const updated = [...prev];
+      updated[index] = { ...updated[index], [field]: value };
+      updated[index] = revalidateItem(updated[index]);
+      return updated;
+    });
+  }, [revalidateItem]);
 
   const handleDownloadTemplate = async () => {
     // Base headers for all categories
@@ -303,6 +354,7 @@ export function BulkImportDialog({ open, onOpenChange, category }: BulkImportDia
     setFile(null);
     setParsedItems([]);
     setImportResult(null);
+    setEditingIndex(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
@@ -419,49 +471,174 @@ export function BulkImportDialog({ open, onOpenChange, category }: BulkImportDia
                           <TableHead>Availability</TableHead>
                         </>
                       )}
+                      <TableHead className="w-10"></TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {parsedItems.map((item, index) => (
-                      <TableRow key={index} className={!item.is_valid ? "bg-destructive/10" : ""}>
-                        <TableCell>
-                          {item.is_valid ? (
-                            <CheckCircle2 className="h-4 w-4 text-green-600" />
-                          ) : (
-                            <AlertCircle className="h-4 w-4 text-destructive" />
+                    {parsedItems.map((item, index) => {
+                      const isEditing = editingIndex === index;
+                      const hasErrors = !item.is_valid;
+                      
+                      return (
+                        <TableRow key={index} className={hasErrors ? "bg-destructive/5" : ""}>
+                          <TableCell>
+                            {item.is_valid ? (
+                              <CheckCircle2 className="h-4 w-4 text-primary" />
+                            ) : (
+                              <AlertCircle className="h-4 w-4 text-destructive" />
+                            )}
+                          </TableCell>
+                          
+                          {/* Item Code */}
+                          <TableCell>
+                            {isEditing ? (
+                              <Input
+                                className="h-8 w-24 font-mono text-sm"
+                                value={item.item_code}
+                                onChange={(e) => updateItemField(index, 'item_code', e.target.value)}
+                              />
+                            ) : (
+                              <span className="font-mono text-sm">{item.item_code || <span className="text-destructive">Missing</span>}</span>
+                            )}
+                          </TableCell>
+                          
+                          {/* Item Name */}
+                          <TableCell>
+                            {isEditing ? (
+                              <Input
+                                className="h-8 w-32"
+                                value={item.item_name}
+                                onChange={(e) => updateItemField(index, 'item_name', e.target.value)}
+                              />
+                            ) : (
+                              <span className="font-medium">{item.item_name || <span className="text-destructive">Missing</span>}</span>
+                            )}
+                          </TableCell>
+                          
+                          {/* Section */}
+                          <TableCell>
+                            {isEditing ? (
+                              <Select
+                                value={item.section}
+                                onValueChange={(val) => updateItemField(index, 'section', val)}
+                              >
+                                <SelectTrigger className="h-8 w-28">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {ITEM_SECTIONS.map((s) => (
+                                    <SelectItem key={s.value} value={s.value}>
+                                      {s.label}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            ) : (
+                              <Badge variant="secondary">{item.section}</Badge>
+                            )}
+                          </TableCell>
+                          
+                          {/* Brand/Model */}
+                          <TableCell>
+                            {item.brand || item.model
+                              ? `${item.brand || ""} ${item.model || ""}`.trim()
+                              : "-"}
+                          </TableCell>
+                          
+                          {/* Unit Cost */}
+                          <TableCell>
+                            {item.unit_cost ? `₹${item.unit_cost.toLocaleString()}` : "-"}
+                          </TableCell>
+                          
+                          {isMachineCategory && (
+                            <>
+                              {/* Serial Number */}
+                              <TableCell>
+                                {isEditing ? (
+                                  <Input
+                                    className="h-8 w-28 font-mono text-sm"
+                                    placeholder="Serial #"
+                                    value={item.serial_number || ""}
+                                    onChange={(e) => updateItemField(index, 'serial_number', e.target.value)}
+                                  />
+                                ) : item.serial_number ? (
+                                  <div className="flex items-center gap-1">
+                                    <Hash className="h-3 w-3 text-muted-foreground" />
+                                    <span className="font-mono text-sm">{item.serial_number}</span>
+                                  </div>
+                                ) : (
+                                  <span className="text-destructive text-sm">Missing</span>
+                                )}
+                              </TableCell>
+                              
+                              {/* Condition */}
+                              <TableCell>
+                                {isEditing ? (
+                                  <Select
+                                    value={item.condition}
+                                    onValueChange={(val) => updateItemField(index, 'condition', val)}
+                                  >
+                                    <SelectTrigger className="h-8 w-28">
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {SERIAL_CONDITIONS.map((c) => (
+                                        <SelectItem key={c.value} value={c.value}>
+                                          {c.label}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                ) : (
+                                  getConditionBadge(item.condition)
+                                )}
+                              </TableCell>
+                              
+                              {/* Availability */}
+                              <TableCell>
+                                {isEditing ? (
+                                  <Select
+                                    value={item.availability}
+                                    onValueChange={(val) => updateItemField(index, 'availability', val)}
+                                  >
+                                    <SelectTrigger className="h-8 w-28">
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {SERIAL_AVAILABILITIES.map((a) => (
+                                        <SelectItem key={a.value} value={a.value}>
+                                          {a.label}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                ) : (
+                                  getAvailabilityBadge(item.availability)
+                                )}
+                              </TableCell>
+                            </>
                           )}
-                        </TableCell>
-                        <TableCell className="font-mono text-sm">{item.item_code}</TableCell>
-                        <TableCell className="font-medium">{item.item_name}</TableCell>
-                        <TableCell>
-                          <Badge variant="secondary">{item.section}</Badge>
-                        </TableCell>
-                        <TableCell>
-                          {item.brand || item.model
-                            ? `${item.brand || ""} ${item.model || ""}`.trim()
-                            : "-"}
-                        </TableCell>
-                        <TableCell>
-                          {item.unit_cost ? `₹${item.unit_cost.toLocaleString()}` : "-"}
-                        </TableCell>
-                        {isMachineCategory && (
-                          <>
-                            <TableCell>
-                              {item.serial_number ? (
-                                <div className="flex items-center gap-1">
-                                  <Hash className="h-3 w-3 text-muted-foreground" />
-                                  <span className="font-mono text-sm">{item.serial_number}</span>
-                                </div>
-                              ) : (
-                                <span className="text-destructive text-sm">Missing</span>
-                              )}
-                            </TableCell>
-                            <TableCell>{getConditionBadge(item.condition)}</TableCell>
-                            <TableCell>{getAvailabilityBadge(item.availability)}</TableCell>
-                          </>
-                        )}
-                      </TableRow>
-                    ))}
+                          
+                          {/* Edit Action */}
+                          <TableCell>
+                            {hasErrors || isEditing ? (
+                              <Button
+                                variant={isEditing ? "default" : "ghost"}
+                                size="sm"
+                                className="h-7 w-7 p-0"
+                                onClick={() => setEditingIndex(isEditing ? null : index)}
+                              >
+                                {isEditing ? (
+                                  <CheckCircle2 className="h-4 w-4" />
+                                ) : (
+                                  <Pencil className="h-4 w-4" />
+                                )}
+                              </Button>
+                            ) : null}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
                   </TableBody>
                 </Table>
               </ScrollArea>
@@ -472,13 +649,23 @@ export function BulkImportDialog({ open, onOpenChange, category }: BulkImportDia
                   <Alert variant="destructive">
                     <AlertCircle className="h-4 w-4" />
                     <AlertDescription>
-                      {invalidCount} row(s) have errors and will be skipped.
+                      <div className="flex items-center justify-between">
+                        <span>{invalidCount} row(s) have errors. Click the pencil icon to edit and fix.</span>
+                      </div>
                       {parsedItems
                         .filter(i => !i.is_valid)
                         .slice(0, 3)
                         .map((item, i) => (
-                          <div key={i} className="text-xs mt-1">
-                            Row {parsedItems.indexOf(item) + 1}: {item.errors.join(", ")}
+                          <div key={i} className="text-xs mt-1 flex items-center gap-2">
+                            <span>Row {parsedItems.indexOf(item) + 1}: {item.errors.join(", ")}</span>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-5 px-1"
+                              onClick={() => setEditingIndex(parsedItems.indexOf(item))}
+                            >
+                              <Pencil className="h-3 w-3" />
+                            </Button>
                           </div>
                         ))}
                     </AlertDescription>
