@@ -42,13 +42,13 @@ export function EditSerialLocationDialog({
   const updateSerial = useUpdateSerialNumber();
   const { data: locations } = useLocations();
 
-  const [locationId, setLocationId] = useState<string>("");
+  const [locationId, setLocationId] = useState<string>("__none__");
   const [condition, setCondition] = useState<string>("working");
   const [availability, setAvailability] = useState<string>("available");
 
   useEffect(() => {
     if (serial && open) {
-      setLocationId(serial.current_location_id || "");
+      setLocationId(serial.current_location_id || "__none__");
       setCondition(serial.condition || "working");
       setAvailability(serial.availability || "available");
     }
@@ -60,7 +60,7 @@ export function EditSerialLocationDialog({
     updateSerial.mutate(
       {
         id: serial.id,
-        current_location_id: locationId || null,
+        current_location_id: locationId === "__none__" ? null : locationId,
         condition,
         availability,
       },
@@ -92,7 +92,7 @@ export function EditSerialLocationDialog({
                 <SelectValue placeholder="Select location" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">No Location</SelectItem>
+                <SelectItem value="__none__">No Location</SelectItem>
                 {locations?.map((loc) => (
                   <SelectItem key={loc.id} value={loc.id}>
                     {loc.name}
