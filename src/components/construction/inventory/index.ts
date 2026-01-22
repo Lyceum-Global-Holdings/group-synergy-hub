@@ -4,3 +4,5 @@ export { LocationWiseView } from "./LocationWiseView";
 export { TransfersView } from "./TransfersView";
 export { ServiceRepairView } from "./ServiceRepairView";
 export { ItemMasterView } from "./ItemMasterView";
+export { AddItemDialog } from "./AddItemDialog";
+export { BulkImportDialog } from "./BulkImportDialog";
