@@ -316,7 +316,7 @@ export function BulkImportDialog({ open, onOpenChange, category }: BulkImportDia
     }
 
     try {
-      await bulkCreate.mutateAsync({
+      const result = await bulkCreate.mutateAsync({
         items: validItems.map(item => ({
           item_code: item.item_code,
           item_name: item.item_name,
@@ -337,11 +337,16 @@ export function BulkImportDialog({ open, onOpenChange, category }: BulkImportDia
         })),
       });
 
+      // Handle the new return type with results and errors
+      const successCount = result.results?.length || validItems.length;
+      const errorCount = result.errors?.length || 0;
+
       setImportResult({
-        success: validItems.length,
-        failed: parsedItems.length - validItems.length,
+        success: successCount,
+        failed: (parsedItems.length - validItems.length) + errorCount,
       });
     } catch (error: any) {
+      console.error("Import error:", error);
       toast({
         title: "Import failed",
         description: error.message,
