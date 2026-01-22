@@ -78,7 +78,11 @@ export function useCreateItemMaster() {
       return result;
     },
     onSuccess: () => {
+      // Invalidate all related queries to update allocation views
       queryClient.invalidateQueries({ queryKey: ["construction-item-master"] });
+      queryClient.invalidateQueries({ queryKey: ["construction-dashboard-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["construction-serial-numbers"] });
+      queryClient.invalidateQueries({ queryKey: ["construction-inventory-stock"] });
       toast({ title: "Item created successfully" });
     },
     onError: (error: Error) => {
@@ -503,6 +507,49 @@ export function useLocations() {
       const { data, error } = await query;
       if (error) throw error;
       return data;
+    },
+  });
+}
+
+// ==================== BULK CREATE ITEM MASTER ====================
+
+export interface BulkCreateItemMasterData {
+  items: CreateItemMasterData[];
+}
+
+export function useBulkCreateItemMaster() {
+  const queryClient = useQueryClient();
+  const { selectedCompany } = useCompany();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async (data: BulkCreateItemMasterData) => {
+      const { data: user } = await supabase.auth.getUser();
+
+      const itemsWithMeta = data.items.map(item => ({
+        ...item,
+        company_id: selectedCompany?.id,
+        created_by: user.user?.id,
+      }));
+
+      const { data: result, error } = await supabase
+        .from("construction_item_master")
+        .insert(itemsWithMeta)
+        .select();
+
+      if (error) throw error;
+      return result;
+    },
+    onSuccess: (result) => {
+      // Invalidate all related queries to update allocation views
+      queryClient.invalidateQueries({ queryKey: ["construction-item-master"] });
+      queryClient.invalidateQueries({ queryKey: ["construction-dashboard-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["construction-serial-numbers"] });
+      queryClient.invalidateQueries({ queryKey: ["construction-inventory-stock"] });
+      toast({ title: `${result.length} items imported successfully` });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to import items", description: error.message, variant: "destructive" });
     },
   });
 }

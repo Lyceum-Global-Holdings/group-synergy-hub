@@ -4,13 +4,6 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
   Table,
   TableBody,
   TableCell,
@@ -18,16 +11,19 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Search, Plus, Package, Edit, Eye } from "lucide-react";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Search, Plus, Package, Edit, Eye, Upload } from "lucide-react";
 import { useItemMaster } from "@/hooks/construction/useConstructionInventory";
 import { ITEM_CATEGORIES, ITEM_SECTIONS, type ItemCategory } from "@/types/construction-inventory";
 import { Skeleton } from "@/components/ui/skeleton";
-import { format } from "date-fns";
+import { AddItemDialog } from "./AddItemDialog";
+import { BulkImportDialog } from "./BulkImportDialog";
 
 export function ItemMasterView() {
   const [searchTerm, setSearchTerm] = useState("");
   const [activeCategory, setActiveCategory] = useState<ItemCategory>("machines");
+  const [addDialogOpen, setAddDialogOpen] = useState(false);
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
 
   const { data: items, isLoading } = useItemMaster(activeCategory);
 
@@ -45,12 +41,14 @@ export function ItemMasterView() {
 
   const getStatusBadge = (status: string) => {
     const styles: Record<string, string> = {
-      active: "bg-green-100 text-green-800",
-      scrap: "bg-red-100 text-red-800",
-      sold: "bg-gray-100 text-gray-800",
+      active: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100",
+      scrap: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-100",
+      sold: "bg-muted text-muted-foreground",
     };
     return <Badge className={styles[status] || ""}>{status}</Badge>;
   };
+
+  const categoryLabel = ITEM_CATEGORIES.find(c => c.value === activeCategory)?.label || "Items";
 
   return (
     <div className="space-y-4">
@@ -76,10 +74,16 @@ export function ItemMasterView() {
                 className="pl-9"
               />
             </div>
-            <Button>
-              <Plus className="h-4 w-4 mr-2" />
-              Add {ITEM_CATEGORIES.find(c => c.value === activeCategory)?.label.slice(0, -1) || "Item"}
-            </Button>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => setImportDialogOpen(true)}>
+                <Upload className="h-4 w-4 mr-2" />
+                Import Data
+              </Button>
+              <Button onClick={() => setAddDialogOpen(true)}>
+                <Plus className="h-4 w-4 mr-2" />
+                Add {categoryLabel.slice(0, -1)}
+              </Button>
+            </div>
           </div>
 
           {/* Items Table */}
@@ -87,7 +91,7 @@ export function ItemMasterView() {
             <CardHeader>
               <CardTitle className="text-lg flex items-center gap-2">
                 <Package className="h-5 w-5" />
-                {ITEM_CATEGORIES.find(c => c.value === activeCategory)?.label} Master
+                {categoryLabel} Master
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -102,7 +106,7 @@ export function ItemMasterView() {
                   <Package className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
                   <h3 className="font-medium">No {activeCategory} found</h3>
                   <p className="text-sm text-muted-foreground">
-                    Add items to the {ITEM_CATEGORIES.find(c => c.value === activeCategory)?.label} master
+                    Add items to the {categoryLabel} master
                   </p>
                 </div>
               ) : (
@@ -176,6 +180,18 @@ export function ItemMasterView() {
           </Card>
         </div>
       </Tabs>
+
+      {/* Dialogs */}
+      <AddItemDialog
+        open={addDialogOpen}
+        onOpenChange={setAddDialogOpen}
+        category={activeCategory}
+      />
+      <BulkImportDialog
+        open={importDialogOpen}
+        onOpenChange={setImportDialogOpen}
+        category={activeCategory}
+      />
     </div>
   );
 }
