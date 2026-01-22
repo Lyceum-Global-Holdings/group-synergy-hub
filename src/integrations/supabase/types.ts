@@ -3140,60 +3140,106 @@ export type Database = {
           },
         ]
       }
-      construction_inventory_transactions: {
+      construction_inventory_stock: {
         Row: {
           company_id: string | null
           created_at: string
-          created_by: string | null
-          from_location_id: string | null
           id: string
-          item_id: string
-          notes: string | null
-          quantity_after: number
-          quantity_before: number
-          quantity_change: number
-          reference_id: string | null
-          reference_type: string | null
-          to_location_id: string | null
-          transaction_type: string
-          unit: string | null
+          item_master_id: string
+          location_id: string
+          quantity: number
+          reserved_quantity: number
           updated_at: string
         }
         Insert: {
           company_id?: string | null
           created_at?: string
-          created_by?: string | null
-          from_location_id?: string | null
           id?: string
-          item_id: string
-          notes?: string | null
-          quantity_after?: number
-          quantity_before?: number
-          quantity_change: number
-          reference_id?: string | null
-          reference_type?: string | null
-          to_location_id?: string | null
-          transaction_type: string
-          unit?: string | null
+          item_master_id: string
+          location_id: string
+          quantity?: number
+          reserved_quantity?: number
           updated_at?: string
         }
         Update: {
           company_id?: string | null
           created_at?: string
-          created_by?: string | null
-          from_location_id?: string | null
           id?: string
-          item_id?: string
-          notes?: string | null
-          quantity_after?: number
-          quantity_before?: number
-          quantity_change?: number
-          reference_id?: string | null
-          reference_type?: string | null
-          to_location_id?: string | null
-          transaction_type?: string
-          unit?: string | null
+          item_master_id?: string
+          location_id?: string
+          quantity?: number
+          reserved_quantity?: number
           updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "construction_inventory_stock_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "construction_inventory_stock_item_master_id_fkey"
+            columns: ["item_master_id"]
+            isOneToOne: false
+            referencedRelation: "construction_item_master"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "construction_inventory_stock_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "warehouse_locations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      construction_inventory_transactions: {
+        Row: {
+          company_id: string | null
+          created_at: string
+          id: string
+          item_master_id: string | null
+          location_id: string | null
+          notes: string | null
+          performed_by: string | null
+          quantity_change: number | null
+          repair_id: string | null
+          serial_number_id: string | null
+          transaction_date: string
+          transaction_type: string
+          transfer_id: string | null
+        }
+        Insert: {
+          company_id?: string | null
+          created_at?: string
+          id?: string
+          item_master_id?: string | null
+          location_id?: string | null
+          notes?: string | null
+          performed_by?: string | null
+          quantity_change?: number | null
+          repair_id?: string | null
+          serial_number_id?: string | null
+          transaction_date?: string
+          transaction_type: string
+          transfer_id?: string | null
+        }
+        Update: {
+          company_id?: string | null
+          created_at?: string
+          id?: string
+          item_master_id?: string | null
+          location_id?: string | null
+          notes?: string | null
+          performed_by?: string | null
+          quantity_change?: number | null
+          repair_id?: string | null
+          serial_number_id?: string | null
+          transaction_date?: string
+          transaction_type?: string
+          transfer_id?: string | null
         }
         Relationships: [
           {
@@ -3204,24 +3250,179 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "construction_inventory_transactions_from_location_id_fkey"
+            foreignKeyName: "construction_inventory_transactions_item_master_id_fkey"
+            columns: ["item_master_id"]
+            isOneToOne: false
+            referencedRelation: "construction_item_master"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "construction_inventory_transactions_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "warehouse_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "construction_inventory_transactions_repair_id_fkey"
+            columns: ["repair_id"]
+            isOneToOne: false
+            referencedRelation: "construction_repair_records"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "construction_inventory_transactions_serial_number_id_fkey"
+            columns: ["serial_number_id"]
+            isOneToOne: false
+            referencedRelation: "construction_serial_numbers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "construction_inventory_transactions_transfer_id_fkey"
+            columns: ["transfer_id"]
+            isOneToOne: false
+            referencedRelation: "construction_inventory_transfers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      construction_inventory_transfers: {
+        Row: {
+          company_id: string | null
+          completed_at: string | null
+          completed_by: string | null
+          created_at: string
+          from_location_id: string
+          id: string
+          initiated_by: string | null
+          notes: string | null
+          status: string
+          to_location_id: string
+          transfer_date: string
+          transfer_number: string
+          updated_at: string
+        }
+        Insert: {
+          company_id?: string | null
+          completed_at?: string | null
+          completed_by?: string | null
+          created_at?: string
+          from_location_id: string
+          id?: string
+          initiated_by?: string | null
+          notes?: string | null
+          status?: string
+          to_location_id: string
+          transfer_date?: string
+          transfer_number: string
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string | null
+          completed_at?: string | null
+          completed_by?: string | null
+          created_at?: string
+          from_location_id?: string
+          id?: string
+          initiated_by?: string | null
+          notes?: string | null
+          status?: string
+          to_location_id?: string
+          transfer_date?: string
+          transfer_number?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "construction_inventory_transfers_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "construction_inventory_transfers_from_location_id_fkey"
             columns: ["from_location_id"]
             isOneToOne: false
             referencedRelation: "warehouse_locations"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "construction_inventory_transactions_item_id_fkey"
-            columns: ["item_id"]
-            isOneToOne: false
-            referencedRelation: "construction_inventory_master"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "construction_inventory_transactions_to_location_id_fkey"
+            foreignKeyName: "construction_inventory_transfers_to_location_id_fkey"
             columns: ["to_location_id"]
             isOneToOne: false
             referencedRelation: "warehouse_locations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      construction_item_master: {
+        Row: {
+          brand: string | null
+          category: string
+          company_id: string | null
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          image_url: string | null
+          is_serial_tracked: boolean
+          item_code: string
+          item_name: string
+          model: string | null
+          purchase_date: string | null
+          section: string
+          status: string
+          unit_cost: number | null
+          unit_of_measurement: string
+          updated_at: string
+        }
+        Insert: {
+          brand?: string | null
+          category: string
+          company_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          image_url?: string | null
+          is_serial_tracked?: boolean
+          item_code: string
+          item_name: string
+          model?: string | null
+          purchase_date?: string | null
+          section: string
+          status?: string
+          unit_cost?: number | null
+          unit_of_measurement?: string
+          updated_at?: string
+        }
+        Update: {
+          brand?: string | null
+          category?: string
+          company_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          image_url?: string | null
+          is_serial_tracked?: boolean
+          item_code?: string
+          item_name?: string
+          model?: string | null
+          purchase_date?: string | null
+          section?: string
+          status?: string
+          unit_cost?: number | null
+          unit_of_measurement?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "construction_item_master_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
             referencedColumns: ["id"]
           },
         ]
@@ -3508,17 +3709,16 @@ export type Database = {
           created_by: string | null
           expected_return_date: string | null
           id: string
-          item_id: string
-          item_name: string
-          location_id: string | null
-          quantity: number
-          remarks: string | null
-          repair_status: string
-          sent_date: string
+          issue_description: string | null
+          item_master_id: string
+          quantity: number | null
+          repair_cost: number | null
+          repair_date: string
+          repair_notes: string | null
+          serial_number_id: string | null
           service_provider: string | null
-          unit: string | null
+          status: string
           updated_at: string
-          updated_by: string | null
         }
         Insert: {
           actual_return_date?: string | null
@@ -3527,17 +3727,16 @@ export type Database = {
           created_by?: string | null
           expected_return_date?: string | null
           id?: string
-          item_id: string
-          item_name: string
-          location_id?: string | null
-          quantity?: number
-          remarks?: string | null
-          repair_status?: string
-          sent_date?: string
+          issue_description?: string | null
+          item_master_id: string
+          quantity?: number | null
+          repair_cost?: number | null
+          repair_date?: string
+          repair_notes?: string | null
+          serial_number_id?: string | null
           service_provider?: string | null
-          unit?: string | null
+          status?: string
           updated_at?: string
-          updated_by?: string | null
         }
         Update: {
           actual_return_date?: string | null
@@ -3546,17 +3745,16 @@ export type Database = {
           created_by?: string | null
           expected_return_date?: string | null
           id?: string
-          item_id?: string
-          item_name?: string
-          location_id?: string | null
-          quantity?: number
-          remarks?: string | null
-          repair_status?: string
-          sent_date?: string
+          issue_description?: string | null
+          item_master_id?: string
+          quantity?: number | null
+          repair_cost?: number | null
+          repair_date?: string
+          repair_notes?: string | null
+          serial_number_id?: string | null
           service_provider?: string | null
-          unit?: string | null
+          status?: string
           updated_at?: string
-          updated_by?: string | null
         }
         Relationships: [
           {
@@ -3567,17 +3765,17 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "construction_repair_records_item_id_fkey"
-            columns: ["item_id"]
+            foreignKeyName: "construction_repair_records_item_master_id_fkey"
+            columns: ["item_master_id"]
             isOneToOne: false
-            referencedRelation: "construction_inventory_master"
+            referencedRelation: "construction_item_master"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "construction_repair_records_location_id_fkey"
-            columns: ["location_id"]
+            foreignKeyName: "construction_repair_records_serial_number_id_fkey"
+            columns: ["serial_number_id"]
             isOneToOne: false
-            referencedRelation: "warehouse_locations"
+            referencedRelation: "construction_serial_numbers"
             referencedColumns: ["id"]
           },
         ]
@@ -3670,6 +3868,79 @@ export type Database = {
           },
         ]
       }
+      construction_serial_numbers: {
+        Row: {
+          asset_value: number | null
+          availability: string
+          company_id: string | null
+          condition: string
+          created_at: string
+          created_by: string | null
+          current_location_id: string | null
+          id: string
+          item_master_id: string
+          notes: string | null
+          purchase_date: string | null
+          serial_number: string
+          updated_at: string
+          warranty_expiry: string | null
+        }
+        Insert: {
+          asset_value?: number | null
+          availability?: string
+          company_id?: string | null
+          condition?: string
+          created_at?: string
+          created_by?: string | null
+          current_location_id?: string | null
+          id?: string
+          item_master_id: string
+          notes?: string | null
+          purchase_date?: string | null
+          serial_number: string
+          updated_at?: string
+          warranty_expiry?: string | null
+        }
+        Update: {
+          asset_value?: number | null
+          availability?: string
+          company_id?: string | null
+          condition?: string
+          created_at?: string
+          created_by?: string | null
+          current_location_id?: string | null
+          id?: string
+          item_master_id?: string
+          notes?: string | null
+          purchase_date?: string | null
+          serial_number?: string
+          updated_at?: string
+          warranty_expiry?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "construction_serial_numbers_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "construction_serial_numbers_current_location_id_fkey"
+            columns: ["current_location_id"]
+            isOneToOne: false
+            referencedRelation: "warehouse_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "construction_serial_numbers_item_master_id_fkey"
+            columns: ["item_master_id"]
+            isOneToOne: false
+            referencedRelation: "construction_item_master"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       construction_subcontractor_master: {
         Row: {
           address: string | null
@@ -3728,6 +3999,52 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      construction_transfer_items: {
+        Row: {
+          id: string
+          item_master_id: string
+          quantity: number | null
+          serial_number_id: string | null
+          transfer_id: string
+        }
+        Insert: {
+          id?: string
+          item_master_id: string
+          quantity?: number | null
+          serial_number_id?: string | null
+          transfer_id: string
+        }
+        Update: {
+          id?: string
+          item_master_id?: string
+          quantity?: number | null
+          serial_number_id?: string | null
+          transfer_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "construction_transfer_items_item_master_id_fkey"
+            columns: ["item_master_id"]
+            isOneToOne: false
+            referencedRelation: "construction_item_master"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "construction_transfer_items_serial_number_id_fkey"
+            columns: ["serial_number_id"]
+            isOneToOne: false
+            referencedRelation: "construction_serial_numbers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "construction_transfer_items_transfer_id_fkey"
+            columns: ["transfer_id"]
+            isOneToOne: false
+            referencedRelation: "construction_inventory_transfers"
             referencedColumns: ["id"]
           },
         ]
