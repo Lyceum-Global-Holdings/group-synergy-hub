@@ -143,7 +143,7 @@ export function ItemMasterTable({
                       </TableCell>
                       <TableCell className="font-mono text-sm">{item.item_code || "-"}</TableCell>
                       <TableCell className="font-medium">{item.item_name}</TableCell>
-                      <TableCell className="text-sm text-muted-foreground">{item.description || "-"}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground">{item.serial_number || "-"}</TableCell>
                       <TableCell>
                         <Badge variant="outline">{getSectionLabel(item.section)}</Badge>
                       </TableCell>
