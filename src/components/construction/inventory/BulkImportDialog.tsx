@@ -26,14 +26,18 @@ import {
   AlertCircle,
   Loader2,
   X,
+  Hash,
 } from "lucide-react";
 import { readExcelFile, writeExcelFromAOA } from "@/utils/excelUtils";
-import { useBulkCreateItemMaster } from "@/hooks/construction/useConstructionInventory";
+import { useBulkCreateItemMasterWithSerials } from "@/hooks/construction/useConstructionInventory";
 import {
   type ItemCategory,
   type ItemSection,
+  type SerialCondition,
+  type SerialAvailability,
   ITEM_CATEGORIES,
   ITEM_SECTIONS,
+  SERIAL_CONDITIONS,
 } from "@/types/construction-inventory";
 import { useToast } from "@/hooks/use-toast";
 
@@ -46,6 +50,12 @@ interface ParsedItem {
   unit_of_measurement?: string;
   description?: string;
   unit_cost?: number;
+  // Serial number fields (for machines)
+  serial_number?: string;
+  condition?: SerialCondition;
+  availability?: SerialAvailability;
+  warranty_expiry?: string;
+  asset_value?: number;
   is_valid: boolean;
   errors: string[];
 }
@@ -64,13 +74,14 @@ export function BulkImportDialog({ open, onOpenChange, category }: BulkImportDia
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
-  const bulkCreate = useBulkCreateItemMaster();
+  const bulkCreate = useBulkCreateItemMasterWithSerials();
 
   const categoryLabel = ITEM_CATEGORIES.find(c => c.value === category)?.label || "Items";
   const isMachineCategory = category === "machines";
 
   const handleDownloadTemplate = async () => {
-    const headers = [
+    // Base headers for all categories
+    const baseHeaders = [
       "item_code",
       "item_name",
       "section",
@@ -81,7 +92,19 @@ export function BulkImportDialog({ open, onOpenChange, category }: BulkImportDia
       "unit_cost",
     ];
 
-    const sampleRow = [
+    // Additional headers for machines (serial tracking)
+    const machineHeaders = [
+      "serial_number",
+      "condition",
+      "availability",
+      "warranty_expiry",
+      "asset_value",
+    ];
+
+    const headers = isMachineCategory ? [...baseHeaders, ...machineHeaders] : baseHeaders;
+
+    // Base sample row
+    const baseSampleRow = [
       `${category.toUpperCase().slice(0, 3)}-001`,
       `Sample ${categoryLabel.slice(0, -1)}`,
       "civil",
@@ -92,7 +115,29 @@ export function BulkImportDialog({ open, onOpenChange, category }: BulkImportDia
       "1000",
     ];
 
-    const data = [headers, sampleRow];
+    // Machine-specific sample data
+    const machineSampleRow = [
+      "SN-001",
+      "working",
+      "available",
+      "2026-12-31",
+      "50000",
+    ];
+
+    const sampleRow = isMachineCategory ? [...baseSampleRow, ...machineSampleRow] : baseSampleRow;
+
+    // Add a note row for machines
+    const data = isMachineCategory
+      ? [
+          headers,
+          sampleRow,
+          [],
+          ["# Notes:"],
+          ["# section: civil, mep, aluminium, mechanical, carpenter"],
+          ["# condition: working, under_repair, damaged, scrap"],
+          ["# availability: available, in_use, in_transit, reserved"],
+        ]
+      : [headers, sampleRow];
 
     await writeExcelFromAOA(data, `${category}_import_template.xlsx`, categoryLabel);
     toast({ title: "Template downloaded" });
@@ -125,38 +170,74 @@ export function BulkImportDialog({ open, onOpenChange, category }: BulkImportDia
       const jsonData = await readExcelFile(file);
 
       const validSections = ITEM_SECTIONS.map(s => s.value);
+      const validConditions = SERIAL_CONDITIONS.map(c => c.value);
+      const validAvailabilities = ["available", "in_use", "in_transit", "reserved"];
 
-      const parsed: ParsedItem[] = jsonData.map((row) => {
-        const errors: string[] = [];
+      const parsed: ParsedItem[] = jsonData
+        .filter((row) => {
+          // Skip note/comment rows
+          const firstCell = String(row.item_code || "").trim();
+          return firstCell && !firstCell.startsWith("#");
+        })
+        .map((row) => {
+          const errors: string[] = [];
 
-        const item_code = String(row.item_code || "").trim();
-        const item_name = String(row.item_name || "").trim();
-        const section = String(row.section || "").trim().toLowerCase() as ItemSection;
-        const brand = String(row.brand || "").trim() || undefined;
-        const model = String(row.model || "").trim() || undefined;
-        const unit_of_measurement = String(row.unit_of_measurement || "pcs").trim();
-        const description = String(row.description || "").trim() || undefined;
-        const unit_cost = row.unit_cost ? Number(row.unit_cost) : undefined;
+          const item_code = String(row.item_code || "").trim();
+          const item_name = String(row.item_name || "").trim();
+          const section = String(row.section || "").trim().toLowerCase() as ItemSection;
+          const brand = String(row.brand || "").trim() || undefined;
+          const model = String(row.model || "").trim() || undefined;
+          const unit_of_measurement = String(row.unit_of_measurement || "pcs").trim();
+          const description = String(row.description || "").trim() || undefined;
+          const unit_cost = row.unit_cost ? Number(row.unit_cost) : undefined;
 
-        if (!item_code) errors.push("Missing item code");
-        if (!item_name) errors.push("Missing item name");
-        if (!validSections.includes(section as ItemSection)) {
-          errors.push(`Invalid section: ${section}. Use: ${validSections.join(", ")}`);
-        }
+          // Machine-specific fields
+          const serial_number = isMachineCategory ? String(row.serial_number || "").trim() || undefined : undefined;
+          const condition = isMachineCategory
+            ? (String(row.condition || "working").trim().toLowerCase() as SerialCondition)
+            : undefined;
+          const availability = isMachineCategory
+            ? (String(row.availability || "available").trim().toLowerCase() as SerialAvailability)
+            : undefined;
+          const warranty_expiry = isMachineCategory ? String(row.warranty_expiry || "").trim() || undefined : undefined;
+          const asset_value = isMachineCategory && row.asset_value ? Number(row.asset_value) : undefined;
 
-        return {
-          item_code,
-          item_name,
-          section: validSections.includes(section as ItemSection) ? section : ("civil" as ItemSection),
-          brand,
-          model,
-          unit_of_measurement,
-          description,
-          unit_cost: isNaN(unit_cost!) ? undefined : unit_cost,
-          is_valid: errors.length === 0,
-          errors,
-        };
-      });
+          // Validate required fields
+          if (!item_code) errors.push("Missing item code");
+          if (!item_name) errors.push("Missing item name");
+          if (!validSections.includes(section as ItemSection)) {
+            errors.push(`Invalid section: ${section}`);
+          }
+
+          // Validate machine-specific fields
+          if (isMachineCategory) {
+            if (!serial_number) errors.push("Missing serial number");
+            if (condition && !validConditions.includes(condition)) {
+              errors.push(`Invalid condition: ${condition}`);
+            }
+            if (availability && !validAvailabilities.includes(availability)) {
+              errors.push(`Invalid availability: ${availability}`);
+            }
+          }
+
+          return {
+            item_code,
+            item_name,
+            section: validSections.includes(section as ItemSection) ? section : ("civil" as ItemSection),
+            brand,
+            model,
+            unit_of_measurement,
+            description,
+            unit_cost: isNaN(unit_cost!) ? undefined : unit_cost,
+            serial_number,
+            condition: condition && validConditions.includes(condition) ? condition : "working",
+            availability: availability && validAvailabilities.includes(availability) ? availability : "available",
+            warranty_expiry,
+            asset_value: asset_value && !isNaN(asset_value) ? asset_value : undefined,
+            is_valid: errors.length === 0,
+            errors,
+          };
+        });
 
       setParsedItems(parsed);
     } catch (error: any) {
@@ -196,6 +277,12 @@ export function BulkImportDialog({ open, onOpenChange, category }: BulkImportDia
           description: item.description,
           unit_cost: item.unit_cost,
           is_serial_tracked: isMachineCategory,
+          // Serial data for machines
+          serial_number: item.serial_number,
+          condition: item.condition,
+          availability: item.availability,
+          warranty_expiry: item.warranty_expiry,
+          asset_value: item.asset_value,
         })),
       });
 
@@ -222,12 +309,34 @@ export function BulkImportDialog({ open, onOpenChange, category }: BulkImportDia
     onOpenChange(false);
   };
 
+  const getConditionBadge = (condition?: string) => {
+    if (!condition) return null;
+    const styles: Record<string, string> = {
+      working: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100",
+      under_repair: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-100",
+      damaged: "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-100",
+      scrap: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-100",
+    };
+    return <Badge className={styles[condition] || ""}>{condition.replace("_", " ")}</Badge>;
+  };
+
+  const getAvailabilityBadge = (availability?: string) => {
+    if (!availability) return null;
+    const styles: Record<string, string> = {
+      available: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100",
+      in_use: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-100",
+      in_transit: "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-100",
+      reserved: "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-100",
+    };
+    return <Badge className={styles[availability] || ""}>{availability.replace("_", " ")}</Badge>;
+  };
+
   const validCount = parsedItems.filter(i => i.is_valid).length;
   const invalidCount = parsedItems.filter(i => !i.is_valid).length;
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-hidden flex flex-col">
+      <DialogContent className="sm:max-w-[900px] max-h-[90vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle>Import {categoryLabel} from File</DialogTitle>
         </DialogHeader>
@@ -237,7 +346,14 @@ export function BulkImportDialog({ open, onOpenChange, category }: BulkImportDia
           <Alert>
             <FileSpreadsheet className="h-4 w-4" />
             <AlertDescription className="flex items-center justify-between">
-              <span>Download the template, fill in your data, and upload to import.</span>
+              <div>
+                <span>Download the template, fill in your data, and upload to import.</span>
+                {isMachineCategory && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Machine template includes serial number fields for tracking.
+                  </p>
+                )}
+              </div>
               <Button variant="outline" size="sm" onClick={handleDownloadTemplate}>
                 <Download className="h-4 w-4 mr-2" />
                 Download Template
@@ -270,15 +386,20 @@ export function BulkImportDialog({ open, onOpenChange, category }: BulkImportDia
           {/* Preview Table */}
           {parsedItems.length > 0 && !isParsing && (
             <div className="flex-1 overflow-hidden flex flex-col">
-              <div className="flex items-center gap-2 mb-2">
-                <Badge variant="outline" className="bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-100">
-                  {validCount} valid
-                </Badge>
-                {invalidCount > 0 && (
-                  <Badge variant="outline" className="bg-destructive/10 text-destructive">
-                    {invalidCount} with errors
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <Badge variant="outline" className="bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-100">
+                    {validCount} valid
                   </Badge>
-                )}
+                  {invalidCount > 0 && (
+                    <Badge variant="outline" className="bg-destructive/10 text-destructive">
+                      {invalidCount} with errors
+                    </Badge>
+                  )}
+                </div>
+                <span className="text-sm text-muted-foreground">
+                  Preview of data to be imported
+                </span>
               </div>
 
               <ScrollArea className="flex-1 border rounded-md">
@@ -291,6 +412,13 @@ export function BulkImportDialog({ open, onOpenChange, category }: BulkImportDia
                       <TableHead>Section</TableHead>
                       <TableHead>Brand / Model</TableHead>
                       <TableHead>Unit Cost</TableHead>
+                      {isMachineCategory && (
+                        <>
+                          <TableHead>Serial Number</TableHead>
+                          <TableHead>Condition</TableHead>
+                          <TableHead>Availability</TableHead>
+                        </>
+                      )}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -303,8 +431,8 @@ export function BulkImportDialog({ open, onOpenChange, category }: BulkImportDia
                             <AlertCircle className="h-4 w-4 text-destructive" />
                           )}
                         </TableCell>
-                        <TableCell className="font-mono">{item.item_code}</TableCell>
-                        <TableCell>{item.item_name}</TableCell>
+                        <TableCell className="font-mono text-sm">{item.item_code}</TableCell>
+                        <TableCell className="font-medium">{item.item_name}</TableCell>
                         <TableCell>
                           <Badge variant="secondary">{item.section}</Badge>
                         </TableCell>
@@ -316,6 +444,22 @@ export function BulkImportDialog({ open, onOpenChange, category }: BulkImportDia
                         <TableCell>
                           {item.unit_cost ? `₹${item.unit_cost.toLocaleString()}` : "-"}
                         </TableCell>
+                        {isMachineCategory && (
+                          <>
+                            <TableCell>
+                              {item.serial_number ? (
+                                <div className="flex items-center gap-1">
+                                  <Hash className="h-3 w-3 text-muted-foreground" />
+                                  <span className="font-mono text-sm">{item.serial_number}</span>
+                                </div>
+                              ) : (
+                                <span className="text-destructive text-sm">Missing</span>
+                              )}
+                            </TableCell>
+                            <TableCell>{getConditionBadge(item.condition)}</TableCell>
+                            <TableCell>{getAvailabilityBadge(item.availability)}</TableCell>
+                          </>
+                        )}
                       </TableRow>
                     ))}
                   </TableBody>
@@ -349,7 +493,8 @@ export function BulkImportDialog({ open, onOpenChange, category }: BulkImportDia
             <Alert className="border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/50">
               <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400" />
               <AlertDescription className="text-green-800 dark:text-green-100">
-                Successfully imported {importResult.success} item(s).
+                Successfully imported {importResult.success} item(s)
+                {isMachineCategory && " with serial numbers"}.
                 {importResult.failed > 0 && ` ${importResult.failed} row(s) were skipped due to errors.`}
               </AlertDescription>
             </Alert>

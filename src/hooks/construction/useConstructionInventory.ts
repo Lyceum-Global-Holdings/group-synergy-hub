@@ -640,3 +640,93 @@ export function useBulkCreateItemMaster() {
     },
   });
 }
+
+// ==================== BULK CREATE ITEM MASTER WITH SERIALS (for machines) ====================
+
+export interface BulkCreateItemWithSerialData extends CreateItemMasterWithSerialData {}
+
+export interface BulkCreateItemMasterWithSerialsData {
+  items: BulkCreateItemWithSerialData[];
+}
+
+export function useBulkCreateItemMasterWithSerials() {
+  const queryClient = useQueryClient();
+  const { selectedCompany } = useCompany();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async (data: BulkCreateItemMasterWithSerialsData) => {
+      const { data: user } = await supabase.auth.getUser();
+      const results: { item: any; serial: any }[] = [];
+
+      for (const itemData of data.items) {
+        const { serial_number, current_location_id, condition, availability, warranty_expiry, asset_value, ...baseItemData } = itemData;
+
+        // Create item master
+        const { data: itemResult, error: itemError } = await supabase
+          .from("construction_item_master")
+          .insert({
+            ...baseItemData,
+            company_id: selectedCompany?.id,
+            created_by: user.user?.id,
+          })
+          .select()
+          .single();
+
+        if (itemError) throw itemError;
+
+        let serialResult = null;
+
+        // If serial number provided (for machines), create serial number record
+        if (serial_number && baseItemData.is_serial_tracked) {
+          const { data: serial, error: serialError } = await supabase
+            .from("construction_serial_numbers")
+            .insert({
+              item_master_id: itemResult.id,
+              serial_number,
+              current_location_id: current_location_id || null,
+              condition: condition || "working",
+              availability: availability || "available",
+              warranty_expiry: warranty_expiry || null,
+              asset_value: asset_value || null,
+              company_id: selectedCompany?.id,
+              created_by: user.user?.id,
+            })
+            .select()
+            .single();
+
+          if (serialError) throw serialError;
+          serialResult = serial;
+
+          // Log transaction
+          await supabase.from("construction_inventory_transactions").insert({
+            item_master_id: itemResult.id,
+            serial_number_id: serial.id,
+            transaction_type: "stock_in",
+            quantity_change: 1,
+            location_id: current_location_id || null,
+            notes: `Machine imported with serial number ${serial_number}`,
+            company_id: selectedCompany?.id,
+            performed_by: user.user?.id,
+          });
+        }
+
+        results.push({ item: itemResult, serial: serialResult });
+      }
+
+      return results;
+    },
+    onSuccess: (results) => {
+      // Invalidate all related queries to update allocation views
+      queryClient.invalidateQueries({ queryKey: ["construction-item-master"] });
+      queryClient.invalidateQueries({ queryKey: ["construction-dashboard-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["construction-serial-numbers"] });
+      queryClient.invalidateQueries({ queryKey: ["construction-inventory-stock"] });
+      queryClient.invalidateQueries({ queryKey: ["construction-transactions"] });
+      toast({ title: `${results.length} items imported successfully` });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to import items", description: error.message, variant: "destructive" });
+    },
+  });
+}
