@@ -52,9 +52,10 @@ interface InventoryMasterDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   item?: InventoryMaster | null;
+  presetCategory?: string | null;
 }
 
-export function InventoryMasterDialog({ open, onOpenChange, item }: InventoryMasterDialogProps) {
+export function InventoryMasterDialog({ open, onOpenChange, item, presetCategory }: InventoryMasterDialogProps) {
   const createMutation = useCreateInventoryMaster();
   const updateMutation = useUpdateInventoryMaster();
   const { data: inventoryMaster = [] } = useInventoryMaster();
@@ -104,7 +105,7 @@ export function InventoryMasterDialog({ open, onOpenChange, item }: InventoryMas
         item_code: "",
         item_name: "",
         section: "",
-        category: "",
+        category: presetCategory || "",
         description: "",
         status: "active",
         image_url: "",
@@ -112,7 +113,7 @@ export function InventoryMasterDialog({ open, onOpenChange, item }: InventoryMas
       setImagePreview(null);
       setDuplicateWarning(null);
     }
-  }, [item, form]);
+  }, [item, form, presetCategory]);
 
   // Check for duplicate item name
   const checkDuplicateName = (name: string) => {
