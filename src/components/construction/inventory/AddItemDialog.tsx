@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -29,6 +29,7 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { Loader2 } from "lucide-react";
 import { useCreateItemMasterWithSerial, useLocations } from "@/hooks/construction/useConstructionInventory";
+import { useNextItemCode } from "@/hooks/construction/useNextItemCode";
 import {
   type ItemCategory,
   type ItemSection,
@@ -69,6 +70,7 @@ interface AddItemDialogProps {
 export function AddItemDialog({ open, onOpenChange, category }: AddItemDialogProps) {
   const createItem = useCreateItemMasterWithSerial();
   const { data: locations } = useLocations();
+  const { data: nextItemCode, refetch: refetchNextCode } = useNextItemCode(category);
 
   // Machines are always serial tracked
   const isMachineCategory = category === "machines";
@@ -95,10 +97,19 @@ export function AddItemDialog({ open, onOpenChange, category }: AddItemDialogPro
     },
   });
 
+  // Auto-fill item code when dialog opens or category changes
+  useEffect(() => {
+    if (open && nextItemCode) {
+      form.setValue("item_code", nextItemCode);
+    }
+  }, [open, nextItemCode, form]);
+
   // Reset form when category changes
   useEffect(() => {
     form.setValue("is_serial_tracked", isMachineCategory);
-  }, [category, isMachineCategory, form]);
+    // Refetch next item code when category changes
+    refetchNextCode();
+  }, [category, isMachineCategory, form, refetchNextCode]);
 
   const onSubmit = async (values: FormOutput) => {
     await createItem.mutateAsync({
@@ -144,7 +155,12 @@ export function AddItemDialog({ open, onOpenChange, category }: AddItemDialogPro
                   <FormItem>
                     <FormLabel>Item Code *</FormLabel>
                     <FormControl>
-                      <Input placeholder="e.g., MCH-001" {...field} />
+                      <Input 
+                        placeholder="Auto-generated" 
+                        {...field} 
+                        readOnly 
+                        className="bg-muted"
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
