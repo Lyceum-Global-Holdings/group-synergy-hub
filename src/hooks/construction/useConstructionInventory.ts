@@ -62,19 +62,30 @@ export function useCreateItemMaster() {
 
   return useMutation({
     mutationFn: async (data: CreateItemMasterData) => {
-      const { data: user } = await supabase.auth.getUser();
+      const { data: authData, error: authError } = await supabase.auth.getUser();
+
+      if (authError || !authData.user) {
+        throw new Error("You must be logged in to create items. Please sign in and try again.");
+      }
+
+      if (!selectedCompany?.id) {
+        throw new Error("No company selected. Please select a company first.");
+      }
 
       const { data: result, error } = await supabase
         .from("construction_item_master")
         .insert({
           ...data,
-          company_id: selectedCompany?.id,
-          created_by: user.user?.id,
+          company_id: selectedCompany.id,
+          created_by: authData.user.id,
         })
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error("Create item error:", error);
+        throw error;
+      }
       return result;
     },
     onSuccess: () => {
@@ -86,6 +97,7 @@ export function useCreateItemMaster() {
       toast({ title: "Item created successfully" });
     },
     onError: (error: Error) => {
+      console.error("Create item mutation error:", error);
       toast({ title: "Failed to create item", description: error.message, variant: "destructive" });
     },
   });
@@ -108,7 +120,15 @@ export function useCreateItemMasterWithSerial() {
 
   return useMutation({
     mutationFn: async (data: CreateItemMasterWithSerialData) => {
-      const { data: user } = await supabase.auth.getUser();
+      const { data: authData, error: authError } = await supabase.auth.getUser();
+
+      if (authError || !authData.user) {
+        throw new Error("You must be logged in to create items. Please sign in and try again.");
+      }
+
+      if (!selectedCompany?.id) {
+        throw new Error("No company selected. Please select a company first.");
+      }
 
       // Extract serial number fields
       const { serial_number, current_location_id, condition, availability, warranty_expiry, asset_value, ...itemData } = data;
@@ -118,13 +138,16 @@ export function useCreateItemMasterWithSerial() {
         .from("construction_item_master")
         .insert({
           ...itemData,
-          company_id: selectedCompany?.id,
-          created_by: user.user?.id,
+          company_id: selectedCompany.id,
+          created_by: authData.user.id,
         })
         .select()
         .single();
 
-      if (itemError) throw itemError;
+      if (itemError) {
+        console.error("Create item with serial error:", itemError);
+        throw itemError;
+      }
 
       // If serial number provided (for machines), create serial number record
       if (serial_number && itemData.is_serial_tracked) {
@@ -138,13 +161,16 @@ export function useCreateItemMasterWithSerial() {
             availability: availability || "available",
             warranty_expiry: warranty_expiry || null,
             asset_value: asset_value || null,
-            company_id: selectedCompany?.id,
-            created_by: user.user?.id,
+            company_id: selectedCompany.id,
+            created_by: authData.user.id,
           })
           .select()
           .single();
 
-        if (serialError) throw serialError;
+        if (serialError) {
+          console.error("Create serial error:", serialError);
+          throw serialError;
+        }
 
         // Log transaction
         await supabase.from("construction_inventory_transactions").insert({
@@ -154,8 +180,8 @@ export function useCreateItemMasterWithSerial() {
           quantity_change: 1,
           location_id: current_location_id || null,
           notes: `Machine added with serial number ${serial_number}`,
-          company_id: selectedCompany?.id,
-          performed_by: user.user?.id,
+          company_id: selectedCompany.id,
+          performed_by: authData.user.id,
         });
 
         return { item: itemResult, serial: serialResult };
@@ -173,6 +199,7 @@ export function useCreateItemMasterWithSerial() {
       toast({ title: "Item created successfully" });
     },
     onError: (error: Error) => {
+      console.error("Create item with serial mutation error:", error);
       toast({ title: "Failed to create item", description: error.message, variant: "destructive" });
     },
   });
@@ -656,76 +683,120 @@ export function useBulkCreateItemMasterWithSerials() {
 
   return useMutation({
     mutationFn: async (data: BulkCreateItemMasterWithSerialsData) => {
-      const { data: user } = await supabase.auth.getUser();
+      const { data: authData, error: authError } = await supabase.auth.getUser();
+      
+      // Validate authentication
+      if (authError || !authData.user) {
+        throw new Error("You must be logged in to import items. Please sign in and try again.");
+      }
+
+      // Validate company selection
+      if (!selectedCompany?.id) {
+        throw new Error("No company selected. Please select a company first.");
+      }
+
       const results: { item: any; serial: any }[] = [];
+      const errors: string[] = [];
 
       for (const itemData of data.items) {
         const { serial_number, current_location_id, condition, availability, warranty_expiry, asset_value, ...baseItemData } = itemData;
 
-        // Create item master
-        const { data: itemResult, error: itemError } = await supabase
-          .from("construction_item_master")
-          .insert({
-            ...baseItemData,
-            company_id: selectedCompany?.id,
-            created_by: user.user?.id,
-          })
-          .select()
-          .single();
-
-        if (itemError) throw itemError;
-
-        let serialResult = null;
-
-        // If serial number provided (for machines), create serial number record
-        if (serial_number && baseItemData.is_serial_tracked) {
-          const { data: serial, error: serialError } = await supabase
-            .from("construction_serial_numbers")
+        try {
+          // Create item master
+          const { data: itemResult, error: itemError } = await supabase
+            .from("construction_item_master")
             .insert({
-              item_master_id: itemResult.id,
-              serial_number,
-              current_location_id: current_location_id || null,
-              condition: condition || "working",
-              availability: availability || "available",
-              warranty_expiry: warranty_expiry || null,
-              asset_value: asset_value || null,
-              company_id: selectedCompany?.id,
-              created_by: user.user?.id,
+              ...baseItemData,
+              company_id: selectedCompany.id,
+              created_by: authData.user.id,
             })
             .select()
             .single();
 
-          if (serialError) throw serialError;
-          serialResult = serial;
+          if (itemError) {
+            console.error("Item insert error:", itemError);
+            errors.push(`Failed to create ${itemData.item_name}: ${itemError.message}`);
+            continue;
+          }
 
-          // Log transaction
-          await supabase.from("construction_inventory_transactions").insert({
-            item_master_id: itemResult.id,
-            serial_number_id: serial.id,
-            transaction_type: "stock_in",
-            quantity_change: 1,
-            location_id: current_location_id || null,
-            notes: `Machine imported with serial number ${serial_number}`,
-            company_id: selectedCompany?.id,
-            performed_by: user.user?.id,
-          });
+          let serialResult = null;
+
+          // If serial number provided (for machines), create serial number record
+          if (serial_number && baseItemData.is_serial_tracked) {
+            const { data: serial, error: serialError } = await supabase
+              .from("construction_serial_numbers")
+              .insert({
+                item_master_id: itemResult.id,
+                serial_number,
+                current_location_id: current_location_id || null,
+                condition: condition || "working",
+                availability: availability || "available",
+                warranty_expiry: warranty_expiry || null,
+                asset_value: asset_value || null,
+                company_id: selectedCompany.id,
+                created_by: authData.user.id,
+              })
+              .select()
+              .single();
+
+            if (serialError) {
+              console.error("Serial insert error:", serialError);
+              errors.push(`Failed to create serial for ${itemData.item_name}: ${serialError.message}`);
+            } else {
+              serialResult = serial;
+
+              // Log transaction
+              const { error: txError } = await supabase.from("construction_inventory_transactions").insert({
+                item_master_id: itemResult.id,
+                serial_number_id: serial.id,
+                transaction_type: "stock_in",
+                quantity_change: 1,
+                location_id: current_location_id || null,
+                notes: `Machine imported with serial number ${serial_number}`,
+                company_id: selectedCompany.id,
+                performed_by: authData.user.id,
+              });
+
+              if (txError) {
+                console.error("Transaction log error:", txError);
+              }
+            }
+          }
+
+          results.push({ item: itemResult, serial: serialResult });
+        } catch (err: any) {
+          console.error("Unexpected error for item:", itemData.item_name, err);
+          errors.push(`Unexpected error for ${itemData.item_name}: ${err.message}`);
         }
-
-        results.push({ item: itemResult, serial: serialResult });
       }
 
-      return results;
+      // If all items failed, throw error
+      if (results.length === 0 && errors.length > 0) {
+        throw new Error(`Import failed: ${errors.join("; ")}`);
+      }
+
+      return { results, errors };
     },
-    onSuccess: (results) => {
+    onSuccess: ({ results, errors }) => {
       // Invalidate all related queries to update allocation views
       queryClient.invalidateQueries({ queryKey: ["construction-item-master"] });
       queryClient.invalidateQueries({ queryKey: ["construction-dashboard-stats"] });
       queryClient.invalidateQueries({ queryKey: ["construction-serial-numbers"] });
       queryClient.invalidateQueries({ queryKey: ["construction-inventory-stock"] });
       queryClient.invalidateQueries({ queryKey: ["construction-transactions"] });
-      toast({ title: `${results.length} items imported successfully` });
+      
+      if (errors.length > 0) {
+        toast({ 
+          title: `${results.length} items imported with ${errors.length} errors`, 
+          description: errors.slice(0, 2).join("; "),
+          variant: "destructive" 
+        });
+      } else {
+        toast({ title: `${results.length} items imported successfully` });
+      }
     },
     onError: (error: Error) => {
+      console.error("Bulk import mutation error:", error);
       toast({ title: "Failed to import items", description: error.message, variant: "destructive" });
     },
   });
