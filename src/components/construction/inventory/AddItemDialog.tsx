@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -28,12 +28,13 @@ import {
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Loader2 } from "lucide-react";
-import { useCreateItemMaster } from "@/hooks/construction/useConstructionInventory";
+import { useCreateItemMasterWithSerial, useLocations } from "@/hooks/construction/useConstructionInventory";
 import {
   type ItemCategory,
   type ItemSection,
   ITEM_SECTIONS,
   ITEM_CATEGORIES,
+  SERIAL_CONDITIONS,
 } from "@/types/construction-inventory";
 
 const formSchema = z.object({
@@ -47,6 +48,13 @@ const formSchema = z.object({
   is_serial_tracked: z.boolean().default(false),
   unit_cost: z.coerce.number().optional(),
   purchase_date: z.string().optional(),
+  // Serial number fields (for machines)
+  serial_number: z.string().optional(),
+  current_location_id: z.string().optional(),
+  condition: z.enum(["working", "under_repair", "damaged", "scrap"] as const).default("working"),
+  availability: z.enum(["available", "in_use", "in_transit", "reserved"] as const).default("available"),
+  warranty_expiry: z.string().optional(),
+  asset_value: z.coerce.number().optional(),
 });
 
 type FormData = z.infer<typeof formSchema>;
@@ -59,7 +67,8 @@ interface AddItemDialogProps {
 }
 
 export function AddItemDialog({ open, onOpenChange, category }: AddItemDialogProps) {
-  const createItem = useCreateItemMaster();
+  const createItem = useCreateItemMasterWithSerial();
+  const { data: locations } = useLocations();
 
   // Machines are always serial tracked
   const isMachineCategory = category === "machines";
@@ -77,8 +86,19 @@ export function AddItemDialog({ open, onOpenChange, category }: AddItemDialogPro
       is_serial_tracked: isMachineCategory,
       unit_cost: undefined,
       purchase_date: "",
+      serial_number: "",
+      current_location_id: "",
+      condition: "working",
+      availability: "available",
+      warranty_expiry: "",
+      asset_value: undefined,
     },
   });
+
+  // Reset form when category changes
+  useEffect(() => {
+    form.setValue("is_serial_tracked", isMachineCategory);
+  }, [category, isMachineCategory, form]);
 
   const onSubmit = async (values: FormOutput) => {
     await createItem.mutateAsync({
@@ -93,6 +113,13 @@ export function AddItemDialog({ open, onOpenChange, category }: AddItemDialogPro
       unit_cost: values.unit_cost,
       purchase_date: values.purchase_date,
       is_serial_tracked: isMachineCategory ? true : values.is_serial_tracked,
+      // Serial number data (only for machines)
+      serial_number: isMachineCategory ? values.serial_number : undefined,
+      current_location_id: isMachineCategory ? values.current_location_id : undefined,
+      condition: isMachineCategory ? values.condition : undefined,
+      availability: isMachineCategory ? values.availability : undefined,
+      warranty_expiry: isMachineCategory ? values.warranty_expiry : undefined,
+      asset_value: isMachineCategory ? values.asset_value : undefined,
     });
     form.reset();
     onOpenChange(false);
@@ -294,10 +321,133 @@ export function AddItemDialog({ open, onOpenChange, category }: AddItemDialogPro
             )}
 
             {isMachineCategory && (
-              <div className="rounded-md border p-4 bg-muted/50">
-                <p className="text-sm text-muted-foreground">
-                  <strong>Note:</strong> Machines are automatically serial-tracked. Each unit will have a unique serial number.
+              <div className="space-y-4 rounded-md border p-4 bg-muted/30">
+                <h4 className="font-medium text-sm">Serial Number Details</h4>
+                <p className="text-xs text-muted-foreground mb-3">
+                  Machines are automatically serial-tracked. Enter the serial number for this unit.
                 </p>
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="serial_number"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Serial Number *</FormLabel>
+                        <FormControl>
+                          <Input placeholder="e.g., SN-MCH-001" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="current_location_id"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Location</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select location" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {locations?.map(loc => (
+                              <SelectItem key={loc.id} value={loc.id}>
+                                {loc.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="condition"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Condition</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select condition" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {SERIAL_CONDITIONS.map(cond => (
+                              <SelectItem key={cond.value} value={cond.value}>
+                                {cond.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="availability"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Availability</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select availability" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="available">Available</SelectItem>
+                            <SelectItem value="in_use">In Use</SelectItem>
+                            <SelectItem value="in_transit">In Transit</SelectItem>
+                            <SelectItem value="reserved">Reserved</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="warranty_expiry"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Warranty Expiry</FormLabel>
+                        <FormControl>
+                          <Input type="date" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="asset_value"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Asset Value (₹)</FormLabel>
+                        <FormControl>
+                          <Input type="number" placeholder="0.00" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
               </div>
             )}
 

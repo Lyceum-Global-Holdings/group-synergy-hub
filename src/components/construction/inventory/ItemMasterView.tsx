@@ -12,8 +12,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Search, Plus, Package, Edit, Eye, Upload } from "lucide-react";
-import { useItemMaster } from "@/hooks/construction/useConstructionInventory";
+import { Search, Plus, Package, Edit, Eye, Upload, Hash } from "lucide-react";
+import { useItemMaster, useSerialNumbers } from "@/hooks/construction/useConstructionInventory";
 import { ITEM_CATEGORIES, ITEM_SECTIONS, type ItemCategory } from "@/types/construction-inventory";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AddItemDialog } from "./AddItemDialog";
@@ -26,7 +26,16 @@ export function ItemMasterView() {
   const [importDialogOpen, setImportDialogOpen] = useState(false);
 
   const { data: items, isLoading } = useItemMaster(activeCategory);
+  const { data: serialNumbers } = useSerialNumbers();
 
+  // Group serial numbers by item_master_id
+  const serialsByItem = serialNumbers?.reduce((acc, serial) => {
+    if (!acc[serial.item_master_id]) {
+      acc[serial.item_master_id] = [];
+    }
+    acc[serial.item_master_id].push(serial);
+    return acc;
+  }, {} as Record<string, typeof serialNumbers>) || {};
   // Filter items by search
   const filteredItems = items?.filter(item => {
     if (!searchTerm) return true;
@@ -116,6 +125,9 @@ export function ItemMasterView() {
                       <TableHead className="w-12"></TableHead>
                       <TableHead>Item Code</TableHead>
                       <TableHead>Item Name</TableHead>
+                      {activeCategory === "machines" && (
+                        <TableHead>Serial Numbers</TableHead>
+                      )}
                       <TableHead>Section</TableHead>
                       <TableHead>Brand / Model</TableHead>
                       <TableHead>Unit</TableHead>
@@ -125,54 +137,73 @@ export function ItemMasterView() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredItems.map(item => (
-                      <TableRow key={item.id}>
-                        <TableCell>
-                          {item.image_url ? (
-                            <img src={item.image_url} alt="" className="h-10 w-10 rounded object-cover" />
-                          ) : (
-                            <div className="h-10 w-10 rounded bg-muted flex items-center justify-center">
-                              <Package className="h-5 w-5 text-muted-foreground" />
-                            </div>
-                          )}
-                        </TableCell>
-                        <TableCell className="font-mono">{item.item_code}</TableCell>
-                        <TableCell className="font-medium">
-                          <div>
-                            {item.item_name}
-                            {item.is_serial_tracked && (
-                              <Badge variant="outline" className="ml-2 text-xs">Serial</Badge>
+                    {filteredItems.map(item => {
+                      const itemSerials = serialsByItem[item.id] || [];
+                      return (
+                        <TableRow key={item.id}>
+                          <TableCell>
+                            {item.image_url ? (
+                              <img src={item.image_url} alt="" className="h-10 w-10 rounded object-cover" />
+                            ) : (
+                              <div className="h-10 w-10 rounded bg-muted flex items-center justify-center">
+                                <Package className="h-5 w-5 text-muted-foreground" />
+                              </div>
                             )}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="secondary">
-                            {ITEM_SECTIONS.find(s => s.value === item.section)?.label || item.section}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          {item.brand || item.model 
-                            ? `${item.brand || ""} ${item.model || ""}`.trim()
-                            : "-"
-                          }
-                        </TableCell>
-                        <TableCell>{item.unit_of_measurement}</TableCell>
-                        <TableCell className="text-right">
-                          {item.unit_cost ? `₹${item.unit_cost.toLocaleString()}` : "-"}
-                        </TableCell>
-                        <TableCell>{getStatusBadge(item.status)}</TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-1">
-                            <Button variant="ghost" size="icon" className="h-8 w-8">
-                              <Eye className="h-4 w-4" />
-                            </Button>
-                            <Button variant="ghost" size="icon" className="h-8 w-8">
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                          </TableCell>
+                          <TableCell className="font-mono">{item.item_code}</TableCell>
+                          <TableCell className="font-medium">
+                            <div>
+                              {item.item_name}
+                              {item.is_serial_tracked && (
+                                <Badge variant="outline" className="ml-2 text-xs">Serial</Badge>
+                              )}
+                            </div>
+                          </TableCell>
+                          {activeCategory === "machines" && (
+                            <TableCell>
+                              {itemSerials.length > 0 ? (
+                                <div className="flex flex-wrap gap-1">
+                                  {itemSerials.map(serial => (
+                                    <Badge key={serial.id} variant="secondary" className="text-xs flex items-center gap-1">
+                                      <Hash className="h-3 w-3" />
+                                      {serial.serial_number}
+                                    </Badge>
+                                  ))}
+                                </div>
+                              ) : (
+                                <span className="text-muted-foreground text-sm">No serials</span>
+                              )}
+                            </TableCell>
+                          )}
+                          <TableCell>
+                            <Badge variant="secondary">
+                              {ITEM_SECTIONS.find(s => s.value === item.section)?.label || item.section}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            {item.brand || item.model 
+                              ? `${item.brand || ""} ${item.model || ""}`.trim()
+                              : "-"
+                            }
+                          </TableCell>
+                          <TableCell>{item.unit_of_measurement}</TableCell>
+                          <TableCell className="text-right">
+                            {item.unit_cost ? `₹${item.unit_cost.toLocaleString()}` : "-"}
+                          </TableCell>
+                          <TableCell>{getStatusBadge(item.status)}</TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-1">
+                              <Button variant="ghost" size="icon" className="h-8 w-8">
+                                <Eye className="h-4 w-4" />
+                              </Button>
+                              <Button variant="ghost" size="icon" className="h-8 w-8">
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
                   </TableBody>
                 </Table>
               )}
