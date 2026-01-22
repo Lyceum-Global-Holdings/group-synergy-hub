@@ -321,6 +321,47 @@ export function useCreateSerialNumber() {
   });
 }
 
+export interface UpdateSerialNumberData {
+  id: string;
+  current_location_id?: string | null;
+  condition?: string;
+  availability?: string;
+  notes?: string;
+}
+
+export function useUpdateSerialNumber() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async ({ id, ...data }: UpdateSerialNumberData) => {
+      const { data: result, error } = await supabase
+        .from("construction_serial_numbers")
+        .update({
+          ...data,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", id)
+        .select(`
+          *,
+          location:warehouse_locations(id, name)
+        `)
+        .single();
+
+      if (error) throw error;
+      return result;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["construction-serial-numbers"] });
+      queryClient.invalidateQueries({ queryKey: ["construction-inventory-stock"] });
+      toast({ title: "Serial number updated successfully" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to update serial number", description: error.message, variant: "destructive" });
+    },
+  });
+}
+
 // ==================== STOCK (Non-Serial Items) ====================
 
 export function useInventoryStock(locationId?: string) {
