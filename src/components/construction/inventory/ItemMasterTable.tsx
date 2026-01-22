@@ -111,7 +111,9 @@ export function ItemMasterTable({
                   <TableHead className="w-[60px]">Image</TableHead>
                   <TableHead>Item ID</TableHead>
                   <TableHead>Item Name</TableHead>
+                  <TableHead>Serial No</TableHead>
                   <TableHead>Section</TableHead>
+                  <TableHead>Notes</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
@@ -119,7 +121,7 @@ export function ItemMasterTable({
               <TableBody>
                 {filteredItems?.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                       No {categoryLabel.toLowerCase()} found
                     </TableCell>
                   </TableRow>
@@ -141,8 +143,12 @@ export function ItemMasterTable({
                       </TableCell>
                       <TableCell className="font-mono text-sm">{item.item_code || "-"}</TableCell>
                       <TableCell className="font-medium">{item.item_name}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground">{item.serial_number || "-"}</TableCell>
                       <TableCell>
                         <Badge variant="outline">{getSectionLabel(item.section)}</Badge>
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground max-w-[200px] truncate" title={item.notes || ""}>
+                        {item.notes || "-"}
                       </TableCell>
                       <TableCell>
                         <Badge variant={item.status === "active" ? "default" : "secondary"}>

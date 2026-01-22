@@ -39,9 +39,11 @@ const INVENTORY_CATEGORIES = [
 const formSchema = z.object({
   item_code: z.string().optional(),
   item_name: z.string().min(1, "Item name is required"),
+  serial_number: z.string().optional(),
   section: z.string().min(1, "Section is required"),
   category: z.string().min(1, "Item category is required"),
   description: z.string().optional(),
+  notes: z.string().optional(),
   status: z.string().default("active"),
   image_url: z.string().optional(),
 });
@@ -79,9 +81,11 @@ export function InventoryMasterDialog({ open, onOpenChange, item, presetCategory
     defaultValues: {
       item_code: "",
       item_name: "",
+      serial_number: "",
       section: "",
       category: "",
       description: "",
+      notes: "",
       status: "active",
       image_url: "",
     },
@@ -92,9 +96,11 @@ export function InventoryMasterDialog({ open, onOpenChange, item, presetCategory
       form.reset({
         item_code: item.item_code || "",
         item_name: item.item_name,
+        serial_number: item.serial_number || "",
         section: item.section || "",
         category: item.category || "",
         description: item.description || "",
+        notes: item.notes || "",
         status: item.status,
         image_url: item.image_url || "",
       });
@@ -104,9 +110,11 @@ export function InventoryMasterDialog({ open, onOpenChange, item, presetCategory
       form.reset({
         item_code: "",
         item_name: "",
+        serial_number: "",
         section: "",
         category: presetCategory || "",
         description: "",
+        notes: "",
         status: "active",
         image_url: "",
       });
@@ -275,6 +283,24 @@ export function InventoryMasterDialog({ open, onOpenChange, item, presetCategory
               />
             </div>
 
+            {/* Serial Number */}
+            <FormField
+              control={form.control}
+              name="serial_number"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Serial Number</FormLabel>
+                  <FormControl>
+                    <Input 
+                      placeholder="Enter serial number (optional)" 
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
             {/* Section and Category */}
             <div className="grid grid-cols-2 gap-4">
               <FormField
@@ -337,6 +363,21 @@ export function InventoryMasterDialog({ open, onOpenChange, item, presetCategory
                   <FormLabel>Description</FormLabel>
                   <FormControl>
                     <Textarea placeholder="Enter item description" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            {/* Notes */}
+            <FormField
+              control={form.control}
+              name="notes"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Notes</FormLabel>
+                  <FormControl>
+                    <Textarea placeholder="Enter additional notes (optional)" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
