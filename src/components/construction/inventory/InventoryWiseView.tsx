@@ -18,15 +18,30 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Search, Plus, Package } from "lucide-react";
+import { Search, Plus, Package, Pencil } from "lucide-react";
 import { useItemMaster, useSerialNumbers, useInventoryStock } from "@/hooks/construction/useConstructionInventory";
 import { ITEM_CATEGORIES, type ItemCategory } from "@/types/construction-inventory";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { AddItemDialog } from "./AddItemDialog";
+import { EditSerialLocationDialog } from "./EditSerialLocationDialog";
+
+interface SerialData {
+  id: string;
+  serial_number: string;
+  item_master_id: string;
+  current_location_id?: string | null;
+  condition: string;
+  availability: string;
+  location?: { id: string; name: string } | null;
+}
 
 export function InventoryWiseView() {
   const [searchTerm, setSearchTerm] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
+  const [addDialogOpen, setAddDialogOpen] = useState(false);
+  const [addDialogCategory, setAddDialogCategory] = useState<ItemCategory>("machines");
+  const [editSerialDialogOpen, setEditSerialDialogOpen] = useState(false);
+  const [selectedSerial, setSelectedSerial] = useState<SerialData | null>(null);
 
   const { data: items, isLoading: itemsLoading } = useItemMaster(
     categoryFilter !== "all" ? (categoryFilter as ItemCategory) : undefined
@@ -76,30 +91,46 @@ export function InventoryWiseView() {
     return <Badge className={variants[availability] || ""}>{availability.replace(/_/g, " ")}</Badge>;
   };
 
+  const handleEditSerial = (serial: SerialData) => {
+    setSelectedSerial(serial);
+    setEditSerialDialogOpen(true);
+  };
+
+  const handleAddItem = (category: ItemCategory) => {
+    setAddDialogCategory(category);
+    setAddDialogOpen(true);
+  };
+
   return (
     <div className="space-y-4">
-      {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-4">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search by item name or code..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-9"
-          />
+      {/* Header with Add Item Button */}
+      <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+        <div className="flex flex-col sm:flex-row gap-4 flex-1">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search by item name or code..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-9"
+            />
+          </div>
+          <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+            <SelectTrigger className="w-full sm:w-[180px]">
+              <SelectValue placeholder="All Categories" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Categories</SelectItem>
+              {ITEM_CATEGORIES.map(cat => (
+                <SelectItem key={cat.value} value={cat.value}>{cat.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
-        <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-          <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="All Categories" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Categories</SelectItem>
-            {ITEM_CATEGORIES.map(cat => (
-              <SelectItem key={cat.value} value={cat.value}>{cat.label}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <Button onClick={() => handleAddItem("machines")}>
+          <Plus className="h-4 w-4 mr-2" />
+          Add Item
+        </Button>
       </div>
 
       {/* Items List */}
@@ -114,9 +145,13 @@ export function InventoryWiseView() {
           <CardContent className="py-12 text-center">
             <Package className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
             <h3 className="font-medium">No items found</h3>
-            <p className="text-sm text-muted-foreground">
+            <p className="text-sm text-muted-foreground mb-4">
               {searchTerm ? "Try a different search term" : "Add items to the Item Master to see them here"}
             </p>
+            <Button variant="outline" onClick={() => handleAddItem("machines")}>
+              <Plus className="h-4 w-4 mr-2" />
+              Add First Item
+            </Button>
           </CardContent>
         </Card>
       ) : (
@@ -159,6 +194,7 @@ export function InventoryWiseView() {
                             <TableHead>Location</TableHead>
                             <TableHead>Condition</TableHead>
                             <TableHead>Availability</TableHead>
+                            <TableHead className="w-[60px]">Actions</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -168,6 +204,16 @@ export function InventoryWiseView() {
                               <TableCell>{serial.location?.name || "-"}</TableCell>
                               <TableCell>{getConditionBadge(serial.condition)}</TableCell>
                               <TableCell>{getAvailabilityBadge(serial.availability)}</TableCell>
+                              <TableCell>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => handleEditSerial(serial)}
+                                  title="Edit location & status"
+                                >
+                                  <Pencil className="h-4 w-4" />
+                                </Button>
+                              </TableCell>
                             </TableRow>
                           ))}
                         </TableBody>
@@ -201,6 +247,20 @@ export function InventoryWiseView() {
           ))}
         </div>
       )}
+
+      {/* Add Item Dialog */}
+      <AddItemDialog
+        open={addDialogOpen}
+        onOpenChange={setAddDialogOpen}
+        category={addDialogCategory}
+      />
+
+      {/* Edit Serial Location Dialog */}
+      <EditSerialLocationDialog
+        open={editSerialDialogOpen}
+        onOpenChange={setEditSerialDialogOpen}
+        serial={selectedSerial}
+      />
     </div>
   );
 }
