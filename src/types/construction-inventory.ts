@@ -3,7 +3,7 @@
 export type ItemCategory = 'machines' | 'tools' | 'safety' | 'equipment' | 'scaffolding' | 'others';
 export type ItemSection = 'civil' | 'mep' | 'aluminium' | 'mechanical' | 'carpenter';
 export type ItemStatus = 'active' | 'scrap' | 'sold';
-export type SerialCondition = 'working' | 'under_repair' | 'damaged' | 'scrap';
+export type SerialCondition = 'working' | 'under_repair' | 'need_to_repair' | 'damaged' | 'scrap';
 export type SerialAvailability = 'available' | 'in_use' | 'in_transit' | 'reserved';
 export type TransferStatus = 'pending' | 'in_transit' | 'completed' | 'cancelled';
 export type RepairStatus = 'sent_for_repair' | 'in_repair' | 'repaired' | 'returned' | 'discarded';
@@ -144,6 +144,7 @@ export const ITEM_STATUSES: { value: ItemStatus; label: string }[] = [
 export const SERIAL_CONDITIONS: { value: SerialCondition; label: string }[] = [
   { value: 'working', label: 'Working' },
   { value: 'under_repair', label: 'Under Repair' },
+  { value: 'need_to_repair', label: 'Need to Repair' },
   { value: 'damaged', label: 'Damaged' },
   { value: 'scrap', label: 'Scrap' },
 ];
