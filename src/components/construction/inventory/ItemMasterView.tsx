@@ -14,16 +14,21 @@ import {
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Search, Plus, Package, Edit, Eye, Upload, Hash } from "lucide-react";
 import { useItemMaster, useSerialNumbers } from "@/hooks/construction/useConstructionInventory";
-import { ITEM_CATEGORIES, ITEM_SECTIONS, type ItemCategory } from "@/types/construction-inventory";
+import { ITEM_CATEGORIES, ITEM_SECTIONS, type ItemCategory, type ConstructionItemMaster } from "@/types/construction-inventory";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AddItemDialog } from "./AddItemDialog";
 import { BulkImportDialog } from "./BulkImportDialog";
+import { ItemDetailsDialog } from "./ItemDetailsDialog";
+import { EditItemDialog } from "./EditItemDialog";
 
 export function ItemMasterView() {
   const [searchTerm, setSearchTerm] = useState("");
   const [activeCategory, setActiveCategory] = useState<ItemCategory>("machines");
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [selectedItem, setSelectedItem] = useState<ConstructionItemMaster | null>(null);
+  const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
 
   const { data: items, isLoading } = useItemMaster(activeCategory);
   const { data: serialNumbers } = useSerialNumbers();
@@ -193,10 +198,26 @@ export function ItemMasterView() {
                           <TableCell>{getStatusBadge(item.status)}</TableCell>
                           <TableCell>
                             <div className="flex items-center gap-1">
-                              <Button variant="ghost" size="icon" className="h-8 w-8">
+                              <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                className="h-8 w-8"
+                                onClick={() => {
+                                  setSelectedItem(item);
+                                  setDetailsDialogOpen(true);
+                                }}
+                              >
                                 <Eye className="h-4 w-4" />
                               </Button>
-                              <Button variant="ghost" size="icon" className="h-8 w-8">
+                              <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                className="h-8 w-8"
+                                onClick={() => {
+                                  setSelectedItem(item);
+                                  setEditDialogOpen(true);
+                                }}
+                              >
                                 <Edit className="h-4 w-4" />
                               </Button>
                             </div>
@@ -222,6 +243,16 @@ export function ItemMasterView() {
         open={importDialogOpen}
         onOpenChange={setImportDialogOpen}
         category={activeCategory}
+      />
+      <ItemDetailsDialog
+        open={detailsDialogOpen}
+        onOpenChange={setDetailsDialogOpen}
+        item={selectedItem}
+      />
+      <EditItemDialog
+        open={editDialogOpen}
+        onOpenChange={setEditDialogOpen}
+        item={selectedItem}
       />
     </div>
   );
