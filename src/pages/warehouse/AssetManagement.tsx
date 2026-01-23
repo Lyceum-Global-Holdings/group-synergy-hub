@@ -63,6 +63,8 @@ import { AssetMasterSelector } from "@/components/common/AssetMasterSelector";
 import { AssetMaster } from "@/types/assetMaster";
 import { AssetRequestsTab } from "@/components/warehouse/asset-requests/AssetRequestsTab";
 import { SubcategoryAnalytics } from "@/components/warehouse/SubcategoryAnalytics";
+import { BulkQRCodeDialog } from "@/components/warehouse/BulkQRCodeDialog";
+import { AssetForQR } from "@/utils/bulkQRCodePdf";
 
 const assetFormSchema = z.object({
   asset_master_id: z.string().optional().transform(v => (v === "none" || v === "" ? undefined : v)),
@@ -131,6 +133,8 @@ export default function AssetManagement() {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [selectedAsset, setSelectedAsset] = useState<WarehouseAsset | null>(null);
   const [selectedAssetMaster, setSelectedAssetMaster] = useState<AssetMaster | null>(null);
+  const [createdAssets, setCreatedAssets] = useState<AssetForQR[]>([]);
+  const [showBulkQRDialog, setShowBulkQRDialog] = useState(false);
   
   const { 
     locations,
@@ -144,8 +148,10 @@ export default function AssetManagement() {
     totalCount,
     activeCount,
     maintenanceCount,
-    createAsset, 
+    createAsset,
+    createAssetAsync,
     createBulkAssets,
+    createBulkAssetsAsync,
     updateAsset,
     deleteAsset,
     deleteBulkAssets,
@@ -219,7 +225,7 @@ export default function AssetManagement() {
   }, [selectedAssetMaster, form]);
 
 
-  const onSubmit = (data: AssetFormValues) => {
+  const onSubmit = async (data: AssetFormValues) => {
     console.log("Form submitted with values:", data);
     
     // Helper to normalize ID fields - convert undefined/empty to undefined
@@ -247,17 +253,51 @@ export default function AssetManagement() {
       notes: data.notes,
     };
 
-    if (data.quantity === 1) {
-      createAsset(assetData);
-    } else {
-      // Create array of identical assets for bulk creation
-      const bulkAssets = Array.from({ length: data.quantity }, () => ({ ...assetData }));
-      createBulkAssets(bulkAssets);
+    try {
+      if (data.quantity === 1) {
+        const created = await createAssetAsync(assetData);
+        if (created) {
+          // Show QR dialog for single asset too
+          const assetForQR: AssetForQR = {
+            id: created.id,
+            name: created.name,
+            asset_id: created.asset_id,
+            serial_number: created.serial_number,
+            asset_tag: created.asset_tag,
+          };
+          setCreatedAssets([assetForQR]);
+          setShowBulkQRDialog(true);
+        }
+      } else {
+        // Create array of identical assets for bulk creation
+        const bulkAssets = Array.from({ length: data.quantity }, () => ({ ...assetData }));
+        const createdBulk = await createBulkAssetsAsync(bulkAssets);
+        if (createdBulk && createdBulk.length > 0) {
+          const assetsForQR: AssetForQR[] = createdBulk.map(asset => ({
+            id: asset.id,
+            name: asset.name,
+            asset_id: asset.asset_id,
+            serial_number: asset.serial_number,
+            asset_tag: asset.asset_tag,
+          }));
+          setCreatedAssets(assetsForQR);
+          setShowBulkQRDialog(true);
+        }
+      }
+      
+      setIsDialogOpen(false);
+      form.reset();
+      setSelectedAssetMaster(null);
+    } catch (error) {
+      console.error('Error creating asset(s):', error);
     }
-    
-    setIsDialogOpen(false);
-    form.reset();
-    setSelectedAssetMaster(null);
+  };
+
+  const handleQRDialogClose = (open: boolean) => {
+    setShowBulkQRDialog(open);
+    if (!open) {
+      setCreatedAssets([]);
+    }
   };
 
   const handleSelectAsset = (assetId: string, checked: boolean) => {
@@ -1205,6 +1245,13 @@ export default function AssetManagement() {
         getLocationsByType={getLocationsByType}
         onUpdate={handleBulkUpdate}
         isUpdating={isUpdatingBulk}
+      />
+
+      {/* QR Code Download Dialog - appears after creating assets */}
+      <BulkQRCodeDialog
+        open={showBulkQRDialog}
+        onOpenChange={handleQRDialogClose}
+        assets={createdAssets}
       />
     </div>
   );
