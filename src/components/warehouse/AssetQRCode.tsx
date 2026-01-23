@@ -75,27 +75,37 @@ export default function AssetQRCode({ assetId, assetName, assetIdentifier }: Ass
           qrImg.onload = () => {
             ctx.drawImage(qrImg, padding, padding, qrSize, qrSize);
             
-            // Draw asset ID on RIGHT side
+            // Draw asset ID on RIGHT side - split category path from number
             if (label) {
               const textX = qrSize + padding + 20;
-              const textAreaWidth = labelWidth - qrSize - padding - 30;
               
-              // Calculate font size based on text length
-              let fontSize = 36;
-              ctx.font = `bold ${fontSize}px monospace`;
-              let textMetrics = ctx.measureText(label);
+              const labelParts = label.split('/');
               
-              // Reduce font size if text is too wide
-              while (textMetrics.width > textAreaWidth && fontSize > 16) {
-                fontSize -= 2;
-                ctx.font = `bold ${fontSize}px monospace`;
-                textMetrics = ctx.measureText(label);
+              if (labelParts.length > 1) {
+                // Category path (e.g., FUR/CHA/CH)
+                const categoryPath = labelParts.slice(0, -1).join('/');
+                // Number (e.g., 000468)
+                const number = labelParts[labelParts.length - 1];
+                
+                ctx.fillStyle = '#000000';
+                ctx.textAlign = 'left';
+                ctx.textBaseline = 'middle';
+                
+                // Draw category path on line 1
+                ctx.font = 'bold 28px monospace';
+                ctx.fillText(categoryPath, textX, labelHeight * 0.35);
+                
+                // Draw number on line 2
+                ctx.font = 'bold 32px monospace';
+                ctx.fillText(number, textX, labelHeight * 0.65);
+              } else {
+                // Single part - display centered
+                ctx.font = 'bold 32px monospace';
+                ctx.fillStyle = '#000000';
+                ctx.textAlign = 'left';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(label, textX, labelHeight / 2);
               }
-              
-              ctx.fillStyle = '#000000';
-              ctx.textAlign = 'left';
-              ctx.textBaseline = 'middle';
-              ctx.fillText(label, textX, labelHeight / 2);
             }
             
             // Convert canvas to data URL
