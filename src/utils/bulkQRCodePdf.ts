@@ -47,27 +47,34 @@ export async function generateBulkQRCodePdf(assets: AssetForQR[]): Promise<Blob>
     // QR code on left (~0.9x0.9 inch)
     doc.addImage(qrDataUrl, 'PNG', 0.05, 0.05, 0.9, 0.9);
 
-    // Label text on right
-    doc.setFontSize(10);
+    // Label text on right - split category path from number
+    doc.setFontSize(9);
     doc.setFont('courier', 'bold');
     doc.setTextColor(0, 0, 0);
-    
-    // Truncate label if too long
-    const maxLabelLength = 12;
-    const displayLabel = label.length > maxLabelLength 
-      ? label.slice(0, maxLabelLength) + '...' 
-      : label;
-    
-    doc.text(displayLabel, 1.05, 0.5);
-    
-    // Add asset name in smaller text below
+
+    // Split the label - keep all but last part together, last part on new line
+    const labelParts = label.split('/');
+    if (labelParts.length > 1) {
+      // Category path (e.g., FUR/CHA/CH)
+      const categoryPath = labelParts.slice(0, -1).join('/');
+      // Number (e.g., 001)
+      const number = labelParts[labelParts.length - 1];
+      
+      doc.text(categoryPath, 1.05, 0.4);
+      doc.text(number, 1.05, 0.55);
+    } else {
+      // Single part - display as is
+      doc.text(label, 1.05, 0.45);
+    }
+
+    // Add asset name below
     doc.setFontSize(6);
     doc.setFont('helvetica', 'normal');
     const maxNameLength = 16;
     const displayName = asset.name.length > maxNameLength 
       ? asset.name.slice(0, maxNameLength) + '...' 
       : asset.name;
-    doc.text(displayName, 1.05, 0.65);
+    doc.text(displayName, 1.05, 0.7);
   }
 
   return doc.output('blob');
