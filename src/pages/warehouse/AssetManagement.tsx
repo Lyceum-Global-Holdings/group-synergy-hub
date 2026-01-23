@@ -337,6 +337,19 @@ export default function AssetManagement() {
     setSelectedAssetIds(new Set());
   };
 
+  const handleDownloadSelectedQRCodes = () => {
+    const selectedAssets = assets.filter(asset => selectedAssetIds.has(asset.id));
+    const assetsForQR: AssetForQR[] = selectedAssets.map(asset => ({
+      id: asset.id,
+      name: asset.name,
+      asset_id: asset.asset_id,
+      serial_number: asset.serial_number,
+      asset_tag: asset.asset_tag,
+    }));
+    setCreatedAssets(assetsForQR);
+    setShowBulkQRDialog(true);
+  };
+
 
   const filteredAssets = assets.filter((asset) => {
     // Search term filter
@@ -987,6 +1000,14 @@ export default function AssetManagement() {
                 >
                   <Trash2 className="h-4 w-4 mr-1" />
                   Delete Selected
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleDownloadSelectedQRCodes}
+                >
+                  <FileText className="h-4 w-4 mr-1" />
+                  Download QR Codes
                 </Button>
                 <Button
                   variant="ghost"
