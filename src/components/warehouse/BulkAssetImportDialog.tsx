@@ -24,6 +24,8 @@ import { useWarehouseAssets } from "@/hooks/useWarehouseAssets";
 import { useAssetCategories } from "@/hooks/useAssetCategories";
 import { useWarehouseLocations } from "@/hooks/useWarehouseLocations";
 import { CreateWarehouseAssetData } from "@/types/warehouse";
+import { BulkQRCodeDialog } from "./BulkQRCodeDialog";
+import { AssetForQR } from "@/utils/bulkQRCodePdf";
 
 interface BulkAssetData extends CreateWarehouseAssetData {
   rowIndex: number;
@@ -42,9 +44,11 @@ export function BulkAssetImportDialog() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [validData, setValidData] = useState<BulkAssetData[]>([]);
   const [invalidData, setInvalidData] = useState<BulkAssetData[]>([]);
+  const [importedAssets, setImportedAssets] = useState<AssetForQR[]>([]);
+  const [showQRDialog, setShowQRDialog] = useState(false);
   
   const { toast } = useToast();
-  const { createBulkAssets, isCreatingBulk } = useWarehouseAssets();
+  const { createBulkAssetsAsync, isCreatingBulk } = useWarehouseAssets();
   const { mainCategories, getSubcategories } = useAssetCategories();
   const { locations } = useWarehouseLocations();
 
@@ -358,7 +362,20 @@ export function BulkAssetImportDialog() {
         return cleanAsset;
       });
 
-      await createBulkAssets(cleanedData);
+      const createdAssets = await createBulkAssetsAsync(cleanedData);
+      
+      // Prepare assets for QR code generation
+      if (createdAssets && createdAssets.length > 0) {
+        const assetsForQR: AssetForQR[] = createdAssets.map(asset => ({
+          id: asset.id,
+          name: asset.name,
+          asset_id: asset.asset_id,
+          serial_number: asset.serial_number,
+          asset_tag: asset.asset_tag,
+        }));
+        setImportedAssets(assetsForQR);
+        setShowQRDialog(true);
+      }
       
       toast({
         title: "Success",
@@ -381,6 +398,13 @@ export function BulkAssetImportDialog() {
     setParsedData([]);
     setValidData([]);
     setInvalidData([]);
+  };
+
+  const handleQRDialogClose = (open: boolean) => {
+    setShowQRDialog(open);
+    if (!open) {
+      setImportedAssets([]);
+    }
   };
 
   return (
@@ -543,6 +567,13 @@ export function BulkAssetImportDialog() {
           )}
         </div>
       </DialogContent>
+
+      {/* QR Code Download Dialog */}
+      <BulkQRCodeDialog
+        open={showQRDialog}
+        onOpenChange={handleQRDialogClose}
+        assets={importedAssets}
+      />
     </Dialog>
   );
 }
