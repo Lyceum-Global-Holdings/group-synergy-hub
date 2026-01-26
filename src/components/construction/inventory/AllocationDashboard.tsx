@@ -1,5 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { 
   Package, 
   Wrench, 
@@ -8,16 +9,35 @@ import {
   AlertTriangle,
   CheckCircle2,
   Clock,
-  TrendingUp
+  TrendingUp,
+  RefreshCw
 } from "lucide-react";
 import { useDashboardStats, useTransactions } from "@/hooks/construction/useConstructionInventory";
 import { ITEM_CATEGORIES } from "@/types/construction-inventory";
 import { format } from "date-fns";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 
 export function AllocationDashboard() {
-  const { data: stats, isLoading: statsLoading } = useDashboardStats();
-  const { data: transactions, isLoading: txLoading } = useTransactions(10);
+  const queryClient = useQueryClient();
+  const { data: stats, isLoading: statsLoading, refetch: refetchStats, isFetching: isRefetching } = useDashboardStats();
+  const { data: transactions, isLoading: txLoading, refetch: refetchTx } = useTransactions(10);
+
+  const handleRefresh = async () => {
+    // Invalidate all construction inventory related queries
+    await queryClient.invalidateQueries({ queryKey: ["construction-item-master"] });
+    await queryClient.invalidateQueries({ queryKey: ["construction-serial-numbers"] });
+    await queryClient.invalidateQueries({ queryKey: ["construction-inventory-stock"] });
+    await queryClient.invalidateQueries({ queryKey: ["construction-dashboard-stats"] });
+    await queryClient.invalidateQueries({ queryKey: ["construction-transactions"] });
+    await queryClient.invalidateQueries({ queryKey: ["construction-inventory-transfers"] });
+    await queryClient.invalidateQueries({ queryKey: ["construction-repair-records"] });
+    
+    // Refetch dashboard data
+    await Promise.all([refetchStats(), refetchTx()]);
+    toast.success("Dashboard refreshed");
+  };
 
   if (statsLoading) {
     return (
@@ -33,6 +53,20 @@ export function AllocationDashboard() {
 
   return (
     <div className="space-y-6">
+      {/* Refresh Button */}
+      <div className="flex justify-end">
+        <Button 
+          variant="outline" 
+          size="sm" 
+          onClick={handleRefresh}
+          disabled={isRefetching}
+          className="gap-2"
+        >
+          <RefreshCw className={`h-4 w-4 ${isRefetching ? 'animate-spin' : ''}`} />
+          Refresh
+        </Button>
+      </div>
+
       {/* KPI Cards */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card>

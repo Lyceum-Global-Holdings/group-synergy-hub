@@ -568,37 +568,50 @@ export function useDashboardStats() {
   return useQuery({
     queryKey: ["construction-dashboard-stats", selectedCompany?.id],
     queryFn: async () => {
-      const companyFilter = selectedCompany?.id ? `company_id.eq.${selectedCompany.id}` : "";
-
-      // Get item counts by category
-      const { data: items } = await supabase
+      // Build queries based on company filter
+      let itemsQuery = supabase
         .from("construction_item_master")
-        .select("category, is_serial_tracked")
-        .or(companyFilter || "id.not.is.null");
-
-      // Get serial numbers stats
-      const { data: serials } = await supabase
+        .select("category, is_serial_tracked");
+      
+      let serialsQuery = supabase
         .from("construction_serial_numbers")
-        .select("condition, availability")
-        .or(companyFilter || "id.not.is.null");
-
-      // Get stock totals
-      const { data: stocks } = await supabase
+        .select("condition, availability");
+      
+      let stocksQuery = supabase
         .from("construction_inventory_stock")
-        .select("quantity, reserved_quantity")
-        .or(companyFilter || "id.not.is.null");
-
-      // Get transfer stats
-      const { data: transfers } = await supabase
+        .select("quantity, reserved_quantity");
+      
+      let transfersQuery = supabase
         .from("construction_inventory_transfers")
-        .select("status")
-        .or(companyFilter || "id.not.is.null");
-
-      // Get repair stats
-      const { data: repairs } = await supabase
+        .select("status");
+      
+      let repairsQuery = supabase
         .from("construction_repair_records")
-        .select("status")
-        .or(companyFilter || "id.not.is.null");
+        .select("status");
+
+      // Apply company filter if specific company is selected
+      if (selectedCompany?.id) {
+        itemsQuery = itemsQuery.eq("company_id", selectedCompany.id);
+        serialsQuery = serialsQuery.eq("company_id", selectedCompany.id);
+        stocksQuery = stocksQuery.eq("company_id", selectedCompany.id);
+        transfersQuery = transfersQuery.eq("company_id", selectedCompany.id);
+        repairsQuery = repairsQuery.eq("company_id", selectedCompany.id);
+      }
+
+      // Execute all queries
+      const [itemsResult, serialsResult, stocksResult, transfersResult, repairsResult] = await Promise.all([
+        itemsQuery,
+        serialsQuery,
+        stocksQuery,
+        transfersQuery,
+        repairsQuery,
+      ]);
+
+      const items = itemsResult.data;
+      const serials = serialsResult.data;
+      const stocks = stocksResult.data;
+      const transfers = transfersResult.data;
+      const repairs = repairsResult.data;
 
       // Calculate stats
       const categoryCount = items?.reduce((acc, item) => {
