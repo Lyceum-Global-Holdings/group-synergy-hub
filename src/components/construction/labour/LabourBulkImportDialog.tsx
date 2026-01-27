@@ -30,6 +30,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { readExcelFile, writeExcelFromAOA } from "@/utils/excelUtils";
 import { useBulkCreateLabourMaster, useLabourMaster } from "@/hooks/construction/useLabourMaster";
+import { useLabourCategories } from "@/hooks/construction/useLabourLookups";
 
 interface ParsedLabour {
   employee_id: string;
@@ -51,14 +52,6 @@ interface ParsedLabour {
 
 const VALID_STATUSES = ["active", "inactive"];
 const VALID_SKILL_LEVELS = ["unskilled", "semi_skilled", "skilled", "master"];
-const VALID_CATEGORIES = [
-  "Civil Skill",
-  "MEP Skill",
-  "Aluminium Skill",
-  "Mechanical Skill",
-  "Carpenter",
-  "General",
-];
 
 interface LabourBulkImportDialogProps {
   open: boolean;
@@ -76,6 +69,10 @@ export function LabourBulkImportDialog({
   
   const bulkCreateMutation = useBulkCreateLabourMaster();
   const { data: existingLabour = [] } = useLabourMaster();
+  const { data: categories = [] } = useLabourCategories();
+
+  // Get valid category names from database
+  const validCategoryNames = categories.map((cat) => cat.name);
 
   // Calculate the next starting Employee ID based on existing records
   const getNextEmployeeIdStart = useCallback(() => {
@@ -166,7 +163,7 @@ export function LabourBulkImportDialog({
       [],
       ["# Notes:"],
       ["# Employee ID will be auto-generated (e.g., EMP00001, EMP00002, ...)"],
-      ["# category: Civil Skill, MEP Skill, Aluminium Skill, Mechanical Skill, Carpenter, General"],
+      [`# category: ${validCategoryNames.length > 0 ? validCategoryNames.join(", ") : "Use categories from Add Labour dialog"}`],
       ["# skill_level: unskilled, semi_skilled, skilled, master"],
       ["# status: active, inactive"],
     ];
@@ -448,7 +445,7 @@ export function LabourBulkImportDialog({
                             <SelectValue placeholder="Select" />
                           </SelectTrigger>
                           <SelectContent>
-                            {VALID_CATEGORIES.map((cat) => (
+                            {validCategoryNames.map((cat) => (
                               <SelectItem key={cat} value={cat}>
                                 {cat}
                               </SelectItem>
