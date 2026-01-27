@@ -2,6 +2,8 @@ import { useState, useEffect, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
+import { cn } from "@/lib/utils";
 import { 
   Select,
   SelectContent,
@@ -303,29 +305,22 @@ export function LabourAttendanceSection({
                         </TableCell>
                         <TableCell>
                           {isEditing ? (
-                            <Select
-                              value={att.attendance_status || 'absent'}
-                              onValueChange={(value: 'present' | 'absent') => handleStatusChange(att, value)}
-                              disabled={updateAttendance.isPending}
-                            >
-                              <SelectTrigger className="w-[110px] h-8">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="present">
-                                  <span className="flex items-center gap-1.5">
-                                    <span className="h-2 w-2 rounded-full bg-green-500" />
-                                    Present
-                                  </span>
-                                </SelectItem>
-                                <SelectItem value="absent">
-                                  <span className="flex items-center gap-1.5">
-                                    <span className="h-2 w-2 rounded-full bg-red-500" />
-                                    Absent
-                                  </span>
-                                </SelectItem>
-                              </SelectContent>
-                            </Select>
+                            <div className="flex items-center gap-2">
+                              <Checkbox
+                                checked={att.attendance_status === 'present'}
+                                onCheckedChange={(checked) => 
+                                  handleStatusChange(att, checked ? 'present' : 'absent')
+                                }
+                                disabled={updateAttendance.isPending}
+                                className="h-5 w-5 data-[state=checked]:bg-green-600 data-[state=checked]:border-green-600"
+                              />
+                              <span className={cn(
+                                "text-sm font-medium",
+                                att.attendance_status === 'present' ? "text-green-700" : "text-muted-foreground"
+                              )}>
+                                {att.attendance_status === 'present' ? 'Present' : 'Absent'}
+                              </span>
+                            </div>
                           ) : (
                             <Badge 
                               variant={isPresent ? 'default' : 'secondary'}
