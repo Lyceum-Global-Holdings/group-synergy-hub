@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Plus, Search, Pencil, Trash2, Users, LayoutDashboard, UserSquare2, MapPin } from "lucide-react";
+import { ArrowLeft, Plus, Search, Pencil, Trash2, Users, LayoutDashboard, UserSquare2, MapPin, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
@@ -23,6 +23,7 @@ import { ResourceDialog } from "@/components/construction/dialogs/ResourceDialog
 import { DeleteConfirmDialog } from "@/components/construction/dialogs/DeleteConfirmDialog";
 import { LabourMasterDialog } from "@/components/construction/dialogs/LabourMasterDialog";
 import { LabourDashboard, LabourWiseView, LabourLocationWiseView } from "@/components/construction/labour";
+import { LabourBulkImportDialog } from "@/components/construction/labour/LabourBulkImportDialog";
 
 export default function LabourResources() {
   const navigate = useNavigate();
@@ -39,6 +40,7 @@ export default function LabourResources() {
   const [masterDialogOpen, setMasterDialogOpen] = useState(false);
   const [editingMaster, setEditingMaster] = useState<LabourMaster | null>(null);
   const [deletingMaster, setDeletingMaster] = useState<LabourMaster | null>(null);
+  const [bulkImportOpen, setBulkImportOpen] = useState(false);
 
   // Hooks
   const { data: resources, isLoading: resourcesLoading } = useConstructionResources();
@@ -154,10 +156,16 @@ export default function LabourResources() {
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
-            <Button onClick={() => { setEditingMaster(null); setMasterDialogOpen(true); }}>
-              <Plus className="mr-2 h-4 w-4" />
-              Add Labour
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" onClick={() => setBulkImportOpen(true)}>
+                <Upload className="mr-2 h-4 w-4" />
+                Import Data
+              </Button>
+              <Button onClick={() => { setEditingMaster(null); setMasterDialogOpen(true); }}>
+                <Plus className="mr-2 h-4 w-4" />
+                Add Labour
+              </Button>
+            </div>
           </div>
 
           <Card>
@@ -261,6 +269,11 @@ export default function LabourResources() {
         title="Delete Labour Record"
         description={`Are you sure you want to delete "${deletingMaster?.name}"? This action cannot be undone.`}
         isDeleting={deleteLabourMutation.isPending}
+      />
+
+      <LabourBulkImportDialog
+        open={bulkImportOpen}
+        onOpenChange={setBulkImportOpen}
       />
     </div>
   );

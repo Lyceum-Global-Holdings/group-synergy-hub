@@ -27,7 +27,8 @@ export function useLabourMaster() {
       if (error) throw error;
       return data as LabourMaster[];
     },
-    enabled: true,
+    staleTime: 0,
+    refetchOnMount: "always",
   });
 }
 
@@ -59,6 +60,39 @@ export function useCreateLabourMaster() {
     },
     onError: (error: Error) => {
       toast({ title: "Error creating labour record", description: error.message, variant: "destructive" });
+    },
+  });
+}
+
+export function useBulkCreateLabourMaster() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const { selectedCompany } = useCompany();
+
+  return useMutation({
+    mutationFn: async (items: Omit<CreateLabourMasterData, 'company_id' | 'created_by'>[]) => {
+      const { data: user } = await supabase.auth.getUser();
+      
+      const recordsToInsert = items.map((item) => ({
+        ...item,
+        company_id: selectedCompany?.id,
+        created_by: user.user?.id,
+      }));
+
+      const { data: result, error } = await supabase
+        .from("construction_labour_master")
+        .insert(recordsToInsert)
+        .select();
+
+      if (error) throw error;
+      return result;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["labour-master"] });
+      toast({ title: `Successfully imported ${data.length} labour records` });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error importing labour records", description: error.message, variant: "destructive" });
     },
   });
 }
