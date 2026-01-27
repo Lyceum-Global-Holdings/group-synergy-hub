@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { Plus, Trash2, Package, CalendarDays, Hash } from 'lucide-react';
+import { Plus, Trash2, Package, CalendarDays, Hash, Check, ChevronsUpDown } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -33,15 +33,25 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '@/components/ui/command';
 import { useCompany } from '@/contexts/CompanyContext';
 import { usePurchaseOrders } from '@/hooks/usePurchaseOrders';
 import { useCreateGoodsReceiptNote } from '@/hooks/useGoodsReceiptNotes';
+import { useWarehouseItems } from '@/hooks/useWarehouseItems';
 import { CreateGrnItemData, QualityStatus } from '@/types/grn';
 import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { Badge } from '@/components/ui/badge';
 import { AlertCircle } from 'lucide-react';
 import { InvoiceUploadField } from './InvoiceUploadField';
+import { cn } from '@/lib/utils';
 
 const formSchema = z.object({
   grn_date: z.string(),
@@ -63,10 +73,12 @@ export function CreateGrnDialog({ open, onOpenChange, poId }: CreateGrnDialogPro
   const { selectedCompany } = useCompany();
   const { data: pos = [] } = usePurchaseOrders();
   const createGrn = useCreateGoodsReceiptNote();
+  const { items: warehouseItems = [] } = useWarehouseItems();
 
   const [items, setItems] = useState<CreateGrnItemData[]>([]);
   const [selectedPoId, setSelectedPoId] = useState<string>(poId || '');
   const [invoiceDocumentUrl, setInvoiceDocumentUrl] = useState<string>('');
+  const [itemComboboxOpen, setItemComboboxOpen] = useState<number | null>(null);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -220,6 +232,19 @@ export function CreateGrnDialog({ open, onOpenChange, poId }: CreateGrnDialogPro
     }
 
     newItems[index] = { ...newItems[index], [field]: value };
+
+    // Auto-fill item details when warehouse item is selected
+    if (field === 'warehouse_item_id') {
+      const selectedItem = warehouseItems.find(wi => wi.id === value);
+      if (selectedItem) {
+        newItems[index].item_name = selectedItem.name;
+        newItems[index].is_batch_tracked = selectedItem.is_batch_tracked || false;
+        newItems[index].is_serialized = selectedItem.is_serialized || false;
+        if (selectedItem.unit_cost) {
+          newItems[index].unit_price = Number(selectedItem.unit_cost);
+        }
+      }
+    }
 
     // Auto-calculate total cost
     if (field === 'quantity_received' || field === 'unit_price') {
@@ -398,13 +423,90 @@ export function CreateGrnDialog({ open, onOpenChange, poId }: CreateGrnDialogPro
                           )}
                         </div>
                       ) : (
-                        <Input
-                          value={item.item_name}
-                          onChange={(e) =>
-                            handleItemChange(index, 'item_name', e.target.value)
-                          }
-                          placeholder="Item name"
-                        />
+                        <div className="flex flex-col gap-1">
+                          <Popover 
+                            open={itemComboboxOpen === index} 
+                            onOpenChange={(open) => setItemComboboxOpen(open ? index : null)}
+                          >
+                            <PopoverTrigger asChild>
+                              <Button
+                                variant="outline"
+                                role="combobox"
+                                aria-expanded={itemComboboxOpen === index}
+                                className="w-[180px] justify-between h-9 font-normal"
+                              >
+                                <span className="truncate">
+                                  {item.item_name || "Select or type item..."}
+                                </span>
+                                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-[280px] p-0" align="start">
+                              <Command>
+                                <CommandInput 
+                                  placeholder="Search or type new item..." 
+                                  value={item.item_name}
+                                  onValueChange={(value) => {
+                                    handleItemChange(index, 'item_name', value);
+                                  }}
+                                />
+                                <CommandList>
+                                  <CommandEmpty>
+                                    <div className="py-2 px-3 text-sm">
+                                      <span className="text-muted-foreground">Press Enter to use: </span>
+                                      <span className="font-medium">{item.item_name}</span>
+                                    </div>
+                                  </CommandEmpty>
+                                  <CommandGroup heading="Item Master">
+                                    {warehouseItems
+                                      .filter(wi => 
+                                        wi.name.toLowerCase().includes((item.item_name || '').toLowerCase()) ||
+                                        wi.item_code.toLowerCase().includes((item.item_name || '').toLowerCase())
+                                      )
+                                      .slice(0, 10)
+                                      .map((wi) => (
+                                        <CommandItem
+                                          key={wi.id}
+                                          value={wi.name}
+                                          onSelect={() => {
+                                            handleItemChange(index, 'warehouse_item_id', wi.id);
+                                            setItemComboboxOpen(null);
+                                          }}
+                                        >
+                                          <Check
+                                            className={cn(
+                                              "mr-2 h-4 w-4",
+                                              item.warehouse_item_id === wi.id ? "opacity-100" : "opacity-0"
+                                            )}
+                                          />
+                                          <div className="flex flex-col">
+                                            <span>{wi.name}</span>
+                                            <span className="text-xs text-muted-foreground">{wi.item_code}</span>
+                                          </div>
+                                        </CommandItem>
+                                      ))}
+                                  </CommandGroup>
+                                </CommandList>
+                              </Command>
+                            </PopoverContent>
+                          </Popover>
+                          {(item.is_batch_tracked || item.is_serialized) && (
+                            <div className="flex gap-1">
+                              {item.is_batch_tracked && (
+                                <Badge variant="outline" className="text-xs">
+                                  <Package className="h-3 w-3 mr-1" />
+                                  Batch
+                                </Badge>
+                              )}
+                              {item.is_serialized && (
+                                <Badge variant="outline" className="text-xs">
+                                  <Hash className="h-3 w-3 mr-1" />
+                                  Serial
+                                </Badge>
+                              )}
+                            </div>
+                          )}
+                        </div>
                       )}
                     </TableCell>
                     <TableCell>{item.unit_of_measure}</TableCell>
