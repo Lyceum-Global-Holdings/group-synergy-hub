@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { Upload, Download, FileSpreadsheet, AlertCircle, Check, X } from "lucide-react";
 import {
   Dialog,
@@ -29,7 +29,7 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { readExcelFile, writeExcelFromAOA } from "@/utils/excelUtils";
-import { useBulkCreateLabourMaster } from "@/hooks/construction/useLabourMaster";
+import { useBulkCreateLabourMaster, useLabourMaster } from "@/hooks/construction/useLabourMaster";
 
 interface ParsedLabour {
   employee_id: string;
@@ -75,6 +75,31 @@ export function LabourBulkImportDialog({
   const [fileName, setFileName] = useState<string | null>(null);
   
   const bulkCreateMutation = useBulkCreateLabourMaster();
+  const { data: existingLabour = [] } = useLabourMaster();
+
+  // Calculate the next starting Employee ID based on existing records
+  const getNextEmployeeIdStart = useCallback(() => {
+    const existingIds = existingLabour
+      .map((l) => l.employee_id)
+      .filter((id): id is string => !!id && id.startsWith("EMP"))
+      .map((id) => parseInt(id.substring(3), 10))
+      .filter((num) => !isNaN(num));
+    
+    return existingIds.length > 0 ? Math.max(...existingIds) + 1 : 1;
+  }, [existingLabour]);
+
+  // Auto-assign Employee IDs when items are parsed
+  useEffect(() => {
+    if (parsedItems.length > 0) {
+      const startIndex = getNextEmployeeIdStart();
+      setParsedItems((prev) =>
+        prev.map((item, index) => ({
+          ...item,
+          employee_id: `EMP${String(startIndex + index).padStart(5, "0")}`,
+        }))
+      );
+    }
+  }, [existingLabour.length]); // Only re-run when existing data changes
 
   const revalidateItem = useCallback((item: ParsedLabour): ParsedLabour => {
     const errors: string[] = [];
@@ -104,8 +129,8 @@ export function LabourBulkImportDialog({
   }, [revalidateItem]);
 
   const handleDownloadTemplate = async () => {
+    // Remove employee_id from template - it will be auto-generated
     const headers = [
-      "employee_id",
       "name",
       "epf_no",
       "trade",
@@ -121,7 +146,6 @@ export function LabourBulkImportDialog({
     ];
 
     const sampleRow = [
-      "EMP00001",
       "John Doe",
       "EPF12345",
       "Mason",
@@ -141,6 +165,7 @@ export function LabourBulkImportDialog({
       sampleRow,
       [],
       ["# Notes:"],
+      ["# Employee ID will be auto-generated (e.g., EMP00001, EMP00002, ...)"],
       ["# category: Civil Skill, MEP Skill, Aluminium Skill, Mechanical Skill, Carpenter, General"],
       ["# skill_level: unskilled, semi_skilled, skilled, master"],
       ["# status: active, inactive"],
@@ -154,17 +179,19 @@ export function LabourBulkImportDialog({
     setIsParsing(true);
     try {
       const jsonData = await readExcelFile(file);
+      const startIndex = getNextEmployeeIdStart();
 
       const parsed: ParsedLabour[] = jsonData
         .filter((row) => {
-          const firstCell = String(row.name || row.employee_id || "").trim();
+          const firstCell = String(row.name || "").trim();
           return firstCell && !firstCell.startsWith("#");
         })
-        .map((row) => {
+        .map((row, index) => {
           const errors: string[] = [];
 
           const name = String(row.name || "").trim();
-          const employee_id = String(row.employee_id || "").trim();
+          // Auto-generate Employee ID sequentially
+          const employee_id = `EMP${String(startIndex + index).padStart(5, "0")}`;
           const epf_no = String(row.epf_no || "").trim();
           const trade = String(row.trade || "").trim();
           const category = String(row.category || "").trim();
@@ -393,8 +420,9 @@ export function LabourBulkImportDialog({
                       <TableCell>
                         <Input
                           value={item.employee_id}
-                          onChange={(e) => updateItemField(index, "employee_id", e.target.value)}
-                          className="h-8 w-24"
+                          disabled
+                          className="h-8 w-28 bg-muted text-muted-foreground"
+                          title="Auto-generated"
                         />
                       </TableCell>
                       <TableCell>
