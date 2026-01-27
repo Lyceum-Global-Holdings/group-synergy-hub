@@ -674,21 +674,71 @@ export function useLocations() {
   const { selectedCompany } = useCompany();
 
   return useQuery({
-    queryKey: ["warehouse-locations", selectedCompany?.id],
+    queryKey: ["warehouse-locations-with-inventory", selectedCompany?.id],
     queryFn: async () => {
-      let query = supabase
+      // First, get all locations (either matching company or NULL company_id)
+      let locationsQuery = supabase
         .from("warehouse_locations")
         .select("id, name, type")
         .order("name", { ascending: true });
 
+      // When a company is selected, we need locations that:
+      // 1. Belong to the company, OR
+      // 2. Have NULL company_id (shared locations), OR
+      // 3. Have inventory items for this company (handled by checking related data)
       if (selectedCompany?.id) {
-        query = query.eq("company_id", selectedCompany.id);
+        locationsQuery = locationsQuery.or(`company_id.eq.${selectedCompany.id},company_id.is.null`);
       }
 
-      const { data, error } = await query;
-      if (error) throw error;
-      return data;
+      const { data: locations, error: locError } = await locationsQuery;
+      if (locError) throw locError;
+
+      // If a company is selected, also fetch locations that have serials/stocks for this company
+      if (selectedCompany?.id) {
+        // Get location IDs from serial numbers for this company
+        const { data: serialLocations } = await supabase
+          .from("construction_serial_numbers")
+          .select("current_location_id")
+          .eq("company_id", selectedCompany.id)
+          .not("current_location_id", "is", null);
+
+        // Get location IDs from inventory stock for this company
+        const { data: stockLocations } = await supabase
+          .from("construction_inventory_stock")
+          .select("location_id")
+          .eq("company_id", selectedCompany.id)
+          .not("location_id", "is", null);
+
+        // Collect unique location IDs that have inventory
+        const inventoryLocationIds = new Set<string>();
+        serialLocations?.forEach(s => {
+          if (s.current_location_id) inventoryLocationIds.add(s.current_location_id);
+        });
+        stockLocations?.forEach(s => {
+          if (s.location_id) inventoryLocationIds.add(s.location_id);
+        });
+
+        // If there are additional locations with inventory, fetch them
+        const existingLocationIds = new Set(locations?.map(l => l.id) || []);
+        const missingLocationIds = Array.from(inventoryLocationIds).filter(id => !existingLocationIds.has(id));
+
+        if (missingLocationIds.length > 0) {
+          const { data: additionalLocations } = await supabase
+            .from("warehouse_locations")
+            .select("id, name, type")
+            .in("id", missingLocationIds);
+
+          if (additionalLocations) {
+            locations?.push(...additionalLocations);
+          }
+        }
+      }
+
+      // Sort by name
+      return (locations || []).sort((a, b) => a.name.localeCompare(b.name));
     },
+    staleTime: 0,
+    refetchOnMount: "always",
   });
 }
 
