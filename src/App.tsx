@@ -99,8 +99,10 @@ const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       retry: 1,
-      staleTime: 5 * 60 * 1000,
-      refetchOnWindowFocus: false,
+      staleTime: 0, // Always fetch fresh data to prevent stale cache issues
+      gcTime: 5 * 60 * 1000, // Keep unused data in cache for 5 minutes for quick navigation
+      refetchOnWindowFocus: true, // Refetch when user returns to tab
+      refetchOnMount: 'always', // Always refetch when component mounts
     },
   },
 });
