@@ -37,6 +37,8 @@ export function useItemMaster(category?: ItemCategory) {
       if (error) throw error;
       return data as ConstructionItemMaster[];
     },
+    staleTime: 0,
+    refetchOnMount: "always",
   });
 }
 
@@ -260,6 +262,8 @@ export function useSerialNumbers(itemMasterId?: string) {
       if (error) throw error;
       return data as ConstructionSerialNumber[];
     },
+    staleTime: 0,
+    refetchOnMount: "always",
   });
 }
 
@@ -391,6 +395,8 @@ export function useInventoryStock(locationId?: string) {
       if (error) throw error;
       return data as ConstructionInventoryStock[];
     },
+    staleTime: 0,
+    refetchOnMount: "always",
   });
 }
 
@@ -496,6 +502,8 @@ export function useTransfers(status?: string) {
       if (error) throw error;
       return data as ConstructionTransfer[];
     },
+    staleTime: 0,
+    refetchOnMount: "always",
   });
 }
 
@@ -528,6 +536,8 @@ export function useRepairRecords(status?: string) {
       if (error) throw error;
       return data as ConstructionRepairRecord[];
     },
+    staleTime: 0,
+    refetchOnMount: "always",
   });
 }
 
@@ -557,10 +567,10 @@ export function useTransactions(limit: number = 50) {
       if (error) throw error;
       return data;
     },
+    staleTime: 0,
+    refetchOnMount: "always",
   });
 }
-
-// ==================== DASHBOARD STATS ====================
 
 export function useDashboardStats() {
   const { selectedCompany } = useCompany();
@@ -652,6 +662,9 @@ export function useDashboardStats() {
         repairStats,
       };
     },
+    staleTime: 0, // Always consider data stale
+    refetchOnMount: "always", // Always refetch when component mounts
+    refetchOnWindowFocus: true, // Refetch when window regains focus
   });
 }
 
