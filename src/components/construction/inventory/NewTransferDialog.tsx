@@ -52,13 +52,16 @@ export function NewTransferDialog({ open, onOpenChange }: NewTransferDialogProps
   // Check if selected category is serial-tracked (machines)
   const isSerialTracked = category === "machines";
 
-  // Get serial numbers available at the selected from location
+  // Get serial numbers available at the selected from location for this category
   const serialsAtLocation = useMemo(() => {
-    if (!fromLocationId || !allSerials) return [];
+    if (!fromLocationId || !allSerials || !category) return [];
     return allSerials.filter(
-      s => s.current_location_id === fromLocationId && s.availability === "available"
+      s => s.current_location_id === fromLocationId && 
+           s.availability === "available" &&
+           s.condition !== "under_repair" &&
+           s.item_master?.category === category
     );
-  }, [allSerials, fromLocationId]);
+  }, [allSerials, fromLocationId, category]);
 
   // Get total available count at the from location
   const totalAvailableAtLocation = useMemo(() => {
@@ -131,37 +134,53 @@ export function NewTransferDialog({ open, onOpenChange }: NewTransferDialogProps
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Prevent double submission
-    if (isSubmittingRef.current || createTransfer.isPending) {
+    // Strict double submission prevention - check ref first
+    if (isSubmittingRef.current) {
+      console.log("Blocked: already submitting (ref)");
       return;
     }
+
+    // Then check mutation state
+    if (createTransfer.isPending) {
+      console.log("Blocked: mutation pending");
+      return;
+    }
+
+    // Set flag immediately before any async work
+    isSubmittingRef.current = true;
 
     // Check company selection
     if (!selectedCompany?.id) {
       toast.error("Please select a company before creating a transfer");
+      isSubmittingRef.current = false;
       return;
     }
 
     if (!fromLocationId || !toLocationId || quantity <= 0) {
+      isSubmittingRef.current = false;
       return;
     }
 
     if (fromLocationId === toLocationId) {
+      isSubmittingRef.current = false;
       return;
     }
 
     // For serial-tracked items, ensure all serials are selected
     if (isSerialTracked) {
       if (selectedSerialIds.length !== quantity || selectedSerialIds.some(id => !id)) {
+        isSubmittingRef.current = false;
         return;
       }
       
       // Get the first selected serial to determine item_master_id
       const firstSerial = serialsAtLocation.find(s => s.id === selectedSerialIds[0]);
-      if (!firstSerial) return;
+      if (!firstSerial) {
+        isSubmittingRef.current = false;
+        return;
+      }
 
       try {
-        isSubmittingRef.current = true;
         await createTransfer.mutateAsync({
           fromLocationId,
           toLocationId,
@@ -171,12 +190,15 @@ export function NewTransferDialog({ open, onOpenChange }: NewTransferDialogProps
           notes: notes || undefined,
         });
         onOpenChange(false);
+      } catch (error) {
+        // Error already handled by mutation onError
       } finally {
         isSubmittingRef.current = false;
       }
     } else {
       // For non-serial items, we need to handle differently
       // This would need item selection - but for now we focus on machines
+      isSubmittingRef.current = false;
       return;
     }
   };
