@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import {
   Dialog,
   DialogContent,
@@ -21,6 +21,8 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useItemMaster, useSerialNumbers, useLocations, useInventoryStock } from "@/hooks/construction/useConstructionInventory";
 import { useCreateTransfer } from "@/hooks/construction/useCreateTransfer";
 import { ITEM_CATEGORIES, type ItemCategory } from "@/types/construction-inventory";
+import { useCompany } from "@/contexts/CompanyContext";
+import { toast } from "sonner";
 
 interface NewTransferDialogProps {
   open: boolean;
@@ -34,6 +36,10 @@ export function NewTransferDialog({ open, onOpenChange }: NewTransferDialogProps
   const [quantity, setQuantity] = useState<number>(0);
   const [selectedSerialIds, setSelectedSerialIds] = useState<string[]>([]);
   const [notes, setNotes] = useState("");
+  const isSubmittingRef = useRef(false);
+
+  // Get company context
+  const { selectedCompany } = useCompany();
 
   // Fetch data
   const { data: allItems, isLoading: itemsLoading } = useItemMaster(category as ItemCategory | undefined);
@@ -125,6 +131,17 @@ export function NewTransferDialog({ open, onOpenChange }: NewTransferDialogProps
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    // Prevent double submission
+    if (isSubmittingRef.current || createTransfer.isPending) {
+      return;
+    }
+
+    // Check company selection
+    if (!selectedCompany?.id) {
+      toast.error("Please select a company before creating a transfer");
+      return;
+    }
+
     if (!fromLocationId || !toLocationId || quantity <= 0) {
       return;
     }
@@ -143,25 +160,32 @@ export function NewTransferDialog({ open, onOpenChange }: NewTransferDialogProps
       const firstSerial = serialsAtLocation.find(s => s.id === selectedSerialIds[0]);
       if (!firstSerial) return;
 
-      await createTransfer.mutateAsync({
-        fromLocationId,
-        toLocationId,
-        itemMasterId: firstSerial.item_master_id,
-        quantity,
-        serialNumberIds: selectedSerialIds,
-        notes: notes || undefined,
-      });
+      try {
+        isSubmittingRef.current = true;
+        await createTransfer.mutateAsync({
+          fromLocationId,
+          toLocationId,
+          itemMasterId: firstSerial.item_master_id,
+          quantity,
+          serialNumberIds: selectedSerialIds,
+          notes: notes || undefined,
+        });
+        onOpenChange(false);
+      } finally {
+        isSubmittingRef.current = false;
+      }
     } else {
       // For non-serial items, we need to handle differently
       // This would need item selection - but for now we focus on machines
       return;
     }
-
-    onOpenChange(false);
   };
 
-  // Form validation
+  // Form validation - include company check
   const isFormValid = useMemo(() => {
+    // Must have a company selected
+    if (!selectedCompany?.id) return false;
+    
     const baseValid = 
       fromLocationId && 
       toLocationId && 
@@ -176,7 +200,7 @@ export function NewTransferDialog({ open, onOpenChange }: NewTransferDialogProps
     }
     
     return baseValid;
-  }, [fromLocationId, toLocationId, quantity, totalAvailableAtLocation, isSerialTracked, selectedSerialIds]);
+  }, [selectedCompany, fromLocationId, toLocationId, quantity, totalAvailableAtLocation, isSerialTracked, selectedSerialIds]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -186,6 +210,16 @@ export function NewTransferDialog({ open, onOpenChange }: NewTransferDialogProps
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4 max-w-2xl">
+          {/* Company Selection Warning */}
+          {!selectedCompany?.id && (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>
+                Please select a specific company before creating a transfer. You are currently viewing "All Companies".
+              </AlertDescription>
+            </Alert>
+          )}
+
           {/* 1. Category */}
           <div className="space-y-2">
             <Label htmlFor="category">Category</Label>
