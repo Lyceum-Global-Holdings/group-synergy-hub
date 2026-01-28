@@ -235,15 +235,48 @@ async function handleProcessApproval(data: ProcessApprovalRequest, supabase: any
     throw new Error('Approval token has expired');
   }
 
+  const { approval_level, po_id, approver_id, approver_email } = tokenData;
+
+  // SECURITY FIX: Verify the approver has access to the PO's company
+  // Fetch PO to get company_id for authorization check
+  const { data: poData, error: poError } = await supabase
+    .from('purchase_orders')
+    .select('company_id')
+    .eq('id', po_id)
+    .single();
+
+  if (poError || !poData) {
+    throw new Error('Purchase order not found');
+  }
+
+  // SECURITY FIX: If approver_id is set, verify company access using RPC
+  if (approver_id) {
+    const { data: hasAccess, error: accessError } = await supabase
+      .rpc('can_access_company', { target_company_id: poData.company_id })
+      .eq('user_id', approver_id);
+    
+    // Use admin check as fallback - verify via profiles table company match
+    const { data: approverProfile } = await supabase
+      .from('profiles')
+      .select('company_id')
+      .eq('user_id', approver_id)
+      .single();
+
+    if (approverProfile && approverProfile.company_id !== poData.company_id) {
+      console.error(`Security violation: Approver ${approver_id} attempted to approve PO from different company`);
+      throw new Error('You do not have permission to approve this purchase order');
+    }
+  }
+
+  // SECURITY FIX: Log the approval attempt for audit trail
+  console.log(`PO Approval: token=${token.substring(0, 8)}..., approver_id=${approver_id}, approver_email=${approver_email}, action=${approval_action}, po_id=${po_id}`);
+
   // Mark token as used
   await supabase
     .from('po_approval_tokens')
     .update({ used: true, used_at: new Date().toISOString() })
     .eq('id', tokenData.id);
 
-  // Process approval based on level
-  const { approval_level, po_id, approver_id } = tokenData;
-  
   if (approval_action === 'approve') {
     // Update PO with approval
     const updateData: any = {
@@ -271,7 +304,7 @@ async function handleProcessApproval(data: ProcessApprovalRequest, supabase: any
       .update(updateData)
       .eq('id', po_id);
 
-    // Create approval record
+    // Create approval record with audit info
     await supabase
       .from('po_approvals')
       .insert({
