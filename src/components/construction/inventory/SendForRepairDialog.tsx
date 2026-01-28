@@ -60,8 +60,10 @@ export function SendForRepairDialog({ open, onOpenChange }: SendForRepairDialogP
     return allSerials.filter(s => {
       // Must be at this location
       if (s.current_location_id !== locationId) return false;
-      // Must be available (not already in repair)
+      // Must be available (not already in repair or in transit)
       if (s.availability !== "available") return false;
+      // Must not be under_repair condition
+      if (s.condition === "under_repair") return false;
       // Must match selected category
       if (s.item_master?.category !== category) return false;
       return true;
@@ -128,33 +130,48 @@ export function SendForRepairDialog({ open, onOpenChange }: SendForRepairDialogP
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Prevent double submission
-    if (isSubmittingRef.current || sendForRepair.isPending) {
+    // Strict double submission prevention - check ref first
+    if (isSubmittingRef.current) {
+      console.log("Blocked: already submitting (ref)");
       return;
     }
+
+    // Then check mutation state
+    if (sendForRepair.isPending) {
+      console.log("Blocked: mutation pending");
+      return;
+    }
+
+    // Set flag immediately before any async work
+    isSubmittingRef.current = true;
 
     // Check company selection
     if (!selectedCompany?.id) {
       toast.error("Please select a company before sending items for repair");
+      isSubmittingRef.current = false;
       return;
     }
 
     if (!locationId || !repairCentre || quantity <= 0) {
+      isSubmittingRef.current = false;
       return;
     }
 
     // For serial-tracked items, ensure all serials are selected
     if (isSerialTracked) {
       if (selectedSerialIds.length !== quantity || selectedSerialIds.some(id => !id)) {
+        isSubmittingRef.current = false;
         return;
       }
       
       // Get the first selected serial to determine item_master_id
       const firstSerial = serialsAtLocation.find(s => s.id === selectedSerialIds[0]);
-      if (!firstSerial) return;
+      if (!firstSerial) {
+        isSubmittingRef.current = false;
+        return;
+      }
 
       try {
-        isSubmittingRef.current = true;
         await sendForRepair.mutateAsync({
           locationId,
           repairCentre,
@@ -165,11 +182,14 @@ export function SendForRepairDialog({ open, onOpenChange }: SendForRepairDialogP
           notes: notes || undefined,
         });
         onOpenChange(false);
+      } catch (error) {
+        // Error already handled by mutation onError
       } finally {
         isSubmittingRef.current = false;
       }
     } else {
       // For non-serial items, we don't support bulk repairs for now
+      isSubmittingRef.current = false;
       return;
     }
   };
