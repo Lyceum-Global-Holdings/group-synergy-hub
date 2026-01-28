@@ -87,13 +87,13 @@ export function useCreateTransfer() {
         if (isSerialTransfer) {
           // Handle serial-tracked transfers (machines)
           for (const serialId of data.serialNumberIds!) {
-            // Create transfer item for each serial
+            // Create transfer item for each serial - constraint requires ONLY serial_number_id (no quantity)
             const { error: itemError } = await supabase
               .from("construction_transfer_items")
               .insert({
                 transfer_id: transfer.id,
                 item_master_id: data.itemMasterId,
-                quantity: 1,
+                quantity: null,
                 serial_number_id: serialId,
               });
 
