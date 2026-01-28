@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import {
   Dialog,
   DialogContent,
@@ -21,6 +21,8 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useItemMaster, useSerialNumbers, useLocations } from "@/hooks/construction/useConstructionInventory";
 import { useSendForRepair } from "@/hooks/construction/useSendForRepair";
 import { ITEM_CATEGORIES, type ItemCategory } from "@/types/construction-inventory";
+import { useCompany } from "@/contexts/CompanyContext";
+import { toast } from "sonner";
 
 interface SendForRepairDialogProps {
   open: boolean;
@@ -35,6 +37,10 @@ export function SendForRepairDialog({ open, onOpenChange }: SendForRepairDialogP
   const [selectedSerialIds, setSelectedSerialIds] = useState<string[]>([]);
   const [issueDescription, setIssueDescription] = useState("");
   const [notes, setNotes] = useState("");
+  const isSubmittingRef = useRef(false);
+
+  // Get company context
+  const { selectedCompany } = useCompany();
 
   // Fetch data
   const { data: allItems, isLoading: itemsLoading } = useItemMaster(category as ItemCategory | undefined);
@@ -122,6 +128,17 @@ export function SendForRepairDialog({ open, onOpenChange }: SendForRepairDialogP
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    // Prevent double submission
+    if (isSubmittingRef.current || sendForRepair.isPending) {
+      return;
+    }
+
+    // Check company selection
+    if (!selectedCompany?.id) {
+      toast.error("Please select a company before sending items for repair");
+      return;
+    }
+
     if (!locationId || !repairCentre || quantity <= 0) {
       return;
     }
@@ -136,25 +153,32 @@ export function SendForRepairDialog({ open, onOpenChange }: SendForRepairDialogP
       const firstSerial = serialsAtLocation.find(s => s.id === selectedSerialIds[0]);
       if (!firstSerial) return;
 
-      await sendForRepair.mutateAsync({
-        locationId,
-        repairCentre,
-        itemMasterId: firstSerial.item_master_id,
-        quantity,
-        serialNumberIds: selectedSerialIds,
-        issueDescription: issueDescription || undefined,
-        notes: notes || undefined,
-      });
+      try {
+        isSubmittingRef.current = true;
+        await sendForRepair.mutateAsync({
+          locationId,
+          repairCentre,
+          itemMasterId: firstSerial.item_master_id,
+          quantity,
+          serialNumberIds: selectedSerialIds,
+          issueDescription: issueDescription || undefined,
+          notes: notes || undefined,
+        });
+        onOpenChange(false);
+      } finally {
+        isSubmittingRef.current = false;
+      }
     } else {
       // For non-serial items, we don't support bulk repairs for now
       return;
     }
-
-    onOpenChange(false);
   };
 
-  // Form validation
+  // Form validation - include company check
   const isFormValid = useMemo(() => {
+    // Must have a company selected
+    if (!selectedCompany?.id) return false;
+    
     const baseValid = 
       locationId && 
       repairCentre.trim() !== "" &&
@@ -168,7 +192,7 @@ export function SendForRepairDialog({ open, onOpenChange }: SendForRepairDialogP
     }
     
     return baseValid;
-  }, [locationId, repairCentre, quantity, totalAvailableAtLocation, isSerialTracked, selectedSerialIds]);
+  }, [selectedCompany, locationId, repairCentre, quantity, totalAvailableAtLocation, isSerialTracked, selectedSerialIds]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -178,6 +202,16 @@ export function SendForRepairDialog({ open, onOpenChange }: SendForRepairDialogP
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4 max-w-2xl">
+          {/* Company Selection Warning */}
+          {!selectedCompany?.id && (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>
+                Please select a specific company before sending items for repair. You are currently viewing "All Companies".
+              </AlertDescription>
+            </Alert>
+          )}
+
           {/* 1. Category */}
           <div className="space-y-2">
             <Label htmlFor="category">Category</Label>
