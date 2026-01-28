@@ -23,8 +23,10 @@ import { useTransfers } from "@/hooks/construction/useConstructionInventory";
 import { TRANSFER_STATUSES, type TransferStatus } from "@/types/construction-inventory";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format } from "date-fns";
+import { NewTransferDialog } from "./NewTransferDialog";
 
 export function TransfersView() {
+  const [isNewTransferOpen, setIsNewTransferOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
 
@@ -133,11 +135,17 @@ export function TransfersView() {
             ))}
           </SelectContent>
         </Select>
-        <Button>
+        <Button onClick={() => setIsNewTransferOpen(true)}>
           <Plus className="h-4 w-4 mr-2" />
           New Transfer
         </Button>
       </div>
+
+      {/* New Transfer Dialog */}
+      <NewTransferDialog 
+        open={isNewTransferOpen} 
+        onOpenChange={setIsNewTransferOpen} 
+      />
 
       {/* Transfers Table */}
       <Card>

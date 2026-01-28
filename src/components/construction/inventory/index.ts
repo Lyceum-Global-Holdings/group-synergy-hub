@@ -6,3 +6,4 @@ export { ServiceRepairView } from "./ServiceRepairView";
 export { ItemMasterView } from "./ItemMasterView";
 export { AddItemDialog } from "./AddItemDialog";
 export { BulkImportDialog } from "./BulkImportDialog";
+export { NewTransferDialog } from "./NewTransferDialog";
