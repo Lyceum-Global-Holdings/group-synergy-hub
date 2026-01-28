@@ -23,8 +23,10 @@ import { useRepairRecords } from "@/hooks/construction/useConstructionInventory"
 import { REPAIR_STATUSES, type RepairStatus } from "@/types/construction-inventory";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format } from "date-fns";
+import { SendForRepairDialog } from "./SendForRepairDialog";
 
 export function ServiceRepairView() {
+  const [showSendForRepairDialog, setShowSendForRepairDialog] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
 
@@ -146,11 +148,17 @@ export function ServiceRepairView() {
             ))}
           </SelectContent>
         </Select>
-        <Button>
+        <Button onClick={() => setShowSendForRepairDialog(true)}>
           <Plus className="h-4 w-4 mr-2" />
           Send for Repair
         </Button>
       </div>
+
+      {/* Send for Repair Dialog */}
+      <SendForRepairDialog
+        open={showSendForRepairDialog}
+        onOpenChange={setShowSendForRepairDialog}
+      />
 
       {/* Active Repairs */}
       <Card>
