@@ -241,13 +241,15 @@ export function useCreateTransfer() {
       }
     },
     onSuccess: () => {
-      // Invalidate all related queries
+      // Invalidate all related queries to ensure UI updates immediately
       queryClient.invalidateQueries({ queryKey: ["construction-transfers"] });
+      queryClient.invalidateQueries({ queryKey: ["construction-inventory-transfers"] });
       queryClient.invalidateQueries({ queryKey: ["construction-transactions"] });
       queryClient.invalidateQueries({ queryKey: ["construction-inventory-stock"] });
       queryClient.invalidateQueries({ queryKey: ["construction-serial-numbers"] });
       queryClient.invalidateQueries({ queryKey: ["construction-dashboard-stats"] });
       queryClient.invalidateQueries({ queryKey: ["construction-item-master"] });
+      queryClient.invalidateQueries({ queryKey: ["warehouse-locations-with-inventory"] });
       
       toast({ title: "Transfer created successfully" });
     },
