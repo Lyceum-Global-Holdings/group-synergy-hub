@@ -100,7 +100,7 @@ export function NewTransferDialog({ open, onOpenChange }: NewTransferDialogProps
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="w-screen h-screen max-w-none max-h-none rounded-none p-6 overflow-y-auto">
         <DialogHeader>
           <DialogTitle>New Inventory Transfer</DialogTitle>
         </DialogHeader>

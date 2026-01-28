@@ -128,7 +128,7 @@ export const LocationManagementDialog = () => {
           Manage Locations
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+      <DialogContent className="w-screen h-screen max-w-none max-h-none rounded-none p-6 overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Location Management</DialogTitle>
         </DialogHeader>

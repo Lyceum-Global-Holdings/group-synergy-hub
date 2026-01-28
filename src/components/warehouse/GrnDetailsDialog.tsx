@@ -78,7 +78,7 @@ export function GrnDetailsDialog({ grnId, open, onOpenChange }: GrnDetailsDialog
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-6xl max-h-[80vh] overflow-y-auto">
+      <DialogContent className="w-screen h-screen max-w-none max-h-none rounded-none p-6 overflow-y-auto">
         {showDocument ? (
           <GrnDocument grn={grn} onClose={() => setShowDocument(false)} />
         ) : (

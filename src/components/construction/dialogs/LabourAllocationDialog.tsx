@@ -107,7 +107,7 @@ export function LabourAllocationDialog({ open, onOpenChange, labour }: LabourAll
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+      <DialogContent className="w-screen h-screen max-w-none max-h-none rounded-none p-6 overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Edit Labour Allocation</DialogTitle>
         </DialogHeader>

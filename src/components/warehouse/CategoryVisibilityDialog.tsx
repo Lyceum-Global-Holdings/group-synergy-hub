@@ -146,7 +146,7 @@ export function CategoryVisibilityDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[80vh] flex flex-col">
+      <DialogContent className="w-screen h-screen max-w-none max-h-none rounded-none p-6 overflow-y-auto flex flex-col">
         <DialogHeader>
           <DialogTitle>Manage Category Visibility</DialogTitle>
           <DialogDescription>

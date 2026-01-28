@@ -162,7 +162,7 @@ export function SafetyIncidentDialog({ open, onOpenChange, incident }: SafetyInc
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="w-screen h-screen max-w-none max-h-none rounded-none p-6 overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
             {incident ? "Edit Safety Incident" : "Report Safety Incident"}

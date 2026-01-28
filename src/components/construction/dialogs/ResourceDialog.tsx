@@ -142,7 +142,7 @@ export function ResourceDialog({ open, onOpenChange, resource, defaultResourceTy
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="w-screen h-screen max-w-none max-h-none rounded-none p-6 overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
             {resource ? "Edit Resource" : "Add Resource"}
