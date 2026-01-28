@@ -288,7 +288,7 @@ export function CreateItemDialog({ open, onOpenChange, editingItem }: CreateItem
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+      <DialogContent className="w-screen h-screen max-w-none max-h-none rounded-none p-6 overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
             {editingItem ? 'Edit Item' : 'Create New Item'}

@@ -20,7 +20,7 @@ export function RiskFlagDetailsDialog({ open, onOpenChange, riskFlag }: RiskFlag
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="w-screen h-screen max-w-none max-h-none rounded-none p-6 overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Risk Flag Details</DialogTitle>
         </DialogHeader>

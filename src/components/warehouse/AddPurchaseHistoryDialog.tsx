@@ -59,7 +59,7 @@ export function AddPurchaseHistoryDialog({ assetMasterId, open, onOpenChange }: 
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md max-h-[80vh] overflow-y-auto">
+      <DialogContent className="w-screen h-screen max-w-none max-h-none rounded-none p-6 overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Add Purchase History</DialogTitle>
         </DialogHeader>

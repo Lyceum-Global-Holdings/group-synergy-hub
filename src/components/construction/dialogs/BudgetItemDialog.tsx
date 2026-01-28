@@ -136,7 +136,7 @@ export function BudgetItemDialog({ open, onOpenChange, budgetItem }: BudgetItemD
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="w-screen h-screen max-w-none max-h-none rounded-none p-6 overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
             {budgetItem ? "Edit Budget Item" : "Add Budget Item"}

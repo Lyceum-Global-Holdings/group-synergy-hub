@@ -104,7 +104,7 @@ export function EditFinishedGoodDialog({ productId, open, onOpenChange }: EditFi
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+      <DialogContent className="w-screen h-screen max-w-none max-h-none rounded-none p-6 overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Edit Finished Good</DialogTitle>
         </DialogHeader>

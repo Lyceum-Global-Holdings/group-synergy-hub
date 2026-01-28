@@ -43,7 +43,7 @@ export function ConductReviewDialog({ open, onOpenChange, blacklistEntry }: Cond
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="w-screen h-screen max-w-none max-h-none rounded-none p-6 overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Conduct Blacklist Review</DialogTitle>
           <DialogDescription>

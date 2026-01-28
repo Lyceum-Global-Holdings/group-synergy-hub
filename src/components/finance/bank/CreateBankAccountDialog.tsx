@@ -78,7 +78,7 @@ export function CreateBankAccountDialog({ open, onOpenChange }: CreateBankAccoun
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="w-screen h-screen max-w-none max-h-none rounded-none p-6 overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Add Bank Account</DialogTitle>
         </DialogHeader>

@@ -87,7 +87,7 @@ export function CreateBinDialog({ open, onOpenChange, editingBin }: CreateBinDia
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px] max-h-[80vh] overflow-y-auto">
+      <DialogContent className="w-screen h-screen max-w-none max-h-none rounded-none p-6 overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
             {editingBin ? 'Edit Bin' : 'Create New Bin'}
