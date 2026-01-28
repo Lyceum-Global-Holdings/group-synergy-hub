@@ -84,72 +84,103 @@ export function useCreateTransfer() {
           throw new Error(`Failed to create transfer: ${transferError.message}`);
         }
 
+        console.log("Transfer record created:", transfer.id, transfer.transfer_number);
+
         if (isSerialTransfer) {
           // Handle serial-tracked transfers (machines)
+          console.log("Processing serial transfer with IDs:", data.serialNumberIds);
+          
           for (const serialId of data.serialNumberIds!) {
+            console.log("Processing serial ID:", serialId);
+            
+            // Get current serial number data first
+            const { data: currentSerial, error: fetchError } = await supabase
+              .from("construction_serial_numbers")
+              .select("serial_number, current_location_id, availability")
+              .eq("id", serialId)
+              .single();
+
+            if (fetchError) {
+              console.error("Failed to fetch serial:", fetchError);
+              throw new Error(`Failed to fetch serial: ${fetchError.message}`);
+            }
+
+            console.log("Current serial data:", currentSerial);
+
             // Create transfer item for each serial - constraint requires ONLY serial_number_id (no quantity)
-            const { error: itemError } = await supabase
+            const { data: insertedItem, error: itemError } = await supabase
               .from("construction_transfer_items")
               .insert({
                 transfer_id: transfer.id,
                 item_master_id: data.itemMasterId,
                 quantity: null,
                 serial_number_id: serialId,
-              });
+              })
+              .select()
+              .single();
 
             if (itemError) {
               console.error("Transfer item creation error:", itemError);
               throw new Error(`Failed to create transfer item: ${itemError.message}`);
             }
 
-            // Update serial number location
-            const { error: serialUpdateError } = await supabase
+            console.log("Transfer item created:", insertedItem);
+
+            // Update serial number location - THIS IS THE CRITICAL UPDATE
+            const { data: updatedSerial, error: serialUpdateError } = await supabase
               .from("construction_serial_numbers")
               .update({
                 current_location_id: data.toLocationId,
                 availability: "available",
                 updated_at: new Date().toISOString(),
               })
-              .eq("id", serialId);
+              .eq("id", serialId)
+              .select()
+              .single();
 
             if (serialUpdateError) {
               console.error("Serial update error:", serialUpdateError);
               throw new Error(`Failed to update serial location: ${serialUpdateError.message}`);
             }
 
-            // Get serial number for transaction notes
-            const { data: serialData } = await supabase
-              .from("construction_serial_numbers")
-              .select("serial_number")
-              .eq("id", serialId)
-              .single();
+            console.log("Serial updated - new location:", updatedSerial?.current_location_id);
 
             // Log transfer out transaction
-            await supabase.from("construction_inventory_transactions").insert({
+            const { error: txOutError } = await supabase.from("construction_inventory_transactions").insert({
               item_master_id: data.itemMasterId,
               serial_number_id: serialId,
               transaction_type: "transfer_out",
               quantity_change: -1,
               location_id: data.fromLocationId,
               transfer_id: transfer.id,
-              notes: `Serial ${serialData?.serial_number || serialId} transferred out: ${data.notes || "N/A"}`,
+              notes: `Serial ${currentSerial?.serial_number || serialId} transferred out: ${data.notes || "N/A"}`,
               company_id: selectedCompany.id,
               performed_by: user.user.id,
             });
 
+            if (txOutError) {
+              console.error("Transfer out transaction error:", txOutError);
+            }
+
             // Log transfer in transaction
-            await supabase.from("construction_inventory_transactions").insert({
+            const { error: txInError } = await supabase.from("construction_inventory_transactions").insert({
               item_master_id: data.itemMasterId,
               serial_number_id: serialId,
               transaction_type: "transfer_in",
               quantity_change: 1,
               location_id: data.toLocationId,
               transfer_id: transfer.id,
-              notes: `Serial ${serialData?.serial_number || serialId} transferred in: ${data.notes || "N/A"}`,
+              notes: `Serial ${currentSerial?.serial_number || serialId} transferred in: ${data.notes || "N/A"}`,
               company_id: selectedCompany.id,
               performed_by: user.user.id,
             });
+
+            if (txInError) {
+              console.error("Transfer in transaction error:", txInError);
+            }
           }
+          
+          console.log("All serials processed successfully");
         } else {
           // Handle quantity-based transfers (non-serial items)
           
@@ -250,6 +281,7 @@ export function useCreateTransfer() {
       queryClient.invalidateQueries({ queryKey: ["construction-dashboard-stats"] });
       queryClient.invalidateQueries({ queryKey: ["construction-item-master"] });
       queryClient.invalidateQueries({ queryKey: ["warehouse-locations-with-inventory"] });
+      queryClient.invalidateQueries({ queryKey: ["warehouse-locations"] });
       
       toast({ title: "Transfer created successfully" });
     },
