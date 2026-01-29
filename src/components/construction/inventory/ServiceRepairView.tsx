@@ -18,21 +18,33 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Search, Wrench, Plus, Clock, CheckCircle2, AlertTriangle, Package } from "lucide-react";
+import { Search, Wrench, Plus, Clock, CheckCircle2, AlertTriangle, Package, Loader2 } from "lucide-react";
 import { useRepairRecords } from "@/hooks/construction/useConstructionInventory";
-import { REPAIR_STATUSES, type RepairStatus } from "@/types/construction-inventory";
+import { useUpdateRepairStatus } from "@/hooks/construction/useUpdateRepairStatus";
+import { REPAIR_STATUSES, type RepairStatus, type ConstructionRepairRecord } from "@/types/construction-inventory";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format } from "date-fns";
 import { SendForRepairDialog } from "./SendForRepairDialog";
+
+// Dropdown options for status changes
+const STATUS_CHANGE_OPTIONS: { value: RepairStatus; label: string }[] = [
+  { value: "sent_for_repair", label: "Sent for Repair" },
+  { value: "in_repair", label: "In Repair" },
+  { value: "repaired", label: "Repair Done" },
+  { value: "returned", label: "Return to Site" },
+];
 
 export function ServiceRepairView() {
   const [showSendForRepairDialog, setShowSendForRepairDialog] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [updatingRepairId, setUpdatingRepairId] = useState<string | null>(null);
 
   const { data: repairs, isLoading } = useRepairRecords(
     statusFilter !== "all" ? statusFilter : undefined
   );
+
+  const updateStatusMutation = useUpdateRepairStatus();
 
   // Filter repairs
   const filteredRepairs = repairs?.filter(repair => {
@@ -54,6 +66,21 @@ export function ServiceRepairView() {
   const closedRepairs = filteredRepairs.filter(r => 
     ["returned", "discarded"].includes(r.status)
   );
+
+  const handleStatusChange = async (repair: ConstructionRepairRecord, newStatus: RepairStatus) => {
+    if (repair.status === newStatus) return;
+    
+    setUpdatingRepairId(repair.id);
+    try {
+      await updateStatusMutation.mutateAsync({
+        repairId: repair.id,
+        newStatus,
+        serialNumberId: repair.serial_number_id,
+      });
+    } finally {
+      setUpdatingRepairId(null);
+    }
+  };
 
   const getStatusBadge = (status: RepairStatus) => {
     const styles: Record<RepairStatus, string> = {
@@ -215,7 +242,30 @@ export function ServiceRepairView() {
                       {format(new Date(repair.repair_date), "MMM d, yyyy")}
                     </TableCell>
                     <TableCell>{repair.service_provider || "-"}</TableCell>
-                    <TableCell>{getStatusBadge(repair.status as RepairStatus)}</TableCell>
+                    <TableCell>
+                      {updatingRepairId === repair.id ? (
+                        <div className="flex items-center gap-2">
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          <span className="text-sm text-muted-foreground">Updating...</span>
+                        </div>
+                      ) : (
+                        <Select
+                          value={repair.status}
+                          onValueChange={(value) => handleStatusChange(repair, value as RepairStatus)}
+                        >
+                          <SelectTrigger className="w-[160px] h-8">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {STATUS_CHANGE_OPTIONS.map(option => (
+                              <SelectItem key={option.value} value={option.value}>
+                                {option.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      )}
+                    </TableCell>
                     <TableCell className="text-right">
                       {repair.repair_cost ? `₹${repair.repair_cost.toLocaleString()}` : "-"}
                     </TableCell>
