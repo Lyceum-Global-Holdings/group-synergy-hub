@@ -26,14 +26,36 @@ type DownloadFormat = "pdf" | "png" | "print";
 export function BulkQRCodeDialog({ open, onOpenChange, assets }: BulkQRCodeDialogProps) {
   const [isGenerating, setIsGenerating] = useState(false);
   const [format, setFormat] = useState<DownloadFormat>("pdf");
-  const [showPrintPreview, setShowPrintPreview] = useState(false);
   const { toast } = useToast();
+
+  const handlePrint = async () => {
+    if (assets.length === 0) return;
+    
+    setIsGenerating(true);
+    try {
+      const { generateAllLabelDataUrls } = await import("@/utils/printQRCodeLabels");
+      const { openPrintWindow } = await import("./BulkQRCodePrintPreview");
+      
+      const dataUrls = await generateAllLabelDataUrls(assets);
+      openPrintWindow(dataUrls);
+      onOpenChange(false);
+    } catch (error) {
+      console.error("Error generating print labels:", error);
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to generate print labels. Please allow popups for this site.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsGenerating(false);
+    }
+  };
 
   const handleAction = async () => {
     if (assets.length === 0) return;
 
     if (format === "print") {
-      setShowPrintPreview(true);
+      await handlePrint();
       return;
     }
 
@@ -185,13 +207,6 @@ export function BulkQRCodeDialog({ open, onOpenChange, assets }: BulkQRCodeDialo
             </Button>
           </div>
         </div>
-
-        {/* Print Preview Dialog */}
-        <BulkQRCodePrintPreview
-          open={showPrintPreview}
-          onOpenChange={setShowPrintPreview}
-          assets={assets}
-        />
       </DialogContent>
     </Dialog>
   );

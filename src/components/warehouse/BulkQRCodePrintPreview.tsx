@@ -1,173 +1,242 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Printer, Loader2, X } from "lucide-react";
+import { Printer, Loader2 } from "lucide-react";
 import { generateAllLabelDataUrls, AssetForPrint } from "@/utils/printQRCodeLabels";
+import { useToast } from "@/hooks/use-toast";
 
 interface BulkQRCodePrintPreviewProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
   assets: AssetForPrint[];
+  onComplete?: () => void;
 }
 
-export function BulkQRCodePrintPreview({ open, onOpenChange, assets }: BulkQRCodePrintPreviewProps) {
-  const [labelDataUrls, setLabelDataUrls] = useState<string[]>([]);
+export function openPrintWindow(labelDataUrls: string[]) {
+  const printWindow = window.open('', '_blank', 'width=800,height=600');
+  
+  if (!printWindow) {
+    throw new Error('Failed to open print window. Please allow popups for this site.');
+  }
+
+  const htmlContent = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>QR Code Labels</title>
+      <style>
+        * {
+          margin: 0;
+          padding: 0;
+          box-sizing: border-box;
+        }
+        
+        body {
+          font-family: Arial, sans-serif;
+          background: #f5f5f5;
+        }
+        
+        .controls {
+          position: fixed;
+          top: 0;
+          left: 0;
+          right: 0;
+          background: white;
+          padding: 16px;
+          border-bottom: 1px solid #e5e7eb;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          z-index: 100;
+        }
+        
+        .controls h1 {
+          font-size: 18px;
+          font-weight: 600;
+        }
+        
+        .print-btn {
+          background: #2563eb;
+          color: white;
+          border: none;
+          padding: 8px 16px;
+          border-radius: 6px;
+          cursor: pointer;
+          font-size: 14px;
+          font-weight: 500;
+        }
+        
+        .print-btn:hover {
+          background: #1d4ed8;
+        }
+        
+        .label-container {
+          padding: 80px 24px 24px;
+          max-width: 1000px;
+          margin: 0 auto;
+        }
+        
+        .label-grid {
+          display: grid;
+          grid-template-columns: repeat(2, 2in);
+          gap: 0.25in;
+          justify-content: center;
+        }
+        
+        .label-item {
+          width: 2in;
+          height: 1in;
+          border: 1px solid #e5e7eb;
+          border-radius: 4px;
+          overflow: hidden;
+          background: white;
+        }
+        
+        .label-item img {
+          width: 100%;
+          height: 100%;
+          object-fit: contain;
+        }
+        
+        @media print {
+          .controls {
+            display: none !important;
+          }
+          
+          body {
+            background: white;
+          }
+          
+          .label-container {
+            padding: 0.5in;
+            max-width: none;
+          }
+          
+          .label-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 2in);
+            gap: 0.25in;
+            justify-content: center;
+          }
+          
+          .label-item {
+            width: 2in;
+            height: 1in;
+            page-break-inside: avoid;
+            break-inside: avoid;
+            border: 1px solid #e5e7eb;
+          }
+          
+          .label-item img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+          }
+        }
+      </style>
+    </head>
+    <body>
+      <div class="controls">
+        <h1>🏷️ QR Code Labels (${labelDataUrls.length})</h1>
+        <button class="print-btn" onclick="window.print()">🖨️ Print Labels</button>
+      </div>
+      
+      <div class="label-container">
+        <div class="label-grid">
+          ${labelDataUrls.map((url, i) => `
+            <div class="label-item">
+              <img src="${url}" alt="QR Label ${i + 1}" />
+            </div>
+          `).join('')}
+        </div>
+      </div>
+      
+      <script>
+        // Auto-trigger print after a short delay to ensure images are loaded
+        window.onload = function() {
+          setTimeout(function() {
+            window.print();
+          }, 500);
+        };
+      </script>
+    </body>
+    </html>
+  `;
+
+  printWindow.document.write(htmlContent);
+  printWindow.document.close();
+}
+
+export function BulkQRCodePrintButton({ assets, onComplete }: BulkQRCodePrintPreviewProps) {
   const [isGenerating, setIsGenerating] = useState(false);
+  const { toast } = useToast();
 
-  useEffect(() => {
-    if (open && assets.length > 0) {
-      generateLabels();
-    }
-  }, [open, assets]);
+  const handlePrint = async () => {
+    if (assets.length === 0) return;
 
-  const generateLabels = async () => {
     setIsGenerating(true);
     try {
       const dataUrls = await generateAllLabelDataUrls(assets);
-      setLabelDataUrls(dataUrls);
+      openPrintWindow(dataUrls);
+      onComplete?.();
     } catch (error) {
       console.error("Error generating labels:", error);
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to generate print labels",
+        variant: "destructive",
+      });
     } finally {
       setIsGenerating(false);
     }
   };
 
-  const handlePrint = () => {
-    window.print();
-  };
-
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-screen h-screen max-w-none max-h-none rounded-none p-0 overflow-hidden print:p-0 print:m-0">
-        {/* Print Controls - Hidden during print */}
-        <div className="print:hidden bg-background border-b p-4 flex items-center justify-between">
-          <DialogHeader className="space-y-0">
-            <DialogTitle className="flex items-center gap-2">
-              <Printer className="h-5 w-5" />
-              Print QR Code Labels
-            </DialogTitle>
-          </DialogHeader>
-          <div className="flex items-center gap-2">
-            <Button
-              onClick={handlePrint}
-              disabled={isGenerating || labelDataUrls.length === 0}
-            >
-              {isGenerating ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Generating...
-                </>
-              ) : (
-                <>
-                  <Printer className="mr-2 h-4 w-4" />
-                  Print ({assets.length} labels)
-                </>
-              )}
-            </Button>
-            <Button variant="ghost" size="icon" onClick={() => onOpenChange(false)}>
-              <X className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
-
-        {/* Print Area */}
-        <div className="overflow-auto flex-1 p-6 print:p-0 print:overflow-visible">
-          {isGenerating ? (
-            <div className="flex items-center justify-center h-64 print:hidden">
-              <div className="text-center">
-                <Loader2 className="h-8 w-8 animate-spin mx-auto mb-2 text-muted-foreground" />
-                <p className="text-muted-foreground">Generating {assets.length} labels...</p>
-              </div>
-            </div>
-          ) : (
-            <div className="qr-label-grid">
-              {labelDataUrls.map((dataUrl, index) => (
-                <div key={index} className="qr-label-item">
-                  <img
-                    src={dataUrl}
-                    alt={`QR Label ${index + 1}`}
-                    className="w-full h-full object-contain"
-                  />
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Print-specific styles */}
-        <style>{`
-          @media print {
-            /* Hide everything except print content */
-            body > *:not(.print-root) {
-              display: none !important;
-            }
-            
-            /* Reset dialog styles for print */
-            [role="dialog"] {
-              position: static !important;
-              transform: none !important;
-              width: 100% !important;
-              height: auto !important;
-              max-width: none !important;
-              max-height: none !important;
-              border: none !important;
-              box-shadow: none !important;
-              background: white !important;
-            }
-            
-            /* Label grid layout for print */
-            .qr-label-grid {
-              display: grid;
-              grid-template-columns: repeat(2, 2in);
-              gap: 0.25in;
-              padding: 0.5in;
-              justify-content: center;
-            }
-            
-            .qr-label-item {
-              width: 2in;
-              height: 1in;
-              page-break-inside: avoid;
-              break-inside: avoid;
-            }
-            
-            .qr-label-item img {
-              width: 100%;
-              height: 100%;
-              object-fit: contain;
-            }
-          }
-          
-          /* Screen styles for preview */
-          @media screen {
-            .qr-label-grid {
-              display: grid;
-              grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-              gap: 1rem;
-              max-width: 1200px;
-              margin: 0 auto;
-            }
-            
-            .qr-label-item {
-              border: 1px solid hsl(var(--border));
-              border-radius: 0.5rem;
-              overflow: hidden;
-              aspect-ratio: 2 / 1;
-            }
-            
-            .qr-label-item img {
-              width: 100%;
-              height: 100%;
-              object-fit: contain;
-            }
-          }
-        `}</style>
-      </DialogContent>
-    </Dialog>
+    <Button
+      onClick={handlePrint}
+      disabled={isGenerating || assets.length === 0}
+    >
+      {isGenerating ? (
+        <>
+          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+          Generating...
+        </>
+      ) : (
+        <>
+          <Printer className="mr-2 h-4 w-4" />
+          Print Labels
+        </>
+      )}
+    </Button>
   );
+}
+
+export function BulkQRCodePrintPreview({ 
+  open, 
+  onOpenChange, 
+  assets 
+}: { 
+  open: boolean; 
+  onOpenChange: (open: boolean) => void; 
+  assets: AssetForPrint[]; 
+}) {
+  const { toast } = useToast();
+
+  // When opened, immediately generate and open print window
+  if (open && assets.length > 0) {
+    generateAllLabelDataUrls(assets)
+      .then((dataUrls) => {
+        openPrintWindow(dataUrls);
+        onOpenChange(false);
+      })
+      .catch((error) => {
+        console.error("Error generating labels:", error);
+        toast({
+          title: "Error",
+          description: error instanceof Error ? error.message : "Failed to generate print labels",
+          variant: "destructive",
+        });
+        onOpenChange(false);
+      });
+  }
+
+  // No UI needed - we open a new window instead
+  return null;
 }
