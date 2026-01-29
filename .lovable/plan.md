@@ -1,72 +1,134 @@
 
-# Plan: Add Bulk QR Code PNG Download
+# Plan: Add Direct Print Function for Asset QR Codes
 
 ## Overview
-Currently, the bulk QR code download only supports PDF format. This plan adds a PNG download option that creates individual PNG files for each selected asset, bundled in a ZIP file for easy download.
+Add a new "Print QR Codes" option that renders QR code labels as images directly in the browser and triggers the print dialog. This bypasses PDF generation issues by using HTML/CSS-based print layouts with embedded image labels.
 
 ## How It Will Work
 
-When you select multiple assets and click "Download QR Codes", the dialog will now show two download options:
-1. **Download as PDF** - Current behavior (multi-page PDF, one label per page)
-2. **Download as PNG (ZIP)** - New option (individual PNG files in a ZIP archive)
+When you select assets and click "Download QR Codes", the dialog will now show three options:
+1. **PDF Document** - Existing behavior
+2. **PNG Images (ZIP)** - Existing behavior  
+3. **Print Directly** - New option that opens a print-ready view with QR labels rendered as images
 
-Each PNG will be a 2x1 inch label (600x300 pixels at 300 DPI) matching the existing single-asset QR code format.
+Clicking "Print" will:
+1. Generate all QR labels as PNG images (reusing the existing Canvas-based logic)
+2. Open a new print preview dialog with labels laid out in a grid
+3. Trigger the browser's print dialog with optimized CSS for label printing
 
 ---
 
 ## Changes Required
 
-### 1. Install JSZip Dependency
-Add the `jszip` library to bundle multiple PNG files into a downloadable ZIP archive.
+### 1. Create Print Preview Component
+**New file: `src/components/warehouse/BulkQRCodePrintPreview.tsx`**
 
-### 2. Create PNG Generation Utility
-**New file: `src/utils/bulkQRCodePng.ts`**
+A dedicated component that:
+- Accepts an array of assets
+- Generates PNG labels for each asset using Canvas API (reusing logic from `bulkQRCodePng.ts`)
+- Displays labels in a print-optimized grid layout (multiple labels per page)
+- Includes print-specific CSS to hide UI controls and format for label sheets
+- Provides a print button that triggers `window.print()`
 
-Create a utility function that:
+### 2. Create Print Utility Function
+**New file: `src/utils/printQRCodeLabels.ts`**
+
+Export a function that:
 - Takes an array of assets
-- Generates a 2x1 inch PNG label for each asset (matching the format in `AssetQRCode.tsx`)
-- Uses Canvas API to draw QR code on left, Asset ID on right
-- Bundles all PNGs into a ZIP file using JSZip
-- Returns the ZIP blob for download
+- Generates image data URLs for each QR label
+- Returns an array of data URLs for rendering in the print preview
 
-### 3. Update BulkQRCodeDialog Component
+### 3. Update BulkQRCodeDialog
 **File: `src/components/warehouse/BulkQRCodeDialog.tsx`**
 
-Modify the dialog to:
-- Add a format selector (PDF vs PNG)
-- Add a second download button or dropdown with format options
-- Handle both PDF and PNG generation based on user selection
-- Update the info text to explain both formats
+Modify to:
+- Add "Print Directly" as a third format option in the radio group
+- Handle the print format by opening the print preview dialog
+- Add a Printer icon for the print option
 
 ---
 
 ## Technical Details
 
-### PNG Label Format (matches existing AssetQRCode component)
-- Dimensions: 600x300 pixels (2x1 inch at 300 DPI)
-- QR Code: 280x280 pixels on the left side
-- Asset ID: Two-line format (category path on line 1, number on line 2)
-- White background with light gray border
+### Print Layout
+- **Page size**: A4 (default) with options for label sheets
+- **Labels per page**: 2x5 grid (10 labels per A4 page) or custom
+- **Each label**: 2x1 inch (matching existing format)
+- **Print CSS**: Hide all UI except the label grid, set proper margins
 
-### ZIP File Structure
-```
-asset-qr-codes-2026-01-29.zip
-├── qr-FUR_CHA_CH_001.png
-├── qr-FUR_CHA_CH_002.png
-├── qr-ELE_COM_PC_001.png
-└── ...
+### Label Generation Flow
+```text
+User selects assets → Opens dialog → Selects "Print Directly" 
+    → Clicks Print → Generates all PNG labels as data URLs
+    → Opens print preview with labels in grid → Triggers window.print()
 ```
 
-### File Naming
-Each PNG is named using the sanitized asset ID (slashes replaced with underscores):
-- Example: `FUR/CHA/CH/001` becomes `qr-FUR_CHA_CH_001.png`
+### Print CSS Strategy
+Use `@media print` rules to:
+- Hide the dialog chrome and navigation
+- Show only the label grid
+- Set page breaks between full pages of labels
+- Use exact dimensions for accurate printing
+
+---
+
+## User Experience
+
+1. Select multiple assets using checkboxes in the Assets List
+2. Click "Download QR Codes" button in the bulk action toolbar
+3. In the dialog, select "Print Directly" format option
+4. Click "Print" button
+5. Browser print preview opens showing all QR labels in a grid
+6. User adjusts printer settings and clicks Print
 
 ---
 
 ## Files to Create/Modify
 
-| File | Action |
-|------|--------|
-| `package.json` | Add `jszip` dependency |
-| `src/utils/bulkQRCodePng.ts` | Create - PNG generation logic |
-| `src/components/warehouse/BulkQRCodeDialog.tsx` | Modify - Add format selection UI |
+| File | Action | Purpose |
+|------|--------|---------|
+| `src/utils/printQRCodeLabels.ts` | Create | Generate label images as data URLs |
+| `src/components/warehouse/BulkQRCodePrintPreview.tsx` | Create | Print-optimized label display component |
+| `src/components/warehouse/BulkQRCodeDialog.tsx` | Modify | Add print option to format selector |
+
+---
+
+## Technical Implementation Notes
+
+### Reusing Existing Canvas Logic
+The `generateSinglePngLabel` function in `bulkQRCodePng.ts` already generates perfect 600x300px labels. We'll create a variant that returns a data URL instead of a Blob for direct rendering in `<img>` tags.
+
+### Print Preview Component Structure
+```text
+BulkQRCodePrintPreview
+├── Print controls (hidden during print)
+│   ├── Print button
+│   └── Close button
+└── Print area (visible during print)
+    └── Label grid
+        ├── Label 1 (img with data URL)
+        ├── Label 2
+        └── ... (all selected assets)
+```
+
+### Print CSS Example
+```css
+@media print {
+  .print-controls { display: none; }
+  .print-area { 
+    position: absolute;
+    left: 0; top: 0;
+    width: 100%;
+  }
+  .label-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 2in);
+    gap: 0.25in;
+  }
+  .label-item {
+    width: 2in;
+    height: 1in;
+    page-break-inside: avoid;
+  }
+}
+```
