@@ -207,6 +207,96 @@ export function useCreateItemMasterWithSerial() {
   });
 }
 
+// Create Item Master with Initial Stock (for bulk categories: tools, safety, equipment, scaffolding)
+export interface CreateItemMasterWithStockData extends CreateItemMasterData {
+  initial_quantity?: number;
+  location_id?: string;
+}
+
+export function useCreateItemMasterWithStock() {
+  const queryClient = useQueryClient();
+  const { selectedCompany } = useCompany();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async (data: CreateItemMasterWithStockData) => {
+      const { data: authData, error: authError } = await supabase.auth.getUser();
+
+      if (authError || !authData.user) {
+        throw new Error("You must be logged in to create items. Please sign in and try again.");
+      }
+
+      if (!selectedCompany?.id) {
+        throw new Error("No company selected. Please select a company first.");
+      }
+
+      // Extract stock fields
+      const { initial_quantity, location_id, ...itemData } = data;
+
+      // Create item master first (ensure is_serial_tracked is false for bulk items)
+      const { data: itemResult, error: itemError } = await supabase
+        .from("construction_item_master")
+        .insert({
+          ...itemData,
+          is_serial_tracked: false,
+          company_id: selectedCompany.id,
+          created_by: authData.user.id,
+        })
+        .select()
+        .single();
+
+      if (itemError) {
+        console.error("Create item with stock error:", itemError);
+        throw itemError;
+      }
+
+      // If initial quantity and location provided, create stock record
+      if (initial_quantity && initial_quantity > 0 && location_id) {
+        const { error: stockError } = await supabase
+          .from("construction_inventory_stock")
+          .insert({
+            item_master_id: itemResult.id,
+            location_id,
+            quantity: initial_quantity,
+            company_id: selectedCompany.id,
+          });
+
+        if (stockError) {
+          console.error("Create stock error:", stockError);
+          throw stockError;
+        }
+
+        // Log transaction
+        await supabase.from("construction_inventory_transactions").insert({
+          item_master_id: itemResult.id,
+          transaction_type: "initial_stock",
+          quantity_change: initial_quantity,
+          location_id,
+          notes: `Initial stock of ${initial_quantity} units added`,
+          company_id: selectedCompany.id,
+          performed_by: authData.user.id,
+        });
+
+        return { item: itemResult, stock: { quantity: initial_quantity, location_id } };
+      }
+
+      return { item: itemResult, stock: null };
+    },
+    onSuccess: () => {
+      // Invalidate all related queries to update allocation views
+      queryClient.invalidateQueries({ queryKey: ["construction-item-master"] });
+      queryClient.invalidateQueries({ queryKey: ["construction-dashboard-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["construction-inventory-stock"] });
+      queryClient.invalidateQueries({ queryKey: ["construction-transactions"] });
+      toast({ title: "Item created successfully" });
+    },
+    onError: (error: Error) => {
+      console.error("Create item with stock mutation error:", error);
+      toast({ title: "Failed to create item", description: error.message, variant: "destructive" });
+    },
+  });
+}
+
 export function useUpdateItemMaster() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -914,6 +1004,134 @@ export function useBulkCreateItemMasterWithSerials() {
     },
     onError: (error: Error) => {
       console.error("Bulk import mutation error:", error);
+      toast({ title: "Failed to import items", description: error.message, variant: "destructive" });
+    },
+  });
+}
+
+// ==================== BULK CREATE ITEM MASTER WITH STOCK (for bulk categories) ====================
+
+export interface BulkCreateItemWithStockData extends CreateItemMasterWithStockData {}
+
+export interface BulkCreateItemMasterWithStockData {
+  items: BulkCreateItemWithStockData[];
+}
+
+export function useBulkCreateItemMasterWithStock() {
+  const queryClient = useQueryClient();
+  const { selectedCompany } = useCompany();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async (data: BulkCreateItemMasterWithStockData) => {
+      const { data: authData, error: authError } = await supabase.auth.getUser();
+      
+      // Validate authentication
+      if (authError || !authData.user) {
+        throw new Error("You must be logged in to import items. Please sign in and try again.");
+      }
+
+      // Validate company selection
+      if (!selectedCompany?.id) {
+        throw new Error("No company selected. Please select a company first.");
+      }
+
+      const results: { item: any; stock: any }[] = [];
+      const errors: string[] = [];
+
+      for (const itemData of data.items) {
+        const { initial_quantity, location_id, ...baseItemData } = itemData;
+
+        try {
+          // Create item master (ensure is_serial_tracked is false)
+          const { data: itemResult, error: itemError } = await supabase
+            .from("construction_item_master")
+            .insert({
+              ...baseItemData,
+              is_serial_tracked: false,
+              company_id: selectedCompany.id,
+              created_by: authData.user.id,
+            })
+            .select()
+            .single();
+
+          if (itemError) {
+            console.error("Item insert error:", itemError);
+            errors.push(`Failed to create ${itemData.item_name}: ${itemError.message}`);
+            continue;
+          }
+
+          let stockResult = null;
+
+          // If initial quantity and location provided, create stock record
+          if (initial_quantity && initial_quantity > 0 && location_id) {
+            const { data: stock, error: stockError } = await supabase
+              .from("construction_inventory_stock")
+              .insert({
+                item_master_id: itemResult.id,
+                location_id,
+                quantity: initial_quantity,
+                company_id: selectedCompany.id,
+              })
+              .select()
+              .single();
+
+            if (stockError) {
+              console.error("Stock insert error:", stockError);
+              errors.push(`Failed to create stock for ${itemData.item_name}: ${stockError.message}`);
+            } else {
+              stockResult = stock;
+
+              // Log transaction
+              const { error: txError } = await supabase.from("construction_inventory_transactions").insert({
+                item_master_id: itemResult.id,
+                transaction_type: "initial_stock",
+                quantity_change: initial_quantity,
+                location_id,
+                notes: `Initial stock of ${initial_quantity} units imported`,
+                company_id: selectedCompany.id,
+                performed_by: authData.user.id,
+              });
+
+              if (txError) {
+                console.error("Transaction log error:", txError);
+              }
+            }
+          }
+
+          results.push({ item: itemResult, stock: stockResult });
+        } catch (err: any) {
+          console.error("Unexpected error for item:", itemData.item_name, err);
+          errors.push(`Unexpected error for ${itemData.item_name}: ${err.message}`);
+        }
+      }
+
+      // If all items failed, throw error
+      if (results.length === 0 && errors.length > 0) {
+        throw new Error(`Import failed: ${errors.join("; ")}`);
+      }
+
+      return { results, errors };
+    },
+    onSuccess: ({ results, errors }) => {
+      // Invalidate all related queries to update allocation views
+      queryClient.invalidateQueries({ queryKey: ["construction-item-master"] });
+      queryClient.invalidateQueries({ queryKey: ["construction-dashboard-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["construction-inventory-stock"] });
+      queryClient.invalidateQueries({ queryKey: ["construction-transactions"] });
+      
+      if (errors.length > 0) {
+        toast({ 
+          title: `${results.length} items imported with ${errors.length} errors`, 
+          description: errors.slice(0, 2).join("; "),
+          variant: "destructive" 
+        });
+      } else {
+        toast({ title: `${results.length} items imported successfully with initial stock` });
+      }
+    },
+    onError: (error: Error) => {
+      console.error("Bulk import with stock mutation error:", error);
       toast({ title: "Failed to import items", description: error.message, variant: "destructive" });
     },
   });

@@ -11,6 +11,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
   Table,
   TableBody,
   TableCell,
@@ -18,7 +24,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Search, Plus, Package, Pencil } from "lucide-react";
+import { Search, Plus, Package, Pencil, ChevronDown, Cog, Wrench, HardHat, Box, Construction } from "lucide-react";
 import { useItemMaster, useSerialNumbers, useInventoryStock } from "@/hooks/construction/useConstructionInventory";
 import { ITEM_CATEGORIES, type ItemCategory } from "@/types/construction-inventory";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -34,6 +40,16 @@ interface SerialData {
   availability: string;
   location?: { id: string; name: string } | null;
 }
+
+// Category icons for the dropdown menu
+const CATEGORY_ICONS: Record<ItemCategory, typeof Cog> = {
+  machines: Cog,
+  tools: Wrench,
+  safety: HardHat,
+  equipment: Box,
+  scaffolding: Construction,
+  others: Package,
+};
 
 export function InventoryWiseView() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -101,9 +117,16 @@ export function InventoryWiseView() {
     setAddDialogOpen(true);
   };
 
+  // Calculate total quantity for bulk items
+  const getTotalQuantity = (itemId: string, unit: string) => {
+    const itemStocks = stocksByItem[itemId] || [];
+    const total = itemStocks.reduce((sum: number, stock: any) => sum + Number(stock.quantity), 0);
+    return `${total} ${unit}`;
+  };
+
   return (
     <div className="space-y-4">
-      {/* Header with Add Item Button */}
+      {/* Header with Add Item Dropdown */}
       <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
         <div className="flex flex-col sm:flex-row gap-4 flex-1">
           <div className="relative flex-1">
@@ -127,10 +150,32 @@ export function InventoryWiseView() {
             </SelectContent>
           </Select>
         </div>
-        <Button onClick={() => handleAddItem("machines")}>
-          <Plus className="h-4 w-4 mr-2" />
-          Add Item
-        </Button>
+        
+        {/* Category-specific Add Item Dropdown */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button>
+              <Plus className="h-4 w-4 mr-2" />
+              Add Item
+              <ChevronDown className="h-4 w-4 ml-2" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-48">
+            {ITEM_CATEGORIES.map(cat => {
+              const Icon = CATEGORY_ICONS[cat.value as ItemCategory];
+              return (
+                <DropdownMenuItem 
+                  key={cat.value} 
+                  onClick={() => handleAddItem(cat.value as ItemCategory)}
+                  className="cursor-pointer"
+                >
+                  <Icon className="h-4 w-4 mr-2" />
+                  Add {cat.label.slice(0, -1)}
+                </DropdownMenuItem>
+              );
+            })}
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       {/* Items List */}
@@ -148,10 +193,30 @@ export function InventoryWiseView() {
             <p className="text-sm text-muted-foreground mb-4">
               {searchTerm ? "Try a different search term" : "Add items to the Item Master to see them here"}
             </p>
-            <Button variant="outline" onClick={() => handleAddItem("machines")}>
-              <Plus className="h-4 w-4 mr-2" />
-              Add First Item
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add First Item
+                  <ChevronDown className="h-4 w-4 ml-2" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="center" className="w-48">
+                {ITEM_CATEGORIES.map(cat => {
+                  const Icon = CATEGORY_ICONS[cat.value as ItemCategory];
+                  return (
+                    <DropdownMenuItem 
+                      key={cat.value} 
+                      onClick={() => handleAddItem(cat.value as ItemCategory)}
+                      className="cursor-pointer"
+                    >
+                      <Icon className="h-4 w-4 mr-2" />
+                      Add {cat.label.slice(0, -1)}
+                    </DropdownMenuItem>
+                  );
+                })}
+              </DropdownMenuContent>
+            </DropdownMenu>
           </CardContent>
         </Card>
       ) : (
@@ -175,8 +240,10 @@ export function InventoryWiseView() {
                   </div>
                   <div className="flex items-center gap-2">
                     <Badge variant="outline">{ITEM_CATEGORIES.find(c => c.value === item.category)?.label}</Badge>
-                    {item.is_serial_tracked && (
+                    {item.is_serial_tracked ? (
                       <Badge className="bg-purple-100 text-purple-800">Serial Tracked</Badge>
+                    ) : (
+                      <Badge className="bg-blue-100 text-blue-800">Bulk: {getTotalQuantity(item.id, item.unit_of_measurement)}</Badge>
                     )}
                   </div>
                 </div>
@@ -223,7 +290,7 @@ export function InventoryWiseView() {
                     )}
                   </div>
                 ) : (
-                  // Stock Quantities for Non-Serial Items
+                  // Stock Quantities for Non-Serial Items (Bulk)
                   <div>
                     <h4 className="text-sm font-medium mb-2">Stock by Location</h4>
                     {stocksByItem[item.id]?.length > 0 ? (

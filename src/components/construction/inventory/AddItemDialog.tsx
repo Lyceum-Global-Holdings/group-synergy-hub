@@ -26,17 +26,18 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Loader2 } from "lucide-react";
-import { useCreateItemMasterWithSerial, useLocations } from "@/hooks/construction/useConstructionInventory";
+import { useCreateItemMasterWithSerial, useCreateItemMasterWithStock, useLocations } from "@/hooks/construction/useConstructionInventory";
 import { useNextItemCode } from "@/hooks/construction/useNextItemCode";
 import {
   type ItemCategory,
-  type ItemSection,
   ITEM_SECTIONS,
   ITEM_CATEGORIES,
   SERIAL_CONDITIONS,
 } from "@/types/construction-inventory";
+
+// Bulk categories - these are quantity-tracked, not serial-tracked
+const BULK_CATEGORIES: ItemCategory[] = ['tools', 'safety', 'equipment', 'scaffolding'];
 
 const formSchema = z.object({
   item_code: z.string().min(1, "Item code is required"),
@@ -46,16 +47,18 @@ const formSchema = z.object({
   model: z.string().optional(),
   unit_of_measurement: z.string().default("pcs"),
   description: z.string().optional(),
-  is_serial_tracked: z.boolean().default(false),
   unit_cost: z.coerce.number().optional(),
   purchase_date: z.string().optional(),
-  // Serial number fields (for machines)
+  // Serial number fields (for machines only)
   serial_number: z.string().optional(),
   current_location_id: z.string().optional(),
   condition: z.enum(["working", "under_repair", "damaged", "scrap"] as const).default("working"),
   availability: z.enum(["available", "in_use", "in_transit", "reserved"] as const).default("available"),
   warranty_expiry: z.string().optional(),
   asset_value: z.coerce.number().optional(),
+  // Bulk item fields (for tools, safety, equipment, scaffolding)
+  initial_quantity: z.coerce.number().min(0).optional(),
+  location_id: z.string().optional(),
 });
 
 type FormData = z.infer<typeof formSchema>;
@@ -68,12 +71,14 @@ interface AddItemDialogProps {
 }
 
 export function AddItemDialog({ open, onOpenChange, category }: AddItemDialogProps) {
-  const createItem = useCreateItemMasterWithSerial();
+  const createItemWithSerial = useCreateItemMasterWithSerial();
+  const createItemWithStock = useCreateItemMasterWithStock();
   const { data: locations } = useLocations();
   const { data: nextItemCode, refetch: refetchNextCode } = useNextItemCode(category);
 
-  // Machines are always serial tracked
+  // Machines are serial tracked, others are bulk tracked
   const isMachineCategory = category === "machines";
+  const isBulkCategory = BULK_CATEGORIES.includes(category);
 
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
@@ -85,7 +90,6 @@ export function AddItemDialog({ open, onOpenChange, category }: AddItemDialogPro
       model: "",
       unit_of_measurement: "pcs",
       description: "",
-      is_serial_tracked: isMachineCategory,
       unit_cost: undefined,
       purchase_date: "",
       serial_number: "",
@@ -94,6 +98,8 @@ export function AddItemDialog({ open, onOpenChange, category }: AddItemDialogPro
       availability: "available",
       warranty_expiry: "",
       asset_value: undefined,
+      initial_quantity: undefined,
+      location_id: "",
     },
   });
 
@@ -106,37 +112,56 @@ export function AddItemDialog({ open, onOpenChange, category }: AddItemDialogPro
 
   // Reset form when category changes
   useEffect(() => {
-    form.setValue("is_serial_tracked", isMachineCategory);
     // Refetch next item code when category changes
     refetchNextCode();
-  }, [category, isMachineCategory, form, refetchNextCode]);
+  }, [category, refetchNextCode]);
 
   const onSubmit = async (values: FormOutput) => {
-    await createItem.mutateAsync({
-      item_code: values.item_code,
-      item_name: values.item_name,
-      section: values.section,
-      category,
-      brand: values.brand,
-      model: values.model,
-      unit_of_measurement: values.unit_of_measurement,
-      description: values.description,
-      unit_cost: values.unit_cost,
-      purchase_date: values.purchase_date,
-      is_serial_tracked: isMachineCategory ? true : values.is_serial_tracked,
-      // Serial number data (only for machines)
-      serial_number: isMachineCategory ? values.serial_number : undefined,
-      current_location_id: isMachineCategory ? values.current_location_id : undefined,
-      condition: isMachineCategory ? values.condition : undefined,
-      availability: isMachineCategory ? values.availability : undefined,
-      warranty_expiry: isMachineCategory ? values.warranty_expiry : undefined,
-      asset_value: isMachineCategory ? values.asset_value : undefined,
-    });
+    if (isMachineCategory) {
+      // Machine category - use serial tracking
+      await createItemWithSerial.mutateAsync({
+        item_code: values.item_code,
+        item_name: values.item_name,
+        section: values.section,
+        category,
+        brand: values.brand,
+        model: values.model,
+        unit_of_measurement: values.unit_of_measurement,
+        description: values.description,
+        unit_cost: values.unit_cost,
+        purchase_date: values.purchase_date,
+        is_serial_tracked: true,
+        serial_number: values.serial_number,
+        current_location_id: values.current_location_id,
+        condition: values.condition,
+        availability: values.availability,
+        warranty_expiry: values.warranty_expiry,
+        asset_value: values.asset_value,
+      });
+    } else {
+      // Bulk category - use quantity tracking
+      await createItemWithStock.mutateAsync({
+        item_code: values.item_code,
+        item_name: values.item_name,
+        section: values.section,
+        category,
+        brand: values.brand,
+        model: values.model,
+        unit_of_measurement: values.unit_of_measurement,
+        description: values.description,
+        unit_cost: values.unit_cost,
+        purchase_date: values.purchase_date,
+        is_serial_tracked: false,
+        initial_quantity: values.initial_quantity,
+        location_id: values.location_id,
+      });
+    }
     form.reset();
     onOpenChange(false);
   };
 
   const categoryLabel = ITEM_CATEGORIES.find(c => c.value === category)?.label || "Item";
+  const isSubmitting = createItemWithSerial.isPending || createItemWithStock.isPending;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -174,7 +199,7 @@ export function AddItemDialog({ open, onOpenChange, category }: AddItemDialogPro
                   <FormItem>
                     <FormLabel>Item Name *</FormLabel>
                     <FormControl>
-                      <Input placeholder="e.g., Excavator" {...field} />
+                      <Input placeholder={isMachineCategory ? "e.g., Excavator" : "e.g., Safety Helmet - Yellow"} {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -243,7 +268,7 @@ export function AddItemDialog({ open, onOpenChange, category }: AddItemDialogPro
                   <FormItem>
                     <FormLabel>Brand</FormLabel>
                     <FormControl>
-                      <Input placeholder="e.g., Caterpillar" {...field} />
+                      <Input placeholder={isMachineCategory ? "e.g., Caterpillar" : "e.g., 3M"} {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -313,29 +338,7 @@ export function AddItemDialog({ open, onOpenChange, category }: AddItemDialogPro
               )}
             />
 
-            {!isMachineCategory && (
-              <FormField
-                control={form.control}
-                name="is_serial_tracked"
-                render={({ field }) => (
-                  <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
-                    <FormControl>
-                      <Checkbox
-                        checked={field.value}
-                        onCheckedChange={field.onChange}
-                      />
-                    </FormControl>
-                    <div className="space-y-1 leading-none">
-                      <FormLabel>Serial Number Tracking</FormLabel>
-                      <p className="text-sm text-muted-foreground">
-                        Enable individual serial number tracking for this item
-                      </p>
-                    </div>
-                  </FormItem>
-                )}
-              />
-            )}
-
+            {/* Machine Category - Serial Number Fields */}
             {isMachineCategory && (
               <div className="space-y-4 rounded-md border p-4 bg-muted/30">
                 <h4 className="font-medium text-sm">Serial Number Details</h4>
@@ -467,12 +470,68 @@ export function AddItemDialog({ open, onOpenChange, category }: AddItemDialogPro
               </div>
             )}
 
+            {/* Bulk Category - Initial Quantity & Location Fields */}
+            {isBulkCategory && (
+              <div className="space-y-4 rounded-md border p-4 bg-muted/30">
+                <h4 className="font-medium text-sm">Initial Stock</h4>
+                <p className="text-xs text-muted-foreground mb-3">
+                  {categoryLabel} are quantity-tracked. Enter the initial quantity and storage location.
+                </p>
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="initial_quantity"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Initial Quantity</FormLabel>
+                        <FormControl>
+                          <Input 
+                            type="number" 
+                            min="0" 
+                            placeholder="e.g., 10" 
+                            {...field} 
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="location_id"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Location</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select location" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {locations?.map(loc => (
+                              <SelectItem key={loc.id} value={loc.id}>
+                                {loc.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              </div>
+            )}
+
             <div className="flex justify-end gap-3 pt-4">
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
                 Cancel
               </Button>
-              <Button type="submit" disabled={createItem.isPending}>
-                {createItem.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              <Button type="submit" disabled={isSubmitting}>
+                {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Add {categoryLabel.slice(0, -1)}
               </Button>
             </div>

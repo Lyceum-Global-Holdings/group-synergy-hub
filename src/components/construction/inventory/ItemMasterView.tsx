@@ -13,13 +13,16 @@ import {
 } from "@/components/ui/table";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Search, Plus, Package, Edit, Eye, Upload, Hash } from "lucide-react";
-import { useItemMaster, useSerialNumbers } from "@/hooks/construction/useConstructionInventory";
+import { useItemMaster, useSerialNumbers, useInventoryStock } from "@/hooks/construction/useConstructionInventory";
 import { ITEM_CATEGORIES, ITEM_SECTIONS, type ItemCategory, type ConstructionItemMaster } from "@/types/construction-inventory";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AddItemDialog } from "./AddItemDialog";
 import { BulkImportDialog } from "./BulkImportDialog";
 import { ItemDetailsDialog } from "./ItemDetailsDialog";
 import { EditItemDialog } from "./EditItemDialog";
+
+// Bulk categories - these are quantity-tracked, not serial-tracked
+const BULK_CATEGORIES: ItemCategory[] = ['tools', 'safety', 'equipment', 'scaffolding'];
 
 export function ItemMasterView() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -32,6 +35,9 @@ export function ItemMasterView() {
 
   const { data: items, isLoading } = useItemMaster(activeCategory);
   const { data: serialNumbers } = useSerialNumbers();
+  const { data: stocks } = useInventoryStock();
+
+  const isBulkCategory = BULK_CATEGORIES.includes(activeCategory);
 
   // Group serial numbers by item_master_id
   const serialsByItem = serialNumbers?.reduce((acc, serial) => {
@@ -41,6 +47,16 @@ export function ItemMasterView() {
     acc[serial.item_master_id].push(serial);
     return acc;
   }, {} as Record<string, typeof serialNumbers>) || {};
+
+  // Group stocks by item_master_id to calculate total quantity
+  const stocksByItem = stocks?.reduce((acc, stock) => {
+    if (!acc[stock.item_master_id]) {
+      acc[stock.item_master_id] = [];
+    }
+    acc[stock.item_master_id].push(stock);
+    return acc;
+  }, {} as Record<string, typeof stocks>) || {};
+
   // Filter items by search
   const filteredItems = items?.filter(item => {
     if (!searchTerm) return true;
@@ -60,6 +76,12 @@ export function ItemMasterView() {
       sold: "bg-muted text-muted-foreground",
     };
     return <Badge className={styles[status] || ""}>{status}</Badge>;
+  };
+
+  // Calculate total quantity for an item across all locations
+  const getTotalQuantity = (itemId: string) => {
+    const itemStocks = stocksByItem[itemId] || [];
+    return itemStocks.reduce((sum: number, stock: any) => sum + Number(stock.quantity), 0);
   };
 
   const categoryLabel = ITEM_CATEGORIES.find(c => c.value === activeCategory)?.label || "Items";
@@ -130,8 +152,11 @@ export function ItemMasterView() {
                       <TableHead className="w-12"></TableHead>
                       <TableHead>Item Code</TableHead>
                       <TableHead>Item Name</TableHead>
-                      {activeCategory === "machines" && (
+                      {/* Show Serial Numbers for machines, Total Quantity for bulk categories */}
+                      {activeCategory === "machines" ? (
                         <TableHead>Serial Numbers</TableHead>
+                      ) : (
+                        <TableHead>Total Quantity</TableHead>
                       )}
                       <TableHead>Section</TableHead>
                       <TableHead>Brand / Model</TableHead>
@@ -144,6 +169,8 @@ export function ItemMasterView() {
                   <TableBody>
                     {filteredItems.map(item => {
                       const itemSerials = serialsByItem[item.id] || [];
+                      const totalQuantity = getTotalQuantity(item.id);
+                      
                       return (
                         <TableRow key={item.id}>
                           <TableCell>
@@ -157,14 +184,10 @@ export function ItemMasterView() {
                           </TableCell>
                           <TableCell className="font-mono">{item.item_code}</TableCell>
                           <TableCell className="font-medium">
-                            <div>
-                              {item.item_name}
-                              {item.is_serial_tracked && (
-                                <Badge variant="outline" className="ml-2 text-xs">Serial</Badge>
-                              )}
-                            </div>
+                            <div>{item.item_name}</div>
                           </TableCell>
-                          {activeCategory === "machines" && (
+                          {/* Show Serial Numbers for machines, Total Quantity for bulk categories */}
+                          {activeCategory === "machines" ? (
                             <TableCell>
                               {itemSerials.length > 0 ? (
                                 <div className="flex flex-wrap gap-1">
@@ -178,6 +201,12 @@ export function ItemMasterView() {
                               ) : (
                                 <span className="text-muted-foreground text-sm">No serials</span>
                               )}
+                            </TableCell>
+                          ) : (
+                            <TableCell>
+                              <Badge variant="secondary" className="text-sm">
+                                {totalQuantity} {item.unit_of_measurement}
+                              </Badge>
                             </TableCell>
                           )}
                           <TableCell>
