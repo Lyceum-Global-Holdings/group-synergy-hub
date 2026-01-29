@@ -12,7 +12,10 @@ export function useLabourMaster() {
     queryFn: async () => {
       let query = supabase
         .from("construction_labour_master")
-        .select("*")
+        .select(`
+          *,
+          location:warehouse_locations!construction_labour_master_location_id_fkey(id, name)
+        `)
         .order("created_at", { ascending: false });
 
       // Include records for the selected company OR records with null company_id
@@ -25,7 +28,7 @@ export function useLabourMaster() {
       const { data, error } = await query;
 
       if (error) throw error;
-      return data as LabourMaster[];
+      return data as (LabourMaster & { location?: { id: string; name: string } | null })[];
     },
     staleTime: 0,
     refetchOnMount: "always",
