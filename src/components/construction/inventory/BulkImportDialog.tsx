@@ -523,9 +523,22 @@ export function BulkImportDialog({ open, onOpenChange, category }: BulkImportDia
               onChange={handleFileChange}
             />
             {file && (
-              <p className="text-sm text-muted-foreground">Selected: {file.name}</p>
+              <div className="flex items-center gap-2">
+                <FileSpreadsheet className="h-4 w-4 text-muted-foreground" />
+                <p className="text-sm text-muted-foreground">Selected: {file.name}</p>
+              </div>
             )}
           </div>
+
+          {/* No Items Parsed Message */}
+          {file && !isParsing && parsedItems.length === 0 && !importResult && (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>
+                No valid data rows found in the file. Please ensure your file has the correct columns matching the template.
+              </AlertDescription>
+            </Alert>
+          )}
 
           {/* Parsing State */}
           {isParsing && (
