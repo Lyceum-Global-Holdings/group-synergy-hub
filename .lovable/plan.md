@@ -1,123 +1,183 @@
 
-# Plan: Fix Print Preview for QR Code Labels
 
-## Problem Identified
-The print preview is showing a blank page because:
-1. The print CSS uses `.print-root` class selector, but this class is never applied to any element
-2. The print preview dialog is nested inside another dialog (`BulkQRCodeDialog`), causing print context issues
-3. The visibility/display rules conflict with the dialog's styling
+# Plan: Differentiate Bulk-Tracked vs Serial-Tracked Inventory Categories
 
-## Solution Approach
-Change the print approach to use a **new browser window** instead of trying to print within the existing dialog. This is more reliable because:
-- Avoids nested dialog CSS conflicts
-- Provides a clean print context
-- Matches how other printing features work (like GrnDocument)
+## Overview
+
+Currently, the construction inventory system treats Tools, Safety, Equipment, and Scaffolding similarly to Machines with individual serial tracking. This needs to change:
+
+- **Machines**: Serial-tracked (each unit has a unique serial number and ID)
+- **Tools, Safety, Equipment, Scaffolding**: Bulk/Quantity-tracked (one Item ID per item type, quantity field instead of serial numbers)
+
+For example: 7 yellow safety helmets should have ONE Item ID with quantity=7, not 7 separate records.
+
+---
+
+## Current Architecture Summary
+
+| Component | Current Behavior |
+|-----------|-----------------|
+| `construction_item_master` | Stores item types with `is_serial_tracked` flag |
+| `construction_serial_numbers` | Stores individual machine serial numbers |
+| `construction_inventory_stock` | Stores quantity-based stock at locations |
+| `AddItemDialog` | Shows serial fields for machines only (correct) |
+| `BulkImportDialog` | Shows serial fields for machines only (correct) |
+| `ItemMasterView` | Shows "Serial Numbers" column only for machines (correct) |
+
+The database architecture is already correct. The main changes needed are:
+
+1. For bulk-tracked categories (tools, safety, equipment, scaffolding), add ability to set initial quantity and location when adding items
+2. Update import templates to include quantity/location fields for bulk items
+3. Add category-specific "Add Tool", "Add Safety", etc. buttons in Inventory-Wise view
+4. Connect Item Master data to the Allocation Dashboard
+
+---
 
 ## Changes Required
 
-### 1. Update Print Preview Component
-**File: `src/components/warehouse/BulkQRCodePrintPreview.tsx`**
+### 1. Modify AddItemDialog for Bulk Categories
 
-Instead of using `window.print()` within the dialog, open a new popup window with the labels:
+**File: `src/components/construction/inventory/AddItemDialog.tsx`**
 
-**Current approach (broken):**
-```text
-Dialog opens → Labels render in dialog → window.print() → Blank page
-```
+For non-machine categories (tools, safety, equipment, scaffolding), add:
+- **Initial Quantity** field (number input)
+- **Location** dropdown (where this initial stock will be stored)
 
-**New approach:**
-```text
-Dialog opens → Labels generate → Open new window with labels → window.print() in that window
-```
+When submitted:
+1. Create the item in `construction_item_master` 
+2. If quantity > 0 and location selected, create/update record in `construction_inventory_stock`
+3. Log a transaction as `initial_stock`
 
-Changes:
-- Open labels in a new browser window/popup dedicated for printing
-- Use inline styles in the popup HTML so print CSS is self-contained
-- The new window will be print-optimized with proper visibility
-- Auto-trigger print dialog in the new window
-- Close parent dialog after print is triggered
+### 2. Update BulkImportDialog for Bulk Categories
 
-### 2. Simplified Print Window Structure
-The new print window will contain:
-- A simple HTML page with the QR label images in a grid
-- Inline CSS for both screen preview and print layout
-- Auto-print trigger on load
-- A manual print button as fallback
+**File: `src/components/construction/inventory/BulkImportDialog.tsx`**
 
-### 3. Alternative: Fix Existing Dialog Print
-If we keep the current dialog approach, we need to:
-- Add a unique class like `qr-print-preview` to the label container
-- Use the same visibility pattern as GrnDocument (hide all, show specific)
-- Ensure the dialog content is positioned correctly for print
+For non-machine categories, the import template should include:
+- `item_code`, `item_name`, `section`, `brand`, `model`, `unit_of_measurement`, `description`, `unit_cost`
+- `initial_quantity` (number of items)
+- `location_name` (matching warehouse location name)
 
-## Recommended Implementation
-Use the **new window approach** as it's more reliable:
+Update parsing logic to:
+1. Create items in `construction_item_master` (without serial tracking)
+2. Create stock records in `construction_inventory_stock` for items with quantity > 0
+3. Match location_name to location_id via lookup
 
-```typescript
-// Open dedicated print window
-const printWindow = window.open('', '_blank');
-printWindow.document.write(`
-  <html>
-  <head>
-    <title>QR Labels</title>
-    <style>
-      /* Grid layout for labels */
-      .label-grid {
-        display: grid;
-        grid-template-columns: repeat(2, 2in);
-        gap: 0.25in;
-        padding: 0.5in;
-        justify-content: center;
-      }
-      .label-item {
-        width: 2in;
-        height: 1in;
-        page-break-inside: avoid;
-      }
-      @media print {
-        .no-print { display: none; }
-      }
-    </style>
-  </head>
-  <body>
-    <button class="no-print" onclick="window.print()">Print</button>
-    <div class="label-grid">
-      ${labels.map(url => `<img src="${url}" class="label-item"/>`).join('')}
-    </div>
-    <script>window.onload = () => window.print();</script>
-  </body>
-  </html>
-`);
-printWindow.document.close();
-```
+### 3. Add Category-Specific Buttons in InventoryWiseView
 
-## Files to Modify
+**File: `src/components/construction/inventory/InventoryWiseView.tsx`**
 
-| File | Action |
-|------|--------|
-| `src/components/warehouse/BulkQRCodePrintPreview.tsx` | Rewrite to use new window approach |
-| `src/components/warehouse/BulkQRCodeDialog.tsx` | Minor updates to handle the new print flow |
+Replace single "Add Item" button with a dropdown menu containing:
+- Add Machine (serial-tracked)
+- Add Tool
+- Add Safety Item
+- Add Equipment
+- Add Scaffolding
+
+Each button opens `AddItemDialog` with the corresponding category pre-selected.
+
+### 4. Update ItemMasterView Column Display
+
+**File: `src/components/construction/inventory/ItemMasterView.tsx`**
+
+For bulk categories (tools, safety, equipment, scaffolding):
+- Replace "Serial Numbers" column with "Total Quantity" column
+- Show aggregated quantity from `construction_inventory_stock` table
+- Remove the "Serial" badge for these categories
+
+### 5. Create useCreateItemMasterWithStock Hook
+
+**File: `src/hooks/construction/useConstructionInventory.ts`**
+
+Add new mutation that:
+1. Creates item master record
+2. Creates stock record at specified location if quantity > 0
+3. Logs initial_stock transaction
+
+### 6. Update AllocationDashboard Statistics
+
+**File: `src/components/construction/inventory/AllocationDashboard.tsx`**
+
+Ensure the dashboard reflects:
+- Total quantity of bulk items by category
+- Correct display of tools, safety, equipment, scaffolding quantities
+- Connection to Item Master categories
+
+---
 
 ## Technical Details
 
-### Print Window Features
-- Opens as a popup window focused for printing
-- Contains only the label grid and print controls
-- Auto-triggers browser print dialog on load
-- Falls back to manual print button if auto-print is blocked
-- Clean, isolated CSS that won't conflict with the main app
+### Form Schema for Bulk Categories
 
-### Label Grid Layout
-- 2 columns of 2x1 inch labels
-- 0.25 inch gap between labels
-- 0.5 inch page margins
-- Automatic page breaks between full pages
-- 10 labels per A4 page (2 columns x 5 rows)
+```typescript
+// Additional fields for bulk-tracked items
+interface BulkItemFields {
+  initial_quantity?: number;  // Starting quantity for this item type
+  location_id?: string;       // Where to store initial stock
+}
+```
 
-### User Flow After Fix
-1. User selects assets and clicks "Download QR Codes"
-2. User selects "Print Directly" option
-3. User clicks "Print Labels" button
-4. New window opens showing all labels in a grid
-5. Browser print dialog appears automatically
-6. User adjusts printer settings and prints
+### Category Detection Logic
+
+```typescript
+const BULK_CATEGORIES: ItemCategory[] = ['tools', 'safety', 'equipment', 'scaffolding'];
+const isBulkTracked = BULK_CATEGORIES.includes(category);
+```
+
+### Stock Creation Flow for Bulk Items
+
+```text
+User fills form with:
+  - Item details (name, code, etc.)
+  - Initial Quantity: 7
+  - Location: "Main Warehouse"
+       ↓
+1. Insert into construction_item_master (is_serial_tracked = false)
+2. Insert into construction_inventory_stock (item_master_id, location_id, quantity=7)
+3. Insert into construction_inventory_transactions (type='initial_stock', quantity=7)
+```
+
+### Import Template for Bulk Categories
+
+| item_code | item_name | section | brand | unit_of_measurement | unit_cost | initial_quantity | location_name |
+|-----------|-----------|---------|-------|---------------------|-----------|------------------|---------------|
+| SAF-001 | Safety Helmet - Yellow | civil | 3M | pcs | 250 | 7 | Main Warehouse |
+| TOL-001 | Hammer - Steel | civil | Stanley | pcs | 500 | 15 | Site A Store |
+
+---
+
+## Files to Create/Modify
+
+| File | Action | Description |
+|------|--------|-------------|
+| `src/components/construction/inventory/AddItemDialog.tsx` | Modify | Add quantity/location fields for bulk categories |
+| `src/components/construction/inventory/BulkImportDialog.tsx` | Modify | Update template and parsing for bulk categories |
+| `src/components/construction/inventory/InventoryWiseView.tsx` | Modify | Add category-specific add buttons |
+| `src/components/construction/inventory/ItemMasterView.tsx` | Modify | Show quantity column for bulk categories |
+| `src/hooks/construction/useConstructionInventory.ts` | Modify | Add mutation for creating items with initial stock |
+| `src/components/construction/inventory/AllocationDashboard.tsx` | Modify | Ensure proper display of bulk item statistics |
+
+---
+
+## User Experience After Changes
+
+### Adding a Bulk Item (e.g., Safety Helmets)
+1. Go to Item Master > Safety tab
+2. Click "Add Safety"
+3. Fill in: Item Code (auto: SAF-001), Name: "Safety Helmet - Yellow", Section, etc.
+4. Set Initial Quantity: 7
+5. Select Location: "Main Warehouse"
+6. Click Save
+7. Result: One item record, with 7 units at Main Warehouse
+
+### Importing Bulk Items
+1. Go to Item Master > Tools tab
+2. Click "Import Data" > Download Template
+3. Template includes: item_code, item_name, ..., **initial_quantity**, **location_name**
+4. Fill in data and upload
+5. Items created with stock at specified locations
+
+### Viewing in Inventory-Wise
+1. Tools show as single card with "Stock by Location" section
+2. Displays: "Main Warehouse: 7 pcs", "Site A: 3 pcs", etc.
+3. No serial numbers shown (machines only have serial numbers)
+
