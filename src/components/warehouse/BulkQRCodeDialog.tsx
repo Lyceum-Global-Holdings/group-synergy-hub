@@ -7,9 +7,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Download, Loader2, QrCode, CheckCircle } from "lucide-react";
+import { Download, Loader2, QrCode, CheckCircle, FileImage, FileText } from "lucide-react";
 import { generateBulkQRCodePdf, downloadBulkQRCodePdf, AssetForQR } from "@/utils/bulkQRCodePdf";
+import { generateBulkQRCodePngZip, downloadBulkQRCodePngZip } from "@/utils/bulkQRCodePng";
 import { useToast } from "@/hooks/use-toast";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Label } from "@/components/ui/label";
 
 interface BulkQRCodeDialogProps {
   open: boolean;
@@ -17,8 +20,11 @@ interface BulkQRCodeDialogProps {
   assets: AssetForQR[];
 }
 
+type DownloadFormat = "pdf" | "png";
+
 export function BulkQRCodeDialog({ open, onOpenChange, assets }: BulkQRCodeDialogProps) {
   const [isGenerating, setIsGenerating] = useState(false);
+  const [format, setFormat] = useState<DownloadFormat>("pdf");
   const { toast } = useToast();
 
   const handleDownload = async () => {
@@ -26,18 +32,27 @@ export function BulkQRCodeDialog({ open, onOpenChange, assets }: BulkQRCodeDialo
 
     setIsGenerating(true);
     try {
-      const blob = await generateBulkQRCodePdf(assets);
-      downloadBulkQRCodePdf(blob);
-      toast({
-        title: "Success",
-        description: `Downloaded QR codes for ${assets.length} assets`,
-      });
+      if (format === "pdf") {
+        const blob = await generateBulkQRCodePdf(assets);
+        downloadBulkQRCodePdf(blob);
+        toast({
+          title: "Success",
+          description: `Downloaded QR codes PDF for ${assets.length} assets`,
+        });
+      } else {
+        const blob = await generateBulkQRCodePngZip(assets);
+        downloadBulkQRCodePngZip(blob);
+        toast({
+          title: "Success",
+          description: `Downloaded QR codes ZIP with ${assets.length} PNG files`,
+        });
+      }
       onOpenChange(false);
     } catch (error) {
-      console.error('Error generating QR code PDF:', error);
+      console.error('Error generating QR codes:', error);
       toast({
         title: "Error",
-        description: "Failed to generate QR code PDF",
+        description: `Failed to generate QR code ${format === "pdf" ? "PDF" : "ZIP"}`,
         variant: "destructive",
       });
     } finally {
@@ -55,7 +70,7 @@ export function BulkQRCodeDialog({ open, onOpenChange, assets }: BulkQRCodeDialo
           </DialogTitle>
           <DialogDescription>
             {assets.length} asset{assets.length > 1 ? 's have' : ' has'} been created. 
-            Download all QR codes as a PDF for printing labels.
+            Download all QR codes for printing labels.
           </DialogDescription>
         </DialogHeader>
 
@@ -66,7 +81,7 @@ export function BulkQRCodeDialog({ open, onOpenChange, assets }: BulkQRCodeDialo
               Assets to include:
             </p>
             <ul className="space-y-1">
-              {assets.slice(0, 10).map((asset, index) => (
+              {assets.slice(0, 10).map((asset) => (
                 <li key={asset.id} className="text-sm flex items-center gap-2">
                   <QrCode className="h-3 w-3 text-muted-foreground" />
                   <span className="truncate">{asset.name}</span>
@@ -85,12 +100,39 @@ export function BulkQRCodeDialog({ open, onOpenChange, assets }: BulkQRCodeDialo
             </ul>
           </div>
 
-          {/* PDF Info */}
-          <div className="bg-muted/50 rounded-lg p-3">
-            <p className="text-sm text-muted-foreground">
-              <strong>PDF Format:</strong> Each page contains one 2×1 inch QR code label, 
-              optimized for standard label printers.
-            </p>
+          {/* Format Selection */}
+          <div className="border rounded-lg p-4">
+            <p className="text-sm font-medium mb-3">Download Format:</p>
+            <RadioGroup
+              value={format}
+              onValueChange={(value) => setFormat(value as DownloadFormat)}
+              className="space-y-3"
+            >
+              <div className="flex items-start gap-3">
+                <RadioGroupItem value="pdf" id="pdf" className="mt-0.5" />
+                <Label htmlFor="pdf" className="flex-1 cursor-pointer">
+                  <div className="flex items-center gap-2">
+                    <FileText className="h-4 w-4 text-destructive" />
+                    <span className="font-medium">PDF Document</span>
+                  </div>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Multi-page PDF with one 2×1 inch label per page. Best for direct printing.
+                  </p>
+                </Label>
+              </div>
+              <div className="flex items-start gap-3">
+                <RadioGroupItem value="png" id="png" className="mt-0.5" />
+                <Label htmlFor="png" className="flex-1 cursor-pointer">
+                  <div className="flex items-center gap-2">
+                    <FileImage className="h-4 w-4 text-primary" />
+                    <span className="font-medium">PNG Images (ZIP)</span>
+                  </div>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Individual 600×300px PNG files in a ZIP archive. Best for custom label software.
+                  </p>
+                </Label>
+              </div>
+            </RadioGroup>
           </div>
 
           {/* Actions */}
@@ -113,7 +155,7 @@ export function BulkQRCodeDialog({ open, onOpenChange, assets }: BulkQRCodeDialo
               ) : (
                 <>
                   <Download className="mr-2 h-4 w-4" />
-                  Download All QR Codes
+                  Download {format === "pdf" ? "PDF" : "ZIP"}
                 </>
               )}
             </Button>
