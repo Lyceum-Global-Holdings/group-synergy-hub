@@ -2676,12 +2676,14 @@ export type Database = {
           is_active: boolean | null
           is_control_account: boolean | null
           is_header: boolean | null
+          is_sensitive: boolean | null
           level: number
           normal_balance: Database["public"]["Enums"]["normal_balance"]
           notes: string | null
           opening_balance: number | null
           opening_balance_date: string | null
           parent_account_id: string | null
+          sensitivity_reason: string | null
           updated_at: string | null
         }
         Insert: {
@@ -2699,12 +2701,14 @@ export type Database = {
           is_active?: boolean | null
           is_control_account?: boolean | null
           is_header?: boolean | null
+          is_sensitive?: boolean | null
           level?: number
           normal_balance: Database["public"]["Enums"]["normal_balance"]
           notes?: string | null
           opening_balance?: number | null
           opening_balance_date?: string | null
           parent_account_id?: string | null
+          sensitivity_reason?: string | null
           updated_at?: string | null
         }
         Update: {
@@ -2722,12 +2726,14 @@ export type Database = {
           is_active?: boolean | null
           is_control_account?: boolean | null
           is_header?: boolean | null
+          is_sensitive?: boolean | null
           level?: number
           normal_balance?: Database["public"]["Enums"]["normal_balance"]
           notes?: string | null
           opening_balance?: number | null
           opening_balance_date?: string | null
           parent_account_id?: string | null
+          sensitivity_reason?: string | null
           updated_at?: string | null
         }
         Relationships: [
@@ -11919,6 +11925,50 @@ export type Database = {
           },
         ]
       }
+      senior_finance_users: {
+        Row: {
+          company_id: string | null
+          created_at: string | null
+          granted_at: string | null
+          granted_by: string | null
+          id: string
+          is_active: boolean | null
+          reason: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          company_id?: string | null
+          created_at?: string | null
+          granted_at?: string | null
+          granted_by?: string | null
+          id?: string
+          is_active?: boolean | null
+          reason?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          company_id?: string | null
+          created_at?: string | null
+          granted_at?: string | null
+          granted_by?: string | null
+          id?: string
+          is_active?: boolean | null
+          reason?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "senior_finance_users_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       site_report_activities: {
         Row: {
           activity_type: string
@@ -15624,6 +15674,10 @@ export type Database = {
         Returns: boolean
       }
       has_sales_access: { Args: { _user_id: string }; Returns: boolean }
+      has_senior_finance_access: {
+        Args: { check_user_id: string }
+        Returns: boolean
+      }
       has_warehouse_access: { Args: { _user_id: string }; Returns: boolean }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
       is_company_hod: {
@@ -15636,6 +15690,10 @@ export type Database = {
       }
       is_same_company: { Args: { _target_user_id: string }; Returns: boolean }
       is_super_admin: { Args: { _user_id: string }; Returns: boolean }
+      journal_entry_has_sensitive_accounts: {
+        Args: { je_id: string }
+        Returns: boolean
+      }
       process_material_issue_stock_update: {
         Args: {
           p_bin_allocation_id?: string
