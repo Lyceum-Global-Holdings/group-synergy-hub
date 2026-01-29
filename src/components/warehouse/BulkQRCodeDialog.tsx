@@ -7,12 +7,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Download, Loader2, QrCode, CheckCircle, FileImage, FileText } from "lucide-react";
+import { Download, Loader2, QrCode, CheckCircle, FileImage, FileText, Printer } from "lucide-react";
 import { generateBulkQRCodePdf, downloadBulkQRCodePdf, AssetForQR } from "@/utils/bulkQRCodePdf";
 import { generateBulkQRCodePngZip, downloadBulkQRCodePngZip } from "@/utils/bulkQRCodePng";
 import { useToast } from "@/hooks/use-toast";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
+import { BulkQRCodePrintPreview } from "./BulkQRCodePrintPreview";
 
 interface BulkQRCodeDialogProps {
   open: boolean;
@@ -20,15 +21,21 @@ interface BulkQRCodeDialogProps {
   assets: AssetForQR[];
 }
 
-type DownloadFormat = "pdf" | "png";
+type DownloadFormat = "pdf" | "png" | "print";
 
 export function BulkQRCodeDialog({ open, onOpenChange, assets }: BulkQRCodeDialogProps) {
   const [isGenerating, setIsGenerating] = useState(false);
   const [format, setFormat] = useState<DownloadFormat>("pdf");
+  const [showPrintPreview, setShowPrintPreview] = useState(false);
   const { toast } = useToast();
 
-  const handleDownload = async () => {
+  const handleAction = async () => {
     if (assets.length === 0) return;
+
+    if (format === "print") {
+      setShowPrintPreview(true);
+      return;
+    }
 
     setIsGenerating(true);
     try {
@@ -132,6 +139,18 @@ export function BulkQRCodeDialog({ open, onOpenChange, assets }: BulkQRCodeDialo
                   </p>
                 </Label>
               </div>
+              <div className="flex items-start gap-3">
+                <RadioGroupItem value="print" id="print" className="mt-0.5" />
+                <Label htmlFor="print" className="flex-1 cursor-pointer">
+                  <div className="flex items-center gap-2">
+                    <Printer className="h-4 w-4 text-success" />
+                    <span className="font-medium">Print Directly</span>
+                  </div>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Open print preview with labels in a grid layout. Best for immediate printing.
+                  </p>
+                </Label>
+              </div>
             </RadioGroup>
           </div>
 
@@ -144,13 +163,18 @@ export function BulkQRCodeDialog({ open, onOpenChange, assets }: BulkQRCodeDialo
               Skip
             </Button>
             <Button
-              onClick={handleDownload}
+              onClick={handleAction}
               disabled={isGenerating || assets.length === 0}
             >
               {isGenerating ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   Generating...
+                </>
+              ) : format === "print" ? (
+                <>
+                  <Printer className="mr-2 h-4 w-4" />
+                  Print Labels
                 </>
               ) : (
                 <>
@@ -161,6 +185,13 @@ export function BulkQRCodeDialog({ open, onOpenChange, assets }: BulkQRCodeDialo
             </Button>
           </div>
         </div>
+
+        {/* Print Preview Dialog */}
+        <BulkQRCodePrintPreview
+          open={showPrintPreview}
+          onOpenChange={setShowPrintPreview}
+          assets={assets}
+        />
       </DialogContent>
     </Dialog>
   );
