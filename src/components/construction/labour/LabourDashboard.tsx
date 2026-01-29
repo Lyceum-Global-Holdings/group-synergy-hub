@@ -31,10 +31,11 @@ export function LabourDashboard() {
     return acc;
   }, {} as Record<string, number>) || {};
 
-  // Location-wise count (using trade as proxy for location/site)
+  // Location-wise count (using location_id field with joined location name)
   const locationCount = labourMaster?.reduce((acc, labour) => {
-    const location = labour.trade || "Unassigned";
-    acc[location] = (acc[location] || 0) + 1;
+    const labourWithLocation = labour as typeof labour & { location?: { id: string; name: string } | null };
+    const locationName = labourWithLocation.location?.name || "Unassigned";
+    acc[locationName] = (acc[locationName] || 0) + 1;
     return acc;
   }, {} as Record<string, number>) || {};
 
