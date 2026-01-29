@@ -37,7 +37,7 @@ import {
   Pencil,
 } from "lucide-react";
 import { readExcelFile, writeExcelFromAOA } from "@/utils/excelUtils";
-import { useBulkCreateItemMasterWithSerials } from "@/hooks/construction/useConstructionInventory";
+import { useBulkCreateItemMasterWithSerials, useBulkCreateItemMasterWithStock, useLocations } from "@/hooks/construction/useConstructionInventory";
 import {
   type ItemCategory,
   type ItemSection,
@@ -49,6 +49,9 @@ import {
   SERIAL_AVAILABILITIES,
 } from "@/types/construction-inventory";
 import { useToast } from "@/hooks/use-toast";
+
+// Bulk categories - these are quantity-tracked, not serial-tracked
+const BULK_CATEGORIES: ItemCategory[] = ['tools', 'safety', 'equipment', 'scaffolding'];
 
 interface ParsedItem {
   item_code: string;
@@ -65,6 +68,10 @@ interface ParsedItem {
   availability?: SerialAvailability;
   warranty_expiry?: string;
   asset_value?: number;
+  // Bulk item fields (for tools, safety, equipment, scaffolding)
+  initial_quantity?: number;
+  location_name?: string;
+  location_id?: string;
   is_valid: boolean;
   errors: string[];
 }
@@ -84,14 +91,23 @@ export function BulkImportDialog({ open, onOpenChange, category }: BulkImportDia
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
-  const bulkCreate = useBulkCreateItemMasterWithSerials();
+  const bulkCreateWithSerials = useBulkCreateItemMasterWithSerials();
+  const bulkCreateWithStock = useBulkCreateItemMasterWithStock();
+  const { data: locations } = useLocations();
 
   const categoryLabel = ITEM_CATEGORIES.find(c => c.value === category)?.label || "Items";
   const isMachineCategory = category === "machines";
+  const isBulkCategory = BULK_CATEGORIES.includes(category);
 
   const validSections = ITEM_SECTIONS.map(s => s.value);
   const validConditions = SERIAL_CONDITIONS.map(c => c.value);
   const validAvailabilities = SERIAL_AVAILABILITIES.map(a => a.value);
+
+  // Create location name to ID map
+  const locationNameMap = locations?.reduce((acc, loc) => {
+    acc[loc.name.toLowerCase()] = loc.id;
+    return acc;
+  }, {} as Record<string, string>) || {};
 
   // Revalidate a single item
   const revalidateItem = useCallback((item: ParsedItem): ParsedItem => {
@@ -112,23 +128,37 @@ export function BulkImportDialog({ open, onOpenChange, category }: BulkImportDia
         errors.push(`Invalid availability: ${item.availability}`);
       }
     }
+
+    // For bulk categories, validate location if quantity is provided
+    if (isBulkCategory && item.initial_quantity && item.initial_quantity > 0) {
+      if (item.location_name && !item.location_id) {
+        errors.push(`Unknown location: ${item.location_name}`);
+      }
+    }
     
     return {
       ...item,
       is_valid: errors.length === 0,
       errors,
     };
-  }, [isMachineCategory, validSections, validConditions, validAvailabilities]);
+  }, [isMachineCategory, isBulkCategory, validSections, validConditions, validAvailabilities]);
 
   // Update item field and revalidate
   const updateItemField = useCallback((index: number, field: keyof ParsedItem, value: any) => {
     setParsedItems(prev => {
       const updated = [...prev];
       updated[index] = { ...updated[index], [field]: value };
+      
+      // If updating location_name for bulk items, also update location_id
+      if (field === 'location_name' && isBulkCategory) {
+        const locationId = locationNameMap[String(value).toLowerCase()];
+        updated[index].location_id = locationId;
+      }
+      
       updated[index] = revalidateItem(updated[index]);
       return updated;
     });
-  }, [revalidateItem]);
+  }, [revalidateItem, isBulkCategory, locationNameMap]);
 
   const handleDownloadTemplate = async () => {
     // Base headers for all categories
@@ -152,43 +182,64 @@ export function BulkImportDialog({ open, onOpenChange, category }: BulkImportDia
       "asset_value",
     ];
 
-    const headers = isMachineCategory ? [...baseHeaders, ...machineHeaders] : baseHeaders;
-
-    // Base sample row
-    const baseSampleRow = [
-      `${category.toUpperCase().slice(0, 3)}-001`,
-      `Sample ${categoryLabel.slice(0, -1)}`,
-      "civil",
-      "Brand Name",
-      "Model XYZ",
-      "pcs",
-      "Sample description",
-      "1000",
+    // Additional headers for bulk categories (quantity tracking)
+    const bulkHeaders = [
+      "initial_quantity",
+      "location_name",
     ];
 
-    // Machine-specific sample data
-    const machineSampleRow = [
-      "SN-001",
-      "working",
-      "available",
-      "2026-12-31",
-      "50000",
-    ];
+    let headers: string[];
+    let sampleRow: (string | number)[];
+    let notes: string[][];
 
-    const sampleRow = isMachineCategory ? [...baseSampleRow, ...machineSampleRow] : baseSampleRow;
+    if (isMachineCategory) {
+      headers = [...baseHeaders, ...machineHeaders];
+      sampleRow = [
+        `${category.toUpperCase().slice(0, 3)}-001`,
+        `Sample ${categoryLabel.slice(0, -1)}`,
+        "civil",
+        "Brand Name",
+        "Model XYZ",
+        "pcs",
+        "Sample description",
+        "1000",
+        "SN-001",
+        "working",
+        "available",
+        "2026-12-31",
+        "50000",
+      ];
+      notes = [
+        [],
+        ["# Notes:"],
+        ["# section: civil, mep, aluminium, mechanical, carpenter"],
+        ["# condition: working, under_repair, damaged, scrap"],
+        ["# availability: available, in_use, in_transit, reserved"],
+      ];
+    } else {
+      headers = [...baseHeaders, ...bulkHeaders];
+      sampleRow = [
+        `${category.toUpperCase().slice(0, 3)}-001`,
+        `Sample ${categoryLabel.slice(0, -1)}`,
+        "civil",
+        "Brand Name",
+        "Model XYZ",
+        "pcs",
+        "Sample description",
+        "250",
+        "10",
+        locations?.[0]?.name || "Main Warehouse",
+      ];
+      notes = [
+        [],
+        ["# Notes:"],
+        ["# section: civil, mep, aluminium, mechanical, carpenter"],
+        ["# initial_quantity: Number of items (optional)"],
+        ["# location_name: Must match an existing location name exactly"],
+      ];
+    }
 
-    // Add a note row for machines
-    const data = isMachineCategory
-      ? [
-          headers,
-          sampleRow,
-          [],
-          ["# Notes:"],
-          ["# section: civil, mep, aluminium, mechanical, carpenter"],
-          ["# condition: working, under_repair, damaged, scrap"],
-          ["# availability: available, in_use, in_transit, reserved"],
-        ]
-      : [headers, sampleRow];
+    const data = [headers, sampleRow, ...notes];
 
     await writeExcelFromAOA(data, `${category}_import_template.xlsx`, categoryLabel);
     toast({ title: "Template downloaded" });
@@ -220,10 +271,6 @@ export function BulkImportDialog({ open, onOpenChange, category }: BulkImportDia
     try {
       const jsonData = await readExcelFile(file);
 
-      const validSections = ITEM_SECTIONS.map(s => s.value);
-      const validConditions = SERIAL_CONDITIONS.map(c => c.value);
-      const validAvailabilities = ["available", "in_use", "in_transit", "reserved"];
-
       const parsed: ParsedItem[] = jsonData
         .filter((row) => {
           // Skip note/comment rows
@@ -253,6 +300,11 @@ export function BulkImportDialog({ open, onOpenChange, category }: BulkImportDia
           const warranty_expiry = isMachineCategory ? String(row.warranty_expiry || "").trim() || undefined : undefined;
           const asset_value = isMachineCategory && row.asset_value ? Number(row.asset_value) : undefined;
 
+          // Bulk category fields
+          const initial_quantity = isBulkCategory && row.initial_quantity ? Number(row.initial_quantity) : undefined;
+          const location_name = isBulkCategory ? String(row.location_name || "").trim() || undefined : undefined;
+          const location_id = location_name ? locationNameMap[location_name.toLowerCase()] : undefined;
+
           // Validate required fields
           if (!item_code) errors.push("Missing item code");
           if (!item_name) errors.push("Missing item name");
@@ -271,6 +323,13 @@ export function BulkImportDialog({ open, onOpenChange, category }: BulkImportDia
             }
           }
 
+          // Validate bulk category fields
+          if (isBulkCategory && initial_quantity && initial_quantity > 0) {
+            if (location_name && !location_id) {
+              errors.push(`Unknown location: ${location_name}`);
+            }
+          }
+
           return {
             item_code,
             item_name,
@@ -285,6 +344,9 @@ export function BulkImportDialog({ open, onOpenChange, category }: BulkImportDia
             availability: availability && validAvailabilities.includes(availability) ? availability : "available",
             warranty_expiry,
             asset_value: asset_value && !isNaN(asset_value) ? asset_value : undefined,
+            initial_quantity: initial_quantity && !isNaN(initial_quantity) ? initial_quantity : undefined,
+            location_name,
+            location_id,
             is_valid: errors.length === 0,
             errors,
           };
@@ -316,35 +378,62 @@ export function BulkImportDialog({ open, onOpenChange, category }: BulkImportDia
     }
 
     try {
-      const result = await bulkCreate.mutateAsync({
-        items: validItems.map(item => ({
-          item_code: item.item_code,
-          item_name: item.item_name,
-          category,
-          section: item.section,
-          brand: item.brand,
-          model: item.model,
-          unit_of_measurement: item.unit_of_measurement,
-          description: item.description,
-          unit_cost: item.unit_cost,
-          is_serial_tracked: isMachineCategory,
-          // Serial data for machines
-          serial_number: item.serial_number,
-          condition: item.condition,
-          availability: item.availability,
-          warranty_expiry: item.warranty_expiry,
-          asset_value: item.asset_value,
-        })),
-      });
+      if (isMachineCategory) {
+        // Use serial tracking import for machines
+        const result = await bulkCreateWithSerials.mutateAsync({
+          items: validItems.map(item => ({
+            item_code: item.item_code,
+            item_name: item.item_name,
+            category,
+            section: item.section,
+            brand: item.brand,
+            model: item.model,
+            unit_of_measurement: item.unit_of_measurement,
+            description: item.description,
+            unit_cost: item.unit_cost,
+            is_serial_tracked: true,
+            serial_number: item.serial_number,
+            condition: item.condition,
+            availability: item.availability,
+            warranty_expiry: item.warranty_expiry,
+            asset_value: item.asset_value,
+          })),
+        });
 
-      // Handle the new return type with results and errors
-      const successCount = result.results?.length || validItems.length;
-      const errorCount = result.errors?.length || 0;
+        const successCount = result.results?.length || validItems.length;
+        const errorCount = result.errors?.length || 0;
 
-      setImportResult({
-        success: successCount,
-        failed: (parsedItems.length - validItems.length) + errorCount,
-      });
+        setImportResult({
+          success: successCount,
+          failed: (parsedItems.length - validItems.length) + errorCount,
+        });
+      } else {
+        // Use stock-based import for bulk categories
+        const result = await bulkCreateWithStock.mutateAsync({
+          items: validItems.map(item => ({
+            item_code: item.item_code,
+            item_name: item.item_name,
+            category,
+            section: item.section,
+            brand: item.brand,
+            model: item.model,
+            unit_of_measurement: item.unit_of_measurement,
+            description: item.description,
+            unit_cost: item.unit_cost,
+            is_serial_tracked: false,
+            initial_quantity: item.initial_quantity,
+            location_id: item.location_id,
+          })),
+        });
+
+        const successCount = result.results?.length || validItems.length;
+        const errorCount = result.errors?.length || 0;
+
+        setImportResult({
+          success: successCount,
+          failed: (parsedItems.length - validItems.length) + errorCount,
+        });
+      }
     } catch (error: any) {
       console.error("Import error:", error);
       toast({
@@ -390,6 +479,7 @@ export function BulkImportDialog({ open, onOpenChange, category }: BulkImportDia
 
   const validCount = parsedItems.filter(i => i.is_valid).length;
   const invalidCount = parsedItems.filter(i => !i.is_valid).length;
+  const isImporting = bulkCreateWithSerials.isPending || bulkCreateWithStock.isPending;
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
@@ -408,6 +498,11 @@ export function BulkImportDialog({ open, onOpenChange, category }: BulkImportDia
                 {isMachineCategory && (
                   <p className="text-xs text-muted-foreground mt-1">
                     Machine template includes serial number fields for tracking.
+                  </p>
+                )}
+                {isBulkCategory && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {categoryLabel} template includes initial quantity and location fields.
                   </p>
                 )}
               </div>
@@ -474,6 +569,12 @@ export function BulkImportDialog({ open, onOpenChange, category }: BulkImportDia
                           <TableHead>Serial Number</TableHead>
                           <TableHead>Condition</TableHead>
                           <TableHead>Availability</TableHead>
+                        </>
+                      )}
+                      {isBulkCategory && (
+                        <>
+                          <TableHead>Quantity</TableHead>
+                          <TableHead>Location</TableHead>
                         </>
                       )}
                       <TableHead className="w-10"></TableHead>
@@ -623,6 +724,62 @@ export function BulkImportDialog({ open, onOpenChange, category }: BulkImportDia
                               </TableCell>
                             </>
                           )}
+
+                          {isBulkCategory && (
+                            <>
+                              {/* Quantity */}
+                              <TableCell>
+                                {isEditing ? (
+                                  <Input
+                                    className="h-8 w-20"
+                                    type="number"
+                                    min="0"
+                                    value={item.initial_quantity || ""}
+                                    onChange={(e) => updateItemField(index, 'initial_quantity', Number(e.target.value))}
+                                  />
+                                ) : (
+                                  <span>{item.initial_quantity || "-"}</span>
+                                )}
+                              </TableCell>
+                              
+                              {/* Location */}
+                              <TableCell>
+                                {isEditing ? (
+                                  <Select
+                                    value={item.location_id || ""}
+                                    onValueChange={(val) => {
+                                      const loc = locations?.find(l => l.id === val);
+                                      updateItemField(index, 'location_name', loc?.name || "");
+                                      setParsedItems(prev => {
+                                        const updated = [...prev];
+                                        updated[index].location_id = val;
+                                        return updated;
+                                      });
+                                    }}
+                                  >
+                                    <SelectTrigger className="h-8 w-32">
+                                      <SelectValue placeholder="Select..." />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {locations?.map((loc) => (
+                                        <SelectItem key={loc.id} value={loc.id}>
+                                          {loc.name}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                ) : item.location_name ? (
+                                  item.location_id ? (
+                                    <Badge variant="secondary">{item.location_name}</Badge>
+                                  ) : (
+                                    <span className="text-destructive text-sm">{item.location_name} (not found)</span>
+                                  )
+                                ) : (
+                                  <span className="text-muted-foreground">-</span>
+                                )}
+                              </TableCell>
+                            </>
+                          )}
                           
                           {/* Edit Action */}
                           <TableCell>
@@ -686,7 +843,8 @@ export function BulkImportDialog({ open, onOpenChange, category }: BulkImportDia
               <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400" />
               <AlertDescription className="text-green-800 dark:text-green-100">
                 Successfully imported {importResult.success} item(s)
-                {isMachineCategory && " with serial numbers"}.
+                {isMachineCategory && " with serial numbers"}
+                {isBulkCategory && " with initial stock"}.
                 {importResult.failed > 0 && ` ${importResult.failed} row(s) were skipped due to errors.`}
               </AlertDescription>
             </Alert>
@@ -700,9 +858,9 @@ export function BulkImportDialog({ open, onOpenChange, category }: BulkImportDia
             {parsedItems.length > 0 && !importResult && (
               <Button
                 onClick={handleImport}
-                disabled={validCount === 0 || bulkCreate.isPending}
+                disabled={validCount === 0 || isImporting}
               >
-                {bulkCreate.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                {isImporting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Import {validCount} Item(s)
               </Button>
             )}
