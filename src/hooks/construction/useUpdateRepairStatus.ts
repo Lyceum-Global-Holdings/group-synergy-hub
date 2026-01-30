@@ -91,12 +91,13 @@ export function useUpdateRepairStatus() {
               .insert({
                 item_master_id: repairRecord.serial_number.item_master_id,
                 location_id: repairRecord.serial_number.current_location_id,
+                serial_number_id: data.serialNumberId,
                 transaction_type: "repair_returned",
-                quantity: 1,
+                quantity_change: 1,
                 transaction_date: new Date().toISOString(),
-                reference_number: data.repairId,
+                repair_id: data.repairId,
                 notes: "Item returned from repair",
-                created_by: user.id,
+                performed_by: user.id,
               });
             
             if (transactionError) {

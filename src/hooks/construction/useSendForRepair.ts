@@ -102,12 +102,11 @@ export function useSendForRepair() {
               location_id: data.locationId,
               serial_number_id: serialId,
               transaction_type: "repair_sent",
-              quantity: 1,
+              quantity_change: -1,
               transaction_date: new Date().toISOString(),
-              reference_number: `REP-${Date.now()}`,
               notes: `Sent to ${data.repairCentre}${data.issueDescription ? ` - ${data.issueDescription}` : ''}`,
               company_id: selectedCompany?.id || null,
-              created_by: user?.user?.id || null,
+              performed_by: user?.user?.id || null,
             });
 
           if (txError) throw txError;
