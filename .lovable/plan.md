@@ -1,64 +1,303 @@
 
-# Plan: Allow All Authenticated Users to Download QR Codes
+# Plan: Add CRUD + Download Controls to RBAC System
 
-## Problem
+## Current State Analysis
 
-Currently, the `asset_master` table has a restrictive SELECT policy that only allows:
-- Admins (admin/super_admin roles)
-- Users with company access AND specific roles (finance, warehouse, or manager)
+Your RBAC system currently has:
 
-This prevents regular authenticated users from viewing assets and downloading their QR codes.
+| Component | Purpose | Limitation |
+|-----------|---------|------------|
+| `permissions` table | Generic CRUD permissions (user.view, user.create, etc.) | Only 16 high-level system permissions |
+| `role_permissions` | Links roles to permissions | Not connected to modules/submodules |
+| `role_modules` | Module access per role (submodules array) | Only tracks access, not operations |
+| `user_modules` | User-specific overrides (grant/deny) | Only tracks access, not operations |
 
-## Current RLS Policies
+**Current Gap**: The system knows *which* modules a user can access, but not *what operations* they can perform within those modules.
 
-| Table | Policy | Current Access |
-|-------|--------|----------------|
-| `warehouse_assets` | "Authenticated users can view warehouse assets" | All authenticated users (auth.uid() IS NOT NULL) |
-| `asset_master` | "Company users and admins can view asset master" | Admins OR (company match + specific roles) |
+---
 
-## Solution
+## Proposed Solution
 
-Update the `asset_master` SELECT policy to allow ALL authenticated users to view asset records, matching the existing `warehouse_assets` policy behavior.
+Extend the RBAC system to support **operation-level controls** per module/submodule:
 
-## Changes Required
-
-**New Migration File**
-
-Create a migration that:
-1. Drops the current restrictive SELECT policy
-2. Creates a new policy allowing all authenticated users to view asset_master records
-
-```sql
--- Drop existing restrictive SELECT policy
-DROP POLICY IF EXISTS "Company users and admins can view asset master" ON asset_master;
-
--- Create new policy allowing all authenticated users to view
-CREATE POLICY "Authenticated users can view asset master"
-ON asset_master FOR SELECT
-USING (auth.uid() IS NOT NULL);
+```text
+Operations: view | add | edit | delete | download
 ```
 
-## Security Considerations
+### Option A: Extend Existing Tables (Recommended)
 
-- **SELECT (read)**: All authenticated users can view asset master records
-- **INSERT/UPDATE/DELETE**: Unchanged - still restricted to creators and admins
+Add an `operations` column to track allowed actions per module:
 
-This change is safe because:
-1. It only affects read access, not write operations
-2. Users must still be authenticated (logged in)
-3. Other policies (INSERT, UPDATE, DELETE) remain unchanged
-4. This matches the existing `warehouse_assets` policy pattern
+```sql
+-- Add operations column to role_modules
+ALTER TABLE role_modules ADD COLUMN operations text[] DEFAULT ARRAY['view'];
 
-## Files to Create
+-- Add operations column to user_modules  
+ALTER TABLE user_modules ADD COLUMN operations text[] DEFAULT ARRAY['view'];
+```
+
+**Schema After Change:**
+
+| Table | Columns |
+|-------|---------|
+| `role_modules` | id, role_id, module_key, submodules, **operations**, created_at |
+| `user_modules` | id, user_id, module_key, submodules, **operations**, access_type, created_at |
+
+---
+
+## Implementation Details
+
+### 1. Database Migration
+
+Create a new migration to add operations support:
+
+```sql
+-- Add operations array column with default view permission
+ALTER TABLE role_modules 
+ADD COLUMN IF NOT EXISTS operations text[] DEFAULT ARRAY['view'];
+
+ALTER TABLE user_modules 
+ADD COLUMN IF NOT EXISTS operations text[] DEFAULT ARRAY['view'];
+
+-- Create helper function to check operation access
+CREATE OR REPLACE FUNCTION has_operation_access(
+  _user_id uuid, 
+  _module_key text, 
+  _operation text
+)
+RETURNS boolean
+LANGUAGE sql STABLE SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT 
+    -- Admins always have all operations
+    is_admin(_user_id)
+    OR
+    -- Check user-specific grants first
+    EXISTS (
+      SELECT 1 FROM user_modules um
+      WHERE um.user_id = _user_id 
+      AND um.module_key = _module_key 
+      AND um.access_type = 'grant'
+      AND _operation = ANY(um.operations)
+    )
+    OR
+    -- Check role-based operations (if no user-specific grants exist)
+    (
+      NOT EXISTS (
+        SELECT 1 FROM user_modules um
+        WHERE um.user_id = _user_id 
+        AND um.access_type = 'grant'
+      )
+      AND EXISTS (
+        SELECT 1 FROM user_roles ur
+        JOIN role_modules rm ON ur.role_id = rm.role_id
+        WHERE ur.user_id = _user_id 
+        AND rm.module_key = _module_key
+        AND _operation = ANY(rm.operations)
+      )
+      AND NOT EXISTS (
+        SELECT 1 FROM user_modules um
+        WHERE um.user_id = _user_id 
+        AND um.module_key = _module_key 
+        AND um.access_type = 'deny'
+      )
+    );
+$$;
+```
+
+### 2. TypeScript Types
+
+Update types to include operations:
+
+```typescript
+// src/types/moduleAccess.ts
+export type ModuleOperation = 'view' | 'add' | 'edit' | 'delete' | 'download';
+
+export interface RoleModule {
+  id: string;
+  role_id: string;
+  module_key: string;
+  submodules: string[];
+  operations: ModuleOperation[];  // NEW
+  created_at: string;
+  updated_at: string;
+}
+
+export interface UserModule {
+  id: string;
+  user_id: string;
+  module_key: string;
+  submodules: string[];
+  operations: ModuleOperation[];  // NEW
+  access_type: 'grant' | 'deny';
+  created_at: string;
+  updated_at: string;
+}
+
+export interface UserModuleAccess {
+  availableModules: string[];
+  deniedModules: string[];
+  moduleSubModules: Record<string, string[]>;
+  moduleOperations: Record<string, ModuleOperation[]>;  // NEW
+}
+```
+
+### 3. RBAC Constants
+
+Create centralized RBAC configuration:
+
+```typescript
+// src/constants/rbacConfig.ts
+export const OPERATIONS = ['view', 'add', 'edit', 'delete', 'download'] as const;
+
+export type Operation = typeof OPERATIONS[number];
+
+export const OPERATION_LABELS: Record<Operation, string> = {
+  view: 'View',
+  add: 'Add/Create',
+  edit: 'Edit/Update',
+  delete: 'Delete',
+  download: 'Download/Export',
+};
+
+export const APP_ROLE_HIERARCHY = {
+  super_admin: 4,
+  admin: 3,
+  manager: 2,
+  user: 1,
+} as const;
+
+// Default operations by role level
+export const DEFAULT_OPERATIONS_BY_ROLE: Record<string, Operation[]> = {
+  super_admin: ['view', 'add', 'edit', 'delete', 'download'],
+  admin: ['view', 'add', 'edit', 'delete', 'download'],
+  manager: ['view', 'add', 'edit', 'download'],
+  user: ['view', 'download'],
+};
+```
+
+### 4. Enhanced useRBAC Hook
+
+Create a centralized hook for all RBAC checks:
+
+```typescript
+// src/hooks/useRBAC.ts
+export const useRBAC = () => {
+  const { user } = useAuth();
+  const { data: effectiveModules } = useUserEffectiveModules(user?.id);
+  const { data: isSuperAdmin } = useSuperAdmin();
+  const { data: isAdmin } = useIsAdmin();
+
+  const canPerform = useCallback((
+    moduleKey: string, 
+    operation: Operation
+  ): boolean => {
+    // Admins can do everything
+    if (isSuperAdmin || isAdmin) return true;
+    
+    // Check module access
+    if (!effectiveModules?.availableModules.includes(moduleKey)) {
+      return false;
+    }
+    
+    // Check operation permission
+    const ops = effectiveModules?.moduleOperations[moduleKey] || ['view'];
+    return ops.includes(operation);
+  }, [effectiveModules, isSuperAdmin, isAdmin]);
+
+  return {
+    // Role checks
+    isSuperAdmin,
+    isAdmin,
+    
+    // Module checks
+    hasModule: (key: string) => effectiveModules?.availableModules.includes(key),
+    
+    // Operation checks
+    canView: (module: string) => canPerform(module, 'view'),
+    canAdd: (module: string) => canPerform(module, 'add'),
+    canEdit: (module: string) => canPerform(module, 'edit'),
+    canDelete: (module: string) => canPerform(module, 'delete'),
+    canDownload: (module: string) => canPerform(module, 'download'),
+    canPerform,
+  };
+};
+```
+
+### 5. Updated ModuleAccessEditor UI
+
+Enhance the editor to show operation checkboxes:
+
+```text
++--------------------------------------------------+
+| Finance Module                                    |
+|   [x] General Ledger                             |
+|       Operations: [x]View [x]Add [x]Edit [ ]Delete [x]Download |
+|   [x] Accounts Payable                           |
+|       Operations: [x]View [x]Add [ ]Edit [ ]Delete [x]Download |
++--------------------------------------------------+
+```
+
+---
+
+## Files to Create/Modify
 
 | File | Action | Description |
 |------|--------|-------------|
-| `supabase/migrations/[timestamp]_authenticated_users_view_asset_master.sql` | Create | Update SELECT policy to allow all authenticated users |
+| `supabase/migrations/[timestamp]_add_operations_to_modules.sql` | Create | Add operations column + helper function |
+| `src/types/moduleAccess.ts` | Modify | Add ModuleOperation type and update interfaces |
+| `src/constants/rbacConfig.ts` | Create | RBAC constants, role hierarchy, default operations |
+| `src/hooks/useRBAC.ts` | Create | Centralized RBAC hook with operation checks |
+| `src/hooks/useModuleAccess.ts` | Modify | Include operations in effective modules calculation |
+| `src/components/admin/ModuleAccessEditor.tsx` | Modify | Add operation checkboxes per submodule |
+| `src/components/admin/OperationCheckboxes.tsx` | Create | Reusable operation checkbox group component |
+| `src/components/admin/EditRoleDialog.tsx` | Modify | Use updated ModuleAccessEditor |
+| `src/components/admin/EditUserDialog.tsx` | Modify | Use updated ModuleAccessEditor |
 
-## Expected Outcome
+---
 
-After this change:
-- All logged-in users can view asset master records
-- All logged-in users can download QR codes for any asset
-- QR code generation (PDF, PNG, Print) will work for all authenticated users
-- Write operations (create/edit/delete) remain restricted to appropriate roles
+## Usage Example
+
+After implementation, components can check permissions like this:
+
+```typescript
+// In any component
+const { canAdd, canEdit, canDelete, canDownload } = useRBAC();
+
+return (
+  <div>
+    {canAdd('warehouse') && <Button>Add Item</Button>}
+    {canEdit('warehouse') && <Button>Edit Item</Button>}
+    {canDelete('warehouse') && <Button>Delete Item</Button>}
+    {canDownload('warehouse') && <Button>Download QR</Button>}
+  </div>
+);
+```
+
+---
+
+## Migration Strategy
+
+1. **Phase 1**: Add columns with defaults (existing data gets `['view']`)
+2. **Phase 2**: Update admin UI to manage operations
+3. **Phase 3**: Update database function for operation checks
+4. **Phase 4**: Create `useRBAC` hook
+5. **Phase 5**: Gradually replace `useIsAdminOrHigher` with `useRBAC` in components
+
+---
+
+## Security Considerations
+
+- All operation checks enforce `is_admin()` bypass for admin users
+- Database function uses `SECURITY DEFINER` with `SET search_path = public`
+- Client-side checks are for UI only; server-side RLS policies remain unchanged
+- Existing RLS policies continue to work independently
+
+---
+
+## Backward Compatibility
+
+- Default operations array `['view']` ensures existing access works
+- Existing `useIsAdminOrHigher` continues to work
+- Gradual migration path - no breaking changes
