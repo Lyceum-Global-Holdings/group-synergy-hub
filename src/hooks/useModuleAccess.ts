@@ -51,6 +51,7 @@ export const useUserEffectiveModules = (userId: string | undefined) => {
           availableModules: [],
           deniedModules: [],
           moduleSubModules: {},
+          moduleOperations: {},
         };
       }
       
@@ -80,8 +81,9 @@ export const useUserEffectiveModules = (userId: string | undefined) => {
       
       if (userModulesError) throw userModulesError;
       
-      // Build module map
+      // Build module map and operations map
       const moduleMap: Record<string, Set<string>> = {};
+      const operationsMap: Record<string, Set<string>> = {};
       const deniedModules: string[] = [];
       
       // Check if user has any user-specific grants
@@ -93,8 +95,10 @@ export const useUserEffectiveModules = (userId: string | undefined) => {
           if (um.access_type === 'grant') {
             if (!moduleMap[um.module_key]) {
               moduleMap[um.module_key] = new Set();
+              operationsMap[um.module_key] = new Set();
             }
             um.submodules.forEach(sub => moduleMap[um.module_key].add(sub));
+            (um.operations || ['view']).forEach(op => operationsMap[um.module_key].add(op));
           } else if (um.access_type === 'deny') {
             deniedModules.push(um.module_key);
           }
@@ -104,14 +108,17 @@ export const useUserEffectiveModules = (userId: string | undefined) => {
         roleModules?.forEach(rm => {
           if (!moduleMap[rm.module_key]) {
             moduleMap[rm.module_key] = new Set();
+            operationsMap[rm.module_key] = new Set();
           }
           rm.submodules.forEach(sub => moduleMap[rm.module_key].add(sub));
+          (rm.operations || ['view']).forEach(op => operationsMap[rm.module_key].add(op));
         });
         
         // Apply user denials
         userModules?.forEach(um => {
           if (um.access_type === 'deny') {
             delete moduleMap[um.module_key];
+            delete operationsMap[um.module_key];
             deniedModules.push(um.module_key);
           }
         });
@@ -123,6 +130,9 @@ export const useUserEffectiveModules = (userId: string | undefined) => {
         moduleSubModules: Object.fromEntries(
           Object.entries(moduleMap).map(([key, value]) => [key, Array.from(value)])
         ),
+        moduleOperations: Object.fromEntries(
+          Object.entries(operationsMap).map(([key, value]) => [key, Array.from(value)])
+        ) as Record<string, import('@/types/moduleAccess').ModuleOperation[]>,
       };
       
       return result;
@@ -139,10 +149,12 @@ export const useAssignModulesToRole = () => {
   return useMutation({
     mutationFn: async ({ 
       roleId, 
-      modules 
+      modules,
+      operations = {}
     }: { 
       roleId: string; 
-      modules: Record<string, string[]> 
+      modules: Record<string, string[]>;
+      operations?: Record<string, string[]>;
     }) => {
       // Delete existing modules for this role
       await supabase
@@ -155,6 +167,7 @@ export const useAssignModulesToRole = () => {
         role_id: roleId,
         module_key: moduleKey,
         submodules: submodules,
+        operations: operations[moduleKey] || ['view'],
       }));
       
       if (moduleEntries.length > 0) {
@@ -193,12 +206,14 @@ export const useAssignModulesToUser = () => {
       userId, 
       moduleKey,
       submodules,
-      accessType 
+      accessType,
+      operations = ['view']
     }: { 
       userId: string; 
       moduleKey: string;
       submodules: string[];
       accessType: 'grant' | 'deny';
+      operations?: string[];
     }) => {
       // Upsert user module
       const { error } = await supabase
@@ -208,6 +223,7 @@ export const useAssignModulesToUser = () => {
           module_key: moduleKey,
           submodules: submodules,
           access_type: accessType,
+          operations: operations,
         }, {
           onConflict: 'user_id,module_key'
         });

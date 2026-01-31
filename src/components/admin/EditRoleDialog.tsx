@@ -16,6 +16,9 @@ import { usePermissions, type Role } from '@/hooks/useUsers';
 import { useUpdateRole } from '@/hooks/useUserMutations';
 import { useRoleModules, useAssignModulesToRole } from '@/hooks/useModuleAccess';
 import { moduleConfig } from '@/constants/moduleConfig';
+import { getDefaultOperations } from '@/constants/rbacConfig';
+import { OperationCheckboxes } from './OperationCheckboxes';
+import type { ModuleOperation } from '@/types/moduleAccess';
 import { Loader2 } from 'lucide-react';
 
 // Available departments
@@ -63,6 +66,7 @@ interface EditRoleDialogProps {
 export function EditRoleDialog({ open, onOpenChange, role, onRoleUpdated }: EditRoleDialogProps) {
   const [selectedPermissions, setSelectedPermissions] = useState<string[]>([]);
   const [selectedModules, setSelectedModules] = useState<Record<string, string[]>>({});
+  const [selectedOperations, setSelectedOperations] = useState<Record<string, string[]>>({});
   const { toast } = useToast();
   
   const { data: permissions = [], isLoading: permissionsLoading } = usePermissions();
@@ -101,10 +105,13 @@ export function EditRoleDialog({ open, onOpenChange, role, onRoleUpdated }: Edit
   useEffect(() => {
     if (roleModules.length > 0) {
       const modulesMap: Record<string, string[]> = {};
+      const operationsMap: Record<string, string[]> = {};
       roleModules.forEach(rm => {
         modulesMap[rm.module_key] = rm.submodules;
+        operationsMap[rm.module_key] = rm.operations || ['view'];
       });
       setSelectedModules(modulesMap);
+      setSelectedOperations(operationsMap);
       form.setValue('modules', modulesMap);
     }
   }, [roleModules, form]);
@@ -128,6 +135,7 @@ export function EditRoleDialog({ open, onOpenChange, role, onRoleUpdated }: Edit
       await assignModulesToRole.mutateAsync({
         roleId: role.id,
         modules: selectedModules,
+        operations: selectedOperations,
       });
 
       // Call callback and reset form
@@ -155,20 +163,30 @@ export function EditRoleDialog({ open, onOpenChange, role, onRoleUpdated }: Edit
 
   const handleModuleToggle = (moduleKey: string, checked: boolean) => {
     const newModules = { ...selectedModules };
+    const newOperations = { ...selectedOperations };
     if (checked) {
       const config = moduleConfig[moduleKey];
       newModules[moduleKey] = config?.subModules.map(sub => sub.key) || [];
+      // Set default operations based on current app_role
+      const currentAppRole = form.getValues('app_role');
+      newOperations[moduleKey] = getDefaultOperations(currentAppRole);
     } else {
       delete newModules[moduleKey];
+      delete newOperations[moduleKey];
     }
     setSelectedModules(newModules);
+    setSelectedOperations(newOperations);
     form.setValue('modules', newModules);
   };
 
   const handleSubModuleToggle = (moduleKey: string, subModuleKey: string, checked: boolean) => {
     const newModules = { ...selectedModules };
+    const newOperations = { ...selectedOperations };
     if (!newModules[moduleKey]) {
       newModules[moduleKey] = [];
+      // Set default operations when first submodule is added
+      const currentAppRole = form.getValues('app_role');
+      newOperations[moduleKey] = getDefaultOperations(currentAppRole);
     }
     
     if (checked) {
@@ -179,11 +197,20 @@ export function EditRoleDialog({ open, onOpenChange, role, onRoleUpdated }: Edit
       newModules[moduleKey] = newModules[moduleKey].filter(key => key !== subModuleKey);
       if (newModules[moduleKey].length === 0) {
         delete newModules[moduleKey];
+        delete newOperations[moduleKey];
       }
     }
     
     setSelectedModules(newModules);
+    setSelectedOperations(newOperations);
     form.setValue('modules', newModules);
+  };
+
+  const handleOperationsChange = (moduleKey: string, operations: ModuleOperation[]) => {
+    setSelectedOperations(prev => ({
+      ...prev,
+      [moduleKey]: operations,
+    }));
   };
 
   const handleSelectAllInCategory = (category: string, categoryPermissions: any[]) => {
@@ -347,6 +374,19 @@ export function EditRoleDialog({ open, onOpenChange, role, onRoleUpdated }: Edit
                             </div>
                           </AccordionTrigger>
                           <AccordionContent>
+                            {/* Operations row */}
+                            {isModuleSelected && (
+                              <div className="pl-6 mb-3 p-2 rounded-md bg-muted/30 border">
+                                <div className="text-xs text-muted-foreground mb-2 font-medium">
+                                  Operations for this module:
+                                </div>
+                                <OperationCheckboxes
+                                  selectedOperations={(selectedOperations[key] || ['view']) as ModuleOperation[]}
+                                  onOperationsChange={(ops) => handleOperationsChange(key, ops)}
+                                  compact
+                                />
+                              </div>
+                            )}
                             <div className="pl-6 space-y-2 mt-2">
                               {config.subModules.map(sub => (
                                 <div key={sub.key} className="flex items-center space-x-2">
