@@ -5,12 +5,17 @@ import { Badge } from "@/components/ui/badge";
 import { ChevronDown, ChevronRight, Lock, Plus, Ban } from "lucide-react";
 import { moduleConfig } from "@/constants/moduleConfig";
 import { cn } from "@/lib/utils";
+import { OperationCheckboxes, OperationBadges } from "./OperationCheckboxes";
+import type { ModuleOperation } from "@/types/moduleAccess";
+import { OPERATIONS } from "@/constants/rbacConfig";
 
 export interface ModuleAccessState {
   // From role - read only
   inheritedModules: Record<string, string[]>;
+  inheritedOperations?: Record<string, ModuleOperation[]>;
   // User-specific grants
   grantedSubmodules: Record<string, string[]>;
+  grantedOperations?: Record<string, ModuleOperation[]>;
   // User-specific denials
   deniedSubmodules: Record<string, string[]>;
 }
@@ -19,14 +24,18 @@ interface ModuleAccessEditorProps {
   state: ModuleAccessState;
   onGrantChange: (moduleKey: string, submoduleKey: string, granted: boolean) => void;
   onDenyChange: (moduleKey: string, submoduleKey: string, denied: boolean) => void;
+  onOperationsChange?: (moduleKey: string, operations: ModuleOperation[]) => void;
   disabled?: boolean;
+  showOperations?: boolean;
 }
 
 export const ModuleAccessEditor: React.FC<ModuleAccessEditorProps> = ({
   state,
   onGrantChange,
   onDenyChange,
+  onOperationsChange,
   disabled = false,
+  showOperations = true,
 }) => {
   const [openModules, setOpenModules] = React.useState<Record<string, boolean>>({});
 
@@ -52,9 +61,27 @@ export const ModuleAccessEditor: React.FC<ModuleAccessEditorProps> = ({
     return { inherited, granted, denied, total: config.subModules.length };
   };
 
+  const getModuleOperations = (moduleKey: string): ModuleOperation[] => {
+    // User-granted operations take precedence
+    if (state.grantedOperations?.[moduleKey]?.length) {
+      return state.grantedOperations[moduleKey];
+    }
+    // Fall back to inherited operations
+    if (state.inheritedOperations?.[moduleKey]?.length) {
+      return state.inheritedOperations[moduleKey];
+    }
+    // Default to view only
+    return ['view'];
+  };
+
+  const hasModuleAccess = (moduleKey: string): boolean => {
+    const summary = getModuleSummary(moduleKey);
+    return summary.inherited > 0 || summary.granted > 0;
+  };
+
   return (
     <div className="space-y-2 border rounded-lg p-3 bg-muted/20">
-      <div className="flex items-center gap-2 text-xs text-muted-foreground mb-3">
+      <div className="flex items-center gap-4 text-xs text-muted-foreground mb-3">
         <div className="flex items-center gap-1">
           <Lock className="h-3 w-3" />
           <span>Inherited</span>
@@ -74,6 +101,7 @@ export const ModuleAccessEditor: React.FC<ModuleAccessEditorProps> = ({
         const isOpen = openModules[moduleKey] ?? false;
         const hasAccess = summary.inherited > 0 || summary.granted > 0;
         const hasDenied = summary.denied > 0;
+        const operations = getModuleOperations(moduleKey);
 
         return (
           <Collapsible key={moduleKey} open={isOpen} onOpenChange={() => toggleModule(moduleKey)}>
@@ -87,7 +115,10 @@ export const ModuleAccessEditor: React.FC<ModuleAccessEditorProps> = ({
                 <config.icon className="h-4 w-4" />
                 <span className="text-sm font-medium">{config.name}</span>
               </div>
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-2">
+                {showOperations && hasAccess && (
+                  <OperationBadges operations={operations} />
+                )}
                 {summary.inherited > 0 && (
                   <Badge variant="secondary" className="text-xs">
                     {summary.inherited} inherited
@@ -112,6 +143,21 @@ export const ModuleAccessEditor: React.FC<ModuleAccessEditorProps> = ({
             </CollapsibleTrigger>
             
             <CollapsibleContent className="pl-8 pr-2 pb-2">
+              {/* Operations row */}
+              {showOperations && hasModuleAccess(moduleKey) && onOperationsChange && (
+                <div className="mt-2 mb-3 p-2 rounded-md bg-muted/30 border">
+                  <div className="text-xs text-muted-foreground mb-2 font-medium">
+                    Operations for this module:
+                  </div>
+                  <OperationCheckboxes
+                    selectedOperations={operations}
+                    onOperationsChange={(ops) => onOperationsChange(moduleKey, ops)}
+                    disabled={disabled}
+                    compact
+                  />
+                </div>
+              )}
+
               <div className="space-y-1 mt-2">
                 {config.subModules.map(subModule => {
                   const status = getSubmoduleStatus(moduleKey, subModule.key);

@@ -34,6 +34,7 @@ import { useRoleModules, useUserModules, useAssignModulesToUser, useRemoveUserMo
 import { useUserCompanyAccess, useAssignCompaniesToUser } from "@/hooks/useUserCompanyAccess";
 import { ModuleAccessEditor, ModuleAccessState } from "./ModuleAccessEditor";
 import { CompanyAccessSelector } from "./CompanyAccessSelector";
+import type { ModuleOperation } from "@/types/moduleAccess";
 
 const editUserSchema = z.object({
   firstName: z.string().min(1, "First name is required"),
@@ -62,12 +63,19 @@ export const EditUserDialog: React.FC<EditUserDialogProps> = ({
   const [additionalCompanyIds, setAdditionalCompanyIds] = useState<string[]>([]);
   const [moduleAccessState, setModuleAccessState] = useState<ModuleAccessState>({
     inheritedModules: {},
+    inheritedOperations: {},
     grantedSubmodules: {},
+    grantedOperations: {},
     deniedSubmodules: {},
   });
-  const [originalUserModules, setOriginalUserModules] = useState<{ granted: Record<string, string[]>; denied: Record<string, string[]> }>({
+  const [originalUserModules, setOriginalUserModules] = useState<{ 
+    granted: Record<string, string[]>; 
+    denied: Record<string, string[]>;
+    operations: Record<string, ModuleOperation[]>;
+  }>({
     granted: {},
     denied: {},
+    operations: {},
   });
   const { toast } = useToast();
   
@@ -129,10 +137,12 @@ export const EditUserDialog: React.FC<EditUserDialogProps> = ({
     if (userModules.length > 0) {
       const granted: Record<string, string[]> = {};
       const denied: Record<string, string[]> = {};
+      const operations: Record<string, ModuleOperation[]> = {};
       
       userModules.forEach(um => {
         if (um.access_type === 'grant') {
           granted[um.module_key] = um.submodules || [];
+          operations[um.module_key] = (um.operations || ['view']) as ModuleOperation[];
         } else if (um.access_type === 'deny') {
           denied[um.module_key] = um.submodules || [];
         }
@@ -141,16 +151,18 @@ export const EditUserDialog: React.FC<EditUserDialogProps> = ({
       setModuleAccessState(prev => ({
         ...prev,
         grantedSubmodules: granted,
+        grantedOperations: operations,
         deniedSubmodules: denied,
       }));
-      setOriginalUserModules({ granted, denied });
+      setOriginalUserModules({ granted, denied, operations });
     } else {
       setModuleAccessState(prev => ({
         ...prev,
         grantedSubmodules: {},
+        grantedOperations: {},
         deniedSubmodules: {},
       }));
-      setOriginalUserModules({ granted: {}, denied: {} });
+      setOriginalUserModules({ granted: {}, denied: {}, operations: {} });
     }
   }, [userModules]);
 
@@ -158,17 +170,21 @@ export const EditUserDialog: React.FC<EditUserDialogProps> = ({
   useEffect(() => {
     if (roleModules.length > 0) {
       const inherited: Record<string, string[]> = {};
+      const inheritedOps: Record<string, ModuleOperation[]> = {};
       roleModules.forEach(rm => {
         inherited[rm.module_key] = rm.submodules || [];
+        inheritedOps[rm.module_key] = (rm.operations || ['view']) as ModuleOperation[];
       });
       setModuleAccessState(prev => ({
         ...prev,
         inheritedModules: inherited,
+        inheritedOperations: inheritedOps,
       }));
     } else {
       setModuleAccessState(prev => ({
         ...prev,
         inheritedModules: {},
+        inheritedOperations: {},
       }));
     }
   }, [roleModules]);
@@ -231,11 +247,13 @@ export const EditUserDialog: React.FC<EditUserDialogProps> = ({
       // Save granted submodules
       for (const [moduleKey, submodules] of Object.entries(moduleAccessState.grantedSubmodules)) {
         if (submodules.length > 0) {
+          const operations = moduleAccessState.grantedOperations?.[moduleKey] || ['view'];
           await assignModulesToUser.mutateAsync({
             userId: user.id,
             moduleKey,
             submodules,
             accessType: 'grant',
+            operations,
           });
         }
       }
@@ -326,6 +344,16 @@ export const EditUserDialog: React.FC<EditUserDialogProps> = ({
       
       return { ...prev, grantedSubmodules: newGranted, deniedSubmodules: newDenied };
     });
+  };
+
+  const handleOperationsChange = (moduleKey: string, operations: ModuleOperation[]) => {
+    setModuleAccessState(prev => ({
+      ...prev,
+      grantedOperations: {
+        ...prev.grantedOperations,
+        [moduleKey]: operations,
+      },
+    }));
   };
 
   if (!user) return null;
@@ -472,6 +500,7 @@ export const EditUserDialog: React.FC<EditUserDialogProps> = ({
                 state={moduleAccessState}
                 onGrantChange={handleGrantChange}
                 onDenyChange={handleDenyChange}
+                onOperationsChange={handleOperationsChange}
               />
             </div>
 

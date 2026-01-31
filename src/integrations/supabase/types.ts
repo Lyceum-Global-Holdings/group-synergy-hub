@@ -11321,6 +11321,7 @@ export type Database = {
           created_at: string | null
           id: string
           module_key: string
+          operations: string[] | null
           role_id: string
           submodules: string[] | null
           updated_at: string | null
@@ -11329,6 +11330,7 @@ export type Database = {
           created_at?: string | null
           id?: string
           module_key: string
+          operations?: string[] | null
           role_id: string
           submodules?: string[] | null
           updated_at?: string | null
@@ -11337,6 +11339,7 @@ export type Database = {
           created_at?: string | null
           id?: string
           module_key?: string
+          operations?: string[] | null
           role_id?: string
           submodules?: string[] | null
           updated_at?: string | null
@@ -14406,6 +14409,7 @@ export type Database = {
           created_at: string | null
           id: string
           module_key: string
+          operations: string[] | null
           submodules: string[] | null
           updated_at: string | null
           user_id: string
@@ -14415,6 +14419,7 @@ export type Database = {
           created_at?: string | null
           id?: string
           module_key: string
+          operations?: string[] | null
           submodules?: string[] | null
           updated_at?: string | null
           user_id: string
@@ -14424,6 +14429,7 @@ export type Database = {
           created_at?: string | null
           id?: string
           module_key?: string
+          operations?: string[] | null
           submodules?: string[] | null
           updated_at?: string | null
           user_id?: string
@@ -15661,6 +15667,10 @@ export type Database = {
       has_finance_access: { Args: { _user_id: string }; Returns: boolean }
       has_hr_access: { Args: { _user_id: string }; Returns: boolean }
       has_manager_access: { Args: { _user_id: string }; Returns: boolean }
+      has_operation_access: {
+        Args: { _module_key: string; _operation: string; _user_id: string }
+        Returns: boolean
+      }
       has_po_approval_role: {
         Args: { _role_name: string; _user_id: string }
         Returns: boolean
