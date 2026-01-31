@@ -1,102 +1,64 @@
 
-# Plan: Make Asset Master Visible to All Admins
+# Plan: Allow All Authenticated Users to Download QR Codes
 
-## Problem Analysis
+## Problem
 
-The current RLS policy on `asset_master` table allows admins to view records, but only for assets that belong to the same company as the admin user. This is because:
+Currently, the `asset_master` table has a restrictive SELECT policy that only allows:
+- Admins (admin/super_admin roles)
+- Users with company access AND specific roles (finance, warehouse, or manager)
 
-1. The SELECT policy requires `can_access_company(company_id) AND is_admin(auth.uid())`
-2. The `can_access_company()` function only bypasses company checks for **super_admin** users
-3. Regular **admin** users must match the company_id of the asset
+This prevents regular authenticated users from viewing assets and downloading their QR codes.
 
-### Current Policy Logic
-```text
-is_super_admin(auth.uid())  →  Can see ALL assets (any company)
-          OR
-can_access_company(company_id) AND is_admin(auth.uid())  →  Can see assets from their own company only
-```
+## Current RLS Policies
 
-### Desired Behavior
-All users with `admin` or `super_admin` roles should be able to view ALL asset_master items regardless of company.
-
----
+| Table | Policy | Current Access |
+|-------|--------|----------------|
+| `warehouse_assets` | "Authenticated users can view warehouse assets" | All authenticated users (auth.uid() IS NOT NULL) |
+| `asset_master` | "Company users and admins can view asset master" | Admins OR (company match + specific roles) |
 
 ## Solution
 
-Update the RLS policy on `asset_master` to allow users with admin privileges (`is_admin()` returns true) to bypass the company restriction, similar to how super_admin works.
+Update the `asset_master` SELECT policy to allow ALL authenticated users to view asset records, matching the existing `warehouse_assets` policy behavior.
 
-### Changes Required
+## Changes Required
 
-**File: New Migration**
+**New Migration File**
 
-Create a new migration to update the SELECT policy:
+Create a migration that:
+1. Drops the current restrictive SELECT policy
+2. Creates a new policy allowing all authenticated users to view asset_master records
 
 ```sql
--- Drop conflicting/duplicate policies
-DROP POLICY IF EXISTS "Finance and asset managers can view assets" ON asset_master;
-DROP POLICY IF EXISTS "Finance and management can view asset master" ON asset_master;
+-- Drop existing restrictive SELECT policy
+DROP POLICY IF EXISTS "Company users and admins can view asset master" ON asset_master;
 
--- Create a single, unified SELECT policy
-CREATE POLICY "Company users and admins can view asset master"
+-- Create new policy allowing all authenticated users to view
+CREATE POLICY "Authenticated users can view asset master"
 ON asset_master FOR SELECT
-USING (
-  -- Super admins and admins can see ALL assets (any company)
-  is_admin(auth.uid()) 
-  OR
-  -- Other roles require company match plus specific role access
-  (can_access_company(company_id) AND 
-   (has_finance_access(auth.uid()) OR 
-    has_warehouse_access(auth.uid()) OR
-    has_manager_access(auth.uid())))
-);
+USING (auth.uid() IS NOT NULL);
 ```
 
----
+## Security Considerations
 
-## Technical Details
+- **SELECT (read)**: All authenticated users can view asset master records
+- **INSERT/UPDATE/DELETE**: Unchanged - still restricted to creators and admins
 
-### Policy Logic After Fix
-```text
-is_admin(auth.uid())  →  Can see ALL assets (admin or super_admin role)
-          OR
-can_access_company(company_id) AND (finance OR warehouse OR manager access)  →  Same company only
-```
+This change is safe because:
+1. It only affects read access, not write operations
+2. Users must still be authenticated (logged in)
+3. Other policies (INSERT, UPDATE, DELETE) remain unchanged
+4. This matches the existing `warehouse_assets` policy pattern
 
-### Why This Works
-
-The `is_admin()` function already returns `TRUE` for both `admin` and `super_admin` roles:
-
-```sql
-SELECT EXISTS (
-  SELECT 1
-  FROM public.user_roles ur
-  JOIN public.roles r ON ur.role_id = r.id
-  WHERE ur.user_id = _user_id
-    AND r.app_role IN ('admin','super_admin')  -- Both admin types
-);
-```
-
-By moving `is_admin()` outside the `can_access_company()` check, all admin-level users get universal access to asset_master.
-
----
-
-## Files to Create/Modify
+## Files to Create
 
 | File | Action | Description |
 |------|--------|-------------|
-| `supabase/migrations/[timestamp]_admin_asset_master_access.sql` | Create | Migration to update RLS policy |
+| `supabase/migrations/[timestamp]_authenticated_users_view_asset_master.sql` | Create | Update SELECT policy to allow all authenticated users |
 
----
+## Expected Outcome
 
-## Impact Assessment
-
-- **Admins**: Will now see asset_master items from ALL companies
-- **Super Admins**: No change (already had universal access)
-- **Finance/Warehouse/Manager roles**: No change (still limited to their company)
-- **Regular users**: No change (no access)
-
----
-
-## Rollback Plan
-
-If needed, the previous policy can be restored by recreating the original conditions that include `is_admin()` inside the company access check.
+After this change:
+- All logged-in users can view asset master records
+- All logged-in users can download QR codes for any asset
+- QR code generation (PDF, PNG, Print) will work for all authenticated users
+- Write operations (create/edit/delete) remain restricted to appropriate roles
