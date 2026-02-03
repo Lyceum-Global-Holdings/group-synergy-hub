@@ -34,7 +34,7 @@ export default function TrainingProgress() {
       lastAccessed: "Never"
     },
     {
-      module: "TUH Modules",
+      module: "Sales",
       completed: 4,
       total: 6,
       status: "in_progress",
