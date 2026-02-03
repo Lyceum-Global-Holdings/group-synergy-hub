@@ -11,9 +11,10 @@ export function CustomerList() {
   const { currencySymbol } = useGLSettings();
 
   const { data: customers, isLoading } = useQuery({
-    queryKey: ['customers', selectedCompany?.id],
+    queryKey: ['customers-directory', selectedCompany?.id],
     queryFn: async () => {
-      const { data, error } = await supabase.from('customers').select('*').eq('company_id', selectedCompany?.id).order('customer_name');
+      // Use secure view - finance users see customer info with masked PII
+      const { data, error } = await supabase.from('customers_directory').select('*').eq('company_id', selectedCompany?.id).order('customer_name');
       if (error) throw error;
       return data;
     },

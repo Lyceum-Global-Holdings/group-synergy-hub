@@ -4929,6 +4929,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "customer_invoices_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers_directory"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "customer_invoices_gl_account_id_fkey"
             columns: ["gl_account_id"]
             isOneToOne: false
@@ -5202,6 +5209,13 @@ export type Database = {
             referencedRelation: "customers"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "customer_purchase_orders_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers_directory"
+            referencedColumns: ["id"]
+          },
         ]
       }
       customer_receipts: {
@@ -5269,6 +5283,13 @@ export type Database = {
             columns: ["customer_id"]
             isOneToOne: false
             referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_receipts_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers_directory"
             referencedColumns: ["id"]
           },
           {
@@ -6126,6 +6147,13 @@ export type Database = {
             columns: ["customer_id"]
             isOneToOne: false
             referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "delivery_orders_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers_directory"
             referencedColumns: ["id"]
           },
           {
@@ -11873,6 +11901,13 @@ export type Database = {
             referencedRelation: "customers"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "sales_orders_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers_directory"
+            referencedColumns: ["id"]
+          },
         ]
       }
       sap_configurations: {
@@ -15486,6 +15521,86 @@ export type Database = {
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "construction_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      customers_directory: {
+        Row: {
+          address: string | null
+          company_id: string | null
+          company_registration_document_url: string | null
+          contact_person: string | null
+          created_at: string | null
+          created_by: string | null
+          customer_code: string | null
+          customer_name: string | null
+          customer_type: string | null
+          email: string | null
+          first_name: string | null
+          id: string | null
+          id_passport_number: string | null
+          last_name: string | null
+          phone: string | null
+          registration_number: string | null
+          sap_customer_code: string | null
+          sap_sync_status: string | null
+          status: string | null
+          tax_id: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          address?: never
+          company_id?: string | null
+          company_registration_document_url?: never
+          contact_person?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          customer_code?: string | null
+          customer_name?: string | null
+          customer_type?: string | null
+          email?: never
+          first_name?: string | null
+          id?: string | null
+          id_passport_number?: never
+          last_name?: string | null
+          phone?: never
+          registration_number?: never
+          sap_customer_code?: string | null
+          sap_sync_status?: string | null
+          status?: string | null
+          tax_id?: never
+          updated_at?: string | null
+        }
+        Update: {
+          address?: never
+          company_id?: string | null
+          company_registration_document_url?: never
+          contact_person?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          customer_code?: string | null
+          customer_name?: string | null
+          customer_type?: string | null
+          email?: never
+          first_name?: string | null
+          id?: string | null
+          id_passport_number?: never
+          last_name?: string | null
+          phone?: never
+          registration_number?: never
+          sap_customer_code?: string | null
+          sap_sync_status?: string | null
+          status?: string | null
+          tax_id?: never
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customers_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
             referencedColumns: ["id"]
           },
         ]
