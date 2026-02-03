@@ -2,7 +2,33 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useToast } from "@/hooks/use-toast";
-import { TelegramSettings, UpdateTelegramSettingsData } from "@/types/telegramSettings";
+
+// Client-side type - excludes sensitive bot_token field
+export interface TelegramSettingsClient {
+  id: string;
+  company_id: string;
+  chat_id: string | null;
+  is_enabled: boolean;
+  notify_on_report_create: boolean;
+  scheduled_send_enabled: boolean;
+  scheduled_send_time: string | null;
+  timezone: string | null;
+  last_scheduled_send: string | null;
+  created_at: string;
+  updated_at: string;
+  // bot_token is intentionally excluded - never sent to client
+  has_bot_token: boolean; // Indicates if a token is configured without exposing it
+}
+
+export interface UpdateTelegramSettingsData {
+  bot_token?: string | null;
+  chat_id?: string | null;
+  is_enabled?: boolean;
+  notify_on_report_create?: boolean;
+  scheduled_send_enabled?: boolean;
+  scheduled_send_time?: string | null;
+  timezone?: string | null;
+}
 
 export function useTelegramSettings() {
   const { selectedCompany } = useCompany();
@@ -14,14 +40,34 @@ export function useTelegramSettings() {
     queryFn: async () => {
       if (!selectedCompany?.id) return null;
       
+      // Fetch settings WITHOUT bot_token - it should never be sent to client
       const { data, error } = await supabase
         .from("telegram_settings")
-        .select("*")
+        .select("id, company_id, chat_id, is_enabled, notify_on_report_create, scheduled_send_enabled, scheduled_send_time, timezone, last_scheduled_send, created_at, updated_at, bot_token")
         .eq("company_id", selectedCompany.id)
         .maybeSingle();
       
       if (error) throw error;
-      return data as TelegramSettings | null;
+      
+      if (!data) return null;
+      
+      // Transform to client-safe type - don't expose actual token, just whether it exists
+      const clientSettings: TelegramSettingsClient = {
+        id: data.id,
+        company_id: data.company_id,
+        chat_id: data.chat_id,
+        is_enabled: data.is_enabled,
+        notify_on_report_create: data.notify_on_report_create,
+        scheduled_send_enabled: data.scheduled_send_enabled,
+        scheduled_send_time: data.scheduled_send_time,
+        timezone: data.timezone,
+        last_scheduled_send: data.last_scheduled_send,
+        created_at: data.created_at,
+        updated_at: data.updated_at,
+        has_bot_token: !!data.bot_token, // Boolean indicator only
+      };
+      
+      return clientSettings;
     },
     enabled: !!selectedCompany?.id,
   });
@@ -39,7 +85,7 @@ export function useTelegramSettings() {
         }, {
           onConflict: "company_id",
         })
-        .select()
+        .select("id, company_id, chat_id, is_enabled, notify_on_report_create, scheduled_send_enabled, scheduled_send_time, timezone, last_scheduled_send, created_at, updated_at")
         .single();
 
       if (error) throw error;
@@ -61,7 +107,17 @@ export function useTelegramSettings() {
     },
   });
 
+  // Test connection via server-side edge function - NEVER expose bot token to client
   const testConnection = async (botToken: string, chatIdsString: string): Promise<boolean> => {
+    if (!selectedCompany?.id) {
+      toast({
+        title: "No company selected",
+        description: "Please select a company first.",
+        variant: "destructive",
+      });
+      return false;
+    }
+
     const chatIds = chatIdsString.split(',').map(id => id.trim()).filter(Boolean);
     
     if (chatIds.length === 0) {
@@ -74,48 +130,90 @@ export function useTelegramSettings() {
     }
 
     try {
-      let successCount = 0;
-      const failedIds: string[] = [];
-
-      for (const chatId of chatIds) {
-        const response = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            chat_id: chatId,
-            text: "✅ Test connection successful! Your Telegram settings are configured correctly.",
-          }),
-        });
-
-        const result = await response.json();
-        
-        if (result.ok) {
-          successCount++;
-        } else {
-          failedIds.push(chatId);
+      // Call server-side edge function - token is sent securely and handled server-side
+      const { data, error } = await supabase.functions.invoke('test-telegram-connection', {
+        body: {
+          company_id: selectedCompany.id,
+          bot_token: botToken,
+          chat_id: chatIdsString,
         }
-      }
+      });
 
-      if (successCount === chatIds.length) {
+      if (error) throw error;
+
+      if (data?.all_success) {
         toast({
           title: "All connections successful!",
-          description: `Test message sent to ${successCount} chat(s).`,
+          description: `Test message sent to ${data.sent_count} chat(s).`,
         });
-      } else if (successCount > 0) {
+      } else if (data?.sent_count > 0) {
+        const failedIds = data.results
+          .filter((r: any) => !r.success)
+          .map((r: any) => r.chatId)
+          .join(', ');
         toast({
           title: "Partial success",
-          description: `Sent to ${successCount}/${chatIds.length} chats. Failed: ${failedIds.join(', ')}`,
+          description: `Sent to ${data.sent_count}/${data.total_chats} chats. Failed: ${failedIds}`,
           variant: "destructive",
         });
       } else {
         toast({
           title: "Connection failed",
-          description: `Could not send to any chats. Check your chat IDs.`,
+          description: data?.error || "Could not send to any chats. Check your credentials.",
           variant: "destructive",
         });
       }
 
-      return successCount > 0;
+      return data?.sent_count > 0;
+    } catch (error: any) {
+      toast({
+        title: "Connection failed",
+        description: error.message || "Could not connect to Telegram.",
+        variant: "destructive",
+      });
+      return false;
+    }
+  };
+
+  // Test with saved credentials (no token passed - fetched server-side)
+  const testSavedConnection = async (): Promise<boolean> => {
+    if (!selectedCompany?.id) {
+      toast({
+        title: "No company selected",
+        description: "Please select a company first.",
+        variant: "destructive",
+      });
+      return false;
+    }
+
+    try {
+      const { data, error } = await supabase.functions.invoke('test-telegram-connection', {
+        body: { company_id: selectedCompany.id }
+      });
+
+      if (error) throw error;
+
+      if (data?.all_success) {
+        toast({
+          title: "Connection successful!",
+          description: `Test message sent to ${data.sent_count} chat(s).`,
+        });
+        return true;
+      } else if (data?.sent_count > 0) {
+        toast({
+          title: "Partial success",
+          description: `Sent to ${data.sent_count}/${data.total_chats} chats.`,
+          variant: "destructive",
+        });
+        return true;
+      } else {
+        toast({
+          title: "Connection failed",
+          description: data?.error || "Could not send to any chats.",
+          variant: "destructive",
+        });
+        return false;
+      }
     } catch (error: any) {
       toast({
         title: "Connection failed",
@@ -172,6 +270,7 @@ export function useTelegramSettings() {
     saveSettings: upsertMutation.mutateAsync,
     isSaving: upsertMutation.isPending,
     testConnection,
+    testSavedConnection,
     testScheduledSend,
   };
 }

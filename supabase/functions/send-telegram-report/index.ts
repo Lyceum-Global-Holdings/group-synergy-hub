@@ -1,8 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-
-// Fallback to environment variables if not provided in request
-const DEFAULT_BOT_TOKEN = Deno.env.get("TELEGRAM_BOT_TOKEN");
-const DEFAULT_CHAT_ID = Deno.env.get("TELEGRAM_CHAT_ID");
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -16,8 +13,7 @@ interface TelegramReportRequest {
   project_name: string;
   report_date: string;
   report_type: string;
-  bot_token?: string;
-  chat_id?: string;
+  company_id: string;
 }
 
 serve(async (req) => {
@@ -27,7 +23,30 @@ serve(async (req) => {
   }
 
   try {
-    console.log("Received request to send Telegram report");
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    // Verify authentication
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized' }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: userError } = await supabase.auth.getUser(token);
+    
+    if (userError || !user) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid authentication' }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    console.log("Received request to send Telegram report from user:", user.id);
     
     const { 
       pdf_base64, 
@@ -36,27 +55,75 @@ serve(async (req) => {
       project_name, 
       report_date, 
       report_type,
-      bot_token,
-      chat_id 
+      company_id
     }: TelegramReportRequest = await req.json();
 
-    // Use provided credentials or fall back to environment variables
-    const telegramBotToken = bot_token || DEFAULT_BOT_TOKEN;
-    const telegramChatIdString = chat_id || DEFAULT_CHAT_ID;
-
-    if (!telegramBotToken || !telegramChatIdString) {
-      console.error("Telegram credentials not configured");
-      throw new Error("Telegram credentials not configured. Please configure Telegram settings.");
+    if (!company_id) {
+      return new Response(
+        JSON.stringify({ error: 'Company ID is required' }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
-    // Parse multiple chat IDs (comma-separated)
-    const chatIds = telegramChatIdString.split(',').map(id => id.trim()).filter(Boolean);
+    // Verify user belongs to this company or is super admin
+    const { data: membership } = await supabase
+      .from('user_companies')
+      .select('id')
+      .eq('user_id', user.id)
+      .eq('company_id', company_id)
+      .maybeSingle();
+
+    if (!membership) {
+      const { data: isSuperAdmin } = await supabase.rpc('is_super_admin', { _user_id: user.id });
+      if (!isSuperAdmin) {
+        return new Response(
+          JSON.stringify({ error: 'Access denied to this company' }),
+          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    }
+
+    // Fetch Telegram credentials from database (server-side only)
+    const { data: settings, error: settingsError } = await supabase
+      .from('telegram_settings')
+      .select('bot_token, chat_id, is_enabled')
+      .eq('company_id', company_id)
+      .maybeSingle();
+
+    if (settingsError) {
+      console.error("Error fetching telegram settings:", settingsError);
+      return new Response(
+        JSON.stringify({ error: 'Failed to fetch Telegram settings' }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    if (!settings?.bot_token || !settings?.chat_id) {
+      console.error("Telegram credentials not configured for company:", company_id);
+      return new Response(
+        JSON.stringify({ error: 'Telegram credentials not configured. Please configure Telegram settings.' }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    if (!settings.is_enabled) {
+      return new Response(
+        JSON.stringify({ error: 'Telegram integration is disabled for this company' }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const telegramBotToken = settings.bot_token;
+    const chatIds = settings.chat_id.split(',').map((id: string) => id.trim()).filter(Boolean);
     
     if (chatIds.length === 0) {
-      throw new Error("No valid chat IDs provided");
+      return new Response(
+        JSON.stringify({ error: 'No valid chat IDs configured' }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
-    console.log(`Sending report ${report_number} to ${chatIds.length} Telegram chat(s): ${chatIds.join(', ')}`);
+    console.log(`Sending report ${report_number} to ${chatIds.length} Telegram chat(s)`);
 
     // Decode base64 PDF
     const binaryString = atob(pdf_base64);
@@ -116,7 +183,7 @@ serve(async (req) => {
   } catch (error) {
     console.error("Error sending Telegram report:", error);
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
