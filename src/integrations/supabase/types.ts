@@ -8127,6 +8127,30 @@ export type Database = {
           },
         ]
       }
+      kpi_query_whitelist: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          id: string
+          query_hash: string
+          query_text: string
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          query_hash: string
+          query_text: string
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          query_hash?: string
+          query_text?: string
+        }
+        Relationships: []
+      }
       material_demand: {
         Row: {
           company_id: string | null
