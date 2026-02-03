@@ -227,21 +227,22 @@ async function handleProcessApproval(data: ProcessApprovalRequest, supabase: any
     .single();
 
   if (tokenError || !tokenData) {
+    console.error(`Invalid token attempt: ${token?.substring(0, 8)}...`);
     throw new Error('Invalid or expired approval token');
   }
 
   // Check expiry
   if (new Date(tokenData.expires_at) < new Date()) {
+    console.error(`Expired token attempt: ${token.substring(0, 8)}...`);
     throw new Error('Approval token has expired');
   }
 
   const { approval_level, po_id, approver_id, approver_email } = tokenData;
 
-  // SECURITY FIX: Verify the approver has access to the PO's company
-  // Fetch PO to get company_id for authorization check
+  // SECURITY: Fetch PO to get company_id and amount for authorization check
   const { data: poData, error: poError } = await supabase
     .from('purchase_orders')
-    .select('company_id')
+    .select('company_id, final_amount, po_number')
     .eq('id', po_id)
     .single();
 
@@ -249,27 +250,72 @@ async function handleProcessApproval(data: ProcessApprovalRequest, supabase: any
     throw new Error('Purchase order not found');
   }
 
-  // SECURITY FIX: If approver_id is set, verify company access using RPC
-  if (approver_id) {
-    const { data: hasAccess, error: accessError } = await supabase
-      .rpc('can_access_company', { target_company_id: poData.company_id })
-      .eq('user_id', approver_id);
-    
-    // Use admin check as fallback - verify via profiles table company match
-    const { data: approverProfile } = await supabase
-      .from('profiles')
-      .select('company_id')
-      .eq('user_id', approver_id)
-      .single();
+  // SECURITY: Verify approver_id is required - cannot process without knowing who is approving
+  if (!approver_id) {
+    console.error(`Security: Approval attempt without approver_id for PO ${po_id}`);
+    throw new Error('Approver identification required. Please log in to approve this PO.');
+  }
 
-    if (approverProfile && approverProfile.company_id !== poData.company_id) {
-      console.error(`Security violation: Approver ${approver_id} attempted to approve PO from different company`);
-      throw new Error('You do not have permission to approve this purchase order');
+  // SECURITY: Verify the approver belongs to the same company as the PO
+  const { data: approverCompanies, error: companyError } = await supabase
+    .from('user_companies')
+    .select('company_id')
+    .eq('user_id', approver_id);
+
+  if (companyError || !approverCompanies || approverCompanies.length === 0) {
+    console.error(`Security: Approver ${approver_id} has no company associations`);
+    throw new Error('You do not have permission to approve this purchase order');
+  }
+
+  const approverCompanyIds = approverCompanies.map((c: any) => c.company_id);
+  if (!approverCompanyIds.includes(poData.company_id)) {
+    console.error(`Security violation: Approver ${approver_id} attempted to approve PO from different company. Approver companies: ${approverCompanyIds.join(',')}, PO company: ${poData.company_id}`);
+    throw new Error('You do not have permission to approve this purchase order');
+  }
+
+  // SECURITY: Map token approval_level to company_approvers approval_level
+  const approverLevelMap: Record<string, string[]> = {
+    'merchandiser': ['procurement', 'manager', 'custom'],
+    'department_head': ['hod', 'manager', 'finance']
+  };
+  const allowedLevels = approverLevelMap[approval_level] || [];
+
+  // SECURITY: Verify the approver is registered as an approver with appropriate level
+  const { data: approverAuth, error: approverAuthError } = await supabase
+    .from('company_approvers')
+    .select('id, approval_level, can_approve_up_to_amount, is_active')
+    .eq('user_id', approver_id)
+    .eq('company_id', poData.company_id)
+    .in('approval_level', allowedLevels)
+    .maybeSingle();
+
+  // SECURITY: Also check if user is an admin (admins can always approve)
+  const { data: isAdmin } = await supabase.rpc('is_admin', { _user_id: approver_id });
+
+  if (!isAdmin && !approverAuth) {
+    console.error(`Security: User ${approver_id} is not authorized as approver for level ${approval_level} in company ${poData.company_id}`);
+    throw new Error(`You are not authorized to approve purchase orders at the ${approval_level} level. Please contact your administrator.`);
+  }
+
+  // SECURITY: Check if the approver entry is active (if not admin)
+  if (!isAdmin && approverAuth && approverAuth.is_active === false) {
+    console.error(`Security: Approver ${approver_id} is inactive`);
+    throw new Error('Your approver status is currently inactive. Please contact your administrator.');
+  }
+
+  // SECURITY: Verify the PO amount is within the approver's limit (if not admin)
+  if (!isAdmin && approverAuth?.can_approve_up_to_amount !== null && approverAuth?.can_approve_up_to_amount !== undefined) {
+    const poAmount = parseFloat(poData.final_amount) || 0;
+    const approverLimit = parseFloat(approverAuth.can_approve_up_to_amount) || 0;
+    
+    if (poAmount > approverLimit) {
+      console.error(`Security: Approver ${approver_id} attempted to approve PO ${po_id} (${poAmount}) exceeding their limit (${approverLimit})`);
+      throw new Error(`This purchase order amount exceeds your approval limit. Amount: ${poAmount.toFixed(2)}, Your limit: ${approverLimit.toFixed(2)}`);
     }
   }
 
-  // SECURITY FIX: Log the approval attempt for audit trail
-  console.log(`PO Approval: token=${token.substring(0, 8)}..., approver_id=${approver_id}, approver_email=${approver_email}, action=${approval_action}, po_id=${po_id}`);
+  // AUDIT: Log the approval attempt
+  console.log(`PO Approval AUTHORIZED: token=${token.substring(0, 8)}..., approver_id=${approver_id}, approver_email=${approver_email}, action=${approval_action}, po_id=${po_id}, po_number=${poData.po_number}, amount=${poData.final_amount}, is_admin=${isAdmin}`);
 
   // Mark token as used
   await supabase
@@ -310,11 +356,13 @@ async function handleProcessApproval(data: ProcessApprovalRequest, supabase: any
       .insert({
         po_id,
         approver_id,
-        action: approval_action === 'approve' ? 'approved' : 'rejected',
+        action: 'approved',
         comments: comments || null,
         approval_level,
         approval_method: 'email',
       });
+
+    console.log(`PO ${poData.po_number} approved by ${approver_id} at level ${approval_level}`);
 
     return new Response(JSON.stringify({ 
       success: true,
@@ -344,6 +392,8 @@ async function handleProcessApproval(data: ProcessApprovalRequest, supabase: any
         approval_level,
         approval_method: 'email',
       });
+
+    console.log(`PO ${poData.po_number} rejected by ${approver_id} at level ${approval_level}`);
 
     return new Response(JSON.stringify({ 
       success: true,
