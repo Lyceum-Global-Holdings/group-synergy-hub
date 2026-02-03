@@ -175,7 +175,7 @@ export function ViewSiteReportDialog({
   };
 
   const handleSendTelegram = async () => {
-    if (!telegramSettings?.bot_token || !telegramSettings?.chat_id) {
+    if (!telegramSettings?.has_bot_token || !telegramSettings?.chat_id) {
       toast({
         title: "Telegram not configured",
         description: "Please configure Telegram settings in the Settings tab.",
@@ -201,8 +201,7 @@ export function ViewSiteReportDialog({
           project_name: displayReport.project?.project_name || 'N/A',
           report_date: formatPeriod(),
           report_type: reportType,
-          bot_token: telegramSettings.bot_token,
-          chat_id: telegramSettings.chat_id
+          company_id: selectedCompany?.id
         }
       });
 
@@ -920,7 +919,7 @@ export function ViewSiteReportDialog({
             <FileDown className="mr-2 h-4 w-4" />
             Export PDF
           </Button>
-          {telegramSettings?.is_enabled && telegramSettings?.bot_token && telegramSettings?.chat_id && (
+          {telegramSettings?.is_enabled && telegramSettings?.has_bot_token && telegramSettings?.chat_id && (
             <Button 
               variant="outline" 
               onClick={handleSendTelegram}

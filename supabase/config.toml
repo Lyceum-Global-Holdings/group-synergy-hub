@@ -10,7 +10,10 @@ verify_jwt = false
 verify_jwt = true
 
 [functions.send-telegram-report]
-verify_jwt = true
+verify_jwt = false
 
 [functions.scheduled-telegram-reports]
+verify_jwt = false
+
+[functions.test-telegram-connection]
 verify_jwt = false

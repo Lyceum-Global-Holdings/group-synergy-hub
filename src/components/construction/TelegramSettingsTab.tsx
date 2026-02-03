@@ -40,7 +40,9 @@ export function TelegramSettingsTab() {
   // Load settings when they're fetched
   useEffect(() => {
     if (settings) {
-      setBotToken(settings.bot_token || "");
+      // Bot token is NOT loaded from server (security) - user must re-enter to change
+      // We show indicator if one is already configured
+      setBotToken(""); // Never populated from server
       // Parse comma-separated chat IDs
       if (settings.chat_id) {
         setChatIds(settings.chat_id.split(',').map(id => id.trim()).filter(Boolean));
@@ -160,6 +162,9 @@ export function TelegramSettingsTab() {
           </div>
           <p className="text-xs text-muted-foreground">
             Get this from @BotFather on Telegram
+            {settings?.has_bot_token && !botToken && (
+              <span className="ml-2 text-primary">✓ Token configured (enter new value to change)</span>
+            )}
           </p>
         </div>
 
@@ -283,7 +288,7 @@ export function TelegramSettingsTab() {
                   variant="secondary"
                   size="sm"
                   onClick={handleTestScheduledSend}
-                  disabled={isTestingSend || !botToken || chatIds.length === 0}
+                  disabled={isTestingSend || (!botToken && !settings?.has_bot_token) || chatIds.length === 0}
                 >
                   {isTestingSend ? (
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -304,7 +309,7 @@ export function TelegramSettingsTab() {
           <Button
             variant="outline"
             onClick={handleTest}
-            disabled={!botToken || chatIds.length === 0 || isTesting}
+            disabled={(!botToken && !settings?.has_bot_token) || chatIds.length === 0 || isTesting}
           >
             {isTesting ? (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
