@@ -4840,6 +4840,9 @@ export type Database = {
           posted_by: string | null
           posted_date: string | null
           sales_order_id: string | null
+          sap_document_number: string | null
+          sap_last_sync_at: string | null
+          sap_sync_status: string | null
           status: string | null
           tax_amount: number | null
           updated_at: string | null
@@ -4863,6 +4866,9 @@ export type Database = {
           posted_by?: string | null
           posted_date?: string | null
           sales_order_id?: string | null
+          sap_document_number?: string | null
+          sap_last_sync_at?: string | null
+          sap_sync_status?: string | null
           status?: string | null
           tax_amount?: number | null
           updated_at?: string | null
@@ -4886,6 +4892,9 @@ export type Database = {
           posted_by?: string | null
           posted_date?: string | null
           sales_order_id?: string | null
+          sap_document_number?: string | null
+          sap_last_sync_at?: string | null
+          sap_sync_status?: string | null
           status?: string | null
           tax_amount?: number | null
           updated_at?: string | null
@@ -5268,6 +5277,8 @@ export type Database = {
           last_name: string | null
           phone: string | null
           registration_number: string | null
+          sap_customer_code: string | null
+          sap_sync_status: string | null
           status: string
           tax_id: string | null
           updated_at: string
@@ -5289,6 +5300,8 @@ export type Database = {
           last_name?: string | null
           phone?: string | null
           registration_number?: string | null
+          sap_customer_code?: string | null
+          sap_sync_status?: string | null
           status?: string
           tax_id?: string | null
           updated_at?: string
@@ -5310,6 +5323,8 @@ export type Database = {
           last_name?: string | null
           phone?: string | null
           registration_number?: string | null
+          sap_customer_code?: string | null
+          sap_sync_status?: string | null
           status?: string
           tax_id?: string | null
           updated_at?: string
@@ -10273,6 +10288,9 @@ export type Database = {
           po_date: string
           po_number: string
           pr_id: string | null
+          sap_document_number: string | null
+          sap_last_sync_at: string | null
+          sap_sync_status: string | null
           status: Database["public"]["Enums"]["po_status"]
           supplier_id: string
           tax_amount: number | null
@@ -10305,6 +10323,9 @@ export type Database = {
           po_date?: string
           po_number: string
           pr_id?: string | null
+          sap_document_number?: string | null
+          sap_last_sync_at?: string | null
+          sap_sync_status?: string | null
           status?: Database["public"]["Enums"]["po_status"]
           supplier_id: string
           tax_amount?: number | null
@@ -10337,6 +10358,9 @@ export type Database = {
           po_date?: string
           po_number?: string
           pr_id?: string | null
+          sap_document_number?: string | null
+          sap_last_sync_at?: string | null
+          sap_sync_status?: string | null
           status?: Database["public"]["Enums"]["po_status"]
           supplier_id?: string
           tax_amount?: number | null
@@ -13166,6 +13190,9 @@ export type Database = {
           po_id: string | null
           posted_by: string | null
           posted_date: string | null
+          sap_document_number: string | null
+          sap_last_sync_at: string | null
+          sap_sync_status: string | null
           status: string | null
           supplier_id: string | null
           tax_amount: number | null
@@ -13192,6 +13219,9 @@ export type Database = {
           po_id?: string | null
           posted_by?: string | null
           posted_date?: string | null
+          sap_document_number?: string | null
+          sap_last_sync_at?: string | null
+          sap_sync_status?: string | null
           status?: string | null
           supplier_id?: string | null
           tax_amount?: number | null
@@ -13218,6 +13248,9 @@ export type Database = {
           po_id?: string | null
           posted_by?: string | null
           posted_date?: string | null
+          sap_document_number?: string | null
+          sap_last_sync_at?: string | null
+          sap_sync_status?: string | null
           status?: string | null
           supplier_id?: string | null
           tax_amount?: number | null
@@ -13801,6 +13834,8 @@ export type Database = {
           postal_code: string | null
           rating: number | null
           registration_number: string | null
+          sap_sync_status: string | null
+          sap_vendor_code: string | null
           state: string | null
           status: string
           supplier_code: string
@@ -13832,6 +13867,8 @@ export type Database = {
           postal_code?: string | null
           rating?: number | null
           registration_number?: string | null
+          sap_sync_status?: string | null
+          sap_vendor_code?: string | null
           state?: string | null
           status?: string
           supplier_code: string
@@ -13863,6 +13900,8 @@ export type Database = {
           postal_code?: string | null
           rating?: number | null
           registration_number?: string | null
+          sap_sync_status?: string | null
+          sap_vendor_code?: string | null
           state?: string | null
           status?: string
           supplier_code?: string
@@ -15645,6 +15684,10 @@ export type Database = {
       get_company_hod: { Args: { p_company_id: string }; Returns: string }
       get_company_manager: { Args: { p_company_id: string }; Returns: string }
       get_current_tenant_id: { Args: never; Returns: string }
+      get_pending_sap_sync_items: {
+        Args: { _company_id: string; _limit?: number; _table_name: string }
+        Returns: Json[]
+      }
       get_public_asset: { Args: { p_id: string }; Returns: Json }
       get_trial_balance: {
         Args: { p_as_of_date: string; p_company_id: string }
@@ -15667,6 +15710,10 @@ export type Database = {
       has_finance_access: { Args: { _user_id: string }; Returns: boolean }
       has_hr_access: { Args: { _user_id: string }; Returns: boolean }
       has_manager_access: { Args: { _user_id: string }; Returns: boolean }
+      has_module_access: {
+        Args: { _module_key: string; _user_id: string }
+        Returns: boolean
+      }
       has_operation_access: {
         Args: { _module_key: string; _operation: string; _user_id: string }
         Returns: boolean
@@ -15685,7 +15732,7 @@ export type Database = {
       }
       has_sales_access: { Args: { _user_id: string }; Returns: boolean }
       has_senior_finance_access: {
-        Args: { check_user_id: string }
+        Args: { _user_id: string }
         Returns: boolean
       }
       has_warehouse_access: { Args: { _user_id: string }; Returns: boolean }
@@ -15739,6 +15786,15 @@ export type Database = {
       }
       update_reservation_on_issue: {
         Args: { p_quantity_issued: number; p_reservation_id: string }
+        Returns: undefined
+      }
+      update_sap_sync_status: {
+        Args: {
+          _record_id: string
+          _sap_doc_number?: string
+          _status: string
+          _table_name: string
+        }
         Returns: undefined
       }
       user_has_company_access: {
