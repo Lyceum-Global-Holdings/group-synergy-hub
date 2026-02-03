@@ -12174,6 +12174,13 @@ export type Database = {
             foreignKeyName: "site_report_labour_attendance_labour_id_fkey"
             columns: ["labour_id"]
             isOneToOne: false
+            referencedRelation: "construction_labour_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "site_report_labour_attendance_labour_id_fkey"
+            columns: ["labour_id"]
+            isOneToOne: false
             referencedRelation: "construction_labour_master"
             referencedColumns: ["id"]
           },
@@ -15392,6 +15399,97 @@ export type Database = {
       }
     }
     Views: {
+      construction_labour_directory: {
+        Row: {
+          category: string | null
+          company_id: string | null
+          contact_number: string | null
+          created_at: string | null
+          created_by: string | null
+          daily_rate: number | null
+          email: string | null
+          employee_id: string | null
+          epf_no: string | null
+          hourly_rate: number | null
+          id: string | null
+          labour_company: string | null
+          location_id: string | null
+          name: string | null
+          notes: string | null
+          project_id: string | null
+          skill_level: string | null
+          status: string | null
+          trade: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          category?: string | null
+          company_id?: string | null
+          contact_number?: never
+          created_at?: string | null
+          created_by?: string | null
+          daily_rate?: number | null
+          email?: never
+          employee_id?: never
+          epf_no?: never
+          hourly_rate?: number | null
+          id?: string | null
+          labour_company?: string | null
+          location_id?: string | null
+          name?: string | null
+          notes?: string | null
+          project_id?: string | null
+          skill_level?: string | null
+          status?: string | null
+          trade?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          category?: string | null
+          company_id?: string | null
+          contact_number?: never
+          created_at?: string | null
+          created_by?: string | null
+          daily_rate?: number | null
+          email?: never
+          employee_id?: never
+          epf_no?: never
+          hourly_rate?: number | null
+          id?: string | null
+          labour_company?: string | null
+          location_id?: string | null
+          name?: string | null
+          notes?: string | null
+          project_id?: string | null
+          skill_level?: string | null
+          status?: string | null
+          trade?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "construction_labour_master_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "construction_labour_master_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "warehouse_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "construction_labour_master_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "construction_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       modern_boms: {
         Row: {
           bom_number: string | null
