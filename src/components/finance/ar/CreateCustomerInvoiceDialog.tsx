@@ -17,9 +17,10 @@ export function CreateCustomerInvoiceDialog({ open, onOpenChange }: Props) {
   const [form, setForm] = useState({ invoice_number: '', customer_id: '', invoice_date: '', due_date: '', gross_amount: '' });
 
   const { data: customers } = useQuery({
-    queryKey: ['customers', selectedCompany?.id],
+    queryKey: ['customers-directory', selectedCompany?.id],
     queryFn: async () => {
-      const { data } = await supabase.from('customers').select('id, customer_name').eq('company_id', selectedCompany?.id);
+      // Use secure view - finance users only see customer name/code, not contact PII
+      const { data } = await supabase.from('customers_directory').select('id, customer_name').eq('company_id', selectedCompany?.id);
       return data || [];
     },
     enabled: !!selectedCompany?.id,
