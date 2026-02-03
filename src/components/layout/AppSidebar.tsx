@@ -45,6 +45,7 @@ const departments = [
       { title: "Payments", url: "/finance/payments" },
       { title: "Bank Reconciliation", url: "/finance/bank-reconciliation" },
       { title: "Financial Reporting", url: "/finance/reporting" },
+      { title: "Finance Settings", url: "/finance/settings" },
     ],
   },
   {
