@@ -1,8 +1,9 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
 
 const ROOM_COLORS: Record<string, string> = {
@@ -81,11 +82,102 @@ serve(async (req) => {
   }
 
   try {
+    // ========== AUTHENTICATION CHECK ==========
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      console.error('No authorization header provided');
+      return new Response(
+        JSON.stringify({ error: 'Authentication required' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
+    
+    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: authHeader } }
+    });
+
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      console.error('Auth error:', authError?.message);
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    console.log(`Authenticated user: ${user.id}`);
+
+    // ========== AUTHORIZATION CHECK ==========
+    // Verify user belongs to a company and has construction access
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('company_id')
+      .eq('user_id', user.id)
+      .single();
+
+    if (profileError || !profile?.company_id) {
+      console.error('Profile error:', profileError?.message);
+      return new Response(
+        JSON.stringify({ error: 'User not associated with a company' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    console.log(`User company: ${profile.company_id}`);
+
+    // Check if user has construction module access
+    const { data: moduleAccess } = await supabase
+      .from('user_modules')
+      .select('module_id')
+      .eq('user_id', user.id)
+      .eq('has_access', true);
+
+    const { data: roleModules } = await supabase
+      .from('role_modules')
+      .select('module_id, roles!inner(id)')
+      .eq('has_access', true);
+
+    const { data: userRoles } = await supabase
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', user.id);
+
+    // Check for admin role which bypasses module checks
+    const isAdmin = userRoles?.some(r => r.role === 'admin' || r.role === 'super_admin');
+    
+    // If not admin, verify construction module access
+    if (!isAdmin) {
+      const hasConstructionAccess = moduleAccess?.some(m => 
+        m.module_id?.toLowerCase().includes('construction')
+      );
+      
+      if (!hasConstructionAccess) {
+        console.log('User lacks construction module access');
+        return new Response(
+          JSON.stringify({ error: 'Access denied. Construction module access required.' }),
+          { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    }
+
+    // ========== REQUEST VALIDATION ==========
     const { imageUrl, totalAreaSqm } = await req.json();
     
     if (!imageUrl) {
       return new Response(
         JSON.stringify({ error: 'Image URL is required' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Validate image URL is from our Supabase storage
+    if (!imageUrl.includes(supabaseUrl) && !imageUrl.startsWith('data:image/')) {
+      console.error('Invalid image source:', imageUrl.substring(0, 50));
+      return new Response(
+        JSON.stringify({ error: 'Invalid image source. Only images from application storage are allowed.' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -252,7 +344,7 @@ Be thorough and identify ALL visible rooms including hallways, closets, and util
       };
     });
 
-    console.log(`Detected ${processedRooms.length} rooms`);
+    console.log(`Detected ${processedRooms.length} rooms for user ${user.id}`);
 
     return new Response(
       JSON.stringify({ 
@@ -273,7 +365,7 @@ Be thorough and identify ALL visible rooms including hallways, closets, and util
       JSON.stringify({ 
         error: isTransient 
           ? 'AI service temporarily unavailable. Please try again in a moment.' 
-          : errorMessage 
+          : 'An error occurred while analyzing the floor plan'
       }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
