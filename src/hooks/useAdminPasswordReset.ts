@@ -13,30 +13,13 @@ export const useAdminPasswordReset = () => {
 
   return useMutation({
     mutationFn: async ({ userId, newPassword }: ResetPasswordParams) => {
-      // Get the current session token
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (!session) {
-        throw new Error('No active session');
-      }
+      // Use Supabase client's functions.invoke for proper environment handling
+      const { data, error } = await supabase.functions.invoke('admin-reset-password', {
+        body: { userId, newPassword },
+      });
 
-      // Call the edge function with the session token
-      const response = await fetch(
-        `https://ajsyvuozkgcnnvvefeed.supabase.co/functions/v1/admin-reset-password`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${session.access_token}`,
-          },
-          body: JSON.stringify({ userId, newPassword }),
-        }
-      );
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to reset password');
+      if (error) {
+        throw new Error(error.message || 'Failed to reset password');
       }
 
       return data;
