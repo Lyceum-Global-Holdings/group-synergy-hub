@@ -106,7 +106,7 @@ export const moduleConfig: Record<string, ModuleConfig> = {
   },
   'tuh-modules': {
     key: 'tuh-modules',
-    name: 'TUH Modules',
+    name: 'Sales',
     description: 'The Uniform Hub specific modules',
     icon: Building2,
     subModules: [
