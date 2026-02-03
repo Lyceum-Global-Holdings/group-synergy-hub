@@ -91,11 +91,11 @@ export function useCompanies() {
         if (company.manager_user_id) userIds.add(company.manager_user_id);
       });
 
-      // Fetch profiles for these users if there are any
+      // Fetch profiles for these users if there are any - use secure view
       let profileMap = new Map();
       if (userIds.size > 0) {
         const { data: profiles, error: profilesError } = await supabase
-          .from('profiles')
+          .from('profiles_directory')
           .select('user_id, full_name, email')
           .in('user_id', Array.from(userIds));
 
