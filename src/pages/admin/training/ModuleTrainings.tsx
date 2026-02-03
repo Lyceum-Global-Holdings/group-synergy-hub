@@ -9,7 +9,7 @@ export default function ModuleTrainings() {
     { name: "Warehouse", status: "Available", lessons: 15 },
     { name: "Sourcing", status: "Available", lessons: 8 },
     { name: "Procurement", status: "Available", lessons: 10 },
-    { name: "TUH Modules", status: "Coming Soon", lessons: 6 },
+    { name: "Sales", status: "Coming Soon", lessons: 6 },
     { name: "Management", status: "Coming Soon", lessons: 5 }
   ];
 
