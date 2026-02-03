@@ -36,7 +36,7 @@ export const usePurchaseRequisitions = () => {
 
       if (userIds.length > 0) {
         const { data: profiles } = await supabase
-          .from('profiles')
+          .from('profiles_directory')
           .select('user_id, full_name, email')
           .in('user_id', userIds);
 
@@ -88,7 +88,7 @@ export const usePurchaseRequisition = (id: string) => {
 
       if (uniqueUserIds.length > 0) {
         const { data: profiles } = await supabase
-          .from('profiles')
+          .from('profiles_directory')
           .select('user_id, full_name, email')
           .in('user_id', uniqueUserIds);
 

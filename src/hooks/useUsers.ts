@@ -69,9 +69,9 @@ export const useUsers = () => {
   return useQuery({
     queryKey: ['users'],
     queryFn: async (): Promise<User[]> => {
-      // Get profiles with user roles
+      // Get profiles with user roles - use secure view that filters emails for non-admins
       const { data: profiles, error: profilesError } = await supabase
-        .from('profiles')
+        .from('profiles_directory')
         .select('*');
 
       if (profilesError) throw profilesError;

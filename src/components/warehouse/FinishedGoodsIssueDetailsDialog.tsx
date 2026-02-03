@@ -48,11 +48,11 @@ export function FinishedGoodsIssueDetailsDialog({
 
       if (issueError) throw issueError;
 
-      // Fetch issued by user separately
+      // Fetch issued by user separately - use secure view
       let issuedByUser = null;
       if (issueData.issued_by) {
         const { data: userData } = await supabase
-          .from('profiles')
+          .from('profiles_directory')
           .select('full_name, email')
           .eq('user_id', issueData.issued_by)
           .single();

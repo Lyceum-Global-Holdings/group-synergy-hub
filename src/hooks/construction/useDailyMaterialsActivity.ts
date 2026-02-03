@@ -209,7 +209,7 @@ export function useDailyMaterialsActivity(startDate: string | null, endDate?: st
       
       if (userIds.length > 0) {
         const { data: profilesData } = await supabase
-          .from('profiles')
+          .from('profiles_directory')
           .select('user_id, full_name, email')
           .in('user_id', userIds);
         
