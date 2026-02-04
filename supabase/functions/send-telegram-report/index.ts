@@ -3,7 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
 interface TelegramReportRequest {
@@ -66,15 +66,18 @@ serve(async (req) => {
     }
 
     // Verify user belongs to this company or is super admin
-    const { data: membership } = await supabase
-      .from('user_companies')
+    const { data: membership, error: membershipError } = await supabase
+      .from('user_company_access')
       .select('id')
       .eq('user_id', user.id)
       .eq('company_id', company_id)
       .maybeSingle();
 
+    console.log("Membership check result:", { membership, membershipError });
+
     if (!membership) {
-      const { data: isSuperAdmin } = await supabase.rpc('is_super_admin', { _user_id: user.id });
+      const { data: isSuperAdmin, error: superAdminError } = await supabase.rpc('is_super_admin', { _user_id: user.id });
+      console.log("Super admin check:", { isSuperAdmin, superAdminError });
       if (!isSuperAdmin) {
         return new Response(
           JSON.stringify({ error: 'Access denied to this company' }),
