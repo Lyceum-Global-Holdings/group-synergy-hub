@@ -3,7 +3,7 @@ import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Plus, Search, Edit, Trash2, History, Settings, Eye, ArrowLeftRight, MapPin, BarChart3, Wrench, Image as ImageIcon, X, Package, FileWarning, ChevronDown, Download } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, History, Settings, Eye, ArrowLeftRight, MapPin, BarChart3, Wrench, Image as ImageIcon, X, Package, FileWarning, ChevronDown, Download, FileSpreadsheet } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -39,6 +39,7 @@ import { ItemDetailsDialog } from '@/components/warehouse/ItemDetailsDialog';
 import { ItemTransferDialog } from '@/components/warehouse/ItemTransferDialog';
 import { ItemStockDetailsDialog } from '@/components/warehouse/ItemStockDetailsDialog';
 import { FixMissingOpeningStockDialog } from '@/components/warehouse/FixMissingOpeningStockDialog';
+import { StockMovementReportDialog } from '@/components/warehouse/StockMovementReportDialog';
 import { WarehouseItem } from '@/types/itemBin';
 import { supabase } from '@/integrations/supabase/client';
 import { useRealtimeStockUpdates } from '@/hooks/useRealtimeStockUpdates';
@@ -71,6 +72,7 @@ export function ItemMasterTab() {
   const [transferItem, setTransferItem] = useState<WarehouseItem | null>(null);
   const [stockDetailsItem, setStockDetailsItem] = useState<WarehouseItem | null>(null);
   const [isFixOpeningStockDialogOpen, setIsFixOpeningStockDialogOpen] = useState(false);
+  const [isStockMovementReportOpen, setIsStockMovementReportOpen] = useState(false);
   
   // Filter states
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
@@ -406,6 +408,10 @@ export function ItemMasterTab() {
                   <DropdownMenuItem onClick={handleDownloadItemMaster}>
                     <Download className="mr-2 h-4 w-4" />
                     Download Item Master
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setIsStockMovementReportOpen(true)}>
+                    <FileSpreadsheet className="mr-2 h-4 w-4" />
+                    Stock Movement Report
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -770,6 +776,11 @@ export function ItemMasterTab() {
       <FixMissingOpeningStockDialog
         open={isFixOpeningStockDialogOpen}
         onOpenChange={setIsFixOpeningStockDialogOpen}
+      />
+
+      <StockMovementReportDialog
+        open={isStockMovementReportOpen}
+        onOpenChange={setIsStockMovementReportOpen}
       />
     </div>
   );
