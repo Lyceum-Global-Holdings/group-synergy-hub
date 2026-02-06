@@ -20,6 +20,9 @@ export interface StockMovementReportItem {
   category_name: string | null;
   brand: string | null;
   supplier_name: string | null;
+  item_location_name: string | null;
+  from_location_name: string | null;
+  to_location_name: string | null;
   quantity_change: number;
   quantity_before: number;
   quantity_after: number;
@@ -85,6 +88,7 @@ export const useStockMovementReport = () => {
           brand,
           category_id,
           supplier_id,
+          location_id,
           item_categories (
             id,
             name
@@ -111,7 +115,12 @@ export const useStockMovementReport = () => {
         }
       }
 
-      // Create items lookup map with supplier names
+      // Get unique item location IDs
+      const itemLocationIds = [...new Set(
+        items?.map(item => item.location_id).filter(Boolean)
+      )] as string[];
+
+      // Create items lookup map with supplier names and location_id
       const itemsMap = new Map(
         items?.map(item => [item.id, {
           item_code: item.item_code,
@@ -119,7 +128,8 @@ export const useStockMovementReport = () => {
           brand: item.brand,
           category_id: item.category_id,
           category_name: item.item_categories?.name || null,
-          supplier_name: item.supplier_id ? suppliersMap.get(item.supplier_id) || null : null
+          supplier_name: item.supplier_id ? suppliersMap.get(item.supplier_id) || null : null,
+          location_id: item.location_id
         }])
       );
 
@@ -154,8 +164,11 @@ export const useStockMovementReport = () => {
         }
       }
 
-      // Get unique location IDs for issued_to_location lookup
-      const locationIds = [...new Set(filteredTransactions.map(t => t.issued_to_location_id).filter(Boolean))] as string[];
+      // Get unique location IDs for issued_to_location lookup + item locations
+      const locationIds = [...new Set([
+        ...filteredTransactions.map(t => t.issued_to_location_id).filter(Boolean),
+        ...itemLocationIds
+      ])] as string[];
       
       let locationsMap = new Map<string, string>();
       if (locationIds.length > 0) {
@@ -169,9 +182,49 @@ export const useStockMovementReport = () => {
         }
       }
 
+      // Get transfer request IDs for from/to location lookup
+      const transferReferenceIds = [...new Set(
+        filteredTransactions
+          .filter(t => t.reference_type === 'transfer' && t.reference_id)
+          .map(t => t.reference_id)
+      )].filter(Boolean) as string[];
+
+      // Fetch transfer requests with location details
+      let transfersMap = new Map<string, { from_location: string | null; to_location: string | null }>();
+      if (transferReferenceIds.length > 0) {
+        const { data: transfers } = await supabase
+          .from('stock_transfer_requests')
+          .select(`
+            id,
+            from_location:warehouse_locations!stock_transfer_requests_from_location_id_fkey(name),
+            from_sublocation:warehouse_locations!stock_transfer_requests_from_sublocation_id_fkey(name),
+            to_location:warehouse_locations!stock_transfer_requests_to_location_id_fkey(name),
+            to_sublocation:warehouse_locations!stock_transfer_requests_to_sublocation_id_fkey(name)
+          `)
+          .in('id', transferReferenceIds);
+
+        if (transfers) {
+          transfersMap = new Map(
+            transfers.map(t => {
+              const fromParts = [t.from_location?.name, t.from_sublocation?.name].filter(Boolean);
+              const toParts = [t.to_location?.name, t.to_sublocation?.name].filter(Boolean);
+              return [
+                t.id,
+                {
+                  from_location: fromParts.length > 0 ? fromParts.join(' > ') : null,
+                  to_location: toParts.length > 0 ? toParts.join(' > ') : null
+                }
+              ];
+            })
+          );
+        }
+      }
+
       // Map transactions to report items
       const reportItems: StockMovementReportItem[] = filteredTransactions.map(t => {
         const item = itemsMap.get(t.item_id);
+        const transferInfo = t.reference_id ? transfersMap.get(t.reference_id) : null;
+        
         return {
           id: t.id,
           created_at: t.created_at,
@@ -183,6 +236,9 @@ export const useStockMovementReport = () => {
           category_name: item?.category_name || null,
           brand: item?.brand || null,
           supplier_name: item?.supplier_name || null,
+          item_location_name: item?.location_id ? locationsMap.get(item.location_id) || null : null,
+          from_location_name: transferInfo?.from_location || null,
+          to_location_name: transferInfo?.to_location || null,
           quantity_change: t.quantity_change,
           quantity_before: t.quantity_before,
           quantity_after: t.quantity_after,
