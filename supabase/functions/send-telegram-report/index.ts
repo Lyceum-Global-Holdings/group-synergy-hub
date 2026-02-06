@@ -47,6 +47,30 @@ serve(async (req) => {
     }
 
     console.log("Received request to send Telegram report from user:", user.id);
+    console.log("Content-Type:", req.headers.get('content-type'));
+    
+    let requestBody: TelegramReportRequest;
+    try {
+      const rawBody = await req.text();
+      console.log("Raw body length:", rawBody.length);
+      
+      if (!rawBody || rawBody.length === 0) {
+        console.error("Empty request body");
+        return new Response(
+          JSON.stringify({ error: 'Empty request body' }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      
+      requestBody = JSON.parse(rawBody);
+      console.log("Parsed request body, company_id:", requestBody.company_id, "has pdf:", !!requestBody.pdf_base64);
+    } catch (parseError) {
+      console.error("Failed to parse request body:", parseError);
+      return new Response(
+        JSON.stringify({ error: 'Invalid request body: ' + (parseError instanceof Error ? parseError.message : String(parseError)) }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
     
     const { 
       pdf_base64, 
@@ -56,14 +80,17 @@ serve(async (req) => {
       report_date, 
       report_type,
       company_id
-    }: TelegramReportRequest = await req.json();
+    } = requestBody;
 
     if (!company_id) {
+      console.error("No company_id in request. Keys present:", Object.keys(requestBody));
       return new Response(
         JSON.stringify({ error: 'Company ID is required' }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
+    
+    console.log("Request validated, company_id:", company_id);
 
     // Verify user belongs to this company or is super admin
     const { data: membership, error: membershipError } = await supabase
