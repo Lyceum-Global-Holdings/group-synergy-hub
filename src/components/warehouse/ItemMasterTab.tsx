@@ -3,7 +3,7 @@ import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Plus, Search, Edit, Trash2, History, Settings, Eye, ArrowLeftRight, MapPin, BarChart3, Wrench, Image as ImageIcon, X, Package, FileWarning, ChevronDown } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, History, Settings, Eye, ArrowLeftRight, MapPin, BarChart3, Wrench, Image as ImageIcon, X, Package, FileWarning, ChevronDown, Download } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -44,6 +44,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { useRealtimeStockUpdates } from '@/hooks/useRealtimeStockUpdates';
 import { useWarehouseBinAllocations } from '@/hooks/useWarehouseBinAllocations';
 import { useIsAdminOrHigher } from '@/hooks/useIsAdminOrHigher';
+import { writeExcelFromJSON } from '@/utils/excelUtils';
+import { format } from 'date-fns';
+import { toast } from 'sonner';
 
 interface LocationStock {
   locationId: string;
@@ -236,6 +239,56 @@ export function ItemMasterTab() {
     }
   };
 
+  const handleDownloadItemMaster = async () => {
+    try {
+      if (items.length === 0) {
+        toast.error('No items to export');
+        return;
+      }
+
+      const exportData = items.map(item => {
+        const category = categories.find(c => c.id === item.category_id);
+        const unit = units.find(u => u.id === item.unit_id);
+        const company = companies.find(c => c.id === item.company_id);
+        const binsString = item.bins?.map(b => `${b.bin_code} (${b.quantity})`).join(', ') || '';
+
+        return {
+          'Item Code': item.item_code,
+          'Name': item.name,
+          'Description': item.description || '',
+          'Category': category?.name || '',
+          'Unit': unit?.abbreviation || '',
+          'Brand': item.brand || '',
+          'Manufacturer': item.manufacturer || '',
+          'Supplier': item.supplier?.name || '',
+          'Bin(s)': binsString,
+          'Current Stock': item.current_stock || 0,
+          'Unit Cost': item.unit_cost || 0,
+          'Selling Price': item.selling_price || 0,
+          'Reorder Level': item.reorder_level || 0,
+          'Min Stock Level': item.min_stock_level || 0,
+          'Max Stock Level': item.max_stock_level || 0,
+          'Status': item.status || '',
+          'Barcode': item.barcode || '',
+          'SKU': item.sku || '',
+          'Company': company?.name || 'All Companies',
+        };
+      });
+
+      const companyName = selectedCompany?.name 
+        ? selectedCompany.name.toLowerCase().replace(/\s+/g, '-') 
+        : 'all-companies';
+      const dateStr = format(new Date(), 'yyyy-MM-dd');
+      const fileName = `item-master-${companyName}-${dateStr}.xlsx`;
+
+      await writeExcelFromJSON(exportData, fileName, 'Item Master');
+      toast.success(`Exported ${items.length} items to Excel`);
+    } catch (error) {
+      console.error('Failed to export item master:', error);
+      toast.error('Failed to export item master');
+    }
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex flex-col gap-3">
@@ -349,6 +402,10 @@ export function ItemMasterTab() {
                   >
                     <FileWarning className="mr-2 h-4 w-4" />
                     Fix Opening Stock
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleDownloadItemMaster}>
+                    <Download className="mr-2 h-4 w-4" />
+                    Download Item Master
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
