@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Plus, TrendingUp, Package, CheckCircle, Clock } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { Plus, TrendingUp, Package, CheckCircle, Clock, Settings2, Wrench, Layers, FileSpreadsheet } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -12,17 +13,31 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useStockTransferRequests } from "@/hooks/useStockTransfer";
 import { CreateStockTransferDialog } from "@/components/warehouse/CreateStockTransferDialog";
 import { StockTransferDetailsDialog } from "@/components/warehouse/StockTransferDetailsDialog";
+import { BulkAdjustmentDialog } from "@/components/warehouse/BulkAdjustmentDialog";
+import { StockMovementReportDialog } from "@/components/warehouse/StockMovementReportDialog";
+import { useIsAdminOrHigher } from "@/hooks/useIsAdminOrHigher";
 import type { StockTransferRequest } from "@/types/stockTransfer";
 import { format } from "date-fns";
 
 export default function StockTransfer() {
+  const navigate = useNavigate();
+  const { canDelete } = useIsAdminOrHigher();
+  
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
   const [selectedTransfer, setSelectedTransfer] = useState<StockTransferRequest | null>(null);
   const [activeTab, setActiveTab] = useState("all");
+  const [showBulkAdjustmentDialog, setShowBulkAdjustmentDialog] = useState(false);
+  const [showMovementReportDialog, setShowMovementReportDialog] = useState(false);
 
   const { data: allTransfers = [], isLoading } = useStockTransferRequests();
 
@@ -136,10 +151,36 @@ export default function StockTransfer() {
           <h1 className="text-3xl font-bold">Stock Transfer</h1>
           <p className="text-muted-foreground">Manage stock transfers between locations</p>
         </div>
-        <Button onClick={() => setCreateDialogOpen(true)}>
-          <Plus className="mr-2 h-4 w-4" />
-          Create Transfer
-        </Button>
+        <div className="flex gap-2">
+          {canDelete && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline">
+                  <Settings2 className="mr-2 h-4 w-4" />
+                  Admin Tools
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="bg-popover">
+                <DropdownMenuItem onClick={() => navigate('/warehouse/stock-adjustment')}>
+                  <Wrench className="mr-2 h-4 w-4" />
+                  Quick Adjustment
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setShowBulkAdjustmentDialog(true)}>
+                  <Layers className="mr-2 h-4 w-4" />
+                  Bulk Adjustment
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setShowMovementReportDialog(true)}>
+                  <FileSpreadsheet className="mr-2 h-4 w-4" />
+                  Stock Movement Report
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+          <Button onClick={() => setCreateDialogOpen(true)}>
+            <Plus className="mr-2 h-4 w-4" />
+            Create Transfer
+          </Button>
+        </div>
       </div>
 
       <div className="grid gap-4 md:grid-cols-4">
@@ -246,6 +287,16 @@ export default function StockTransfer() {
           transfer={selectedTransfer}
         />
       )}
+
+      <BulkAdjustmentDialog
+        open={showBulkAdjustmentDialog}
+        onOpenChange={setShowBulkAdjustmentDialog}
+      />
+
+      <StockMovementReportDialog
+        open={showMovementReportDialog}
+        onOpenChange={setShowMovementReportDialog}
+      />
     </div>
   );
 }
