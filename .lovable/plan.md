@@ -1,165 +1,99 @@
 
-# Plan: Stock Movement Report Generation Feature
+
+# Plan: Add Stock Adjustment Functionality to Stock Transfer Page
 
 ## Overview
-Add a comprehensive Stock Movement Report generation feature that allows administrators to export detailed stock transaction data for any specified time period. The report will be accessible from the Item Master tab's Admin Tools dropdown and will include all stock movements with resolved item details, categorization, and value calculations.
+Add stock adjustment capabilities to the Stock Transfer page, making it a more comprehensive inventory management hub for administrators. This includes quick/bulk adjustment options and access to the Stock Movement Report.
 
-## Solution Architecture
+## Current State
+- Stock Transfer page (`/warehouse/stock-transfer`) only handles transfers between locations
+- Stock adjustments exist on a separate page (`/warehouse/stock-adjustment`)
+- Stock Movement Report dialog was recently added to Item Master tab
 
-The best approach is to create a dedicated dialog component that:
-1. Allows selecting a date range (from/to dates)
-2. Provides optional filters (transaction type, category, item)
-3. Generates a comprehensive Excel report with all movement details
-4. Is restricted to admin roles and above
+## Proposed Solution
+Add an "Admin Tools" dropdown to the Stock Transfer page header (for admin roles and above) that provides:
+1. **Quick Adjustment** - Single item stock adjustment
+2. **Bulk Adjustment** - Multi-item batch adjustments  
+3. **Stock Movement Report** - Generate Excel reports for any date range
 
 ## Implementation Details
 
-### 1. Create Stock Movement Report Dialog Component
+### 1. Update Stock Transfer Page
 
-**File:** `src/components/warehouse/StockMovementReportDialog.tsx`
-
-**Features:**
-- Date range picker (Start Date / End Date inputs)
-- Optional filters for:
-  - Transaction Type (all/specific types)
-  - Category filter
-  - Item search/filter
-- Loading state while fetching data
-- Export to Excel functionality
-
-**Form Fields:**
-- Start Date (required)
-- End Date (required)
-- Transaction Type filter (optional - dropdown)
-- Category filter (optional - dropdown)
-
-### 2. Create Hook for Date-Filtered Stock Transactions
-
-**File:** `src/hooks/useStockMovementReport.ts`
-
-**Functionality:**
-- Accept date range parameters
-- Query `stock_transactions` table with date filters
-- Join with `warehouse_items` table to get item details
-- Join with `item_categories` to get category names
-- Join with `profiles_directory` to get user names
-- Return formatted data ready for export
-
-**Query Structure:**
-```sql
-SELECT st.*, 
-       wi.item_code, wi.name as item_name, wi.brand,
-       ic.name as category_name,
-       pd.full_name as created_by_name
-FROM stock_transactions st
-LEFT JOIN warehouse_items wi ON st.item_id = wi.id
-LEFT JOIN item_categories ic ON wi.category_id = ic.id
-LEFT JOIN profiles_directory pd ON st.created_by = pd.user_id
-WHERE st.created_at >= start_date 
-  AND st.created_at <= end_date
-ORDER BY st.created_at DESC
-```
-
-### 3. Update ItemMasterTab Component
-
-**File:** `src/components/warehouse/ItemMasterTab.tsx`
+**File:** `src/pages/warehouse/StockTransfer.tsx`
 
 **Changes:**
-- Import `StockMovementReportDialog`
-- Add state for dialog visibility
-- Add menu item in Admin Tools dropdown with `FileSpreadsheet` icon
-- Wire up dialog open/close
+- Add imports for admin tools components and hooks:
+  - `useIsAdminOrHigher` hook for role checking
+  - `StockAdjustmentDialog` component
+  - `BulkAdjustmentDialog` component
+  - `StockMovementReportDialog` component
+  - `DropdownMenu` components from UI library
+  - Icons: `Settings2`, `FileSpreadsheet`, `Wrench`
+- Add state variables for dialog visibility:
+  - `showQuickAdjustmentDialog`
+  - `showBulkAdjustmentDialog`
+  - `showMovementReportDialog`
+- Add Admin Tools dropdown in the header alongside "Create Transfer" button
+- Render the dialog components
 
-### 4. Excel Export Data Structure
+### 2. UI Layout
 
-The report will include these columns:
-- Date/Time
-- Transaction Type
-- Reference Type
-- Reference ID
-- Item Code
-- Item Name
-- Category
-- Brand
-- Qty Change
-- Qty Before
-- Qty After
-- Unit Cost (LKR)
-- Total Value (LKR)
-- Issued To Location
-- Created By
-- Notes
+The Admin Tools dropdown will appear next to the "Create Transfer" button for authorized users:
 
-### 5. Access Control
-
-- The dialog trigger is wrapped in the existing `{canDelete && (...)}` check
-- This uses the `useIsAdminOrHigher` hook which validates:
-  - admin role
-  - super_admin role
-  - moderator role
-- No additional access control changes needed
-
-## Component Flow
-
-```text
-User clicks "Stock Movement Report" in Admin Tools dropdown
-                    |
-                    v
-    StockMovementReportDialog opens
-                    |
-                    v
-    User selects date range + optional filters
-                    |
-                    v
-    User clicks "Generate Report"
-                    |
-                    v
-    useStockMovementReport hook fetches data with filters
-                    |
-                    v
-    Data is transformed to export format
-                    |
-                    v
-    writeExcelFromJSON creates and downloads the Excel file
-                    |
-                    v
-    Success toast notification
+```
+Stock Transfer                    [Admin Tools ▾] [+ Create Transfer]
+Manage stock transfers...         ├─ Quick Adjustment
+                                  ├─ Bulk Adjustment
+                                  └─ Stock Movement Report
 ```
 
-## Files to Create
-1. `src/components/warehouse/StockMovementReportDialog.tsx` - Main dialog component
-2. `src/hooks/useStockMovementReport.ts` - Data fetching hook with date filtering
+### 3. Access Control
 
-## Files to Modify
-1. `src/components/warehouse/ItemMasterTab.tsx` - Add dialog trigger and state
+- Admin Tools dropdown only visible when `canDelete` is true (from `useIsAdminOrHigher`)
+- This includes users with roles:
+  - admin
+  - super_admin
+  - moderator
+
+### 4. Dialog Integration
+
+**Quick Adjustment Dialog:**
+- Reuse existing `StockAdjustmentDialog` component
+- Opens with empty/default item (user selects item within dialog)
+- Note: The current StockAdjustmentDialog requires an itemId, so we'll need to handle the "no item selected" case or use a modified approach
+
+**Alternative for Quick Adjustment:**
+- Navigate to the Stock Adjustment page instead of opening a dialog
+- OR create a simplified "Quick Adjustment" that lets user select item first
+
+**Bulk Adjustment Dialog:**
+- Reuse existing `BulkAdjustmentDialog` component
+- Full 3-step workflow: Setup → Add Items → Review & Submit
+
+**Stock Movement Report Dialog:**
+- Reuse existing `StockMovementReportDialog` component
+- Same functionality as in Item Master tab
 
 ## Technical Notes
 
-- Uses existing `writeExcelFromJSON` from `@/utils/excelUtils.ts`
-- Follows existing dialog patterns (e.g., `GenerateReportDialog`)
-- Uses native HTML date inputs for simplicity (matching existing patterns)
-- Transaction type labels reused from `StockMovementDialog.tsx`
-- Company filtering applied automatically via the existing data context
-- Date filtering uses ISO date strings with timezone handling
+- All dialogs already exist and are tested
+- No database changes required
+- No new dependencies needed
+- Follows existing patterns from Item Master tab
+- Company context automatically applied through existing hooks
+
+## Files to Modify
+
+1. `src/pages/warehouse/StockTransfer.tsx` - Add Admin Tools dropdown and dialog integrations
 
 ## User Experience
 
-1. Admin navigates to Item & Bin Master page
-2. Clicks "Admin Tools" dropdown
-3. Selects "Stock Movement Report"
-4. Dialog opens with:
-   - Start Date (defaults to 30 days ago)
-   - End Date (defaults to today)
-   - Optional Transaction Type filter
-   - Optional Category filter
-5. User adjusts dates/filters as needed
-6. Clicks "Generate Report"
-7. Excel file downloads automatically
-8. Success toast confirms the export
+1. Admin navigates to Stock Transfer page
+2. Sees "Admin Tools" dropdown next to "Create Transfer" button
+3. Can access:
+   - Quick adjustments for individual items
+   - Bulk adjustments for multiple items
+   - Stock movement reports for any date range
+4. All functionality respects company context and permissions
 
-## Security Considerations
-
-- Feature only accessible to admin/super_admin/moderator roles
-- Data export respects existing company filtering
-- No new database permissions required (uses authenticated role)
-- Audit trail maintained through existing stock_transactions records
