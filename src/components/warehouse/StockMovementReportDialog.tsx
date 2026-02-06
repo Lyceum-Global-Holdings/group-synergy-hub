@@ -84,6 +84,7 @@ export function StockMovementReportDialog({ open, onOpenChange }: StockMovementR
         'Item Name': item.item_name,
         'Category': item.category_name || '',
         'Brand': item.brand || '',
+        'Supplier': item.supplier_name || '',
         'Qty Change': item.quantity_change,
         'Qty Before': item.quantity_before,
         'Qty After': item.quantity_after,
