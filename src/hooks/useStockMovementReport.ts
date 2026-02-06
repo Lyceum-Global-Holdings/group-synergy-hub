@@ -19,6 +19,7 @@ export interface StockMovementReportItem {
   item_name: string;
   category_name: string | null;
   brand: string | null;
+  supplier_name: string | null;
   quantity_change: number;
   quantity_before: number;
   quantity_after: number;
@@ -83,6 +84,7 @@ export const useStockMovementReport = () => {
           name,
           brand,
           category_id,
+          supplier_id,
           item_categories (
             id,
             name
@@ -92,14 +94,32 @@ export const useStockMovementReport = () => {
       
       if (itemsError) throw itemsError;
 
-      // Create items lookup map
+      // Get unique supplier IDs and fetch supplier names
+      const supplierIds = [...new Set(
+        items?.map(item => item.supplier_id).filter(Boolean)
+      )] as string[];
+      
+      let suppliersMap = new Map<string, string>();
+      if (supplierIds.length > 0) {
+        const { data: suppliers } = await supabase
+          .from('suppliers')
+          .select('id, name')
+          .in('id', supplierIds);
+        
+        if (suppliers) {
+          suppliersMap = new Map(suppliers.map(s => [s.id, s.name]));
+        }
+      }
+
+      // Create items lookup map with supplier names
       const itemsMap = new Map(
         items?.map(item => [item.id, {
           item_code: item.item_code,
           item_name: item.name,
           brand: item.brand,
           category_id: item.category_id,
-          category_name: item.item_categories?.name || null
+          category_name: item.item_categories?.name || null,
+          supplier_name: item.supplier_id ? suppliersMap.get(item.supplier_id) || null : null
         }])
       );
 
@@ -162,6 +182,7 @@ export const useStockMovementReport = () => {
           item_name: item?.item_name || 'Unknown',
           category_name: item?.category_name || null,
           brand: item?.brand || null,
+          supplier_name: item?.supplier_name || null,
           quantity_change: t.quantity_change,
           quantity_before: t.quantity_before,
           quantity_after: t.quantity_after,
