@@ -1,6 +1,6 @@
 
 
-# Plan: Track Sub-Location Stock Changes in Stock Movement Report
+# Plan: Track Sub-Location Stock Changes in Stock Movement Report ✅ COMPLETED
 
 ## Overview
 Enhance the Stock Movement Report to track stock changes by sub-location. This includes adding the item's default location and resolving from/to location details for transfer transactions.
