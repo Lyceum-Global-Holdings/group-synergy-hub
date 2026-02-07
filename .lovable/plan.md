@@ -1,318 +1,296 @@
 
 
-# Plan: Enhanced Location Analytics with Subcategory Details and PDF Export
+# Plan: Add Asset Master Items Table to Location Analytics
 
 ## Overview
-Enhance the **Location Reports** tab within the Analytics & Reports section to include comprehensive subcategory analysis per location, and add PDF export functionality with embedded charts for all report types.
+Add a detailed analysis table in the **Location Reports** tab that shows asset distribution by **Asset Master items** for each location. This provides granular visibility into exactly which master items exist at each location, their quantities, values, and condition breakdowns.
 
 ## Current State
 
 | Component | Current Behavior |
 |-----------|------------------|
-| LocationReportAnalytics | Shows location-wise KPIs, status/condition breakdowns, but no subcategory data |
-| UnifiedAssetAnalytics | Has 4 sub-tabs (Overview, Subcategory, Location, Generate Reports) |
-| Export | Only Excel export available; no PDF with graphs |
+| Location Expanded View | Shows status/condition breakdown, category badges, subcategory analysis table |
+| Missing | No breakdown by individual Asset Master items |
 
-## Requirements
-
-1. Under each location breakdown, show:
-   - Total Assets
-   - Total Value
-   - Utilization
-   - Main category breakdown
-   - Sub category breakdown and detailed analysis
-   - Subcategories by Asset Count
-   - Condition Distribution by Subcategory
-
-2. PDF export with graphs included
+## Requirement
+Add a new section showing Asset Master item-level analysis per location with:
+- Asset Master name
+- Brand
+- Category
+- Count at location
+- Total value
+- Condition breakdown (Good/Fair/Poor)
 
 ---
 
 ## Solution Architecture
 
-### Part 1: Enhanced Location Data with Subcategory Analysis
-
-**Modify `LocationReportAnalytics.tsx`** to add subcategory data per location:
+### Data Flow
 
 ```text
-+------------------------------------------------------------------+
-| Location Detailed View (Expanded Row)                             |
-+------------------------------------------------------------------+
-| Status Breakdown | Condition Breakdown | Value Metrics | Performance|
-+------------------------------------------------------------------+
-| Main Category Breakdown:                                          |
-| [Furniture: 45] [Electronics: 30] [Vehicles: 15]                 |
-+------------------------------------------------------------------+
-| Subcategory Analysis:                                             |
-| | Subcategory    | Count | Value     | Good | Fair | Poor |      |
-| | Office Chairs  | 25    | Rs. 50K   | 20   | 3    | 2    |      |
-| | Desks          | 20    | Rs. 80K   | 18   | 2    | 0    |      |
-+------------------------------------------------------------------+
-| Subcategories by Asset Count (Bar Chart)                          |
-| Condition Distribution by Subcategory (Stacked Bar)               |
-+------------------------------------------------------------------+
+warehouse_assets (asset_master_id)
+         ↓
+    Group by location_id + asset_master_id
+         ↓
+Asset Master Breakdown Table
 ```
 
-### Part 2: PDF Export with Charts
-
-Create a new utility `src/utils/locationReportPdfExport.ts` that:
-
-1. Uses `jsPDF` with `jspdf-autotable` (already installed)
-2. Generates charts using canvas rendering
-3. Embeds chart images in PDF
-4. Includes all breakdown data in tables
-
----
-
-## Files to Create
-
-| File | Purpose |
-|------|---------|
-| `src/utils/locationReportPdfExport.ts` | PDF generation utility with chart rendering |
-
-## Files to Modify
-
-| File | Changes |
-|------|---------|
-| `src/components/warehouse/LocationReportAnalytics.tsx` | Add subcategory breakdown per location, add PDF export button |
-| `src/components/warehouse/UnifiedAssetAnalytics.tsx` | Pass categories prop to LocationReportAnalytics for subcategory data |
-
----
-
-## Detailed Implementation
-
-### 1. Enhanced LocationReportAnalytics Data Model
-
-Add subcategory data to the `LocationAnalyticsData` interface:
+### New Data Structure
 
 ```typescript
+interface AssetMasterBreakdown {
+  assetMasterId: string;
+  assetMasterName: string;
+  brand: string | null;
+  categoryName: string | null;
+  subcategoryName: string | null;
+  assetCount: number;
+  totalValue: number;
+  goodCondition: number;
+  fairCondition: number;
+  poorCondition: number;
+  needsRepair: number;
+}
+
+// Add to LocationAnalyticsData interface
 interface LocationAnalyticsData {
   // ... existing fields ...
-  
-  // NEW: Category breakdown
-  categoryBreakdown: {
-    categoryId: string;
-    categoryName: string;
-    assetCount: number;
-    totalValue: number;
-  }[];
-  
-  // NEW: Subcategory breakdown
-  subcategoryBreakdown: {
-    subcategoryId: string;
-    subcategoryName: string;
-    parentCategoryName: string;
-    assetCount: number;
-    totalValue: number;
-    goodCondition: number;
-    fairCondition: number;
-    poorCondition: number;
-    needsRepair: number;
-  }[];
+  assetMasterBreakdown: AssetMasterBreakdown[];
 }
 ```
 
-### 2. Enhanced Expanded Row View
-
-When a location row is expanded, show:
-
-**Section 1: Existing Content** (Status, Condition, Value, Performance)
-
-**Section 2: Main Category Breakdown** (NEW)
-- Horizontal list of categories with counts
-- Small pie chart showing category distribution
-
-**Section 3: Subcategory Details Table** (NEW)
-```text
-| Subcategory   | Category   | Assets | Value    | Good | Fair | Poor |
-|---------------|------------|--------|----------|------|------|------|
-| Office Chairs | Furniture  | 25     | Rs. 50K  | 20   | 3    | 2    |
-| Laptops       | Electronics| 15     | Rs. 120K | 12   | 2    | 1    |
-```
-
-**Section 4: Subcategory Charts** (NEW)
-- Bar chart: Subcategories by Asset Count
-- Stacked bar: Condition Distribution by Subcategory
-
-### 3. PDF Export Utility
-
-Create `locationReportPdfExport.ts` with the following structure:
-
-```typescript
-// Key functions
-export async function exportLocationReportPdf(
-  reportData: LocationAnalyticsData[],
-  reportType: 'location' | 'sublocation' | 'department',
-  kpis: KPIData,
-  chartImages: ChartImages
-): Promise<void>
-
-// Chart rendering helper (converts recharts to canvas)
-async function renderChartToImage(
-  chartData: any[],
-  chartType: 'bar' | 'pie' | 'stackedBar',
-  config: ChartConfig
-): Promise<string> // Returns base64 data URL
-```
-
-**PDF Structure:**
-1. **Header**: Report title, date, filters applied
-2. **KPI Summary**: Total Assets, Total Value, Utilization, Top Location
-3. **Asset Count Chart**: Bar chart image
-4. **Value Distribution Chart**: Pie chart image
-5. **Status Distribution Chart**: Stacked bar image
-6. **Detailed Table**: All locations with full breakdown
-
-### 4. Chart-to-Image Rendering Approach
-
-Since recharts renders to SVG, we'll use a canvas-based approach:
-
-```typescript
-// Create a temporary canvas
-const canvas = document.createElement('canvas');
-const ctx = canvas.getContext('2d');
-
-// Draw chart manually using canvas API
-// For bar charts: draw rectangles
-// For pie charts: draw arcs
-// Export as base64 image
-
-const imageData = canvas.toDataURL('image/png');
-```
-
-This approach avoids external dependencies like html2canvas.
-
 ---
 
-## UI Changes
+## UI Enhancement
 
-### LocationReportAnalytics Header
-
-**Before:**
-```text
-| Location Reports                    [Export to Excel] |
-```
-
-**After:**
-```text
-| Location Reports          [Export PDF] [Export Excel] |
-```
-
-### Expanded Row Enhancement
-
-**Before (4 columns):**
-- Status Breakdown
-- Condition Breakdown
-- Value Metrics
-- Performance
-
-**After (Full Width Sections):**
+### Enhanced Expanded Row Layout
 
 ```text
 +------------------------------------------------------------------+
 | Row 1: Status | Condition | Value | Performance (existing)       |
 +------------------------------------------------------------------+
-| Row 2: Main Category Breakdown                                   |
-| [Furniture: 45] [Electronics: 30] [Vehicles: 15] [Others: 10]   |
+| Row 2: Main Category Breakdown (existing)                        |
 +------------------------------------------------------------------+
-| Row 3: Subcategory Analysis                                      |
-| Table with: Subcategory | Parent | Count | Value | Condition... |
+| Row 3: Subcategory Analysis Table (existing)                     |
 +------------------------------------------------------------------+
-| Row 4: Mini Charts (collapsible)                                 |
-| [Subcategory Count Chart] [Condition by Subcategory Chart]      |
+| Row 4: Subcategory Charts (existing)                             |
 +------------------------------------------------------------------+
+| Row 5: Asset Master Items Detail (NEW)                           |
+| +--------------------------------------------------------------+ |
+| | Asset Master Item | Brand | Category | Count | Value | Condition| |
+| | High Back Chair   | Mova  | Furniture| 25    | 125K  | G:20 F:5 | |
+| | Office Cupboard   | Alpha | Furniture| 15    | 200K  | G:12 F:3 | |
+| | 4 Cluster Table   | Alpha | Furniture| 10    | 500K  | G:8 F:2  | |
+| +--------------------------------------------------------------+ |
++------------------------------------------------------------------+
+```
+
+### Table Columns
+
+| Column | Description |
+|--------|-------------|
+| Item Name | Asset Master item name |
+| Brand | Brand from asset master |
+| Category | Parent category name |
+| Subcategory | Subcategory name |
+| Count | Number of assets at this location |
+| Total Value | Sum of current values |
+| Good | Count in good condition |
+| Fair | Count in fair condition |
+| Poor | Count in poor/needs repair condition |
+
+---
+
+## Implementation Details
+
+### 1. Enhance Data Aggregation
+
+Add asset master tracking in the aggregation loop:
+
+```typescript
+// Track asset master data per location
+const locationAssetMasterData: Record<
+  string,
+  Record<
+    string,
+    {
+      assetMasterName: string;
+      brand: string | null;
+      categoryId: string | null;
+      subcategoryId: string | null;
+      count: number;
+      value: number;
+      good: number;
+      fair: number;
+      poor: number;
+      needsRepair: number;
+    }
+  >
+> = {};
+
+// Inside asset iteration
+if (asset.asset_master_id) {
+  if (!locationAssetMasterData[key]) locationAssetMasterData[key] = {};
+  if (!locationAssetMasterData[key][asset.asset_master_id]) {
+    locationAssetMasterData[key][asset.asset_master_id] = {
+      assetMasterName: asset.name, // Asset name from warehouse_assets
+      brand: asset.brand,
+      categoryId: asset.category_id,
+      subcategoryId: asset.subcategory_id,
+      count: 0,
+      value: 0,
+      good: 0,
+      fair: 0,
+      poor: 0,
+      needsRepair: 0,
+    };
+  }
+  const amData = locationAssetMasterData[key][asset.asset_master_id];
+  amData.count++;
+  amData.value += asset.current_value || asset.purchase_price || 0;
+  // ... condition tracking
+}
+```
+
+### 2. Build Asset Master Breakdown
+
+```typescript
+// After aggregation
+Object.keys(groupedData).forEach((locId) => {
+  if (locationAssetMasterData[locId]) {
+    groupedData[locId].assetMasterBreakdown = Object.entries(
+      locationAssetMasterData[locId]
+    )
+      .map(([amId, amData]) => {
+        const cat = categoryMap.get(amData.categoryId || "");
+        const subcat = categoryMap.get(amData.subcategoryId || "");
+        return {
+          assetMasterId: amId,
+          assetMasterName: amData.assetMasterName,
+          brand: amData.brand,
+          categoryName: cat?.name || null,
+          subcategoryName: subcat?.name || null,
+          assetCount: amData.count,
+          totalValue: amData.value,
+          goodCondition: amData.good,
+          fairCondition: amData.fair,
+          poorCondition: amData.poor,
+          needsRepair: amData.needsRepair,
+        };
+      })
+      .sort((a, b) => b.assetCount - a.assetCount);
+  }
+});
+```
+
+### 3. Enhanced UI Section
+
+Add new section in the expanded row after subcategory charts:
+
+```tsx
+{/* Row 5: Asset Master Items Detail */}
+{item.assetMasterBreakdown.length > 0 && (
+  <div>
+    <p className="text-xs font-medium text-muted-foreground mb-2 flex items-center gap-1">
+      <Package className="h-3 w-3" />
+      Asset Master Items Detail
+    </p>
+    <div className="border rounded-lg overflow-hidden">
+      <Table>
+        <TableHeader>
+          <TableRow className="bg-muted/50">
+            <TableHead className="text-xs py-2">Item Name</TableHead>
+            <TableHead className="text-xs py-2">Brand</TableHead>
+            <TableHead className="text-xs py-2">Category</TableHead>
+            <TableHead className="text-xs py-2">Subcategory</TableHead>
+            <TableHead className="text-xs py-2 text-right">Count</TableHead>
+            <TableHead className="text-xs py-2 text-right">Value</TableHead>
+            <TableHead className="text-xs py-2 text-right text-success">Good</TableHead>
+            <TableHead className="text-xs py-2 text-right text-warning">Fair</TableHead>
+            <TableHead className="text-xs py-2 text-right text-destructive">Poor</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {item.assetMasterBreakdown.slice(0, 15).map((am) => (
+            <TableRow key={am.assetMasterId} className="text-xs">
+              <TableCell className="py-1.5 font-medium">{am.assetMasterName}</TableCell>
+              <TableCell className="py-1.5 text-muted-foreground">{am.brand || "—"}</TableCell>
+              <TableCell className="py-1.5 text-muted-foreground">{am.categoryName || "—"}</TableCell>
+              <TableCell className="py-1.5 text-muted-foreground">{am.subcategoryName || "—"}</TableCell>
+              <TableCell className="py-1.5 text-right">{am.assetCount}</TableCell>
+              <TableCell className="py-1.5 text-right">Rs. {am.totalValue.toLocaleString()}</TableCell>
+              <TableCell className="py-1.5 text-right text-success">{am.goodCondition}</TableCell>
+              <TableCell className="py-1.5 text-right text-warning">{am.fairCondition}</TableCell>
+              <TableCell className="py-1.5 text-right text-destructive">{am.poorCondition + am.needsRepair}</TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+      {item.assetMasterBreakdown.length > 15 && (
+        <div className="text-xs text-muted-foreground text-center py-2 border-t">
+          +{item.assetMasterBreakdown.length - 15} more items
+        </div>
+      )}
+    </div>
+  </div>
+)}
 ```
 
 ---
 
-## PDF Report Layout
+## Files to Modify
 
+| File | Changes |
+|------|---------|
+| `src/components/warehouse/LocationReportAnalytics.tsx` | Add AssetMasterBreakdown interface, enhance aggregation logic, add detail table UI |
+| `src/utils/locationReportPdfExport.ts` | Include Asset Master breakdown in PDF export |
+
+---
+
+## Visual Comparison
+
+### Before
 ```text
-Page 1:
-+------------------------------------------------------------------+
-| ASSET LOCATION REPORT                           [Company Logo]   |
-| Generated: Feb 7, 2026                                           |
-+------------------------------------------------------------------+
-| Report Type: Location-wise                                       |
-| Filters: All Locations | All Statuses                           |
-+------------------------------------------------------------------+
-| KPI SUMMARY                                                      |
-| +------------+ +------------+ +------------+ +------------+      |
-| |Total Assets| |Total Value | |Utilization | |Top Location|      |
-| |    1,234   | |Rs. 12.5M   | |   85.2%    | | Head Office|      |
-| +------------+ +------------+ +------------+ +------------+      |
-+------------------------------------------------------------------+
-| ASSET DISTRIBUTION BY LOCATION                                   |
-| [Bar Chart Image - 500x200px]                                    |
-+------------------------------------------------------------------+
-| VALUE DISTRIBUTION                                               |
-| [Pie Chart Image - 300x200px]                                    |
-+------------------------------------------------------------------+
+Expanded Location Row:
+├── Status Breakdown
+├── Condition Breakdown
+├── Value Metrics
+├── Performance
+├── Main Category Breakdown (badges)
+├── Subcategory Analysis (table)
+└── Subcategory Charts (bar charts)
+```
 
-Page 2+:
-+------------------------------------------------------------------+
-| DETAILED BREAKDOWN                                               |
-+------------------------------------------------------------------+
-| Location: Head Office                                            |
-| Assets: 245 | Value: Rs. 2.5M | Utilization: 88%                |
-|                                                                  |
-| Main Categories:                                                  |
-| Furniture: 120 | Electronics: 80 | Vehicles: 45                 |
-|                                                                  |
-| Subcategory Analysis:                                            |
-| | Subcategory   | Count | Value    | Good | Fair | Poor |       |
-| | Office Chairs | 50    | Rs. 500K | 45   | 3    | 2    |       |
-| | Desks         | 40    | Rs. 800K | 38   | 2    | 0    |       |
-| | Laptops       | 60    | Rs. 1.2M | 55   | 4    | 1    |       |
-+------------------------------------------------------------------+
+### After
+```text
+Expanded Location Row:
+├── Status Breakdown
+├── Condition Breakdown
+├── Value Metrics
+├── Performance
+├── Main Category Breakdown (badges)
+├── Subcategory Analysis (table)
+├── Subcategory Charts (bar charts)
+└── Asset Master Items Detail (NEW table)  ← NEW
 ```
 
 ---
 
-## Technical Dependencies
+## Benefits
 
-| Dependency | Status | Usage |
-|------------|--------|-------|
-| `jspdf` | Already installed | PDF document creation |
-| `jspdf-autotable` | Already installed | Table rendering in PDF |
-| Canvas API | Built-in | Chart rendering to images |
-
----
-
-## Implementation Order
-
-1. **Enhance data aggregation** in `LocationReportAnalytics.tsx`
-   - Add category and subcategory breakdown calculation
-   - Extend `LocationAnalyticsData` interface
-
-2. **Update expanded row UI**
-   - Add category badges row
-   - Add subcategory analysis table
-   - Add mini charts for subcategory visualization
-
-3. **Create PDF export utility**
-   - Build `locationReportPdfExport.ts`
-   - Implement canvas-based chart rendering
-   - Use jspdf-autotable for tables
-
-4. **Integrate PDF export button**
-   - Add button to header
-   - Capture chart data for PDF generation
-
-5. **Test all report types**
-   - Location-wise PDF with subcategories
-   - Sub-location-wise PDF
-   - Department-wise PDF
+1. **Granular Visibility**: See exactly which Asset Master items are at each location
+2. **Inventory Control**: Quickly identify item distribution across locations
+3. **Condition Tracking**: Monitor asset health by master item per location
+4. **Value Analysis**: Understand value concentration by specific items
+5. **Consistent with Architecture**: Uses existing `asset_master_id` relationship in `warehouse_assets`
 
 ---
 
-## Summary of Changes
+## Technical Notes
 
-| Component | Changes |
-|-----------|---------|
-| `LocationReportAnalytics.tsx` | Add category/subcategory breakdown per location, enhanced expanded view, PDF export button |
-| `locationReportPdfExport.ts` (NEW) | PDF generation with charts and tables |
-| Expanded row view | Now includes category badges, subcategory table, condition charts |
-
-This enhancement provides a comprehensive location-based asset analysis with deep drill-down into category and subcategory distributions, exportable as both Excel and PDF with visual charts.
+- Uses existing `asset_master_id` field from `warehouse_assets` table
+- Aggregates from asset-level data (no additional database queries needed)
+- Groups by asset master ID with name from first matching asset
+- Sorted by asset count (highest first) for relevance
+- Shows top 15 items with expandable indicator for more
 
