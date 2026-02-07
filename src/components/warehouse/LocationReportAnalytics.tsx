@@ -100,8 +100,6 @@ export function LocationReportAnalytics({
   const [reportType, setReportType] = useState<ReportType>("location");
   const [selectedLocation, setSelectedLocation] = useState<string>("all");
   const [selectedSublocation, setSelectedSublocation] = useState<string>("all");
-  const [selectedCategory, setSelectedCategory] = useState<string>("all");
-  const [selectedSubcategory, setSelectedSubcategory] = useState<string>("all");
   const [selectedStatus, setSelectedStatus] = useState<string>("all");
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const [isExporting, setIsExporting] = useState(false);
@@ -139,19 +137,6 @@ export function LocationReportAnalytics({
     );
   }, [locations, selectedLocation, selectedSublocation]);
 
-  // Get main categories (no parent_id) and filtered subcategories
-  const mainCategories = useMemo(
-    () => categories.filter((cat) => !cat.parent_id),
-    [categories]
-  );
-
-  const filteredSubcategories = useMemo(() => {
-    if (selectedCategory === "all") {
-      return categories.filter((cat) => cat.parent_id);
-    }
-    return categories.filter((cat) => cat.parent_id === selectedCategory);
-  }, [categories, selectedCategory]);
-
   // Filter assets based on selected filters
   const filteredAssets = useMemo(() => {
     let result = [...assets];
@@ -164,20 +149,12 @@ export function LocationReportAnalytics({
       result = result.filter((a) => a.sublocation_id === selectedSublocation);
     }
 
-    if (selectedCategory !== "all") {
-      result = result.filter((a) => a.category_id === selectedCategory);
-    }
-
-    if (selectedSubcategory !== "all") {
-      result = result.filter((a) => a.subcategory_id === selectedSubcategory);
-    }
-
     if (selectedStatus !== "all") {
       result = result.filter((a) => a.status === selectedStatus);
     }
 
     return result;
-  }, [assets, selectedLocation, selectedSublocation, selectedCategory, selectedSubcategory, selectedStatus]);
+  }, [assets, selectedLocation, selectedSublocation, selectedStatus]);
 
   // Calculate analytics data based on report type
   const analyticsData = useMemo(() => {
@@ -407,11 +384,6 @@ export function LocationReportAnalytics({
     setSelectedSublocation(value);
   };
 
-  const handleCategoryChange = (value: string) => {
-    setSelectedCategory(value);
-    setSelectedSubcategory("all"); // Reset subcategory when category changes
-  };
-
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
       const data = payload[0]?.payload;
@@ -534,45 +506,6 @@ export function LocationReportAnalytics({
             </div>
           )}
 
-          {/* Category Filter */}
-          <div className="w-48">
-            <Select value={selectedCategory} onValueChange={handleCategoryChange}>
-              <SelectTrigger>
-                <SelectValue placeholder="All Categories" />
-              </SelectTrigger>
-              <SelectContent className="bg-background border shadow-md z-50">
-                <SelectItem value="all">All Categories</SelectItem>
-                {mainCategories.map((cat) => (
-                  <SelectItem key={cat.id} value={cat.id}>
-                    {cat.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Sub-Category Filter */}
-          <div className="w-48">
-            <Select
-              value={selectedSubcategory}
-              onValueChange={setSelectedSubcategory}
-              disabled={selectedCategory === "all"}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="All Sub-Categories" />
-              </SelectTrigger>
-              <SelectContent className="bg-background border shadow-md z-50">
-                <SelectItem value="all">All Sub-Categories</SelectItem>
-                {filteredSubcategories.map((cat) => (
-                  <SelectItem key={cat.id} value={cat.id}>
-                    {cat.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Status Filter */}
           <div className="w-48">
             <Select value={selectedStatus} onValueChange={setSelectedStatus}>
               <SelectTrigger>
