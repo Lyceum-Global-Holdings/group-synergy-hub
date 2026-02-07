@@ -1,224 +1,229 @@
 
-
-# Plan: Location/Sub-Location Wise Asset Reports for Fixed Assets
-
-## Status: ✅ COMPLETED
+# Plan: Sync Finance Fixed Assets with Warehouse Asset Management
 
 ## Overview
-Add a detailed location-wise and sub-location-wise asset report generation feature to the Fixed Assets module. Users can generate and download comprehensive Excel reports showing assets grouped by location and sub-location.
+Finance Fixed Assets and Warehouse Asset Management are currently working with different tables, causing data inconsistency. This plan synchronizes both modules to use `warehouse_assets` as the single source of truth for individual physical assets.
 
-## Implementation Complete
+## Current Architecture
 
-### Files Created:
-1. **`src/hooks/useAssetLocationReport.ts`** - Custom hook for fetching asset data with location/category joins
-2. **`src/components/finance/assets/AssetLocationReportDialog.tsx`** - Dialog for report configuration and Excel export
+| Module | Table | Purpose |
+|--------|-------|---------|
+| Finance → Fixed Assets | `asset_master` | Asset "templates/definitions" |
+| Warehouse → Asset Management | `warehouse_assets` | Individual physical assets |
 
-### Files Modified:
-1. **`src/pages/finance/FixedAssets.tsx`** - Added "Location Report" button and dialog integration
+### Current Sync
+- ONE-WAY: When `asset_master` is updated, changes propagate to `warehouse_assets` via `asset_master_id`
+- Finance sees asset templates, not actual physical assets
+- Depreciation runs on `asset_master`, not on individual `warehouse_assets`
 
-### Features Implemented:
-- Location and sub-location filtering (hierarchical)
-- Category filtering
-- Status filtering (Available, In Use, Under Maintenance, Disposed, Retired)
-- Purchase date range filtering
-- Excel export with comprehensive asset details
-- Sorted by Location > Sub-Location > Asset Name
+## Proposed Architecture
 
-### 1. Hook: `src/hooks/useAssetLocationReport.ts`
+Use `warehouse_assets` as the single source of truth for all physical assets:
 
-A custom hook to fetch and process asset data grouped by location/sub-location.
-
-**Features:**
-- Fetch assets from `warehouse_assets` with category, location, and sublocation joins
-- Support filters: location, sublocation, category, status, date range
-- Group data by location and sublocation hierarchy
-- Calculate totals per location (count, total value, depreciated value)
-- Return structured data for Excel export
-
-**Interface:**
-```typescript
-interface AssetLocationReportFilters {
-  locationId?: string;        // Optional: specific location
-  sublocationId?: string;     // Optional: specific sublocation
-  categoryId?: string;        // Optional: filter by asset category
-  status?: string;            // Optional: active, disposed, etc.
-  startDate?: string;         // Optional: purchase date from
-  endDate?: string;           // Optional: purchase date to
-}
-
-interface AssetLocationReportItem {
-  asset_id: string;
-  asset_tag: string | null;
-  asset_name: string;
-  brand: string | null;
-  category_name: string | null;
-  subcategory_name: string | null;
-  serial_number: string | null;
-  location_name: string;
-  sublocation_name: string | null;
-  status: string;
-  condition: string;
-  purchase_date: string | null;
-  purchase_price: number | null;
-  current_value: number | null;
-  accumulated_depreciation: number | null;
-  depreciation_method: string | null;
-  useful_life_years: number | null;
-  notes: string | null;
-}
+```text
+asset_master (Templates)
+     |
+     | (one-to-many via asset_master_id)
+     v
+warehouse_assets (Physical Assets) <-- Single Source of Truth
+     |
+     |-- Finance Fixed Assets (reads/writes)
+     |-- Warehouse Asset Management (reads/writes)
+     |-- Depreciation (runs here)
+     |-- Location Reports (already uses this)
 ```
-
-### 2. Dialog: `src/components/finance/assets/AssetLocationReportDialog.tsx`
-
-A dialog component for report configuration and generation.
-
-**UI Elements:**
-- Location selector (dropdown with "All Locations" option)
-- Sub-location selector (filtered by selected location, with "All Sub-Locations" option)
-- Category filter (dropdown)
-- Status filter (dropdown: All, Active, Disposed, Under Maintenance, Retired)
-- Date range filter (purchase date from/to)
-- "Generate Report" button
-- Loading state while generating
-
-**Features:**
-- Similar pattern to `StockMovementReportDialog.tsx`
-- Uses `writeExcelFromJSON` for Excel export
-- Filename format: `asset-location-report-{company}-{location/all}-{date}.xlsx`
 
 ---
 
-## Excel Report Format
+## Implementation Details
 
-### Detailed Report Columns:
-| Column | Description |
-|--------|-------------|
-| Location | Primary location name |
-| Sub-Location | Sub-location within the location |
-| Asset Tag | Unique asset identifier |
-| Asset Name | Name of the asset |
-| Brand | Brand/manufacturer |
-| Category | Asset category |
-| Sub-Category | Asset sub-category |
-| Serial Number | Asset serial number |
-| Status | Current status (Active/Disposed/etc.) |
-| Condition | Physical condition |
-| Purchase Date | Date of acquisition |
-| Purchase Price (LKR) | Original purchase cost |
-| Current Value (LKR) | Current book value |
-| Accum. Depreciation (LKR) | Total depreciation to date |
-| Depreciation Method | Straight Line/Declining Balance |
-| Useful Life (Years) | Expected useful life |
-| Notes | Additional notes |
+### 1. Update Finance Asset Register
 
-### Report Organization:
-- Assets sorted by Location > Sub-Location > Asset Name
-- Summary section at bottom with totals per location
+**File:** `src/components/finance/assets/AssetRegister.tsx`
+
+Change from querying `asset_master` to querying `warehouse_assets`:
+
+**Before:**
+```typescript
+.from("asset_master")
+.select(`*, asset_categories (name)`)
+```
+
+**After:**
+```typescript
+.from("warehouse_assets")
+.select(`
+  *,
+  asset_master (asset_name, image_url),
+  category:asset_categories!warehouse_assets_category_id_fkey (name),
+  location:warehouse_locations!warehouse_assets_location_id_fkey (name),
+  sublocation:warehouse_locations!warehouse_assets_sublocation_id_fkey (name)
+`)
+```
+
+**Display Changes:**
+- Show asset tag/serial number
+- Show location and sub-location columns
+- Show individual asset depreciation status
+
+### 2. Update Finance Asset Reports
+
+**File:** `src/components/finance/assets/AssetReports.tsx`
+
+Change summary statistics to aggregate from `warehouse_assets`:
+
+- Total Assets = count of `warehouse_assets`
+- Total Cost = sum of `warehouse_assets.purchase_price`
+- Net Book Value = sum of (`purchase_price` - `accumulated_depreciation`)
+- Group by location in addition to category
+
+### 3. Update Run Depreciation Dialog
+
+**File:** `src/components/finance/assets/RunDepreciationDialog.tsx`
+
+Switch depreciation to run on individual `warehouse_assets`:
+
+**Changes:**
+1. Query depreciable assets from `warehouse_assets` (where `status = 'active'` and depreciation_method is set)
+2. Calculate depreciation per physical asset
+3. Update each `warehouse_assets` record with new depreciation values
+4. Create `depreciation_schedule` entries linked to `warehouse_assets.id`
+5. Create `asset_transactions` entries linked to `warehouse_assets.id`
+
+**Note:** This requires either:
+- Option A: Change `depreciation_schedule.asset_id` FK to reference `warehouse_assets` (schema change)
+- Option B: Add new column `depreciation_schedule.warehouse_asset_id` (additive schema change - safer)
+
+### 4. Update Depreciation Schedule View
+
+**File:** `src/components/finance/assets/DepreciationScheduleView.tsx`
+
+Update query to join with `warehouse_assets` instead of `asset_master`:
+
+```typescript
+.from("depreciation_schedule")
+.select(`
+  *,
+  warehouse_asset:warehouse_assets!depreciation_schedule_warehouse_asset_id_fkey (
+    name,
+    asset_tag,
+    purchase_price,
+    location:warehouse_locations!warehouse_assets_location_id_fkey (name)
+  ),
+  accounting_periods (period_name, start_date, end_date)
+`)
+```
+
+### 5. Update Asset Transaction List
+
+**File:** `src/components/finance/assets/AssetTransactionList.tsx`
+
+Update to reference `warehouse_assets` for transaction history.
+
+### 6. Create Bidirectional Sync Hook (Optional Enhancement)
+
+**New File:** `src/hooks/useAssetSync.ts`
+
+For aggregate statistics that `asset_master` might need:
+
+```typescript
+// When warehouse_assets are modified, update asset_master aggregates
+const syncAssetMasterAggregates = async (assetMasterId: string) => {
+  const { data } = await supabase
+    .from('warehouse_assets')
+    .select('purchase_price, accumulated_depreciation, current_value')
+    .eq('asset_master_id', assetMasterId);
+
+  // Calculate totals
+  const totalPurchasePrice = data.reduce((sum, a) => sum + (a.purchase_price || 0), 0);
+  const totalAccumDepr = data.reduce((sum, a) => sum + (a.accumulated_depreciation || 0), 0);
+  
+  // Update asset_master with aggregates
+  await supabase
+    .from('asset_master')
+    .update({
+      purchase_price: totalPurchasePrice,
+      accumulated_depreciation: totalAccumDepr,
+      current_value: totalPurchasePrice - totalAccumDepr,
+    })
+    .eq('id', assetMasterId);
+};
+```
+
+---
+
+## Database Schema Change
+
+Add a new column to `depreciation_schedule` to link to individual assets:
+
+```sql
+ALTER TABLE depreciation_schedule 
+ADD COLUMN warehouse_asset_id UUID REFERENCES warehouse_assets(id);
+
+-- Keep asset_id for backward compatibility with asset_master
+-- New depreciation entries will use warehouse_asset_id
+```
 
 ---
 
 ## Files to Modify
 
-### 1. `src/pages/finance/FixedAssets.tsx`
-
-Add a "Location Report" button to the header next to existing buttons:
-
-```typescript
-<Button variant="outline" onClick={() => setShowLocationReportDialog(true)}>
-  <MapPin className="h-4 w-4 mr-2" />
-  Location Report
-</Button>
-```
-
-Add state and import for the dialog:
-```typescript
-const [showLocationReportDialog, setShowLocationReportDialog] = useState(false);
-
-// At end of component
-<AssetLocationReportDialog 
-  open={showLocationReportDialog} 
-  onOpenChange={setShowLocationReportDialog} 
-/>
-```
+| File | Changes |
+|------|---------|
+| `src/components/finance/assets/AssetRegister.tsx` | Query `warehouse_assets`, add location columns |
+| `src/components/finance/assets/AssetReports.tsx` | Aggregate from `warehouse_assets` |
+| `src/components/finance/assets/RunDepreciationDialog.tsx` | Run depreciation on `warehouse_assets` |
+| `src/components/finance/assets/DepreciationScheduleView.tsx` | Join with `warehouse_assets` |
+| `src/components/finance/assets/AssetTransactionList.tsx` | Reference `warehouse_assets` |
+| `src/hooks/useAssetMaster.ts` | Add aggregate sync on warehouse_assets changes |
 
 ---
 
-## Data Flow
+## Data Flow After Implementation
 
 ```text
-User clicks "Location Report" button
+User adds asset in Warehouse Asset Management
               |
               v
-  AssetLocationReportDialog opens
+     Creates record in warehouse_assets
               |
               v
-  User selects filters (location, category, etc.)
+     Finance Fixed Assets shows this asset
               |
               v
-  User clicks "Generate Report"
+     Run Depreciation updates warehouse_assets
               |
               v
-  useAssetLocationReport.fetchReport() called
+     Both modules show updated depreciation values
               |
               v
-  Query warehouse_assets with joins:
-  - warehouse_locations (location_id)
-  - warehouse_locations (sublocation_id)
-  - asset_categories (category_id)
-  - asset_categories (subcategory_id)
-              |
-              v
-  Transform to AssetLocationReportItem[]
-              |
-              v
-  Map to Excel export format
-              |
-              v
-  writeExcelFromJSON() generates .xlsx file
-              |
-              v
-  Browser downloads file
+     Location Report works correctly (already uses warehouse_assets)
 ```
 
 ---
 
-## Implementation Steps
+## Benefits
 
-1. **Create hook** `src/hooks/useAssetLocationReport.ts`
-   - Query warehouse_assets with location/category joins
-   - Apply filters (location, sublocation, category, status, date range)
-   - Sort by location, sublocation, asset name
-   - Return formatted report items
+1. **Single Source of Truth** - Both modules use `warehouse_assets`
+2. **Accurate Location Tracking** - Finance sees asset locations
+3. **Individual Asset Depreciation** - Depreciation runs per physical asset
+4. **No Data Duplication** - Eliminates sync issues
+5. **Existing Reports Work** - Location report already uses correct table
 
-2. **Create dialog** `src/components/finance/assets/AssetLocationReportDialog.tsx`
-   - Location dropdown using `useWarehouseLocations`
-   - Sublocation dropdown filtered by selected location
-   - Category dropdown using `useAssetCategories`
-   - Status dropdown (hardcoded options)
-   - Date range inputs
-   - Generate button with loading state
-   - Excel export using existing utility
+## Migration Consideration
 
-3. **Update Fixed Assets page** `src/pages/finance/FixedAssets.tsx`
-   - Add "Location Report" button
-   - Add state for dialog visibility
-   - Import and render the dialog
+Existing `asset_master` entries without corresponding `warehouse_assets` records will need migration:
+- Option 1: Auto-create `warehouse_assets` records for each `asset_master`
+- Option 2: Display warning in Finance when assets exist only in `asset_master`
 
 ---
 
-## Technical Notes
+## Implementation Order
 
-- Uses existing `useWarehouseLocations` hook for location data
-- Uses existing `useAssetCategories` hook for category filter
-- Uses existing `writeExcelFromJSON` utility for Excel export
-- Follows same pattern as `StockMovementReportDialog` for consistency
-- No database schema changes required
-- Company context automatically applied through existing patterns
-
-## Dependencies
-
-No new dependencies required. Uses existing:
-- ExcelJS (via excelUtils)
-- date-fns for date formatting
-- Existing UI components (Dialog, Select, Button, etc.)
-
+1. Add `warehouse_asset_id` column to `depreciation_schedule` (schema)
+2. Update `AssetRegister.tsx` to query `warehouse_assets`
+3. Update `AssetReports.tsx` for aggregate statistics
+4. Update `RunDepreciationDialog.tsx` to depreciate `warehouse_assets`
+5. Update `DepreciationScheduleView.tsx` for new joins
+6. Update `AssetTransactionList.tsx` for transaction references
+7. Test end-to-end: add asset in warehouse, view in finance, run depreciation
