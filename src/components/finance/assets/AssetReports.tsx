@@ -13,7 +13,7 @@ export function AssetReports() {
   const { selectedCompany } = useCompany();
 
   const { data: assets, isLoading } = useQuery({
-    queryKey: ["fixed-assets-summary", selectedCompany?.id],
+    queryKey: ["fixed-assets-summary"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("warehouse_assets")
@@ -28,13 +28,11 @@ export function AssetReports() {
           location:warehouse_locations!warehouse_assets_location_id_fkey (
             name
           )
-        `)
-        .eq("company_id", selectedCompany?.id);
+        `);
 
       if (error) throw error;
       return data;
     },
-    enabled: !!selectedCompany?.id,
   });
 
   // Fetch depreciation history for trend chart

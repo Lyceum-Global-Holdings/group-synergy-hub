@@ -14,7 +14,7 @@ export function AssetRegister() {
   const { selectedCompany } = useCompany();
 
   const { data: assets, isLoading } = useQuery({
-    queryKey: ["fixed-assets", selectedCompany?.id],
+    queryKey: ["fixed-assets"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("warehouse_assets")
@@ -38,13 +38,11 @@ export function AssetRegister() {
             name
           )
         `)
-        .eq("company_id", selectedCompany?.id)
         .order("created_at", { ascending: false });
 
       if (error) throw error;
       return data;
     },
-    enabled: !!selectedCompany?.id,
   });
 
   const getStatusBadge = (status: string | null) => {
