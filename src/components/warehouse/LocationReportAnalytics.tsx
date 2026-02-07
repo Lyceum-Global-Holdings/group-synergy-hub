@@ -54,6 +54,7 @@ import {
   LocationReportData,
   CategoryBreakdown,
   SubcategoryBreakdown,
+  AssetMasterBreakdown,
 } from "@/utils/locationReportPdfExport";
 
 interface LocationReportAnalyticsProps {
@@ -78,9 +79,11 @@ interface LocationAnalyticsData {
   poorCondition: number;
   needsRepairCondition: number;
   utilizationRate: number;
-  // NEW: Category and subcategory breakdowns
+  // Category and subcategory breakdowns
   categoryBreakdown: CategoryBreakdown[];
   subcategoryBreakdown: SubcategoryBreakdown[];
+  // Asset Master item-level breakdown
+  assetMasterBreakdown: AssetMasterBreakdown[];
 }
 
 type ReportType = "location" | "sublocation" | "department";
@@ -234,6 +237,7 @@ export function LocationReportAnalytics({
         utilizationRate: 0,
         categoryBreakdown: [],
         subcategoryBreakdown: [],
+        assetMasterBreakdown: [],
       };
     });
 
@@ -254,6 +258,25 @@ export function LocationReportAnalytics({
           poor: number;
           needsRepair: number;
           parentCategoryId: string | null;
+        }
+      >
+    > = {};
+    // Track Asset Master item data per location
+    const locationAssetMasterData: Record<
+      string,
+      Record<
+        string,
+        {
+          assetMasterName: string;
+          brand: string | null;
+          categoryId: string | null;
+          subcategoryId: string | null;
+          count: number;
+          value: number;
+          good: number;
+          fair: number;
+          poor: number;
+          needsRepair: number;
         }
       >
     > = {};
@@ -312,6 +335,32 @@ export function LocationReportAnalytics({
           else if (asset.condition === "poor") subcatData.poor++;
           else if (asset.condition === "needs_repair") subcatData.needsRepair++;
         }
+
+        // Asset Master tracking
+        if (asset.asset_master_id) {
+          if (!locationAssetMasterData[key]) locationAssetMasterData[key] = {};
+          if (!locationAssetMasterData[key][asset.asset_master_id]) {
+            locationAssetMasterData[key][asset.asset_master_id] = {
+              assetMasterName: asset.name,
+              brand: asset.brand,
+              categoryId: asset.category_id,
+              subcategoryId: asset.subcategory_id,
+              count: 0,
+              value: 0,
+              good: 0,
+              fair: 0,
+              poor: 0,
+              needsRepair: 0,
+            };
+          }
+          const amData = locationAssetMasterData[key][asset.asset_master_id];
+          amData.count++;
+          amData.value += asset.current_value || asset.purchase_price || 0;
+          if (asset.condition === "good") amData.good++;
+          else if (asset.condition === "fair") amData.fair++;
+          else if (asset.condition === "poor") amData.poor++;
+          else if (asset.condition === "needs_repair") amData.needsRepair++;
+        }
       }
     });
 
@@ -350,6 +399,29 @@ export function LocationReportAnalytics({
               fairCondition: subcatData.fair,
               poorCondition: subcatData.poor,
               needsRepair: subcatData.needsRepair,
+            };
+          })
+          .sort((a, b) => b.assetCount - a.assetCount);
+      }
+
+      // Asset Master breakdown
+      if (locationAssetMasterData[locId]) {
+        groupedData[locId].assetMasterBreakdown = Object.entries(locationAssetMasterData[locId])
+          .map(([amId, amData]) => {
+            const cat = amData.categoryId ? categoryMap.get(amData.categoryId) : null;
+            const subcat = amData.subcategoryId ? categoryMap.get(amData.subcategoryId) : null;
+            return {
+              assetMasterId: amId,
+              assetMasterName: amData.assetMasterName,
+              brand: amData.brand,
+              categoryName: cat?.name || null,
+              subcategoryName: subcat?.name || null,
+              assetCount: amData.count,
+              totalValue: amData.value,
+              goodCondition: amData.good,
+              fairCondition: amData.fair,
+              poorCondition: amData.poor,
+              needsRepair: amData.needsRepair,
             };
           })
           .sort((a, b) => b.assetCount - a.assetCount);
@@ -518,6 +590,7 @@ export function LocationReportAnalytics({
         utilizationRate: item.utilizationRate,
         categoryBreakdown: item.categoryBreakdown,
         subcategoryBreakdown: item.subcategoryBreakdown,
+        assetMasterBreakdown: item.assetMasterBreakdown || [],
       }));
 
       const chartData = {
@@ -1335,10 +1408,57 @@ export function LocationReportAnalytics({
                                         </div>
                                       )}
 
+                                      {/* Row 5: Asset Master Items Detail */}
+                                      {item.assetMasterBreakdown && item.assetMasterBreakdown.length > 0 && (
+                                        <div>
+                                          <p className="text-xs font-medium text-muted-foreground mb-2 flex items-center gap-1">
+                                            <Package className="h-3 w-3" />
+                                            Asset Master Items Detail
+                                          </p>
+                                          <div className="border rounded-lg overflow-hidden">
+                                            <Table>
+                                              <TableHeader>
+                                                <TableRow className="bg-muted/50">
+                                                  <TableHead className="text-xs py-2">Item Name</TableHead>
+                                                  <TableHead className="text-xs py-2">Brand</TableHead>
+                                                  <TableHead className="text-xs py-2">Category</TableHead>
+                                                  <TableHead className="text-xs py-2">Subcategory</TableHead>
+                                                  <TableHead className="text-xs py-2 text-right">Count</TableHead>
+                                                  <TableHead className="text-xs py-2 text-right">Value</TableHead>
+                                                  <TableHead className="text-xs py-2 text-right text-success">Good</TableHead>
+                                                  <TableHead className="text-xs py-2 text-right text-warning">Fair</TableHead>
+                                                  <TableHead className="text-xs py-2 text-right text-destructive">Poor</TableHead>
+                                                </TableRow>
+                                              </TableHeader>
+                                              <TableBody>
+                                                {item.assetMasterBreakdown.slice(0, 15).map((am) => (
+                                                  <TableRow key={am.assetMasterId} className="text-xs">
+                                                    <TableCell className="py-1.5 font-medium">{am.assetMasterName}</TableCell>
+                                                    <TableCell className="py-1.5 text-muted-foreground">{am.brand || "—"}</TableCell>
+                                                    <TableCell className="py-1.5 text-muted-foreground">{am.categoryName || "—"}</TableCell>
+                                                    <TableCell className="py-1.5 text-muted-foreground">{am.subcategoryName || "—"}</TableCell>
+                                                    <TableCell className="py-1.5 text-right">{am.assetCount}</TableCell>
+                                                    <TableCell className="py-1.5 text-right">Rs. {am.totalValue.toLocaleString()}</TableCell>
+                                                    <TableCell className="py-1.5 text-right text-success">{am.goodCondition}</TableCell>
+                                                    <TableCell className="py-1.5 text-right text-warning">{am.fairCondition}</TableCell>
+                                                    <TableCell className="py-1.5 text-right text-destructive">{am.poorCondition + am.needsRepair}</TableCell>
+                                                  </TableRow>
+                                                ))}
+                                              </TableBody>
+                                            </Table>
+                                            {item.assetMasterBreakdown.length > 15 && (
+                                              <div className="text-xs text-muted-foreground text-center py-2 border-t">
+                                                +{item.assetMasterBreakdown.length - 15} more items
+                                              </div>
+                                            )}
+                                          </div>
+                                        </div>
+                                      )}
+
                                       {/* No subcategory data message */}
-                                      {item.subcategoryBreakdown.length === 0 && (
+                                      {item.subcategoryBreakdown.length === 0 && (!item.assetMasterBreakdown || item.assetMasterBreakdown.length === 0) && (
                                         <div className="text-xs text-muted-foreground text-center py-2">
-                                          No subcategory data available for this location
+                                          No detailed breakdown data available for this location
                                         </div>
                                       )}
                                     </div>

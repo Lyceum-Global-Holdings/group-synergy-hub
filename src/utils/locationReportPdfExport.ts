@@ -20,6 +20,20 @@ export interface SubcategoryBreakdown {
   needsRepair: number;
 }
 
+export interface AssetMasterBreakdown {
+  assetMasterId: string;
+  assetMasterName: string;
+  brand: string | null;
+  categoryName: string | null;
+  subcategoryName: string | null;
+  assetCount: number;
+  totalValue: number;
+  goodCondition: number;
+  fairCondition: number;
+  poorCondition: number;
+  needsRepair: number;
+}
+
 export interface LocationReportData {
   id: string;
   name: string;
@@ -38,6 +52,7 @@ export interface LocationReportData {
   utilizationRate: number;
   categoryBreakdown: CategoryBreakdown[];
   subcategoryBreakdown: SubcategoryBreakdown[];
+  assetMasterBreakdown: AssetMasterBreakdown[];
 }
 
 export interface ReportKPIs {
@@ -679,6 +694,44 @@ export async function exportLocationReportPdf(
         body: subcatData,
         theme: "grid",
         headStyles: { fillColor: [107, 114, 128], fontSize: 7 },
+        styles: { fontSize: 7, cellPadding: 1 },
+        margin: { left: margin, right: margin },
+      });
+
+      currentY = (doc as any).lastAutoTable.finalY + 6;
+    }
+
+    // Asset Master Breakdown (if available)
+    if (location.assetMasterBreakdown && location.assetMasterBreakdown.length > 0) {
+      // Check for new page
+      if (currentY > pageHeight - 80) {
+        doc.addPage();
+        currentY = 20;
+      }
+
+      doc.setFontSize(9);
+      doc.setFont("helvetica", "bold");
+      doc.text("Asset Master Items Detail:", margin, currentY);
+      currentY += 2;
+
+      const amHeaders = ["Item Name", "Brand", "Category", "Count", "Value", "Good", "Fair", "Poor"];
+      const amData = location.assetMasterBreakdown.slice(0, 10).map((am) => [
+        am.assetMasterName.length > 20 ? am.assetMasterName.substring(0, 20) + "..." : am.assetMasterName,
+        am.brand || "—",
+        am.categoryName || "—",
+        am.assetCount.toString(),
+        `Rs. ${am.totalValue.toLocaleString()}`,
+        am.goodCondition.toString(),
+        am.fairCondition.toString(),
+        (am.poorCondition + am.needsRepair).toString(),
+      ]);
+
+      autoTable(doc, {
+        startY: currentY,
+        head: [amHeaders],
+        body: amData,
+        theme: "grid",
+        headStyles: { fillColor: [79, 70, 229], fontSize: 7 },
         styles: { fontSize: 7, cellPadding: 1 },
         margin: { left: margin, right: margin },
       });
