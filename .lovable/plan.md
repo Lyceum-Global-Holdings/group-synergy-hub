@@ -1,296 +1,147 @@
 
 
-# Plan: Add Asset Master Items Table to Location Analytics
+# Plan: Include Parent Information in Location Report Downloads
 
-## Overview
-Add a detailed analysis table in the **Location Reports** tab that shows asset distribution by **Asset Master items** for each location. This provides granular visibility into exactly which master items exist at each location, their quantities, values, and condition breakdowns.
+## Problem
+When downloading the location detail report as JPG or PDF, the **Parent** information (shown in the main table row) is not included in the captured content. The user sees "Parent: 10th Floor, Department: LGH" in the table but this data is missing from downloads.
 
 ## Current State
 
-| Component | Current Behavior |
-|-----------|------------------|
-| Location Expanded View | Shows status/condition breakdown, category badges, subcategory analysis table |
-| Missing | No breakdown by individual Asset Master items |
+**What's being captured:**
+```text
++------------------------------------------+
+| LGH (Header)                      [JPG] [PDF]
+| Assets: 419 | Value: Rs. 13.8M | Util: 100%
++------------------------------------------+
+| Status | Condition | Value | Performance  |
+| ...detail rows...                         |
++------------------------------------------+
+```
 
-## Requirement
-Add a new section showing Asset Master item-level analysis per location with:
-- Asset Master name
-- Brand
-- Category
-- Count at location
-- Total value
-- Condition breakdown (Good/Fair/Poor)
+**What's missing:**
+- Parent location name (e.g., "10th Floor")
+- Report type context (Location/Sub-Location/Department)
 
----
+## Solution
 
-## Solution Architecture
+Enhance the captured header section to include:
+1. **Report Type Label** (e.g., "Department Report")
+2. **Parent Location Name** (e.g., "Parent: 10th Floor")
+3. **Full Summary Row Data** mirroring the main table
 
-### Data Flow
+### Updated Header Layout
 
 ```text
-warehouse_assets (asset_master_id)
-         ↓
-    Group by location_id + asset_master_id
-         ↓
-Asset Master Breakdown Table
-```
-
-### New Data Structure
-
-```typescript
-interface AssetMasterBreakdown {
-  assetMasterId: string;
-  assetMasterName: string;
-  brand: string | null;
-  categoryName: string | null;
-  subcategoryName: string | null;
-  assetCount: number;
-  totalValue: number;
-  goodCondition: number;
-  fairCondition: number;
-  poorCondition: number;
-  needsRepair: number;
-}
-
-// Add to LocationAnalyticsData interface
-interface LocationAnalyticsData {
-  // ... existing fields ...
-  assetMasterBreakdown: AssetMasterBreakdown[];
-}
++--------------------------------------------------------------+
+| DEPARTMENT REPORT                              [JPG] [PDF]   |
+| Parent: 10th Floor                                           |
+| Department: LGH                                              |
++--------------------------------------------------------------+
+| Assets     | Value          | Active    | Utilization        |
+| 419        | Rs. 13,875,320 | 419       | 100%               |
++--------------------------------------------------------------+
+| Status | Condition | Value | Performance                     |
+| ...detail rows...                                            |
++--------------------------------------------------------------+
 ```
 
 ---
 
-## UI Enhancement
+## Implementation
 
-### Enhanced Expanded Row Layout
+### File to Modify
+`src/components/warehouse/LocationReportAnalytics.tsx`
 
-```text
-+------------------------------------------------------------------+
-| Row 1: Status | Condition | Value | Performance (existing)       |
-+------------------------------------------------------------------+
-| Row 2: Main Category Breakdown (existing)                        |
-+------------------------------------------------------------------+
-| Row 3: Subcategory Analysis Table (existing)                     |
-+------------------------------------------------------------------+
-| Row 4: Subcategory Charts (existing)                             |
-+------------------------------------------------------------------+
-| Row 5: Asset Master Items Detail (NEW)                           |
-| +--------------------------------------------------------------+ |
-| | Asset Master Item | Brand | Category | Count | Value | Condition| |
-| | High Back Chair   | Mova  | Furniture| 25    | 125K  | G:20 F:5 | |
-| | Office Cupboard   | Alpha | Furniture| 15    | 200K  | G:12 F:3 | |
-| | 4 Cluster Table   | Alpha | Furniture| 10    | 500K  | G:8 F:2  | |
-| +--------------------------------------------------------------+ |
-+------------------------------------------------------------------+
-```
+### Changes
 
-### Table Columns
-
-| Column | Description |
-|--------|-------------|
-| Item Name | Asset Master item name |
-| Brand | Brand from asset master |
-| Category | Parent category name |
-| Subcategory | Subcategory name |
-| Count | Number of assets at this location |
-| Total Value | Sum of current values |
-| Good | Count in good condition |
-| Fair | Count in fair condition |
-| Poor | Count in poor/needs repair condition |
-
----
-
-## Implementation Details
-
-### 1. Enhance Data Aggregation
-
-Add asset master tracking in the aggregation loop:
-
-```typescript
-// Track asset master data per location
-const locationAssetMasterData: Record<
-  string,
-  Record<
-    string,
-    {
-      assetMasterName: string;
-      brand: string | null;
-      categoryId: string | null;
-      subcategoryId: string | null;
-      count: number;
-      value: number;
-      good: number;
-      fair: number;
-      poor: number;
-      needsRepair: number;
-    }
-  >
-> = {};
-
-// Inside asset iteration
-if (asset.asset_master_id) {
-  if (!locationAssetMasterData[key]) locationAssetMasterData[key] = {};
-  if (!locationAssetMasterData[key][asset.asset_master_id]) {
-    locationAssetMasterData[key][asset.asset_master_id] = {
-      assetMasterName: asset.name, // Asset name from warehouse_assets
-      brand: asset.brand,
-      categoryId: asset.category_id,
-      subcategoryId: asset.subcategory_id,
-      count: 0,
-      value: 0,
-      good: 0,
-      fair: 0,
-      poor: 0,
-      needsRepair: 0,
-    };
-  }
-  const amData = locationAssetMasterData[key][asset.asset_master_id];
-  amData.count++;
-  amData.value += asset.current_value || asset.purchase_price || 0;
-  // ... condition tracking
-}
-```
-
-### 2. Build Asset Master Breakdown
-
-```typescript
-// After aggregation
-Object.keys(groupedData).forEach((locId) => {
-  if (locationAssetMasterData[locId]) {
-    groupedData[locId].assetMasterBreakdown = Object.entries(
-      locationAssetMasterData[locId]
-    )
-      .map(([amId, amData]) => {
-        const cat = categoryMap.get(amData.categoryId || "");
-        const subcat = categoryMap.get(amData.subcategoryId || "");
-        return {
-          assetMasterId: amId,
-          assetMasterName: amData.assetMasterName,
-          brand: amData.brand,
-          categoryName: cat?.name || null,
-          subcategoryName: subcat?.name || null,
-          assetCount: amData.count,
-          totalValue: amData.value,
-          goodCondition: amData.good,
-          fairCondition: amData.fair,
-          poorCondition: amData.poor,
-          needsRepair: amData.needsRepair,
-        };
-      })
-      .sort((a, b) => b.assetCount - a.assetCount);
-  }
-});
-```
-
-### 3. Enhanced UI Section
-
-Add new section in the expanded row after subcategory charts:
+**1. Update the header section** (around lines 1314-1344) to include:
 
 ```tsx
-{/* Row 5: Asset Master Items Detail */}
-{item.assetMasterBreakdown.length > 0 && (
+{/* Header with location name and download button */}
+<div className="flex items-center justify-between border-b pb-3">
   <div>
-    <p className="text-xs font-medium text-muted-foreground mb-2 flex items-center gap-1">
-      <Package className="h-3 w-3" />
-      Asset Master Items Detail
-    </p>
-    <div className="border rounded-lg overflow-hidden">
-      <Table>
-        <TableHeader>
-          <TableRow className="bg-muted/50">
-            <TableHead className="text-xs py-2">Item Name</TableHead>
-            <TableHead className="text-xs py-2">Brand</TableHead>
-            <TableHead className="text-xs py-2">Category</TableHead>
-            <TableHead className="text-xs py-2">Subcategory</TableHead>
-            <TableHead className="text-xs py-2 text-right">Count</TableHead>
-            <TableHead className="text-xs py-2 text-right">Value</TableHead>
-            <TableHead className="text-xs py-2 text-right text-success">Good</TableHead>
-            <TableHead className="text-xs py-2 text-right text-warning">Fair</TableHead>
-            <TableHead className="text-xs py-2 text-right text-destructive">Poor</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {item.assetMasterBreakdown.slice(0, 15).map((am) => (
-            <TableRow key={am.assetMasterId} className="text-xs">
-              <TableCell className="py-1.5 font-medium">{am.assetMasterName}</TableCell>
-              <TableCell className="py-1.5 text-muted-foreground">{am.brand || "—"}</TableCell>
-              <TableCell className="py-1.5 text-muted-foreground">{am.categoryName || "—"}</TableCell>
-              <TableCell className="py-1.5 text-muted-foreground">{am.subcategoryName || "—"}</TableCell>
-              <TableCell className="py-1.5 text-right">{am.assetCount}</TableCell>
-              <TableCell className="py-1.5 text-right">Rs. {am.totalValue.toLocaleString()}</TableCell>
-              <TableCell className="py-1.5 text-right text-success">{am.goodCondition}</TableCell>
-              <TableCell className="py-1.5 text-right text-warning">{am.fairCondition}</TableCell>
-              <TableCell className="py-1.5 text-right text-destructive">{am.poorCondition + am.needsRepair}</TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-      {item.assetMasterBreakdown.length > 15 && (
-        <div className="text-xs text-muted-foreground text-center py-2 border-t">
-          +{item.assetMasterBreakdown.length - 15} more items
-        </div>
-      )}
-    </div>
+    {/* Report Type Badge */}
+    <Badge variant="outline" className="mb-2">
+      {reportType === "location" 
+        ? "Location Report" 
+        : reportType === "sublocation" 
+        ? "Sub-Location Report" 
+        : "Department Report"}
+    </Badge>
+    
+    {/* Parent Name (for sublocation/department) */}
+    {item.parentName && (
+      <p className="text-sm text-muted-foreground">
+        Parent: {item.parentName}
+      </p>
+    )}
+    
+    {/* Location Name */}
+    <h3 className="text-lg font-semibold">{item.name}</h3>
   </div>
-)}
+  <div className="flex gap-2">
+    {/* JPG and PDF buttons - unchanged */}
+  </div>
+</div>
+
+{/* Summary KPIs row - NEW */}
+<div className="grid grid-cols-4 gap-4 bg-muted/30 p-3 rounded-lg">
+  <div className="text-center">
+    <p className="text-xs text-muted-foreground">Assets</p>
+    <p className="text-xl font-bold">{item.assetCount}</p>
+  </div>
+  <div className="text-center">
+    <p className="text-xs text-muted-foreground">Total Value</p>
+    <p className="text-xl font-bold">Rs. {item.totalValue.toLocaleString()}</p>
+  </div>
+  <div className="text-center">
+    <p className="text-xs text-muted-foreground">Active</p>
+    <Badge variant="default" className="text-lg px-3 py-1">{item.activeCount}</Badge>
+  </div>
+  <div className="text-center">
+    <p className="text-xs text-muted-foreground">Utilization</p>
+    <Badge 
+      variant={item.utilizationRate > 70 ? "default" : item.utilizationRate > 40 ? "secondary" : "destructive"}
+      className="text-lg px-3 py-1"
+    >
+      {item.utilizationRate.toFixed(0)}%
+    </Badge>
+  </div>
+</div>
 ```
-
----
-
-## Files to Modify
-
-| File | Changes |
-|------|---------|
-| `src/components/warehouse/LocationReportAnalytics.tsx` | Add AssetMasterBreakdown interface, enhance aggregation logic, add detail table UI |
-| `src/utils/locationReportPdfExport.ts` | Include Asset Master breakdown in PDF export |
 
 ---
 
 ## Visual Comparison
 
-### Before
+### Before Download (Missing Data)
 ```text
-Expanded Location Row:
-├── Status Breakdown
-├── Condition Breakdown
-├── Value Metrics
-├── Performance
-├── Main Category Breakdown (badges)
-├── Subcategory Analysis (table)
-└── Subcategory Charts (bar charts)
++--------------------------------+
+| LGH                            |
+| Assets: 419 | Value | Util     |
++--------------------------------+
+| Detail content...              |
 ```
 
-### After
+### After Download (Complete Data)
 ```text
-Expanded Location Row:
-├── Status Breakdown
-├── Condition Breakdown
-├── Value Metrics
-├── Performance
-├── Main Category Breakdown (badges)
-├── Subcategory Analysis (table)
-├── Subcategory Charts (bar charts)
-└── Asset Master Items Detail (NEW table)  ← NEW
++--------------------------------+
+| DEPARTMENT REPORT              |
+| Parent: 10th Floor             |
+| LGH                            |
++--------------------------------+
+| Assets | Value    | Active | % |
+| 419    | Rs.13.8M | 419    |100|
++--------------------------------+
+| Detail content...              |
 ```
 
 ---
 
 ## Benefits
 
-1. **Granular Visibility**: See exactly which Asset Master items are at each location
-2. **Inventory Control**: Quickly identify item distribution across locations
-3. **Condition Tracking**: Monitor asset health by master item per location
-4. **Value Analysis**: Understand value concentration by specific items
-5. **Consistent with Architecture**: Uses existing `asset_master_id` relationship in `warehouse_assets`
-
----
-
-## Technical Notes
-
-- Uses existing `asset_master_id` field from `warehouse_assets` table
-- Aggregates from asset-level data (no additional database queries needed)
-- Groups by asset master ID with name from first matching asset
-- Sorted by asset count (highest first) for relevance
-- Shows top 15 items with expandable indicator for more
+1. **Complete Context**: Downloads now include parent hierarchy
+2. **Report Type Clarity**: Badge shows what type of report (Location/Sub-Location/Department)
+3. **Summary KPIs**: Prominent display of key metrics matching the main table row
+4. **Professional Output**: Well-structured header for both JPG and PDF exports
 
