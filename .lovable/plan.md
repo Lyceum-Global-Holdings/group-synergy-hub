@@ -1,185 +1,220 @@
 
 
-# Plan: Track Sub-Location Stock Changes in Stock Movement Report ✅ COMPLETED
+# Plan: Location/Sub-Location Wise Asset Reports for Fixed Assets
 
 ## Overview
-Enhance the Stock Movement Report to track stock changes by sub-location. This includes adding the item's default location and resolving from/to location details for transfer transactions.
+Add a detailed location-wise and sub-location-wise asset report generation feature to the Fixed Assets module. Users will be able to generate and download comprehensive Excel reports showing assets grouped by location and sub-location, with detailed asset information.
 
 ## Current State
-- The report currently captures `issued_to_location_id` from `stock_transactions` for material issues to sub-locations
-- Transfer transactions (`transfer_in`, `transfer_out`) have a `reference_id` pointing to `stock_transfer_requests`, but the from/to location info is not being resolved
-- The item's default warehouse location (`warehouse_items.location_id`) is not included
+- Fixed Assets page has 4 tabs: Asset Register, Depreciation, Transactions, Reports
+- The Reports tab shows summary charts and statistics
+- `warehouse_assets` table stores individual assets with `location_id` and `sublocation_id` fields
+- Locations are managed in `warehouse_locations` table with hierarchical parent/child structure
+- No location-wise detailed reporting currently exists
 
-## Solution
+## Proposed Solution
 
-Add comprehensive location tracking to the Stock Movement Report:
-
-1. **Item Location** - The item's default/primary warehouse location from `warehouse_items.location_id`
-2. **From Location** - For transfers, resolved from `stock_transfer_requests` (from_location + from_sublocation)
-3. **To Location** - For transfers, resolved from `stock_transfer_requests` (to_location + to_sublocation)
-4. **Keep existing** - "Issued To Location" for material issues to sub-locations
+Create a new "Location Report" feature accessible from the Fixed Assets page that generates detailed Excel reports of assets organized by location and sub-location.
 
 ---
 
-## Implementation Details
+## New Files to Create
 
-### 1. Update StockMovementReportItem Interface
+### 1. Hook: `src/hooks/useAssetLocationReport.ts`
 
-**File:** `src/hooks/useStockMovementReport.ts`
+A custom hook to fetch and process asset data grouped by location/sub-location.
 
-Add new fields to the interface:
-- `item_location_name: string | null` - Item's default warehouse location
-- `from_location_name: string | null` - Transfer source location (location + sublocation combined)
-- `to_location_name: string | null` - Transfer destination location (location + sublocation combined)
+**Features:**
+- Fetch assets from `warehouse_assets` with category, location, and sublocation joins
+- Support filters: location, sublocation, category, status, date range
+- Group data by location and sublocation hierarchy
+- Calculate totals per location (count, total value, depreciated value)
+- Return structured data for Excel export
 
-### 2. Update Data Fetching Logic
-
-**File:** `src/hooks/useStockMovementReport.ts`
-
-Changes:
-1. Fetch `location_id` from `warehouse_items` query
-2. Build lookup map for item locations
-3. Identify transfer transactions (where `reference_type = 'transfer'`)
-4. Fetch related `stock_transfer_requests` records for transfer reference IDs
-5. Resolve from/to location names including sublocations
-6. Map the location data to report items
-
-**Query Updates:**
-
+**Interface:**
 ```typescript
-// 1. Add location_id to warehouse_items query
-.select(`
-  id,
-  item_code,
-  name,
-  brand,
-  category_id,
-  supplier_id,
-  location_id,  // ADD THIS
-  item_categories (id, name)
-`)
+interface AssetLocationReportFilters {
+  locationId?: string;        // Optional: specific location
+  sublocationId?: string;     // Optional: specific sublocation
+  categoryId?: string;        // Optional: filter by asset category
+  status?: string;            // Optional: active, disposed, etc.
+  startDate?: string;         // Optional: purchase date from
+  endDate?: string;           // Optional: purchase date to
+}
 
-// 2. Create item location lookup from the locations already being fetched
-
-// 3. For transfer transactions, fetch stock_transfer_requests
-const transferReferenceIds = filteredTransactions
-  .filter(t => t.reference_type === 'transfer' && t.reference_id)
-  .map(t => t.reference_id);
-
-if (transferReferenceIds.length > 0) {
-  const { data: transfers } = await supabase
-    .from('stock_transfer_requests')
-    .select(`
-      id,
-      from_location:warehouse_locations!stock_transfer_requests_from_location_id_fkey(name),
-      from_sublocation:warehouse_locations!stock_transfer_requests_from_sublocation_id_fkey(name),
-      to_location:warehouse_locations!stock_transfer_requests_to_location_id_fkey(name),
-      to_sublocation:warehouse_locations!stock_transfer_requests_to_sublocation_id_fkey(name)
-    `)
-    .in('id', transferReferenceIds);
+interface AssetLocationReportItem {
+  asset_id: string;
+  asset_tag: string | null;
+  asset_name: string;
+  brand: string | null;
+  category_name: string | null;
+  subcategory_name: string | null;
+  serial_number: string | null;
+  location_name: string;
+  sublocation_name: string | null;
+  status: string;
+  condition: string;
+  purchase_date: string | null;
+  purchase_price: number | null;
+  current_value: number | null;
+  accumulated_depreciation: number | null;
+  depreciation_method: string | null;
+  useful_life_years: number | null;
+  notes: string | null;
 }
 ```
 
-### 3. Update Excel Export Columns
+### 2. Dialog: `src/components/finance/assets/AssetLocationReportDialog.tsx`
 
-**File:** `src/components/warehouse/StockMovementReportDialog.tsx`
+A dialog component for report configuration and generation.
 
-Add new columns to the export mapping after "Supplier":
-- `'Item Location'` - Item's default warehouse location
-- `'From Location'` - Source location for transfers (shows "Location > Sublocation" format)
-- `'To Location'` - Destination location for transfers
+**UI Elements:**
+- Location selector (dropdown with "All Locations" option)
+- Sub-location selector (filtered by selected location, with "All Sub-Locations" option)
+- Category filter (dropdown)
+- Status filter (dropdown: All, Active, Disposed, Under Maintenance, Retired)
+- Date range filter (purchase date from/to)
+- "Generate Report" button
+- Loading state while generating
 
-### 4. Updated Excel Column Order
+**Features:**
+- Similar pattern to `StockMovementReportDialog.tsx`
+- Uses `writeExcelFromJSON` for Excel export
+- Filename format: `asset-location-report-{company}-{location/all}-{date}.xlsx`
 
+---
+
+## Excel Report Format
+
+### Detailed Report Columns:
 | Column | Description |
 |--------|-------------|
-| Date/Time | Transaction timestamp |
-| Transaction Type | Type of movement |
-| Reference Type | Reference category |
-| Reference ID | Reference identifier |
-| Item Code | Item's code |
-| Item Name | Item's name |
-| Category | Item category |
-| Brand | Item brand |
-| Supplier | Item's default supplier |
-| **Item Location** | **Item's default warehouse location (NEW)** |
-| **From Location** | **Transfer source location + sublocation (NEW)** |
-| **To Location** | **Transfer destination location + sublocation (NEW)** |
-| Qty Change | Quantity changed |
-| Qty Before | Stock before transaction |
-| Qty After | Stock after transaction |
-| Unit Cost (LKR) | Cost per unit |
-| Total Value (LKR) | Total transaction value |
-| Issued To Location | Target location for material issues |
-| Created By | User who created |
-| Notes | Transaction notes |
+| Location | Primary location name |
+| Sub-Location | Sub-location within the location |
+| Asset Tag | Unique asset identifier |
+| Asset Name | Name of the asset |
+| Brand | Brand/manufacturer |
+| Category | Asset category |
+| Sub-Category | Asset sub-category |
+| Serial Number | Asset serial number |
+| Status | Current status (Active/Disposed/etc.) |
+| Condition | Physical condition |
+| Purchase Date | Date of acquisition |
+| Purchase Price (LKR) | Original purchase cost |
+| Current Value (LKR) | Current book value |
+| Accum. Depreciation (LKR) | Total depreciation to date |
+| Depreciation Method | Straight Line/Declining Balance |
+| Useful Life (Years) | Expected useful life |
+| Notes | Additional notes |
+
+### Report Organization:
+- Assets sorted by Location > Sub-Location > Asset Name
+- Summary section at bottom with totals per location
+
+---
+
+## Files to Modify
+
+### 1. `src/pages/finance/FixedAssets.tsx`
+
+Add a "Location Report" button to the header next to existing buttons:
+
+```typescript
+<Button variant="outline" onClick={() => setShowLocationReportDialog(true)}>
+  <MapPin className="h-4 w-4 mr-2" />
+  Location Report
+</Button>
+```
+
+Add state and import for the dialog:
+```typescript
+const [showLocationReportDialog, setShowLocationReportDialog] = useState(false);
+
+// At end of component
+<AssetLocationReportDialog 
+  open={showLocationReportDialog} 
+  onOpenChange={setShowLocationReportDialog} 
+/>
+```
 
 ---
 
 ## Data Flow
 
 ```text
-fetchReport() called with date filters
-            |
-            v
-Query stock_transactions for date range
-            |
-            v
-Extract unique item_ids and reference_ids
-            |
-            v
-┌─────────────────────────────────────────┐
-│ Parallel fetches:                       │
-│ - warehouse_items (with location_id)    │
-│ - suppliers                             │
-│ - profiles_directory                    │
-│ - warehouse_locations                   │
-│ - stock_transfer_requests (for transfers)│
-└─────────────────────────────────────────┘
-            |
-            v
-Build lookup maps for all related data
-            |
-            v
-Map transactions to report items with:
- - item_location_name (from item's location_id)
- - from_location_name (from transfer request, if applicable)
- - to_location_name (from transfer request, if applicable)
- - issued_to_location_name (existing)
-            |
-            v
-Return enriched report data
+User clicks "Location Report" button
+              |
+              v
+  AssetLocationReportDialog opens
+              |
+              v
+  User selects filters (location, category, etc.)
+              |
+              v
+  User clicks "Generate Report"
+              |
+              v
+  useAssetLocationReport.fetchReport() called
+              |
+              v
+  Query warehouse_assets with joins:
+  - warehouse_locations (location_id)
+  - warehouse_locations (sublocation_id)
+  - asset_categories (category_id)
+  - asset_categories (subcategory_id)
+              |
+              v
+  Transform to AssetLocationReportItem[]
+              |
+              v
+  Map to Excel export format
+              |
+              v
+  writeExcelFromJSON() generates .xlsx file
+              |
+              v
+  Browser downloads file
 ```
 
 ---
 
-## Files to Modify
+## Implementation Steps
 
-1. `src/hooks/useStockMovementReport.ts` - Add location fetching and mapping logic
-2. `src/components/warehouse/StockMovementReportDialog.tsx` - Add new columns to Excel export
+1. **Create hook** `src/hooks/useAssetLocationReport.ts`
+   - Query warehouse_assets with location/category joins
+   - Apply filters (location, sublocation, category, status, date range)
+   - Sort by location, sublocation, asset name
+   - Return formatted report items
+
+2. **Create dialog** `src/components/finance/assets/AssetLocationReportDialog.tsx`
+   - Location dropdown using `useWarehouseLocations`
+   - Sublocation dropdown filtered by selected location
+   - Category dropdown using `useAssetCategories`
+   - Status dropdown (hardcoded options)
+   - Date range inputs
+   - Generate button with loading state
+   - Excel export using existing utility
+
+3. **Update Fixed Assets page** `src/pages/finance/FixedAssets.tsx`
+   - Add "Location Report" button
+   - Add state for dialog visibility
+   - Import and render the dialog
+
+---
 
 ## Technical Notes
 
-- Location names will be combined as "Location > Sublocation" when both exist
-- For non-transfer transactions, from/to location fields will be empty
-- The item's default location comes from `warehouse_items.location_id`
-- Transfer locations come from the referenced `stock_transfer_requests` record
-- Existing "Issued To Location" remains for material issue transactions
+- Uses existing `useWarehouseLocations` hook for location data
+- Uses existing `useAssetCategories` hook for category filter
+- Uses existing `writeExcelFromJSON` utility for Excel export
+- Follows same pattern as `StockMovementReportDialog` for consistency
+- No database schema changes required
+- Company context automatically applied through existing patterns
 
-## Example Output
+## Dependencies
 
-For a transfer transaction:
-| Item Location | From Location | To Location | Issued To Location |
-|--------------|---------------|-------------|--------------------|
-| Main Warehouse | Main Warehouse > Zone A | Branch Office > Storage B | |
-
-For a material issue to sub-location:
-| Item Location | From Location | To Location | Issued To Location |
-|--------------|---------------|-------------|--------------------|
-| Main Warehouse | | | Site A - Construction |
-
-For an adjustment:
-| Item Location | From Location | To Location | Issued To Location |
-|--------------|---------------|-------------|--------------------|
-| Main Warehouse | | | |
+No new dependencies required. Uses existing:
+- ExcelJS (via excelUtils)
+- date-fns for date formatting
+- Existing UI components (Dialog, Select, Button, etc.)
 
