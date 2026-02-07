@@ -1,229 +1,93 @@
 
-# Plan: Sync Finance Fixed Assets with Warehouse Asset Management
+# Fix: Sync Finance Fixed Assets with Warehouse Asset Data
 
-## Overview
-Finance Fixed Assets and Warehouse Asset Management are currently working with different tables, causing data inconsistency. This plan synchronizes both modules to use `warehouse_assets` as the single source of truth for individual physical assets.
+## Problem Identified
+Finance Fixed Assets components are not showing any assets because:
 
-## Current Architecture
+| Component | Filter Used | Issue |
+|-----------|-------------|-------|
+| AssetRegister.tsx | `.eq("company_id", selectedCompany?.id)` | No match - warehouse_assets have NULL company_id |
+| AssetReports.tsx | `.eq("company_id", selectedCompany?.id)` | No match |
+| RunDepreciationDialog.tsx | `.eq("company_id", selectedCompany?.id)` | No match |
+| DepreciationScheduleView.tsx | `.eq("company_id", selectedCompany?.id)` | No match |
+| AssetTransactionList.tsx | `.eq("company_id", selectedCompany?.id)` | No match |
 
-| Module | Table | Purpose |
-|--------|-------|---------|
-| Finance → Fixed Assets | `asset_master` | Asset "templates/definitions" |
-| Warehouse → Asset Management | `warehouse_assets` | Individual physical assets |
+Meanwhile, **Warehouse Asset Management** (`useWarehouseAssets.ts`) queries **without** any company_id filter, so it shows all assets.
 
-### Current Sync
-- ONE-WAY: When `asset_master` is updated, changes propagate to `warehouse_assets` via `asset_master_id`
-- Finance sees asset templates, not actual physical assets
-- Depreciation runs on `asset_master`, not on individual `warehouse_assets`
-
-## Proposed Architecture
-
-Use `warehouse_assets` as the single source of truth for all physical assets:
-
-```text
-asset_master (Templates)
-     |
-     | (one-to-many via asset_master_id)
-     v
-warehouse_assets (Physical Assets) <-- Single Source of Truth
-     |
-     |-- Finance Fixed Assets (reads/writes)
-     |-- Warehouse Asset Management (reads/writes)
-     |-- Depreciation (runs here)
-     |-- Location Reports (already uses this)
+## Database Evidence
+```
+warehouse_assets records:
+- company_id: NULL (all records)
+- Data exists: "4 Cluster Table", "Office Cupboard", etc.
 ```
 
----
-
-## Implementation Details
-
-### 1. Update Finance Asset Register
-
-**File:** `src/components/finance/assets/AssetRegister.tsx`
-
-Change from querying `asset_master` to querying `warehouse_assets`:
-
-**Before:**
-```typescript
-.from("asset_master")
-.select(`*, asset_categories (name)`)
-```
-
-**After:**
-```typescript
-.from("warehouse_assets")
-.select(`
-  *,
-  asset_master (asset_name, image_url),
-  category:asset_categories!warehouse_assets_category_id_fkey (name),
-  location:warehouse_locations!warehouse_assets_location_id_fkey (name),
-  sublocation:warehouse_locations!warehouse_assets_sublocation_id_fkey (name)
-`)
-```
-
-**Display Changes:**
-- Show asset tag/serial number
-- Show location and sub-location columns
-- Show individual asset depreciation status
-
-### 2. Update Finance Asset Reports
-
-**File:** `src/components/finance/assets/AssetReports.tsx`
-
-Change summary statistics to aggregate from `warehouse_assets`:
-
-- Total Assets = count of `warehouse_assets`
-- Total Cost = sum of `warehouse_assets.purchase_price`
-- Net Book Value = sum of (`purchase_price` - `accumulated_depreciation`)
-- Group by location in addition to category
-
-### 3. Update Run Depreciation Dialog
-
-**File:** `src/components/finance/assets/RunDepreciationDialog.tsx`
-
-Switch depreciation to run on individual `warehouse_assets`:
-
-**Changes:**
-1. Query depreciable assets from `warehouse_assets` (where `status = 'active'` and depreciation_method is set)
-2. Calculate depreciation per physical asset
-3. Update each `warehouse_assets` record with new depreciation values
-4. Create `depreciation_schedule` entries linked to `warehouse_assets.id`
-5. Create `asset_transactions` entries linked to `warehouse_assets.id`
-
-**Note:** This requires either:
-- Option A: Change `depreciation_schedule.asset_id` FK to reference `warehouse_assets` (schema change)
-- Option B: Add new column `depreciation_schedule.warehouse_asset_id` (additive schema change - safer)
-
-### 4. Update Depreciation Schedule View
-
-**File:** `src/components/finance/assets/DepreciationScheduleView.tsx`
-
-Update query to join with `warehouse_assets` instead of `asset_master`:
-
-```typescript
-.from("depreciation_schedule")
-.select(`
-  *,
-  warehouse_asset:warehouse_assets!depreciation_schedule_warehouse_asset_id_fkey (
-    name,
-    asset_tag,
-    purchase_price,
-    location:warehouse_locations!warehouse_assets_location_id_fkey (name)
-  ),
-  accounting_periods (period_name, start_date, end_date)
-`)
-```
-
-### 5. Update Asset Transaction List
-
-**File:** `src/components/finance/assets/AssetTransactionList.tsx`
-
-Update to reference `warehouse_assets` for transaction history.
-
-### 6. Create Bidirectional Sync Hook (Optional Enhancement)
-
-**New File:** `src/hooks/useAssetSync.ts`
-
-For aggregate statistics that `asset_master` might need:
-
-```typescript
-// When warehouse_assets are modified, update asset_master aggregates
-const syncAssetMasterAggregates = async (assetMasterId: string) => {
-  const { data } = await supabase
-    .from('warehouse_assets')
-    .select('purchase_price, accumulated_depreciation, current_value')
-    .eq('asset_master_id', assetMasterId);
-
-  // Calculate totals
-  const totalPurchasePrice = data.reduce((sum, a) => sum + (a.purchase_price || 0), 0);
-  const totalAccumDepr = data.reduce((sum, a) => sum + (a.accumulated_depreciation || 0), 0);
-  
-  // Update asset_master with aggregates
-  await supabase
-    .from('asset_master')
-    .update({
-      purchase_price: totalPurchasePrice,
-      accumulated_depreciation: totalAccumDepr,
-      current_value: totalPurchasePrice - totalAccumDepr,
-    })
-    .eq('id', assetMasterId);
-};
-```
-
----
-
-## Database Schema Change
-
-Add a new column to `depreciation_schedule` to link to individual assets:
-
-```sql
-ALTER TABLE depreciation_schedule 
-ADD COLUMN warehouse_asset_id UUID REFERENCES warehouse_assets(id);
-
--- Keep asset_id for backward compatibility with asset_master
--- New depreciation entries will use warehouse_asset_id
-```
+## Solution
+Remove the `company_id` filter from `warehouse_assets` queries in Finance Fixed Assets components to match the Warehouse module's behavior.
 
 ---
 
 ## Files to Modify
 
-| File | Changes |
-|------|---------|
-| `src/components/finance/assets/AssetRegister.tsx` | Query `warehouse_assets`, add location columns |
-| `src/components/finance/assets/AssetReports.tsx` | Aggregate from `warehouse_assets` |
-| `src/components/finance/assets/RunDepreciationDialog.tsx` | Run depreciation on `warehouse_assets` |
-| `src/components/finance/assets/DepreciationScheduleView.tsx` | Join with `warehouse_assets` |
-| `src/components/finance/assets/AssetTransactionList.tsx` | Reference `warehouse_assets` |
-| `src/hooks/useAssetMaster.ts` | Add aggregate sync on warehouse_assets changes |
+### 1. `src/components/finance/assets/AssetRegister.tsx`
+**Line 41** - Remove company filter:
+```typescript
+// Before
+.eq("company_id", selectedCompany?.id)
 
----
-
-## Data Flow After Implementation
-
-```text
-User adds asset in Warehouse Asset Management
-              |
-              v
-     Creates record in warehouse_assets
-              |
-              v
-     Finance Fixed Assets shows this asset
-              |
-              v
-     Run Depreciation updates warehouse_assets
-              |
-              v
-     Both modules show updated depreciation values
-              |
-              v
-     Location Report works correctly (already uses warehouse_assets)
+// After
+// Remove this line - warehouse doesn't filter by company
 ```
 
+### 2. `src/components/finance/assets/AssetReports.tsx`
+**Line 32** - Remove company filter:
+```typescript
+// Before
+.eq("company_id", selectedCompany?.id)
+
+// After
+// Remove this line
+```
+
+### 3. `src/components/finance/assets/RunDepreciationDialog.tsx`
+**Line 73** - Remove company filter from assets query:
+```typescript
+// Before
+.eq("company_id", selectedCompany?.id)
+.eq("status", "active")
+
+// After
+.eq("status", "active")
+```
+
+### 4. `src/components/finance/assets/DepreciationScheduleView.tsx`
+**Line 39** - Keep company filter (depreciation_schedule is company-specific)
+
+### 5. `src/components/finance/assets/AssetTransactionList.tsx`
+**Line 33** - Keep company filter (asset_transactions is company-specific)
+
 ---
 
-## Benefits
+## Implementation Summary
 
-1. **Single Source of Truth** - Both modules use `warehouse_assets`
-2. **Accurate Location Tracking** - Finance sees asset locations
-3. **Individual Asset Depreciation** - Depreciation runs per physical asset
-4. **No Data Duplication** - Eliminates sync issues
-5. **Existing Reports Work** - Location report already uses correct table
-
-## Migration Consideration
-
-Existing `asset_master` entries without corresponding `warehouse_assets` records will need migration:
-- Option 1: Auto-create `warehouse_assets` records for each `asset_master`
-- Option 2: Display warning in Finance when assets exist only in `asset_master`
+| File | Change |
+|------|--------|
+| AssetRegister.tsx | Remove `.eq("company_id", ...)` from warehouse_assets query |
+| AssetReports.tsx | Remove `.eq("company_id", ...)` from warehouse_assets query |
+| RunDepreciationDialog.tsx | Remove `.eq("company_id", ...)` from warehouse_assets query |
+| DepreciationScheduleView.tsx | Keep as-is (queries depreciation_schedule, not warehouse_assets directly) |
+| AssetTransactionList.tsx | Keep as-is (queries asset_transactions, not warehouse_assets directly) |
 
 ---
 
-## Implementation Order
+## After Fix
+- Finance Fixed Assets will show the same assets as Warehouse Asset Management
+- Both modules will be in sync
+- Depreciation can be run on visible assets
+- Reports will show accurate data
 
-1. Add `warehouse_asset_id` column to `depreciation_schedule` (schema)
-2. Update `AssetRegister.tsx` to query `warehouse_assets`
-3. Update `AssetReports.tsx` for aggregate statistics
-4. Update `RunDepreciationDialog.tsx` to depreciate `warehouse_assets`
-5. Update `DepreciationScheduleView.tsx` for new joins
-6. Update `AssetTransactionList.tsx` for transaction references
-7. Test end-to-end: add asset in warehouse, view in finance, run depreciation
+---
+
+## Technical Notes
+- This is a minimal change that aligns Finance with the existing Warehouse behavior
+- No database migrations required
+- Depreciation schedule and transaction tables still use company_id for their own records (which is correct for financial data)
