@@ -1311,13 +1311,22 @@ export function LocationReportAnalytics({
                                       ref={(el) => { detailRefs.current[item.id] = el; }}
                                       className="space-y-6 bg-background p-4 rounded-lg"
                                     >
-                                      {/* Header with location name and download button */}
+                                      {/* Header with report type, parent info, and download buttons */}
                                       <div className="flex items-center justify-between border-b pb-3">
                                         <div>
+                                          <Badge variant="outline" className="mb-2">
+                                            {reportType === "location" 
+                                              ? "Location Report" 
+                                              : reportType === "sublocation" 
+                                              ? "Sub-Location Report" 
+                                              : "Department Report"}
+                                          </Badge>
+                                          {item.parentName && (
+                                            <p className="text-sm text-muted-foreground">
+                                              Parent: {item.parentName}
+                                            </p>
+                                          )}
                                           <h3 className="text-lg font-semibold">{item.name}</h3>
-                                          <p className="text-sm text-muted-foreground">
-                                            Assets: {item.assetCount} | Value: Rs. {item.totalValue.toLocaleString()} | Utilization: {item.utilizationRate.toFixed(0)}%
-                                          </p>
                                         </div>
                                         <div className="flex gap-2">
                                           <Button
@@ -1340,6 +1349,31 @@ export function LocationReportAnalytics({
                                             <FileText className="h-4 w-4" />
                                             {isCapturingPdf === item.id ? "Generating..." : "PDF"}
                                           </Button>
+                                        </div>
+                                      </div>
+                                      
+                                      {/* Summary KPIs row */}
+                                      <div className="grid grid-cols-4 gap-4 bg-muted/30 p-3 rounded-lg">
+                                        <div className="text-center">
+                                          <p className="text-xs text-muted-foreground">Assets</p>
+                                          <p className="text-xl font-bold">{item.assetCount}</p>
+                                        </div>
+                                        <div className="text-center">
+                                          <p className="text-xs text-muted-foreground">Total Value</p>
+                                          <p className="text-xl font-bold">Rs. {item.totalValue.toLocaleString()}</p>
+                                        </div>
+                                        <div className="text-center">
+                                          <p className="text-xs text-muted-foreground">Active</p>
+                                          <Badge variant="default" className="text-lg px-3 py-1">{item.activeCount}</Badge>
+                                        </div>
+                                        <div className="text-center">
+                                          <p className="text-xs text-muted-foreground">Utilization</p>
+                                          <Badge 
+                                            variant={item.utilizationRate > 70 ? "default" : item.utilizationRate > 40 ? "secondary" : "destructive"}
+                                            className="text-lg px-3 py-1"
+                                          >
+                                            {item.utilizationRate.toFixed(0)}%
+                                          </Badge>
                                         </div>
                                       </div>
                                       
