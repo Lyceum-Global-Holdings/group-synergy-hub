@@ -54,7 +54,7 @@ export function RunDepreciationDialog({ open, onOpenChange }: RunDepreciationDia
 
   // Get assets with depreciation setup from warehouse_assets
   const { data: assets, isLoading: assetsLoading } = useQuery({
-    queryKey: ["depreciable-warehouse-assets", selectedCompany?.id],
+    queryKey: ["depreciable-warehouse-assets"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("warehouse_assets")
@@ -70,7 +70,6 @@ export function RunDepreciationDialog({ open, onOpenChange }: RunDepreciationDia
             name
           )
         `)
-        .eq("company_id", selectedCompany?.id)
         .eq("status", "active");
       if (error) throw error;
       // Filter assets that have depreciation setup (either on asset itself or via asset_master)
@@ -79,7 +78,7 @@ export function RunDepreciationDialog({ open, onOpenChange }: RunDepreciationDia
         return a.depreciation_method || master?.depreciation_method;
       });
     },
-    enabled: !!selectedCompany?.id && open,
+    enabled: open,
   });
 
   // Calculate depreciation preview
