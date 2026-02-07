@@ -1,4 +1,5 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useRef, useCallback } from "react";
+import html2canvas from "html2canvas";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -45,6 +46,7 @@ import {
   AlertCircle,
   FileText,
   Layers,
+  Camera,
 } from "lucide-react";
 import { WarehouseAsset, WarehouseLocation, AssetCategory } from "@/types/warehouse";
 import { toast } from "@/hooks/use-toast";
@@ -125,6 +127,53 @@ export function LocationReportAnalytics({
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const [isExporting, setIsExporting] = useState(false);
   const [isExportingPdf, setIsExportingPdf] = useState(false);
+  const [isCapturing, setIsCapturing] = useState<string | null>(null);
+  
+  // Refs for capturing location detail sections
+  const detailRefs = useRef<Record<string, HTMLDivElement | null>>({});
+
+  // Function to capture expanded section as JPG
+  const handleCaptureAsJpg = useCallback(async (locationId: string, locationName: string) => {
+    const element = detailRefs.current[locationId];
+    if (!element) {
+      toast({
+        title: "Capture Failed",
+        description: "Could not find the section to capture.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsCapturing(locationId);
+    try {
+      const canvas = await html2canvas(element, {
+        backgroundColor: "#ffffff",
+        scale: 2,
+        useCORS: true,
+        logging: false,
+      });
+      
+      // Convert to JPG and download
+      const link = document.createElement("a");
+      link.download = `${locationName.replace(/\s+/g, "_")}_Report_${new Date().toISOString().split("T")[0]}.jpg`;
+      link.href = canvas.toDataURL("image/jpeg", 0.95);
+      link.click();
+      
+      toast({
+        title: "Download Complete",
+        description: `Location report saved as JPG.`,
+      });
+    } catch (error) {
+      console.error("Capture error:", error);
+      toast({
+        title: "Capture Failed",
+        description: "Failed to capture the section. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsCapturing(null);
+    }
+  }, []);
 
   // Get locations by type
   const mainLocations = useMemo(
@@ -1166,7 +1215,31 @@ export function LocationReportAnalytics({
                                     }
                                     className="p-4"
                                   >
-                                    <div className="space-y-6">
+                                    {/* Capture container with ref */}
+                                    <div 
+                                      ref={(el) => { detailRefs.current[item.id] = el; }}
+                                      className="space-y-6 bg-background p-4 rounded-lg"
+                                    >
+                                      {/* Header with location name and download button */}
+                                      <div className="flex items-center justify-between border-b pb-3">
+                                        <div>
+                                          <h3 className="text-lg font-semibold">{item.name}</h3>
+                                          <p className="text-sm text-muted-foreground">
+                                            Assets: {item.assetCount} | Value: Rs. {item.totalValue.toLocaleString()} | Utilization: {item.utilizationRate.toFixed(0)}%
+                                          </p>
+                                        </div>
+                                        <Button
+                                          variant="outline"
+                                          size="sm"
+                                          onClick={() => handleCaptureAsJpg(item.id, item.name)}
+                                          disabled={isCapturing === item.id}
+                                          className="gap-2"
+                                        >
+                                          <Camera className="h-4 w-4" />
+                                          {isCapturing === item.id ? "Capturing..." : "Download JPG"}
+                                        </Button>
+                                      </div>
+                                      
                                       {/* Row 1: Status, Condition, Value, Performance */}
                                       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                                         <div>
