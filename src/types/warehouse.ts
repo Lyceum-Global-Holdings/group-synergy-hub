@@ -39,6 +39,7 @@ export interface WarehouseAsset {
   subcategory_id: string | null;
   brand: string | null;
   asset_id: string | null;
+  asset_master_id: string | null;
   serial_number: string | null;
   asset_tag: string | null;
   location_id: string | null;
