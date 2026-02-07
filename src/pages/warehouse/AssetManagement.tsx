@@ -12,7 +12,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { FileText, FileSpreadsheet } from "lucide-react";
+import { FileText } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -65,7 +65,7 @@ import { AssetRequestsTab } from "@/components/warehouse/asset-requests/AssetReq
 import { SubcategoryAnalytics } from "@/components/warehouse/SubcategoryAnalytics";
 import { BulkQRCodeDialog } from "@/components/warehouse/BulkQRCodeDialog";
 import { AssetForQR } from "@/utils/bulkQRCodePdf";
-import { WarehouseAssetReportDialog } from "@/components/warehouse/WarehouseAssetReportDialog";
+import { LocationReportAnalytics } from "@/components/warehouse/LocationReportAnalytics";
 
 const assetFormSchema = z.object({
   asset_master_id: z.string().optional().transform(v => (v === "none" || v === "" ? undefined : v)),
@@ -136,7 +136,6 @@ export default function AssetManagement() {
   const [selectedAssetMaster, setSelectedAssetMaster] = useState<AssetMaster | null>(null);
   const [createdAssets, setCreatedAssets] = useState<AssetForQR[]>([]);
   const [showBulkQRDialog, setShowBulkQRDialog] = useState(false);
-  const [isReportDialogOpen, setIsReportDialogOpen] = useState(false);
   
   const { 
     locations,
@@ -439,10 +438,6 @@ export default function AssetManagement() {
         <div className="flex gap-2">
           <BulkAssetImportDialog />
           <CategoryManagementDialog />
-          <Button variant="outline" onClick={() => setIsReportDialogOpen(true)}>
-            <FileSpreadsheet className="mr-2 h-4 w-4" />
-            Reports
-          </Button>
           <LocationManagementDialog />
 
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
@@ -864,7 +859,7 @@ export default function AssetManagement() {
 
       {/* Tabs for Assets List and Analytics */}
       <Tabs defaultValue="assets-list" className="w-full">
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className="grid w-full grid-cols-6">
           <TabsTrigger value="assets-list" className="flex items-center gap-2">
             <Package className="h-4 w-4" />
             Assets List
@@ -884,6 +879,10 @@ export default function AssetManagement() {
           <TabsTrigger value="subcategory-analytics" className="flex items-center gap-2">
             <Layers className="h-4 w-4" />
             Subcategory Analytics
+          </TabsTrigger>
+          <TabsTrigger value="location-reports" className="flex items-center gap-2">
+            <MapPin className="h-4 w-4" />
+            Location Reports
           </TabsTrigger>
         </TabsList>
 
@@ -1179,6 +1178,14 @@ export default function AssetManagement() {
             categories={[...mainCategories, ...mainCategories.flatMap(cat => getSubcategories(cat.id))]}
           />
         </TabsContent>
+
+        <TabsContent value="location-reports" className="mt-6">
+          <LocationReportAnalytics 
+            assets={assets}
+            locations={locations}
+            categories={[...mainCategories, ...mainCategories.flatMap(cat => getSubcategories(cat.id))]}
+          />
+        </TabsContent>
       </Tabs>
 
       {/* Dialogs */}
@@ -1279,12 +1286,6 @@ export default function AssetManagement() {
         open={showBulkQRDialog}
         onOpenChange={handleQRDialogClose}
         assets={createdAssets}
-      />
-
-      {/* Asset Reports Dialog */}
-      <WarehouseAssetReportDialog
-        open={isReportDialogOpen}
-        onOpenChange={setIsReportDialogOpen}
       />
     </div>
   );
