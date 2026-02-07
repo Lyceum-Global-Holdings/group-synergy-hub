@@ -43,10 +43,18 @@ import {
   ChevronDown,
   ChevronRight,
   AlertCircle,
+  FileText,
+  Layers,
 } from "lucide-react";
 import { WarehouseAsset, WarehouseLocation, AssetCategory } from "@/types/warehouse";
 import { toast } from "@/hooks/use-toast";
 import { writeExcelFromJSON } from "@/utils/excelUtils";
+import {
+  exportLocationReportPdf,
+  LocationReportData,
+  CategoryBreakdown,
+  SubcategoryBreakdown,
+} from "@/utils/locationReportPdfExport";
 
 interface LocationReportAnalyticsProps {
   assets: WarehouseAsset[];
@@ -70,6 +78,9 @@ interface LocationAnalyticsData {
   poorCondition: number;
   needsRepairCondition: number;
   utilizationRate: number;
+  // NEW: Category and subcategory breakdowns
+  categoryBreakdown: CategoryBreakdown[];
+  subcategoryBreakdown: SubcategoryBreakdown[];
 }
 
 type ReportType = "location" | "sublocation" | "department";
@@ -84,6 +95,13 @@ const COLORS = [
   "hsl(340, 82%, 52%)", // Pink
   "hsl(24, 95%, 53%)", // Orange
 ];
+
+const CONDITION_COLORS = {
+  good: "hsl(142, 76%, 36%)",
+  fair: "hsl(38, 92%, 50%)",
+  poor: "hsl(0, 84%, 60%)",
+  needsRepair: "hsl(0, 74%, 50%)",
+};
 
 const STATUS_COLORS = {
   active: "hsl(142, 76%, 36%)",
@@ -103,6 +121,7 @@ export function LocationReportAnalytics({
   const [selectedStatus, setSelectedStatus] = useState<string>("all");
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const [isExporting, setIsExporting] = useState(false);
+  const [isExportingPdf, setIsExportingPdf] = useState(false);
 
   // Get locations by type
   const mainLocations = useMemo(
@@ -186,6 +205,11 @@ export function LocationReportAnalytics({
 
     const groupingLocations = getGroupingLocations();
 
+    // Create category and subcategory lookup maps
+    const mainCategories = categories.filter((c) => !c.parent_id);
+    const subcategoryList = categories.filter((c) => c.parent_id);
+    const categoryMap = new Map(categories.map((c) => [c.id, c]));
+
     // Group assets
     const groupedData: Record<string, LocationAnalyticsData> = {};
 
@@ -208,8 +232,31 @@ export function LocationReportAnalytics({
         poorCondition: 0,
         needsRepairCondition: 0,
         utilizationRate: 0,
+        categoryBreakdown: [],
+        subcategoryBreakdown: [],
       };
     });
+
+    // Track category/subcategory counts per location
+    const locationCategoryData: Record<
+      string,
+      Record<string, { count: number; value: number }>
+    > = {};
+    const locationSubcategoryData: Record<
+      string,
+      Record<
+        string,
+        {
+          count: number;
+          value: number;
+          good: number;
+          fair: number;
+          poor: number;
+          needsRepair: number;
+          parentCategoryId: string | null;
+        }
+      >
+    > = {};
 
     // Aggregate asset data
     filteredAssets.forEach((asset) => {
@@ -230,6 +277,82 @@ export function LocationReportAnalytics({
         else if (asset.condition === "fair") data.fairCondition++;
         else if (asset.condition === "poor") data.poorCondition++;
         else if (asset.condition === "needs_repair") data.needsRepairCondition++;
+
+        // Category tracking
+        if (asset.category_id) {
+          if (!locationCategoryData[key]) locationCategoryData[key] = {};
+          if (!locationCategoryData[key][asset.category_id]) {
+            locationCategoryData[key][asset.category_id] = { count: 0, value: 0 };
+          }
+          locationCategoryData[key][asset.category_id].count++;
+          locationCategoryData[key][asset.category_id].value +=
+            asset.current_value || asset.purchase_price || 0;
+        }
+
+        // Subcategory tracking
+        if (asset.subcategory_id) {
+          if (!locationSubcategoryData[key]) locationSubcategoryData[key] = {};
+          if (!locationSubcategoryData[key][asset.subcategory_id]) {
+            const subcat = categoryMap.get(asset.subcategory_id);
+            locationSubcategoryData[key][asset.subcategory_id] = {
+              count: 0,
+              value: 0,
+              good: 0,
+              fair: 0,
+              poor: 0,
+              needsRepair: 0,
+              parentCategoryId: subcat?.parent_id || null,
+            };
+          }
+          const subcatData = locationSubcategoryData[key][asset.subcategory_id];
+          subcatData.count++;
+          subcatData.value += asset.current_value || asset.purchase_price || 0;
+          if (asset.condition === "good") subcatData.good++;
+          else if (asset.condition === "fair") subcatData.fair++;
+          else if (asset.condition === "poor") subcatData.poor++;
+          else if (asset.condition === "needs_repair") subcatData.needsRepair++;
+        }
+      }
+    });
+
+    // Build category and subcategory breakdowns for each location
+    Object.keys(groupedData).forEach((locId) => {
+      // Category breakdown
+      if (locationCategoryData[locId]) {
+        groupedData[locId].categoryBreakdown = Object.entries(locationCategoryData[locId])
+          .map(([catId, catData]) => {
+            const cat = categoryMap.get(catId);
+            return {
+              categoryId: catId,
+              categoryName: cat?.name || "Unknown",
+              assetCount: catData.count,
+              totalValue: catData.value,
+            };
+          })
+          .sort((a, b) => b.assetCount - a.assetCount);
+      }
+
+      // Subcategory breakdown
+      if (locationSubcategoryData[locId]) {
+        groupedData[locId].subcategoryBreakdown = Object.entries(locationSubcategoryData[locId])
+          .map(([subcatId, subcatData]) => {
+            const subcat = categoryMap.get(subcatId);
+            const parentCat = subcatData.parentCategoryId
+              ? categoryMap.get(subcatData.parentCategoryId)
+              : null;
+            return {
+              subcategoryId: subcatId,
+              subcategoryName: subcat?.name || "Unknown",
+              parentCategoryName: parentCat?.name || "Unknown",
+              assetCount: subcatData.count,
+              totalValue: subcatData.value,
+              goodCondition: subcatData.good,
+              fairCondition: subcatData.fair,
+              poorCondition: subcatData.poor,
+              needsRepair: subcatData.needsRepair,
+            };
+          })
+          .sort((a, b) => b.assetCount - a.assetCount);
       }
     });
 
@@ -238,7 +361,6 @@ export function LocationReportAnalytics({
       data.utilizationRate =
         data.assetCount > 0 ? (data.activeCount / data.assetCount) * 100 : 0;
     });
-
     const dataArray = Object.values(groupedData).filter((d) => d.assetCount > 0);
     const sortedByCount = [...dataArray].sort((a, b) => b.assetCount - a.assetCount);
     const sortedByValue = [...dataArray].sort((a, b) => b.totalValue - a.totalValue);
@@ -308,6 +430,7 @@ export function LocationReportAnalytics({
     sublocations,
     departments,
     locations,
+    categories,
   ]);
 
   const toggleRow = (id: string) => {
@@ -371,6 +494,69 @@ export function LocationReportAnalytics({
       });
     } finally {
       setIsExporting(false);
+    }
+  };
+
+  const handleExportPdf = async () => {
+    setIsExportingPdf(true);
+    try {
+      const reportData: LocationReportData[] = analyticsData.sortedByCount.map((item) => ({
+        id: item.id,
+        name: item.name,
+        parentId: item.parentId,
+        parentName: item.parentName,
+        assetCount: item.assetCount,
+        totalValue: item.totalValue,
+        activeCount: item.activeCount,
+        maintenanceCount: item.maintenanceCount,
+        inactiveCount: item.inactiveCount,
+        disposedCount: item.disposedCount,
+        goodCondition: item.goodCondition,
+        fairCondition: item.fairCondition,
+        poorCondition: item.poorCondition,
+        needsRepairCondition: item.needsRepairCondition,
+        utilizationRate: item.utilizationRate,
+        categoryBreakdown: item.categoryBreakdown,
+        subcategoryBreakdown: item.subcategoryBreakdown,
+      }));
+
+      const chartData = {
+        assetCountData: analyticsData.sortedByCount.slice(0, 10).map((loc) => ({
+          name: loc.name,
+          value: loc.assetCount,
+        })),
+        valueDistribution: analyticsData.valueDistribution.map((loc) => ({
+          name: loc.name,
+          value: loc.value,
+        })),
+        statusDistribution: analyticsData.statusByLocation.map((loc) => ({
+          name: loc.name,
+          active: loc.Active,
+          maintenance: loc.Maintenance,
+          inactive: loc.Inactive,
+        })),
+      };
+
+      await exportLocationReportPdf(
+        reportData,
+        reportType,
+        analyticsData.kpis,
+        chartData
+      );
+
+      toast({
+        title: "PDF Export Successful",
+        description: "Location report exported as PDF with charts",
+      });
+    } catch (error) {
+      console.error("PDF Export error:", error);
+      toast({
+        title: "PDF Export Failed",
+        description: "Failed to export PDF report. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsExportingPdf(false);
     }
   };
 
@@ -438,10 +624,16 @@ export function LocationReportAnalytics({
             Analyze asset distribution across locations, sub-locations, and departments
           </p>
         </div>
-        <Button onClick={handleExport} disabled={isExporting}>
-          <Download className="mr-2 h-4 w-4" />
-          {isExporting ? "Exporting..." : "Export to Excel"}
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={handleExportPdf} disabled={isExportingPdf}>
+            <FileText className="mr-2 h-4 w-4" />
+            {isExportingPdf ? "Exporting..." : "Export PDF"}
+          </Button>
+          <Button onClick={handleExport} disabled={isExporting}>
+            <Download className="mr-2 h-4 w-4" />
+            {isExporting ? "Exporting..." : "Export Excel"}
+          </Button>
+        </div>
       </div>
 
       {/* Report Type Tabs */}
@@ -901,102 +1093,254 @@ export function LocationReportAnalytics({
                                     }
                                     className="p-4"
                                   >
-                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                                      <div>
-                                        <p className="text-xs font-medium text-muted-foreground mb-1">
-                                          Status Breakdown
-                                        </p>
-                                        <div className="space-y-1 text-sm">
-                                          <div className="flex justify-between">
-                                            <span className="text-success">Active:</span>
-                                            <span>{item.activeCount}</span>
+                                    <div className="space-y-6">
+                                      {/* Row 1: Status, Condition, Value, Performance */}
+                                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                        <div>
+                                          <p className="text-xs font-medium text-muted-foreground mb-1">
+                                            Status Breakdown
+                                          </p>
+                                          <div className="space-y-1 text-sm">
+                                            <div className="flex justify-between">
+                                              <span className="text-success">Active:</span>
+                                              <span>{item.activeCount}</span>
+                                            </div>
+                                            <div className="flex justify-between">
+                                              <span className="text-warning">Maintenance:</span>
+                                              <span>{item.maintenanceCount}</span>
+                                            </div>
+                                            <div className="flex justify-between">
+                                              <span className="text-destructive">Inactive:</span>
+                                              <span>{item.inactiveCount}</span>
+                                            </div>
+                                            <div className="flex justify-between">
+                                              <span className="text-muted-foreground">
+                                                Disposed:
+                                              </span>
+                                              <span>{item.disposedCount}</span>
+                                            </div>
                                           </div>
-                                          <div className="flex justify-between">
-                                            <span className="text-warning">Maintenance:</span>
-                                            <span>{item.maintenanceCount}</span>
+                                        </div>
+                                        <div>
+                                          <p className="text-xs font-medium text-muted-foreground mb-1">
+                                            Condition Breakdown
+                                          </p>
+                                          <div className="space-y-1 text-sm">
+                                            <div className="flex justify-between">
+                                              <span className="text-success">Good:</span>
+                                              <span>{item.goodCondition}</span>
+                                            </div>
+                                            <div className="flex justify-between">
+                                              <span className="text-warning">Fair:</span>
+                                              <span>{item.fairCondition}</span>
+                                            </div>
+                                            <div className="flex justify-between">
+                                              <span className="text-destructive">Poor:</span>
+                                              <span>{item.poorCondition}</span>
+                                            </div>
+                                            <div className="flex justify-between">
+                                              <span className="text-destructive">
+                                                Needs Repair:
+                                              </span>
+                                              <span>{item.needsRepairCondition}</span>
+                                            </div>
                                           </div>
-                                          <div className="flex justify-between">
-                                            <span className="text-destructive">Inactive:</span>
-                                            <span>{item.inactiveCount}</span>
+                                        </div>
+                                        <div>
+                                          <p className="text-xs font-medium text-muted-foreground mb-1">
+                                            Value Metrics
+                                          </p>
+                                          <div className="space-y-1 text-sm">
+                                            <div className="flex justify-between">
+                                              <span>Total Value:</span>
+                                              <span>Rs. {item.totalValue.toLocaleString()}</span>
+                                            </div>
+                                            <div className="flex justify-between">
+                                              <span>Avg Value:</span>
+                                              <span>
+                                                Rs.{" "}
+                                                {item.assetCount > 0
+                                                  ? Math.round(
+                                                      item.totalValue / item.assetCount
+                                                    ).toLocaleString()
+                                                  : 0}
+                                              </span>
+                                            </div>
                                           </div>
-                                          <div className="flex justify-between">
-                                            <span className="text-muted-foreground">
-                                              Disposed:
-                                            </span>
-                                            <span>{item.disposedCount}</span>
+                                        </div>
+                                        <div>
+                                          <p className="text-xs font-medium text-muted-foreground mb-1">
+                                            Performance
+                                          </p>
+                                          <div className="space-y-1 text-sm">
+                                            <div className="flex justify-between">
+                                              <span>Utilization:</span>
+                                              <span>{item.utilizationRate.toFixed(1)}%</span>
+                                            </div>
+                                            <div className="flex justify-between">
+                                              <span>Good Condition:</span>
+                                              <span>
+                                                {item.assetCount > 0
+                                                  ? (
+                                                      (item.goodCondition / item.assetCount) *
+                                                      100
+                                                    ).toFixed(0)
+                                                  : 0}
+                                                %
+                                              </span>
+                                            </div>
                                           </div>
                                         </div>
                                       </div>
-                                      <div>
-                                        <p className="text-xs font-medium text-muted-foreground mb-1">
-                                          Condition Breakdown
-                                        </p>
-                                        <div className="space-y-1 text-sm">
-                                          <div className="flex justify-between">
-                                            <span className="text-success">Good:</span>
-                                            <span>{item.goodCondition}</span>
-                                          </div>
-                                          <div className="flex justify-between">
-                                            <span className="text-warning">Fair:</span>
-                                            <span>{item.fairCondition}</span>
-                                          </div>
-                                          <div className="flex justify-between">
-                                            <span className="text-destructive">Poor:</span>
-                                            <span>{item.poorCondition}</span>
-                                          </div>
-                                          <div className="flex justify-between">
-                                            <span className="text-destructive">
-                                              Needs Repair:
-                                            </span>
-                                            <span>{item.needsRepairCondition}</span>
-                                          </div>
-                                        </div>
-                                      </div>
-                                      <div>
-                                        <p className="text-xs font-medium text-muted-foreground mb-1">
-                                          Value Metrics
-                                        </p>
-                                        <div className="space-y-1 text-sm">
-                                          <div className="flex justify-between">
-                                            <span>Total Value:</span>
-                                            <span>Rs. {item.totalValue.toLocaleString()}</span>
-                                          </div>
-                                          <div className="flex justify-between">
-                                            <span>Avg Value:</span>
-                                            <span>
-                                              Rs.{" "}
-                                              {item.assetCount > 0
-                                                ? Math.round(
-                                                    item.totalValue / item.assetCount
-                                                  ).toLocaleString()
-                                                : 0}
-                                            </span>
+
+                                      {/* Row 2: Main Category Breakdown */}
+                                      {item.categoryBreakdown.length > 0 && (
+                                        <div>
+                                          <p className="text-xs font-medium text-muted-foreground mb-2 flex items-center gap-1">
+                                            <Layers className="h-3 w-3" />
+                                            Main Category Breakdown
+                                          </p>
+                                          <div className="flex flex-wrap gap-2">
+                                            {item.categoryBreakdown.slice(0, 8).map((cat) => (
+                                              <Badge
+                                                key={cat.categoryId}
+                                                variant="secondary"
+                                                className="text-xs"
+                                              >
+                                                {cat.categoryName}: {cat.assetCount}
+                                              </Badge>
+                                            ))}
+                                            {item.categoryBreakdown.length > 8 && (
+                                              <Badge variant="outline" className="text-xs">
+                                                +{item.categoryBreakdown.length - 8} more
+                                              </Badge>
+                                            )}
                                           </div>
                                         </div>
-                                      </div>
-                                      <div>
-                                        <p className="text-xs font-medium text-muted-foreground mb-1">
-                                          Performance
-                                        </p>
-                                        <div className="space-y-1 text-sm">
-                                          <div className="flex justify-between">
-                                            <span>Utilization:</span>
-                                            <span>{item.utilizationRate.toFixed(1)}%</span>
-                                          </div>
-                                          <div className="flex justify-between">
-                                            <span>Good Condition:</span>
-                                            <span>
-                                              {item.assetCount > 0
-                                                ? (
-                                                    (item.goodCondition / item.assetCount) *
-                                                    100
-                                                  ).toFixed(0)
-                                                : 0}
-                                              %
-                                            </span>
+                                      )}
+
+                                      {/* Row 3: Subcategory Analysis Table */}
+                                      {item.subcategoryBreakdown.length > 0 && (
+                                        <div>
+                                          <p className="text-xs font-medium text-muted-foreground mb-2">
+                                            Subcategory Analysis
+                                          </p>
+                                          <div className="border rounded-lg overflow-hidden">
+                                            <Table>
+                                              <TableHeader>
+                                                <TableRow className="bg-muted/50">
+                                                  <TableHead className="text-xs py-2">Subcategory</TableHead>
+                                                  <TableHead className="text-xs py-2">Category</TableHead>
+                                                  <TableHead className="text-xs py-2 text-right">Assets</TableHead>
+                                                  <TableHead className="text-xs py-2 text-right">Value</TableHead>
+                                                  <TableHead className="text-xs py-2 text-right text-success">Good</TableHead>
+                                                  <TableHead className="text-xs py-2 text-right text-warning">Fair</TableHead>
+                                                  <TableHead className="text-xs py-2 text-right text-destructive">Poor</TableHead>
+                                                </TableRow>
+                                              </TableHeader>
+                                              <TableBody>
+                                                {item.subcategoryBreakdown.slice(0, 8).map((sub) => (
+                                                  <TableRow key={sub.subcategoryId} className="text-xs">
+                                                    <TableCell className="py-1.5 font-medium">
+                                                      {sub.subcategoryName}
+                                                    </TableCell>
+                                                    <TableCell className="py-1.5 text-muted-foreground">
+                                                      {sub.parentCategoryName}
+                                                    </TableCell>
+                                                    <TableCell className="py-1.5 text-right">
+                                                      {sub.assetCount}
+                                                    </TableCell>
+                                                    <TableCell className="py-1.5 text-right">
+                                                      Rs. {sub.totalValue.toLocaleString()}
+                                                    </TableCell>
+                                                    <TableCell className="py-1.5 text-right text-success">
+                                                      {sub.goodCondition}
+                                                    </TableCell>
+                                                    <TableCell className="py-1.5 text-right text-warning">
+                                                      {sub.fairCondition}
+                                                    </TableCell>
+                                                    <TableCell className="py-1.5 text-right text-destructive">
+                                                      {sub.poorCondition + sub.needsRepair}
+                                                    </TableCell>
+                                                  </TableRow>
+                                                ))}
+                                              </TableBody>
+                                            </Table>
+                                            {item.subcategoryBreakdown.length > 8 && (
+                                              <div className="text-xs text-muted-foreground text-center py-2 border-t">
+                                                +{item.subcategoryBreakdown.length - 8} more subcategories
+                                              </div>
+                                            )}
                                           </div>
                                         </div>
-                                      </div>
+                                      )}
+
+                                      {/* Row 4: Subcategory Charts */}
+                                      {item.subcategoryBreakdown.length > 0 && (
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                          {/* Subcategories by Asset Count */}
+                                          <div className="border rounded-lg p-3">
+                                            <p className="text-xs font-medium text-muted-foreground mb-2">
+                                              Subcategories by Asset Count
+                                            </p>
+                                            <ResponsiveContainer width="100%" height={180}>
+                                              <BarChart data={item.subcategoryBreakdown.slice(0, 6)}>
+                                                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                                                <XAxis
+                                                  dataKey="subcategoryName"
+                                                  tick={{ fontSize: 9 }}
+                                                  angle={-45}
+                                                  textAnchor="end"
+                                                  height={60}
+                                                  stroke="hsl(var(--foreground))"
+                                                  tickFormatter={(v) => v.length > 10 ? v.substring(0, 10) + "..." : v}
+                                                />
+                                                <YAxis tick={{ fontSize: 9 }} stroke="hsl(var(--foreground))" />
+                                                <Tooltip
+                                                  formatter={(value: number) => [value, "Assets"]}
+                                                  contentStyle={{ fontSize: 11 }}
+                                                />
+                                                <Bar dataKey="assetCount" fill="hsl(217, 91%, 60%)" name="Assets" />
+                                              </BarChart>
+                                            </ResponsiveContainer>
+                                          </div>
+
+                                          {/* Condition Distribution by Subcategory */}
+                                          <div className="border rounded-lg p-3">
+                                            <p className="text-xs font-medium text-muted-foreground mb-2">
+                                              Condition Distribution by Subcategory
+                                            </p>
+                                            <ResponsiveContainer width="100%" height={180}>
+                                              <BarChart data={item.subcategoryBreakdown.slice(0, 6)}>
+                                                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                                                <XAxis
+                                                  dataKey="subcategoryName"
+                                                  tick={{ fontSize: 9 }}
+                                                  angle={-45}
+                                                  textAnchor="end"
+                                                  height={60}
+                                                  stroke="hsl(var(--foreground))"
+                                                  tickFormatter={(v) => v.length > 10 ? v.substring(0, 10) + "..." : v}
+                                                />
+                                                <YAxis tick={{ fontSize: 9 }} stroke="hsl(var(--foreground))" />
+                                                <Tooltip contentStyle={{ fontSize: 11 }} />
+                                                <Legend wrapperStyle={{ fontSize: 10 }} />
+                                                <Bar dataKey="goodCondition" stackId="a" fill={CONDITION_COLORS.good} name="Good" />
+                                                <Bar dataKey="fairCondition" stackId="a" fill={CONDITION_COLORS.fair} name="Fair" />
+                                                <Bar dataKey="poorCondition" stackId="a" fill={CONDITION_COLORS.poor} name="Poor" />
+                                                <Bar dataKey="needsRepair" stackId="a" fill={CONDITION_COLORS.needsRepair} name="Repair" />
+                                              </BarChart>
+                                            </ResponsiveContainer>
+                                          </div>
+                                        </div>
+                                      )}
+
+                                      {/* No subcategory data message */}
+                                      {item.subcategoryBreakdown.length === 0 && (
+                                        <div className="text-xs text-muted-foreground text-center py-2">
+                                          No subcategory data available for this location
+                                        </div>
+                                      )}
                                     </div>
                                   </TableCell>
                                 </TableRow>
