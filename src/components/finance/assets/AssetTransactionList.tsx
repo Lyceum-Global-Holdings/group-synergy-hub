@@ -7,7 +7,7 @@ import { useCompany } from "@/contexts/CompanyContext";
 import { formatCurrency } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format } from "date-fns";
-import { ArrowUpRight, ArrowDownRight, RefreshCw, Trash2 } from "lucide-react";
+import { ArrowUpRight, ArrowDownRight, RefreshCw, Trash2, MapPin } from "lucide-react";
 
 export function AssetTransactionList() {
   const { selectedCompany } = useCompany();
@@ -19,6 +19,13 @@ export function AssetTransactionList() {
         .from("asset_transactions")
         .select(`
           *,
+          warehouse_asset:warehouse_assets (
+            name,
+            asset_tag,
+            location:warehouse_locations!warehouse_assets_location_id_fkey (
+              name
+            )
+          ),
           asset_master (
             asset_name
           )
@@ -79,6 +86,8 @@ export function AssetTransactionList() {
             <TableRow>
               <TableHead>Date</TableHead>
               <TableHead>Asset</TableHead>
+              <TableHead>Tag</TableHead>
+              <TableHead>Location</TableHead>
               <TableHead>Type</TableHead>
               <TableHead>Reference</TableHead>
               <TableHead>Description</TableHead>
@@ -88,36 +97,58 @@ export function AssetTransactionList() {
           <TableBody>
             {transactions?.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center text-muted-foreground">
+                <TableCell colSpan={8} className="text-center text-muted-foreground">
                   No asset transactions recorded
                 </TableCell>
               </TableRow>
             ) : (
-              transactions?.map((txn) => (
-                <TableRow key={txn.id}>
-                  <TableCell>
-                    {format(new Date(txn.transaction_date), "dd MMM yyyy")}
-                  </TableCell>
-                  <TableCell className="font-medium">
-                    {(txn.asset_master as any)?.asset_name}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      {getTransactionIcon(txn.transaction_type)}
-                      {getTransactionBadge(txn.transaction_type)}
-                    </div>
-                  </TableCell>
-                  <TableCell className="font-mono text-sm">
-                    {txn.reference_number || "-"}
-                  </TableCell>
-                  <TableCell className="max-w-[200px] truncate">
-                    {txn.description}
-                  </TableCell>
-                  <TableCell className="text-right font-semibold">
-                    {formatCurrency(txn.amount)}
-                  </TableCell>
-                </TableRow>
-              ))
+              transactions?.map((txn) => {
+                // Prefer warehouse_asset data, fallback to asset_master for backward compatibility
+                const warehouseAsset = txn.warehouse_asset as any;
+                const assetMaster = txn.asset_master as any;
+                const assetName = warehouseAsset?.name || assetMaster?.asset_name || "Unknown Asset";
+                const assetTag = warehouseAsset?.asset_tag;
+                const location = warehouseAsset?.location as any;
+
+                return (
+                  <TableRow key={txn.id}>
+                    <TableCell>
+                      {format(new Date(txn.transaction_date), "dd MMM yyyy")}
+                    </TableCell>
+                    <TableCell className="font-medium">
+                      {assetName}
+                    </TableCell>
+                    <TableCell className="font-mono text-sm text-muted-foreground">
+                      {assetTag || "-"}
+                    </TableCell>
+                    <TableCell>
+                      {location?.name ? (
+                        <div className="flex items-center gap-1 text-sm">
+                          <MapPin className="h-3 w-3 text-muted-foreground" />
+                          <span>{location.name}</span>
+                        </div>
+                      ) : (
+                        "-"
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        {getTransactionIcon(txn.transaction_type)}
+                        {getTransactionBadge(txn.transaction_type)}
+                      </div>
+                    </TableCell>
+                    <TableCell className="font-mono text-sm">
+                      {txn.reference_number || "-"}
+                    </TableCell>
+                    <TableCell className="max-w-[200px] truncate">
+                      {txn.description}
+                    </TableCell>
+                    <TableCell className="text-right font-semibold">
+                      {formatCurrency(txn.amount)}
+                    </TableCell>
+                  </TableRow>
+                );
+              })
             )}
           </TableBody>
         </Table>

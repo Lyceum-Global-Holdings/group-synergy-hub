@@ -865,6 +865,7 @@ export type Database = {
           reference_number: string | null
           transaction_date: string
           transaction_type: string | null
+          warehouse_asset_id: string | null
         }
         Insert: {
           amount: number
@@ -878,6 +879,7 @@ export type Database = {
           reference_number?: string | null
           transaction_date: string
           transaction_type?: string | null
+          warehouse_asset_id?: string | null
         }
         Update: {
           amount?: number
@@ -891,6 +893,7 @@ export type Database = {
           reference_number?: string | null
           transaction_date?: string
           transaction_type?: string | null
+          warehouse_asset_id?: string | null
         }
         Relationships: [
           {
@@ -912,6 +915,13 @@ export type Database = {
             columns: ["journal_entry_id"]
             isOneToOne: false
             referencedRelation: "journal_entries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "asset_transactions_warehouse_asset_id_fkey"
+            columns: ["warehouse_asset_id"]
+            isOneToOne: false
+            referencedRelation: "warehouse_assets"
             referencedColumns: ["id"]
           },
         ]
@@ -6585,6 +6595,7 @@ export type Database = {
           period_id: string | null
           period_number: number | null
           posted_date: string | null
+          warehouse_asset_id: string | null
         }
         Insert: {
           accumulated_depreciation: number
@@ -6600,6 +6611,7 @@ export type Database = {
           period_id?: string | null
           period_number?: number | null
           posted_date?: string | null
+          warehouse_asset_id?: string | null
         }
         Update: {
           accumulated_depreciation?: number
@@ -6615,6 +6627,7 @@ export type Database = {
           period_id?: string | null
           period_number?: number | null
           posted_date?: string | null
+          warehouse_asset_id?: string | null
         }
         Relationships: [
           {
@@ -6643,6 +6656,13 @@ export type Database = {
             columns: ["period_id"]
             isOneToOne: false
             referencedRelation: "accounting_periods"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "depreciation_schedule_warehouse_asset_id_fkey"
+            columns: ["warehouse_asset_id"]
+            isOneToOne: false
+            referencedRelation: "warehouse_assets"
             referencedColumns: ["id"]
           },
         ]

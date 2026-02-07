@@ -22,10 +22,12 @@ interface RunDepreciationDialogProps {
 interface DepreciationPreview {
   asset_id: string;
   asset_name: string;
+  asset_tag: string | null;
   depreciation_method: string;
   current_value: number;
   depreciation_amount: number;
   new_value: number;
+  location: string | null;
 }
 
 export function RunDepreciationDialog({ open, onOpenChange }: RunDepreciationDialogProps) {
@@ -50,18 +52,32 @@ export function RunDepreciationDialog({ open, onOpenChange }: RunDepreciationDia
     enabled: !!selectedCompany?.id && open,
   });
 
-  // Get assets with depreciation setup
+  // Get assets with depreciation setup from warehouse_assets
   const { data: assets, isLoading: assetsLoading } = useQuery({
-    queryKey: ["depreciable-assets", selectedCompany?.id],
+    queryKey: ["depreciable-warehouse-assets", selectedCompany?.id],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("asset_master")
-        .select("*")
+        .from("warehouse_assets")
+        .select(`
+          *,
+          asset_master (
+            depreciation_method,
+            depreciation_rate,
+            useful_life_years,
+            salvage_value
+          ),
+          location:warehouse_locations!warehouse_assets_location_id_fkey (
+            name
+          )
+        `)
         .eq("company_id", selectedCompany?.id)
-        .eq("status", "active")
-        .not("depreciation_method", "is", null);
+        .eq("status", "active");
       if (error) throw error;
-      return data;
+      // Filter assets that have depreciation setup (either on asset itself or via asset_master)
+      return data.filter(a => {
+        const master = a.asset_master as any;
+        return a.depreciation_method || master?.depreciation_method;
+      });
     },
     enabled: !!selectedCompany?.id && open,
   });
@@ -79,9 +95,15 @@ export function RunDepreciationDialog({ open, onOpenChange }: RunDepreciationDia
       const results: DepreciationPreview[] = [];
       
       for (const asset of assets) {
+        const master = asset.asset_master as any;
+        
+        // Get depreciation parameters (prefer asset-level, fallback to master)
         const purchasePrice = asset.purchase_price || 0;
-        const salvageValue = asset.salvage_value || 0;
-        const usefulLife = asset.useful_life_years || 1;
+        const salvageValue = asset.salvage_value || master?.salvage_value || 0;
+        const usefulLife = asset.useful_life_years || master?.useful_life_years || 1;
+        const depMethod = asset.depreciation_method || master?.depreciation_method;
+        const depRate = asset.depreciation_rate || master?.depreciation_rate;
+        
         const accumulatedDep = asset.accumulated_depreciation || 0;
         const currentValue = purchasePrice - accumulatedDep;
         
@@ -89,10 +111,10 @@ export function RunDepreciationDialog({ open, onOpenChange }: RunDepreciationDia
         if (currentValue <= salvageValue) continue;
         
         let depAmount = 0;
-        if (asset.depreciation_method === "straight_line") {
+        if (depMethod === "straight_line") {
           depAmount = (purchasePrice - salvageValue) / (usefulLife * 12);
-        } else if (asset.depreciation_method === "declining_balance") {
-          const rate = asset.depreciation_rate || (2 / usefulLife);
+        } else if (depMethod === "declining_balance") {
+          const rate = depRate || (2 / usefulLife);
           depAmount = currentValue * rate / 12;
         } else {
           // Default to straight line
@@ -106,11 +128,13 @@ export function RunDepreciationDialog({ open, onOpenChange }: RunDepreciationDia
         if (depAmount > 0) {
           results.push({
             asset_id: asset.id,
-            asset_name: asset.asset_name,
-            depreciation_method: asset.depreciation_method || "straight_line",
+            asset_name: asset.name || "Unnamed Asset",
+            asset_tag: asset.asset_tag,
+            depreciation_method: depMethod || "straight_line",
             current_value: currentValue,
             depreciation_amount: depAmount,
             new_value: currentValue - depAmount,
+            location: (asset.location as any)?.name || null,
           });
         }
       }
@@ -137,9 +161,9 @@ export function RunDepreciationDialog({ open, onOpenChange }: RunDepreciationDia
         const newAccumulatedDep = (asset.accumulated_depreciation || 0) + item.depreciation_amount;
         const newCurrentValue = (asset.purchase_price || 0) - newAccumulatedDep;
 
-        // Update asset record
+        // Update warehouse_assets record
         const { error: updateError } = await supabase
-          .from("asset_master")
+          .from("warehouse_assets")
           .update({
             accumulated_depreciation: newAccumulatedDep,
             current_value: newCurrentValue,
@@ -149,11 +173,36 @@ export function RunDepreciationDialog({ open, onOpenChange }: RunDepreciationDia
 
         if (updateError) throw updateError;
 
-        // Create depreciation schedule record
+        // Also update asset_master if linked (for aggregate tracking)
+        if (asset.asset_master_id) {
+          // Get all warehouse_assets with this asset_master_id to calculate aggregates
+          const { data: relatedAssets } = await supabase
+            .from("warehouse_assets")
+            .select("purchase_price, accumulated_depreciation, current_value")
+            .eq("asset_master_id", asset.asset_master_id);
+
+          if (relatedAssets) {
+            const totalPurchase = relatedAssets.reduce((sum, a) => sum + (a.purchase_price || 0), 0);
+            const totalAccumDep = relatedAssets.reduce((sum, a) => sum + (a.accumulated_depreciation || 0), 0);
+            
+            await supabase
+              .from("asset_master")
+              .update({
+                purchase_price: totalPurchase,
+                accumulated_depreciation: totalAccumDep,
+                current_value: totalPurchase - totalAccumDep,
+                updated_at: new Date().toISOString(),
+              })
+              .eq("id", asset.asset_master_id);
+          }
+        }
+
+        // Create depreciation schedule record with warehouse_asset_id
         const { error: scheduleError } = await supabase
           .from("depreciation_schedule")
           .insert({
-            asset_id: item.asset_id,
+            warehouse_asset_id: item.asset_id,
+            asset_id: asset.asset_master_id, // Keep for backward compatibility
             period_id: selectedPeriod,
             period_date: period.end_date,
             depreciation_amount: item.depreciation_amount,
@@ -165,11 +214,12 @@ export function RunDepreciationDialog({ open, onOpenChange }: RunDepreciationDia
 
         if (scheduleError) throw scheduleError;
 
-        // Create asset transaction record
+        // Create asset transaction record with warehouse_asset_id
         const { error: txnError } = await supabase
           .from("asset_transactions")
           .insert({
-            asset_id: item.asset_id,
+            warehouse_asset_id: item.asset_id,
+            asset_id: asset.asset_master_id, // Keep for backward compatibility
             transaction_type: "depreciation",
             transaction_date: period.end_date,
             amount: item.depreciation_amount,
@@ -183,10 +233,13 @@ export function RunDepreciationDialog({ open, onOpenChange }: RunDepreciationDia
       return { count: preview.length };
     },
     onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["warehouse_assets"] });
       queryClient.invalidateQueries({ queryKey: ["asset_master"] });
       queryClient.invalidateQueries({ queryKey: ["depreciation_schedule"] });
       queryClient.invalidateQueries({ queryKey: ["asset_transactions"] });
-      queryClient.invalidateQueries({ queryKey: ["depreciable-assets"] });
+      queryClient.invalidateQueries({ queryKey: ["depreciable-warehouse-assets"] });
+      queryClient.invalidateQueries({ queryKey: ["fixed-assets"] });
+      queryClient.invalidateQueries({ queryKey: ["fixed-assets-summary"] });
       toast.success(`Depreciation posted for ${data.count} assets`);
       onOpenChange(false);
       setShowPreview(false);
@@ -214,11 +267,11 @@ export function RunDepreciationDialog({ open, onOpenChange }: RunDepreciationDia
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
+      <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Run Depreciation</DialogTitle>
           <DialogDescription>
-            Calculate and post depreciation for all active fixed assets
+            Calculate and post depreciation for all active physical assets
           </DialogDescription>
         </DialogHeader>
         
@@ -288,6 +341,8 @@ export function RunDepreciationDialog({ open, onOpenChange }: RunDepreciationDia
                   <TableHeader>
                     <TableRow>
                       <TableHead>Asset</TableHead>
+                      <TableHead>Tag</TableHead>
+                      <TableHead>Location</TableHead>
                       <TableHead>Method</TableHead>
                       <TableHead className="text-right">Current Value</TableHead>
                       <TableHead className="text-right">Depreciation</TableHead>
@@ -298,6 +353,12 @@ export function RunDepreciationDialog({ open, onOpenChange }: RunDepreciationDia
                     {preview.map((item) => (
                       <TableRow key={item.asset_id}>
                         <TableCell className="font-medium">{item.asset_name}</TableCell>
+                        <TableCell className="font-mono text-sm text-muted-foreground">
+                          {item.asset_tag || "-"}
+                        </TableCell>
+                        <TableCell className="text-sm">
+                          {item.location || "-"}
+                        </TableCell>
                         <TableCell className="capitalize text-muted-foreground">
                           {item.depreciation_method?.replace("_", " ")}
                         </TableCell>

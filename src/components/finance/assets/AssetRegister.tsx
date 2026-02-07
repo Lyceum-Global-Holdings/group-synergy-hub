@@ -7,7 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useCompany } from "@/contexts/CompanyContext";
 import { formatCurrency } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Eye, Edit, Package } from "lucide-react";
+import { Eye, Edit, Package, MapPin } from "lucide-react";
 import { format } from "date-fns";
 
 export function AssetRegister() {
@@ -17,10 +17,24 @@ export function AssetRegister() {
     queryKey: ["fixed-assets", selectedCompany?.id],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("asset_master")
+        .from("warehouse_assets")
         .select(`
           *,
-          asset_categories (
+          asset_master (
+            asset_name,
+            image_url,
+            depreciation_method,
+            depreciation_rate,
+            useful_life_years,
+            salvage_value
+          ),
+          category:asset_categories!warehouse_assets_category_id_fkey (
+            name
+          ),
+          location:warehouse_locations!warehouse_assets_location_id_fkey (
+            name
+          ),
+          sublocation:warehouse_locations!warehouse_assets_sublocation_id_fkey (
             name
           )
         `)
@@ -62,7 +76,9 @@ export function AssetRegister() {
           <TableHeader>
             <TableRow>
               <TableHead>Asset Name</TableHead>
+              <TableHead>Asset Tag</TableHead>
               <TableHead>Category</TableHead>
+              <TableHead>Location</TableHead>
               <TableHead>Purchase Date</TableHead>
               <TableHead className="text-right">Purchase Price</TableHead>
               <TableHead className="text-right">Accum. Depreciation</TableHead>
@@ -74,10 +90,11 @@ export function AssetRegister() {
           <TableBody>
             {assets?.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8} className="text-center text-muted-foreground">
+                <TableCell colSpan={10} className="text-center text-muted-foreground">
                   <div className="flex flex-col items-center py-8">
                     <Package className="h-12 w-12 text-muted-foreground/50 mb-2" />
                     <p>No fixed assets registered</p>
+                    <p className="text-sm mt-1">Add assets in Warehouse → Asset Management</p>
                   </div>
                 </TableCell>
               </TableRow>
@@ -86,18 +103,38 @@ export function AssetRegister() {
                 const purchasePrice = Number(asset.purchase_price) || 0;
                 const accumDepr = Number(asset.accumulated_depreciation) || 0;
                 const netBookValue = purchasePrice - accumDepr;
+                const assetMaster = asset.asset_master as any;
+                const category = asset.category as any;
+                const location = asset.location as any;
+                const sublocation = asset.sublocation as any;
 
                 return (
                   <TableRow key={asset.id}>
                     <TableCell className="font-medium">
                       <div>
-                        <div>{asset.asset_name}</div>
+                        <div>{asset.name || assetMaster?.asset_name}</div>
                         {asset.brand && (
                           <div className="text-sm text-muted-foreground">{asset.brand}</div>
                         )}
                       </div>
                     </TableCell>
-                    <TableCell>{(asset.asset_categories as any)?.name || "-"}</TableCell>
+                    <TableCell className="font-mono text-sm">
+                      {asset.asset_tag || "-"}
+                    </TableCell>
+                    <TableCell>{category?.name || "-"}</TableCell>
+                    <TableCell>
+                      {location?.name || sublocation?.name ? (
+                        <div className="flex items-center gap-1 text-sm">
+                          <MapPin className="h-3 w-3 text-muted-foreground" />
+                          <span>{location?.name}</span>
+                          {sublocation?.name && (
+                            <span className="text-muted-foreground">/ {sublocation.name}</span>
+                          )}
+                        </div>
+                      ) : (
+                        "-"
+                      )}
+                    </TableCell>
                     <TableCell>
                       {asset.purchase_date
                         ? format(new Date(asset.purchase_date), "dd MMM yyyy")
