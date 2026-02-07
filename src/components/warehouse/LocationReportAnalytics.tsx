@@ -1607,7 +1607,7 @@ export function LocationReportAnalytics({
                                                 </TableRow>
                                               </TableHeader>
                                               <TableBody>
-                                                {item.assetMasterBreakdown.slice(0, 15).map((am) => (
+                                                {item.assetMasterBreakdown.map((am) => (
                                                   <TableRow key={am.assetMasterId} className="text-xs">
                                                     <TableCell className="py-1.5 font-medium">{am.assetMasterName}</TableCell>
                                                     <TableCell className="py-1.5 text-muted-foreground">{am.brand || "—"}</TableCell>
@@ -1622,11 +1622,6 @@ export function LocationReportAnalytics({
                                                 ))}
                                               </TableBody>
                                             </Table>
-                                            {item.assetMasterBreakdown.length > 15 && (
-                                              <div className="text-xs text-muted-foreground text-center py-2 border-t">
-                                                +{item.assetMasterBreakdown.length - 15} more items
-                                              </div>
-                                            )}
                                           </div>
                                         </div>
                                       )}
