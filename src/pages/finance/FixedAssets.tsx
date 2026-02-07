@@ -1,16 +1,18 @@
 import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { Plus, Package, Calculator, ArrowRightLeft, FileText, Download, Play } from "lucide-react";
+import { Plus, Package, Calculator, ArrowRightLeft, FileText, Download, Play, MapPin } from "lucide-react";
 import { AssetRegister } from "@/components/finance/assets/AssetRegister";
 import { DepreciationScheduleView } from "@/components/finance/assets/DepreciationScheduleView";
 import { AssetTransactionList } from "@/components/finance/assets/AssetTransactionList";
 import { AssetReports } from "@/components/finance/assets/AssetReports";
 import { RunDepreciationDialog } from "@/components/finance/assets/RunDepreciationDialog";
+import { AssetLocationReportDialog } from "@/components/finance/assets/AssetLocationReportDialog";
 
 export default function FixedAssets() {
   const [activeTab, setActiveTab] = useState("register");
   const [showDepreciationDialog, setShowDepreciationDialog] = useState(false);
+  const [showLocationReportDialog, setShowLocationReportDialog] = useState(false);
 
   return (
     <div className="container mx-auto p-6 space-y-6">
@@ -22,6 +24,10 @@ export default function FixedAssets() {
           </p>
         </div>
         <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={() => setShowLocationReportDialog(true)}>
+            <MapPin className="h-4 w-4 mr-2" />
+            Location Report
+          </Button>
           <Button variant="outline" size="sm">
             <Download className="h-4 w-4 mr-2" />
             Export
@@ -73,6 +79,11 @@ export default function FixedAssets() {
       <RunDepreciationDialog 
         open={showDepreciationDialog} 
         onOpenChange={setShowDepreciationDialog} 
+      />
+
+      <AssetLocationReportDialog
+        open={showLocationReportDialog}
+        onOpenChange={setShowLocationReportDialog}
       />
     </div>
   );
