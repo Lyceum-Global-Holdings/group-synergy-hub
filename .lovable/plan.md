@@ -1,214 +1,167 @@
 
-# Plan: Add Location/Sub-Location/Department Analytics with Charts
+# Implementation Plan: Location Reports Analytics
 
 ## Overview
-Transform the current Excel-only report functionality into a full analytics dashboard with interactive charts, KPIs, and visual insights for location, sub-location, and department-wise asset distribution.
+Add a comprehensive analytics dashboard for location, sub-location, and department-wise asset reporting to the Warehouse Asset Management module. This replaces the standalone "Reports" button with a dedicated tab featuring interactive charts, KPIs, and Excel export.
 
 ## Current State
-| Component | Purpose |
-|-----------|---------|
-| `AssetAnalytics.tsx` | General asset analytics with status, condition, category, location charts |
-| `SubcategoryAnalytics.tsx` | Detailed subcategory breakdown with hierarchical view |
-| `WarehouseAssetReportDialog.tsx` | Excel export only (no visualizations) |
+- **5 tabs** in Asset Management: Assets List, Asset Master, Asset Requests, Analytics, Subcategory Analytics
+- **Reports button** in header opens `WarehouseAssetReportDialog` (Excel export only)
+- **Existing analytics** use recharts with KPI cards, pie charts, and bar charts
 
-## Proposed Solution
-Create a new analytics component `LocationReportAnalytics.tsx` that replaces the Excel-only dialog with a comprehensive analytics view featuring:
-- Interactive charts for location/sublocation/department distribution
-- Drill-down capability
-- Filters with cascading dependencies
-- KPI summary cards
-- Export functionality
+## Changes Summary
+
+| Action | File | Description |
+|--------|------|-------------|
+| Create | `src/components/warehouse/LocationReportAnalytics.tsx` | New analytics component with charts and filters |
+| Modify | `src/pages/warehouse/AssetManagement.tsx` | Add 6th tab, remove Reports button from header |
+| Modify | `src/hooks/useWarehouseAssetReport.ts` | Add aggregation functions for analytics |
 
 ---
 
-## Files to Create
+## File 1: LocationReportAnalytics.tsx (NEW)
 
-### 1. `src/components/warehouse/LocationReportAnalytics.tsx`
-New analytics component with:
-
-**KPI Cards:**
-- Total assets across locations
-- Total value by location hierarchy
-- Top location by asset count
-- Utilization metrics
-
-**Charts:**
-- **Bar Chart**: Asset count by location/sublocation/department
-- **Pie Chart**: Value distribution across selected hierarchy level
-- **Stacked Bar Chart**: Status distribution by location
-- **Horizontal Bar Chart**: Top 10 locations by asset value
-
-**Features:**
-- Tab-based view: Location-wise | Sub-location-wise | Department-wise
-- Cascading filter dropdowns (same as report dialog)
-- Drill-down from location to sublocation to department
-- Export current view to Excel
-
----
-
-## Files to Modify
-
-### 2. `src/pages/warehouse/AssetManagement.tsx`
-
-**Changes:**
-1. Add new tab "Location Reports" in the tabs list
-2. Import and render `LocationReportAnalytics` component
-3. Remove the "Reports" button from header (functionality moves to tab)
-4. Remove `WarehouseAssetReportDialog` import and usage
-
-**Tab Structure After Change:**
-```text
-[Assets List] [Asset Master] [Asset Requests] [Analytics] [Subcategory Analytics] [Location Reports]
-                                                                                    ^^^^^^^^^^^^^^^^
-                                                                                    New tab
-```
-
----
-
-## Component Structure
-
-### LocationReportAnalytics.tsx
+### Component Structure
 
 ```text
 +------------------------------------------------------------------+
-| Location Reports                                                  |
+| Location Reports                                     [Export]    |
 +------------------------------------------------------------------+
-| [Location-wise] [Sub-Location-wise] [Department-wise]  [Export]  |
+| [Location-wise] [Sub-Location-wise] [Department-wise]            |
 +------------------------------------------------------------------+
-| Filters:                                                          |
-| Location: [All v]  Sub-Loc: [All v]  Dept: [All v]  Status: [All v]
+| Filters: [Location v] [Sub-Location v] [Department v] [Status v] |
 +------------------------------------------------------------------+
-| KPI Cards Row:                                                    |
+| KPI Cards:                                                       |
 | [Total Assets] [Total Value] [Top Location] [Avg Value/Location] |
 +------------------------------------------------------------------+
-| Charts Grid:                                                      |
-| +-----------------------------+ +-----------------------------+  |
-| |  Asset Count by Location    | |  Value Distribution (Pie)   |  |
-| |  (Bar Chart)                | |                             |  |
-| +-----------------------------+ +-----------------------------+  |
-| +-----------------------------+ +-----------------------------+  |
-| |  Status by Location         | |  Top 10 by Value           |  |
-| |  (Stacked Bar)              | |  (Horizontal Bar)          |  |
-| +-----------------------------+ +-----------------------------+  |
+| Charts (2x2 Grid):                                               |
+| +---------------------------+ +---------------------------+      |
+| | Asset Count by Location   | | Value Distribution (Pie)  |      |
+| | (Bar Chart)               | |                           |      |
+| +---------------------------+ +---------------------------+      |
+| +---------------------------+ +---------------------------+      |
+| | Status by Location        | | Top 10 by Value          |      |
+| | (Stacked Bar)             | | (Horizontal Bar)         |      |
+| +---------------------------+ +---------------------------+      |
 +------------------------------------------------------------------+
-| Detailed Table (collapsible):                                     |
-| Location | Assets | Value | Active | Maintenance | Good | Fair   |
+| Detailed Data Table (Collapsible)                                |
 +------------------------------------------------------------------+
 ```
 
----
+### Key Features
+1. **Tab-based report type selection** - Location, Sub-location, Department
+2. **Cascading filters** - Sub-location depends on Location, Department depends on Sub-location
+3. **Four chart visualizations** using recharts (matching existing patterns)
+4. **KPI summary cards** - Total assets, value, top location, utilization
+5. **Export to Excel** - Reuses existing `writeExcelFromJSON` utility
+6. **Collapsible data table** - Shows detailed breakdown
 
-## Technical Implementation
-
-### Data Processing Logic
-
+### Props Interface
 ```typescript
-interface LocationAnalyticsData {
-  // For bar charts
-  locationDistribution: {
-    name: string;
-    assetCount: number;
-    totalValue: number;
-    activeCount: number;
-    maintenanceCount: number;
-  }[];
-  
-  // For pie chart
-  valueDistribution: {
-    name: string;
-    value: number;
-    color: string;
-  }[];
-  
-  // KPIs
-  kpis: {
-    totalAssets: number;
-    totalValue: number;
-    topLocation: string;
-    avgValuePerLocation: number;
-    utilizationRate: number;
-  };
-  
-  // Detailed data for table/export
-  detailedData: {
-    location: string;
-    sublocation?: string;
-    department?: string;
-    assetCount: number;
-    totalValue: number;
-    statusBreakdown: Record<string, number>;
-    conditionBreakdown: Record<string, number>;
-  }[];
+interface LocationReportAnalyticsProps {
+  assets: WarehouseAsset[];
+  locations: WarehouseLocation[];
+  categories: AssetCategory[];
 }
 ```
 
-### Chart Components Used
-- `BarChart` from recharts - Asset count distribution
-- `PieChart` from recharts - Value distribution  
-- `LineChart` from recharts - Trends if applicable
-- Custom stacked bar for status breakdown
+### Data Aggregation Logic
+- Group assets by location/sublocation/department based on selected tab
+- Calculate: asset count, total value, status breakdown, condition breakdown
+- Derive: utilization rate, average value per location
 
 ---
 
-## User Flow
+## File 2: AssetManagement.tsx (MODIFY)
 
-```text
-1. User navigates to Asset Management
-            |
-            v
-2. Clicks "Location Reports" tab
-            |
-            v
-3. Sees Location-wise analytics (default)
-   - KPI cards with totals
-   - Bar chart showing assets per location
-   - Pie chart showing value distribution
-   - Status breakdown chart
-            |
-            v
-4. User can:
-   - Switch to Sub-Location or Department view
-   - Apply filters (location, status, condition)
-   - Click on chart element for drill-down
-   - Export current filtered data to Excel
+### Changes
+
+1. **Import new component**
+```typescript
+import { LocationReportAnalytics } from "@/components/warehouse/LocationReportAnalytics";
 ```
 
+2. **Update TabsList** - Change from 5 columns to 6
+```typescript
+// Line 867: Change grid-cols-5 to grid-cols-6
+<TabsList className="grid w-full grid-cols-6">
+```
+
+3. **Add new tab trigger**
+```typescript
+<TabsTrigger value="location-reports" className="flex items-center gap-2">
+  <MapPin className="h-4 w-4" />
+  Location Reports
+</TabsTrigger>
+```
+
+4. **Add new TabsContent**
+```typescript
+<TabsContent value="location-reports" className="mt-6">
+  <LocationReportAnalytics 
+    assets={assets}
+    locations={locations}
+    categories={[...mainCategories, ...mainCategories.flatMap(cat => getSubcategories(cat.id))]}
+  />
+</TabsContent>
+```
+
+5. **Remove Reports button from header** (Lines 442-445)
+- Delete the Reports button and related state
+- Keep `WarehouseAssetReportDialog` since export functionality will be inside the new component
+
 ---
 
-## Filter Behavior
+## File 3: useWarehouseAssetReport.ts (MODIFY)
 
-| View | Available Filters |
-|------|-------------------|
-| Location-wise | Status, Condition, Category |
-| Sub-Location-wise | Location, Status, Condition, Category |
-| Department-wise | Location, Sub-Location, Status, Condition, Category |
+### Add Aggregation Function
 
-Cascading logic:
-- Selecting Location enables Sub-Location filter
-- Selecting Sub-Location enables Department filter
+```typescript
+export interface LocationAnalyticsData {
+  locationId: string;
+  locationName: string;
+  sublocationName?: string;
+  departmentName?: string;
+  assetCount: number;
+  totalValue: number;
+  activeCount: number;
+  maintenanceCount: number;
+  inactiveCount: number;
+  disposedCount: number;
+  goodCondition: number;
+  fairCondition: number;
+  poorCondition: number;
+}
+
+const fetchAnalytics = async (
+  groupBy: 'location' | 'sublocation' | 'department',
+  filters: Partial<WarehouseAssetReportFilters>
+): Promise<LocationAnalyticsData[]>
+```
+
+This function aggregates data for chart visualizations.
 
 ---
 
-## Charts Specification
+## Chart Specifications
 
 ### 1. Asset Count by Location (Bar Chart)
-- X-axis: Location names
+- X-axis: Location/Sublocation/Department names
 - Y-axis: Asset count
-- Color: Primary theme color
-- Tooltip: Shows count and percentage
+- Color: Primary theme color (hsl(217, 91%, 60%))
 
-### 2. Value Distribution (Pie Chart)
+### 2. Value Distribution (Pie Chart)  
 - Segments: Top 8 locations + "Others"
-- Labels: Location name + percentage
-- Colors: Theme color palette
+- Labels: Name + percentage
+- Colors: COLORS array from existing analytics
 
-### 3. Status Distribution by Location (Stacked Bar)
+### 3. Status Distribution (Stacked Bar)
 - X-axis: Location names
 - Y-axis: Asset count
 - Stacks: Active (green), Maintenance (yellow), Inactive (red), Disposed (gray)
 
 ### 4. Top Locations by Value (Horizontal Bar)
-- Y-axis: Location names (top 10)
+- Y-axis: Top 10 location names
 - X-axis: Total value
 - Sorted descending
 
@@ -216,39 +169,39 @@ Cascading logic:
 
 ## Implementation Order
 
-1. Create `LocationReportAnalytics.tsx` component with:
-   - Tab-based report type selection
-   - Filter dropdowns
-   - KPI cards
-   - Charts using recharts
-   - Data table with expandable rows
-   - Export button
+1. **Modify `useWarehouseAssetReport.ts`**
+   - Add `fetchAnalytics` function
+   - Add `LocationAnalyticsData` interface
 
-2. Modify `AssetManagement.tsx`:
-   - Add new tab for "Location Reports"
-   - Import and render new component
-   - Keep Reports dialog as backup for quick exports (optional)
+2. **Create `LocationReportAnalytics.tsx`**
+   - Build component structure with tabs
+   - Add cascading filter dropdowns
+   - Implement KPI cards
+   - Add chart visualizations
+   - Add export button
+   - Add collapsible data table
 
-3. Update `useWarehouseAssetReport.ts` hook:
-   - Add aggregation functions for analytics
-   - Return both raw data and aggregated statistics
-
----
-
-## Dependencies
-- `recharts` (already installed)
-- `@/components/ui/card`
-- `@/components/ui/tabs`
-- `@/components/ui/select`
-- `@/hooks/useWarehouseAssets`
-- `@/hooks/useWarehouseLocations`
-- `@/utils/excelUtils`
+3. **Modify `AssetManagement.tsx`**
+   - Import new component
+   - Change grid to 6 columns
+   - Add new tab trigger and content
+   - Remove Reports button from header
+   - Remove report dialog state (keep dialog for export functionality within new component)
 
 ---
 
-## Benefits
-1. Visual insights instead of just Excel exports
-2. Interactive drill-down capability
-3. Real-time filtering with instant chart updates
-4. Consistent with existing analytics patterns (AssetAnalytics, SubcategoryAnalytics)
-5. Export still available for detailed reporting needs
+## Technical Dependencies
+- `recharts` - Already installed (BarChart, PieChart, etc.)
+- `@/components/ui/card` - KPI cards
+- `@/components/ui/tabs` - Report type selection
+- `@/components/ui/select` - Filter dropdowns
+- `@/utils/excelUtils` - Excel export
+- `date-fns` - Date formatting
+
+---
+
+## Visual Consistency
+The new component will follow existing patterns from:
+- `AssetAnalytics.tsx` - KPI cards layout, chart styling, color scheme
+- `SubcategoryAnalytics.tsx` - Collapsible sections, status/condition breakdowns
+- `WarehouseAssetReportDialog.tsx` - Filter logic, cascading dropdowns
