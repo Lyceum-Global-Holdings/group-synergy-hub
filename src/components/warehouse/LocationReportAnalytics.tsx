@@ -51,6 +51,7 @@ import {
 import { WarehouseAsset, WarehouseLocation, AssetCategory } from "@/types/warehouse";
 import { toast } from "@/hooks/use-toast";
 import { writeExcelFromJSON } from "@/utils/excelUtils";
+import { jsPDF } from "jspdf";
 import {
   exportLocationReportPdf,
   LocationReportData,
@@ -128,6 +129,7 @@ export function LocationReportAnalytics({
   const [isExporting, setIsExporting] = useState(false);
   const [isExportingPdf, setIsExportingPdf] = useState(false);
   const [isCapturing, setIsCapturing] = useState<string | null>(null);
+  const [isCapturingPdf, setIsCapturingPdf] = useState<string | null>(null);
   
   // Refs for capturing location detail sections
   const detailRefs = useRef<Record<string, HTMLDivElement | null>>({});
@@ -172,6 +174,95 @@ export function LocationReportAnalytics({
       });
     } finally {
       setIsCapturing(null);
+    }
+  }, []);
+
+  // Function to capture expanded section as PDF
+  const handleCaptureAsPdf = useCallback(async (locationId: string, locationName: string) => {
+    const element = detailRefs.current[locationId];
+    if (!element) {
+      toast({
+        title: "Capture Failed",
+        description: "Could not find the section to capture.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsCapturingPdf(locationId);
+    try {
+      const canvas = await html2canvas(element, {
+        backgroundColor: "#ffffff",
+        scale: 2,
+        useCORS: true,
+        logging: false,
+      });
+      
+      const imgData = canvas.toDataURL("image/png");
+      const imgWidth = canvas.width;
+      const imgHeight = canvas.height;
+      
+      // Calculate PDF dimensions (A4 landscape for better fit)
+      const pdfWidth = 297; // A4 landscape width in mm
+      const pdfHeight = 210; // A4 landscape height in mm
+      const margin = 10;
+      
+      // Calculate scale to fit image within PDF page
+      const availableWidth = pdfWidth - (margin * 2);
+      const availableHeight = pdfHeight - (margin * 2);
+      const scale = Math.min(availableWidth / (imgWidth / 3.78), availableHeight / (imgHeight / 3.78));
+      
+      const scaledWidth = (imgWidth / 3.78) * scale;
+      const scaledHeight = (imgHeight / 3.78) * scale;
+      
+      const doc = new jsPDF({
+        orientation: scaledWidth > scaledHeight ? "landscape" : "portrait",
+        unit: "mm",
+        format: "a4",
+      });
+      
+      // Center the image on the page
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      const x = (pageWidth - scaledWidth) / 2;
+      const y = margin;
+      
+      // Add title
+      doc.setFontSize(16);
+      doc.setFont("helvetica", "bold");
+      doc.text(`${locationName} - Asset Report`, pageWidth / 2, margin, { align: "center" });
+      
+      // Add the captured image
+      doc.addImage(imgData, "PNG", x, y + 10, scaledWidth, scaledHeight);
+      
+      // Add footer
+      doc.setFontSize(8);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(128, 128, 128);
+      doc.text(
+        `Generated: ${new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}`,
+        pageWidth / 2,
+        pageHeight - 5,
+        { align: "center" }
+      );
+      
+      // Save the PDF
+      const fileName = `${locationName.replace(/\s+/g, "_")}_Report_${new Date().toISOString().split("T")[0]}.pdf`;
+      doc.save(fileName);
+      
+      toast({
+        title: "Download Complete",
+        description: `Location report saved as PDF.`,
+      });
+    } catch (error) {
+      console.error("PDF capture error:", error);
+      toast({
+        title: "Capture Failed",
+        description: "Failed to generate PDF. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsCapturingPdf(null);
     }
   }, []);
 
@@ -1228,16 +1319,28 @@ export function LocationReportAnalytics({
                                             Assets: {item.assetCount} | Value: Rs. {item.totalValue.toLocaleString()} | Utilization: {item.utilizationRate.toFixed(0)}%
                                           </p>
                                         </div>
-                                        <Button
-                                          variant="outline"
-                                          size="sm"
-                                          onClick={() => handleCaptureAsJpg(item.id, item.name)}
-                                          disabled={isCapturing === item.id}
-                                          className="gap-2"
-                                        >
-                                          <Camera className="h-4 w-4" />
-                                          {isCapturing === item.id ? "Capturing..." : "Download JPG"}
-                                        </Button>
+                                        <div className="flex gap-2">
+                                          <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => handleCaptureAsJpg(item.id, item.name)}
+                                            disabled={isCapturing === item.id || isCapturingPdf === item.id}
+                                            className="gap-2"
+                                          >
+                                            <Camera className="h-4 w-4" />
+                                            {isCapturing === item.id ? "Capturing..." : "JPG"}
+                                          </Button>
+                                          <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => handleCaptureAsPdf(item.id, item.name)}
+                                            disabled={isCapturing === item.id || isCapturingPdf === item.id}
+                                            className="gap-2"
+                                          >
+                                            <FileText className="h-4 w-4" />
+                                            {isCapturingPdf === item.id ? "Generating..." : "PDF"}
+                                          </Button>
+                                        </div>
                                       </div>
                                       
                                       {/* Row 1: Status, Condition, Value, Performance */}
