@@ -6,7 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useCompany } from "@/contexts/CompanyContext";
 import { formatCurrency } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
-import { format } from "date-fns";
+import { MapPin } from "lucide-react";
 
 export function DepreciationScheduleView() {
   const { selectedCompany } = useCompany();
@@ -18,6 +18,14 @@ export function DepreciationScheduleView() {
         .from("depreciation_schedule")
         .select(`
           *,
+          warehouse_asset:warehouse_assets (
+            name,
+            asset_tag,
+            purchase_price,
+            location:warehouse_locations!warehouse_assets_location_id_fkey (
+              name
+            )
+          ),
           asset_master (
             asset_name,
             purchase_price
@@ -51,6 +59,8 @@ export function DepreciationScheduleView() {
           <TableHeader>
             <TableRow>
               <TableHead>Asset</TableHead>
+              <TableHead>Asset Tag</TableHead>
+              <TableHead>Location</TableHead>
               <TableHead>Period</TableHead>
               <TableHead className="text-right">Original Cost</TableHead>
               <TableHead className="text-right">Depreciation</TableHead>
@@ -62,38 +72,61 @@ export function DepreciationScheduleView() {
           <TableBody>
             {schedule?.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center text-muted-foreground">
+                <TableCell colSpan={9} className="text-center text-muted-foreground">
                   No depreciation schedule entries. Run depreciation to generate schedule.
                 </TableCell>
               </TableRow>
             ) : (
-              schedule?.map((entry) => (
-                <TableRow key={entry.id}>
-                  <TableCell className="font-medium">
-                    {(entry.asset_master as any)?.asset_name}
-                  </TableCell>
-                  <TableCell>
-                    {(entry.accounting_periods as any)?.period_name || "-"}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    {formatCurrency((entry.asset_master as any)?.purchase_price || 0)}
-                  </TableCell>
-                  <TableCell className="text-right text-destructive">
-                    ({formatCurrency(entry.depreciation_amount || 0)})
-                  </TableCell>
-                  <TableCell className="text-right">
-                    {formatCurrency(entry.accumulated_depreciation || 0)}
-                  </TableCell>
-                  <TableCell className="text-right font-semibold">
-                    {formatCurrency(entry.book_value || 0)}
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={entry.is_posted ? "default" : "secondary"}>
-                      {entry.is_posted ? "Posted" : "Pending"}
-                    </Badge>
-                  </TableCell>
-                </TableRow>
-              ))
+              schedule?.map((entry) => {
+                // Prefer warehouse_asset data, fallback to asset_master for backward compatibility
+                const warehouseAsset = entry.warehouse_asset as any;
+                const assetMaster = entry.asset_master as any;
+                const assetName = warehouseAsset?.name || assetMaster?.asset_name || "Unknown Asset";
+                const assetTag = warehouseAsset?.asset_tag;
+                const purchasePrice = warehouseAsset?.purchase_price || assetMaster?.purchase_price || 0;
+                const location = warehouseAsset?.location as any;
+
+                return (
+                  <TableRow key={entry.id}>
+                    <TableCell className="font-medium">
+                      {assetName}
+                    </TableCell>
+                    <TableCell className="font-mono text-sm text-muted-foreground">
+                      {assetTag || "-"}
+                    </TableCell>
+                    <TableCell>
+                      {location?.name ? (
+                        <div className="flex items-center gap-1 text-sm">
+                          <MapPin className="h-3 w-3 text-muted-foreground" />
+                          <span>{location.name}</span>
+                        </div>
+                      ) : (
+                        "-"
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {(entry.accounting_periods as any)?.period_name || "-"}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {formatCurrency(purchasePrice)}
+                    </TableCell>
+                    <TableCell className="text-right text-destructive">
+                      ({formatCurrency(entry.depreciation_amount || 0)})
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {formatCurrency(entry.accumulated_depreciation || 0)}
+                    </TableCell>
+                    <TableCell className="text-right font-semibold">
+                      {formatCurrency(entry.book_value || 0)}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={entry.is_posted ? "default" : "secondary"}>
+                        {entry.is_posted ? "Posted" : "Pending"}
+                      </Badge>
+                    </TableCell>
+                  </TableRow>
+                );
+              })
             )}
           </TableBody>
         </Table>

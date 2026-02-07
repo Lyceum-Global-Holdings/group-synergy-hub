@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useCompany } from "@/contexts/CompanyContext";
 import { formatCurrency } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Package, TrendingDown, DollarSign, AlertTriangle } from "lucide-react";
+import { Package, TrendingDown, DollarSign, AlertTriangle, MapPin } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid } from "recharts";
 
 const COLORS = ["hsl(var(--primary))", "hsl(var(--chart-2))", "hsl(var(--chart-3))", "hsl(var(--chart-4))", "hsl(var(--chart-5))"];
@@ -16,14 +16,36 @@ export function AssetReports() {
     queryKey: ["fixed-assets-summary", selectedCompany?.id],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("asset_master")
+        .from("warehouse_assets")
         .select(`
           *,
-          asset_categories (
+          asset_master (
+            asset_name
+          ),
+          category:asset_categories!warehouse_assets_category_id_fkey (
+            name
+          ),
+          location:warehouse_locations!warehouse_assets_location_id_fkey (
             name
           )
         `)
         .eq("company_id", selectedCompany?.id);
+
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!selectedCompany?.id,
+  });
+
+  // Fetch depreciation history for trend chart
+  const { data: depreciationHistory } = useQuery({
+    queryKey: ["depreciation-history", selectedCompany?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("depreciation_schedule")
+        .select("depreciation_amount, created_at, accounting_periods:period_id(period_name, fiscal_year)")
+        .eq("company_id", selectedCompany?.id)
+        .order("created_at", { ascending: true });
 
       if (error) throw error;
       return data;
@@ -42,29 +64,47 @@ export function AssetReports() {
   const fullyDepreciated = assets?.filter((a) => {
     const cost = Number(a.purchase_price) || 0;
     const depr = Number(a.accumulated_depreciation) || 0;
-    return depr >= cost;
+    return depr >= cost && cost > 0;
   }).length || 0;
 
   // Group by category
   const categoryData = assets?.reduce((acc, asset) => {
-    const category = (asset.asset_categories as any)?.name || "Uncategorized";
+    const category = (asset.category as any)?.name || "Uncategorized";
     if (!acc[category]) {
-      acc[category] = { name: category, value: 0 };
+      acc[category] = { name: category, value: 0, count: 0 };
     }
     acc[category].value += Number(asset.purchase_price) || 0;
+    acc[category].count += 1;
     return acc;
-  }, {} as Record<string, { name: string; value: number }>);
+  }, {} as Record<string, { name: string; value: number; count: number }>);
 
   const pieData = Object.values(categoryData || {});
 
-  // Depreciation by year (sample)
-  const depreciationTrend = [
-    { year: "2020", depreciation: 45000 },
-    { year: "2021", depreciation: 52000 },
-    { year: "2022", depreciation: 58000 },
-    { year: "2023", depreciation: 65000 },
-    { year: "2024", depreciation: 72000 },
-  ];
+  // Group by location
+  const locationData = assets?.reduce((acc, asset) => {
+    const location = (asset.location as any)?.name || "Unassigned";
+    if (!acc[location]) {
+      acc[location] = { name: location, value: 0, count: 0 };
+    }
+    acc[location].value += Number(asset.purchase_price) || 0;
+    acc[location].count += 1;
+    return acc;
+  }, {} as Record<string, { name: string; value: number; count: number }>);
+
+  const locationPieData = Object.values(locationData || {});
+
+  // Process depreciation trend data
+  const depreciationTrend = depreciationHistory?.reduce((acc, entry) => {
+    const period = entry.accounting_periods as any;
+    const year = period?.fiscal_year?.toString() || "Unknown";
+    if (!acc[year]) {
+      acc[year] = { year, depreciation: 0 };
+    }
+    acc[year].depreciation += Number(entry.depreciation_amount) || 0;
+    return acc;
+  }, {} as Record<string, { year: string; depreciation: number }>);
+
+  const trendData = Object.values(depreciationTrend || {}).slice(-5);
 
   return (
     <div className="space-y-6">
@@ -76,7 +116,7 @@ export function AssetReports() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{totalAssets}</div>
-            <p className="text-xs text-muted-foreground">Registered fixed assets</p>
+            <p className="text-xs text-muted-foreground">Physical fixed assets</p>
           </CardContent>
         </Card>
 
@@ -152,21 +192,59 @@ export function AssetReports() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Annual Depreciation Trend</CardTitle>
+            <CardTitle className="flex items-center gap-2">
+              <MapPin className="h-4 w-4" />
+              Assets by Location
+            </CardTitle>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={depreciationTrend}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="year" />
-                <YAxis />
-                <Tooltip formatter={(value) => formatCurrency(Number(value))} />
-                <Bar dataKey="depreciation" fill="hsl(var(--primary))" />
-              </BarChart>
-            </ResponsiveContainer>
+            {locationPieData.length > 0 ? (
+              <ResponsiveContainer width="100%" height={300}>
+                <PieChart>
+                  <Pie
+                    data={locationPieData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={60}
+                    outerRadius={100}
+                    paddingAngle={2}
+                    dataKey="value"
+                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                    labelLine={false}
+                  >
+                    {locationPieData.map((_, index) => (
+                      <Cell key={`cell-${index}`} fill={COLORS[(index + 2) % COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip formatter={(value) => formatCurrency(Number(value))} />
+                  <Legend />
+                </PieChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex items-center justify-center h-[300px] text-muted-foreground">
+                No location data available
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Annual Depreciation Trend</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <ResponsiveContainer width="100%" height={300}>
+            <BarChart data={trendData.length > 0 ? trendData : [{ year: "No Data", depreciation: 0 }]}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="year" />
+              <YAxis />
+              <Tooltip formatter={(value) => formatCurrency(Number(value))} />
+              <Bar dataKey="depreciation" fill="hsl(var(--primary))" />
+            </BarChart>
+          </ResponsiveContainer>
+        </CardContent>
+      </Card>
     </div>
   );
 }
