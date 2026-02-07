@@ -12,7 +12,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { FileText } from "lucide-react";
+import { FileText, FileSpreadsheet } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -65,6 +65,7 @@ import { AssetRequestsTab } from "@/components/warehouse/asset-requests/AssetReq
 import { SubcategoryAnalytics } from "@/components/warehouse/SubcategoryAnalytics";
 import { BulkQRCodeDialog } from "@/components/warehouse/BulkQRCodeDialog";
 import { AssetForQR } from "@/utils/bulkQRCodePdf";
+import { WarehouseAssetReportDialog } from "@/components/warehouse/WarehouseAssetReportDialog";
 
 const assetFormSchema = z.object({
   asset_master_id: z.string().optional().transform(v => (v === "none" || v === "" ? undefined : v)),
@@ -135,6 +136,7 @@ export default function AssetManagement() {
   const [selectedAssetMaster, setSelectedAssetMaster] = useState<AssetMaster | null>(null);
   const [createdAssets, setCreatedAssets] = useState<AssetForQR[]>([]);
   const [showBulkQRDialog, setShowBulkQRDialog] = useState(false);
+  const [isReportDialogOpen, setIsReportDialogOpen] = useState(false);
   
   const { 
     locations,
@@ -437,6 +439,10 @@ export default function AssetManagement() {
         <div className="flex gap-2">
           <BulkAssetImportDialog />
           <CategoryManagementDialog />
+          <Button variant="outline" onClick={() => setIsReportDialogOpen(true)}>
+            <FileSpreadsheet className="mr-2 h-4 w-4" />
+            Reports
+          </Button>
           <LocationManagementDialog />
 
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
@@ -1273,6 +1279,12 @@ export default function AssetManagement() {
         open={showBulkQRDialog}
         onOpenChange={handleQRDialogClose}
         assets={createdAssets}
+      />
+
+      {/* Asset Reports Dialog */}
+      <WarehouseAssetReportDialog
+        open={isReportDialogOpen}
+        onOpenChange={setIsReportDialogOpen}
       />
     </div>
   );
