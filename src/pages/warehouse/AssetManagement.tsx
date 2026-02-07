@@ -56,16 +56,14 @@ import { AssetTransferDialog } from "@/components/warehouse/AssetTransferDialog"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { WarehouseAsset, WarehouseLocation, AssetCategory, CreateWarehouseAssetData, CreateWarehouseLocationData } from "@/types/warehouse";
-import { AssetAnalytics } from "@/components/warehouse/AssetAnalytics";
 import { BulkAssetUpdateDialog } from "@/components/warehouse/BulkAssetUpdateDialog";
 import { AssetMasterTab } from "@/components/warehouse/AssetMasterTab";
 import { AssetMasterSelector } from "@/components/common/AssetMasterSelector";
 import { AssetMaster } from "@/types/assetMaster";
 import { AssetRequestsTab } from "@/components/warehouse/asset-requests/AssetRequestsTab";
-import { SubcategoryAnalytics } from "@/components/warehouse/SubcategoryAnalytics";
 import { BulkQRCodeDialog } from "@/components/warehouse/BulkQRCodeDialog";
 import { AssetForQR } from "@/utils/bulkQRCodePdf";
-import { LocationReportAnalytics } from "@/components/warehouse/LocationReportAnalytics";
+import { UnifiedAssetAnalytics } from "@/components/warehouse/UnifiedAssetAnalytics";
 
 const assetFormSchema = z.object({
   asset_master_id: z.string().optional().transform(v => (v === "none" || v === "" ? undefined : v)),
@@ -859,7 +857,7 @@ export default function AssetManagement() {
 
       {/* Tabs for Assets List and Analytics */}
       <Tabs defaultValue="assets-list" className="w-full">
-        <TabsList className="grid w-full grid-cols-6">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="assets-list" className="flex items-center gap-2">
             <Package className="h-4 w-4" />
             Assets List
@@ -874,15 +872,7 @@ export default function AssetManagement() {
           </TabsTrigger>
           <TabsTrigger value="analytics" className="flex items-center gap-2">
             <BarChart3 className="h-4 w-4" />
-            Analytics
-          </TabsTrigger>
-          <TabsTrigger value="subcategory-analytics" className="flex items-center gap-2">
-            <Layers className="h-4 w-4" />
-            Subcategory Analytics
-          </TabsTrigger>
-          <TabsTrigger value="location-reports" className="flex items-center gap-2">
-            <MapPin className="h-4 w-4" />
-            Location Reports
+            Analytics & Reports
           </TabsTrigger>
         </TabsList>
 
@@ -1162,28 +1152,13 @@ export default function AssetManagement() {
         </TabsContent>
 
         <TabsContent value="analytics" className="mt-6">
-          <AssetAnalytics 
+          <UnifiedAssetAnalytics 
             assets={assets}
             locations={locations}
             categories={[...mainCategories, ...mainCategories.flatMap(cat => getSubcategories(cat.id))]}
             totalCount={totalCount}
             activeCount={activeCount}
             maintenanceCount={maintenanceCount}
-          />
-        </TabsContent>
-
-        <TabsContent value="subcategory-analytics" className="mt-6">
-          <SubcategoryAnalytics 
-            assets={assets}
-            categories={[...mainCategories, ...mainCategories.flatMap(cat => getSubcategories(cat.id))]}
-          />
-        </TabsContent>
-
-        <TabsContent value="location-reports" className="mt-6">
-          <LocationReportAnalytics 
-            assets={assets}
-            locations={locations}
-            categories={[...mainCategories, ...mainCategories.flatMap(cat => getSubcategories(cat.id))]}
           />
         </TabsContent>
       </Tabs>
