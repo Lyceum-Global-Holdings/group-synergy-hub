@@ -472,7 +472,7 @@ export function LocationReportAnalytics({
                 <SelectTrigger>
                   <SelectValue placeholder="All Locations" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="bg-background border shadow-md z-50">
                   <SelectItem value="all">All Locations</SelectItem>
                   {mainLocations.map((loc) => (
                     <SelectItem key={loc.id} value={loc.id}>
@@ -494,7 +494,7 @@ export function LocationReportAnalytics({
                 <SelectTrigger>
                   <SelectValue placeholder="All Sub-Locations" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="bg-background border shadow-md z-50">
                   <SelectItem value="all">All Sub-Locations</SelectItem>
                   {sublocations.map((loc) => (
                     <SelectItem key={loc.id} value={loc.id}>
@@ -511,7 +511,7 @@ export function LocationReportAnalytics({
               <SelectTrigger>
                 <SelectValue placeholder="All Statuses" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="bg-background border shadow-md z-50">
                 <SelectItem value="all">All Statuses</SelectItem>
                 <SelectItem value="active">Active</SelectItem>
                 <SelectItem value="maintenance">Maintenance</SelectItem>
