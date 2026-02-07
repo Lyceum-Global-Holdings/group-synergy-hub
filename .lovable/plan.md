@@ -1,187 +1,66 @@
 
 
-# Plan: Consolidate Analytics with Report Generation
+# Plan: Enhanced Location Analytics with Subcategory Details and PDF Export
 
 ## Overview
-Merge the three separate analytics tabs (Analytics, Subcategory Analytics, Location Reports) into a single unified **"Analytics & Reports"** tab. This consolidated view will include sub-tabs for different report types, each with chart visualizations and Excel report generation functionality.
+Enhance the **Location Reports** tab within the Analytics & Reports section to include comprehensive subcategory analysis per location, and add PDF export functionality with embedded charts for all report types.
 
 ## Current State
 
-| Current Tab | Purpose |
-|-------------|---------|
-| Analytics | General asset analytics (status, condition, category, brand) |
-| Subcategory Analytics | Subcategory-specific breakdown with hierarchical view |
-| Location Reports | Location/sublocation/department analytics with charts |
+| Component | Current Behavior |
+|-----------|------------------|
+| LocationReportAnalytics | Shows location-wise KPIs, status/condition breakdowns, but no subcategory data |
+| UnifiedAssetAnalytics | Has 4 sub-tabs (Overview, Subcategory, Location, Generate Reports) |
+| Export | Only Excel export available; no PDF with graphs |
 
-**Problem:** Three separate tabs for related analytics functionality creates fragmentation and requires users to navigate between tabs for a complete view.
+## Requirements
 
-## Proposed Solution
+1. Under each location breakdown, show:
+   - Total Assets
+   - Total Value
+   - Utilization
+   - Main category breakdown
+   - Sub category breakdown and detailed analysis
+   - Subcategories by Asset Count
+   - Condition Distribution by Subcategory
 
-Create a single **"Analytics & Reports"** tab with internal sub-navigation:
-
-```text
-+----------------------------------------------------------+
-| Analytics & Reports                         [Export All] |
-+----------------------------------------------------------+
-| [Overview] [Category] [Subcategory] [Location] [Reports] |
-+----------------------------------------------------------+
-|                                                          |
-|   Content based on selected sub-tab                      |
-|                                                          |
-+----------------------------------------------------------+
-```
+2. PDF export with graphs included
 
 ---
 
-## New Component Structure
+## Solution Architecture
 
-### File: `src/components/warehouse/UnifiedAssetAnalytics.tsx` (NEW)
+### Part 1: Enhanced Location Data with Subcategory Analysis
 
-A single component that consolidates all analytics with internal tabs:
-
-**Sub-tabs:**
-1. **Overview** - KPIs, status/condition pie charts, financial summary (from AssetAnalytics)
-2. **Category Analysis** - Category/brand breakdown (from AssetAnalytics)
-3. **Subcategory Analysis** - Hierarchical subcategory view (from SubcategoryAnalytics)
-4. **Location Reports** - Location/sublocation/department analytics (from LocationReportAnalytics)
-5. **Generate Reports** - Dedicated report generation panel with filters and export options
-
-### Report Generation Panel Features
-
-```text
-+----------------------------------------------------------+
-| Generate Reports                                          |
-+----------------------------------------------------------+
-| Report Type:                                              |
-| [Location-wise] [Sub-Location-wise] [Department-wise]    |
-| [Category-wise] [Subcategory-wise]                       |
-+----------------------------------------------------------+
-| Filters:                                                  |
-| Location:     [All Locations v]                          |
-| Sub-Location: [All Sub-Locations v]                      |
-| Category:     [All Categories v]                         |
-| Status:       [All Statuses v]                           |
-| Date Range:   [From]  [To]                               |
-+----------------------------------------------------------+
-| [Preview Report]                    [Export to Excel]    |
-+----------------------------------------------------------+
-| Report Preview Table                                      |
-| (Shows filtered data before export)                       |
-+----------------------------------------------------------+
-```
-
----
-
-## Implementation Details
-
-### 1. Create UnifiedAssetAnalytics Component
-
-**Structure:**
-```typescript
-interface UnifiedAssetAnalyticsProps {
-  assets: WarehouseAsset[];
-  locations: WarehouseLocation[];
-  categories: AssetCategory[];
-  totalCount?: number;
-  activeCount?: number;
-  maintenanceCount?: number;
-}
-
-// Internal sub-tabs
-type AnalyticsTab = 
-  | "overview" 
-  | "category" 
-  | "subcategory" 
-  | "location" 
-  | "reports";
-```
-
-**Component contains:**
-- Internal `<Tabs>` for sub-navigation
-- Reuses logic from existing analytics components
-- New "Generate Reports" section with comprehensive filters
-- Preview table before export
-- Export functionality for each report type
-
-### 2. Report Types Supported
-
-| Report Type | Grouping | Key Columns |
-|-------------|----------|-------------|
-| Location-wise | Primary locations | Location, Asset Count, Value, Status Breakdown |
-| Sub-Location-wise | Sub-locations | Location, Sub-Location, Asset Count, Value |
-| Department-wise | Departments | Location, Sub-Location, Department, Assets, Value |
-| Category-wise | Main categories | Category, Asset Count, Value, Condition Breakdown |
-| Subcategory-wise | Subcategories | Category, Subcategory, Assets, Value, Depreciation |
-
-### 3. Update AssetManagement.tsx
-
-**Changes:**
-1. Change TabsList from `grid-cols-6` to `grid-cols-4`:
-   - Assets List
-   - Asset Master
-   - Asset Requests
-   - **Analytics & Reports** (consolidated)
-
-2. Remove separate tab triggers for:
-   - Analytics
-   - Subcategory Analytics
-   - Location Reports
-
-3. Replace with single tab content using `UnifiedAssetAnalytics`
-
-4. Remove imports for old components (can keep for backward compatibility or delete)
-
----
-
-## Visual Layout
-
-### Tab Structure After Change
-
-**Before (6 tabs):**
-```text
-[Assets List] [Asset Master] [Asset Requests] [Analytics] [Subcategory Analytics] [Location Reports]
-```
-
-**After (4 tabs):**
-```text
-[Assets List] [Asset Master] [Asset Requests] [Analytics & Reports]
-```
-
-### Analytics & Reports Internal Layout
+**Modify `LocationReportAnalytics.tsx`** to add subcategory data per location:
 
 ```text
 +------------------------------------------------------------------+
-|                    Analytics & Reports                            |
+| Location Detailed View (Expanded Row)                             |
 +------------------------------------------------------------------+
-| [Overview] [Category] [Subcategory] [Location] [Generate Reports] |
+| Status Breakdown | Condition Breakdown | Value Metrics | Performance|
 +------------------------------------------------------------------+
-|                                                                   |
-| Overview Tab:                                                     |
-| +------------------+------------------+------------------+         |
-| | Total Assets     | Utilization Rate | Total Value     |         |
-| | 1,234            | 85.2%           | Rs. 12,345,678  |         |
-| +------------------+------------------+------------------+         |
-|                                                                   |
-| +------------------------+ +------------------------+             |
-| | Status Distribution    | | Condition Distribution |             |
-| | (Pie Chart)            | | (Pie Chart)            |             |
-| +------------------------+ +------------------------+             |
-|                                                                   |
+| Main Category Breakdown:                                          |
+| [Furniture: 45] [Electronics: 30] [Vehicles: 15]                 |
 +------------------------------------------------------------------+
-
-Generate Reports Tab:
+| Subcategory Analysis:                                             |
+| | Subcategory    | Count | Value     | Good | Fair | Poor |      |
+| | Office Chairs  | 25    | Rs. 50K   | 20   | 3    | 2    |      |
+| | Desks          | 20    | Rs. 80K   | 18   | 2    | 0    |      |
 +------------------------------------------------------------------+
-| Report Type: [Location v]   Status: [All v]   Category: [All v]  |
-+------------------------------------------------------------------+
-| [Preview]                                    [Export to Excel]   |
-+------------------------------------------------------------------+
-| Preview Table:                                                    |
-| | Location      | Assets | Active | Maintenance | Value        | |
-| | Head Office   | 245    | 210    | 15          | Rs. 2,500,000| |
-| | Branch A      | 180    | 150    | 20          | Rs. 1,800,000| |
-| ...                                                               |
+| Subcategories by Asset Count (Bar Chart)                          |
+| Condition Distribution by Subcategory (Stacked Bar)               |
 +------------------------------------------------------------------+
 ```
+
+### Part 2: PDF Export with Charts
+
+Create a new utility `src/utils/locationReportPdfExport.ts` that:
+
+1. Uses `jsPDF` with `jspdf-autotable` (already installed)
+2. Generates charts using canvas rendering
+3. Embeds chart images in PDF
+4. Includes all breakdown data in tables
 
 ---
 
@@ -189,112 +68,251 @@ Generate Reports Tab:
 
 | File | Purpose |
 |------|---------|
-| `src/components/warehouse/UnifiedAssetAnalytics.tsx` | Consolidated analytics with all sub-tabs and report generation |
+| `src/utils/locationReportPdfExport.ts` | PDF generation utility with chart rendering |
 
 ## Files to Modify
 
 | File | Changes |
 |------|---------|
-| `src/pages/warehouse/AssetManagement.tsx` | Reduce to 4 tabs, use UnifiedAssetAnalytics |
-
-## Files to Optionally Remove
-
-| File | Reason |
-|------|--------|
-| `src/components/warehouse/AssetAnalytics.tsx` | Merged into UnifiedAssetAnalytics (or keep as sub-component) |
-| `src/components/warehouse/SubcategoryAnalytics.tsx` | Merged into UnifiedAssetAnalytics (or keep as sub-component) |
-| `src/components/warehouse/LocationReportAnalytics.tsx` | Merged into UnifiedAssetAnalytics (or keep as sub-component) |
-
-**Recommendation:** Keep existing components as sub-components for modularity and import them into UnifiedAssetAnalytics.
+| `src/components/warehouse/LocationReportAnalytics.tsx` | Add subcategory breakdown per location, add PDF export button |
+| `src/components/warehouse/UnifiedAssetAnalytics.tsx` | Pass categories prop to LocationReportAnalytics for subcategory data |
 
 ---
 
-## Technical Approach
+## Detailed Implementation
 
-### Option A: Wrapper Component (Recommended)
-Create `UnifiedAssetAnalytics` as a wrapper that imports and renders existing components in tabs.
+### 1. Enhanced LocationReportAnalytics Data Model
 
-**Advantages:**
-- Minimal code duplication
-- Easier to maintain
-- Preserves existing tested logic
-- Faster implementation
-
-### Option B: Full Merge
-Copy all logic into a single large component.
-
-**Disadvantages:**
-- Large file size (~2000+ lines)
-- Harder to maintain
-- More testing required
-
-**Selected: Option A**
-
----
-
-## Implementation Steps
-
-1. **Create `UnifiedAssetAnalytics.tsx`**
-   - Import existing analytics components
-   - Add internal Tabs structure
-   - Create new "Generate Reports" section with:
-     - Report type selector (5 types)
-     - Filter dropdowns with cascading logic
-     - Preview table
-     - Export button
-
-2. **Modify `AssetManagement.tsx`**
-   - Change grid to 4 columns
-   - Replace three tab triggers with one "Analytics & Reports"
-   - Replace three TabsContent with single UnifiedAssetAnalytics
-   - Keep imports for sub-components
-
-3. **Test all report generation flows**
-   - Location-wise export
-   - Sub-location-wise export
-   - Department-wise export
-   - Category-wise export
-   - Subcategory-wise export
-
----
-
-## Report Generation Logic
+Add subcategory data to the `LocationAnalyticsData` interface:
 
 ```typescript
-// Report types with their configurations
-const reportConfigs = {
-  location: {
-    label: "Location-wise",
-    groupByField: "location_id",
-    columns: ["Location", "Total Assets", "Active", "Maintenance", "Inactive", "Total Value"]
-  },
-  sublocation: {
-    label: "Sub-Location-wise",
-    groupByField: "sublocation_id",
-    columns: ["Location", "Sub-Location", "Total Assets", "Active", "Total Value"]
-  },
-  department: {
-    label: "Department-wise",
-    groupByField: "department_id",
-    columns: ["Location", "Sub-Location", "Department", "Total Assets", "Value"]
-  },
-  category: {
-    label: "Category-wise",
-    groupByField: "category_id",
-    columns: ["Category", "Total Assets", "Good", "Fair", "Poor", "Total Value"]
-  },
-  subcategory: {
-    label: "Subcategory-wise",
-    groupByField: "subcategory_id",
-    columns: ["Category", "Subcategory", "Total Assets", "Value", "Depreciation"]
-  }
-};
+interface LocationAnalyticsData {
+  // ... existing fields ...
+  
+  // NEW: Category breakdown
+  categoryBreakdown: {
+    categoryId: string;
+    categoryName: string;
+    assetCount: number;
+    totalValue: number;
+  }[];
+  
+  // NEW: Subcategory breakdown
+  subcategoryBreakdown: {
+    subcategoryId: string;
+    subcategoryName: string;
+    parentCategoryName: string;
+    assetCount: number;
+    totalValue: number;
+    goodCondition: number;
+    fairCondition: number;
+    poorCondition: number;
+    needsRepair: number;
+  }[];
+}
+```
+
+### 2. Enhanced Expanded Row View
+
+When a location row is expanded, show:
+
+**Section 1: Existing Content** (Status, Condition, Value, Performance)
+
+**Section 2: Main Category Breakdown** (NEW)
+- Horizontal list of categories with counts
+- Small pie chart showing category distribution
+
+**Section 3: Subcategory Details Table** (NEW)
+```text
+| Subcategory   | Category   | Assets | Value    | Good | Fair | Poor |
+|---------------|------------|--------|----------|------|------|------|
+| Office Chairs | Furniture  | 25     | Rs. 50K  | 20   | 3    | 2    |
+| Laptops       | Electronics| 15     | Rs. 120K | 12   | 2    | 1    |
+```
+
+**Section 4: Subcategory Charts** (NEW)
+- Bar chart: Subcategories by Asset Count
+- Stacked bar: Condition Distribution by Subcategory
+
+### 3. PDF Export Utility
+
+Create `locationReportPdfExport.ts` with the following structure:
+
+```typescript
+// Key functions
+export async function exportLocationReportPdf(
+  reportData: LocationAnalyticsData[],
+  reportType: 'location' | 'sublocation' | 'department',
+  kpis: KPIData,
+  chartImages: ChartImages
+): Promise<void>
+
+// Chart rendering helper (converts recharts to canvas)
+async function renderChartToImage(
+  chartData: any[],
+  chartType: 'bar' | 'pie' | 'stackedBar',
+  config: ChartConfig
+): Promise<string> // Returns base64 data URL
+```
+
+**PDF Structure:**
+1. **Header**: Report title, date, filters applied
+2. **KPI Summary**: Total Assets, Total Value, Utilization, Top Location
+3. **Asset Count Chart**: Bar chart image
+4. **Value Distribution Chart**: Pie chart image
+5. **Status Distribution Chart**: Stacked bar image
+6. **Detailed Table**: All locations with full breakdown
+
+### 4. Chart-to-Image Rendering Approach
+
+Since recharts renders to SVG, we'll use a canvas-based approach:
+
+```typescript
+// Create a temporary canvas
+const canvas = document.createElement('canvas');
+const ctx = canvas.getContext('2d');
+
+// Draw chart manually using canvas API
+// For bar charts: draw rectangles
+// For pie charts: draw arcs
+// Export as base64 image
+
+const imageData = canvas.toDataURL('image/png');
+```
+
+This approach avoids external dependencies like html2canvas.
+
+---
+
+## UI Changes
+
+### LocationReportAnalytics Header
+
+**Before:**
+```text
+| Location Reports                    [Export to Excel] |
+```
+
+**After:**
+```text
+| Location Reports          [Export PDF] [Export Excel] |
+```
+
+### Expanded Row Enhancement
+
+**Before (4 columns):**
+- Status Breakdown
+- Condition Breakdown
+- Value Metrics
+- Performance
+
+**After (Full Width Sections):**
+
+```text
++------------------------------------------------------------------+
+| Row 1: Status | Condition | Value | Performance (existing)       |
++------------------------------------------------------------------+
+| Row 2: Main Category Breakdown                                   |
+| [Furniture: 45] [Electronics: 30] [Vehicles: 15] [Others: 10]   |
++------------------------------------------------------------------+
+| Row 3: Subcategory Analysis                                      |
+| Table with: Subcategory | Parent | Count | Value | Condition... |
++------------------------------------------------------------------+
+| Row 4: Mini Charts (collapsible)                                 |
+| [Subcategory Count Chart] [Condition by Subcategory Chart]      |
++------------------------------------------------------------------+
 ```
 
 ---
 
-## Dependencies
-- `recharts` - Charts (already installed)
-- `writeExcelFromJSON` - Excel export utility (already exists)
-- Existing analytics components for reuse
+## PDF Report Layout
+
+```text
+Page 1:
++------------------------------------------------------------------+
+| ASSET LOCATION REPORT                           [Company Logo]   |
+| Generated: Feb 7, 2026                                           |
++------------------------------------------------------------------+
+| Report Type: Location-wise                                       |
+| Filters: All Locations | All Statuses                           |
++------------------------------------------------------------------+
+| KPI SUMMARY                                                      |
+| +------------+ +------------+ +------------+ +------------+      |
+| |Total Assets| |Total Value | |Utilization | |Top Location|      |
+| |    1,234   | |Rs. 12.5M   | |   85.2%    | | Head Office|      |
+| +------------+ +------------+ +------------+ +------------+      |
++------------------------------------------------------------------+
+| ASSET DISTRIBUTION BY LOCATION                                   |
+| [Bar Chart Image - 500x200px]                                    |
++------------------------------------------------------------------+
+| VALUE DISTRIBUTION                                               |
+| [Pie Chart Image - 300x200px]                                    |
++------------------------------------------------------------------+
+
+Page 2+:
++------------------------------------------------------------------+
+| DETAILED BREAKDOWN                                               |
++------------------------------------------------------------------+
+| Location: Head Office                                            |
+| Assets: 245 | Value: Rs. 2.5M | Utilization: 88%                |
+|                                                                  |
+| Main Categories:                                                  |
+| Furniture: 120 | Electronics: 80 | Vehicles: 45                 |
+|                                                                  |
+| Subcategory Analysis:                                            |
+| | Subcategory   | Count | Value    | Good | Fair | Poor |       |
+| | Office Chairs | 50    | Rs. 500K | 45   | 3    | 2    |       |
+| | Desks         | 40    | Rs. 800K | 38   | 2    | 0    |       |
+| | Laptops       | 60    | Rs. 1.2M | 55   | 4    | 1    |       |
++------------------------------------------------------------------+
+```
+
+---
+
+## Technical Dependencies
+
+| Dependency | Status | Usage |
+|------------|--------|-------|
+| `jspdf` | Already installed | PDF document creation |
+| `jspdf-autotable` | Already installed | Table rendering in PDF |
+| Canvas API | Built-in | Chart rendering to images |
+
+---
+
+## Implementation Order
+
+1. **Enhance data aggregation** in `LocationReportAnalytics.tsx`
+   - Add category and subcategory breakdown calculation
+   - Extend `LocationAnalyticsData` interface
+
+2. **Update expanded row UI**
+   - Add category badges row
+   - Add subcategory analysis table
+   - Add mini charts for subcategory visualization
+
+3. **Create PDF export utility**
+   - Build `locationReportPdfExport.ts`
+   - Implement canvas-based chart rendering
+   - Use jspdf-autotable for tables
+
+4. **Integrate PDF export button**
+   - Add button to header
+   - Capture chart data for PDF generation
+
+5. **Test all report types**
+   - Location-wise PDF with subcategories
+   - Sub-location-wise PDF
+   - Department-wise PDF
+
+---
+
+## Summary of Changes
+
+| Component | Changes |
+|-----------|---------|
+| `LocationReportAnalytics.tsx` | Add category/subcategory breakdown per location, enhanced expanded view, PDF export button |
+| `locationReportPdfExport.ts` (NEW) | PDF generation with charts and tables |
+| Expanded row view | Now includes category badges, subcategory table, condition charts |
+
+This enhancement provides a comprehensive location-based asset analysis with deep drill-down into category and subcategory distributions, exportable as both Excel and PDF with visual charts.
 
