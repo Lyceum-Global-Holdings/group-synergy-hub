@@ -175,6 +175,15 @@ export function ViewSiteReportDialog({
   };
 
   const handleSendTelegram = async () => {
+    if (!selectedCompany?.id) {
+      toast({
+        title: "No company selected",
+        description: "Please select a company before sending reports.",
+        variant: "destructive"
+      });
+      return;
+    }
+
     if (!telegramSettings?.has_bot_token || !telegramSettings?.chat_id) {
       toast({
         title: "Telegram not configured",
@@ -201,7 +210,7 @@ export function ViewSiteReportDialog({
           project_name: displayReport.project?.project_name || 'N/A',
           report_date: formatPeriod(),
           report_type: reportType,
-          company_id: selectedCompany?.id
+          company_id: selectedCompany.id
         }
       });
 
