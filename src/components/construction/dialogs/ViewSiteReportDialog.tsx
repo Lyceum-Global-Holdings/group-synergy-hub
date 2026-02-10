@@ -202,6 +202,8 @@ export function ViewSiteReportDialog({
         attendanceRecords: attendanceRecords || []
       });
 
+      console.log("Sending telegram report with company_id:", selectedCompany.id);
+
       const { data, error } = await supabase.functions.invoke('send-telegram-report', {
         body: {
           pdf_base64: pdfBase64,
@@ -214,7 +216,14 @@ export function ViewSiteReportDialog({
         }
       });
 
-      if (error) throw error;
+      if (error) {
+        const errorMessage = error?.message || 'Unknown error';
+        throw new Error(errorMessage);
+      }
+
+      if (data && !data.success) {
+        throw new Error(data.results?.map((r: any) => r.error).filter(Boolean).join(', ') || 'Send failed');
+      }
 
       toast({
         title: "Report sent!",
