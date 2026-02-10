@@ -327,72 +327,27 @@ export const useCreateUser = () => {
     }) => {
       console.log('Creating user with data:', userData);
       
-      // First check if current user is admin or if no admins exist
-      const { data: currentUser } = await supabase.auth.getUser();
-      if (!currentUser.user) {
-        throw new Error('You must be logged in to create users');
-      }
-
-      // Check admin status or if this is bootstrap scenario
-      const { data: isAdminResult, error: adminCheckError } = await supabase
-        .rpc('is_admin', { _user_id: currentUser.user.id });
-      
-      if (adminCheckError) {
-        console.error('Admin check error:', adminCheckError);
-      }
-
-      // Check if any admin users exist
-      const { data: adminRoles, error: rolesErr } = await supabase
-        .from('roles')
-        .select('id')
-        .in('app_role', ['admin', 'super_admin']);
-      
-      if (rolesErr) {
-        console.error('Admin role lookup error:', rolesErr);
-      }
-      
-      const adminRoleIds = (adminRoles ?? []).map(r => r.id);
-      let hasAdmins = false;
-      
-      if (adminRoleIds.length > 0) {
-        const { count, error: countErr } = await supabase
-          .from('user_roles')
-          .select('*', { head: true, count: 'exact' })
-          .in('role_id', adminRoleIds);
-        
-        if (countErr) {
-          console.error('Admin count check error:', countErr);
-        } else {
-          hasAdmins = (count ?? 0) > 0;
-        }
-      }
-      const isCurrentUserAdmin = isAdminResult === true;
-
-      if (hasAdmins && !isCurrentUserAdmin) {
-        throw new Error('Only administrators can create new users');
-      }
-      
-      // Create user via Supabase Auth
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: userData.email,
-        password: userData.password,
-        options: {
-          data: {
-            full_name: userData.fullName
-          }
+      // Create user via Edge Function (server-side, bypasses signup_disabled)
+      const { data: createData, error: createError } = await supabase.functions.invoke('admin-create-user', {
+        body: {
+          email: userData.email,
+          password: userData.password,
+          fullName: userData.fullName,
         }
       });
 
-      if (authError) {
-        console.error('Auth error:', authError);
-        throw new Error(`Failed to create user account: ${authError.message}`);
+      if (createError) {
+        console.error('Edge function error:', createError);
+        throw new Error(`Failed to create user account: ${createError.message}`);
       }
 
-      if (!authData.user) {
-        throw new Error('User creation failed - no user returned');
+      if (!createData?.userId) {
+        const serverError = createData?.error || 'No user ID returned';
+        throw new Error(`Failed to create user account: ${serverError}`);
       }
 
-      console.log('User created successfully:', authData.user.id);
+      const newUserId = createData.userId;
+      console.log('User created successfully:', newUserId);
 
       // Wait for profile to be created by handle_new_user() trigger
       let profileExists = false;
@@ -403,7 +358,7 @@ export const useCreateUser = () => {
         const { data: profile, error: profileCheckError } = await supabase
           .from('profiles')
           .select('user_id')
-          .eq('user_id', authData.user.id)
+          .eq('user_id', newUserId)
           .maybeSingle();
 
         if (profile) {
@@ -439,7 +394,7 @@ export const useCreateUser = () => {
         const { error: profileError } = await supabase
           .from('profiles')
           .update(profileUpdate)
-          .eq('user_id', authData.user.id);
+          .eq('user_id', newUserId);
 
         if (profileError) {
           console.error('Profile update error:', profileError);
@@ -452,7 +407,7 @@ export const useCreateUser = () => {
         const { error: roleError } = await supabase
           .from('user_roles')
           .insert({
-            user_id: authData.user.id,
+            user_id: newUserId,
             role_id: userData.roleId
           });
 
@@ -464,7 +419,7 @@ export const useCreateUser = () => {
         console.log('Role assigned successfully');
       }
 
-      return authData.user;
+      return { id: newUserId };
     },
     onSuccess: () => {
       // Invalidate and refetch users
