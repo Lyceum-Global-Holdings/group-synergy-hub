@@ -1,73 +1,50 @@
 
 
-# Fix: Telegram Report Sending Error
+# Fix: User Creation Failing ("Signups not allowed")
 
-## Root Cause
+## Problem
 
-The error logs confirm the request is still sending `bot_token` and `chat_id` instead of `company_id`. This means your browser is running an **older cached version** of the code. The fix from the previous edit is correct in the codebase but hasn't reached your browser yet.
+User creation fails because the code uses `supabase.auth.signUp()` on the client side, but **signups are disabled** in your Supabase project (this is expected for an admin-provisioned system). The auth logs confirm: `"error_code": "signup_disabled"`.
 
-## Immediate Action Required
+## Solution
 
-**Hard-refresh your browser** to load the updated code:
-- **Mac**: Cmd + Shift + R
-- **Windows/Linux**: Ctrl + Shift + R
+Create a new **Edge Function** (`admin-create-user`) that uses the **service role key** to create users via `supabase.auth.admin.createUser()`, which bypasses the signup restriction. This follows the same pattern as the existing `admin-reset-password` function.
 
-If you're using the **published URL** (`group-synergy-hub.lovable.app`), you'll need to **publish** the latest changes first.
+## Changes
 
-## Additional Safeguard (Code Change)
+### 1. New Edge Function: `supabase/functions/admin-create-user/index.ts`
 
-To make the fix more robust and provide better error feedback, I'll add extra logging and validation:
+- Verifies the calling user is authenticated
+- Checks admin status via `is_admin` RPC
+- Creates user with `supabase.auth.admin.createUser()` using the service role key
+- Sets `email_confirm: true` to skip email verification (admin-provisioned)
+- Returns the new user ID
 
-### File: `src/components/construction/dialogs/ViewSiteReportDialog.tsx`
+### 2. Update: `src/hooks/useUsers.ts` (useCreateUser mutation)
 
-1. Add a `console.log` before the function invoke to confirm the correct payload is being sent (helps verify the right code is running)
-2. Improve error handling to show the actual server error message in the toast notification
-
-### Changes
+Replace the `supabase.auth.signUp()` call (line 376) with a call to the new Edge Function:
 
 ```typescript
-// Before invoke call, add debug log
-console.log("Sending telegram report with company_id:", selectedCompany.id);
+// Before (broken):
+const { data: authData, error: authError } = await supabase.auth.signUp({ ... });
 
-const { data, error } = await supabase.functions.invoke('send-telegram-report', {
+// After (fixed):
+const { data, error } = await supabase.functions.invoke('admin-create-user', {
   body: {
-    pdf_base64: pdfBase64,
-    filename: `${displayReport.report_number}.pdf`,
-    report_number: displayReport.report_number,
-    project_name: displayReport.project?.project_name || 'N/A',
-    report_date: formatPeriod(),
-    report_type: reportType,
-    company_id: selectedCompany.id
+    email: userData.email,
+    password: userData.password,
+    fullName: userData.fullName,
   }
 });
-
-// Improve error handling to show server message
-if (error) {
-  const errorMessage = error?.message || 'Unknown error';
-  throw new Error(errorMessage);
-}
-
-if (data && !data.success) {
-  throw new Error(data.results?.map(r => r.error).filter(Boolean).join(', ') || 'Send failed');
-}
 ```
 
-### In the catch block, update toast to show the specific error:
+- Remove the client-side admin check (lines 330-373) since the Edge Function handles authorization server-side
+- Update the response handling to use the user ID returned by the Edge Function
+- Keep the existing profile update, role assignment, and module assignment logic
 
-```typescript
-toast({
-  title: "Failed to send",
-  description: error.message || "Could not send report to Telegram.",
-  variant: "destructive"
-});
-```
+## Security
 
-## Summary
-
-| Change | Purpose |
-|--------|---------|
-| Hard refresh browser | Load the already-correct code |
-| Add console.log before invoke | Verify correct payload is sent |
-| Improve error toast | Show actual error message from server |
-| Check `data.success` | Handle partial send failures |
+- Admin authorization is enforced **server-side** in the Edge Function (not client-side)
+- Service role key is only used server-side, never exposed to the client
+- Follows the same security pattern as the existing `admin-reset-password` function
 
