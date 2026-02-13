@@ -189,7 +189,7 @@ export function EditAssetMasterDialog({ asset, open, onOpenChange }: EditAssetMa
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="w-screen h-screen max-w-none max-h-none rounded-none p-6 overflow-y-auto">
+      <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Edit Asset Master Item</DialogTitle>
         </DialogHeader>

@@ -116,7 +116,7 @@ export function BulkUploadFinishedGoodsDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="w-screen h-screen max-w-none max-h-none rounded-none p-6 overflow-y-auto">
+      <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Bulk Upload Finished Goods</DialogTitle>
           <DialogDescription>

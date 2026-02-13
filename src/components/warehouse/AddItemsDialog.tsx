@@ -45,7 +45,7 @@ export function AddItemsDialog({ open, onOpenChange, editingItem }: AddItemsDial
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-screen h-screen max-w-none max-h-none rounded-none p-6 overflow-y-auto flex flex-col">
+      <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto flex flex-col">
         <DialogHeader>
           <DialogTitle>
             {editingItem ? 'Edit Item' : 'Add Items'}

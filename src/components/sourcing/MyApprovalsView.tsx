@@ -250,7 +250,7 @@ export default function MyApprovalsView() {
 
       {/* Details Dialog */}
       <Dialog open={!!selectedApproval && !showApproveDialog && !showRejectDialog} onOpenChange={() => setSelectedApproval(null)}>
-        <DialogContent className="w-screen h-screen max-w-none max-h-none rounded-none p-6 overflow-y-auto">
+        <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Registration Details & Timeline</DialogTitle>
           </DialogHeader>

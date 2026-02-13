@@ -141,7 +141,7 @@ export function LabourMasterDialog({ open, onOpenChange, labour }: LabourMasterD
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-screen h-screen max-w-none max-h-none rounded-none p-6 overflow-y-auto">
+      <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{labour ? "Edit Labour" : "Add Labour"}</DialogTitle>
         </DialogHeader>
