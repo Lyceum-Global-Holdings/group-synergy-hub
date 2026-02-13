@@ -57,7 +57,7 @@ export function BlacklistSupplierDialog({ open, onOpenChange }: BlacklistSupplie
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-screen h-screen max-w-none max-h-none rounded-none p-6 overflow-y-auto">
+      <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Add Supplier to Blacklist</DialogTitle>
           <DialogDescription>

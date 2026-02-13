@@ -66,7 +66,7 @@ export function StockMovementDialog({ open, onOpenChange, itemId, itemName, curr
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-screen h-screen max-w-none max-h-none rounded-none p-6 overflow-y-auto flex flex-col">
+      <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center justify-between">
             Stock Movement History - {itemName}

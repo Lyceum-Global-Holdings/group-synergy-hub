@@ -177,7 +177,7 @@ export default function ApprovalDashboard() {
       {/* Review Dialog */}
       {selectedRegistration && !showRejectDialog && (
         <Dialog open={!!selectedRegistration} onOpenChange={() => setSelectedRegistration(null)}>
-          <DialogContent className="w-screen h-screen max-w-none max-h-none rounded-none p-6 overflow-y-auto">
+          <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>{selectedRegistration.supplier_data.supplier_name}</DialogTitle>
               <DialogDescription>Review complete registration details</DialogDescription>

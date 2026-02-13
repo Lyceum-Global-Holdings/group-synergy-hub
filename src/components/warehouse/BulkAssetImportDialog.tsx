@@ -418,7 +418,7 @@ export function BulkAssetImportDialog() {
           Bulk Import
         </Button>
       </DialogTrigger>
-      <DialogContent className="w-screen h-screen max-w-none max-h-none rounded-none p-6 overflow-y-auto">
+      <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Bulk Asset Import</DialogTitle>
           <DialogDescription>

@@ -165,7 +165,7 @@ export function AddItemDialog({ open, onOpenChange, category }: AddItemDialogPro
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-screen h-screen max-w-none max-h-none rounded-none p-6 overflow-y-auto">
+      <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Add New {categoryLabel.slice(0, -1)}</DialogTitle>
         </DialogHeader>

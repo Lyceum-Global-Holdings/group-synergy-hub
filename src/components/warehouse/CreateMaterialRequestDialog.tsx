@@ -212,7 +212,7 @@ export function CreateMaterialRequestDialog({ open, onOpenChange }: CreateMateri
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-screen h-screen max-w-none max-h-none rounded-none p-6 overflow-y-auto">
+      <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Create Material Request</DialogTitle>
         </DialogHeader>
