@@ -1,50 +1,56 @@
 
 
-# Fix: User Creation Failing ("Signups not allowed")
+# Fix: Scheduled Telegram Report Not Sending
 
-## Problem
+## Analysis
 
-User creation fails because the code uses `supabase.auth.signUp()` on the client side, but **signups are disabled** in your Supabase project (this is expected for an admin-provisioned system). The auth logs confirm: `"error_code": "signup_disabled"`.
+The scheduled Telegram function ran at 18:00 UTC on Feb 13 (confirmed by `last_scheduled_send = 2026-02-13 18:00:01`), but the report was not delivered. The old logs have expired, so the exact failure point (PDF generation or Telegram API) is unknown. However, there is a **critical bug** that prevents recovery from failures.
 
-## Solution
+## Bug: `last_scheduled_send` Updated Even On Failure
 
-Create a new **Edge Function** (`admin-create-user`) that uses the **service role key** to create users via `supabase.auth.admin.createUser()`, which bypasses the signup restriction. This follows the same pattern as the existing `admin-reset-password` function.
+In `supabase/functions/scheduled-telegram-reports/index.ts` at line 323, `last_scheduled_send` is updated after the report processing loop **regardless of whether any sends succeeded**. This means:
 
-## Changes
+1. The function finds reports and tries to send them
+2. PDF generation or Telegram API fails for all reports
+3. `last_scheduled_send` is still set to today -- marking it as "done"
+4. The next cron run sees "already sent today" and skips -- **no retry possible**
 
-### 1. New Edge Function: `supabase/functions/admin-create-user/index.ts`
+## Fix Plan
 
-- Verifies the calling user is authenticated
-- Checks admin status via `is_admin` RPC
-- Creates user with `supabase.auth.admin.createUser()` using the service role key
-- Sets `email_confirm: true` to skip email verification (admin-provisioned)
-- Returns the new user ID
+### 1. Only update `last_scheduled_send` on success (line 323 area)
 
-### 2. Update: `src/hooks/useUsers.ts` (useCreateUser mutation)
+Move the `last_scheduled_send` update inside a condition that checks if at least one report was sent successfully for that company:
 
-Replace the `supabase.auth.signUp()` call (line 376) with a call to the new Edge Function:
+```text
+Before:
+  // Always runs after loop (even if all sends failed)
+  await supabase.from('telegram_settings').update({ last_scheduled_send: ... })
 
-```typescript
-// Before (broken):
-const { data: authData, error: authError } = await supabase.auth.signUp({ ... });
-
-// After (fixed):
-const { data, error } = await supabase.functions.invoke('admin-create-user', {
-  body: {
-    email: userData.email,
-    password: userData.password,
-    fullName: userData.fullName,
+After:
+  // Only update if at least one report was actually delivered
+  const companyResults = results.filter(r => r.company_id === setting.company_id);
+  const anySuccess = companyResults.some(r => r.success && r.report_id);
+  if (anySuccess || companyResults.every(r => r.message === 'No reports today')) {
+    await supabase.from('telegram_settings').update({ last_scheduled_send: ... })
   }
-});
 ```
 
-- Remove the client-side admin check (lines 330-373) since the Edge Function handles authorization server-side
-- Update the response handling to use the user ID returned by the Edge Function
-- Keep the existing profile update, role assignment, and module assignment logic
+### 2. Add detailed error logging for failure tracking
 
-## Security
+Add structured logging before the `last_scheduled_send` update so failures are clearly visible:
+- Log the count of successful vs failed sends per company
+- Log specific failure reasons (PDF generation error, Telegram API error)
+- This ensures future failures can be diagnosed even after logs rotate
 
-- Admin authorization is enforced **server-side** in the Edge Function (not client-side)
-- Service role key is only used server-side, never exposed to the client
-- Follows the same security pattern as the existing `admin-reset-password` function
+### 3. Add a manual "Retry" mechanism
+
+In `ViewSiteReportDialog.tsx`, the existing "Send to Telegram" button already works as a manual retry. No changes needed here -- the user can manually resend any report.
+
+## Files to Modify
+
+- `supabase/functions/scheduled-telegram-reports/index.ts` -- Fix the `last_scheduled_send` update logic and improve error logging
+
+## For the Feb 13 Report
+
+Since the Feb 13 report was missed, you can manually send it using the "Send to Telegram" button in the View Site Report dialog. The scheduled function fix will prevent this issue from recurring.
 
