@@ -320,10 +320,33 @@ serve(async (req) => {
           }
         }
 
-        await supabase
-          .from('telegram_settings')
-          .update({ last_scheduled_send: new Date().toISOString() })
-          .eq('id', setting.id);
+        // Determine if we should mark this company as "sent today"
+        const companyResults = results.filter((r: any) => r.company_id === setting.company_id);
+        const successCount = companyResults.filter((r: any) => r.success && r.report_id).length;
+        const failCount = companyResults.filter((r: any) => !r.success && r.report_id).length;
+        const noReports = companyResults.every((r: any) => r.message === 'No reports today');
+
+        console.log(`Company ${setting.company_id} send summary: ${successCount} succeeded, ${failCount} failed`);
+
+        if (failCount > 0) {
+          const failures = companyResults.filter((r: any) => !r.success && r.report_id);
+          for (const f of failures) {
+            console.error(`  FAILED report ${f.report_id} (chat ${f.chat_id || 'N/A'}): ${f.error}`);
+          }
+        }
+
+        // Only update last_scheduled_send if at least one report was delivered
+        // or if there were genuinely no reports today.
+        // This allows the cron to retry on the next run if ALL sends failed.
+        if (successCount > 0 || noReports) {
+          await supabase
+            .from('telegram_settings')
+            .update({ last_scheduled_send: new Date().toISOString() })
+            .eq('id', setting.id);
+          console.log(`Updated last_scheduled_send for company ${setting.company_id}`);
+        } else if (failCount > 0) {
+          console.error(`NOT updating last_scheduled_send for company ${setting.company_id} — all ${failCount} report(s) failed. Will retry on next cron run.`);
+        }
       }
     }
 
