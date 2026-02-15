@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -47,6 +47,7 @@ import { useWarehouseLocations } from "@/hooks/useWarehouseLocations";
 import { useWarehouseAssets } from "@/hooks/useWarehouseAssets";
 import { useAssetCategories } from "@/hooks/useAssetCategories";
 import { useCompanies } from "@/hooks/useCompanies";
+import { useCompany } from "@/contexts/CompanyContext";
 import { CategoryManagementDialog } from "@/components/warehouse/CategoryManagementDialog";
 import { BulkAssetImportDialog } from "@/components/warehouse/BulkAssetImportDialog";
 import { LocationManagementDialog } from "@/components/warehouse/LocationManagementDialog";
@@ -135,6 +136,8 @@ export default function AssetManagement() {
   const [selectedAssetMaster, setSelectedAssetMaster] = useState<AssetMaster | null>(null);
   const [createdAssets, setCreatedAssets] = useState<AssetForQR[]>([]);
   const [showBulkQRDialog, setShowBulkQRDialog] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 50;
   
   const { 
     locations,
@@ -142,6 +145,8 @@ export default function AssetManagement() {
     error: locationsError
   } = useWarehouseLocations();
   
+  const { selectedCompany } = useCompany();
+
   const { 
     assets, 
     isLoading: assetsLoading,
@@ -162,7 +167,7 @@ export default function AssetManagement() {
     isDeleting,
     isDeletingBulk,
     isUpdatingBulk
-  } = useWarehouseAssets();
+  } = useWarehouseAssets(selectedCompany?.id);
 
   const { 
     mainCategories, 
@@ -237,6 +242,7 @@ export default function AssetManagement() {
     const assetData = {
       name: data.name,
       asset_master_id: normalizeId(data.asset_master_id),
+      company_id: data.company_id,
       category: selectedCategory?.name || "",
       category_id: data.category_id,
       subcategory_id: normalizeId(data.subcategory_id),
@@ -426,6 +432,17 @@ export default function AssetManagement() {
   const displayTotalAssets = filteredAssets.length;
   const displayActiveAssets = filteredAssets.filter(a => a.status === "active").length;
   const displayMaintenanceAssets = filteredAssets.filter(a => a.status === "maintenance").length;
+
+  const totalPages = Math.ceil(filteredAssets.length / pageSize);
+  const paginatedAssets = useMemo(() => 
+    filteredAssets.slice((currentPage - 1) * pageSize, currentPage * pageSize),
+    [filteredAssets, currentPage, pageSize]
+  );
+
+  // Reset page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, locationFilter, sublocationFilter, categoryFilter]);
 
   return (
     <div className="space-y-6">
@@ -1077,7 +1094,7 @@ export default function AssetManagement() {
                         </TableCell>
                       </TableRow>
                     ) : (
-                      filteredAssets.map((asset) => (
+                      paginatedAssets.map((asset) => (
                         <TableRow key={asset.id} className={selectedAssetIds.has(asset.id) ? "bg-muted/50" : ""}>
                           <TableCell>
                             <Checkbox
@@ -1156,6 +1173,35 @@ export default function AssetManagement() {
                   </TableBody>
                 </Table>
               </div>
+              {/* Pagination Controls */}
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between pt-4">
+                  <p className="text-sm text-muted-foreground">
+                    Showing {((currentPage - 1) * pageSize) + 1}–{Math.min(currentPage * pageSize, filteredAssets.length)} of {filteredAssets.length} assets
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                      disabled={currentPage === 1}
+                    >
+                      Previous
+                    </Button>
+                    <span className="text-sm text-muted-foreground">
+                      Page {currentPage} of {totalPages}
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                      disabled={currentPage === totalPages}
+                    >
+                      Next
+                    </Button>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>

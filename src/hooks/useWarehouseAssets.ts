@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { WarehouseAsset, CreateWarehouseAssetData } from '@/types/warehouse';
 import { useToast } from '@/hooks/use-toast';
 
-export const useWarehouseAssets = () => {
+export const useWarehouseAssets = (companyId?: string) => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -12,14 +12,19 @@ export const useWarehouseAssets = () => {
     isLoading,
     error
   } = useQuery({
-    queryKey: ['warehouse-assets'],
+    queryKey: ['warehouse-assets', companyId],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from('warehouse_assets')
         .select('*')
         .order('created_at', { ascending: false })
         .limit(10000);
 
+      if (companyId) {
+        query = query.eq('company_id', companyId);
+      }
+
+      const { data, error } = await query;
       if (error) throw error;
       return data as WarehouseAsset[];
     }
@@ -27,44 +32,56 @@ export const useWarehouseAssets = () => {
 
   // Get accurate counts from server
   const { data: totalCount } = useQuery({
-    queryKey: ['warehouse-assets-total-count'],
+    queryKey: ['warehouse-assets-total-count', companyId],
     queryFn: async () => {
-      const { count, error } = await supabase
+      let query = supabase
         .from('warehouse_assets')
         .select('*', { count: 'exact', head: true });
-      
+
+      if (companyId) {
+        query = query.eq('company_id', companyId);
+      }
+
+      const { count, error } = await query;
       if (error) throw error;
       return count || 0;
     },
-    
   });
 
   const { data: activeCount } = useQuery({
-    queryKey: ['warehouse-assets-active-count'],
+    queryKey: ['warehouse-assets-active-count', companyId],
     queryFn: async () => {
-      const { count, error } = await supabase
+      let query = supabase
         .from('warehouse_assets')
         .select('*', { count: 'exact', head: true })
         .eq('status', 'active');
-      
+
+      if (companyId) {
+        query = query.eq('company_id', companyId);
+      }
+
+      const { count, error } = await query;
       if (error) throw error;
       return count || 0;
     },
-  
   });
 
   const { data: maintenanceCount } = useQuery({
-    queryKey: ['warehouse-assets-maintenance-count'],
+    queryKey: ['warehouse-assets-maintenance-count', companyId],
     queryFn: async () => {
-      const { count, error } = await supabase
+      let query = supabase
         .from('warehouse_assets')
         .select('*', { count: 'exact', head: true })
         .eq('status', 'maintenance');
-      
+
+      if (companyId) {
+        query = query.eq('company_id', companyId);
+      }
+
+      const { count, error } = await query;
       if (error) throw error;
       return count || 0;
     },
-    
   });
 
   const createAssetMutation = useMutation({
@@ -72,7 +89,6 @@ export const useWarehouseAssets = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User not authenticated');
 
-      // Sanitize UUID fields - convert "none" or empty strings to null
       const sanitizedData = {
         ...assetData,
         category_id: assetData.category_id || null,
@@ -244,18 +260,14 @@ export const useWarehouseAssets = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User not authenticated');
 
-      // Sanitize each asset's UUID fields and date/numeric fields
       const assetsWithUser = assetsData.map(asset => ({
         ...asset,
-        // UUID field sanitization
         category_id: asset.category_id || null,
         subcategory_id: asset.subcategory_id && asset.subcategory_id !== "none" ? asset.subcategory_id : null,
         location_id: asset.location_id && asset.location_id !== "none" ? asset.location_id : null,
         sublocation_id: asset.sublocation_id && asset.sublocation_id !== "none" ? asset.sublocation_id : null,
         department_id: asset.department_id && asset.department_id !== "none" ? asset.department_id : null,
-        // Date field sanitization - convert empty strings to null
         purchase_date: asset.purchase_date || null,
-        // Numeric field sanitization
         purchase_price: asset.purchase_price ?? null,
         current_value: asset.current_value ?? null,
         created_by: user.id
