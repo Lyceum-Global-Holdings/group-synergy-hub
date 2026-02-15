@@ -19,6 +19,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { useWarehouseLocations } from '@/hooks/useWarehouseLocations';
 import { LocationManagementDialog } from '@/components/warehouse/LocationManagementDialog';
 import { LocationAnalytics } from '@/components/warehouse/LocationAnalytics';
@@ -32,6 +41,9 @@ import { CapacityPlanningTab } from '@/components/warehouse/CapacityPlanningTab'
 import { useToast } from '@/hooks/use-toast';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Checkbox } from '@/components/ui/checkbox';
+import { ScrollArea } from '@/components/ui/scroll-area';
+
+type WarehouseLocation = typeof import('@/hooks/useWarehouseLocations') extends { useWarehouseLocations: () => { locations: (infer T)[] } } ? T : any;
 
 export default function WarehouseManagement() {
   const [searchTerm, setSearchTerm] = useState('');
@@ -39,8 +51,10 @@ export default function WarehouseManagement() {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [selectedLocations, setSelectedLocations] = useState<string[]>([]);
   const [detailsLocationId, setDetailsLocationId] = useState<string | null>(null);
-  
-  const { locations, isLoading, deleteLocation, updateLocation, bulkDeleteLocations, bulkUpdateStatus, isDeleting } = useWarehouseLocations();
+  const [editLocationData, setEditLocationData] = useState<any | null>(null);
+  const [editForm, setEditForm] = useState<Record<string, any>>({});
+
+  const { locations, isLoading, deleteLocation, updateLocation, bulkDeleteLocations, bulkUpdateStatus, isDeleting, isUpdating } = useWarehouseLocations();
   const { toast } = useToast();
 
   // Calculate statistics
@@ -51,15 +65,12 @@ export default function WarehouseManagement() {
     activeLocations: locations.filter(l => l.status === 'active').length,
   };
 
-  // Filter locations
   const filteredLocations = locations.filter(location => {
     const matchesSearch = location.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       location.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       location.location_code?.toLowerCase().includes(searchTerm.toLowerCase());
-    
     const matchesType = typeFilter === 'all' || location.type === typeFilter;
     const matchesStatus = statusFilter === 'all' || location.status === statusFilter;
-
     return matchesSearch && matchesType && matchesStatus;
   });
 
@@ -140,7 +151,6 @@ export default function WarehouseManagement() {
       maintenance: 'bg-yellow-100 text-yellow-800',
       closed: 'bg-red-100 text-red-800',
     };
-    
     const displayStatus = status || 'active';
     return (
       <Badge className={statusColors[displayStatus as keyof typeof statusColors] || statusColors.active}>
@@ -155,21 +165,82 @@ export default function WarehouseManagement() {
       sublocation: 'bg-green-100 text-green-800',
       department: 'bg-orange-100 text-orange-800',
     };
-    
     const typeIcons = {
       location: Building,
       sublocation: MapPin,
       department: Users,
     };
-    
     const Icon = typeIcons[type as keyof typeof typeIcons];
-    
     return (
       <Badge className={typeColors[type as keyof typeof typeColors]}>
         {Icon && <Icon className="h-3 w-3 mr-1" />}
         {type}
       </Badge>
     );
+  };
+
+  // Edit location handlers
+  const handleOpenEdit = (location: any) => {
+    setEditLocationData(location);
+    setEditForm({
+      name: location.name || '',
+      location_code: location.location_code || '',
+      type: location.type || 'location',
+      parent_id: location.parent_id || '',
+      status: location.status || 'active',
+      warehouse_category: location.warehouse_category || '',
+      capacity: location.capacity ?? '',
+      description: location.description || '',
+      contact_person: location.contact_person || '',
+      contact_phone: location.contact_phone || '',
+      physical_address: location.physical_address || '',
+    });
+  };
+
+  const handleEditFormChange = (field: string, value: string | number) => {
+    setEditForm(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editLocationData) return;
+    try {
+      await updateLocation({
+        id: editLocationData.id,
+        name: editForm.name,
+        location_code: editForm.location_code || null,
+        type: editForm.type,
+        parent_id: editForm.parent_id || null,
+        status: editForm.status,
+        warehouse_category: editForm.warehouse_category || null,
+        capacity: editForm.capacity ? Number(editForm.capacity) : null,
+        description: editForm.description || null,
+        contact_person: editForm.contact_person || null,
+        contact_phone: editForm.contact_phone || null,
+        physical_address: editForm.physical_address || null,
+      });
+      toast({
+        title: 'Location updated',
+        description: `${editForm.name} has been successfully updated.`,
+      });
+      setEditLocationData(null);
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to update location.',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  // Get potential parent locations based on selected type
+  const getParentOptions = () => {
+    if (editForm.type === 'sublocation') {
+      return locations.filter(l => l.type === 'location');
+    }
+    if (editForm.type === 'department') {
+      return locations.filter(l => l.type === 'location' || l.type === 'sublocation');
+    }
+    return [];
   };
 
   if (isLoading) {
@@ -447,6 +518,14 @@ export default function WarehouseManagement() {
                           <Button
                             size="sm"
                             variant="ghost"
+                            onClick={() => handleOpenEdit(location)}
+                            title="Edit Location"
+                          >
+                            <Edit2 className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
                             onClick={() => handleDelete(location.id, location.name)}
                             disabled={isDeleting}
                           >
@@ -491,6 +570,159 @@ export default function WarehouseManagement() {
         open={detailsLocationId !== null}
         onOpenChange={(open) => !open && setDetailsLocationId(null)}
       />
+
+      {/* Edit Location Dialog */}
+      <Dialog open={editLocationData !== null} onOpenChange={(open) => !open && setEditLocationData(null)}>
+        <DialogContent className="max-w-4xl max-h-[85vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>Edit Location</DialogTitle>
+          </DialogHeader>
+          <ScrollArea className="flex-1 pr-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-name">Name *</Label>
+                <Input
+                  id="edit-name"
+                  value={editForm.name || ''}
+                  onChange={(e) => handleEditFormChange('name', e.target.value)}
+                  placeholder="Location name"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="edit-code">Location Code</Label>
+                <Input
+                  id="edit-code"
+                  value={editForm.location_code || ''}
+                  onChange={(e) => handleEditFormChange('location_code', e.target.value)}
+                  placeholder="e.g. WH-001"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label>Type</Label>
+                <Select value={editForm.type || 'location'} onValueChange={(v) => handleEditFormChange('type', v)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="location">Location</SelectItem>
+                    <SelectItem value="sublocation">Sublocation</SelectItem>
+                    <SelectItem value="department">Department</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Parent Location</Label>
+                <Select value={editForm.parent_id || '__none__'} onValueChange={(v) => handleEditFormChange('parent_id', v === '__none__' ? '' : v)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="No parent" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">No Parent</SelectItem>
+                    {getParentOptions().map((loc) => (
+                      <SelectItem key={loc.id} value={loc.id}>{loc.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Status</Label>
+                <Select value={editForm.status || 'active'} onValueChange={(v) => handleEditFormChange('status', v)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="active">Active</SelectItem>
+                    <SelectItem value="inactive">Inactive</SelectItem>
+                    <SelectItem value="maintenance">Maintenance</SelectItem>
+                    <SelectItem value="closed">Closed</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Warehouse Category</Label>
+                <Select value={editForm.warehouse_category || '__none__'} onValueChange={(v) => handleEditFormChange('warehouse_category', v === '__none__' ? '' : v)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">None</SelectItem>
+                    <SelectItem value="raw_materials">Raw Materials</SelectItem>
+                    <SelectItem value="finished_goods">Finished Goods</SelectItem>
+                    <SelectItem value="general">General</SelectItem>
+                    <SelectItem value="wip">Work in Progress</SelectItem>
+                    <SelectItem value="returns">Returns</SelectItem>
+                    <SelectItem value="quarantine">Quarantine</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="edit-capacity">Capacity</Label>
+                <Input
+                  id="edit-capacity"
+                  type="number"
+                  value={editForm.capacity ?? ''}
+                  onChange={(e) => handleEditFormChange('capacity', e.target.value)}
+                  placeholder="e.g. 1000"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="edit-contact">Contact Person</Label>
+                <Input
+                  id="edit-contact"
+                  value={editForm.contact_person || ''}
+                  onChange={(e) => handleEditFormChange('contact_person', e.target.value)}
+                  placeholder="Contact name"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="edit-phone">Contact Phone</Label>
+                <Input
+                  id="edit-phone"
+                  value={editForm.contact_phone || ''}
+                  onChange={(e) => handleEditFormChange('contact_phone', e.target.value)}
+                  placeholder="Phone number"
+                />
+              </div>
+
+              <div className="space-y-2 md:col-span-2">
+                <Label htmlFor="edit-description">Description</Label>
+                <Textarea
+                  id="edit-description"
+                  value={editForm.description || ''}
+                  onChange={(e) => handleEditFormChange('description', e.target.value)}
+                  placeholder="Location description"
+                  rows={2}
+                />
+              </div>
+
+              <div className="space-y-2 md:col-span-2">
+                <Label htmlFor="edit-address">Physical Address</Label>
+                <Textarea
+                  id="edit-address"
+                  value={editForm.physical_address || ''}
+                  onChange={(e) => handleEditFormChange('physical_address', e.target.value)}
+                  placeholder="Physical address"
+                  rows={2}
+                />
+              </div>
+            </div>
+          </ScrollArea>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditLocationData(null)}>Cancel</Button>
+            <Button onClick={handleSaveEdit} disabled={isUpdating || !editForm.name}>
+              {isUpdating ? 'Saving...' : 'Save Changes'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
