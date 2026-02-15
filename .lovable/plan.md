@@ -1,63 +1,58 @@
 
 
-# Permanent Fix: Scheduled Telegram Report De-duplication Bug
+# Fix: Sub-Location Report Not Showing Data
 
 ## Root Cause
 
-The de-duplication check (lines 174-182) prevents the report from being sent by comparing `last_scheduled_send` against **UTC midnight**:
+In `LocationReportAnalytics.tsx`, when the user switches between Location/Sub-Location/Department tabs, filter state values (`selectedLocation`, `selectedSublocation`) persist even though their corresponding dropdown UI elements become hidden.
 
-```text
-today = midnight UTC (00:00)
-if last_scheduled_send >= today → skip
-```
-
-Your scheduled time is **23:30 IST = 18:00 UTC**. The database shows `last_scheduled_send = 2026-02-14 04:07 UTC` (09:37 IST) -- set **before** the actual scheduled time. When the real 18:00 UTC run happened, it saw "already sent today" and skipped.
-
-This means any stale or early timestamp after UTC midnight but before 18:00 UTC blocks the entire day's delivery.
+For example:
+1. User goes to **Department** tab, selects "LNNB" location and "8th Floor" sublocation
+2. User switches to **Sub-Location** tab
+3. The sublocation dropdown disappears (it only renders for Department tab, line 892)
+4. But `selectedSublocation` is still set to "8th Floor" in React state
+5. The `filteredAssets` (line 310-311) still applies `sublocation_id === selectedSublocation`, drastically reducing the dataset
+6. Result: "No Data Available"
 
 ## Fix
 
-Replace the UTC-midnight-based check with a check against the **actual scheduled time**. The function should only skip if `last_scheduled_send` is after the most recent occurrence of the scheduled time.
+### File: `src/components/warehouse/LocationReportAnalytics.tsx`
 
-### File: `supabase/functions/scheduled-telegram-reports/index.ts`
+**Change 1: Reset filters when report type (tab) changes**
 
-#### Change 1: Fix the de-duplication logic (lines 174-183)
+Update the `setReportType` handler in the `Tabs` `onValueChange` (line 855) to reset all dependent filters when switching tabs:
 
-Replace the UTC midnight comparison with a comparison against the actual scheduled UTC time:
-
-```text
-Before:
-  const today = new Date();
-  today.setUTCHours(0, 0, 0, 0);
-  if (lastSend >= today) → skip
-
-After:
-  // Calculate the scheduled time in UTC for today
-  // If that time hasn't passed yet, use yesterday's scheduled time
-  // Only skip if last_scheduled_send is AFTER the most recent scheduled window
-  const scheduledUtcMinutes = convert scheduled time to UTC minutes
-  const scheduledUtcToday = new Date(now) at scheduled UTC hour:minute
-  if (scheduledUtcToday > now) subtract 1 day  // hasn't fired yet today
-  if (lastSend >= scheduledUtcToday) → skip
+```typescript
+onValueChange={(value) => {
+  setReportType(value as ReportType);
+  setSelectedLocation("all");
+  setSelectedSublocation("all");
+  setSelectedStatus("all");
+  setExpandedRows(new Set());
+}}
 ```
 
-This ensures the dedup window is anchored to the actual scheduled time, not an arbitrary UTC midnight boundary.
+This ensures that when switching between Location, Sub-Location, and Department tabs, all filters reset to "all" so hidden filters cannot silently restrict the data.
 
-#### Change 2: Add logging for dedup decisions
+**Change 2: Add sublocation filter for the Sub-Location tab**
 
-Log the exact comparison values so future issues are immediately diagnosable:
+Currently the sublocation filter dropdown only shows for the Department tab (line 892). For better UX, also show a sublocation filter when `reportType === "sublocation"` so users can drill into a specific sub-location:
 
-```text
-console.log(`Dedup check: last_scheduled_send=${lastSend}, 
-  scheduled window start=${scheduledUtcToday}, 
-  skip=${lastSend >= scheduledUtcToday}`)
+```typescript
+{(reportType === "sublocation" || reportType === "department") && (
+  <div className="w-48">
+    <Select value={selectedSublocation} onValueChange={handleSublocationChange}
+      disabled={selectedLocation === "all"}>
+      ...sublocation options...
+    </Select>
+  </div>
+)}
 ```
 
-## For the Feb 14 Report
+This makes the filtering behavior consistent and visible -- users can see and control the sublocation filter rather than it being a hidden state.
 
-After this fix deploys, you can manually send the Feb 14 report using the "Send to Telegram" button in the View Site Report dialog. The fix ensures future scheduled sends are never blocked by stale timestamps.
+## Summary
 
-## Files to Modify
-
-- `supabase/functions/scheduled-telegram-reports/index.ts` -- Fix dedup check logic (lines 174-183)
-
+- Reset all filter state when switching tabs to prevent hidden filters from restricting data
+- Show the sublocation filter dropdown on the Sub-Location tab for better usability
+- One file modified: `src/components/warehouse/LocationReportAnalytics.tsx`
