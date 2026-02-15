@@ -1,44 +1,72 @@
 
-# Add Sub-Location Filter to Asset List
+
+# Add Edit/Update Function to Warehouse Management Locations
 
 ## What This Does
 
-Adds a "Sub-Location" dropdown filter next to the existing Location and Category filters in the asset list view. The sub-location dropdown is dependent on the selected location -- it only shows sub-locations belonging to the chosen location, and is disabled when "All Locations" is selected.
+Adds an **Edit** button to each row in the Warehouse Management locations table. Clicking it opens a pre-filled edit dialog where users can update all location fields (name, type, status, capacity, contact info, address, etc.) and save changes.
+
+## Current State
+
+- Each row only has **View** and **Delete** buttons
+- The `updateLocation` mutation already exists in `useWarehouseLocations` hook and works correctly
+- The `LocationManagementDialog` has edit functionality but it is a separate full dialog for managing all locations -- not ideal for quick single-row edits
 
 ## Changes
 
-### File: `src/pages/warehouse/AssetManagement.tsx`
+### File: `src/pages/admin/WarehouseManagement.tsx`
 
-**1. Add state for the sublocation filter**
+**1. Add edit state**
 
-Add a new state variable `sublocationFilter` initialized to `"all"`, alongside the existing `locationFilter` and `categoryFilter` (around line 120).
-
-**2. Reset sublocation when location changes**
-
-When the user changes the location filter, reset `sublocationFilter` back to `"all"` so stale sublocation selections don't persist. This will be handled by wrapping `setLocationFilter` in a handler that also calls `setSublocationFilter("all")`.
-
-**3. Update `filteredAssets` logic**
-
-Add a `matchesSublocation` check in the filter function (around line 367):
+Add state for tracking which location is being edited:
 ```
-const matchesSublocation = sublocationFilter === "all" || asset.sublocation_id === sublocationFilter;
-return matchesSearch && matchesLocation && matchesSublocation && matchesCategory;
+const [editLocationData, setEditLocationData] = useState<WarehouseLocation | null>(null);
 ```
 
-**4. Add the Sub-Location dropdown in the UI**
+**2. Add Edit button to each row**
 
-Insert a new `Select` component between the Location and Category filters (after line 960). It will:
-- Show "All Sub-Locations" as default
-- List sub-locations for the currently selected location using the existing `getLocationsByType("sublocation", locationFilter)` helper
-- Be disabled when `locationFilter === "all"` (since sub-locations need a parent location)
-
-```text
-Filter bar layout:
-[Search] [Location ▼] [Sub-Location ▼] [Category ▼]
+Insert an Edit button (pencil icon) between the View and Delete buttons in the Actions column (around line 438-455):
 ```
+<Button size="sm" variant="ghost" onClick={() => setEditLocationData(location)}>
+  <Edit2 className="h-4 w-4" />
+</Button>
+```
+
+**3. Add an Edit Location Dialog**
+
+Create an inline `Dialog` component at the bottom of the page (next to the existing `LocationDetailsDialog`) that:
+- Opens when `editLocationData` is not null
+- Pre-fills a form with the selected location's current values (name, type, status, location_code, description, capacity, contact_person, contact_phone, physical_address, warehouse_category)
+- Provides dropdowns for type, status, and warehouse_category
+- Provides a parent location selector (filtered by type)
+- Calls `updateLocation({ id, ...updatedFields })` on save
+- Closes and resets state on cancel or successful save
+- Follows the standard dialog sizing (max-w-4xl, max-h-85vh with scroll)
+
+**4. Wire up updateLocation and isUpdating**
+
+Destructure `updateLocation` and `isUpdating` from the existing `useWarehouseLocations()` hook call (line 43 already has `updateLocation` but `isUpdating` is not destructured -- add it).
+
+## Form Fields in the Edit Dialog
+
+| Field | Type | Notes |
+|-------|------|-------|
+| Name | Text input | Required |
+| Location Code | Text input | Optional |
+| Type | Dropdown | location / sublocation / department |
+| Parent | Dropdown | Filtered by type selection |
+| Status | Dropdown | active / inactive / maintenance / closed |
+| Warehouse Category | Dropdown | raw_materials / finished_goods / general / wip / returns / quarantine |
+| Capacity | Number input | Optional |
+| Description | Textarea | Optional |
+| Contact Person | Text input | Optional |
+| Contact Phone | Text input | Optional |
+| Physical Address | Textarea | Optional |
 
 ## Summary
 
-- One file modified: `src/pages/warehouse/AssetManagement.tsx`
-- Three small additions: state variable, filter logic, and UI dropdown
-- Sub-location dropdown is context-aware (dependent on selected location, disabled otherwise)
+- One file modified: `src/pages/admin/WarehouseManagement.tsx`
+- Adds per-row Edit button and an edit dialog
+- Uses the existing `updateLocation` mutation -- no backend changes needed
+- Follows the established dialog sizing and layout standards
+
