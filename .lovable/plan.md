@@ -1,67 +1,36 @@
 
 
-# Fix: Supabase 1000-Row Default Limit Preventing All Assets from Loading
+# Add Department Filter to Asset List
 
-## Problem
+## What This Does
 
-Supabase enforces a **default maximum of 1000 rows** per query response. Even though the code uses `.limit(10000)`, the server still caps results at 1000. This is why only 1000 assets are visible despite having 4152+ in the database.
-
-## Solution
-
-Replace the single `.limit(10000)` query with a **paginated fetch loop** using `.range()` that fetches all rows in batches of 1000 until no more data remains. This pattern will be applied to the main asset query in `useWarehouseAssets.ts`.
+Adds a "Filter by Department" dropdown to the asset list filters, alongside the existing Location, Sub-Location, and Category filters. The department dropdown will be context-aware -- it will only show departments belonging to the currently selected sub-location, and will be disabled when no sub-location is selected.
 
 ## Changes
 
-### File: `src/hooks/useWarehouseAssets.ts`
+### File: `src/pages/warehouse/AssetManagement.tsx`
 
-**Replace the single query (lines 16-30) with a batch-fetch helper:**
+**1. Add department filter state** (near line 122, alongside existing filter states):
+- Add `const [departmentFilter, setDepartmentFilter] = useState<string>("all");`
 
-```typescript
-queryFn: async () => {
-  const allData: WarehouseAsset[] = [];
-  const batchSize = 1000;
-  let from = 0;
-  let keepFetching = true;
+**2. Update sub-location filter change handler** (around line 968):
+- When the sub-location filter changes, reset `departmentFilter` to `"all"` (same pattern as location resetting sub-location)
 
-  while (keepFetching) {
-    let query = supabase
-      .from('warehouse_assets')
-      .select('*')
-      .order('created_at', { ascending: false })
-      .range(from, from + batchSize - 1);
+**3. Add department match to the filter logic** (around line 377):
+- Add `const matchesDepartment = departmentFilter === "all" || asset.department_id === departmentFilter;`
+- Include `matchesDepartment` in the return condition
 
-    if (companyId) {
-      query = query.eq('company_id', companyId);
-    }
+**4. Add department filter dropdown** (after the sub-location filter Select, around line 994):
+- Add a new `<Select>` for department, populated via `getLocationsByType("department", sublocationFilter)`
+- Disable it when `sublocationFilter === "all"`
 
-    const { data, error } = await query;
-    if (error) throw error;
-
-    allData.push(...(data as WarehouseAsset[]));
-
-    if (!data || data.length < batchSize) {
-      keepFetching = false;
-    } else {
-      from += batchSize;
-    }
-  }
-
-  return allData;
-}
-```
-
-This fetches in chunks of 1000 rows using `.range(from, to)` until fewer than 1000 rows are returned, meaning all data has been retrieved.
-
-### No other files need changes
-
-- The KPI cards already derive counts from `filteredAssets` (client-side), so they will automatically reflect the full dataset.
-- Pagination in the table (50 per page) is already implemented, so rendering performance is not affected.
-- The count queries using `{ count: 'exact', head: true }` are unaffected since they only return counts, not rows.
+**5. Reset page on department filter change** (around line 444):
+- Add `departmentFilter` to the `useEffect` dependency array that resets `currentPage` to 1
 
 ## Summary
 
-- One file modified: `src/hooks/useWarehouseAssets.ts`
-- Replaces `.limit(10000)` with a batch-fetch loop using `.range()` in increments of 1000
-- All 4152+ assets will now load correctly
-- No performance impact since the table already paginates at 50 rows per page
+- One file modified: `src/pages/warehouse/AssetManagement.tsx`
+- Adds a department filter dropdown that is enabled only when a sub-location is selected
+- Resets automatically when the parent sub-location filter changes
+- Follows the exact same pattern as the existing sub-location filter
 
