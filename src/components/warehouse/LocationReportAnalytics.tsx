@@ -52,6 +52,7 @@ import { WarehouseAsset, WarehouseLocation, AssetCategory } from "@/types/wareho
 import { toast } from "@/hooks/use-toast";
 import { writeExcelFromJSON } from "@/utils/excelUtils";
 import { jsPDF } from "jspdf";
+import autoTable from "jspdf-autotable";
 import {
   exportLocationReportPdf,
   LocationReportData,
@@ -177,94 +178,7 @@ export function LocationReportAnalytics({
     }
   }, []);
 
-  // Function to capture expanded section as PDF
-  const handleCaptureAsPdf = useCallback(async (locationId: string, locationName: string) => {
-    const element = detailRefs.current[locationId];
-    if (!element) {
-      toast({
-        title: "Capture Failed",
-        description: "Could not find the section to capture.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setIsCapturingPdf(locationId);
-    try {
-      const canvas = await html2canvas(element, {
-        backgroundColor: "#ffffff",
-        scale: 2,
-        useCORS: true,
-        logging: false,
-      });
-      
-      const imgData = canvas.toDataURL("image/png");
-      const imgWidth = canvas.width;
-      const imgHeight = canvas.height;
-      
-      // Calculate PDF dimensions (A4 landscape for better fit)
-      const pdfWidth = 297; // A4 landscape width in mm
-      const pdfHeight = 210; // A4 landscape height in mm
-      const margin = 10;
-      
-      // Calculate scale to fit image within PDF page
-      const availableWidth = pdfWidth - (margin * 2);
-      const availableHeight = pdfHeight - (margin * 2);
-      const scale = Math.min(availableWidth / (imgWidth / 3.78), availableHeight / (imgHeight / 3.78));
-      
-      const scaledWidth = (imgWidth / 3.78) * scale;
-      const scaledHeight = (imgHeight / 3.78) * scale;
-      
-      const doc = new jsPDF({
-        orientation: scaledWidth > scaledHeight ? "landscape" : "portrait",
-        unit: "mm",
-        format: "a4",
-      });
-      
-      // Center the image on the page
-      const pageWidth = doc.internal.pageSize.getWidth();
-      const pageHeight = doc.internal.pageSize.getHeight();
-      const x = (pageWidth - scaledWidth) / 2;
-      const y = margin;
-      
-      // Add title
-      doc.setFontSize(16);
-      doc.setFont("helvetica", "bold");
-      doc.text(`${locationName} - Asset Report`, pageWidth / 2, margin, { align: "center" });
-      
-      // Add the captured image
-      doc.addImage(imgData, "PNG", x, y + 10, scaledWidth, scaledHeight);
-      
-      // Add footer
-      doc.setFontSize(8);
-      doc.setFont("helvetica", "normal");
-      doc.setTextColor(128, 128, 128);
-      doc.text(
-        `Generated: ${new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}`,
-        pageWidth / 2,
-        pageHeight - 5,
-        { align: "center" }
-      );
-      
-      // Save the PDF
-      const fileName = `${locationName.replace(/\s+/g, "_")}_Report_${new Date().toISOString().split("T")[0]}.pdf`;
-      doc.save(fileName);
-      
-      toast({
-        title: "Download Complete",
-        description: `Location report saved as PDF.`,
-      });
-    } catch (error) {
-      console.error("PDF capture error:", error);
-      toast({
-        title: "Capture Failed",
-        description: "Failed to generate PDF. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsCapturingPdf(null);
-    }
-  }, []);
+  // handleCaptureAsPdf is defined after analyticsData below
 
   // Get locations by type
   const mainLocations = useMemo(
@@ -644,6 +558,256 @@ export function LocationReportAnalytics({
     locations,
     categories,
   ]);
+
+  // Function to generate structured PDF for a location's detailed breakdown
+  const handleCaptureAsPdf = useCallback((locationId: string, locationName: string) => {
+    const item = analyticsData.sortedByCount.find((i) => i.id === locationId);
+    if (!item) {
+      toast({
+        title: "Export Failed",
+        description: "Could not find data for this location.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsCapturingPdf(locationId);
+    try {
+      const doc = new jsPDF("p", "mm", "a4");
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const margin = 14;
+      let y = 20;
+
+      const reportTypeLabel = reportType === "location" ? "Location" : reportType === "sublocation" ? "Sub-Location" : "Department";
+      const formatCurrency = (val: number) => `$${val.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+      // --- Header ---
+      doc.setFontSize(16);
+      doc.setFont("helvetica", "bold");
+      doc.text(locationName, pageWidth / 2, y, { align: "center" });
+      y += 7;
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(100, 100, 100);
+      doc.text(`${reportTypeLabel} Asset Detail Report`, pageWidth / 2, y, { align: "center" });
+      y += 5;
+      if (item.parentName) {
+        doc.text(`Parent: ${item.parentName}`, pageWidth / 2, y, { align: "center" });
+        y += 5;
+      }
+      doc.text(`Generated: ${new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}`, pageWidth / 2, y, { align: "center" });
+      y += 4;
+      doc.setDrawColor(200, 200, 200);
+      doc.line(margin, y, pageWidth - margin, y);
+      y += 8;
+      doc.setTextColor(0, 0, 0);
+
+      // --- KPI Summary ---
+      doc.setFontSize(12);
+      doc.setFont("helvetica", "bold");
+      doc.text("Key Performance Indicators", margin, y);
+      y += 2;
+
+      autoTable(doc, {
+        startY: y,
+        head: [["Total Assets", "Total Value", "Active Assets", "Utilization Rate"]],
+        body: [[
+          item.assetCount.toString(),
+          formatCurrency(item.totalValue),
+          item.activeCount.toString(),
+          `${item.utilizationRate.toFixed(1)}%`,
+        ]],
+        theme: "grid",
+        headStyles: { fillColor: [59, 130, 246], fontSize: 9 },
+        bodyStyles: { fontSize: 10, halign: "center", fontStyle: "bold" },
+        margin: { left: margin, right: margin },
+      });
+      y = (doc as any).lastAutoTable.finalY + 8;
+
+      // --- Status Breakdown ---
+      doc.setFontSize(12);
+      doc.setFont("helvetica", "bold");
+      doc.text("Status Breakdown", margin, y);
+      y += 2;
+
+      autoTable(doc, {
+        startY: y,
+        head: [["Active", "Maintenance", "Inactive", "Disposed"]],
+        body: [[
+          item.activeCount.toString(),
+          item.maintenanceCount.toString(),
+          item.inactiveCount.toString(),
+          item.disposedCount.toString(),
+        ]],
+        theme: "grid",
+        headStyles: { fillColor: [34, 197, 94], fontSize: 9 },
+        bodyStyles: { fontSize: 10, halign: "center" },
+        margin: { left: margin, right: margin },
+      });
+      y = (doc as any).lastAutoTable.finalY + 8;
+
+      // --- Condition Breakdown ---
+      doc.setFontSize(12);
+      doc.setFont("helvetica", "bold");
+      doc.text("Condition Breakdown", margin, y);
+      y += 2;
+
+      autoTable(doc, {
+        startY: y,
+        head: [["Good", "Fair", "Poor", "Needs Repair"]],
+        body: [[
+          item.goodCondition.toString(),
+          item.fairCondition.toString(),
+          item.poorCondition.toString(),
+          item.needsRepairCondition.toString(),
+        ]],
+        theme: "grid",
+        headStyles: { fillColor: [139, 92, 246], fontSize: 9 },
+        bodyStyles: { fontSize: 10, halign: "center" },
+        margin: { left: margin, right: margin },
+      });
+      y = (doc as any).lastAutoTable.finalY + 8;
+
+      // --- Value Metrics ---
+      doc.setFontSize(12);
+      doc.setFont("helvetica", "bold");
+      doc.text("Value Metrics", margin, y);
+      y += 2;
+
+      autoTable(doc, {
+        startY: y,
+        head: [["Total Value", "Average Value per Asset"]],
+        body: [[
+          formatCurrency(item.totalValue),
+          formatCurrency(item.assetCount > 0 ? item.totalValue / item.assetCount : 0),
+        ]],
+        theme: "grid",
+        headStyles: { fillColor: [245, 158, 11], fontSize: 9, textColor: [0, 0, 0] },
+        bodyStyles: { fontSize: 10, halign: "center", fontStyle: "bold" },
+        margin: { left: margin, right: margin },
+      });
+      y = (doc as any).lastAutoTable.finalY + 8;
+
+      // --- Category Breakdown ---
+      if (item.categoryBreakdown.length > 0) {
+        doc.setFontSize(12);
+        doc.setFont("helvetica", "bold");
+        doc.text("Category Breakdown", margin, y);
+        y += 2;
+
+        autoTable(doc, {
+          startY: y,
+          head: [["Category", "Assets", "Value"]],
+          body: item.categoryBreakdown.map((cat) => [
+            cat.categoryName,
+            cat.assetCount.toString(),
+            formatCurrency(cat.totalValue),
+          ]),
+          theme: "striped",
+          headStyles: { fillColor: [59, 130, 246], fontSize: 9 },
+          bodyStyles: { fontSize: 9 },
+          margin: { left: margin, right: margin },
+        });
+        y = (doc as any).lastAutoTable.finalY + 8;
+      }
+
+      // --- Subcategory Analysis ---
+      if (item.subcategoryBreakdown.length > 0) {
+        doc.setFontSize(12);
+        doc.setFont("helvetica", "bold");
+        doc.text("Subcategory Analysis", margin, y);
+        y += 2;
+
+        autoTable(doc, {
+          startY: y,
+          head: [["Subcategory", "Parent Category", "Assets", "Value", "Good", "Fair", "Poor", "Needs Repair"]],
+          body: item.subcategoryBreakdown.map((sub) => [
+            sub.subcategoryName,
+            sub.parentCategoryName,
+            sub.assetCount.toString(),
+            formatCurrency(sub.totalValue),
+            sub.goodCondition.toString(),
+            sub.fairCondition.toString(),
+            sub.poorCondition.toString(),
+            sub.needsRepair.toString(),
+          ]),
+          theme: "striped",
+          headStyles: { fillColor: [139, 92, 246], fontSize: 8 },
+          bodyStyles: { fontSize: 8 },
+          columnStyles: {
+            0: { cellWidth: 30 },
+            1: { cellWidth: 28 },
+          },
+          margin: { left: margin, right: margin },
+        });
+        y = (doc as any).lastAutoTable.finalY + 8;
+      }
+
+      // --- Asset Master Items ---
+      if (item.assetMasterBreakdown.length > 0) {
+        doc.setFontSize(12);
+        doc.setFont("helvetica", "bold");
+        doc.text("Asset Master Items", margin, y);
+        y += 2;
+
+        autoTable(doc, {
+          startY: y,
+          head: [["Item Name", "Brand", "Category", "Subcategory", "Count", "Value", "Good", "Fair", "Poor"]],
+          body: item.assetMasterBreakdown.map((am) => [
+            am.assetMasterName,
+            am.brand || "-",
+            am.categoryName || "-",
+            am.subcategoryName || "-",
+            am.assetCount.toString(),
+            formatCurrency(am.totalValue),
+            am.goodCondition.toString(),
+            am.fairCondition.toString(),
+            am.poorCondition.toString(),
+          ]),
+          theme: "striped",
+          headStyles: { fillColor: [34, 197, 94], fontSize: 8 },
+          bodyStyles: { fontSize: 8 },
+          columnStyles: {
+            0: { cellWidth: 28 },
+          },
+          margin: { left: margin, right: margin },
+        });
+      }
+
+      // --- Page numbers footer ---
+      const totalPages = doc.getNumberOfPages();
+      for (let i = 1; i <= totalPages; i++) {
+        doc.setPage(i);
+        doc.setFontSize(8);
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(128, 128, 128);
+        doc.text(
+          `Page ${i} of ${totalPages}`,
+          pageWidth / 2,
+          doc.internal.pageSize.getHeight() - 5,
+          { align: "center" }
+        );
+      }
+
+      const fileName = `${locationName.replace(/\s+/g, "_")}_Detail_Report_${new Date().toISOString().split("T")[0]}.pdf`;
+      doc.save(fileName);
+
+      toast({
+        title: "Download Complete",
+        description: "Structured PDF report saved successfully.",
+      });
+    } catch (error) {
+      console.error("PDF generation error:", error);
+      toast({
+        title: "Export Failed",
+        description: "Failed to generate PDF. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsCapturingPdf(null);
+    }
+  }, [analyticsData, reportType]);
+
 
   const toggleRow = (id: string) => {
     setExpandedRows((prev) => {
