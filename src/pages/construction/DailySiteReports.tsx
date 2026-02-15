@@ -1,4 +1,4 @@
-// Force rebuild - Telegram settings fully implemented
+// Force rebuild - dedup fix applied
 import { useState } from "react";
 import { Plus, Search, FileText, Calendar, Cloud, Users, Pencil, Trash2, Sparkles, BarChart3, Eye, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
