@@ -236,14 +236,16 @@ export function LocationReportAnalytics({
 
   // Calculate analytics data based on report type
   const analyticsData = useMemo(() => {
+    const OTHER_KEY = "__other__";
+
     const getGroupingKey = (asset: WarehouseAsset): string | null => {
       switch (reportType) {
         case "location":
           return asset.location_id || null;
         case "sublocation":
-          return asset.sublocation_id || null;
+          return asset.sublocation_id || OTHER_KEY;
         case "department":
-          return asset.department_id || null;
+          return asset.department_id || OTHER_KEY;
         default:
           return null;
       }
@@ -296,6 +298,32 @@ export function LocationReportAnalytics({
         assetMasterBreakdown: [],
       };
     });
+
+    // Add synthetic "Other" group for sublocation/department reports
+    if (reportType === "sublocation" || reportType === "department") {
+      groupedData[OTHER_KEY] = {
+        id: OTHER_KEY,
+        name: "Other",
+        parentId: null,
+        parentName: reportType === "sublocation"
+          ? (selectedLocation !== "all" ? locations.find(l => l.id === selectedLocation)?.name : undefined)
+          : undefined,
+        assetCount: 0,
+        totalValue: 0,
+        activeCount: 0,
+        maintenanceCount: 0,
+        inactiveCount: 0,
+        disposedCount: 0,
+        goodCondition: 0,
+        fairCondition: 0,
+        poorCondition: 0,
+        needsRepairCondition: 0,
+        utilizationRate: 0,
+        categoryBreakdown: [],
+        subcategoryBreakdown: [],
+        assetMasterBreakdown: [],
+      };
+    }
 
     // Track category/subcategory counts per location
     const locationCategoryData: Record<
@@ -419,6 +447,11 @@ export function LocationReportAnalytics({
         }
       }
     });
+
+    // Remove "Other" if it has no assets
+    if (groupedData[OTHER_KEY] && groupedData[OTHER_KEY].assetCount === 0) {
+      delete groupedData[OTHER_KEY];
+    }
 
     // Build category and subcategory breakdowns for each location
     Object.keys(groupedData).forEach((locId) => {
