@@ -1,82 +1,67 @@
 
 
-# Fix: Asset Counts Wrong and Assets Not Displaying Correctly
+# Fix: Supabase 1000-Row Default Limit Preventing All Assets from Loading
 
-## Root Causes Found
+## Problem
 
-1. **Missing `company_id` on asset creation**: The form collects `company_id` but the `onSubmit` handler never includes it in the data sent to the database. All 4152 assets have NULL `company_id`.
-2. **No company filtering on asset queries**: The `useWarehouseAssets` hook fetches all assets from all companies without filtering by the selected company.
-3. **No pagination**: The table renders all 4152 rows at once, making it slow and unusable ("cannot see assets correctly").
+Supabase enforces a **default maximum of 1000 rows** per query response. Even though the code uses `.limit(10000)`, the server still caps results at 1000. This is why only 1000 assets are visible despite having 4152+ in the database.
 
-## Fix Plan
+## Solution
 
-### 1. File: `src/pages/warehouse/AssetManagement.tsx` -- Include `company_id` in asset creation
+Replace the single `.limit(10000)` query with a **paginated fetch loop** using `.range()` that fetches all rows in batches of 1000 until no more data remains. This pattern will be applied to the main asset query in `useWarehouseAssets.ts`.
 
-In the `onSubmit` function (around line 237), add `company_id: data.company_id` to the `assetData` object so newly created assets are properly tagged with the selected company.
+## Changes
 
-### 2. File: `src/hooks/useWarehouseAssets.ts` -- Add company filtering
+### File: `src/hooks/useWarehouseAssets.ts`
 
-- Accept an optional `companyId` parameter
-- Filter the main assets query with `.eq('company_id', companyId)` when provided
-- Filter the count queries the same way so server-side counts also match
-- Include `companyId` in all query keys for proper cache separation
+**Replace the single query (lines 16-30) with a batch-fetch helper:**
 
-### 3. File: `src/pages/warehouse/AssetManagement.tsx` -- Pass company context to hook
+```typescript
+queryFn: async () => {
+  const allData: WarehouseAsset[] = [];
+  const batchSize = 1000;
+  let from = 0;
+  let keepFetching = true;
 
-- Import `useCompany` from the company context
-- Pass `selectedCompany?.id` to `useWarehouseAssets(selectedCompany?.id)`
-- This ensures the asset list and counts only show the selected company's assets
+  while (keepFetching) {
+    let query = supabase
+      .from('warehouse_assets')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .range(from, from + batchSize - 1);
 
-### 4. File: `src/pages/warehouse/AssetManagement.tsx` -- Add pagination
+    if (companyId) {
+      query = query.eq('company_id', companyId);
+    }
 
-Add pagination controls below the asset table:
-- Default page size of 50 rows
-- Page state tracking (`currentPage`)
-- Slice `filteredAssets` for the current page: `filteredAssets.slice((page-1)*50, page*50)`
-- Show "Page X of Y" with Previous/Next buttons
-- Reset to page 1 when filters change
+    const { data, error } = await query;
+    if (error) throw error;
 
-### 5. Backfill existing NULL `company_id` records
+    allData.push(...(data as WarehouseAsset[]));
 
-Provide a SQL query the user can run to assign the correct `company_id` to existing assets that currently have NULL values (if the user has a single company, this is straightforward).
-
-## Technical Details
-
-### `useWarehouseAssets.ts` changes:
-```
-export const useWarehouseAssets = (companyId?: string) => {
-  // Main query
-  queryKey: ['warehouse-assets', companyId],
-  queryFn: async () => {
-    let query = supabase.from('warehouse_assets').select('*').order(...).limit(10000);
-    if (companyId) query = query.eq('company_id', companyId);
-    ...
+    if (!data || data.length < batchSize) {
+      keepFetching = false;
+    } else {
+      from += batchSize;
+    }
   }
-  // Same pattern for count queries
+
+  return allData;
 }
 ```
 
-### Pagination in `AssetManagement.tsx`:
-```
-const [currentPage, setCurrentPage] = useState(1);
-const pageSize = 50;
-const totalPages = Math.ceil(filteredAssets.length / pageSize);
-const paginatedAssets = filteredAssets.slice((currentPage - 1) * pageSize, currentPage * pageSize);
-// Reset page on filter change
-useEffect(() => setCurrentPage(1), [searchTerm, locationFilter, sublocationFilter, categoryFilter]);
-// Render paginatedAssets instead of filteredAssets in table body
-```
+This fetches in chunks of 1000 rows using `.range(from, to)` until fewer than 1000 rows are returned, meaning all data has been retrieved.
 
-## Files Modified
+### No other files need changes
 
-- `src/hooks/useWarehouseAssets.ts` -- add company filtering parameter
-- `src/pages/warehouse/AssetManagement.tsx` -- pass company context, fix company_id on create, add pagination
+- The KPI cards already derive counts from `filteredAssets` (client-side), so they will automatically reflect the full dataset.
+- Pagination in the table (50 per page) is already implemented, so rendering performance is not affected.
+- The count queries using `{ count: 'exact', head: true }` are unaffected since they only return counts, not rows.
 
 ## Summary
 
-- KPI cards will show correct counts for the selected company
-- Asset table will only show the selected company's assets
-- Pagination (50 per page) makes the table usable
-- New assets will be properly tagged with company_id
-- Existing NULL records need a one-time backfill (SQL provided after implementation)
+- One file modified: `src/hooks/useWarehouseAssets.ts`
+- Replaces `.limit(10000)` with a batch-fetch loop using `.range()` in increments of 1000
+- All 4152+ assets will now load correctly
+- No performance impact since the table already paginates at 50 rows per page
 
