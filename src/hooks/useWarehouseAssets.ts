@@ -14,19 +14,35 @@ export const useWarehouseAssets = (companyId?: string) => {
   } = useQuery({
     queryKey: ['warehouse-assets', companyId],
     queryFn: async () => {
-      let query = supabase
-        .from('warehouse_assets')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(10000);
+      const allData: WarehouseAsset[] = [];
+      const batchSize = 1000;
+      let from = 0;
+      let keepFetching = true;
 
-      if (companyId) {
-        query = query.eq('company_id', companyId);
+      while (keepFetching) {
+        let query = supabase
+          .from('warehouse_assets')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .range(from, from + batchSize - 1);
+
+        if (companyId) {
+          query = query.eq('company_id', companyId);
+        }
+
+        const { data, error } = await query;
+        if (error) throw error;
+
+        allData.push(...(data as WarehouseAsset[]));
+
+        if (!data || data.length < batchSize) {
+          keepFetching = false;
+        } else {
+          from += batchSize;
+        }
       }
 
-      const { data, error } = await query;
-      if (error) throw error;
-      return data as WarehouseAsset[];
+      return allData;
     }
   });
 
