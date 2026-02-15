@@ -81,7 +81,7 @@ function drawBarChart(
   title: string,
   barColor: string = "#3b82f6"
 ): void {
-  const padding = { top: 40, right: 20, bottom: 60, left: 60 };
+  const padding = { top: 40, right: 30, bottom: 80, left: 70 };
   const chartWidth = width - padding.left - padding.right;
   const chartHeight = height - padding.top - padding.bottom;
 
@@ -91,9 +91,9 @@ function drawBarChart(
 
   // Title
   ctx.fillStyle = "#1f2937";
-  ctx.font = "bold 14px Arial";
+  ctx.font = "bold 16px Arial";
   ctx.textAlign = "center";
-  ctx.fillText(title, width / 2, 24);
+  ctx.fillText(title, width / 2, 28);
 
   if (data.length === 0) {
     ctx.fillStyle = "#6b7280";
@@ -103,10 +103,10 @@ function drawBarChart(
   }
 
   const maxValue = Math.max(...data.map((d) => d.value));
-  const barWidth = Math.min(40, chartWidth / data.length - 10);
+  const barWidth = Math.min(50, chartWidth / data.length - 10);
 
   // Draw bars
-  data.slice(0, 10).forEach((item, index) => {
+  data.forEach((item, index) => {
     const barHeight = (item.value / maxValue) * chartHeight;
     const x = padding.left + (chartWidth / data.length) * index + barWidth / 2;
     const y = padding.top + chartHeight - barHeight;
@@ -116,7 +116,7 @@ function drawBarChart(
 
     // Value label
     ctx.fillStyle = "#1f2937";
-    ctx.font = "10px Arial";
+    ctx.font = "11px Arial";
     ctx.textAlign = "center";
     ctx.fillText(item.value.toLocaleString(), x + barWidth / 2, y - 5);
 
@@ -126,8 +126,8 @@ function drawBarChart(
     ctx.rotate(-Math.PI / 4);
     ctx.textAlign = "right";
     ctx.fillStyle = "#4b5563";
-    ctx.font = "9px Arial";
-    const label = item.name.length > 10 ? item.name.substring(0, 10) + "..." : item.name;
+    ctx.font = "10px Arial";
+    const label = item.name.length > 18 ? item.name.substring(0, 18) + "..." : item.name;
     ctx.fillText(label, 0, 0);
     ctx.restore();
   });
@@ -167,7 +167,7 @@ function drawPieChart(
   title: string
 ): void {
   const centerX = width / 2;
-  const centerY = height / 2 + 10;
+  const centerY = height / 2 - 10;
   const radius = Math.min(width, height) / 3;
 
   // Clear and set background
@@ -176,9 +176,9 @@ function drawPieChart(
 
   // Title
   ctx.fillStyle = "#1f2937";
-  ctx.font = "bold 14px Arial";
+  ctx.font = "bold 16px Arial";
   ctx.textAlign = "center";
-  ctx.fillText(title, width / 2, 24);
+  ctx.fillText(title, width / 2, 28);
 
   if (data.length === 0) {
     ctx.fillStyle = "#6b7280";
@@ -191,11 +191,12 @@ function drawPieChart(
   const colors = [
     "#3b82f6", "#10b981", "#f59e0b", "#ef4444",
     "#8b5cf6", "#ec4899", "#06b6d4", "#84cc16",
+    "#d946ef", "#14b8a6", "#f97316", "#6366f1",
   ];
 
   let startAngle = -Math.PI / 2;
 
-  data.slice(0, 8).forEach((item, index) => {
+  data.forEach((item, index) => {
     const sliceAngle = (item.value / total) * 2 * Math.PI;
     const endAngle = startAngle + sliceAngle;
 
@@ -214,35 +215,36 @@ function drawPieChart(
     const labelY = centerY + Math.sin(labelAngle) * labelRadius;
 
     ctx.fillStyle = "#ffffff";
-    ctx.font = "10px Arial";
+    ctx.font = "11px Arial";
     ctx.textAlign = "center";
     const percent = ((item.value / total) * 100).toFixed(0);
-    if (parseFloat(percent) > 5) {
+    if (parseFloat(percent) > 4) {
       ctx.fillText(`${percent}%`, labelX, labelY);
     }
 
     startAngle = endAngle;
   });
 
-  // Legend
-  const legendStartY = height - 50;
+  // Legend - 3 columns with more space
+  const legendStartY = height - 80;
   const legendStartX = 20;
-  const itemWidth = (width - 40) / 4;
+  const cols = 3;
+  const itemWidth = (width - 40) / cols;
 
-  data.slice(0, 8).forEach((item, index) => {
-    const row = Math.floor(index / 4);
-    const col = index % 4;
+  data.forEach((item, index) => {
+    const row = Math.floor(index / cols);
+    const col = index % cols;
     const x = legendStartX + col * itemWidth;
-    const y = legendStartY + row * 15;
+    const y = legendStartY + row * 18;
 
     ctx.fillStyle = colors[index % colors.length];
     ctx.fillRect(x, y, 10, 10);
 
     ctx.fillStyle = "#4b5563";
-    ctx.font = "9px Arial";
+    ctx.font = "10px Arial";
     ctx.textAlign = "left";
-    const label = item.name.length > 12 ? item.name.substring(0, 12) + "..." : item.name;
-    ctx.fillText(label, x + 14, y + 8);
+    const label = item.name.length > 18 ? item.name.substring(0, 18) + "..." : item.name;
+    ctx.fillText(label, x + 14, y + 9);
   });
 }
 
@@ -253,7 +255,7 @@ function drawStackedBarChart(
   height: number,
   title: string
 ): void {
-  const padding = { top: 50, right: 20, bottom: 80, left: 60 };
+  const padding = { top: 50, right: 30, bottom: 100, left: 70 };
   const chartWidth = width - padding.left - padding.right;
   const chartHeight = height - padding.top - padding.bottom;
 
@@ -263,9 +265,9 @@ function drawStackedBarChart(
 
   // Title
   ctx.fillStyle = "#1f2937";
-  ctx.font = "bold 14px Arial";
+  ctx.font = "bold 16px Arial";
   ctx.textAlign = "center";
-  ctx.fillText(title, width / 2, 24);
+  ctx.fillText(title, width / 2, 28);
 
   if (data.length === 0) {
     ctx.fillStyle = "#6b7280";
@@ -275,7 +277,7 @@ function drawStackedBarChart(
   }
 
   const maxValue = Math.max(...data.map((d) => d.active + d.maintenance + d.inactive));
-  const barWidth = Math.min(35, chartWidth / data.length - 8);
+  const barWidth = Math.min(45, chartWidth / data.length - 8);
 
   const colors = {
     active: "#22c55e",
@@ -283,7 +285,7 @@ function drawStackedBarChart(
     inactive: "#ef4444",
   };
 
-  data.slice(0, 10).forEach((item, index) => {
+  data.forEach((item, index) => {
     const x = padding.left + (chartWidth / data.length) * index + barWidth / 2;
     let currentY = padding.top + chartHeight;
 
@@ -310,8 +312,8 @@ function drawStackedBarChart(
     ctx.rotate(-Math.PI / 4);
     ctx.textAlign = "right";
     ctx.fillStyle = "#4b5563";
-    ctx.font = "9px Arial";
-    const label = item.name.length > 10 ? item.name.substring(0, 10) + "..." : item.name;
+    ctx.font = "10px Arial";
+    const label = item.name.length > 18 ? item.name.substring(0, 18) + "..." : item.name;
     ctx.fillText(label, 0, 0);
     ctx.restore();
   });
@@ -324,15 +326,15 @@ function drawStackedBarChart(
     { label: "Inactive", color: colors.inactive },
   ];
 
-  let legendX = width - 200;
+  let legendX = width - 280;
   legends.forEach((leg) => {
     ctx.fillStyle = leg.color;
     ctx.fillRect(legendX, legendY - 8, 10, 10);
     ctx.fillStyle = "#4b5563";
-    ctx.font = "10px Arial";
+    ctx.font = "11px Arial";
     ctx.textAlign = "left";
     ctx.fillText(leg.label, legendX + 14, legendY);
-    legendX += 60;
+    legendX += 80;
   });
 }
 
@@ -343,7 +345,7 @@ function drawSubcategoryConditionChart(
   height: number,
   title: string
 ): void {
-  const padding = { top: 50, right: 20, bottom: 100, left: 60 };
+  const padding = { top: 50, right: 30, bottom: 100, left: 70 };
   const chartWidth = width - padding.left - padding.right;
   const chartHeight = height - padding.top - padding.bottom;
 
@@ -353,9 +355,9 @@ function drawSubcategoryConditionChart(
 
   // Title
   ctx.fillStyle = "#1f2937";
-  ctx.font = "bold 14px Arial";
+  ctx.font = "bold 16px Arial";
   ctx.textAlign = "center";
-  ctx.fillText(title, width / 2, 24);
+  ctx.fillText(title, width / 2, 28);
 
   if (data.length === 0) {
     ctx.fillStyle = "#6b7280";
@@ -367,7 +369,7 @@ function drawSubcategoryConditionChart(
   const maxValue = Math.max(
     ...data.map((d) => d.goodCondition + d.fairCondition + d.poorCondition + d.needsRepair)
   );
-  const barWidth = Math.min(30, chartWidth / data.length - 6);
+  const barWidth = Math.min(40, chartWidth / data.length - 6);
 
   const colors = {
     good: "#22c55e",
@@ -376,7 +378,7 @@ function drawSubcategoryConditionChart(
     needsRepair: "#dc2626",
   };
 
-  data.slice(0, 8).forEach((item, index) => {
+  data.forEach((item, index) => {
     const x = padding.left + (chartWidth / data.length) * index + barWidth / 2;
     let currentY = padding.top + chartHeight;
 
@@ -409,9 +411,9 @@ function drawSubcategoryConditionChart(
     ctx.rotate(-Math.PI / 4);
     ctx.textAlign = "right";
     ctx.fillStyle = "#4b5563";
-    ctx.font = "8px Arial";
-    const label = item.subcategoryName.length > 12
-      ? item.subcategoryName.substring(0, 12) + "..."
+    ctx.font = "10px Arial";
+    const label = item.subcategoryName.length > 18
+      ? item.subcategoryName.substring(0, 18) + "..."
       : item.subcategoryName;
     ctx.fillText(label, 0, 0);
     ctx.restore();
@@ -426,15 +428,15 @@ function drawSubcategoryConditionChart(
     { label: "Needs Repair", color: colors.needsRepair },
   ];
 
-  let legendX = width - 280;
+  let legendX = width - 340;
   legends.forEach((leg) => {
     ctx.fillStyle = leg.color;
     ctx.fillRect(legendX, legendY - 8, 10, 10);
     ctx.fillStyle = "#4b5563";
-    ctx.font = "10px Arial";
+    ctx.font = "11px Arial";
     ctx.textAlign = "left";
     ctx.fillText(leg.label, legendX + 14, legendY);
-    legendX += 70;
+    legendX += 80;
   });
 }
 
@@ -491,6 +493,8 @@ export async function exportLocationReportPdf(
       ? "Sub-Location"
       : "Department";
 
+  // ===== PAGE 1: Header, KPIs, Asset Count Bar Chart =====
+
   // Header
   doc.setFontSize(18);
   doc.setFont("helvetica", "bold");
@@ -515,16 +519,12 @@ export async function exportLocationReportPdf(
     minute: "2-digit",
   })}`, pageWidth / 2, 35, { align: "center" });
 
-  // Reset text color
   doc.setTextColor(0, 0, 0);
 
-  // KPI Summary Section
+  // KPI Summary
   doc.setFontSize(12);
   doc.setFont("helvetica", "bold");
   doc.text("KPI SUMMARY", margin, 48);
-
-  doc.setFontSize(10);
-  doc.setFont("helvetica", "normal");
 
   const kpiData = [
     ["Total Assets", kpis.totalAssets.toLocaleString()],
@@ -550,53 +550,65 @@ export async function exportLocationReportPdf(
 
   let currentY = (doc as any).lastAutoTable.finalY + 10;
 
-  // Generate and add charts
+  // Asset Count Bar Chart - full width
   try {
-    // Asset Count Chart
     const assetCountImage = await renderChartToImage(
       "bar",
       chartData.assetCountData,
-      500,
-      250,
+      800,
+      400,
       `Assets by ${reportTypeLabel}`
     );
-    doc.addImage(assetCountImage, "PNG", margin, currentY, 85, 42);
 
-    // Value Distribution Pie Chart
+    if (currentY > pageHeight - 70) {
+      doc.addPage();
+      currentY = 20;
+    }
+    doc.addImage(assetCountImage, "PNG", margin, currentY, 180, 60);
+    currentY += 65;
+  } catch (error) {
+    console.error("Bar chart rendering error:", error);
+  }
+
+  // ===== PAGE 2: Pie Chart + Status Chart =====
+  doc.addPage();
+  currentY = 20;
+
+  try {
+    // Value Distribution Pie Chart - centered
     const valueDistImage = await renderChartToImage(
       "pie",
       chartData.valueDistribution,
+      600,
       400,
-      300,
       "Value Distribution"
     );
-    doc.addImage(valueDistImage, "PNG", margin + 90, currentY, 85, 42);
+    doc.addImage(valueDistImage, "PNG", 30, currentY, 150, 70);
+    currentY += 78;
 
-    currentY += 47;
+    // Status Distribution Chart - full width
+    if (currentY > pageHeight - 70) {
+      doc.addPage();
+      currentY = 20;
+    }
 
-    // Status Distribution Chart
     const statusImage = await renderChartToImage(
       "stackedBar",
       chartData.statusDistribution,
-      500,
-      280,
+      800,
+      400,
       `Status by ${reportTypeLabel}`
     );
-    doc.addImage(statusImage, "PNG", margin, currentY, 180, 50);
-
-    currentY += 55;
+    doc.addImage(statusImage, "PNG", margin, currentY, 180, 60);
+    currentY += 65;
   } catch (error) {
     console.error("Chart rendering error:", error);
-    currentY += 10;
   }
 
-  // Check if we need a new page
-  if (currentY > pageHeight - 60) {
-    doc.addPage();
-    currentY = 20;
-  }
+  // ===== PAGE 3+: Summary Table (all locations) =====
+  doc.addPage();
+  currentY = 20;
 
-  // Summary Table
   doc.setFontSize(12);
   doc.setFont("helvetica", "bold");
   doc.text(`${reportTypeLabel.toUpperCase()} SUMMARY`, margin, currentY);
@@ -610,7 +622,7 @@ export async function exportLocationReportPdf(
     "Utilization",
   ];
 
-  const summaryData = reportData.slice(0, 15).map((item) => [
+  const summaryData = reportData.map((item) => [
     item.name,
     item.assetCount.toString(),
     item.totalValue.toLocaleString(),
@@ -630,8 +642,8 @@ export async function exportLocationReportPdf(
 
   currentY = (doc as any).lastAutoTable.finalY + 15;
 
-  // Detailed breakdowns for each location
-  for (const location of reportData.slice(0, 10)) {
+  // ===== Remaining pages: Detailed breakdowns per location =====
+  for (const location of reportData) {
     // Check for new page
     if (currentY > pageHeight - 100) {
       doc.addPage();
@@ -652,7 +664,7 @@ export async function exportLocationReportPdf(
 
     currentY += 12;
 
-    // Category Breakdown (if available)
+    // Category Breakdown
     if (location.categoryBreakdown && location.categoryBreakdown.length > 0) {
       doc.setFontSize(9);
       doc.setFont("helvetica", "bold");
@@ -660,25 +672,31 @@ export async function exportLocationReportPdf(
       currentY += 4;
 
       const categoryText = location.categoryBreakdown
-        .slice(0, 6)
         .map((cat) => `${cat.categoryName}: ${cat.assetCount}`)
         .join(" | ");
 
       doc.setFont("helvetica", "normal");
       doc.setFontSize(8);
-      doc.text(categoryText, margin, currentY);
-      currentY += 6;
+      // Split long category text across lines
+      const splitText = doc.splitTextToSize(categoryText, pageWidth - margin * 2);
+      doc.text(splitText, margin, currentY);
+      currentY += splitText.length * 4 + 4;
     }
 
-    // Subcategory Table (if available)
+    // Subcategory Table
     if (location.subcategoryBreakdown && location.subcategoryBreakdown.length > 0) {
+      if (currentY > pageHeight - 40) {
+        doc.addPage();
+        currentY = 20;
+      }
+
       doc.setFontSize(9);
       doc.setFont("helvetica", "bold");
       doc.text("Subcategory Analysis:", margin, currentY);
       currentY += 2;
 
       const subcatHeaders = ["Subcategory", "Category", "Assets", "Value", "Good", "Fair", "Poor"];
-      const subcatData = location.subcategoryBreakdown.slice(0, 8).map((sub) => [
+      const subcatData = location.subcategoryBreakdown.map((sub) => [
         sub.subcategoryName,
         sub.parentCategoryName,
         sub.assetCount.toString(),
@@ -701,10 +719,9 @@ export async function exportLocationReportPdf(
       currentY = (doc as any).lastAutoTable.finalY + 6;
     }
 
-    // Asset Master Breakdown (if available)
+    // Asset Master Breakdown
     if (location.assetMasterBreakdown && location.assetMasterBreakdown.length > 0) {
-      // Check for new page
-      if (currentY > pageHeight - 80) {
+      if (currentY > pageHeight - 40) {
         doc.addPage();
         currentY = 20;
       }
@@ -715,8 +732,8 @@ export async function exportLocationReportPdf(
       currentY += 2;
 
       const amHeaders = ["Item Name", "Brand", "Category", "Count", "Value", "Good", "Fair", "Poor"];
-      const amData = location.assetMasterBreakdown.slice(0, 10).map((am) => [
-        am.assetMasterName.length > 20 ? am.assetMasterName.substring(0, 20) + "..." : am.assetMasterName,
+      const amData = location.assetMasterBreakdown.map((am) => [
+        am.assetMasterName.length > 30 ? am.assetMasterName.substring(0, 30) + "..." : am.assetMasterName,
         am.brand || "—",
         am.categoryName || "—",
         am.assetCount.toString(),
