@@ -1,56 +1,63 @@
 
 
-# Fix: Scheduled Telegram Report Not Sending
+# Permanent Fix: Scheduled Telegram Report De-duplication Bug
 
-## Analysis
+## Root Cause
 
-The scheduled Telegram function ran at 18:00 UTC on Feb 13 (confirmed by `last_scheduled_send = 2026-02-13 18:00:01`), but the report was not delivered. The old logs have expired, so the exact failure point (PDF generation or Telegram API) is unknown. However, there is a **critical bug** that prevents recovery from failures.
+The de-duplication check (lines 174-182) prevents the report from being sent by comparing `last_scheduled_send` against **UTC midnight**:
 
-## Bug: `last_scheduled_send` Updated Even On Failure
+```text
+today = midnight UTC (00:00)
+if last_scheduled_send >= today → skip
+```
 
-In `supabase/functions/scheduled-telegram-reports/index.ts` at line 323, `last_scheduled_send` is updated after the report processing loop **regardless of whether any sends succeeded**. This means:
+Your scheduled time is **23:30 IST = 18:00 UTC**. The database shows `last_scheduled_send = 2026-02-14 04:07 UTC` (09:37 IST) -- set **before** the actual scheduled time. When the real 18:00 UTC run happened, it saw "already sent today" and skipped.
 
-1. The function finds reports and tries to send them
-2. PDF generation or Telegram API fails for all reports
-3. `last_scheduled_send` is still set to today -- marking it as "done"
-4. The next cron run sees "already sent today" and skips -- **no retry possible**
+This means any stale or early timestamp after UTC midnight but before 18:00 UTC blocks the entire day's delivery.
 
-## Fix Plan
+## Fix
 
-### 1. Only update `last_scheduled_send` on success (line 323 area)
+Replace the UTC-midnight-based check with a check against the **actual scheduled time**. The function should only skip if `last_scheduled_send` is after the most recent occurrence of the scheduled time.
 
-Move the `last_scheduled_send` update inside a condition that checks if at least one report was sent successfully for that company:
+### File: `supabase/functions/scheduled-telegram-reports/index.ts`
+
+#### Change 1: Fix the de-duplication logic (lines 174-183)
+
+Replace the UTC midnight comparison with a comparison against the actual scheduled UTC time:
 
 ```text
 Before:
-  // Always runs after loop (even if all sends failed)
-  await supabase.from('telegram_settings').update({ last_scheduled_send: ... })
+  const today = new Date();
+  today.setUTCHours(0, 0, 0, 0);
+  if (lastSend >= today) → skip
 
 After:
-  // Only update if at least one report was actually delivered
-  const companyResults = results.filter(r => r.company_id === setting.company_id);
-  const anySuccess = companyResults.some(r => r.success && r.report_id);
-  if (anySuccess || companyResults.every(r => r.message === 'No reports today')) {
-    await supabase.from('telegram_settings').update({ last_scheduled_send: ... })
-  }
+  // Calculate the scheduled time in UTC for today
+  // If that time hasn't passed yet, use yesterday's scheduled time
+  // Only skip if last_scheduled_send is AFTER the most recent scheduled window
+  const scheduledUtcMinutes = convert scheduled time to UTC minutes
+  const scheduledUtcToday = new Date(now) at scheduled UTC hour:minute
+  if (scheduledUtcToday > now) subtract 1 day  // hasn't fired yet today
+  if (lastSend >= scheduledUtcToday) → skip
 ```
 
-### 2. Add detailed error logging for failure tracking
+This ensures the dedup window is anchored to the actual scheduled time, not an arbitrary UTC midnight boundary.
 
-Add structured logging before the `last_scheduled_send` update so failures are clearly visible:
-- Log the count of successful vs failed sends per company
-- Log specific failure reasons (PDF generation error, Telegram API error)
-- This ensures future failures can be diagnosed even after logs rotate
+#### Change 2: Add logging for dedup decisions
 
-### 3. Add a manual "Retry" mechanism
+Log the exact comparison values so future issues are immediately diagnosable:
 
-In `ViewSiteReportDialog.tsx`, the existing "Send to Telegram" button already works as a manual retry. No changes needed here -- the user can manually resend any report.
+```text
+console.log(`Dedup check: last_scheduled_send=${lastSend}, 
+  scheduled window start=${scheduledUtcToday}, 
+  skip=${lastSend >= scheduledUtcToday}`)
+```
+
+## For the Feb 14 Report
+
+After this fix deploys, you can manually send the Feb 14 report using the "Send to Telegram" button in the View Site Report dialog. The fix ensures future scheduled sends are never blocked by stale timestamps.
 
 ## Files to Modify
 
-- `supabase/functions/scheduled-telegram-reports/index.ts` -- Fix the `last_scheduled_send` update logic and improve error logging
-
-## For the Feb 13 Report
-
-Since the Feb 13 report was missed, you can manually send it using the "Send to Telegram" button in the View Site Report dialog. The scheduled function fix will prevent this issue from recurring.
+- `supabase/functions/scheduled-telegram-reports/index.ts` -- Fix dedup check logic (lines 174-183)
 
