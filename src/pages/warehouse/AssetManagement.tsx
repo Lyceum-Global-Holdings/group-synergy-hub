@@ -120,6 +120,7 @@ export default function AssetManagement() {
   const [searchTerm, setSearchTerm] = useState("");
   const [locationFilter, setLocationFilter] = useState<string>("all");
   const [sublocationFilter, setSublocationFilter] = useState<string>("all");
+  const [departmentFilter, setDepartmentFilter] = useState<string>("all");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedAssetIds, setSelectedAssetIds] = useState<Set<string>>(new Set());
@@ -374,7 +375,10 @@ export default function AssetManagement() {
     // Category filter
     const matchesCategory = categoryFilter === "all" || asset.category_id === categoryFilter;
     
-    return matchesSearch && matchesLocation && matchesSublocation && matchesCategory;
+    // Department filter
+    const matchesDepartment = departmentFilter === "all" || asset.department_id === departmentFilter;
+    
+    return matchesSearch && matchesLocation && matchesSublocation && matchesDepartment && matchesCategory;
   });
 
   const getLocationsByType = (type: "location" | "sublocation" | "department", parentId?: string) => {
@@ -442,7 +446,7 @@ export default function AssetManagement() {
   // Reset page when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, locationFilter, sublocationFilter, categoryFilter]);
+  }, [searchTerm, locationFilter, sublocationFilter, departmentFilter, categoryFilter]);
 
   return (
     <div className="space-y-6">
@@ -965,7 +969,7 @@ export default function AssetManagement() {
                 />
               </div>
               
-              <Select value={locationFilter} onValueChange={(val) => { setLocationFilter(val); setSublocationFilter("all"); }}>
+              <Select value={locationFilter} onValueChange={(val) => { setLocationFilter(val); setSublocationFilter("all"); setDepartmentFilter("all"); }}>
                 <SelectTrigger className="w-[200px]">
                   <SelectValue placeholder="Filter by Location" />
                 </SelectTrigger>
@@ -979,7 +983,7 @@ export default function AssetManagement() {
                 </SelectContent>
               </Select>
 
-              <Select value={sublocationFilter} onValueChange={setSublocationFilter} disabled={locationFilter === "all"}>
+              <Select value={sublocationFilter} onValueChange={(val) => { setSublocationFilter(val); setDepartmentFilter("all"); }} disabled={locationFilter === "all"}>
                 <SelectTrigger className="w-[200px]">
                   <SelectValue placeholder="Filter by Sub-Location" />
                 </SelectTrigger>
@@ -988,6 +992,20 @@ export default function AssetManagement() {
                   {getLocationsByType("sublocation", locationFilter).map((sublocation) => (
                     <SelectItem key={sublocation.id} value={sublocation.id}>
                       {sublocation.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <Select value={departmentFilter} onValueChange={setDepartmentFilter} disabled={sublocationFilter === "all"}>
+                <SelectTrigger className="w-[200px]">
+                  <SelectValue placeholder="Filter by Department" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Departments</SelectItem>
+                  {getLocationsByType("department", sublocationFilter).map((department) => (
+                    <SelectItem key={department.id} value={department.id}>
+                      {department.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
