@@ -852,7 +852,13 @@ export function LocationReportAnalytics({
       {/* Report Type Tabs */}
       <Tabs
         value={reportType}
-        onValueChange={(value) => setReportType(value as ReportType)}
+        onValueChange={(value) => {
+          setReportType(value as ReportType);
+          setSelectedLocation("all");
+          setSelectedSublocation("all");
+          setSelectedStatus("all");
+          setExpandedRows(new Set());
+        }}
       >
         <TabsList className="grid w-full max-w-md grid-cols-3">
           <TabsTrigger value="location" className="flex items-center gap-2">
@@ -889,7 +895,7 @@ export function LocationReportAnalytics({
             </div>
           )}
 
-          {reportType === "department" && (
+          {(reportType === "sublocation" || reportType === "department") && (
             <div className="w-48">
               <Select
                 value={selectedSublocation}
