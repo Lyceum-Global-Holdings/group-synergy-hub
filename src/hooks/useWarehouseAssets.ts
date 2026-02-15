@@ -36,7 +36,7 @@ export const useWarehouseAssets = () => {
       if (error) throw error;
       return count || 0;
     },
-    staleTime: 30000 // Cache for 30 seconds
+    
   });
 
   const { data: activeCount } = useQuery({
@@ -50,7 +50,7 @@ export const useWarehouseAssets = () => {
       if (error) throw error;
       return count || 0;
     },
-    staleTime: 30000
+  
   });
 
   const { data: maintenanceCount } = useQuery({
@@ -64,7 +64,7 @@ export const useWarehouseAssets = () => {
       if (error) throw error;
       return count || 0;
     },
-    staleTime: 30000
+    
   });
 
   const createAssetMutation = useMutation({

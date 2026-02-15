@@ -422,11 +422,10 @@ export default function AssetManagement() {
     return allCategories.find(cat => cat.id === id)?.name || "";
   };
 
-  const totalValue = assets.reduce((sum, asset) => sum + (asset.purchase_price || 0), 0);
-  // Use server-side counts for accurate totals, fallback to client-side calculation if not available
-  const displayTotalAssets = totalCount ?? assets.length;
-  const displayActiveAssets = activeCount ?? assets.filter(asset => asset.status === "active").length;
-  const displayMaintenanceAssets = maintenanceCount ?? assets.filter(asset => asset.status === "maintenance").length;
+  const totalValue = filteredAssets.reduce((sum, asset) => sum + (asset.purchase_price || 0), 0);
+  const displayTotalAssets = filteredAssets.length;
+  const displayActiveAssets = filteredAssets.filter(a => a.status === "active").length;
+  const displayMaintenanceAssets = filteredAssets.filter(a => a.status === "maintenance").length;
 
   return (
     <div className="space-y-6">
