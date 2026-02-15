@@ -173,11 +173,29 @@ serve(async (req) => {
 
         if (!forceMode) {
           const lastSend = setting.last_scheduled_send ? new Date(setting.last_scheduled_send) : null;
-          const today = new Date();
-          today.setUTCHours(0, 0, 0, 0);
           
-          if (lastSend && lastSend >= today) {
-            console.log(`Already sent today for company ${setting.company_id}, skipping`);
+          // Calculate the most recent scheduled UTC time window
+          const [schHour, schMinute] = (scheduledTime.split(':').map(Number));
+          const offsetHours = TIMEZONE_OFFSETS[setting.timezone || 'UTC'] ?? 0;
+          const offsetMinutes = Math.round(offsetHours * 60);
+          let utcTotalMinutes = (schHour * 60 + schMinute) - offsetMinutes;
+          if (utcTotalMinutes < 0) utcTotalMinutes += 1440;
+          if (utcTotalMinutes >= 1440) utcTotalMinutes -= 1440;
+          const schUtcHour = Math.floor(utcTotalMinutes / 60);
+          const schUtcMin = utcTotalMinutes % 60;
+
+          // Build the most recent occurrence of the scheduled time
+          const scheduledUtcToday = new Date(now);
+          scheduledUtcToday.setUTCHours(schUtcHour, schUtcMin, 0, 0);
+          // If that time is still in the future, the "current window" started yesterday
+          if (scheduledUtcToday > now) {
+            scheduledUtcToday.setUTCDate(scheduledUtcToday.getUTCDate() - 1);
+          }
+
+          console.log(`Dedup check: last_scheduled_send=${lastSend?.toISOString() ?? 'never'}, scheduled_window_start=${scheduledUtcToday.toISOString()}, skip=${lastSend ? lastSend >= scheduledUtcToday : false}`);
+
+          if (lastSend && lastSend >= scheduledUtcToday) {
+            console.log(`Already sent in current scheduled window for company ${setting.company_id}, skipping`);
             continue;
           }
         }
