@@ -1,4 +1,5 @@
 import { useMemo, useState, useRef, useCallback } from "react";
+import { useCompany } from "@/contexts/CompanyContext";
 import html2canvas from "html2canvas";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -122,6 +123,7 @@ export function LocationReportAnalytics({
   locations,
   categories,
 }: LocationReportAnalyticsProps) {
+  const { formatCurrency } = useCompany();
   const [reportType, setReportType] = useState<ReportType>("location");
   const [selectedLocation, setSelectedLocation] = useState<string>("all");
   const [selectedSublocation, setSelectedSublocation] = useState<string>("all");
@@ -579,7 +581,7 @@ export function LocationReportAnalytics({
       let y = 20;
 
       const reportTypeLabel = reportType === "location" ? "Location" : reportType === "sublocation" ? "Sub-Location" : "Department";
-      const formatCurrency = (val: number) => `$${val.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+      // Uses formatCurrency from useCompany() context for correct system currency
 
       // --- Header ---
       doc.setFontSize(16);
@@ -806,7 +808,7 @@ export function LocationReportAnalytics({
     } finally {
       setIsCapturingPdf(null);
     }
-  }, [analyticsData, reportType]);
+  }, [analyticsData, reportType, formatCurrency]);
 
 
   const toggleRow = (id: string) => {
