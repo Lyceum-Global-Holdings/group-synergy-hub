@@ -118,6 +118,7 @@ const getStatusIcon = (status: string) => {
 export default function AssetManagement() {
   const [searchTerm, setSearchTerm] = useState("");
   const [locationFilter, setLocationFilter] = useState<string>("all");
+  const [sublocationFilter, setSublocationFilter] = useState<string>("all");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedAssetIds, setSelectedAssetIds] = useState<Set<string>>(new Set());
@@ -361,10 +362,13 @@ export default function AssetManagement() {
     // Location filter
     const matchesLocation = locationFilter === "all" || asset.location_id === locationFilter;
     
+    // Sub-location filter
+    const matchesSublocation = sublocationFilter === "all" || asset.sublocation_id === sublocationFilter;
+    
     // Category filter
     const matchesCategory = categoryFilter === "all" || asset.category_id === categoryFilter;
     
-    return matchesSearch && matchesLocation && matchesCategory;
+    return matchesSearch && matchesLocation && matchesSublocation && matchesCategory;
   });
 
   const getLocationsByType = (type: "location" | "sublocation" | "department", parentId?: string) => {
@@ -945,7 +949,7 @@ export default function AssetManagement() {
                 />
               </div>
               
-              <Select value={locationFilter} onValueChange={setLocationFilter}>
+              <Select value={locationFilter} onValueChange={(val) => { setLocationFilter(val); setSublocationFilter("all"); }}>
                 <SelectTrigger className="w-[200px]">
                   <SelectValue placeholder="Filter by Location" />
                 </SelectTrigger>
@@ -954,6 +958,20 @@ export default function AssetManagement() {
                   {getLocationsByType("location").map((location) => (
                     <SelectItem key={location.id} value={location.id}>
                       {location.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <Select value={sublocationFilter} onValueChange={setSublocationFilter} disabled={locationFilter === "all"}>
+                <SelectTrigger className="w-[200px]">
+                  <SelectValue placeholder="Filter by Sub-Location" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Sub-Locations</SelectItem>
+                  {getLocationsByType("sublocation", locationFilter).map((sublocation) => (
+                    <SelectItem key={sublocation.id} value={sublocation.id}>
+                      {sublocation.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
