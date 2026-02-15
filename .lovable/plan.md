@@ -1,90 +1,81 @@
 
 
-# Show Unallocated Assets as "Other" in Sub-Location Reports
+# Fix PDF Export Charts and Structure for Location Reports
 
-## Problem
+## Problems Identified
 
-When the report type is set to "Sub-location", assets that have no `sublocation_id` (NULL) are silently dropped from charts and the detailed breakdown. The same applies to the "Department" report type for assets without a `department_id`. These assets should appear grouped under an "Other" entry.
+1. **Charts are compressed** -- Canvas renders at 500x250px but squeezed into 85x42mm in PDF, making labels unreadable
+2. **Legend text truncated** -- "Maintenance" shows as "Maintenan", location names cut to 10-12 chars
+3. **Two charts crammed side-by-side** on the same row (bar + pie at 85mm each)
+4. **Status chart only shows one color** when most assets share one status, making the stacked bars misleading
+5. **Data is artificially capped** -- summary table limited to 15 rows, detail breakdowns to 10 locations, asset master items to 10 per location
 
 ## Solution
 
-Modify the analytics calculation in `LocationReportAnalytics.tsx` to create a synthetic "Other" group that captures assets with a NULL grouping key for the sublocation and department report types.
+Rewrite the PDF layout in `src/utils/locationReportPdfExport.ts` to produce a clean, structured, professional report.
 
 ## Changes
 
-### File: `src/components/warehouse/LocationReportAnalytics.tsx`
+### File: `src/utils/locationReportPdfExport.ts`
 
-**1. Add an "Other" entry to `groupedData` for sublocation/department report types (after line 298, where locations are initialized):**
+**1. Increase chart canvas sizes and give each chart a full-width row:**
 
-After initializing all real locations in the `groupedData` object, add a synthetic entry with a special ID (e.g., `"__other__"`) when the report type is "sublocation" or "department":
+- Bar chart: render at 800x400 canvas, place full-width (180mm wide, ~60mm tall) on its own section
+- Pie chart: render at 600x400 canvas, place centered (~120mm wide, ~70mm tall) below the bar chart
+- Status chart: render at 800x400 canvas, place full-width on a new page
 
-```typescript
-const OTHER_KEY = "__other__";
-if (reportType === "sublocation" || reportType === "department") {
-  groupedData[OTHER_KEY] = {
-    id: OTHER_KEY,
-    name: "Other",
-    parentId: null,
-    parentName: reportType === "sublocation" 
-      ? (selectedLocation !== "all" ? locations.find(l => l.id === selectedLocation)?.name : undefined) 
-      : undefined,
-    assetCount: 0,
-    totalValue: 0,
-    activeCount: 0,
-    maintenanceCount: 0,
-    inactiveCount: 0,
-    disposedCount: 0,
-    goodCondition: 0,
-    fairCondition: 0,
-    poorCondition: 0,
-    needsRepairCondition: 0,
-    utilizationRate: 0,
-    categoryBreakdown: [],
-    subcategoryBreakdown: [],
-    assetMasterBreakdown: [],
-  };
-}
+**2. Fix legend and label truncation:**
+
+- Increase label character limits from 10-12 to 18-20 characters
+- Increase legend label limits from 12 to 18 characters
+- Adjust legend layout to use 3 columns instead of 4 for more space
+- Fix pie chart legend positioning to avoid overlap
+
+**3. Remove artificial data caps:**
+
+- Summary table: remove `.slice(0, 15)` -- show all locations
+- Detail breakdowns: remove `.slice(0, 10)` -- iterate all locations
+- Subcategory table: remove `.slice(0, 8)` limit per location
+- Asset master table: remove `.slice(0, 10)` limit per location
+- Increase asset name truncation from 20 to 30 chars
+
+**4. Restructure PDF page flow:**
+
+```
+Page 1: Header, KPI Summary, Asset Count Bar Chart
+Page 2: Value Distribution Pie Chart, Status Stacked Bar Chart
+Page 3+: Summary Table (all locations)
+Remaining: Detailed breakdowns per location (with proper page breaks)
+Footer: Page numbers on every page
 ```
 
-**2. Update `getGroupingKey` to return the "Other" key instead of null (around line 239):**
+**5. Add proper page-break logic before each chart:**
 
-Change the sublocation and department cases so that when the asset has no sublocation/department ID, it returns the `OTHER_KEY` constant instead of `null`:
+- Check remaining space before rendering each chart
+- Add page break if insufficient space (less than chart height + margin)
 
-```typescript
-const getGroupingKey = (asset: WarehouseAsset): string | null => {
-  switch (reportType) {
-    case "location":
-      return asset.location_id || null;
-    case "sublocation":
-      return asset.sublocation_id || OTHER_KEY;
-    case "department":
-      return asset.department_id || OTHER_KEY;
-    default:
-      return null;
-  }
-};
-```
+### Specific Code Changes
 
-**3. Remove "Other" from results if it has zero assets (after aggregation, around line 421):**
+**drawBarChart (line 84):** Increase bottom padding from 60 to 80, increase label text from 9px to 10px, increase truncation from 10 to 18 chars
 
-After the aggregation loop, clean up the "Other" entry if no assets were assigned to it:
+**drawPieChart (line 162):** Move legend higher, increase legend label from 12 to 18 chars, use 3 columns instead of 4, increase font from 9px to 10px
 
-```typescript
-if (groupedData[OTHER_KEY] && groupedData[OTHER_KEY].assetCount === 0) {
-  delete groupedData[OTHER_KEY];
-}
-```
+**drawStackedBarChart (line 249):** Increase bottom padding from 80 to 100, increase label from 10 to 18 chars, increase legend spacing from 60 to 80px
 
-This ensures "Other" only appears when there are actually unallocated assets.
+**drawSubcategoryConditionChart (line 339):** Same label length increases
 
-## What This Achieves
+**exportLocationReportPdf (line 475):**
+- Place bar chart full-width: `doc.addImage(img, "PNG", margin, currentY, 180, 60)`
+- Add page break, place pie chart centered: `doc.addImage(img, "PNG", 30, currentY, 150, 70)`
+- Add page break, place status chart full-width: `doc.addImage(img, "PNG", margin, currentY, 180, 60)`
+- Remove all `.slice()` limits on data output
+- Add `if (currentY > pageHeight - chartHeight) { doc.addPage(); currentY = 20; }` before each chart
 
-- Charts (pie/bar) will show an "Other" segment for assets without a sub-location or department
-- The detailed breakdown section will include an "Other" card with full category, subcategory, and asset master breakdowns
-- "Other" only appears when there are assets with NULL sub-location/department -- it won't clutter the view otherwise
-- Location report type is unaffected (assets must have a location)
+## Summary
 
-## Files Modified
-
-- `src/components/warehouse/LocationReportAnalytics.tsx`
+- One file modified: `src/utils/locationReportPdfExport.ts`
+- Charts given full-width placement with proper spacing
+- Labels and legends no longer truncated
+- All data included without artificial caps
+- Professional page flow with proper page breaks
 
