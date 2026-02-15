@@ -1,72 +1,46 @@
 
+# Fix: Asset Count Shows Wrong in Asset List
 
-# Add Edit/Update Function to Warehouse Management Locations
+## Problem
 
-## What This Does
+The KPI cards (Total Assets, Active Assets, Maintenance Assets) display **server-side unfiltered counts** from separate database queries, while the asset table shows **client-side filtered results**. When the user applies any filter (search, location, sub-location, category), the table updates but the KPI cards still show the total unfiltered counts -- making them appear wrong.
 
-Adds an **Edit** button to each row in the Warehouse Management locations table. Clicking it opens a pre-filled edit dialog where users can update all location fields (name, type, status, capacity, contact info, address, etc.) and save changes.
+Additionally, the count queries use `staleTime: 30000` (30-second cache) which contradicts the project standard of `staleTime: 0`, causing counts to lag behind after mutations.
 
-## Current State
+## Fix
 
-- Each row only has **View** and **Delete** buttons
-- The `updateLocation` mutation already exists in `useWarehouseLocations` hook and works correctly
-- The `LocationManagementDialog` has edit functionality but it is a separate full dialog for managing all locations -- not ideal for quick single-row edits
+### File: `src/pages/warehouse/AssetManagement.tsx`
 
-## Changes
+**Derive counts from `filteredAssets` instead of server-side counts.**
 
-### File: `src/pages/admin/WarehouseManagement.tsx`
-
-**1. Add edit state**
-
-Add state for tracking which location is being edited:
+Replace lines 425-429:
 ```
-const [editLocationData, setEditLocationData] = useState<WarehouseLocation | null>(null);
+const totalValue = assets.reduce(...);
+const displayTotalAssets = totalCount ?? assets.length;
+const displayActiveAssets = activeCount ?? ...;
+const displayMaintenanceAssets = maintenanceCount ?? ...;
 ```
 
-**2. Add Edit button to each row**
-
-Insert an Edit button (pencil icon) between the View and Delete buttons in the Actions column (around line 438-455):
+With:
 ```
-<Button size="sm" variant="ghost" onClick={() => setEditLocationData(location)}>
-  <Edit2 className="h-4 w-4" />
-</Button>
+const totalValue = filteredAssets.reduce((sum, asset) => sum + (asset.purchase_price || 0), 0);
+const displayTotalAssets = filteredAssets.length;
+const displayActiveAssets = filteredAssets.filter(a => a.status === "active").length;
+const displayMaintenanceAssets = filteredAssets.filter(a => a.status === "maintenance").length;
 ```
 
-**3. Add an Edit Location Dialog**
+This ensures:
+- When no filters are applied, the cards show the correct total (from all loaded assets)
+- When filters are applied, the cards reflect the filtered subset
+- The total value also updates to reflect only the filtered assets
 
-Create an inline `Dialog` component at the bottom of the page (next to the existing `LocationDetailsDialog`) that:
-- Opens when `editLocationData` is not null
-- Pre-fills a form with the selected location's current values (name, type, status, location_code, description, capacity, contact_person, contact_phone, physical_address, warehouse_category)
-- Provides dropdowns for type, status, and warehouse_category
-- Provides a parent location selector (filtered by type)
-- Calls `updateLocation({ id, ...updatedFields })` on save
-- Closes and resets state on cancel or successful save
-- Follows the standard dialog sizing (max-w-4xl, max-h-85vh with scroll)
+### File: `src/hooks/useWarehouseAssets.ts`
 
-**4. Wire up updateLocation and isUpdating**
-
-Destructure `updateLocation` and `isUpdating` from the existing `useWarehouseLocations()` hook call (line 43 already has `updateLocation` but `isUpdating` is not destructured -- add it).
-
-## Form Fields in the Edit Dialog
-
-| Field | Type | Notes |
-|-------|------|-------|
-| Name | Text input | Required |
-| Location Code | Text input | Optional |
-| Type | Dropdown | location / sublocation / department |
-| Parent | Dropdown | Filtered by type selection |
-| Status | Dropdown | active / inactive / maintenance / closed |
-| Warehouse Category | Dropdown | raw_materials / finished_goods / general / wip / returns / quarantine |
-| Capacity | Number input | Optional |
-| Description | Textarea | Optional |
-| Contact Person | Text input | Optional |
-| Contact Phone | Text input | Optional |
-| Physical Address | Textarea | Optional |
+**Remove staleTime overrides** from the three count queries (lines 39, 53, 67) so they follow the global `staleTime: 0` standard. This prevents stale counts after asset creation/deletion.
 
 ## Summary
 
-- One file modified: `src/pages/admin/WarehouseManagement.tsx`
-- Adds per-row Edit button and an edit dialog
-- Uses the existing `updateLocation` mutation -- no backend changes needed
-- Follows the established dialog sizing and layout standards
-
+- Two files modified with small edits
+- KPI cards will now always match the assets shown in the table
+- Total value will also reflect filtered results
+- Count queries will stay fresh per the project standard
