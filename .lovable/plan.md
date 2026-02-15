@@ -1,43 +1,44 @@
 
+# Add Sub-Location Filter to Asset List
 
-# Fix: Use System Currency in PDF Export
+## What This Does
 
-## Problem
+Adds a "Sub-Location" dropdown filter next to the existing Location and Category filters in the asset list view. The sub-location dropdown is dependent on the selected location -- it only shows sub-locations belonging to the chosen location, and is disabled when "All Locations" is selected.
 
-Line 582 of `LocationReportAnalytics.tsx` hardcodes a `$` dollar sign for all currency values in the PDF export:
+## Changes
 
-```typescript
-const formatCurrency = (val: number) => `$${val.toLocaleString("en-US", ...)}`;
+### File: `src/pages/warehouse/AssetManagement.tsx`
+
+**1. Add state for the sublocation filter**
+
+Add a new state variable `sublocationFilter` initialized to `"all"`, alongside the existing `locationFilter` and `categoryFilter` (around line 120).
+
+**2. Reset sublocation when location changes**
+
+When the user changes the location filter, reset `sublocationFilter` back to `"all"` so stale sublocation selections don't persist. This will be handled by wrapping `setLocationFilter` in a handler that also calls `setSublocationFilter("all")`.
+
+**3. Update `filteredAssets` logic**
+
+Add a `matchesSublocation` check in the filter function (around line 367):
+```
+const matchesSublocation = sublocationFilter === "all" || asset.sublocation_id === sublocationFilter;
+return matchesSearch && matchesLocation && matchesSublocation && matchesCategory;
 ```
 
-The rest of the application uses `useCompany().formatCurrency` which reads the GL Settings (base currency, symbol, decimal places) from the database.
+**4. Add the Sub-Location dropdown in the UI**
 
-## Fix
+Insert a new `Select` component between the Location and Category filters (after line 960). It will:
+- Show "All Sub-Locations" as default
+- List sub-locations for the currently selected location using the existing `getLocationsByType("sublocation", locationFilter)` helper
+- Be disabled when `locationFilter === "all"` (since sub-locations need a parent location)
 
-### File: `src/components/warehouse/LocationReportAnalytics.tsx`
-
-**Change 1: Import `useCompany` and extract `formatCurrency`**
-
-At the top of the component function, destructure `formatCurrency` from the `useCompany` context (which is already available since this component renders inside the CompanyContext provider).
-
-**Change 2: Remove the hardcoded `$` formatter inside `handleCaptureAsPdf`**
-
-Delete line 582:
-```typescript
-const formatCurrency = (val: number) => `$${val.toLocaleString("en-US", ...)}`;
+```text
+Filter bar layout:
+[Search] [Location ▼] [Sub-Location ▼] [Category ▼]
 ```
 
-The function will then use the `formatCurrency` from `useCompany()` declared at the component level, which automatically applies the correct currency code, symbol, and decimal places from GL Settings.
+## Summary
 
-**Change 3: Add `formatCurrency` to the `useCallback` dependency array**
-
-Update the dependency array of `handleCaptureAsPdf` to include `formatCurrency` so it stays in sync with any settings changes.
-
-## Result
-
-All currency values in the exported PDF (Total Value, Average Value, Category/Subcategory values, Asset Master values) will display with the correct currency symbol (e.g., `Rs.`, `$`, `EUR`) as configured in the system's Finance/GL Settings.
-
-## Files Modified
-
-- `src/components/warehouse/LocationReportAnalytics.tsx` (3 small edits)
-
+- One file modified: `src/pages/warehouse/AssetManagement.tsx`
+- Three small additions: state variable, filter logic, and UI dropdown
+- Sub-location dropdown is context-aware (dependent on selected location, disabled otherwise)
