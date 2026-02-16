@@ -71,6 +71,7 @@ interface LocationReportAnalyticsProps {
 interface LocationAnalyticsData {
   id: string;
   name: string;
+  locationCode?: string | null;
   parentId?: string | null;
   parentName?: string;
   assetCount: number;
@@ -280,6 +281,7 @@ export function LocationReportAnalytics({
       groupedData[loc.id] = {
         id: loc.id,
         name: loc.name,
+        locationCode: loc.location_code,
         parentId: loc.parent_id,
         parentName: parentLoc?.name,
         assetCount: 0,
@@ -304,6 +306,7 @@ export function LocationReportAnalytics({
       groupedData[OTHER_KEY] = {
         id: OTHER_KEY,
         name: "Other",
+        locationCode: null,
         parentId: null,
         parentName: reportType === "sublocation"
           ? (selectedLocation !== "all" ? locations.find(l => l.id === selectedLocation)?.name : undefined)
@@ -572,7 +575,7 @@ export function LocationReportAnalytics({
 
     // Pie chart data - Value distribution
     const valueDistribution = sortedByValue.slice(0, 8).map((loc, index) => ({
-      name: loc.name,
+      name: loc.locationCode || loc.name,
       value: loc.totalValue,
       color: COLORS[index % COLORS.length],
     }));
