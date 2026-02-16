@@ -1,50 +1,53 @@
 
 
-# Add Native jsPDF-Drawn Charts to PDF Export
+# Fix: Exclude Disposed Assets from Total Value in Location Reports
 
 ## Problem
-The previous fix replaced stretched canvas-rendered chart images with plain tables. While this fixed the distortion, the user wants actual visual charts in the PDF alongside (or instead of) the tables.
+The sub-location report's total value includes assets with `status === 'disposed'`, inflating the financial totals with assets that are no longer in service.
 
 ## Solution
-Draw charts natively using jsPDF drawing primitives (rectangles, lines, arcs, text). These render at full PDF resolution with no stretching since they are vector-based, not image-based.
+Exclude disposed assets from value calculations throughout the analytics computation. Disposed assets will still appear in asset counts and status breakdowns (so users can see them), but their values will not be included in `totalValue`, `valueDistribution`, or any financial KPIs.
 
-## File: `src/utils/locationReportPdfExport.ts`
+## File: `src/components/warehouse/LocationReportAnalytics.tsx`
 
-### 1. Add a native horizontal bar chart for "Assets by Location"
-- Draw colored horizontal bars proportional to asset count
-- Label each bar with location name and count
-- Uses `doc.setFillColor()` + `doc.rect()` for bars and `doc.text()` for labels
-- Keep the existing table below the chart for detailed numbers
+### Change 1: Per-location value aggregation (line 377)
+In the asset aggregation loop, only add to `totalValue` if the asset is not disposed:
 
-### 2. Add a native pie chart for "Value Distribution"
-- Draw colored arc segments using jsPDF path drawing or filled wedges
-- Add a legend beside the chart with color swatches and labels
-- Keep the existing table below for exact values
+```typescript
+// Before
+data.totalValue += asset.current_value || asset.purchase_price || 0;
 
-### 3. Add a native stacked horizontal bar chart for "Status by Location"
-- Draw stacked colored segments (green=Active, yellow=Maintenance, red=Inactive)
-- Label each row with the location name
-- Add a color legend
-- Keep the existing table below
+// After
+if (asset.status !== 'disposed') {
+  data.totalValue += asset.current_value || asset.purchase_price || 0;
+}
+```
 
-### 4. Helper drawing functions to add
-- `drawHorizontalBarChart(doc, data, x, y, width, height, color)` - draws a simple horizontal bar chart
-- `drawPieChartNative(doc, data, cx, cy, radius)` - draws pie segments using trigonometry + `doc.triangle()`/`doc.lines()`
-- `drawStackedBarChartNative(doc, data, x, y, width, height)` - draws stacked horizontal bars
+### Change 2: KPI total value calculation (lines 534-536)
+Filter out disposed assets from the total value KPI:
 
-### Layout adjustments
-- Charts will be placed above their corresponding tables
-- Each chart takes approximately 60-80mm of vertical space
-- Page break logic will be adjusted to accommodate charts + tables
-- If content overflows page 1, it flows naturally to page 2
+```typescript
+// Before
+const totalValue = filteredAssets.reduce(
+  (sum, a) => sum + (a.current_value || a.purchase_price || 0), 0
+);
 
-## Technical approach
-- jsPDF supports `doc.rect(x, y, w, h, 'F')` for filled rectangles (bars)
-- For pie chart: calculate angles from data percentages, draw filled triangular wedges from center using `doc.lines()` with fill
-- Colors: use a predefined palette array for consistent chart coloring
-- All drawing is vector-based, so it scales perfectly at any zoom level
+// After
+const totalValue = filteredAssets
+  .filter((a) => a.status !== 'disposed')
+  .reduce((sum, a) => sum + (a.current_value || a.purchase_price || 0), 0);
+```
+
+### Change 3: Category/subcategory/asset-master value tracking (lines 398-399 and similar)
+Also exclude disposed assets from category and subcategory value breakdowns so drilldown values are consistent:
+
+```typescript
+// Only add value if not disposed
+const assetValue = asset.status !== 'disposed' ? (asset.current_value || asset.purchase_price || 0) : 0;
+```
 
 ## Result
-- PDF will contain professional-looking charts AND detailed tables
-- No image stretching since everything is drawn natively in PDF
-- Charts use location codes where available (already handled by data passed in)
+- Disposed assets still appear in counts and status charts for visibility
+- Financial totals (total value, value distribution, category values) exclude disposed assets
+- Consistent across KPIs, charts, tables, Excel exports, and PDF exports
+
