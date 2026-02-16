@@ -1,53 +1,43 @@
 
 
-# Fix: Exclude Disposed Assets from Total Value in Location Reports
+# Fix: Wrong Total Value Due to JavaScript `||` Operator on Zero Values
 
-## Problem
-The sub-location report's total value includes assets with `status === 'disposed'`, inflating the financial totals with assets that are no longer in service.
+## Root Cause
 
-## Solution
-Exclude disposed assets from value calculations throughout the analytics computation. Disposed assets will still appear in asset counts and status breakdowns (so users can see them), but their values will not be included in `totalValue`, `valueDistribution`, or any financial KPIs.
+The value calculation uses `asset.current_value || asset.purchase_price || 0` throughout the file. In JavaScript, `||` treats `0` as falsy. So when an asset has `current_value = 0` (e.g., fully depreciated), the expression skips the `0` and falls through to `purchase_price`, which could be a large number like 500,000. This inflates the total value significantly.
+
+**Example:**
+- Asset with `current_value = 0`, `purchase_price = 500,000`
+- `0 || 500000 || 0` evaluates to `500,000` (wrong -- should be `0`)
+
+## Fix
+
+Replace all `||` with `??` (nullish coalescing) for value calculations. `??` only falls through on `null` or `undefined`, not on `0`.
+
+- `asset.current_value ?? asset.purchase_price ?? 0` correctly returns `0` when `current_value` is `0`
+- It still falls back to `purchase_price` when `current_value` is `null`/`undefined`
 
 ## File: `src/components/warehouse/LocationReportAnalytics.tsx`
 
-### Change 1: Per-location value aggregation (line 377)
-In the asset aggregation loop, only add to `totalValue` if the asset is not disposed:
+**5 locations to update** (all the same pattern change):
 
-```typescript
-// Before
-data.totalValue += asset.current_value || asset.purchase_price || 0;
+1. **Line 377** - Per-location value aggregation
+2. **Line 400** - Category value tracking
+3. **Line 420** - Subcategory value tracking
+4. **Line 446** - Asset Master value tracking
+5. **Line 537** - KPI total value calculation
 
-// After
-if (asset.status !== 'disposed') {
-  data.totalValue += asset.current_value || asset.purchase_price || 0;
-}
+Each changes from:
 ```
-
-### Change 2: KPI total value calculation (lines 534-536)
-Filter out disposed assets from the total value KPI:
-
-```typescript
-// Before
-const totalValue = filteredAssets.reduce(
-  (sum, a) => sum + (a.current_value || a.purchase_price || 0), 0
-);
-
-// After
-const totalValue = filteredAssets
-  .filter((a) => a.status !== 'disposed')
-  .reduce((sum, a) => sum + (a.current_value || a.purchase_price || 0), 0);
+asset.current_value || asset.purchase_price || 0
 ```
-
-### Change 3: Category/subcategory/asset-master value tracking (lines 398-399 and similar)
-Also exclude disposed assets from category and subcategory value breakdowns so drilldown values are consistent:
-
-```typescript
-// Only add value if not disposed
-const assetValue = asset.status !== 'disposed' ? (asset.current_value || asset.purchase_price || 0) : 0;
+To:
+```
+asset.current_value ?? asset.purchase_price ?? 0
 ```
 
 ## Result
-- Disposed assets still appear in counts and status charts for visibility
-- Financial totals (total value, value distribution, category values) exclude disposed assets
-- Consistent across KPIs, charts, tables, Excel exports, and PDF exports
+- Assets with `current_value = 0` will correctly contribute `0` to totals instead of their `purchase_price`
+- Assets with `current_value = null` will still correctly fall back to `purchase_price`
+- This is a universal fix that applies to all report types (location, sub-location, department)
 
