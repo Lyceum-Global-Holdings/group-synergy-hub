@@ -178,12 +178,16 @@ export const useWarehouseAssets = (companyId?: string) => {
 
   const deleteAssetMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('warehouse_assets')
         .delete()
-        .eq('id', id);
+        .eq('id', id)
+        .select('id');
 
       if (error) throw error;
+      if (!data || data.length === 0) {
+        throw new Error('Asset could not be deleted. You may not have permission.');
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['warehouse-assets'] });
@@ -199,7 +203,7 @@ export const useWarehouseAssets = (companyId?: string) => {
       console.error('Error deleting asset:', error);
       toast({
         title: "Error",
-        description: "Failed to delete asset",
+        description: error.message || "Failed to delete asset",
         variant: "destructive",
       });
     }
@@ -207,12 +211,21 @@ export const useWarehouseAssets = (companyId?: string) => {
 
   const deleteBulkAssetsMutation = useMutation({
     mutationFn: async (assetIds: string[]) => {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('warehouse_assets')
         .delete()
-        .in('id', assetIds);
+        .in('id', assetIds)
+        .select('id');
 
       if (error) throw error;
+      if (!data || data.length === 0) {
+        throw new Error('Assets could not be deleted. You may not have permission.');
+      }
+      if (data.length < assetIds.length) {
+        throw new Error(
+          `Only ${data.length} of ${assetIds.length} assets were deleted. Some assets may require admin permission.`
+        );
+      }
     },
     onSuccess: (_, assetIds) => {
       queryClient.invalidateQueries({ queryKey: ['warehouse-assets'] });
@@ -228,7 +241,7 @@ export const useWarehouseAssets = (companyId?: string) => {
       console.error('Error deleting assets:', error);
       toast({
         title: "Error",
-        description: "Failed to delete assets",
+        description: error.message || "Failed to delete assets",
         variant: "destructive",
       });
     }
