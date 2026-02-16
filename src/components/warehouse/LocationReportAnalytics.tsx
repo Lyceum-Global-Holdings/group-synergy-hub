@@ -550,6 +550,26 @@ export function LocationReportAnalytics({
       Disposed: loc.disposedCount,
     }));
 
+    // Collect all unique categories across top locations for stacked bar chart
+    const allCategories = new Set<string>();
+    sortedByCount.slice(0, 10).forEach((loc) => {
+      loc.categoryBreakdown.forEach((cat) => allCategories.add(cat.categoryName));
+    });
+    const categoryList = Array.from(allCategories).sort();
+
+    // Build stacked data: each location gets a key per category
+    const categoryByLocation = sortedByCount.slice(0, 10).map((loc) => {
+      const row: Record<string, string | number> = {
+        name: loc.name.length > 15 ? loc.name.substring(0, 15) + "..." : loc.name,
+        fullName: loc.name,
+      };
+      categoryList.forEach((catName) => {
+        const match = loc.categoryBreakdown.find((c) => c.categoryName === catName);
+        row[catName] = match ? match.assetCount : 0;
+      });
+      return row;
+    });
+
     // Pie chart data - Value distribution
     const valueDistribution = sortedByValue.slice(0, 8).map((loc, index) => ({
       name: loc.name,
@@ -575,6 +595,8 @@ export function LocationReportAnalytics({
       sortedByValue,
       statusByLocation,
       valueDistribution,
+      categoryByLocation,
+      categoryList,
       kpis: {
         totalAssets,
         totalValue,
@@ -1234,8 +1256,8 @@ export function LocationReportAnalytics({
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <ResponsiveContainer width="100%" height={300}>
-                      <BarChart data={analyticsData.sortedByCount.slice(0, 10)}>
+                    <ResponsiveContainer width="100%" height={350}>
+                      <BarChart data={analyticsData.categoryByLocation}>
                         <CartesianGrid
                           strokeDasharray="3 3"
                           stroke="hsl(var(--border))"
@@ -1247,17 +1269,19 @@ export function LocationReportAnalytics({
                           textAnchor="end"
                           height={80}
                           stroke="hsl(var(--foreground))"
-                          tickFormatter={(value) =>
-                            value.length > 12 ? value.substring(0, 12) + "..." : value
-                          }
                         />
                         <YAxis stroke="hsl(var(--foreground))" />
-                        <Tooltip content={<CustomTooltip />} />
-                        <Bar
-                          dataKey="assetCount"
-                          fill="hsl(217, 91%, 60%)"
-                          name="Assets"
-                        />
+                        <Tooltip />
+                        <Legend />
+                        {analyticsData.categoryList.map((catName, index) => (
+                          <Bar
+                            key={catName}
+                            dataKey={catName}
+                            stackId="categories"
+                            fill={COLORS[index % COLORS.length]}
+                            name={catName}
+                          />
+                        ))}
                       </BarChart>
                     </ResponsiveContainer>
                   </CardContent>
