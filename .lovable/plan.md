@@ -1,46 +1,26 @@
 
-# Show Subcategories in Stacked Bar Chart
+
+# Use Location Codes in Stacked Bar Chart
 
 ## Change
 
-Update the stacked bar chart to use **subcategories** instead of categories. Each bar segment will represent a different subcategory with its own color.
+Update the `subcategoryByLocation` data builder (line 564-574) to use `locationCode` instead of `name` for the bar chart X-axis labels, falling back to `name` when no code is available.
 
 ## File: `src/components/warehouse/LocationReportAnalytics.tsx`
 
-### 1. Replace category collection with subcategory collection (lines 553-571)
+### Line 566: Update the `name` field in `subcategoryByLocation`
 
-Change the data preparation logic to iterate over `subcategoryBreakdown` instead of `categoryBreakdown`:
-
+Change:
 ```typescript
-// Collect all unique subcategories across top locations for stacked bar chart
-const allSubcategories = new Set<string>();
-sortedByCount.slice(0, 10).forEach((loc) => {
-  loc.subcategoryBreakdown.forEach((sub) => allSubcategories.add(sub.subcategoryName));
-});
-const subcategoryList = Array.from(allSubcategories).sort();
-
-// Build stacked data: each location gets a key per subcategory
-const subcategoryByLocation = sortedByCount.slice(0, 10).map((loc) => {
-  const row: Record<string, string | number> = {
-    name: loc.name.length > 15 ? loc.name.substring(0, 15) + "..." : loc.name,
-    fullName: loc.name,
-  };
-  subcategoryList.forEach((subName) => {
-    const match = loc.subcategoryBreakdown.find((s) => s.subcategoryName === subName);
-    row[subName] = match ? match.assetCount : 0;
-  });
-  return row;
-});
+name: loc.name.length > 15 ? loc.name.substring(0, 15) + "..." : loc.name,
 ```
 
-### 2. Update returned analytics object (lines 598-599)
+To:
+```typescript
+name: (loc.locationCode || loc.name).length > 15 
+  ? (loc.locationCode || loc.name).substring(0, 15) + "..." 
+  : (loc.locationCode || loc.name),
+```
 
-Replace `categoryByLocation` / `categoryList` with `subcategoryByLocation` / `subcategoryList`.
+This ensures the chart bars display the location code (e.g., "LYC-KUR") when available, with a fallback to the full location name. The `fullName` field remains unchanged for tooltip display.
 
-### 3. Update the BarChart component (around line 1259)
-
-Change `data={analyticsData.categoryByLocation}` to `data={analyticsData.subcategoryByLocation}` and map over `analyticsData.subcategoryList` instead of `categoryList`.
-
-## Result
-
-Each bar will be composed of stacked segments -- one per subcategory -- with distinct colors and a legend identifying them all.
