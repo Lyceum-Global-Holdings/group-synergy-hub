@@ -1,62 +1,93 @@
+# Fix: Silent Delete Failure Due to RLS Policy
 
+## What Happened
 
-# Fix: Value Calculation Bug Across All Analytics Components
+When you deleted 100 chairs, the system showed a success message ("Successfully deleted 100 assets") but **no rows were actually removed** from the database. This is because Supabase's Row Level Security (RLS) silently returns success even when 0 rows are affected by a delete operation.
 
-## Root Cause
+The DELETE policy on `warehouse_assets` requires `is_admin(auth.uid())`. If your current session doesn't satisfy this check, the delete completes with no error but removes nothing. The UI then shows "Success" because it only checks for errors, not whether rows were actually deleted.
 
-The previous fix only updated `LocationReportAnalytics.tsx`, but the sub-location report values shown in the "Generate Reports" tab and overview KPIs come from **separate calculations** in `UnifiedAssetAnalytics.tsx` that were never fixed. Additionally, multiple other analytics components have the same `||` vs `??` bug.
+**Current data in Lyceum Panadura:**
 
-The `||` operator treats `0` as falsy, causing assets with `current_value = 0` (fully depreciated) to fall back to their `purchase_price`, inflating totals.
+- 460 chairs (should be 360 after deleting 100) = still all there
+- 180 tables = correct
+- Total: 9,959,460 (inflated because 100 chairs weren't actually removed)
 
-## Files and Changes
+## Fix (Two Parts)
 
-### 1. `src/components/warehouse/UnifiedAssetAnalytics.tsx`
+### Part 1: Fix the delete mutations to verify rows were actually deleted
 
-**Line 256** - Report data aggregation (this is the main culprit for the "Generate Reports" sub-location report):
-```
-// Before
-data.totalValue += asset.current_value || asset.purchase_price || 0;
-// After
-data.totalValue += asset.current_value ?? asset.purchase_price ?? 0;
-```
+In `src/hooks/useWarehouseAssets.ts`, update both `deleteAssetMutation` and `deleteBulkAssetsMutation` to use `.select()` after `.delete()` so Supabase returns the deleted rows. Then check if the count matches expectations. If no rows were deleted, throw an error so the user sees a failure message instead of a false success.
 
-**Lines 337-339** - Overview KPI total value:
-```
-// Before
-const totalValue = assets.reduce(
-  (sum, a) => sum + (a.current_value || a.purchase_price || 0), 0
-);
-// After
-const totalValue = assets.reduce(
-  (sum, a) => sum + (a.current_value ?? a.purchase_price ?? 0), 0
-);
-```
+**Single delete (line 179-206):**
 
-### 2. `src/components/warehouse/AssetAnalytics.tsx`
+```typescript
+mutationFn: async (id: string) => {
+  const { data, error } = await supabase
+    .from('warehouse_assets')
+    .delete()
+    .eq('id', id)
+    .select('id');
 
-**Lines 33, 63, 81, 96** - Category value, location value, brand value, and financial metrics calculations:
-- Replace all `(asset.current_value || asset.purchase_price || 0)` with `(asset.current_value ?? asset.purchase_price ?? 0)`
-
-### 3. `src/components/warehouse/SubcategoryAnalytics.tsx`
-
-**Line 122** - Subcategory value aggregation:
-```
-// Before
-acc[subId].totalValue += (asset.current_value || asset.purchase_price || 0);
-// After
-acc[subId].totalValue += (asset.current_value ?? asset.purchase_price ?? 0);
+  if (error) throw error;
+  if (!data || data.length === 0) {
+    throw new Error('Asset could not be deleted. You may not have permission.');
+  }
+},
 ```
 
-### 4. `src/pages/warehouse/AssetManagement.tsx`
+**Bulk delete (line 208-235):**
 
-**Line 1144** - Asset list display value:
+```typescript
+mutationFn: async (assetIds: string[]) => {
+  const { data, error } = await supabase
+    .from('warehouse_assets')
+    .delete()
+    .in('id', assetIds)
+    .select('id');
+
+  if (error) throw error;
+  if (!data || data.length === 0) {
+    throw new Error('Assets could not be deleted. You may not have permission.');
+  }
+  if (data.length < assetIds.length) {
+    throw new Error(
+      `Only ${data.length} of ${assetIds.length} assets were deleted. Some assets may require admin permission.`
+    );
+  }
+},
 ```
-// Before
-Rs. {(asset.current_value || asset.purchase_price || 0).toLocaleString()}
-// After
-Rs. {(asset.current_value ?? asset.purchase_price ?? 0).toLocaleString()}
+
+Also update the bulk delete success message to use actual count:
+
+```typescript
+onSuccess: (_, assetIds) => {
+  // ... invalidate queries ...
+  toast({
+    title: "Success",
+    description: `Successfully deleted ${assetIds.length} assets`,
+  });
+},
 ```
 
-## Summary
+### Part 2: Fix the RLS DELETE policy to allow proper access
 
-Total: **7 occurrences** across **4 files** that need the `||` to `??` fix. This ensures consistent, correct value calculations everywhere in the Warehouse module.
+The current DELETE policy only allows `is_admin()`. This should also allow users who created the assets or have warehouse access, consistent with the UPDATE policy.
+
+Update the RLS policy via SQL:
+
+```sql
+DROP POLICY "Admins can delete warehouse assets" ON warehouse_assets;
+CREATE POLICY "Authorized users can delete warehouse assets" 
+  ON warehouse_assets FOR DELETE 
+  USING (
+    is_admin(auth.uid()) 
+    OR (auth.uid() = created_by)
+    OR (can_access_company(company_id) AND has_warehouse_access(auth.uid()))
+  );
+```
+
+## Result
+
+- Delete operations will show an error if rows aren't actually removed (no more false success)
+- Users with warehouse access can delete assets they have permission to manage
+- After this fix, retrying the delete of those 100 chairs will actually remove them, correcting the total value
