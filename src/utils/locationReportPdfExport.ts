@@ -1,6 +1,205 @@
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 
+// Color palette for charts
+const CHART_COLORS: [number, number, number][] = [
+  [59, 130, 246],   // blue
+  [16, 185, 129],   // green
+  [245, 158, 11],   // amber
+  [239, 68, 68],    // red
+  [139, 92, 246],   // violet
+  [236, 72, 153],   // pink
+  [14, 165, 233],   // sky
+  [168, 85, 247],   // purple
+  [34, 197, 94],    // emerald
+  [249, 115, 22],   // orange
+];
+
+function drawHorizontalBarChart(
+  doc: jsPDF,
+  data: { name: string; value: number }[],
+  startX: number,
+  startY: number,
+  chartWidth: number,
+  barHeight: number,
+  color: [number, number, number] = [59, 130, 246]
+): number {
+  if (data.length === 0) return startY;
+  const maxVal = Math.max(...data.map((d) => d.value));
+  if (maxVal === 0) return startY;
+
+  const labelWidth = 40;
+  const barAreaWidth = chartWidth - labelWidth - 25;
+  const spacing = barHeight + 3;
+  let y = startY;
+
+  data.forEach((item, i) => {
+    const barW = (item.value / maxVal) * barAreaWidth;
+    // Label
+    doc.setFontSize(7);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(60, 60, 60);
+    const truncName = item.name.length > 18 ? item.name.substring(0, 18) + "…" : item.name;
+    doc.text(truncName, startX, y + barHeight - 1);
+    // Bar
+    const shade = CHART_COLORS[i % CHART_COLORS.length] || color;
+    doc.setFillColor(shade[0], shade[1], shade[2]);
+    doc.rect(startX + labelWidth, y, Math.max(barW, 1), barHeight, "F");
+    // Value label
+    doc.setFontSize(7);
+    doc.setTextColor(0, 0, 0);
+    doc.text(item.value.toLocaleString(), startX + labelWidth + barW + 2, y + barHeight - 1);
+    y += spacing;
+  });
+
+  doc.setTextColor(0, 0, 0);
+  return y + 2;
+}
+
+function drawPieChartNative(
+  doc: jsPDF,
+  data: { name: string; value: number }[],
+  cx: number,
+  cy: number,
+  radius: number
+): number {
+  const total = data.reduce((s, d) => s + d.value, 0);
+  if (total === 0) return cy + radius + 5;
+
+  let startAngle = -Math.PI / 2;
+  const segments = 60; // segments per full circle for smoothness
+
+  data.forEach((item, i) => {
+    const sliceAngle = (item.value / total) * 2 * Math.PI;
+    if (sliceAngle < 0.001) return;
+
+    const color = CHART_COLORS[i % CHART_COLORS.length];
+    doc.setFillColor(color[0], color[1], color[2]);
+
+    // Draw pie wedge as a filled polygon using lines
+    const steps = Math.max(Math.ceil((sliceAngle / (2 * Math.PI)) * segments), 2);
+    const points: [number, number][] = [];
+    // Start from center
+    points.push([0, 0]); // relative origin
+    for (let s = 0; s <= steps; s++) {
+      const angle = startAngle + (sliceAngle * s) / steps;
+      points.push([Math.cos(angle) * radius, Math.sin(angle) * radius]);
+    }
+    // Close back to center
+    points.push([0, 0]);
+
+    // Convert to relative movements for doc.lines()
+    const lines: [number, number][] = [];
+    for (let p = 1; p < points.length; p++) {
+      lines.push([points[p][0] - points[p - 1][0], points[p][1] - points[p - 1][1]]);
+    }
+
+    doc.lines(lines, cx + points[0][0], cy + points[0][1], [1, 1], "F");
+    startAngle += sliceAngle;
+  });
+
+  // Draw legend to the right of pie
+  const legendX = cx + radius + 12;
+  let legendY = cy - radius + 5;
+
+  data.forEach((item, i) => {
+    if (legendY > cy + radius + 20) return;
+    const color = CHART_COLORS[i % CHART_COLORS.length];
+    doc.setFillColor(color[0], color[1], color[2]);
+    doc.rect(legendX, legendY - 3, 4, 4, "F");
+
+    doc.setFontSize(7);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(40, 40, 40);
+    const pct = ((item.value / total) * 100).toFixed(1);
+    const label = item.name.length > 14 ? item.name.substring(0, 14) + "…" : item.name;
+    doc.text(`${label} (${pct}%)`, legendX + 6, legendY);
+    legendY += 6;
+  });
+
+  doc.setTextColor(0, 0, 0);
+  return cy + radius + 8;
+}
+
+function drawStackedBarChartNative(
+  doc: jsPDF,
+  data: { name: string; active: number; maintenance: number; inactive: number }[],
+  startX: number,
+  startY: number,
+  chartWidth: number,
+  barHeight: number
+): number {
+  if (data.length === 0) return startY;
+  const maxVal = Math.max(...data.map((d) => d.active + d.maintenance + d.inactive));
+  if (maxVal === 0) return startY;
+
+  const labelWidth = 40;
+  const barAreaWidth = chartWidth - labelWidth - 10;
+  const spacing = barHeight + 3;
+  let y = startY;
+
+  // Legend
+  const legendItems: { label: string; color: [number, number, number] }[] = [
+    { label: "Active", color: [34, 197, 94] },
+    { label: "Maintenance", color: [245, 158, 11] },
+    { label: "Inactive", color: [239, 68, 68] },
+  ];
+
+  let lx = startX + labelWidth;
+  legendItems.forEach((li) => {
+    doc.setFillColor(li.color[0], li.color[1], li.color[2]);
+    doc.rect(lx, y - 3, 4, 4, "F");
+    doc.setFontSize(7);
+    doc.setTextColor(60, 60, 60);
+    doc.text(li.label, lx + 5, y);
+    lx += 30;
+  });
+  y += 5;
+  doc.setTextColor(0, 0, 0);
+
+  data.forEach((item) => {
+    const total = item.active + item.maintenance + item.inactive;
+    // Label
+    doc.setFontSize(7);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(60, 60, 60);
+    const truncName = item.name.length > 18 ? item.name.substring(0, 18) + "…" : item.name;
+    doc.text(truncName, startX, y + barHeight - 1);
+
+    let bx = startX + labelWidth;
+    // Active
+    if (item.active > 0) {
+      const w = (item.active / maxVal) * barAreaWidth;
+      doc.setFillColor(34, 197, 94);
+      doc.rect(bx, y, w, barHeight, "F");
+      bx += w;
+    }
+    // Maintenance
+    if (item.maintenance > 0) {
+      const w = (item.maintenance / maxVal) * barAreaWidth;
+      doc.setFillColor(245, 158, 11);
+      doc.rect(bx, y, w, barHeight, "F");
+      bx += w;
+    }
+    // Inactive
+    if (item.inactive > 0) {
+      const w = (item.inactive / maxVal) * barAreaWidth;
+      doc.setFillColor(239, 68, 68);
+      doc.rect(bx, y, w, barHeight, "F");
+      bx += w;
+    }
+    // Total label
+    doc.setFontSize(7);
+    doc.setTextColor(0, 0, 0);
+    doc.text(total.toString(), bx + 2, y + barHeight - 1);
+
+    y += spacing;
+  });
+
+  doc.setTextColor(0, 0, 0);
+  return y + 2;
+}
+
 export interface CategoryBreakdown {
   categoryId: string;
   categoryName: string;
@@ -148,14 +347,18 @@ export async function exportLocationReportPdf(
 
   let currentY = (doc as any).lastAutoTable.finalY + 10;
 
-  // Asset Count Table (replaces bar chart)
+  // Asset Count Bar Chart + Table
   doc.setFontSize(11);
   doc.setFont("helvetica", "bold");
   doc.text(`Assets by ${reportTypeLabel} (Top ${chartData.assetCountData.length})`, margin, currentY);
-  currentY += 4;
+  currentY += 5;
 
   const sortedAssetCount = [...chartData.assetCountData].sort((a, b) => b.value - a.value);
   const assetCountTotal = sortedAssetCount.reduce((sum, d) => sum + d.value, 0);
+
+  // Draw native horizontal bar chart
+  currentY = drawHorizontalBarChart(doc, sortedAssetCount, margin, currentY, pageWidth - margin * 2, 5);
+  currentY += 3;
 
   autoTable(doc, {
     startY: currentY,
@@ -179,13 +382,26 @@ export async function exportLocationReportPdf(
     currentY = 20;
   }
 
-  // Value Distribution Table (replaces pie chart)
+  // Value Distribution Pie Chart + Table
   doc.setFontSize(11);
   doc.setFont("helvetica", "bold");
   doc.text("Value Distribution", margin, currentY);
-  currentY += 4;
+  currentY += 6;
 
   const totalValue = chartData.valueDistribution.reduce((sum, d) => sum + d.value, 0);
+
+  // Draw native pie chart
+  const pieRadius = 25;
+  const pieCx = margin + pieRadius + 5;
+  const pieCy = currentY + pieRadius;
+  currentY = drawPieChartNative(doc, chartData.valueDistribution, pieCx, pieCy, pieRadius);
+  currentY += 3;
+
+  // Check page break before table
+  if (currentY > pageHeight - 60) {
+    doc.addPage();
+    currentY = 20;
+  }
 
   autoTable(doc, {
     startY: currentY,
@@ -212,7 +428,17 @@ export async function exportLocationReportPdf(
   doc.setFontSize(11);
   doc.setFont("helvetica", "bold");
   doc.text(`Status by ${reportTypeLabel}`, margin, currentY);
-  currentY += 4;
+  currentY += 5;
+
+  // Draw native stacked bar chart
+  currentY = drawStackedBarChartNative(doc, chartData.statusDistribution, margin, currentY, pageWidth - margin * 2, 5);
+  currentY += 3;
+
+  // Check page break before table
+  if (currentY > pageHeight - 60) {
+    doc.addPage();
+    currentY = 20;
+  }
 
   autoTable(doc, {
     startY: currentY,
