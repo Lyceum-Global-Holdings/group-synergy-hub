@@ -30,7 +30,7 @@ export function AssetAnalytics({ assets, locations, categories, totalCount, acti
       const count = assets.filter(asset => asset.category_id === category.id).length;
       const value = assets
         .filter(asset => asset.category_id === category.id)
-        .reduce((sum, asset) => sum + (asset.current_value || asset.purchase_price || 0), 0);
+        .reduce((sum, asset) => sum + (asset.current_value ?? asset.purchase_price ?? 0), 0);
       
       return {
         name: category.name,
@@ -60,7 +60,7 @@ export function AssetAnalytics({ assets, locations, categories, totalCount, acti
       const count = assets.filter(asset => asset.location_id === location.id).length;
       const value = assets
         .filter(asset => asset.location_id === location.id)
-        .reduce((sum, asset) => sum + (asset.current_value || asset.purchase_price || 0), 0);
+        .reduce((sum, asset) => sum + (asset.current_value ?? asset.purchase_price ?? 0), 0);
       
       return {
         name: location.name,
@@ -78,7 +78,7 @@ export function AssetAnalytics({ assets, locations, categories, totalCount, acti
           acc[brand] = { name: brand, count: 0, value: 0, goodCondition: 0 };
         }
         acc[brand].count += 1;
-        acc[brand].value += (asset.current_value || asset.purchase_price || 0);
+        acc[brand].value += (asset.current_value ?? asset.purchase_price ?? 0);
         if (asset.condition === 'good') acc[brand].goodCondition += 1;
         return acc;
       }, {} as Record<string, { name: string; count: number; value: number; goodCondition: number }>);
@@ -93,7 +93,7 @@ export function AssetAnalytics({ assets, locations, categories, totalCount, acti
 
     // Financial metrics
     const totalPurchaseValue = assets.reduce((sum, asset) => sum + (asset.purchase_price || 0), 0);
-    const totalCurrentValue = assets.reduce((sum, asset) => sum + (asset.current_value || asset.purchase_price || 0), 0);
+    const totalCurrentValue = assets.reduce((sum, asset) => sum + (asset.current_value ?? asset.purchase_price ?? 0), 0);
     const depreciation = totalPurchaseValue - totalCurrentValue;
     const depreciationRate = totalPurchaseValue > 0 ? (depreciation / totalPurchaseValue) * 100 : 0;
 
