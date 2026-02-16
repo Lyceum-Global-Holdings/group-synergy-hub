@@ -268,7 +268,7 @@ export function LocationReportAnalytics({
 
     // Create category and subcategory lookup maps
     const mainCategories = categories.filter((c) => !c.parent_id);
-    const subcategoryList = categories.filter((c) => c.parent_id);
+    const subcategoryEntries = categories.filter((c) => c.parent_id);
     const categoryMap = new Map(categories.map((c) => [c.id, c]));
 
     // Group assets
@@ -550,22 +550,22 @@ export function LocationReportAnalytics({
       Disposed: loc.disposedCount,
     }));
 
-    // Collect all unique categories across top locations for stacked bar chart
-    const allCategories = new Set<string>();
+    // Collect all unique subcategories across top locations for stacked bar chart
+    const allSubcategories = new Set<string>();
     sortedByCount.slice(0, 10).forEach((loc) => {
-      loc.categoryBreakdown.forEach((cat) => allCategories.add(cat.categoryName));
+      loc.subcategoryBreakdown.forEach((sub) => allSubcategories.add(sub.subcategoryName));
     });
-    const categoryList = Array.from(allCategories).sort();
+    const subcategoryList = Array.from(allSubcategories).sort();
 
-    // Build stacked data: each location gets a key per category
-    const categoryByLocation = sortedByCount.slice(0, 10).map((loc) => {
+    // Build stacked data: each location gets a key per subcategory
+    const subcategoryByLocation = sortedByCount.slice(0, 10).map((loc) => {
       const row: Record<string, string | number> = {
         name: loc.name.length > 15 ? loc.name.substring(0, 15) + "..." : loc.name,
         fullName: loc.name,
       };
-      categoryList.forEach((catName) => {
-        const match = loc.categoryBreakdown.find((c) => c.categoryName === catName);
-        row[catName] = match ? match.assetCount : 0;
+      subcategoryList.forEach((subName) => {
+        const match = loc.subcategoryBreakdown.find((s) => s.subcategoryName === subName);
+        row[subName] = match ? match.assetCount : 0;
       });
       return row;
     });
@@ -595,8 +595,8 @@ export function LocationReportAnalytics({
       sortedByValue,
       statusByLocation,
       valueDistribution,
-      categoryByLocation,
-      categoryList,
+      subcategoryByLocation,
+      subcategoryList,
       kpis: {
         totalAssets,
         totalValue,
@@ -1257,7 +1257,7 @@ export function LocationReportAnalytics({
                   </CardHeader>
                   <CardContent>
                     <ResponsiveContainer width="100%" height={350}>
-                      <BarChart data={analyticsData.categoryByLocation}>
+                      <BarChart data={analyticsData.subcategoryByLocation}>
                         <CartesianGrid
                           strokeDasharray="3 3"
                           stroke="hsl(var(--border))"
@@ -1273,13 +1273,13 @@ export function LocationReportAnalytics({
                         <YAxis stroke="hsl(var(--foreground))" />
                         <Tooltip />
                         <Legend />
-                        {analyticsData.categoryList.map((catName, index) => (
+                        {analyticsData.subcategoryList.map((subName, index) => (
                           <Bar
-                            key={catName}
-                            dataKey={catName}
-                            stackId="categories"
+                            key={subName}
+                            dataKey={subName}
+                            stackId="subcategories"
                             fill={COLORS[index % COLORS.length]}
-                            name={catName}
+                            name={subName}
                           />
                         ))}
                       </BarChart>
