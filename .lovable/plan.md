@@ -1,75 +1,46 @@
 
-# Add Category-Colored Stacked Bars to Asset Count Chart
+# Show Subcategories in Stacked Bar Chart
 
-## What This Does
+## Change
 
-Transforms the "Asset Count by Location/Sub-Location/Department" bar chart from a single solid-color bar into a stacked bar chart where each segment represents a different category, each with its own color. This gives immediate visual insight into the category composition at each location.
+Update the stacked bar chart to use **subcategories** instead of categories. Each bar segment will represent a different subcategory with its own color.
 
-## Changes
+## File: `src/components/warehouse/LocationReportAnalytics.tsx`
 
-### File: `src/components/warehouse/LocationReportAnalytics.tsx`
+### 1. Replace category collection with subcategory collection (lines 553-571)
 
-**1. Add new chart data in the `useMemo` (around line 543, alongside `statusByLocation`):**
-
-Collect all unique category names across the top 10 locations, then build a dataset where each location row has a key per category with its count:
+Change the data preparation logic to iterate over `subcategoryBreakdown` instead of `categoryBreakdown`:
 
 ```typescript
-// Collect all unique categories across top locations
-const allCategories = new Set<string>();
+// Collect all unique subcategories across top locations for stacked bar chart
+const allSubcategories = new Set<string>();
 sortedByCount.slice(0, 10).forEach((loc) => {
-  loc.categoryBreakdown.forEach((cat) => allCategories.add(cat.categoryName));
+  loc.subcategoryBreakdown.forEach((sub) => allSubcategories.add(sub.subcategoryName));
 });
-const categoryList = Array.from(allCategories).sort();
+const subcategoryList = Array.from(allSubcategories).sort();
 
-// Build stacked data: each location gets a key per category
-const categoryByLocation = sortedByCount.slice(0, 10).map((loc) => {
+// Build stacked data: each location gets a key per subcategory
+const subcategoryByLocation = sortedByCount.slice(0, 10).map((loc) => {
   const row: Record<string, string | number> = {
     name: loc.name.length > 15 ? loc.name.substring(0, 15) + "..." : loc.name,
     fullName: loc.name,
   };
-  categoryList.forEach((catName) => {
-    const match = loc.categoryBreakdown.find((c) => c.categoryName === catName);
-    row[catName] = match ? match.assetCount : 0;
+  subcategoryList.forEach((subName) => {
+    const match = loc.subcategoryBreakdown.find((s) => s.subcategoryName === subName);
+    row[subName] = match ? match.assetCount : 0;
   });
   return row;
 });
 ```
 
-Include `categoryByLocation` and `categoryList` in the returned analytics object.
+### 2. Update returned analytics object (lines 598-599)
 
-**2. Replace the single `<Bar>` with multiple stacked `<Bar>` components (lines 1238-1261):**
+Replace `categoryByLocation` / `categoryList` with `subcategoryByLocation` / `subcategoryList`.
 
-Change the BarChart from a simple bar to a stacked bar:
+### 3. Update the BarChart component (around line 1259)
 
-```tsx
-<BarChart data={analyticsData.categoryByLocation}>
-  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-  <XAxis ... />
-  <YAxis stroke="hsl(var(--foreground))" />
-  <Tooltip />
-  <Legend />
-  {analyticsData.categoryList.map((catName, index) => (
-    <Bar
-      key={catName}
-      dataKey={catName}
-      stackId="categories"
-      fill={COLORS[index % COLORS.length]}
-      name={catName}
-    />
-  ))}
-</BarChart>
-```
+Change `data={analyticsData.categoryByLocation}` to `data={analyticsData.subcategoryByLocation}` and map over `analyticsData.subcategoryList` instead of `categoryList`.
 
-Each category gets its own color from the existing `COLORS` array and they stack on top of each other using `stackId="categories"`.
+## Result
 
-**3. Add `Legend` import (if not already imported from recharts).**
-
-Verify that `Legend` is in the recharts import statement; add it if missing.
-
-## Summary
-
-- One file modified: `src/components/warehouse/LocationReportAnalytics.tsx`
-- The asset count bar chart becomes a stacked bar chart with each category in a different color
-- A legend is added below the chart showing category-to-color mapping
-- Uses the existing `categoryBreakdown` data already computed per location -- no new data fetching needed
-- Falls back gracefully: locations with no categories simply show no bar segments
+Each bar will be composed of stacked segments -- one per subcategory -- with distinct colors and a legend identifying them all.
