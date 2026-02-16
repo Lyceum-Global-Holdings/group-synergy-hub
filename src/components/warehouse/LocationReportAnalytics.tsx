@@ -545,7 +545,7 @@ export function LocationReportAnalytics({
 
     // Chart data - Status distribution by location (for stacked bar)
     const statusByLocation = sortedByCount.slice(0, 10).map((loc) => ({
-      name: loc.name.length > 15 ? loc.name.substring(0, 15) + "..." : loc.name,
+      name: (loc.locationCode || loc.name).length > 15 ? (loc.locationCode || loc.name).substring(0, 15) + "..." : (loc.locationCode || loc.name),
       fullName: loc.name,
       Active: loc.activeCount,
       Maintenance: loc.maintenanceCount,
