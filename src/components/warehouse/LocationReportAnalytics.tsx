@@ -563,7 +563,7 @@ export function LocationReportAnalytics({
     // Build stacked data: each location gets a key per subcategory
     const subcategoryByLocation = sortedByCount.slice(0, 10).map((loc) => {
       const row: Record<string, string | number> = {
-        name: loc.name.length > 15 ? loc.name.substring(0, 15) + "..." : loc.name,
+        name: (loc.locationCode || loc.name).length > 15 ? (loc.locationCode || loc.name).substring(0, 15) + "..." : (loc.locationCode || loc.name),
         fullName: loc.name,
       };
       subcategoryList.forEach((subName) => {
