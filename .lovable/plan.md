@@ -1,55 +1,50 @@
 
 
-# Fix Sub-Location Report PDF Export: Structured Tables + Location Codes
+# Add Native jsPDF-Drawn Charts to PDF Export
 
-## Problems Identified
-
-1. **Stretched charts in PDF**: The `exportLocationReportPdf` function renders charts as canvas images (`renderChartToImage`) and embeds them as PNGs in the PDF. These images get stretched/distorted when scaled to fit the PDF page.
-
-2. **"Asset Count by Sub-Location" not using location codes**: The `handleExportPdf` function passes `loc.name` for all chart data instead of `loc.locationCode || loc.name`.
-
-3. **Charts in the global PDF export are image-based**: All three charts (Asset Count bar, Value Distribution pie, Status stacked bar) are rendered via canvas and added as images, causing quality and stretching issues.
+## Problem
+The previous fix replaced stretched canvas-rendered chart images with plain tables. While this fixed the distortion, the user wants actual visual charts in the PDF alongside (or instead of) the tables.
 
 ## Solution
+Draw charts natively using jsPDF drawing primitives (rectangles, lines, arcs, text). These render at full PDF resolution with no stretching since they are vector-based, not image-based.
 
-Replace all canvas-rendered chart images in the PDF with structured jsPDF-autoTable tables, and use location codes where available.
+## File: `src/utils/locationReportPdfExport.ts`
 
-### File 1: `src/components/warehouse/LocationReportAnalytics.tsx`
+### 1. Add a native horizontal bar chart for "Assets by Location"
+- Draw colored horizontal bars proportional to asset count
+- Label each bar with location name and count
+- Uses `doc.setFillColor()` + `doc.rect()` for bars and `doc.text()` for labels
+- Keep the existing table below the chart for detailed numbers
 
-**Update `handleExportPdf` chart data (lines 960-975)** to use location codes:
+### 2. Add a native pie chart for "Value Distribution"
+- Draw colored arc segments using jsPDF path drawing or filled wedges
+- Add a legend beside the chart with color swatches and labels
+- Keep the existing table below for exact values
 
-```typescript
-assetCountData: analyticsData.sortedByCount.slice(0, 10).map((loc) => ({
-  name: loc.locationCode || loc.name,
-  value: loc.assetCount,
-})),
-valueDistribution: analyticsData.valueDistribution.map((loc) => ({
-  name: loc.name,  // already uses locationCode from earlier fix
-  value: loc.value,
-})),
-statusDistribution: analyticsData.statusByLocation.map((loc) => ({
-  name: loc.name,  // already uses locationCode from earlier fix
-  active: loc.Active,
-  maintenance: loc.Maintenance,
-  inactive: loc.Inactive,
-})),
-```
+### 3. Add a native stacked horizontal bar chart for "Status by Location"
+- Draw stacked colored segments (green=Active, yellow=Maintenance, red=Inactive)
+- Label each row with the location name
+- Add a color legend
+- Keep the existing table below
 
-### File 2: `src/utils/locationReportPdfExport.ts`
+### 4. Helper drawing functions to add
+- `drawHorizontalBarChart(doc, data, x, y, width, height, color)` - draws a simple horizontal bar chart
+- `drawPieChartNative(doc, data, cx, cy, radius)` - draws pie segments using trigonometry + `doc.triangle()`/`doc.lines()`
+- `drawStackedBarChartNative(doc, data, x, y, width, height)` - draws stacked horizontal bars
 
-**Replace canvas chart rendering with autoTable structured data** on pages 1-2:
+### Layout adjustments
+- Charts will be placed above their corresponding tables
+- Each chart takes approximately 60-80mm of vertical space
+- Page break logic will be adjusted to accommodate charts + tables
+- If content overflows page 1, it flows naturally to page 2
 
-1. **Asset Count Bar Chart (lines 553-571)**: Replace `renderChartToImage("bar", ...)` and `doc.addImage(...)` with an autoTable showing Location | Asset Count, sorted descending.
-
-2. **Value Distribution Pie Chart (lines 577-587)**: Replace `renderChartToImage("pie", ...)` with an autoTable showing Location | Value | Percentage of total.
-
-3. **Status Distribution Chart (lines 595-603)**: Replace `renderChartToImage("stackedBar", ...)` with an autoTable showing Location | Active | Maintenance | Inactive | Total.
-
-4. **Remove the canvas rendering functions** (`drawBarChart`, `drawPieChart`, `drawStackedBarChart`, `drawSubcategoryConditionChart`, `renderChartToImage`) as they will no longer be needed.
+## Technical approach
+- jsPDF supports `doc.rect(x, y, w, h, 'F')` for filled rectangles (bars)
+- For pie chart: calculate angles from data percentages, draw filled triangular wedges from center using `doc.lines()` with fill
+- Colors: use a predefined palette array for consistent chart coloring
+- All drawing is vector-based, so it scales perfectly at any zoom level
 
 ## Result
-
-- PDF exports will contain clean, structured tables instead of stretched chart images
-- All location labels in the PDF will use location codes when available
-- File sizes will be smaller and rendering will be faster without canvas operations
-
+- PDF will contain professional-looking charts AND detailed tables
+- No image stretching since everything is drawn natively in PDF
+- Charts use location codes where available (already handled by data passed in)
