@@ -374,7 +374,8 @@ export function LocationReportAnalytics({
       if (key && groupedData[key]) {
         const data = groupedData[key];
         data.assetCount++;
-        data.totalValue += asset.current_value || asset.purchase_price || 0;
+        const assetValue = asset.status !== 'disposed' ? (asset.current_value || asset.purchase_price || 0) : 0;
+        data.totalValue += assetValue;
 
         // Status counts
         if (asset.status === "active") data.activeCount++;
@@ -396,7 +397,7 @@ export function LocationReportAnalytics({
           }
           locationCategoryData[key][asset.category_id].count++;
           locationCategoryData[key][asset.category_id].value +=
-            asset.current_value || asset.purchase_price || 0;
+            asset.status !== 'disposed' ? (asset.current_value || asset.purchase_price || 0) : 0;
         }
 
         // Subcategory tracking
@@ -416,7 +417,7 @@ export function LocationReportAnalytics({
           }
           const subcatData = locationSubcategoryData[key][asset.subcategory_id];
           subcatData.count++;
-          subcatData.value += asset.current_value || asset.purchase_price || 0;
+          subcatData.value += asset.status !== 'disposed' ? (asset.current_value || asset.purchase_price || 0) : 0;
           if (asset.condition === "good") subcatData.good++;
           else if (asset.condition === "fair") subcatData.fair++;
           else if (asset.condition === "poor") subcatData.poor++;
@@ -442,7 +443,7 @@ export function LocationReportAnalytics({
           }
           const amData = locationAssetMasterData[key][asset.asset_master_id];
           amData.count++;
-          amData.value += asset.current_value || asset.purchase_price || 0;
+          amData.value += asset.status !== 'disposed' ? (asset.current_value || asset.purchase_price || 0) : 0;
           if (asset.condition === "good") amData.good++;
           else if (asset.condition === "fair") amData.fair++;
           else if (asset.condition === "poor") amData.poor++;
@@ -531,10 +532,9 @@ export function LocationReportAnalytics({
 
     // KPIs
     const totalAssets = filteredAssets.length;
-    const totalValue = filteredAssets.reduce(
-      (sum, a) => sum + (a.current_value || a.purchase_price || 0),
-      0
-    );
+    const totalValue = filteredAssets
+      .filter((a) => a.status !== 'disposed')
+      .reduce((sum, a) => sum + (a.current_value || a.purchase_price || 0), 0);
     const topLocation = sortedByCount[0];
     const avgValuePerLocation =
       dataArray.length > 0 ? totalValue / dataArray.length : 0;
