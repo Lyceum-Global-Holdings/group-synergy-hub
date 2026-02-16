@@ -1419,11 +1419,11 @@ export function LocationReportAnalytics({
                         <XAxis type="number" stroke="hsl(var(--foreground))" />
                         <YAxis
                           type="category"
-                          dataKey="name"
+                          dataKey={(entry: any) => entry.locationCode || entry.name}
                           width={100}
                           tick={{ fontSize: 11 }}
                           stroke="hsl(var(--foreground))"
-                          tickFormatter={(value) =>
+                          tickFormatter={(value: string) =>
                             value.length > 12 ? value.substring(0, 12) + "..." : value
                           }
                         />
