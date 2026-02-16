@@ -959,7 +959,7 @@ export function LocationReportAnalytics({
 
       const chartData = {
         assetCountData: analyticsData.sortedByCount.slice(0, 10).map((loc) => ({
-          name: loc.name,
+          name: loc.locationCode || loc.name,
           value: loc.assetCount,
         })),
         valueDistribution: analyticsData.valueDistribution.map((loc) => ({
