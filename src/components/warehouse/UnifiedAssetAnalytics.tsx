@@ -253,7 +253,7 @@ export function UnifiedAssetAnalytics({
       if (key && groupedResults[key]) {
         const data = groupedResults[key];
         data.assetCount++;
-        data.totalValue += asset.current_value || asset.purchase_price || 0;
+        data.totalValue += asset.current_value ?? asset.purchase_price ?? 0;
 
         if (asset.status === "active") data.activeCount++;
         else if (asset.status === "maintenance") data.maintenanceCount++;
@@ -335,7 +335,7 @@ export function UnifiedAssetAnalytics({
     const maintenance =
       maintenanceCount ?? assets.filter((a) => a.status === "maintenance").length;
     const totalValue = assets.reduce(
-      (sum, a) => sum + (a.current_value || a.purchase_price || 0),
+      (sum, a) => sum + (a.current_value ?? a.purchase_price ?? 0),
       0
     );
     const utilizationRate = total > 0 ? (active / total) * 100 : 0;

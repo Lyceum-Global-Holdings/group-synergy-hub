@@ -1141,7 +1141,7 @@ export default function AssetManagement() {
                             </div>
                           </TableCell>
                           <TableCell>
-                            Rs. {(asset.current_value || asset.purchase_price || 0).toLocaleString()}
+                            Rs. {(asset.current_value ?? asset.purchase_price ?? 0).toLocaleString()}
                           </TableCell>
                           <TableCell>
                             <DropdownMenu>

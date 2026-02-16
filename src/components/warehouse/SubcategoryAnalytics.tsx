@@ -119,7 +119,7 @@ export function SubcategoryAnalytics({ assets, categories }: SubcategoryAnalytic
       }
       
       acc[subId].count++;
-      acc[subId].totalValue += (asset.current_value || asset.purchase_price || 0);
+      acc[subId].totalValue += (asset.current_value ?? asset.purchase_price ?? 0);
       acc[subId].purchaseValue += (asset.purchase_price || 0);
       
       // Status counts
