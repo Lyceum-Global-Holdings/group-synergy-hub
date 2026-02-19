@@ -32,6 +32,7 @@ export function ConvertToIssueDialog({ open, onOpenChange, request, items }: Con
     }))
   );
   const [notes, setNotes] = useState("");
+  const [isConverting, setIsConverting] = useState(false);
   
   const { createMaterialIssueAsync } = useMaterialIssues();
   const { createItems: createIssueItems } = useMaterialIssueItems();
@@ -45,6 +46,8 @@ export function ConvertToIssueDialog({ open, onOpenChange, request, items }: Con
   };
 
   const handleConvert = async () => {
+    if (isConverting) return;
+    setIsConverting(true);
     try {
       // Create Material Issue Note
       const newIssue = await createMaterialIssueAsync({
@@ -101,6 +104,8 @@ export function ConvertToIssueDialog({ open, onOpenChange, request, items }: Con
       onOpenChange(false);
     } catch (error) {
       console.error("Error converting request to issue:", error);
+    } finally {
+      setIsConverting(false);
     }
   };
 
@@ -174,8 +179,8 @@ export function ConvertToIssueDialog({ open, onOpenChange, request, items }: Con
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button onClick={handleConvert}>
-            Issue Materials
+          <Button onClick={handleConvert} disabled={isConverting}>
+            {isConverting ? "Issuing..." : "Issue Materials"}
           </Button>
         </DialogFooter>
       </DialogContent>
