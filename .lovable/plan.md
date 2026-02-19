@@ -1,138 +1,43 @@
 
 
-# Fix MRN Stock Adjustments and Company Bin Scoping
+# Fix Duplicate Material Issue Notes from Convert Dialog
 
-## Problems Identified
+## Root Cause
 
-1. **Stock adjustment not recorded properly**: When an MRN is approved, the bin allocation lookup (line 131-136 in `useMaterialReturns.ts`) searches for ANY bin allocation for the item without filtering by the MRN's company. This can result in either updating the wrong company's bin or finding no bin at all, causing stock desync.
+The "Issue Materials" button in `ConvertToIssueDialog.tsx` has no protection against double-clicks. When clicked rapidly, `handleConvert` fires twice, creating two separate Material Issue Notes for the same Material Request.
 
-2. **Items not scoped to company bin**: The `ItemSelector` component in `CreateMaterialReturnDialog.tsx` uses `useWarehouseItems` which already filters by selected company. However, the approval process doesn't ensure the bin belongs to the same company.
+Evidence from the database shows this pattern repeatedly:
+- MIN-20260219-001 and MIN-20260219-002 both created for MR-20260219-001 (6 seconds apart)
+- MIN-20251029-001 and MIN-20251029-002 both created for MR-20251029-001 (1 second apart)
+- MIN-20251024-001 and MIN-20251024-002 both created for MR-20251024-001 (less than 1 second apart)
 
-## Changes
+## Fix
 
-### 1. Fix Bin Allocation Lookup in Approval (`src/hooks/useMaterialReturns.ts`)
+### File: `src/components/warehouse/ConvertToIssueDialog.tsx`
 
-Update the `approveMaterialReturnMutation` to:
-- First fetch the MRN's `company_id` from the `material_return_notes` record
-- Filter `warehouse_bin_allocations` by both `warehouse_item_id` AND the MRN's `company_id`
-- This ensures the stock is returned to the correct company's bin
+1. **Add a `isConverting` state** to track when the conversion is in progress
+2. **Set it to `true`** at the start of `handleConvert` and `false` on completion/error
+3. **Disable the "Issue Materials" button** while `isConverting` is true
+4. **Show loading text** on the button during conversion (e.g., "Issuing...")
 
-Current code (line 131-136):
-```typescript
-const { data: binAllocation } = await supabase
-  .from('warehouse_bin_allocations')
-  .select('id')
-  .eq('warehouse_item_id', item.item_id)
-  .limit(1)
-  .maybeSingle();
+```text
+Changes:
+- Line 27+: Add `const [isConverting, setIsConverting] = useState(false);`
+- Line 47: Add `if (isConverting) return;` guard at start of handleConvert
+- Line 48: Add `setIsConverting(true);`
+- Line 101+: Add `finally { setIsConverting(false); }` block
+- Line 177: Add `disabled={isConverting}` to the Issue Materials button
 ```
 
-Updated code:
-```typescript
-const { data: binAllocation } = await supabase
-  .from('warehouse_bin_allocations')
-  .select('id')
-  .eq('warehouse_item_id', item.item_id)
-  .eq('company_id', mrnCompanyId)
-  .limit(1)
-  .maybeSingle();
-```
+### Cleanup of Existing Duplicates
 
-Also fetch the MRN record at the start of the mutation to get the `company_id`.
-
-### 2. Update RPC Function (`process_material_return_stock_update`)
-
-Update the database function to also accept `p_company_id` parameter so it can create a new bin allocation if none exists for the item in that company. Currently, if no bin allocation is found, the stock is added to `warehouse_items` but NOT to any bin allocation -- causing a data desync.
-
-The updated RPC will:
-- Accept a `p_company_id` parameter
-- If `p_bin_allocation_id` is NULL but `p_company_id` is provided, find or create a default bin allocation for the item in that company
-- Always ensure bin allocations are updated alongside `warehouse_items.current_stock`
-
-### 3. Pass `company_id` in Approval Mutation
-
-Update the approval flow to pass `company_id` to the RPC call so the function can properly scope the stock update.
-
-## Technical Details
-
-### Database Migration
-
-```sql
-CREATE OR REPLACE FUNCTION process_material_return_stock_update(
-  p_item_id UUID,
-  p_quantity_returned NUMERIC,
-  p_bin_allocation_id UUID DEFAULT NULL,
-  p_mrn_id UUID DEFAULT NULL,
-  p_mrn_number TEXT DEFAULT NULL,
-  p_company_id UUID DEFAULT NULL
-)
-RETURNS VOID
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path TO 'public'
-AS $$
-DECLARE
-  v_warehouse_item RECORD;
-  v_bin_alloc_id UUID;
-BEGIN
-  SELECT * INTO v_warehouse_item
-  FROM warehouse_items WHERE id = p_item_id FOR UPDATE;
-
-  IF NOT FOUND THEN
-    RAISE EXCEPTION 'Warehouse item not found: %', p_item_id;
-  END IF;
-
-  -- Insert stock transaction
-  INSERT INTO stock_transactions (
-    item_id, transaction_type, reference_type, reference_id,
-    quantity_change, quantity_before, quantity_after,
-    notes, created_by
-  ) VALUES (
-    p_item_id, 'material_return', 'mrn', p_mrn_id,
-    p_quantity_returned, v_warehouse_item.current_stock,
-    v_warehouse_item.current_stock + p_quantity_returned,
-    'Material Return via MRN: ' || COALESCE(p_mrn_number, 'Unknown'),
-    auth.uid()
-  );
-
-  -- Update warehouse item stock
-  UPDATE warehouse_items
-  SET current_stock = current_stock + p_quantity_returned, updated_at = NOW()
-  WHERE id = p_item_id;
-
-  -- Determine bin allocation ID
-  v_bin_alloc_id := p_bin_allocation_id;
-
-  -- If no bin allocation provided, find one scoped to company
-  IF v_bin_alloc_id IS NULL AND p_company_id IS NOT NULL THEN
-    SELECT id INTO v_bin_alloc_id
-    FROM warehouse_bin_allocations
-    WHERE warehouse_item_id = p_item_id AND company_id = p_company_id
-    LIMIT 1;
-  END IF;
-
-  -- Update bin allocation if found
-  IF v_bin_alloc_id IS NOT NULL THEN
-    UPDATE warehouse_bin_allocations
-    SET allocated_quantity = allocated_quantity + p_quantity_returned,
-        available_quantity = available_quantity + p_quantity_returned,
-        updated_at = NOW()
-    WHERE id = v_bin_alloc_id;
-  END IF;
-END;
-$$;
-```
-
-### Hook Update (`src/hooks/useMaterialReturns.ts`)
-
-- Fetch MRN record to get `company_id` before processing items
-- Filter bin allocation lookup by `company_id`
-- Pass `company_id` to RPC function
+The user should manually delete the duplicate MIN records from the database. The duplicates are:
+- MIN-20260219-002 (duplicate of MIN-20260219-001)
+- MIN-20251029-001 (duplicate, the request's `min_id` points to MIN-20251029-002)
+- MIN-20251024-002 (duplicate of MIN-20251024-001)
 
 ## Summary
 
-- 1 database migration (update RPC function to accept `p_company_id`)
-- 1 file updated (`src/hooks/useMaterialReturns.ts`)
-- Ensures stock returns always target the correct company bin
-- Prevents data desync between `warehouse_items.current_stock` and `warehouse_bin_allocations`
-
+- 1 file modified (`ConvertToIssueDialog.tsx`)
+- No database migration needed
+- Adds loading state to prevent double-click duplicate submissions
