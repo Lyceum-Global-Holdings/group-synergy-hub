@@ -1,69 +1,53 @@
 
 
-# Fix: PWA Service Worker Caching Stale Data
+# Add Location Field to Material Issue Notes
 
-## Root Cause
+## What This Does
 
-The `vite.config.ts` has a PWA Workbox configuration that **caches all Supabase API responses** for up to 24 hours:
+Adds a "Location" dropdown to the Material Issue Note form, allowing users to specify which warehouse location the materials are being issued to or from. This location will also be displayed in the issue details view and the issues list table.
 
-```typescript
-runtimeCaching: [
-  {
-    urlPattern: /^https:\/\/.*\.supabase\.co\/.*/i,
-    handler: "NetworkFirst",
-    options: {
-      cacheName: "supabase-cache",
-      expiration: {
-        maxEntries: 100,
-        maxAgeSeconds: 60 * 60 * 24 // 24 hours
-      }
-    }
-  }
-]
+## Changes
+
+### 1. Database Migration
+
+Add a `location_id` column to the `material_issue_notes` table, referencing `warehouse_locations`:
+
+```sql
+ALTER TABLE material_issue_notes 
+ADD COLUMN location_id UUID REFERENCES warehouse_locations(id);
 ```
 
-While "NetworkFirst" prioritizes the network, when there are any connectivity hiccups, timeouts, or slow responses, the service worker falls back to serving **cached (old) data**. This means:
-- Inventory items show old data after updates
-- Daily Site Reports show stale report data
-- Any new records added don't appear until the cache expires (up to 24 hours)
+No RLS changes needed -- the existing policies on `material_issue_notes` already cover this column.
 
-This directly contradicts the project's permanent architecture standard of `staleTime: 0` and `refetchOnMount: 'always'` -- React Query fetches fresh data, but the service worker intercepts the network request and can return cached responses before React Query even sees the real data.
+### 2. Update TypeScript Types (`src/types/materialIssueReturn.ts`)
 
-## Fix
+- Add `location_id: string | null` to the `MaterialIssueNote` interface
+- Add `location_id?: string` to the `CreateMaterialIssueData` interface
 
-### File: `vite.config.ts`
+### 3. Update Create Dialog (`src/components/warehouse/CreateMaterialIssueDialog.tsx`)
 
-**Remove the Supabase runtime caching entirely.** API data should never be cached by the service worker -- React Query already handles data freshness. Only static assets (JS, CSS, fonts, images) should be cached by the PWA.
+- Import `useWarehouseLocations` hook
+- Add `location_id` to the form state
+- Add a Location dropdown (Select component) in the Header Info tab, populated from `warehouse_locations`
+- Pass `location_id` when calling `createMaterialIssueAsync`
 
-Updated workbox config:
+### 4. Update Details Dialog (`src/components/warehouse/MaterialIssueDetailsDialog.tsx`)
 
-```typescript
-workbox: {
-  maximumFileSizeToCacheInBytes: 15 * 1024 * 1024,
-  globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"],
-  // No runtimeCaching for Supabase API -- data must always be fresh
-  navigateFallback: "index.html",
-  navigateFallbackDenylist: [/^\/api/],
-  // Force the new service worker to activate immediately
-  skipWaiting: true,
-  clientsClaim: true,
-}
-```
+- Fetch the location name alongside the issue data (join with `warehouse_locations`)
+- Display the location in the "Issue Details" section of the Overview tab
 
-Key changes:
-1. **Remove `runtimeCaching`** for Supabase URLs -- no more stale API data
-2. **Add `skipWaiting: true`** -- new service worker activates immediately instead of waiting for all tabs to close
-3. **Add `clientsClaim: true`** -- new service worker takes control of all open tabs immediately
-4. **Add `navigateFallback`** -- ensures SPA routing works offline
+### 5. Update Issues List (`src/pages/warehouse/MaterialIssueReturn.tsx`)
 
-## Why This Is a Permanent Fix
+- Add a "Location" column to the Material Issues table
+- Fetch location name when querying issues (join with `warehouse_locations`)
 
-Previously, every time data appeared stale, the symptoms looked like a React Query or RLS issue. The actual interceptor was the service worker silently serving cached API responses. By removing API caching from the service worker entirely:
-- React Query's `staleTime: 0` will work as intended
-- All data fetches go directly to Supabase (no middleman cache)
-- Publishing updates will immediately show new code (via `skipWaiting` + `clientsClaim`)
-- Static assets (JS, CSS, images) are still cached for performance
+### 6. Update Hook (`src/hooks/useMaterialIssues.ts`)
+
+- Update the query to join with `warehouse_locations` to fetch location name alongside each issue
+- No changes needed to create/update mutations (they already spread all fields)
 
 ## Summary
 
-One file change (`vite.config.ts`) that permanently resolves the recurring "data not showing after update" issue by eliminating the service worker's API response cache.
+- 1 database migration (add column)
+- 6 files updated
+- Location selector uses the existing `warehouse_locations` table and `useWarehouseLocations` hook
