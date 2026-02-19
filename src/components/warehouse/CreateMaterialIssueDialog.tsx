@@ -18,6 +18,7 @@ import { useMaterialIssues } from '@/hooks/useMaterialIssues';
 import { useMaterialIssueItems } from '@/hooks/useMaterialIssueItems';
 import { ItemSelector } from '@/components/common/ItemSelector';
 import { useWarehouseItems } from '@/hooks/useWarehouseItems';
+import { useWarehouseLocations } from '@/hooks/useWarehouseLocations';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import {
@@ -71,6 +72,7 @@ export function CreateMaterialIssueDialog({ open, onOpenChange }: MaterialIssueD
     notes: '',
     cpo_id: '',
     cpo_number: '',
+    location_id: '',
   });
 
   const [items, setItems] = useState<IssueItem[]>([]);
@@ -78,6 +80,7 @@ export function CreateMaterialIssueDialog({ open, onOpenChange }: MaterialIssueD
   const [reservedItems, setReservedItems] = useState<any[]>([]);
 
   const { items: warehouseItems } = useWarehouseItems();
+  const { locations = [] } = useWarehouseLocations();
   const { createMaterialIssueAsync, isCreating } = useMaterialIssues();
   const { createItems } = useMaterialIssueItems();
 
@@ -214,6 +217,7 @@ export function CreateMaterialIssueDialog({ open, onOpenChange }: MaterialIssueD
         job_number: formData.job_number || undefined,
         pr_number: formData.pr_number || undefined,
         po_number: formData.po_number || undefined,
+        location_id: formData.location_id || undefined,
       });
 
       // Create items with reservation linkage
@@ -248,6 +252,7 @@ export function CreateMaterialIssueDialog({ open, onOpenChange }: MaterialIssueD
         notes: '',
         cpo_id: '',
         cpo_number: '',
+        location_id: '',
       });
       setItems([]);
       setReservedItems([]);
@@ -303,6 +308,23 @@ export function CreateMaterialIssueDialog({ open, onOpenChange }: MaterialIssueD
                 </AlertDescription>
               </Alert>
             )}
+
+            {/* Location Selection */}
+            <div className="space-y-2">
+              <Label htmlFor="location_id">Issue Location</Label>
+              <Select value={formData.location_id} onValueChange={(value) => handleInputChange('location_id', value)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select location for this issue" />
+                </SelectTrigger>
+                <SelectContent>
+                  {locations.map((loc: any) => (
+                    <SelectItem key={loc.id} value={loc.id}>
+                      {loc.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">

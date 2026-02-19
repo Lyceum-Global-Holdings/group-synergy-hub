@@ -56,6 +56,7 @@ export interface MaterialIssueNote {
   mr_received_by: string | null;
   mr_received_date: string | null;
   form_reference: string | null;
+  location_id: string | null;
 }
 
 export interface CreateMaterialIssueData {
@@ -74,6 +75,7 @@ export interface CreateMaterialIssueData {
   job_number?: string;
   pr_number?: string;
   po_number?: string;
+  location_id?: string;
 }
 
 export interface MaterialIssueItem {

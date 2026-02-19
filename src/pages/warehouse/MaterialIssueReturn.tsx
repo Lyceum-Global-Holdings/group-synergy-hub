@@ -120,6 +120,14 @@ export default function MaterialIssueReturn() {
     { accessorKey: "issued_to", header: "Issued To" },
     { accessorKey: "department", header: "Department" },
     {
+      accessorKey: "location_id",
+      header: "Location",
+      cell: ({ row }) => {
+        const loc = (row.original as any).warehouse_locations;
+        return loc?.name || <span className="text-muted-foreground">-</span>;
+      }
+    },
+    {
       accessorKey: "status",
       header: "Status",
       cell: ({ row }) => (

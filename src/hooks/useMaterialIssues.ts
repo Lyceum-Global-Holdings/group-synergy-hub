@@ -16,7 +16,7 @@ export const useMaterialIssues = () => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('material_issue_notes')
-        .select('*')
+        .select('*, warehouse_locations(name)')
         .order('created_at', { ascending: false });
 
       if (error) throw error;

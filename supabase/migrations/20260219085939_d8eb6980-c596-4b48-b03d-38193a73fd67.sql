@@ -1,0 +1,1 @@
+ALTER TABLE material_issue_notes ADD COLUMN location_id UUID REFERENCES warehouse_locations(id);
