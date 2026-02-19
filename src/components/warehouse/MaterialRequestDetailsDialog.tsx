@@ -119,10 +119,10 @@ export function MaterialRequestDetailsDialog({ open, onOpenChange, request }: Ma
                     <span className="text-muted-foreground">Requested By:</span>
                     <span>{request.requested_by}</span>
                   </div>
-                  {request.department && (
+                  {(request as any).warehouse_locations?.name && (
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground">Department:</span>
-                      <span>{request.department}</span>
+                      <span className="text-muted-foreground">Location:</span>
+                      <span>{(request as any).warehouse_locations.name}</span>
                     </div>
                   )}
                   {request.job_number && (

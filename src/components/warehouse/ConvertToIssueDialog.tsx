@@ -58,6 +58,7 @@ export function ConvertToIssueDialog({ open, onOpenChange, request, items }: Con
         epf_number: request.epf_number || undefined,
         items_required_date: request.items_required_date,
         job_number: request.job_number || undefined,
+        location_id: request.location_id || undefined,
       });
 
       if (newIssue) {
@@ -113,7 +114,7 @@ export function ConvertToIssueDialog({ open, onOpenChange, request, items }: Con
         <div className="space-y-4">
           <div className="bg-muted p-4 rounded-lg text-sm space-y-1">
             <div><strong>Requested By:</strong> {request.requested_by}</div>
-            <div><strong>Department:</strong> {request.department || "N/A"}</div>
+            <div><strong>Location:</strong> {(request as any).warehouse_locations?.name || "N/A"}</div>
             <div><strong>Purpose:</strong> {request.purpose}</div>
           </div>
 

@@ -12,6 +12,7 @@ import { Plus, Trash2, ArrowLeft, ArrowRight, CheckCircle, Package } from "lucid
 import { useMaterialRequests } from "@/hooks/useMaterialRequests";
 import { useMaterialRequestItems } from "@/hooks/useMaterialRequestItems";
 import { useWarehouseReservations } from "@/hooks/useWarehouseReservations";
+import { useWarehouseLocations } from "@/hooks/useWarehouseLocations";
 import { ItemSelector } from "@/components/common/ItemSelector";
 import { MaterialRequestPriority } from "@/types/materialIssueReturn";
 import { WarehouseItem } from "@/types/itemBin";
@@ -40,7 +41,7 @@ export function CreateMaterialRequestDialog({ open, onOpenChange }: CreateMateri
   const [requestData, setRequestData] = useState({
     request_date: new Date().toISOString().split('T')[0],
     requested_by: "",
-    department: "",
+    location_id: "",
     contact_number: "",
     epf_number: "",
     job_number: "",
@@ -56,6 +57,7 @@ export function CreateMaterialRequestDialog({ open, onOpenChange }: CreateMateri
   
   const { createRequestAsync, isCreating } = useMaterialRequests();
   const { createItems } = useMaterialRequestItems();
+  const { locations } = useWarehouseLocations();
 
   // Fetch confirmed CPOs
   const { data: confirmedCPOs } = useQuery({
@@ -192,7 +194,7 @@ export function CreateMaterialRequestDialog({ open, onOpenChange }: CreateMateri
     setRequestData({
       request_date: new Date().toISOString().split('T')[0],
       requested_by: "",
-      department: "",
+      location_id: "",
       contact_number: "",
       epf_number: "",
       job_number: "",
@@ -278,13 +280,22 @@ export function CreateMaterialRequestDialog({ open, onOpenChange }: CreateMateri
                 />
               </div>
               <div>
-                <Label htmlFor="department">Department</Label>
-                <Input
-                  id="department"
-                  value={requestData.department}
-                  onChange={(e) => setRequestData({ ...requestData, department: e.target.value })}
-                  placeholder="e.g., Production, Warehouse"
-                />
+                <Label htmlFor="location_id">Location</Label>
+                <Select
+                  value={requestData.location_id}
+                  onValueChange={(value) => setRequestData({ ...requestData, location_id: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select location" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {locations?.map((loc) => (
+                      <SelectItem key={loc.id} value={loc.id}>
+                        {loc.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
 
@@ -523,7 +534,7 @@ export function CreateMaterialRequestDialog({ open, onOpenChange }: CreateMateri
               <h3 className="font-semibold">Request Details</h3>
               <div className="grid grid-cols-2 gap-2 text-sm">
                 <div><span className="text-muted-foreground">Requested By:</span> {requestData.requested_by}</div>
-                <div><span className="text-muted-foreground">Department:</span> {requestData.department || "N/A"}</div>
+                <div><span className="text-muted-foreground">Location:</span> {locations?.find(l => l.id === requestData.location_id)?.name || "N/A"}</div>
                 <div><span className="text-muted-foreground">Date Required:</span> {requestData.items_required_date}</div>
                 <div><span className="text-muted-foreground">Priority:</span> {requestData.priority}</div>
                 {requestData.cpo_number && (
