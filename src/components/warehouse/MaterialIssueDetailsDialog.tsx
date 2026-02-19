@@ -52,7 +52,7 @@ export function MaterialIssueDetailsDialog({ open, onOpenChange, issueId }: Mate
     try {
       const { data: issueData, error: issueError } = await supabase
         .from('material_issue_notes')
-        .select('*')
+        .select('*, warehouse_locations(name)')
         .eq('id', issueId)
         .single();
 
@@ -212,6 +212,7 @@ export function MaterialIssueDetailsDialog({ open, onOpenChange, issueId }: Mate
                   <div><span className="font-medium">Required Date:</span> {issue.items_required_date ? format(new Date(issue.items_required_date), 'MMM dd, yyyy') : '-'}</div>
                   <div><span className="font-medium">Job Number:</span> {issue.job_number || '-'}</div>
                   <div><span className="font-medium">PR Number:</span> {issue.pr_number || '-'}</div>
+                  <div><span className="font-medium">Location:</span> {(issue as any).warehouse_locations?.name || '-'}</div>
                 </div>
               </div>
             </div>
