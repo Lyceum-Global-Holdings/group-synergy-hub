@@ -101,6 +101,20 @@ export const useMaterialReturns = () => {
       console.log('[MaterialReturn] MRN ID:', id);
       console.log('[MaterialReturn] MRN Number:', mrnNumber);
       
+      // Fetch MRN record to get company_id
+      const { data: mrnRecord, error: mrnFetchError } = await supabase
+        .from('material_return_notes')
+        .select('company_id')
+        .eq('id', id)
+        .single();
+
+      if (mrnFetchError) {
+        console.error('[MaterialReturn] ERROR fetching MRN record:', mrnFetchError);
+        throw mrnFetchError;
+      }
+      const mrnCompanyId = mrnRecord?.company_id;
+      console.log('[MaterialReturn] MRN Company ID:', mrnCompanyId);
+
       // First, get the return items
       console.log('[MaterialReturn] Fetching return items...');
       const { data: returnItems, error: itemsError } = await supabase
@@ -128,10 +142,16 @@ export const useMaterialReturns = () => {
         
         // Find bin allocation for the item
         console.log('[MaterialReturn] Looking for bin allocation...');
-        const { data: binAllocation, error: binError } = await supabase
+        const binQuery = supabase
           .from('warehouse_bin_allocations')
           .select('id')
-          .eq('warehouse_item_id', item.item_id)
+          .eq('warehouse_item_id', item.item_id);
+        
+        if (mrnCompanyId) {
+          binQuery.eq('company_id', mrnCompanyId);
+        }
+
+        const { data: binAllocation, error: binError } = await binQuery
           .limit(1)
           .maybeSingle();
 
@@ -147,7 +167,8 @@ export const useMaterialReturns = () => {
           p_quantity_returned: item.quantity_returned,
           p_bin_allocation_id: binAllocation?.id || null,
           p_mrn_id: id,
-          p_mrn_number: mrnNumber
+          p_mrn_number: mrnNumber,
+          p_company_id: mrnCompanyId || null
         });
         
         const { data: rpcResult, error: rpcError } = await supabase.rpc('process_material_return_stock_update', {
@@ -155,7 +176,8 @@ export const useMaterialReturns = () => {
           p_quantity_returned: item.quantity_returned,
           p_bin_allocation_id: binAllocation?.id || null,
           p_mrn_id: id,
-          p_mrn_number: mrnNumber
+          p_mrn_number: mrnNumber,
+          p_company_id: mrnCompanyId || null
         });
 
         if (rpcError) {

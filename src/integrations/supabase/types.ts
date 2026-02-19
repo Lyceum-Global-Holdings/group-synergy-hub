@@ -17427,16 +17427,28 @@ export type Database = {
         }
         Returns: undefined
       }
-      process_material_return_stock_update: {
-        Args: {
-          p_bin_allocation_id?: string
-          p_item_id: string
-          p_mrn_id?: string
-          p_mrn_number?: string
-          p_quantity_returned: number
-        }
-        Returns: undefined
-      }
+      process_material_return_stock_update:
+        | {
+            Args: {
+              p_bin_allocation_id?: string
+              p_item_id: string
+              p_mrn_id?: string
+              p_mrn_number?: string
+              p_quantity_returned: number
+            }
+            Returns: undefined
+          }
+        | {
+            Args: {
+              p_bin_allocation_id?: string
+              p_company_id?: string
+              p_item_id: string
+              p_mrn_id?: string
+              p_mrn_number?: string
+              p_quantity_returned: number
+            }
+            Returns: undefined
+          }
       record_workflow_action: {
         Args: {
           p_comments?: string
