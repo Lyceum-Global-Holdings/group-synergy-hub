@@ -1,53 +1,53 @@
 
-
-# Add Location Field to Material Issue Notes
+# Replace Department with Location in Material Request Form
 
 ## What This Does
 
-Adds a "Location" dropdown to the Material Issue Note form, allowing users to specify which warehouse location the materials are being issued to or from. This location will also be displayed in the issue details view and the issues list table.
+Replaces the free-text "Department" field in the Material Request form with a "Location" dropdown, identical to the one in Material Issue Notes. The dropdown will be populated from the `warehouse_locations` table.
 
 ## Changes
 
 ### 1. Database Migration
 
-Add a `location_id` column to the `material_issue_notes` table, referencing `warehouse_locations`:
+Add a `location_id` column to `material_requests` and keep the existing `department` column for backward compatibility (existing records may have department data):
 
 ```sql
-ALTER TABLE material_issue_notes 
+ALTER TABLE material_requests 
 ADD COLUMN location_id UUID REFERENCES warehouse_locations(id);
 ```
 
-No RLS changes needed -- the existing policies on `material_issue_notes` already cover this column.
-
 ### 2. Update TypeScript Types (`src/types/materialIssueReturn.ts`)
 
-- Add `location_id: string | null` to the `MaterialIssueNote` interface
-- Add `location_id?: string` to the `CreateMaterialIssueData` interface
+- `MaterialRequest` interface: add `location_id: string | null`
+- `CreateMaterialRequestData` interface: replace `department?: string` with `location_id?: string`
 
-### 3. Update Create Dialog (`src/components/warehouse/CreateMaterialIssueDialog.tsx`)
+### 3. Update Create Dialog (`src/components/warehouse/CreateMaterialRequestDialog.tsx`)
 
 - Import `useWarehouseLocations` hook
-- Add `location_id` to the form state
-- Add a Location dropdown (Select component) in the Header Info tab, populated from `warehouse_locations`
-- Pass `location_id` when calling `createMaterialIssueAsync`
+- Replace the `department` text input (line 280-288) with a Location dropdown (Select component) populated from `warehouse_locations` -- same pattern as the Material Issue Note form
+- Update form state: replace `department: ""` with `location_id: ""`
+- Update the review step (line 526) to show the selected location name instead of department
 
-### 4. Update Details Dialog (`src/components/warehouse/MaterialIssueDetailsDialog.tsx`)
+### 4. Update Details Dialog (`src/components/warehouse/MaterialRequestDetailsDialog.tsx`)
 
-- Fetch the location name alongside the issue data (join with `warehouse_locations`)
-- Display the location in the "Issue Details" section of the Overview tab
+- Change "Department" display (lines 122-127) to show the location name
+- Fetch location name by joining with `warehouse_locations` or looking it up from the request's `location_id`
 
-### 5. Update Issues List (`src/pages/warehouse/MaterialIssueReturn.tsx`)
+### 5. Update Convert to Issue Dialog (`src/components/warehouse/ConvertToIssueDialog.tsx`)
 
-- Add a "Location" column to the Material Issues table
-- Fetch location name when querying issues (join with `warehouse_locations`)
+- When converting a request to an issue, pass `location_id` instead of `department` (line 53)
+- Update the summary display (line 116) from "Department" to "Location"
 
-### 6. Update Hook (`src/hooks/useMaterialIssues.ts`)
+### 6. Update Hook (`src/hooks/useMaterialRequests.ts`)
 
-- Update the query to join with `warehouse_locations` to fetch location name alongside each issue
-- No changes needed to create/update mutations (they already spread all fields)
+- Update the query to join with `warehouse_locations` to fetch location name
+
+### 7. Update Material Requests List (`src/pages/warehouse/MaterialIssueReturn.tsx`)
+
+- If the requests table shows a "Department" column, update it to show "Location" with the resolved name
 
 ## Summary
 
-- 1 database migration (add column)
+- 1 database migration (add `location_id` column)
 - 6 files updated
-- Location selector uses the existing `warehouse_locations` table and `useWarehouseLocations` hook
+- Department text input replaced with Location dropdown using the same `useWarehouseLocations` hook and pattern as Material Issue Notes
