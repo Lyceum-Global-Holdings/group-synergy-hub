@@ -13,6 +13,7 @@ import { useMaterialRequests } from "@/hooks/useMaterialRequests";
 import { useMaterialRequestItems } from "@/hooks/useMaterialRequestItems";
 import { useWarehouseReservations } from "@/hooks/useWarehouseReservations";
 import { useWarehouseLocations } from "@/hooks/useWarehouseLocations";
+import { useCurrentUserProfile } from "@/hooks/useCurrentUserProfile";
 import { ItemSelector } from "@/components/common/ItemSelector";
 import { MaterialRequestPriority } from "@/types/materialIssueReturn";
 import { WarehouseItem } from "@/types/itemBin";
@@ -58,6 +59,14 @@ export function CreateMaterialRequestDialog({ open, onOpenChange }: CreateMateri
   const { createRequestAsync, isCreating } = useMaterialRequests();
   const { createItems } = useMaterialRequestItems();
   const { locations } = useWarehouseLocations();
+  const { data: userProfile } = useCurrentUserProfile();
+
+  // Default requested_by to current user when dialog opens
+  useEffect(() => {
+    if (open && userProfile?.full_name && !requestData.requested_by) {
+      setRequestData(prev => ({ ...prev, requested_by: userProfile.full_name || "" }));
+    }
+  }, [open, userProfile]);
 
   // Fetch confirmed CPOs
   const { data: confirmedCPOs } = useQuery({
@@ -193,7 +202,7 @@ export function CreateMaterialRequestDialog({ open, onOpenChange }: CreateMateri
     setStep(1);
     setRequestData({
       request_date: new Date().toISOString().split('T')[0],
-      requested_by: "",
+      requested_by: userProfile?.full_name || "",
       location_id: "",
       contact_number: "",
       epf_number: "",
