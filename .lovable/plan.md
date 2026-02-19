@@ -1,53 +1,44 @@
 
-# Replace Department with Location in Material Request Form
+
+# Default "Requested By" to Current User
 
 ## What This Does
 
-Replaces the free-text "Department" field in the Material Request form with a "Location" dropdown, identical to the one in Material Issue Notes. The dropdown will be populated from the `warehouse_locations` table.
+Pre-fills the "Requested By" field with the current logged-in user's name when the Material Request form opens. The field remains editable so users can change or type a different name if needed.
 
 ## Changes
 
-### 1. Database Migration
+### File: `src/components/warehouse/CreateMaterialRequestDialog.tsx`
 
-Add a `location_id` column to `material_requests` and keep the existing `department` column for backward compatibility (existing records may have department data):
+1. **Import the `useCurrentUserProfile` hook** (already exists in the project)
+2. **Pre-fill `requested_by`** with the user's `full_name` when the dialog opens using a `useEffect`
+3. **Keep the existing `<Input>` field** -- it already supports typing, so no UI change needed
 
-```sql
-ALTER TABLE material_requests 
-ADD COLUMN location_id UUID REFERENCES warehouse_locations(id);
+### Technical Details
+
+```typescript
+// Add import
+import { useCurrentUserProfile } from "@/hooks/useCurrentUserProfile";
+
+// Inside the component
+const { data: userProfile } = useCurrentUserProfile();
+
+// Add useEffect to set default when dialog opens
+useEffect(() => {
+  if (open && userProfile?.full_name && !requestData.requested_by) {
+    setRequestData(prev => ({ ...prev, requested_by: userProfile.full_name }));
+  }
+}, [open, userProfile]);
 ```
 
-### 2. Update TypeScript Types (`src/types/materialIssueReturn.ts`)
+Also update the `resetForm` function to reset `requested_by` back to the current user's name instead of empty string:
 
-- `MaterialRequest` interface: add `location_id: string | null`
-- `CreateMaterialRequestData` interface: replace `department?: string` with `location_id?: string`
-
-### 3. Update Create Dialog (`src/components/warehouse/CreateMaterialRequestDialog.tsx`)
-
-- Import `useWarehouseLocations` hook
-- Replace the `department` text input (line 280-288) with a Location dropdown (Select component) populated from `warehouse_locations` -- same pattern as the Material Issue Note form
-- Update form state: replace `department: ""` with `location_id: ""`
-- Update the review step (line 526) to show the selected location name instead of department
-
-### 4. Update Details Dialog (`src/components/warehouse/MaterialRequestDetailsDialog.tsx`)
-
-- Change "Department" display (lines 122-127) to show the location name
-- Fetch location name by joining with `warehouse_locations` or looking it up from the request's `location_id`
-
-### 5. Update Convert to Issue Dialog (`src/components/warehouse/ConvertToIssueDialog.tsx`)
-
-- When converting a request to an issue, pass `location_id` instead of `department` (line 53)
-- Update the summary display (line 116) from "Department" to "Location"
-
-### 6. Update Hook (`src/hooks/useMaterialRequests.ts`)
-
-- Update the query to join with `warehouse_locations` to fetch location name
-
-### 7. Update Material Requests List (`src/pages/warehouse/MaterialIssueReturn.tsx`)
-
-- If the requests table shows a "Department" column, update it to show "Location" with the resolved name
+```typescript
+requested_by: userProfile?.full_name || "",
+```
 
 ## Summary
 
-- 1 database migration (add `location_id` column)
-- 6 files updated
-- Department text input replaced with Location dropdown using the same `useWarehouseLocations` hook and pattern as Material Issue Notes
+- 1 file modified (`CreateMaterialRequestDialog.tsx`)
+- No database changes needed
+- The field auto-fills with the logged-in user's name but remains fully editable
