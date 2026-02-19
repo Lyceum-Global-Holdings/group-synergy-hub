@@ -178,6 +178,7 @@ export interface MaterialRequest {
   request_date: string;
   requested_by: string;
   department: string | null;
+  location_id: string | null;
   contact_number: string | null;
   epf_number: string | null;
   job_number: string | null;
@@ -206,6 +207,7 @@ export interface CreateMaterialRequestData {
   request_date: string;
   requested_by: string;
   department?: string;
+  location_id?: string;
   contact_number?: string;
   epf_number?: string;
   job_number?: string;

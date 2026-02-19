@@ -9387,6 +9387,7 @@ export type Database = {
           id: string
           items_required_date: string
           job_number: string | null
+          location_id: string | null
           management_approval_date: string | null
           management_approved_by: string | null
           management_comments: string | null
@@ -9416,6 +9417,7 @@ export type Database = {
           id?: string
           items_required_date: string
           job_number?: string | null
+          location_id?: string | null
           management_approval_date?: string | null
           management_approved_by?: string | null
           management_comments?: string | null
@@ -9445,6 +9447,7 @@ export type Database = {
           id?: string
           items_required_date?: string
           job_number?: string | null
+          location_id?: string | null
           management_approval_date?: string | null
           management_approved_by?: string | null
           management_comments?: string | null
@@ -9465,6 +9468,13 @@ export type Database = {
             columns: ["cpo_id"]
             isOneToOne: false
             referencedRelation: "customer_purchase_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "material_requests_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "warehouse_locations"
             referencedColumns: ["id"]
           },
           {
