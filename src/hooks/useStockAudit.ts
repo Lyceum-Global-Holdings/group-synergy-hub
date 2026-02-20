@@ -16,6 +16,18 @@ export interface StockAuditItem {
   status: StockAuditStatus;
 }
 
+export interface StockAuditLogEntry {
+  id: string;
+  recorded_at: string;
+  recorded_by: string;
+  total_items: number;
+  in_sync_count: number;
+  desync_count: number;
+  no_bins_count: number;
+  desynced_items: Array<{ id: string; item_code: string; name: string; current_stock: number; bin_total: number; variance: number }>;
+  no_bins_items: Array<{ id: string; item_code: string; name: string; current_stock: number }>;
+}
+
 export function useStockAudit() {
   const queryClient = useQueryClient();
   const { selectedCompany, isViewingAllCompanies } = useCompany();
@@ -38,7 +50,6 @@ export function useStockAudit() {
       if (!items || items.length === 0) return [];
 
       // Fetch bin allocations in chunks of 100 to avoid URL length limits
-      // (large companies with 700+ items would cause 400 Bad Request with a single .in() call)
       const itemIds = items.map((i) => i.id);
       const CHUNK_SIZE = 100;
       const chunks: string[][] = [];
@@ -99,6 +110,63 @@ export function useStockAudit() {
     enabled: !!(isViewingAllCompanies || selectedCompany?.id),
   });
 
+  // Fetch audit history (last 50 snapshots)
+  const { data: auditHistory = [] } = useQuery({
+    queryKey: ['stock-audit-history', selectedCompany?.id],
+    queryFn: async (): Promise<StockAuditLogEntry[]> => {
+      const { data, error } = await supabase
+        .from('warehouse_stock_audit_logs')
+        .select('id, recorded_at, recorded_by, total_items, in_sync_count, desync_count, no_bins_count, desynced_items, no_bins_items')
+        .eq('company_id', selectedCompany!.id)
+        .order('recorded_at', { ascending: false })
+        .limit(50);
+      if (error) throw error;
+      return (data || []) as StockAuditLogEntry[];
+    },
+    enabled: !!selectedCompany?.id && !isViewingAllCompanies,
+  });
+
+  // Log a snapshot of the current audit state
+  const logSnapshotMutation = useMutation({
+    mutationFn: async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user || !selectedCompany?.id) return;
+      if (auditItems.length === 0) return; // don't log empty snapshots
+
+      const desynced = auditItems.filter((i) => i.status === 'desync');
+      const noBins = auditItems.filter((i) => i.status === 'no_bins');
+
+      const { error } = await supabase.from('warehouse_stock_audit_logs').insert({
+        company_id: selectedCompany.id,
+        recorded_by: user.id,
+        total_items: summary.total,
+        in_sync_count: summary.inSync,
+        desync_count: summary.desynced,
+        no_bins_count: summary.noBins,
+        desynced_items: desynced.map((i) => ({
+          id: i.id,
+          item_code: i.item_code,
+          name: i.name,
+          current_stock: i.current_stock,
+          bin_total: i.bin_total,
+          variance: i.variance,
+        })),
+        no_bins_items: noBins.map((i) => ({
+          id: i.id,
+          item_code: i.item_code,
+          name: i.name,
+          current_stock: i.current_stock,
+        })),
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['stock-audit-history', selectedCompany?.id] });
+    },
+    // Silently fail — logging is best-effort and shouldn't interrupt the user
+    onError: () => {},
+  });
+
   // Fix a single desynced item: adjust the largest bin allocation so SUM = current_stock
   const fixDesyncMutation = useMutation({
     mutationFn: async (item: StockAuditItem) => {
@@ -106,7 +174,6 @@ export function useStockAudit() {
         throw new Error('No bin allocations exist for this item. Create a bin allocation first.');
       }
 
-      // Get all bin allocations for this item ordered by quantity desc
       const { data: allocations, error: fetchError } = await supabase
         .from('warehouse_bin_allocations')
         .select('id, allocated_quantity, reserved_quantity')
@@ -118,12 +185,10 @@ export function useStockAudit() {
         throw new Error('No bin allocations found.');
       }
 
-      // Sum of all other allocations (not the primary one)
       const otherTotal = allocations
         .slice(1)
         .reduce((sum, a) => sum + (a.allocated_quantity || 0), 0);
 
-      // The primary allocation should hold: current_stock - otherTotal
       const newPrimaryQty = Math.max(0, item.current_stock - otherTotal);
       const primaryAlloc = allocations[0];
       const newReserved = Math.min(primaryAlloc.reserved_quantity || 0, newPrimaryQty);
@@ -224,6 +289,8 @@ export function useStockAudit() {
     error,
     refetch,
     summary,
+    auditHistory,
+    logSnapshot: logSnapshotMutation.mutate,
     fixDesync: fixDesyncMutation.mutate,
     isFixingDesync: fixDesyncMutation.isPending,
     fixAllDesyncs: fixAllDesyncsMutation.mutate,
