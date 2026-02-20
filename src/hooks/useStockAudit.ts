@@ -37,14 +37,28 @@ export function useStockAudit() {
       if (itemsError) throw itemsError;
       if (!items || items.length === 0) return [];
 
-      // Fetch all bin allocations for these items in one query
+      // Fetch bin allocations in chunks of 100 to avoid URL length limits
+      // (large companies with 700+ items would cause 400 Bad Request with a single .in() call)
       const itemIds = items.map((i) => i.id);
-      const { data: allocations, error: allocError } = await supabase
-        .from('warehouse_bin_allocations')
-        .select('warehouse_item_id, allocated_quantity')
-        .in('warehouse_item_id', itemIds);
+      const CHUNK_SIZE = 100;
+      const chunks: string[][] = [];
+      for (let i = 0; i < itemIds.length; i += CHUNK_SIZE) {
+        chunks.push(itemIds.slice(i, i + CHUNK_SIZE));
+      }
 
-      if (allocError) throw allocError;
+      const chunkResults = await Promise.all(
+        chunks.map((chunk) =>
+          supabase
+            .from('warehouse_bin_allocations')
+            .select('warehouse_item_id, allocated_quantity')
+            .in('warehouse_item_id', chunk)
+            .then((r) => {
+              if (r.error) throw r.error;
+              return r.data || [];
+            })
+        )
+      );
+      const allocations = chunkResults.flat();
 
       // Group allocations by item id
       const allocationsByItem = new Map<string, number[]>();
