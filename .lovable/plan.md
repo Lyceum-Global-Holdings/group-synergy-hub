@@ -1,112 +1,101 @@
 
-# Stock Audit View — End-to-End Test Results & Fix Plan
+# Stock Desync Warning Banner on Item Master Tab
 
-## Test Findings
+## What This Does
 
-### What Works Correctly
+Adds a dismissible amber/red warning banner at the top of the **Item Master** tab that automatically appears when any desynced items are detected. It shows the count of desynced items and a "Go to Stock Audit" button that switches to the audit tab. Users are alerted immediately without having to manually navigate away.
 
-1. **Tab Integration** — The "Stock Audit" tab is correctly added as the 6th tab in `ItemBinMaster.tsx` with a `ShieldAlert` icon and the tab grid is `grid-cols-6`. All wiring is correct.
-2. **Component Structure** — `StockAuditTab.tsx` is complete: summary cards, filterable/searchable table, per-row Fix button (admin-only), Fix All button with confirmation dialog.
-3. **Fix Logic** — The `fixDesync` mutation correctly identifies the largest bin allocation and adjusts its quantity so `SUM(bins) = current_stock`. It correctly clamps `reserved_quantity` and recalculates `available_quantity`.
-4. **Desynced Items Confirmed** — The 3 known desynced items still exist in the database (they belong to company `04164042-eeea-4e57-b185-90561dff734e`):
+## How It Works
 
-| Item | Item Code | Current Stock | Bin Total | Variance |
-|---|---|---|---|---|
-| Size Lable | SizeLable | 910.00 | 1,000.00 | -90.00 |
-| Waistband stripe White | WaistbandstripeW | 60.00 | 100.00 | -40.00 |
-| zipper 8in Gray | 8zipperG | 993.00 | 1,000.00 | -7.00 |
+The `useStockAudit` hook already computes the `summary.desynced` count. The banner will reuse that same hook — no extra database queries are needed. Because `useStockAudit` is already used by `StockAuditTab`, the query result is cached by React Query and shared for free.
 
-(Draw code 50" has `no_bins` status, not `desync`)
+The tab switch is controlled by lifting `value` state from `<Tabs>` up to `ItemBinMaster.tsx`, then passing a `onGoToAudit` callback down to `ItemMasterTab` which the banner's button calls.
 
-5. **Fix mutation is safe** — For `SizeLable`: primary bin has 1000 allocated with 50 reserved. After fix: primary allocation becomes 910, reserved clamped to 50, available = 860. Correct behavior.
+## Files to Change
 
-### Critical Bug Found: 400 Error for Large Companies
+| File | Change |
+|---|---|
+| `src/pages/warehouse/ItemBinMaster.tsx` | Lift tab state, pass `onGoToAudit` prop to `ItemMasterTab` |
+| `src/components/warehouse/ItemMasterTab.tsx` | Accept `onGoToAudit` prop, render desync warning banner |
 
-The `useStockAudit` hook fetches all warehouse items and then runs:
-```typescript
-const { data: allocations } = await supabase
-  .from('warehouse_bin_allocations')
-  .select('warehouse_item_id, allocated_quantity')
-  .in('warehouse_item_id', itemIds);  // ALL item IDs in URL query string!
+No new files, no new hooks, no database changes.
+
+## Detailed Changes
+
+### 1. `src/pages/warehouse/ItemBinMaster.tsx`
+
+Convert `<Tabs>` from uncontrolled (`defaultValue`) to controlled (`value` + `onValueChange`) using a `useState`:
+
+```tsx
+const [activeTab, setActiveTab] = useState('items');
+
+<Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+  ...
+  <TabsContent value="items">
+    <ItemMasterTab onGoToAudit={() => setActiveTab('audit')} />
+  </TabsContent>
 ```
 
-The main company (`11a46626`) has **702 active items**. When all 702 UUIDs are passed to `.in()`, the resulting URL exceeds the maximum length limit and Supabase returns **400 Bad Request** — this is exactly the error visible in the network logs from the current session. The Stock Audit tab shows a loading spinner forever or an empty table for this company.
+This is a minimal, non-breaking change — the rest of the tabs and tab contents remain unchanged.
 
-The company with the desyncs (`04164042`) only has 35 items, so it works fine there.
+### 2. `src/components/warehouse/ItemMasterTab.tsx`
 
-## The Fix
-
-### File: `src/hooks/useStockAudit.ts`
-
-Instead of fetching items first and then querying allocations with `.in(itemIds)`, the hook should fetch **all bin allocations scoped to the company** in a single separate query, without passing item IDs in the URL. Both queries are then joined in JavaScript.
-
-**Current (broken for large companies):**
-```typescript
-// Step 1: fetch items (702 items)
-const { data: items } = await supabase.from('warehouse_items').select(...).eq('company_id', companyId);
-const itemIds = items.map(i => i.id); // 702 UUIDs
-
-// Step 2: passes 702 UUIDs into URL — causes 400 Bad Request
-const { data: allocations } = await supabase
-  .from('warehouse_bin_allocations')
-  .select('warehouse_item_id, allocated_quantity')
-  .in('warehouse_item_id', itemIds); // URL too long!
-```
-
-**Fixed approach:**
-```typescript
-// Step 1: fetch items (as before)
-const { data: items } = await supabase.from('warehouse_items').select(...).eq('company_id', companyId);
-
-// Step 2: fetch ALL allocations for the company via a join on warehouse_items — no long ID list in URL
-const { data: allocations } = await supabase
-  .from('warehouse_bin_allocations')
-  .select('warehouse_item_id, allocated_quantity, warehouse_items!inner(company_id)')
-  .eq('warehouse_items.company_id', companyId);
-```
-
-If the join syntax proves tricky, an alternative is to chunk the `itemIds` array into batches of 100 and run parallel queries, then merge results.
-
-The simplest and most robust fix is to use a **Supabase RPC** or join-based query. Given existing patterns in this codebase, the join approach is preferred.
-
-## Summary
-
-- **1 file to fix**: `src/hooks/useStockAudit.ts` — replace the `.in(itemIds)` call with a company-scoped join query
-- **0 other files need changes** — the component and page integration are correct
-- After this fix, the Stock Audit tab will load correctly for all companies including the main one with 702 items
-- The 3 desynced items will appear and the Fix / Fix All buttons will work as intended
-
-## Technical Detail — Exact Code Change
-
-In `src/hooks/useStockAudit.ts`, replace lines 41–46 (the `.in()` call) with:
-
-```typescript
-// Fetch bin allocations scoped to this company via a join — avoids URL length limits
-const allocQuery = supabase
-  .from('warehouse_bin_allocations')
-  .select('warehouse_item_id, allocated_quantity, warehouse_items!inner(company_id, status)');
-
-if (!isViewingAllCompanies && selectedCompany?.id) {
-  allocQuery.eq('warehouse_items.company_id', selectedCompany.id);
+**Props interface addition:**
+```tsx
+interface ItemMasterTabProps {
+  onGoToAudit?: () => void;
 }
 
-const { data: allocations, error: allocError } = await allocQuery;
+export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
 ```
 
-If the inner join filter syntax is not supported, a safe chunked fallback:
-```typescript
-const CHUNK_SIZE = 100;
-const chunks = [];
-for (let i = 0; i < itemIds.length; i += CHUNK_SIZE) {
-  chunks.push(itemIds.slice(i, i + CHUNK_SIZE));
-}
-const allAllocations = (await Promise.all(
-  chunks.map(chunk =>
-    supabase
-      .from('warehouse_bin_allocations')
-      .select('warehouse_item_id, allocated_quantity')
-      .in('warehouse_item_id', chunk)
-      .then(r => r.data || [])
-  )
-)).flat();
+**Import `useStockAudit` and `Alert`:**
+```tsx
+import { useStockAudit } from '@/hooks/useStockAudit';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { AlertTriangle } from 'lucide-react';
 ```
+
+**Banner logic — placed at the very top of the returned JSX, before the filter row:**
+```tsx
+const { summary } = useStockAudit();
+
+// In JSX:
+{summary.desynced > 0 && (
+  <Alert variant="destructive" className="border-amber-300 bg-amber-50 text-amber-900">
+    <AlertTriangle className="h-4 w-4 text-amber-600" />
+    <AlertDescription className="flex items-center justify-between">
+      <span>
+        <strong>{summary.desynced} item{summary.desynced > 1 ? 's have' : ' has'} a stock desync</strong>
+        {' '}— the item master stock does not match bin allocation totals.
+      </span>
+      {onGoToAudit && (
+        <Button
+          variant="outline"
+          size="sm"
+          className="ml-4 border-amber-400 text-amber-800 hover:bg-amber-100 shrink-0"
+          onClick={onGoToAudit}
+        >
+          <ShieldAlert className="mr-1 h-3 w-3" />
+          Go to Stock Audit
+        </Button>
+      )}
+    </AlertDescription>
+  </Alert>
+)}
+```
+
+The banner only renders when `summary.desynced > 0`, so it is invisible when everything is in sync. The React Query cache means no extra network call is made — the audit data was already fetched when the hook was mounted.
+
+## Visual Result
+
+When desyncs exist:
+```
+┌──────────────────────────────────────────────────────────────────┐
+│ ⚠ 3 items have a stock desync — the item master stock does not   │
+│   match bin allocation totals.         [Go to Stock Audit →]     │
+└──────────────────────────────────────────────────────────────────┘
+[Search]  [Category ▾]  [Bin ▾]  [Status ▾]  [Supplier ▾]     [Add Items]
+```
+
+When everything is in sync: the banner is completely absent.
