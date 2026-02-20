@@ -16500,6 +16500,53 @@ export type Database = {
           },
         ]
       }
+      warehouse_stock_audit_logs: {
+        Row: {
+          company_id: string
+          desync_count: number
+          desynced_items: Json
+          id: string
+          in_sync_count: number
+          no_bins_count: number
+          no_bins_items: Json
+          recorded_at: string
+          recorded_by: string
+          total_items: number
+        }
+        Insert: {
+          company_id: string
+          desync_count: number
+          desynced_items?: Json
+          id?: string
+          in_sync_count: number
+          no_bins_count: number
+          no_bins_items?: Json
+          recorded_at?: string
+          recorded_by: string
+          total_items: number
+        }
+        Update: {
+          company_id?: string
+          desync_count?: number
+          desynced_items?: Json
+          id?: string
+          in_sync_count?: number
+          no_bins_count?: number
+          no_bins_items?: Json
+          recorded_at?: string
+          recorded_by?: string
+          total_items?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "warehouse_stock_audit_logs_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       warehouse_stock_movements: {
         Row: {
           bin_allocation_id: string | null

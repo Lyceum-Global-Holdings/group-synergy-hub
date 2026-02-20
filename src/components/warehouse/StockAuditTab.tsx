@@ -1,10 +1,12 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DataTable } from '@/components/ui/data-table';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -23,9 +25,16 @@ import {
   AlertTriangle,
   XCircle,
   Wrench,
+  History,
+  ChevronDown,
+  ChevronUp,
+  TrendingUp,
+  TrendingDown,
+  Minus,
 } from 'lucide-react';
-import { useStockAudit, type StockAuditItem, type StockAuditStatus } from '@/hooks/useStockAudit';
+import { useStockAudit, type StockAuditItem, type StockAuditStatus, type StockAuditLogEntry } from '@/hooks/useStockAudit';
 import { useIsAdminOrHigher } from '@/hooks/useIsAdminOrHigher';
+import { format, parseISO } from 'date-fns';
 import type { ColumnDef } from '@tanstack/react-table';
 
 type FilterValue = 'all' | StockAuditStatus;
@@ -48,14 +57,158 @@ const statusConfig: Record<StockAuditStatus, { label: string; variant: 'default'
   },
 };
 
+function TrendIndicator({ current, previous }: { current: number; previous: number | undefined }) {
+  if (previous === undefined) return <Minus className="h-3.5 w-3.5 text-muted-foreground inline" />;
+  if (current > previous) return <TrendingUp className="h-3.5 w-3.5 text-destructive inline" />;
+  if (current < previous) return <TrendingDown className="h-3.5 w-3.5 text-success inline" />;
+  return <Minus className="h-3.5 w-3.5 text-muted-foreground inline" />;
+}
+
+function AuditHistoryPanel({ history }: { history: StockAuditLogEntry[] }) {
+  const [open, setOpen] = useState(false);
+
+  if (history.length === 0) {
+    return (
+      <Card className="opacity-60">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <History className="h-4 w-4" />
+            Audit History
+          </CardTitle>
+          <CardDescription>No history yet — history is recorded each time this tab is opened.</CardDescription>
+        </CardHeader>
+      </Card>
+    );
+  }
+
+  return (
+    <Collapsible open={open} onOpenChange={setOpen}>
+      <Card>
+        <CardHeader className="pb-3">
+          <CollapsibleTrigger asChild>
+            <button className="flex w-full items-center justify-between text-left">
+              <div>
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <History className="h-4 w-4" />
+                  Audit History
+                  <Badge variant="secondary" className="text-xs font-normal">{history.length} snapshots</Badge>
+                </CardTitle>
+                <CardDescription className="mt-0.5">
+                  Snapshot recorded each time this tab is opened — track desync trends over time
+                </CardDescription>
+              </div>
+              {open
+                ? <ChevronUp className="h-4 w-4 text-muted-foreground shrink-0" />
+                : <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
+              }
+            </button>
+          </CollapsibleTrigger>
+        </CardHeader>
+
+        <CollapsibleContent>
+          <CardContent className="pt-0">
+            <div className="overflow-x-auto rounded-md border">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b bg-muted/50">
+                    <th className="px-3 py-2 text-left font-medium text-muted-foreground whitespace-nowrap">Date / Time</th>
+                    <th className="px-3 py-2 text-right font-medium text-muted-foreground">Total</th>
+                    <th className="px-3 py-2 text-right font-medium text-muted-foreground">In Sync</th>
+                    <th className="px-3 py-2 text-right font-medium text-muted-foreground">Desynced</th>
+                    <th className="px-3 py-2 text-right font-medium text-muted-foreground">No Bins</th>
+                    <th className="px-3 py-2 text-left font-medium text-muted-foreground">Desynced Items</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {history.map((entry, idx) => {
+                    const prev = history[idx + 1];
+                    const hasDesyncs = entry.desync_count > 0;
+                    return (
+                      <tr key={entry.id} className="border-b last:border-0 hover:bg-muted/30 transition-colors">
+                        {/* Date */}
+                        <td className="px-3 py-2 whitespace-nowrap font-mono text-xs text-muted-foreground">
+                          {format(parseISO(entry.recorded_at), 'yyyy-MM-dd HH:mm')}
+                        </td>
+
+                        {/* Total */}
+                        <td className="px-3 py-2 text-right tabular-nums">{entry.total_items}</td>
+
+                        {/* In Sync */}
+                        <td className="px-3 py-2 text-right tabular-nums text-success">{entry.in_sync_count}</td>
+
+                        {/* Desynced */}
+                        <td className="px-3 py-2 text-right tabular-nums">
+                          <span className={`inline-flex items-center gap-1 font-medium ${hasDesyncs ? 'text-destructive' : 'text-success'}`}>
+                            {entry.desync_count}
+                            <TrendIndicator current={entry.desync_count} previous={prev?.desync_count} />
+                          </span>
+                        </td>
+
+                        {/* No Bins */}
+                        <td className="px-3 py-2 text-right tabular-nums">
+                          <span className={entry.no_bins_count > 0 ? 'text-warning' : 'text-muted-foreground'}>
+                            {entry.no_bins_count}
+                          </span>
+                        </td>
+
+                        {/* Desynced Items list */}
+                        <td className="px-3 py-2">
+                          {entry.desynced_items.length === 0 ? (
+                            <span className="text-muted-foreground italic text-xs">—</span>
+                          ) : (
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <button className="text-xs text-destructive underline underline-offset-2 hover:no-underline">
+                                  {entry.desynced_items.length} item{entry.desynced_items.length > 1 ? 's' : ''}
+                                </button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-80 p-3" align="start">
+                                <p className="text-xs font-medium text-muted-foreground mb-2">Desynced Items at this snapshot</p>
+                                <div className="space-y-1.5 max-h-48 overflow-y-auto">
+                                  {entry.desynced_items.map((item) => (
+                                    <div key={item.id} className="flex items-center justify-between text-xs">
+                                      <span className="font-mono font-medium">{item.item_code}</span>
+                                      <span className="text-muted-foreground truncate max-w-[140px] ml-2">{item.name}</span>
+                                      <span className={`ml-2 tabular-nums shrink-0 ${item.variance > 0 ? 'text-warning' : 'text-destructive'}`}>
+                                        {item.variance > 0 ? '+' : ''}{item.variance.toFixed(2)}
+                                      </span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </PopoverContent>
+                            </Popover>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </CollapsibleContent>
+      </Card>
+    </Collapsible>
+  );
+}
+
 export function StockAuditTab() {
-  const { auditItems, isLoading, refetch, summary, fixDesync, isFixingDesync, fixAllDesyncs, isFixingAll } = useStockAudit();
+  const { auditItems, isLoading, refetch, summary, auditHistory, logSnapshot, fixDesync, isFixingDesync, fixAllDesyncs, isFixingAll } = useStockAudit();
   const { canDelete: isAdmin } = useIsAdminOrHigher();
 
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<FilterValue>('all');
   const [fixItem, setFixItem] = useState<StockAuditItem | null>(null);
   const [showFixAllDialog, setShowFixAllDialog] = useState(false);
+
+  // Log a snapshot once per mount, after data finishes loading
+  const hasLogged = useRef(false);
+  useEffect(() => {
+    if (!isLoading && auditItems.length > 0 && !hasLogged.current) {
+      hasLogged.current = true;
+      logSnapshot(undefined);
+    }
+  }, [isLoading, auditItems, logSnapshot]);
 
   const filteredItems = useMemo(() => {
     let items = auditItems;
@@ -293,6 +446,9 @@ export function StockAuditTab() {
           />
         </CardContent>
       </Card>
+
+      {/* Audit History Panel */}
+      <AuditHistoryPanel history={auditHistory} />
 
       {/* Fix Single Item Dialog */}
       <AlertDialog open={!!fixItem} onOpenChange={() => setFixItem(null)}>
