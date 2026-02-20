@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Package, MapPin, Tag, Ruler, Grid3x3, ShieldAlert } from 'lucide-react';
 import { ItemMasterTab } from '@/components/warehouse/ItemMasterTab';
@@ -12,6 +13,8 @@ export default function ItemBinMaster() {
   // Enable real-time stock updates
   useRealtimeStockUpdates();
 
+  const [activeTab, setActiveTab] = useState('items');
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -23,8 +26,7 @@ export default function ItemBinMaster() {
         </div>
       </div>
 
-
-      <Tabs defaultValue="items" className="space-y-4">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <TabsList className="grid w-full grid-cols-6">
           <TabsTrigger value="items" className="flex items-center gap-2">
             <Package className="h-4 w-4" />
@@ -53,7 +55,7 @@ export default function ItemBinMaster() {
         </TabsList>
 
         <TabsContent value="items">
-          <ItemMasterTab />
+          <ItemMasterTab onGoToAudit={() => setActiveTab('audit')} />
         </TabsContent>
 
         <TabsContent value="bins">

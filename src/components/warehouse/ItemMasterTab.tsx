@@ -45,6 +45,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { useRealtimeStockUpdates } from '@/hooks/useRealtimeStockUpdates';
 import { useWarehouseBinAllocations } from '@/hooks/useWarehouseBinAllocations';
 import { useIsAdminOrHigher } from '@/hooks/useIsAdminOrHigher';
+import { useStockAudit } from '@/hooks/useStockAudit';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { AlertTriangle, ShieldAlert } from 'lucide-react';
 import { writeExcelFromJSON } from '@/utils/excelUtils';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
@@ -59,7 +62,11 @@ interface ItemLocationStockMap {
   [itemId: string]: LocationStock[];
 }
 
-export function ItemMasterTab() {
+interface ItemMasterTabProps {
+  onGoToAudit?: () => void;
+}
+
+export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
   // Enable real-time stock updates
   useRealtimeStockUpdates();
   const [searchTerm, setSearchTerm] = useState('');
@@ -94,6 +101,7 @@ export function ItemMasterTab() {
   const { units } = useItemUnits();
   const { migrateAllocationsToCorrectLocation, isMigrating, reconcileStock, isReconciling, fixAllocationsFromHistory, isFixingFromHistory } = useWarehouseBinAllocations();
   const { canDelete } = useIsAdminOrHigher();
+  const { summary } = useStockAudit();
 
   // Fetch all top-level warehouse locations
   const { data: allLocations = [] } = useQuery({
@@ -293,6 +301,28 @@ export function ItemMasterTab() {
 
   return (
     <div className="space-y-4">
+      {summary.desynced > 0 && (
+        <Alert className="border-yellow-300 bg-yellow-50 text-yellow-900 dark:border-yellow-700 dark:bg-yellow-950/30 dark:text-yellow-200">
+          <AlertTriangle className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
+          <AlertDescription className="flex items-center justify-between">
+            <span>
+              <strong>{summary.desynced} item{summary.desynced > 1 ? 's have' : ' has'} a stock desync</strong>
+              {' '}— item master stock does not match bin allocation totals.
+            </span>
+            {onGoToAudit && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="ml-4 shrink-0 border-yellow-400 text-yellow-800 hover:bg-yellow-100 dark:border-yellow-600 dark:text-yellow-300 dark:hover:bg-yellow-900/50"
+                onClick={onGoToAudit}
+              >
+                <ShieldAlert className="mr-1 h-3 w-3" />
+                Go to Stock Audit
+              </Button>
+            )}
+          </AlertDescription>
+        </Alert>
+      )}
       <div className="flex flex-col gap-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 flex-wrap">
