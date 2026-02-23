@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useToast } from "@/hooks/use-toast";
+import { invokeEdgeFunction } from "@/lib/edgeFunctionClient";
 
 // Client-side type - excludes sensitive bot_token field
 export interface TelegramSettingsClient {
@@ -131,15 +132,16 @@ export function useTelegramSettings() {
 
     try {
       // Call server-side edge function - token is sent securely and handled server-side
-      const { data, error } = await supabase.functions.invoke('test-telegram-connection', {
+      const { data, error, suggestion } = await invokeEdgeFunction('test-telegram-connection', {
         body: {
           company_id: selectedCompany.id,
           bot_token: botToken,
           chat_id: chatIdsString,
-        }
+        },
+        companyId: selectedCompany.id,
       });
 
-      if (error) throw error;
+      if (error) throw new Error(suggestion || error.message);
 
       if (data?.all_success) {
         toast({
@@ -187,11 +189,12 @@ export function useTelegramSettings() {
     }
 
     try {
-      const { data, error } = await supabase.functions.invoke('test-telegram-connection', {
-        body: { company_id: selectedCompany.id }
+      const { data, error, suggestion } = await invokeEdgeFunction('test-telegram-connection', {
+        body: { company_id: selectedCompany.id },
+        companyId: selectedCompany.id,
       });
 
-      if (error) throw error;
+      if (error) throw new Error(suggestion || error.message);
 
       if (data?.all_success) {
         toast({
@@ -235,11 +238,12 @@ export function useTelegramSettings() {
     }
 
     try {
-      const { data, error } = await supabase.functions.invoke('scheduled-telegram-reports', {
-        body: { force: true, company_id: selectedCompany.id }
+      const { data, error, suggestion } = await invokeEdgeFunction('scheduled-telegram-reports', {
+        body: { force: true, company_id: selectedCompany.id },
+        companyId: selectedCompany.id,
       });
 
-      if (error) throw error;
+      if (error) throw new Error(suggestion || error.message);
 
       if (data?.processed > 0) {
         toast({

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { invokeEdgeFunction } from "@/lib/edgeFunctionClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -92,7 +93,7 @@ export default function PoEmailApproval() {
     try {
       setProcessing(true);
 
-      const { data, error } = await supabase.functions.invoke('po-email-approval', {
+      const { data, error, suggestion } = await invokeEdgeFunction('po-email-approval', {
         body: {
           action: 'process_approval',
           token,
@@ -101,7 +102,7 @@ export default function PoEmailApproval() {
         }
       });
 
-      if (error) throw error;
+      if (error) throw new Error(suggestion || error.message);
 
       setSuccess(
         approvalAction === 'approve' 

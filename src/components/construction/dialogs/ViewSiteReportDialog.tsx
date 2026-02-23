@@ -15,6 +15,7 @@ import { useDailyMaterialsActivity, CurrentStockBalance } from "@/hooks/construc
 import { exportSiteReportToPdf, generateSiteReportPdfBase64 } from "@/utils/siteReportPdfExport";
 import { useToast } from "@/hooks/use-toast";
 import { useCompany } from "@/contexts/CompanyContext";
+import { invokeEdgeFunction } from "@/lib/edgeFunctionClient";
 import { cn } from "@/lib/utils";
 import { useTelegramSettings } from "@/hooks/useTelegramSettings";
 import { useLabourAttendance } from "@/hooks/construction/useLabourAttendance";
@@ -204,7 +205,7 @@ export function ViewSiteReportDialog({
 
       console.log("Sending telegram report with company_id:", selectedCompany.id);
 
-      const { data, error } = await supabase.functions.invoke('send-telegram-report', {
+      const { data, error, suggestion } = await invokeEdgeFunction('send-telegram-report', {
         body: {
           pdf_base64: pdfBase64,
           filename: `${displayReport.report_number}.pdf`,
@@ -213,11 +214,12 @@ export function ViewSiteReportDialog({
           report_date: formatPeriod(),
           report_type: reportType,
           company_id: selectedCompany.id
-        }
+        },
+        companyId: selectedCompany.id,
       });
 
       if (error) {
-        const errorMessage = error?.message || 'Unknown error';
+        const errorMessage = suggestion || error?.message || 'Unknown error';
         throw new Error(errorMessage);
       }
 

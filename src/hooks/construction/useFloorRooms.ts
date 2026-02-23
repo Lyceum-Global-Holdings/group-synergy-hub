@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { FloorDrawingRoom, DetectedRoom, RoomCoordinate } from "@/types/construction";
 import { toast } from "sonner";
 import { Json } from "@/integrations/supabase/types";
+import { invokeEdgeFunction } from "@/lib/edgeFunctionClient";
 
 // Helper to convert database row to typed FloorDrawingRoom
 function mapDbRowToRoom(row: any): FloorDrawingRoom {
@@ -45,7 +46,7 @@ export function useDetectRooms() {
       totalAreaSqm?: number;
     }) => {
       // Call the edge function
-      const { data: functionData, error: functionError } = await supabase.functions.invoke(
+      const { data: functionData, error: functionError, suggestion } = await invokeEdgeFunction(
         'analyze-floor-plan',
         {
           body: { imageUrl, totalAreaSqm }
@@ -54,7 +55,7 @@ export function useDetectRooms() {
 
       if (functionError) {
         console.error('Edge function error:', functionError);
-        throw new Error(functionError.message || 'Failed to analyze floor plan');
+        throw new Error(suggestion || functionError.message || 'Failed to analyze floor plan');
       }
 
       if (!functionData.success) {

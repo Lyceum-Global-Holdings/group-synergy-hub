@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { invokeEdgeFunction } from '@/lib/edgeFunctionClient';
 
 // Hook to bootstrap admin user (for first-time setup)
 export const useBootstrapAdmin = () => {
@@ -328,7 +329,7 @@ export const useCreateUser = () => {
       console.log('Creating user with data:', userData);
       
       // Create user via Edge Function (server-side, bypasses signup_disabled)
-      const { data: createData, error: createError } = await supabase.functions.invoke('admin-create-user', {
+      const { data: createData, error: createError, suggestion } = await invokeEdgeFunction('admin-create-user', {
         body: {
           email: userData.email,
           password: userData.password,
@@ -338,7 +339,7 @@ export const useCreateUser = () => {
 
       if (createError) {
         console.error('Edge function error:', createError);
-        throw new Error(`Failed to create user account: ${createError.message}`);
+        throw new Error(suggestion || `Failed to create user account: ${createError.message}`);
       }
 
       if (!createData?.userId) {

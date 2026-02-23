@@ -1,6 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
 import { SupplierRegistrationRequest } from "@/types/supplierRegistration";
+import { invokeEdgeFunction } from "@/lib/edgeFunctionClient";
 
 export class ApprovalWorkflowEngine {
   /**
@@ -365,7 +366,7 @@ export class ApprovalWorkflowEngine {
 
     // Call edge function to send email
     try {
-      await supabase.functions.invoke('send-approval-notification', {
+      await invokeEdgeFunction('send-approval-notification', {
         body: {
           approver_email: profile.email,
           approver_name: profile.full_name,
@@ -374,6 +375,7 @@ export class ApprovalWorkflowEngine {
           stage_name: stageName,
           notification_type: 'assigned',
         },
+        companyId: companyId,
       });
     } catch (error) {
       console.error('Failed to send notification:', error);
