@@ -15058,6 +15058,53 @@ export type Database = {
           },
         ]
       }
+      system_error_logs: {
+        Row: {
+          company_id: string | null
+          created_at: string
+          error_code: number | null
+          error_message: string
+          function_name: string
+          id: string
+          request_context: Json | null
+          resolution: string | null
+          status: string
+          user_id: string | null
+        }
+        Insert: {
+          company_id?: string | null
+          created_at?: string
+          error_code?: number | null
+          error_message: string
+          function_name: string
+          id?: string
+          request_context?: Json | null
+          resolution?: string | null
+          status?: string
+          user_id?: string | null
+        }
+        Update: {
+          company_id?: string | null
+          created_at?: string
+          error_code?: number | null
+          error_message?: string
+          function_name?: string
+          id?: string
+          request_context?: Json | null
+          resolution?: string | null
+          status?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "system_error_logs_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tax_codes: {
         Row: {
           company_id: string | null

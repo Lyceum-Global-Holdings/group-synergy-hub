@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { useCurrentUserRoles } from "./useCurrentUserRoles";
+import { invokeEdgeFunction } from "@/lib/edgeFunctionClient";
 
 
 interface ApproveAsMerchandiserParams {
@@ -123,7 +124,7 @@ export const useSendDeptHeadApprovalEmail = () => {
       if (!user) throw new Error("User not authenticated");
 
       // Send email to department head
-      const { error } = await supabase.functions.invoke('po-email-approval', {
+      const { error, suggestion } = await invokeEdgeFunction('po-email-approval', {
         body: {
           action: 'send_email',
           po_id: poId,
@@ -134,7 +135,7 @@ export const useSendDeptHeadApprovalEmail = () => {
 
       if (error) {
         console.error('Error sending approval email:', error);
-        throw new Error('Failed to send approval email');
+        throw new Error(suggestion || 'Failed to send approval email');
       }
     },
     onSuccess: () => {

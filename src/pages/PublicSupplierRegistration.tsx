@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SUPPLIER_TYPES, PAYMENT_TERMS } from "@/types/supplier";
-import { supabase } from "@/integrations/supabase/client";
+import { invokeEdgeFunction } from "@/lib/edgeFunctionClient";
 import { toast } from "sonner";
 
 export default function PublicSupplierRegistration() {
@@ -40,11 +40,11 @@ export default function PublicSupplierRegistration() {
     setIsSubmitting(true);
     try {
       // Call edge function for public registration
-      const { data: result, error } = await supabase.functions.invoke('public-supplier-registration', {
+      const { data: result, error, suggestion } = await invokeEdgeFunction('public-supplier-registration', {
         body: { supplier_data: data }
       });
 
-      if (error) throw error;
+      if (error) throw new Error(suggestion || error.message);
 
       setIsSubmitted(true);
       toast.success("Registration submitted successfully!");
