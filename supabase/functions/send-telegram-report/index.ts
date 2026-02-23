@@ -82,70 +82,77 @@ serve(async (req) => {
       company_id
     } = requestBody;
 
-    if (!company_id) {
-      console.error("No company_id in request. Keys present:", Object.keys(requestBody));
-      return new Response(
-        JSON.stringify({ error: 'Company ID is required' }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-    
-    console.log("Request validated, company_id:", company_id);
+    let telegramBotToken: string;
+    let chatIds: string[];
 
-    // Verify user belongs to this company or is super admin
-    const { data: membership, error: membershipError } = await supabase
-      .from('user_company_access')
-      .select('id')
-      .eq('user_id', user.id)
-      .eq('company_id', company_id)
-      .maybeSingle();
+    if (company_id) {
+      // NEW FORMAT: verify membership, fetch credentials from DB
+      console.log("Request validated, company_id:", company_id);
 
-    console.log("Membership check result:", { membership, membershipError });
+      const { data: membership, error: membershipError } = await supabase
+        .from('user_company_access')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('company_id', company_id)
+        .maybeSingle();
 
-    if (!membership) {
-      const { data: isSuperAdmin, error: superAdminError } = await supabase.rpc('is_super_admin', { _user_id: user.id });
-      console.log("Super admin check:", { isSuperAdmin, superAdminError });
-      if (!isSuperAdmin) {
+      console.log("Membership check result:", { membership, membershipError });
+
+      if (!membership) {
+        const { data: isSuperAdmin, error: superAdminError } = await supabase.rpc('is_super_admin', { _user_id: user.id });
+        console.log("Super admin check:", { isSuperAdmin, superAdminError });
+        if (!isSuperAdmin) {
+          return new Response(
+            JSON.stringify({ error: 'Access denied to this company' }),
+            { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+      }
+
+      const { data: settings, error: settingsError } = await supabase
+        .from('telegram_settings')
+        .select('bot_token, chat_id, is_enabled')
+        .eq('company_id', company_id)
+        .maybeSingle();
+
+      if (settingsError) {
+        console.error("Error fetching telegram settings:", settingsError);
         return new Response(
-          JSON.stringify({ error: 'Access denied to this company' }),
-          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          JSON.stringify({ error: 'Failed to fetch Telegram settings' }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
-    }
 
-    // Fetch Telegram credentials from database (server-side only)
-    const { data: settings, error: settingsError } = await supabase
-      .from('telegram_settings')
-      .select('bot_token, chat_id, is_enabled')
-      .eq('company_id', company_id)
-      .maybeSingle();
+      if (!settings?.bot_token || !settings?.chat_id) {
+        console.error("Telegram credentials not configured for company:", company_id);
+        return new Response(
+          JSON.stringify({ error: 'Telegram credentials not configured. Please configure Telegram settings.' }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
 
-    if (settingsError) {
-      console.error("Error fetching telegram settings:", settingsError);
+      if (!settings.is_enabled) {
+        return new Response(
+          JSON.stringify({ error: 'Telegram integration is disabled for this company' }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      telegramBotToken = settings.bot_token;
+      chatIds = settings.chat_id.split(',').map((id: string) => id.trim()).filter(Boolean);
+    } else if ((requestBody as any).bot_token && (requestBody as any).chat_id) {
+      // LEGACY FORMAT: use provided credentials directly (user already authenticated via JWT above)
+      console.log("Using legacy format with direct bot_token/chat_id");
+      telegramBotToken = (requestBody as any).bot_token;
+      chatIds = (requestBody as any).chat_id.split(',').map((id: string) => id.trim()).filter(Boolean);
+    } else {
+      console.error("No company_id or bot_token/chat_id in request. Keys present:", Object.keys(requestBody));
       return new Response(
-        JSON.stringify({ error: 'Failed to fetch Telegram settings' }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    if (!settings?.bot_token || !settings?.chat_id) {
-      console.error("Telegram credentials not configured for company:", company_id);
-      return new Response(
-        JSON.stringify({ error: 'Telegram credentials not configured. Please configure Telegram settings.' }),
+        JSON.stringify({ error: 'Company ID or bot_token/chat_id are required' }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    if (!settings.is_enabled) {
-      return new Response(
-        JSON.stringify({ error: 'Telegram integration is disabled for this company' }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    const telegramBotToken = settings.bot_token;
-    const chatIds = settings.chat_id.split(',').map((id: string) => id.trim()).filter(Boolean);
-    
     if (chatIds.length === 0) {
       return new Response(
         JSON.stringify({ error: 'No valid chat IDs configured' }),
