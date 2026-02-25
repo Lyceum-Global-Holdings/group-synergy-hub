@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -18,7 +18,7 @@ import { useCompany } from "@/contexts/CompanyContext";
 import { invokeEdgeFunction } from "@/lib/edgeFunctionClient";
 import { cn } from "@/lib/utils";
 import { useTelegramSettings } from "@/hooks/useTelegramSettings";
-import { useLabourAttendance } from "@/hooks/construction/useLabourAttendance";
+import { useLabourAttendance, useLaboursByLocation, useBulkCreateAttendance } from "@/hooks/construction/useLabourAttendance";
 interface ViewSiteReportDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -116,10 +116,34 @@ export function ViewSiteReportDialog({
     isLoading
   } = useDailyMaterialsActivity(periodStartDate, periodEndDate);
 
-  // Fetch labour attendance for this report - use report ID directly since it's available immediately
-  // Also use freshReport.id when available for refresh scenarios
+  // Fetch labour attendance for this report
   const reportIdForAttendance = report?.id;
   const { data: attendanceRecords, isLoading: attendanceLoading, refetch: refetchAttendance } = useLabourAttendance(reportIdForAttendance);
+
+  // Auto-initialize attendance records from labours assigned to the report's location
+  const reportLocationId = (displayReport as any)?.location_id || null;
+  const { data: locationLabours } = useLaboursByLocation(reportLocationId);
+  const bulkCreateAttendance = useBulkCreateAttendance();
+
+  useEffect(() => {
+    if (
+      reportIdForAttendance &&
+      reportLocationId &&
+      locationLabours &&
+      locationLabours.length > 0 &&
+      attendanceRecords !== undefined &&
+      attendanceRecords.length === 0 &&
+      !bulkCreateAttendance.isPending
+    ) {
+      const labourIds = locationLabours.map(l => l.id);
+      bulkCreateAttendance.mutate({
+        siteReportId: reportIdForAttendance,
+        locationId: reportLocationId,
+        attendanceDate: displayReport.report_date,
+        labourIds,
+      });
+    }
+  }, [reportIdForAttendance, reportLocationId, locationLabours?.length, attendanceRecords?.length]);
 
   // Calculate attendance summary with proper category matching
   const presentLabours = attendanceRecords?.filter(a => a.attendance_status === 'present') || [];
