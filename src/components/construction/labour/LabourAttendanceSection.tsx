@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -21,7 +21,6 @@ import {
   UserCheck,
   UserX,
   HardHat,
-  Wrench,
   Zap,
   Building2,
   Briefcase
@@ -30,8 +29,8 @@ import { format } from "date-fns";
 import { 
   useLabourAttendance, 
   useLaboursByLocation,
-  useBulkCreateAttendance,
   useUpdateLabourAttendance,
+  useUpsertLabourAttendance,
   type LabourAttendanceWithLabour
 } from "@/hooks/construction/useLabourAttendance";
 import type { DailySiteReport } from "@/types/construction";
@@ -68,83 +67,124 @@ export function LabourAttendanceSection({
   const { data: attendance, isLoading: attendanceLoading } = useLabourAttendance(report.id);
   const effectiveCompanyId = report.company_id || undefined;
   const { data: locationLabours, isLoading: laboursLoading } = useLaboursByLocation(locationId, effectiveCompanyId);
-  const bulkCreate = useBulkCreateAttendance();
   const updateAttendance = useUpdateLabourAttendance();
+  const upsertAttendance = useUpsertLabourAttendance();
 
   const [timeInputs, setTimeInputs] = useState<Record<string, { in: string; out: string }>>({});
-  const attemptedInitKeysRef = useRef<Set<string>>(new Set());
 
-  const locationLabourIds = useMemo(() => (locationLabours ?? []).map((labour) => labour.id), [locationLabours]);
-  const locationLabourIdsKey = locationLabourIds.join(",");
-  const attendanceInitKey = `${report.id}:${locationId ?? "no-location"}:${report.report_date}:${effectiveCompanyId ?? "no-company"}:${locationLabourIdsKey}`;
+  const effectiveAttendance = useMemo<LabourAttendanceWithLabour[]>(() => {
+    if (attendance && attendance.length > 0) return attendance;
 
-  // Initialize attendance records for all assigned labours when a report has none
-  useEffect(() => {
-    if (!locationId || !report.id || !report.report_date || !effectiveCompanyId) return;
-    if (!attendance || attendance.length > 0) return;
-    if (locationLabourIds.length === 0 || bulkCreate.isPending) return;
-    if (attemptedInitKeysRef.current.has(attendanceInitKey)) return;
-
-    attemptedInitKeysRef.current.add(attendanceInitKey);
-    bulkCreate.mutate({
-      siteReportId: report.id,
-      locationId,
-      attendanceDate: report.report_date,
-      labourIds: locationLabourIds,
-      companyId: effectiveCompanyId,
-    });
-  }, [locationId, report.id, report.report_date, effectiveCompanyId, attendance?.length, locationLabourIdsKey, attendanceInitKey, bulkCreate.isPending]);
+    return (locationLabours ?? []).map((labour) => ({
+      id: `virtual-${labour.id}`,
+      site_report_id: report.id,
+      labour_id: labour.id,
+      location_id: locationId,
+      company_id: effectiveCompanyId ?? labour.company_id,
+      attendance_date: report.report_date,
+      attendance_status: "absent",
+      in_time: null,
+      out_time: null,
+      category: labour.category,
+      notes: null,
+      created_by: null,
+      created_at: report.created_at,
+      updated_at: report.updated_at,
+      labour,
+    }));
+  }, [attendance, locationLabours, report.id, report.report_date, report.created_at, report.updated_at, locationId, effectiveCompanyId]);
 
   // Initialize time inputs from attendance data
   useEffect(() => {
-    if (attendance) {
-      const inputs: Record<string, { in: string; out: string }> = {};
-      attendance.forEach(att => {
-        inputs[att.id] = {
-          in: att.in_time || "",
-          out: att.out_time || "",
-        };
-      });
-      setTimeInputs(inputs);
-    }
-  }, [attendance]);
+    const inputs: Record<string, { in: string; out: string }> = {};
+    effectiveAttendance.forEach((att) => {
+      inputs[att.id] = {
+        in: att.in_time || "",
+        out: att.out_time || "",
+      };
+    });
+    setTimeInputs(inputs);
+  }, [effectiveAttendance]);
 
   // Calculate and emit summary
   const summary = useMemo<AttendanceSummary>(() => {
-    if (!attendance) return { total: 0, present: 0, absent: 0, categoryBreakdown: {} };
+    if (!effectiveAttendance.length) {
+      return { total: 0, present: 0, absent: 0, categoryBreakdown: {} };
+    }
 
-    const present = attendance.filter(a => a.attendance_status === 'present');
-    const absent = attendance.filter(a => a.attendance_status === 'absent');
+    const present = effectiveAttendance.filter((a) => a.attendance_status === "present");
+    const absent = effectiveAttendance.filter((a) => a.attendance_status === "absent");
     const categoryBreakdown: Record<string, number> = {};
 
     // Only count present labours for category breakdown
-    present.forEach(a => {
-      const cat = a.category || a.labour?.category || 'Other';
+    present.forEach((a) => {
+      const cat = a.category || a.labour?.category || "Other";
       categoryBreakdown[cat] = (categoryBreakdown[cat] || 0) + 1;
     });
 
     return {
-      total: attendance.length,
+      total: effectiveAttendance.length,
       present: present.length,
       absent: absent.length,
       categoryBreakdown,
     };
-  }, [attendance]);
+  }, [effectiveAttendance]);
 
   useEffect(() => {
     onAttendanceChange?.(summary);
   }, [summary, onAttendanceChange]);
 
-  const handleStatusChange = async (attendanceRecord: LabourAttendanceWithLabour, status: 'present' | 'absent') => {
-    if (status === 'absent') {
+  const isVirtualRecord = (attendanceRecord: LabourAttendanceWithLabour) =>
+    attendanceRecord.id.startsWith("virtual-");
+
+  const upsertVirtualAttendance = async (
+    attendanceRecord: LabourAttendanceWithLabour,
+    updates: { attendance_status?: "present" | "absent"; in_time?: string | null; out_time?: string | null }
+  ) => {
+    if (!locationId) return;
+
+    await upsertAttendance.mutateAsync({
+      site_report_id: report.id,
+      labour_id: attendanceRecord.labour_id,
+      location_id: locationId,
+      attendance_date: report.report_date,
+      attendance_status: updates.attendance_status ?? attendanceRecord.attendance_status,
+      in_time: updates.in_time ?? attendanceRecord.in_time,
+      out_time: updates.out_time ?? attendanceRecord.out_time,
+      category: attendanceRecord.category || attendanceRecord.labour?.category || null,
+      companyId: effectiveCompanyId,
+    });
+  };
+
+  const handleStatusChange = async (
+    attendanceRecord: LabourAttendanceWithLabour,
+    status: "present" | "absent"
+  ) => {
+    if (isVirtualRecord(attendanceRecord)) {
+      await upsertVirtualAttendance(attendanceRecord, {
+        attendance_status: status,
+        in_time: status === "absent" ? null : attendanceRecord.in_time,
+        out_time: status === "absent" ? null : attendanceRecord.out_time,
+      });
+
+      if (status === "absent") {
+        setTimeInputs((prev) => ({
+          ...prev,
+          [attendanceRecord.id]: { in: "", out: "" },
+        }));
+      }
+      return;
+    }
+
+    if (status === "absent") {
       // Clear times when marking absent
       await updateAttendance.mutateAsync({
         id: attendanceRecord.id,
-        attendance_status: 'absent',
+        attendance_status: "absent",
         in_time: null,
         out_time: null,
       });
-      setTimeInputs(prev => ({
+      setTimeInputs((prev) => ({
         ...prev,
         [attendanceRecord.id]: { in: "", out: "" },
       }));
@@ -152,32 +192,46 @@ export function LabourAttendanceSection({
       // Just update status to present
       await updateAttendance.mutateAsync({
         id: attendanceRecord.id,
-        attendance_status: 'present',
+        attendance_status: "present",
       });
     }
   };
 
   const handleTimeChange = async (
-    attendanceRecord: LabourAttendanceWithLabour, 
-    field: 'in' | 'out', 
+    attendanceRecord: LabourAttendanceWithLabour,
+    field: "in" | "out",
     value: string
   ) => {
-    setTimeInputs(prev => ({
+    const currentValue = timeInputs[attendanceRecord.id] ?? { in: "", out: "" };
+    const nextValue = { ...currentValue, [field]: value };
+
+    setTimeInputs((prev) => ({
       ...prev,
-      [attendanceRecord.id]: { ...prev[attendanceRecord.id], [field]: value },
+      [attendanceRecord.id]: nextValue,
     }));
 
     // Format time value for database
-    const timeValue = value ? `${value}:00` : null;
-    if (field === 'in') {
+    const inTimeValue = nextValue.in ? `${nextValue.in}:00` : null;
+    const outTimeValue = nextValue.out ? `${nextValue.out}:00` : null;
+
+    if (isVirtualRecord(attendanceRecord)) {
+      await upsertVirtualAttendance(attendanceRecord, {
+        attendance_status: "present",
+        in_time: inTimeValue,
+        out_time: outTimeValue,
+      });
+      return;
+    }
+
+    if (field === "in") {
       await updateAttendance.mutateAsync({
         id: attendanceRecord.id,
-        in_time: timeValue,
+        in_time: inTimeValue,
       });
     } else {
       await updateAttendance.mutateAsync({
         id: attendanceRecord.id,
-        out_time: timeValue,
+        out_time: outTimeValue,
       });
     }
   };
@@ -188,7 +242,8 @@ export function LabourAttendanceSection({
     return time.substring(0, 5);
   };
 
-  const isLoading = attendanceLoading || laboursLoading || bulkCreate.isPending;
+  const isLoading = attendanceLoading || laboursLoading;
+  const isMutating = updateAttendance.isPending || upsertAttendance.isPending;
 
   if (!locationId) {
     return (
@@ -274,7 +329,7 @@ export function LabourAttendanceSection({
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {attendance && attendance.length > 0 ? (
+          {effectiveAttendance.length > 0 ? (
             <div className="rounded-md border">
               <Table>
                 <TableHeader>
@@ -289,8 +344,8 @@ export function LabourAttendanceSection({
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {attendance.map((att) => {
-                    const isPresent = att.attendance_status === 'present';
+                  {effectiveAttendance.map((att) => {
+                    const isPresent = att.attendance_status === "present";
                     return (
                       <TableRow key={att.id}>
                         <TableCell className="font-mono text-xs">
@@ -311,26 +366,28 @@ export function LabourAttendanceSection({
                           {isEditing ? (
                             <div className="flex items-center gap-2">
                               <Checkbox
-                                checked={att.attendance_status === 'present'}
-                                onCheckedChange={(checked) => 
-                                  handleStatusChange(att, checked ? 'present' : 'absent')
+                                checked={att.attendance_status === "present"}
+                                onCheckedChange={(checked) =>
+                                  handleStatusChange(att, checked ? "present" : "absent")
                                 }
-                                disabled={updateAttendance.isPending}
+                                disabled={isMutating}
                                 className="h-5 w-5 data-[state=checked]:bg-green-600 data-[state=checked]:border-green-600"
                               />
-                              <span className={cn(
-                                "text-sm font-medium",
-                                att.attendance_status === 'present' ? "text-green-700" : "text-muted-foreground"
-                              )}>
-                                {att.attendance_status === 'present' ? 'Present' : 'Absent'}
+                              <span
+                                className={cn(
+                                  "text-sm font-medium",
+                                  att.attendance_status === "present" ? "text-green-700" : "text-muted-foreground"
+                                )}
+                              >
+                                {att.attendance_status === "present" ? "Present" : "Absent"}
                               </span>
                             </div>
                           ) : (
-                            <Badge 
-                              variant={isPresent ? 'default' : 'secondary'}
-                              className={isPresent ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}
+                            <Badge
+                              variant={isPresent ? "default" : "secondary"}
+                              className={isPresent ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}
                             >
-                              {isPresent ? 'Present' : 'Absent'}
+                              {isPresent ? "Present" : "Absent"}
                             </Badge>
                           )}
                         </TableCell>
@@ -339,9 +396,9 @@ export function LabourAttendanceSection({
                             <Input
                               type="time"
                               value={(timeInputs[att.id]?.in || "").substring(0, 5)}
-                              onChange={(e) => handleTimeChange(att, 'in', e.target.value)}
+                              onChange={(e) => handleTimeChange(att, "in", e.target.value)}
                               className="w-[110px] mx-auto h-8"
-                              disabled={!isPresent}
+                              disabled={!isPresent || isMutating}
                             />
                           ) : (
                             formatTimeDisplay(att.in_time)
@@ -352,9 +409,9 @@ export function LabourAttendanceSection({
                             <Input
                               type="time"
                               value={(timeInputs[att.id]?.out || "").substring(0, 5)}
-                              onChange={(e) => handleTimeChange(att, 'out', e.target.value)}
+                              onChange={(e) => handleTimeChange(att, "out", e.target.value)}
                               className="w-[110px] mx-auto h-8"
-                              disabled={!isPresent}
+                              disabled={!isPresent || isMutating}
                             />
                           ) : (
                             formatTimeDisplay(att.out_time)

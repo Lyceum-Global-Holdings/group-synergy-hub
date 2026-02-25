@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -18,7 +18,7 @@ import { useCompany } from "@/contexts/CompanyContext";
 import { invokeEdgeFunction } from "@/lib/edgeFunctionClient";
 import { cn } from "@/lib/utils";
 import { useTelegramSettings } from "@/hooks/useTelegramSettings";
-import { useLabourAttendance, useLaboursByLocation, useBulkCreateAttendance } from "@/hooks/construction/useLabourAttendance";
+import { useLabourAttendance, useLaboursByLocation, type LabourAttendanceWithLabour } from "@/hooks/construction/useLabourAttendance";
 interface ViewSiteReportDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -118,37 +118,43 @@ export function ViewSiteReportDialog({
 
   // Fetch labour attendance for this report
   const reportIdForAttendance = displayReport?.id ?? report?.id ?? null;
-  const { data: attendanceRecords, isLoading: attendanceLoading, refetch: refetchAttendance } = useLabourAttendance(reportIdForAttendance);
+  const { data: attendanceRecords, isLoading: attendanceLoading } = useLabourAttendance(reportIdForAttendance);
 
-  // Auto-initialize attendance records from labours assigned to the report's location
   const reportLocationId = (displayReport as any)?.location_id || null;
   const effectiveReportCompanyId = displayReport?.company_id || selectedCompany?.id || null;
   const { data: locationLabours } = useLaboursByLocation(reportLocationId, effectiveReportCompanyId);
-  const bulkCreateAttendance = useBulkCreateAttendance();
-  const locationLabourIds = (locationLabours ?? []).map((labour) => labour.id);
-  const locationLabourIdsKey = locationLabourIds.join(",");
-  const attemptedInitKeysRef = useRef<Set<string>>(new Set());
-  const attendanceInitKey = `${reportIdForAttendance ?? "no-report"}:${reportLocationId ?? "no-location"}:${displayReport?.report_date ?? "no-date"}:${effectiveReportCompanyId ?? "no-company"}:${locationLabourIdsKey}`;
 
-  useEffect(() => {
-    if (!reportIdForAttendance || !reportLocationId || !displayReport?.report_date || !effectiveReportCompanyId) return;
-    if (attendanceRecords === undefined || attendanceRecords.length > 0) return;
-    if (locationLabourIds.length === 0 || bulkCreateAttendance.isPending) return;
-    if (attemptedInitKeysRef.current.has(attendanceInitKey)) return;
+  const displayAttendanceRecords = useMemo<LabourAttendanceWithLabour[]>(() => {
+    if (attendanceRecords && attendanceRecords.length > 0) {
+      return attendanceRecords;
+    }
 
-    attemptedInitKeysRef.current.add(attendanceInitKey);
-    bulkCreateAttendance.mutate({
-      siteReportId: reportIdForAttendance,
-      locationId: reportLocationId,
-      attendanceDate: displayReport.report_date,
-      labourIds: locationLabourIds,
-      companyId: effectiveReportCompanyId,
-    });
-  }, [reportIdForAttendance, reportLocationId, displayReport?.report_date, effectiveReportCompanyId, attendanceRecords?.length, locationLabourIdsKey, attendanceInitKey, bulkCreateAttendance.isPending]);
+    if (!reportIdForAttendance || !displayReport?.report_date) {
+      return [];
+    }
+
+    return (locationLabours ?? []).map((labour) => ({
+      id: `virtual-${labour.id}`,
+      site_report_id: reportIdForAttendance,
+      labour_id: labour.id,
+      location_id: reportLocationId,
+      company_id: effectiveReportCompanyId,
+      attendance_date: displayReport.report_date,
+      attendance_status: "absent",
+      in_time: null,
+      out_time: null,
+      category: labour.category,
+      notes: null,
+      created_by: null,
+      created_at: displayReport.created_at,
+      updated_at: displayReport.updated_at,
+      labour,
+    }));
+  }, [attendanceRecords, locationLabours, reportIdForAttendance, reportLocationId, effectiveReportCompanyId, displayReport?.report_date, displayReport?.created_at, displayReport?.updated_at]);
 
   // Calculate attendance summary with proper category matching
-  const presentLabours = attendanceRecords?.filter(a => a.attendance_status === 'present') || [];
-  const absentLabours = attendanceRecords?.filter(a => a.attendance_status === 'absent') || [];
+  const presentLabours = displayAttendanceRecords.filter((a) => a.attendance_status === "present");
+  const absentLabours = displayAttendanceRecords.filter((a) => a.attendance_status === "absent");
   
   // Match category names from Labour Master (Civil Skill, Civil Labour (Unskill), MEP, Aluminium, Officer)
   const categoryBreakdown = presentLabours.reduce((acc, a) => {
@@ -493,7 +499,7 @@ export function ViewSiteReportDialog({
                   <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary" />
                   <span className="ml-2 text-muted-foreground">Loading attendance...</span>
                 </div>
-              ) : attendanceRecords && attendanceRecords.length > 0 ? (
+              ) : displayAttendanceRecords.length > 0 ? (
                 <>
                   {/* Status Summary Cards */}
                   <div className="grid grid-cols-2 gap-3">
@@ -550,7 +556,7 @@ export function ViewSiteReportDialog({
                     <CardHeader className="pb-2">
                       <CardTitle className="text-sm font-medium flex items-center gap-2">
                         <Clock className="h-4 w-4" />
-                        Attendance Details ({attendanceRecords.length} total)
+                        Attendance Details ({displayAttendanceRecords.length} total)
                       </CardTitle>
                     </CardHeader>
                     <CardContent>
@@ -567,7 +573,7 @@ export function ViewSiteReportDialog({
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {attendanceRecords.map((record) => (
+                          {displayAttendanceRecords.map((record) => (
                             <TableRow key={record.id}>
                               <TableCell className="font-mono text-xs">
                                 {record.labour?.employee_id || "-"}

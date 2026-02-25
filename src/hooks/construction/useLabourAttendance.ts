@@ -13,6 +13,43 @@ export interface LabourAttendanceWithLabour extends LabourAttendance {
   labour: LabourMaster;
 }
 
+async function resolveAttendanceInsertContext(
+  siteReportId: string,
+  fallbackCompanyId?: string | null
+): Promise<{ userId: string; companyId: string } | null> {
+  const { data: user, error: userError } = await supabase.auth.getUser();
+  if (userError) throw userError;
+
+  const userId = user.user?.id;
+  if (!userId) return null;
+
+  const { data: reportCompanyRow, error: reportCompanyError } = await supabase
+    .from("daily_site_reports")
+    .select("company_id")
+    .eq("id", siteReportId)
+    .maybeSingle();
+
+  if (reportCompanyError) throw reportCompanyError;
+
+  const resolvedCompanyId = reportCompanyRow?.company_id ?? fallbackCompanyId ?? null;
+  if (!resolvedCompanyId) return null;
+
+  const [isSuperAdminResult, canAccessCompanyResult] = await Promise.all([
+    supabase.rpc("is_super_admin", { _user_id: userId }),
+    supabase.rpc("can_access_company", { target_company_id: resolvedCompanyId }),
+  ]);
+
+  if (isSuperAdminResult.error) throw isSuperAdminResult.error;
+  if (canAccessCompanyResult.error) throw canAccessCompanyResult.error;
+
+  const hasCompanyAccess =
+    isSuperAdminResult.data === true || canAccessCompanyResult.data === true;
+
+  if (!hasCompanyAccess) return null;
+
+  return { userId, companyId: resolvedCompanyId };
+}
+
 export function useLabourAttendance(siteReportId: string | null | undefined) {
   return useQuery({
     queryKey: ["labour-attendance", siteReportId],
@@ -159,16 +196,26 @@ export function useUpsertLabourAttendance() {
   const { selectedCompany } = useCompany();
 
   return useMutation({
-    mutationFn: async (data: CreateLabourAttendanceData) => {
-      const { data: user } = await supabase.auth.getUser();
-      
+    mutationFn: async ({
+      companyId,
+      ...data
+    }: CreateLabourAttendanceData & { companyId?: string | null }) => {
+      const insertContext = await resolveAttendanceInsertContext(
+        data.site_report_id,
+        companyId ?? selectedCompany?.id ?? null
+      );
+
+      if (!insertContext) {
+        throw new Error("You do not have access to create attendance for this report");
+      }
+
       const { data: result, error } = await supabase
         .from("site_report_labour_attendance")
         .upsert(
           {
             ...data,
-            company_id: selectedCompany?.id,
-            created_by: user.user?.id,
+            company_id: insertContext.companyId,
+            created_by: insertContext.userId,
           },
           { onConflict: "site_report_id,labour_id,attendance_date" }
         )
@@ -209,42 +256,17 @@ export function useBulkCreateAttendance() {
       labourIds: string[];
       companyId?: string | null;
     }) => {
-      const { data: user } = await supabase.auth.getUser();
-      const userId = user.user?.id;
+      const insertContext = await resolveAttendanceInsertContext(
+        siteReportId,
+        companyId ?? selectedCompany?.id ?? null
+      );
 
-      if (!userId) {
-        throw new Error("You must be logged in to initialize attendance");
-      }
-
-      // Resolve company from the report first (source of truth for link-based flows)
-      const { data: reportCompanyRow, error: reportCompanyError } = await supabase
-        .from("daily_site_reports")
-        .select("company_id")
-        .eq("id", siteReportId)
-        .maybeSingle();
-
-      if (reportCompanyError) throw reportCompanyError;
-
-      let resolvedCompanyId = reportCompanyRow?.company_id ?? companyId ?? selectedCompany?.id ?? null;
-
-      // If company cannot be resolved, skip auto-initialization without throwing
-      if (!resolvedCompanyId) {
+      // Skip silent initialization if company cannot be resolved or access is not allowed
+      if (!insertContext) {
         return [];
       }
 
-      // Preflight access check to avoid RLS insert errors in shared-link/edit flows
-      const [isSuperAdminResult, canAccessCompanyResult] = await Promise.all([
-        supabase.rpc("is_super_admin", { _user_id: userId }),
-        supabase.rpc("can_access_company", { target_company_id: resolvedCompanyId }),
-      ]);
-
-      if (isSuperAdminResult.error) throw isSuperAdminResult.error;
-      if (canAccessCompanyResult.error) throw canAccessCompanyResult.error;
-
-      const hasCompanyAccess = isSuperAdminResult.data === true || canAccessCompanyResult.data === true;
-      if (!hasCompanyAccess) {
-        return [];
-      }
+      const { userId, companyId: resolvedCompanyId } = insertContext;
       
       // First get existing attendance records for this report
       const { data: existing, error: existingError } = await supabase
