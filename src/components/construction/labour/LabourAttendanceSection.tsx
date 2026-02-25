@@ -66,25 +66,30 @@ export function LabourAttendanceSection({
   onAttendanceChange 
 }: LabourAttendanceSectionProps) {
   const { data: attendance, isLoading: attendanceLoading } = useLabourAttendance(report.id);
-  const { data: locationLabours, isLoading: laboursLoading } = useLaboursByLocation(locationId);
+  const effectiveCompanyId = report.company_id || undefined;
+  const { data: locationLabours, isLoading: laboursLoading } = useLaboursByLocation(locationId, effectiveCompanyId);
   const bulkCreate = useBulkCreateAttendance();
   const updateAttendance = useUpdateLabourAttendance();
 
   const [timeInputs, setTimeInputs] = useState<Record<string, { in: string; out: string }>>({});
 
-  // Initialize attendance records for all labours at this location
-  // Auto-create records both when editing and viewing so attendance data is always populated
+  const locationLabourIds = useMemo(() => (locationLabours ?? []).map((labour) => labour.id), [locationLabours]);
+  const locationLabourIdsKey = locationLabourIds.join(",");
+
+  // Initialize attendance records for all assigned labours when a report has none
   useEffect(() => {
-    if (locationId && locationLabours && locationLabours.length > 0 && report.id) {
-      const labourIds = locationLabours.map(l => l.id);
-      bulkCreate.mutate({
-        siteReportId: report.id,
-        locationId,
-        attendanceDate: report.report_date,
-        labourIds,
-      });
-    }
-  }, [locationId, locationLabours?.length, report.id, report.report_date]);
+    if (!locationId || !report.id || !report.report_date || !effectiveCompanyId) return;
+    if (!attendance || attendance.length > 0) return;
+    if (locationLabourIds.length === 0 || bulkCreate.isPending) return;
+
+    bulkCreate.mutate({
+      siteReportId: report.id,
+      locationId,
+      attendanceDate: report.report_date,
+      labourIds: locationLabourIds,
+      companyId: effectiveCompanyId,
+    });
+  }, [locationId, report.id, report.report_date, effectiveCompanyId, attendance?.length, locationLabourIdsKey, bulkCreate.isPending]);
 
   // Initialize time inputs from attendance data
   useEffect(() => {
