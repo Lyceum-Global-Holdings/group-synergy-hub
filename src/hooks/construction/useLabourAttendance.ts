@@ -210,13 +210,50 @@ export function useBulkCreateAttendance() {
       companyId?: string | null;
     }) => {
       const { data: user } = await supabase.auth.getUser();
+      const userId = user.user?.id;
+
+      if (!userId) {
+        throw new Error("You must be logged in to initialize attendance");
+      }
+
+      // Resolve company from the report first (source of truth for link-based flows)
+      const { data: reportCompanyRow, error: reportCompanyError } = await supabase
+        .from("daily_site_reports")
+        .select("company_id")
+        .eq("id", siteReportId)
+        .maybeSingle();
+
+      if (reportCompanyError) throw reportCompanyError;
+
+      let resolvedCompanyId = reportCompanyRow?.company_id ?? companyId ?? selectedCompany?.id ?? null;
+
+      // If company cannot be resolved, skip auto-initialization without throwing
+      if (!resolvedCompanyId) {
+        return [];
+      }
+
+      // Preflight access check to avoid RLS insert errors in shared-link/edit flows
+      const [isSuperAdminResult, canAccessCompanyResult] = await Promise.all([
+        supabase.rpc("is_super_admin", { _user_id: userId }),
+        supabase.rpc("can_access_company", { target_company_id: resolvedCompanyId }),
+      ]);
+
+      if (isSuperAdminResult.error) throw isSuperAdminResult.error;
+      if (canAccessCompanyResult.error) throw canAccessCompanyResult.error;
+
+      const hasCompanyAccess = isSuperAdminResult.data === true || canAccessCompanyResult.data === true;
+      if (!hasCompanyAccess) {
+        return [];
+      }
       
       // First get existing attendance records for this report
-      const { data: existing } = await supabase
+      const { data: existing, error: existingError } = await supabase
         .from("site_report_labour_attendance")
         .select("labour_id")
         .eq("site_report_id", siteReportId)
         .eq("attendance_date", attendanceDate);
+
+      if (existingError) throw existingError;
 
       const existingLabourIds = new Set(existing?.map(e => e.labour_id) || []);
       
@@ -226,10 +263,12 @@ export function useBulkCreateAttendance() {
       if (newLabourIds.length === 0) return [];
 
       // Get labour details to include category
-      const { data: labours } = await supabase
+      const { data: labours, error: laboursError } = await supabase
         .from("construction_labour_directory")
         .select("id, category")
         .in("id", newLabourIds);
+
+      if (laboursError) throw laboursError;
 
       const labourCategoryMap = new Map(labours?.map(l => [l.id, l.category]) || []);
 
@@ -240,8 +279,8 @@ export function useBulkCreateAttendance() {
         attendance_date: attendanceDate,
         attendance_status: 'absent' as const, // Default to absent until marked IN
         category: labourCategoryMap.get(labourId) || null,
-        company_id: companyId ?? selectedCompany?.id,
-        created_by: user.user?.id,
+        company_id: resolvedCompanyId,
+        created_by: userId,
       }));
 
       const { data: result, error } = await supabase

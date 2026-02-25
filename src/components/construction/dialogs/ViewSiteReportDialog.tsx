@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -127,12 +127,16 @@ export function ViewSiteReportDialog({
   const bulkCreateAttendance = useBulkCreateAttendance();
   const locationLabourIds = (locationLabours ?? []).map((labour) => labour.id);
   const locationLabourIdsKey = locationLabourIds.join(",");
+  const attemptedInitKeysRef = useRef<Set<string>>(new Set());
+  const attendanceInitKey = `${reportIdForAttendance ?? "no-report"}:${reportLocationId ?? "no-location"}:${displayReport?.report_date ?? "no-date"}:${effectiveReportCompanyId ?? "no-company"}:${locationLabourIdsKey}`;
 
   useEffect(() => {
     if (!reportIdForAttendance || !reportLocationId || !displayReport?.report_date || !effectiveReportCompanyId) return;
     if (attendanceRecords === undefined || attendanceRecords.length > 0) return;
     if (locationLabourIds.length === 0 || bulkCreateAttendance.isPending) return;
+    if (attemptedInitKeysRef.current.has(attendanceInitKey)) return;
 
+    attemptedInitKeysRef.current.add(attendanceInitKey);
     bulkCreateAttendance.mutate({
       siteReportId: reportIdForAttendance,
       locationId: reportLocationId,
@@ -140,7 +144,7 @@ export function ViewSiteReportDialog({
       labourIds: locationLabourIds,
       companyId: effectiveReportCompanyId,
     });
-  }, [reportIdForAttendance, reportLocationId, displayReport?.report_date, effectiveReportCompanyId, attendanceRecords?.length, locationLabourIdsKey, bulkCreateAttendance.isPending]);
+  }, [reportIdForAttendance, reportLocationId, displayReport?.report_date, effectiveReportCompanyId, attendanceRecords?.length, locationLabourIdsKey, attendanceInitKey, bulkCreateAttendance.isPending]);
 
   // Calculate attendance summary with proper category matching
   const presentLabours = attendanceRecords?.filter(a => a.attendance_status === 'present') || [];
