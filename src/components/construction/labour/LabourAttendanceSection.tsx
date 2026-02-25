@@ -73,8 +73,9 @@ export function LabourAttendanceSection({
   const [timeInputs, setTimeInputs] = useState<Record<string, { in: string; out: string }>>({});
 
   // Initialize attendance records for all labours at this location
+  // Auto-create records both when editing and viewing so attendance data is always populated
   useEffect(() => {
-    if (locationId && locationLabours && locationLabours.length > 0 && report.id && isEditing) {
+    if (locationId && locationLabours && locationLabours.length > 0 && report.id) {
       const labourIds = locationLabours.map(l => l.id);
       bulkCreate.mutate({
         siteReportId: report.id,
@@ -83,7 +84,7 @@ export function LabourAttendanceSection({
         labourIds,
       });
     }
-  }, [locationId, locationLabours?.length, report.id, report.report_date, isEditing]);
+  }, [locationId, locationLabours?.length, report.id, report.report_date]);
 
   // Initialize time inputs from attendance data
   useEffect(() => {
