@@ -14,8 +14,6 @@ export interface LabourAttendanceWithLabour extends LabourAttendance {
 }
 
 export function useLabourAttendance(siteReportId: string | null | undefined) {
-  const { selectedCompany } = useCompany();
-
   return useQuery({
     queryKey: ["labour-attendance", siteReportId],
     queryFn: async () => {
@@ -25,7 +23,7 @@ export function useLabourAttendance(siteReportId: string | null | undefined) {
         .from("site_report_labour_attendance")
         .select(`
           *,
-          labour:construction_labour_master(*)
+          labour:construction_labour_directory(*)
         `)
         .eq("site_report_id", siteReportId)
         .order("created_at", { ascending: true });
@@ -37,23 +35,27 @@ export function useLabourAttendance(siteReportId: string | null | undefined) {
   });
 }
 
-export function useLaboursByLocation(locationId: string | null | undefined) {
+export function useLaboursByLocation(
+  locationId: string | null | undefined,
+  companyId?: string | null
+) {
   const { selectedCompany } = useCompany();
+  const effectiveCompanyId = companyId ?? selectedCompany?.id ?? null;
 
   return useQuery({
-    queryKey: ["labours-by-location", locationId, selectedCompany?.id],
+    queryKey: ["labours-by-location", locationId, effectiveCompanyId],
     queryFn: async () => {
       if (!locationId) return [];
 
       let query = supabase
-        .from("construction_labour_master")
+        .from("construction_labour_directory")
         .select("*")
         .eq("location_id", locationId)
         .eq("status", "active")
         .order("name", { ascending: true });
 
-      if (selectedCompany?.id) {
-        query = query.or(`company_id.eq.${selectedCompany.id},company_id.is.null`);
+      if (effectiveCompanyId) {
+        query = query.or(`company_id.eq.${effectiveCompanyId},company_id.is.null`);
       }
 
       const { data, error } = await query;
@@ -83,7 +85,7 @@ export function useCreateLabourAttendance() {
         })
         .select(`
           *,
-          labour:construction_labour_master(*)
+          labour:construction_labour_directory(*)
         `)
         .single();
 
@@ -111,7 +113,7 @@ export function useUpdateLabourAttendance() {
         .eq("id", id)
         .select(`
           *,
-          labour:construction_labour_master(*)
+          labour:construction_labour_directory(*)
         `)
         .single();
 
@@ -172,7 +174,7 @@ export function useUpsertLabourAttendance() {
         )
         .select(`
           *,
-          labour:construction_labour_master(*)
+          labour:construction_labour_directory(*)
         `)
         .single();
 
@@ -198,12 +200,14 @@ export function useBulkCreateAttendance() {
       siteReportId, 
       locationId, 
       attendanceDate, 
-      labourIds 
-    }: { 
-      siteReportId: string; 
-      locationId: string; 
+      labourIds,
+      companyId,
+    }: {
+      siteReportId: string;
+      locationId: string;
       attendanceDate: string;
       labourIds: string[];
+      companyId?: string | null;
     }) => {
       const { data: user } = await supabase.auth.getUser();
       
@@ -223,7 +227,7 @@ export function useBulkCreateAttendance() {
 
       // Get labour details to include category
       const { data: labours } = await supabase
-        .from("construction_labour_master")
+        .from("construction_labour_directory")
         .select("id, category")
         .in("id", newLabourIds);
 
@@ -236,7 +240,7 @@ export function useBulkCreateAttendance() {
         attendance_date: attendanceDate,
         attendance_status: 'absent' as const, // Default to absent until marked IN
         category: labourCategoryMap.get(labourId) || null,
-        company_id: selectedCompany?.id,
+        company_id: companyId ?? selectedCompany?.id,
         created_by: user.user?.id,
       }));
 
@@ -245,7 +249,7 @@ export function useBulkCreateAttendance() {
         .insert(records)
         .select(`
           *,
-          labour:construction_labour_master(*)
+          labour:construction_labour_directory(*)
         `);
 
       if (error) throw error;

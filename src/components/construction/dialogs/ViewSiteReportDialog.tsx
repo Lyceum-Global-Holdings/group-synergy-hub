@@ -117,33 +117,30 @@ export function ViewSiteReportDialog({
   } = useDailyMaterialsActivity(periodStartDate, periodEndDate);
 
   // Fetch labour attendance for this report
-  const reportIdForAttendance = report?.id;
+  const reportIdForAttendance = displayReport?.id ?? report?.id ?? null;
   const { data: attendanceRecords, isLoading: attendanceLoading, refetch: refetchAttendance } = useLabourAttendance(reportIdForAttendance);
 
   // Auto-initialize attendance records from labours assigned to the report's location
   const reportLocationId = (displayReport as any)?.location_id || null;
-  const { data: locationLabours } = useLaboursByLocation(reportLocationId);
+  const effectiveReportCompanyId = displayReport?.company_id || selectedCompany?.id || null;
+  const { data: locationLabours } = useLaboursByLocation(reportLocationId, effectiveReportCompanyId);
   const bulkCreateAttendance = useBulkCreateAttendance();
+  const locationLabourIds = (locationLabours ?? []).map((labour) => labour.id);
+  const locationLabourIdsKey = locationLabourIds.join(",");
 
   useEffect(() => {
-    if (
-      reportIdForAttendance &&
-      reportLocationId &&
-      locationLabours &&
-      locationLabours.length > 0 &&
-      attendanceRecords !== undefined &&
-      attendanceRecords.length === 0 &&
-      !bulkCreateAttendance.isPending
-    ) {
-      const labourIds = locationLabours.map(l => l.id);
-      bulkCreateAttendance.mutate({
-        siteReportId: reportIdForAttendance,
-        locationId: reportLocationId,
-        attendanceDate: displayReport.report_date,
-        labourIds,
-      });
-    }
-  }, [reportIdForAttendance, reportLocationId, locationLabours?.length, attendanceRecords?.length]);
+    if (!reportIdForAttendance || !reportLocationId || !displayReport?.report_date || !effectiveReportCompanyId) return;
+    if (attendanceRecords === undefined || attendanceRecords.length > 0) return;
+    if (locationLabourIds.length === 0 || bulkCreateAttendance.isPending) return;
+
+    bulkCreateAttendance.mutate({
+      siteReportId: reportIdForAttendance,
+      locationId: reportLocationId,
+      attendanceDate: displayReport.report_date,
+      labourIds: locationLabourIds,
+      companyId: effectiveReportCompanyId,
+    });
+  }, [reportIdForAttendance, reportLocationId, displayReport?.report_date, effectiveReportCompanyId, attendanceRecords?.length, locationLabourIdsKey, bulkCreateAttendance.isPending]);
 
   // Calculate attendance summary with proper category matching
   const presentLabours = attendanceRecords?.filter(a => a.attendance_status === 'present') || [];
