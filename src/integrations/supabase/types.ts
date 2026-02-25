@@ -17258,6 +17258,10 @@ export type Database = {
         Args: { target_company_id: string }
         Returns: boolean
       }
+      can_manage_site_report_attendance: {
+        Args: { _site_report_id: string }
+        Returns: boolean
+      }
       check_duplicate_supplier: {
         Args: {
           p_email?: string
