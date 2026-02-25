@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -72,16 +72,20 @@ export function LabourAttendanceSection({
   const updateAttendance = useUpdateLabourAttendance();
 
   const [timeInputs, setTimeInputs] = useState<Record<string, { in: string; out: string }>>({});
+  const attemptedInitKeysRef = useRef<Set<string>>(new Set());
 
   const locationLabourIds = useMemo(() => (locationLabours ?? []).map((labour) => labour.id), [locationLabours]);
   const locationLabourIdsKey = locationLabourIds.join(",");
+  const attendanceInitKey = `${report.id}:${locationId ?? "no-location"}:${report.report_date}:${effectiveCompanyId ?? "no-company"}:${locationLabourIdsKey}`;
 
   // Initialize attendance records for all assigned labours when a report has none
   useEffect(() => {
     if (!locationId || !report.id || !report.report_date || !effectiveCompanyId) return;
     if (!attendance || attendance.length > 0) return;
     if (locationLabourIds.length === 0 || bulkCreate.isPending) return;
+    if (attemptedInitKeysRef.current.has(attendanceInitKey)) return;
 
+    attemptedInitKeysRef.current.add(attendanceInitKey);
     bulkCreate.mutate({
       siteReportId: report.id,
       locationId,
@@ -89,7 +93,7 @@ export function LabourAttendanceSection({
       labourIds: locationLabourIds,
       companyId: effectiveCompanyId,
     });
-  }, [locationId, report.id, report.report_date, effectiveCompanyId, attendance?.length, locationLabourIdsKey, bulkCreate.isPending]);
+  }, [locationId, report.id, report.report_date, effectiveCompanyId, attendance?.length, locationLabourIdsKey, attendanceInitKey, bulkCreate.isPending]);
 
   // Initialize time inputs from attendance data
   useEffect(() => {
