@@ -45,9 +45,8 @@ export function useLaboursByLocation(locationId: string | null | undefined) {
     queryFn: async () => {
       if (!locationId) return [];
 
-      // Use secure view that masks PII for non-HR users
       let query = supabase
-        .from("construction_labour_directory")
+        .from("construction_labour_master")
         .select("*")
         .eq("location_id", locationId)
         .eq("status", "active")
