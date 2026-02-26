@@ -14,28 +14,34 @@ export function useAccessibleCompanyIds() {
     queryKey: ["accessible-company-ids", selectedCompany?.id],
     queryFn: async () => {
       const { data: userData } = await supabase.auth.getUser();
-      if (!userData.user) return selectedCompany?.id ? [selectedCompany.id] : [];
+
+      const ids = new Set<string>();
+      if (selectedCompany?.id) ids.add(selectedCompany.id);
+
+      if (!userData.user) return Array.from(ids);
 
       const userId = userData.user.id;
 
       // Check if super admin
-      const { data: isSuperAdmin } = await supabase.rpc("is_super_admin", {
+      const { data: isSuperAdmin, error: superAdminError } = await supabase.rpc("is_super_admin", {
         _user_id: userId,
       });
 
-      if (isSuperAdmin) {
+      if (!superAdminError && isSuperAdmin) {
         // Super admin: fetch all company IDs
         const { data: allCompanies } = await supabase
           .from("companies")
           .select("id");
-        return allCompanies?.map((c) => c.id) || [];
+
+        allCompanies?.forEach((company) => ids.add(company.id));
+        return Array.from(ids);
       }
 
       // Regular user: get primary company + user_company_access
       const { data: profile } = await supabase
         .from("profiles")
         .select("company_id")
-        .eq("id", userId)
+        .eq("user_id", userId)
         .maybeSingle();
 
       const { data: accessData } = await supabase
@@ -43,12 +49,14 @@ export function useAccessibleCompanyIds() {
         .select("company_id")
         .eq("user_id", userId);
 
-      const ids = new Set<string>();
       if (profile?.company_id) ids.add(profile.company_id);
-      accessData?.forEach((a) => ids.add(a.company_id));
+      accessData?.forEach((access) => {
+        if (access.company_id) ids.add(access.company_id);
+      });
 
       return Array.from(ids);
     },
     staleTime: 5 * 60 * 1000, // Cache for 5 minutes
   });
 }
+
