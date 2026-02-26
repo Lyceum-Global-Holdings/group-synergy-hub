@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useToast } from "@/hooks/use-toast";
+import { useAccessibleCompanyIds } from "./useAccessibleCompanyIds";
 import type {
   ConstructionItemMaster,
   ConstructionSerialNumber,
@@ -16,16 +17,19 @@ import type {
 
 export function useItemMaster(category?: ItemCategory) {
   const { selectedCompany } = useCompany();
+  const { data: accessibleIds } = useAccessibleCompanyIds();
 
   return useQuery({
-    queryKey: ["construction-item-master", selectedCompany?.id, category],
+    queryKey: ["construction-item-master", selectedCompany?.id, category, accessibleIds],
     queryFn: async () => {
       let query = supabase
         .from("construction_item_master")
         .select("*")
         .order("item_name", { ascending: true });
 
-      if (selectedCompany?.id) {
+      if (selectedCompany?.id && accessibleIds && accessibleIds.length > 0) {
+        query = query.in("company_id", accessibleIds);
+      } else if (selectedCompany?.id) {
         query = query.eq("company_id", selectedCompany.id);
       }
 
@@ -327,9 +331,10 @@ export function useUpdateItemMaster() {
 
 export function useSerialNumbers(itemMasterId?: string) {
   const { selectedCompany } = useCompany();
+  const { data: accessibleIds } = useAccessibleCompanyIds();
 
   return useQuery({
-    queryKey: ["construction-serial-numbers", selectedCompany?.id, itemMasterId],
+    queryKey: ["construction-serial-numbers", selectedCompany?.id, itemMasterId, accessibleIds],
     queryFn: async () => {
       let query = supabase
         .from("construction_serial_numbers")
@@ -340,7 +345,9 @@ export function useSerialNumbers(itemMasterId?: string) {
         `)
         .order("serial_number", { ascending: true });
 
-      if (selectedCompany?.id) {
+      if (selectedCompany?.id && accessibleIds && accessibleIds.length > 0) {
+        query = query.in("company_id", accessibleIds);
+      } else if (selectedCompany?.id) {
         query = query.eq("company_id", selectedCompany.id);
       }
 
@@ -460,9 +467,10 @@ export function useUpdateSerialNumber() {
 
 export function useInventoryStock(locationId?: string) {
   const { selectedCompany } = useCompany();
+  const { data: accessibleIds } = useAccessibleCompanyIds();
 
   return useQuery({
-    queryKey: ["construction-inventory-stock", selectedCompany?.id, locationId],
+    queryKey: ["construction-inventory-stock", selectedCompany?.id, locationId, accessibleIds],
     queryFn: async () => {
       let query = supabase
         .from("construction_inventory_stock")
@@ -473,7 +481,9 @@ export function useInventoryStock(locationId?: string) {
         `)
         .order("created_at", { ascending: false });
 
-      if (selectedCompany?.id) {
+      if (selectedCompany?.id && accessibleIds && accessibleIds.length > 0) {
+        query = query.in("company_id", accessibleIds);
+      } else if (selectedCompany?.id) {
         query = query.eq("company_id", selectedCompany.id);
       }
 
@@ -567,9 +577,10 @@ export function useAddStock() {
 
 export function useTransfers(status?: string) {
   const { selectedCompany } = useCompany();
+  const { data: accessibleIds } = useAccessibleCompanyIds();
 
   return useQuery({
-    queryKey: ["construction-transfers", selectedCompany?.id, status],
+    queryKey: ["construction-transfers", selectedCompany?.id, status, accessibleIds],
     queryFn: async () => {
       let query = supabase
         .from("construction_inventory_transfers")
@@ -580,7 +591,9 @@ export function useTransfers(status?: string) {
         `)
         .order("transfer_date", { ascending: false });
 
-      if (selectedCompany?.id) {
+      if (selectedCompany?.id && accessibleIds && accessibleIds.length > 0) {
+        query = query.in("company_id", accessibleIds);
+      } else if (selectedCompany?.id) {
         query = query.eq("company_id", selectedCompany.id);
       }
 
@@ -601,9 +614,10 @@ export function useTransfers(status?: string) {
 
 export function useRepairRecords(status?: string) {
   const { selectedCompany } = useCompany();
+  const { data: accessibleIds } = useAccessibleCompanyIds();
 
   return useQuery({
-    queryKey: ["construction-repairs", selectedCompany?.id, status],
+    queryKey: ["construction-repairs", selectedCompany?.id, status, accessibleIds],
     queryFn: async () => {
       let query = supabase
         .from("construction_repair_records")
@@ -614,7 +628,9 @@ export function useRepairRecords(status?: string) {
         `)
         .order("repair_date", { ascending: false });
 
-      if (selectedCompany?.id) {
+      if (selectedCompany?.id && accessibleIds && accessibleIds.length > 0) {
+        query = query.in("company_id", accessibleIds);
+      } else if (selectedCompany?.id) {
         query = query.eq("company_id", selectedCompany.id);
       }
 
@@ -635,9 +651,10 @@ export function useRepairRecords(status?: string) {
 
 export function useTransactions(limit: number = 50) {
   const { selectedCompany } = useCompany();
+  const { data: accessibleIds } = useAccessibleCompanyIds();
 
   return useQuery({
-    queryKey: ["construction-transactions", selectedCompany?.id, limit],
+    queryKey: ["construction-transactions", selectedCompany?.id, limit, accessibleIds],
     queryFn: async () => {
       let query = supabase
         .from("construction_inventory_transactions")
@@ -649,7 +666,9 @@ export function useTransactions(limit: number = 50) {
         .order("transaction_date", { ascending: false })
         .limit(limit);
 
-      if (selectedCompany?.id) {
+      if (selectedCompany?.id && accessibleIds && accessibleIds.length > 0) {
+        query = query.in("company_id", accessibleIds);
+      } else if (selectedCompany?.id) {
         query = query.eq("company_id", selectedCompany.id);
       }
 
@@ -664,9 +683,10 @@ export function useTransactions(limit: number = 50) {
 
 export function useDashboardStats() {
   const { selectedCompany } = useCompany();
+  const { data: accessibleIds } = useAccessibleCompanyIds();
 
   return useQuery({
-    queryKey: ["construction-dashboard-stats", selectedCompany?.id],
+    queryKey: ["construction-dashboard-stats", selectedCompany?.id, accessibleIds],
     queryFn: async () => {
       // Build queries based on company filter
       let itemsQuery = supabase
@@ -689,8 +709,14 @@ export function useDashboardStats() {
         .from("construction_repair_records")
         .select("status");
 
-      // Apply company filter if specific company is selected
-      if (selectedCompany?.id) {
+      // Apply company filter - use accessible IDs for cross-company visibility
+      if (selectedCompany?.id && accessibleIds && accessibleIds.length > 0) {
+        itemsQuery = itemsQuery.in("company_id", accessibleIds);
+        serialsQuery = serialsQuery.in("company_id", accessibleIds);
+        stocksQuery = stocksQuery.in("company_id", accessibleIds);
+        transfersQuery = transfersQuery.in("company_id", accessibleIds);
+        repairsQuery = repairsQuery.in("company_id", accessibleIds);
+      } else if (selectedCompany?.id) {
         itemsQuery = itemsQuery.eq("company_id", selectedCompany.id);
         serialsQuery = serialsQuery.eq("company_id", selectedCompany.id);
         stocksQuery = stocksQuery.eq("company_id", selectedCompany.id);
@@ -762,44 +788,43 @@ export function useDashboardStats() {
 
 export function useLocations() {
   const { selectedCompany } = useCompany();
+  const { data: accessibleIds } = useAccessibleCompanyIds();
 
   return useQuery({
-    queryKey: ["warehouse-locations-with-inventory", selectedCompany?.id],
+    queryKey: ["warehouse-locations-with-inventory", selectedCompany?.id, accessibleIds],
     queryFn: async () => {
-      // First, get all locations (either matching company or NULL company_id)
+      const companyIds = (selectedCompany?.id && accessibleIds && accessibleIds.length > 0)
+        ? accessibleIds
+        : (selectedCompany?.id ? [selectedCompany.id] : []);
+
+      // First, get all locations (either matching companies or NULL company_id)
       let locationsQuery = supabase
         .from("warehouse_locations")
         .select("id, name, type")
         .order("name", { ascending: true });
 
-      // When a company is selected, we need locations that:
-      // 1. Belong to the company, OR
-      // 2. Have NULL company_id (shared locations), OR
-      // 3. Have inventory items for this company (handled by checking related data)
-      if (selectedCompany?.id) {
-        locationsQuery = locationsQuery.or(`company_id.eq.${selectedCompany.id},company_id.is.null`);
+      if (companyIds.length > 0) {
+        const orFilter = companyIds.map(id => `company_id.eq.${id}`).join(",");
+        locationsQuery = locationsQuery.or(`${orFilter},company_id.is.null`);
       }
 
       const { data: locations, error: locError } = await locationsQuery;
       if (locError) throw locError;
 
-      // If a company is selected, also fetch locations that have serials/stocks for this company
-      if (selectedCompany?.id) {
-        // Get location IDs from serial numbers for this company
+      // Also fetch locations that have serials/stocks for accessible companies
+      if (companyIds.length > 0) {
         const { data: serialLocations } = await supabase
           .from("construction_serial_numbers")
           .select("current_location_id")
-          .eq("company_id", selectedCompany.id)
+          .in("company_id", companyIds)
           .not("current_location_id", "is", null);
 
-        // Get location IDs from inventory stock for this company
         const { data: stockLocations } = await supabase
           .from("construction_inventory_stock")
           .select("location_id")
-          .eq("company_id", selectedCompany.id)
+          .in("company_id", companyIds)
           .not("location_id", "is", null);
 
-        // Collect unique location IDs that have inventory
         const inventoryLocationIds = new Set<string>();
         serialLocations?.forEach(s => {
           if (s.current_location_id) inventoryLocationIds.add(s.current_location_id);
@@ -808,7 +833,6 @@ export function useLocations() {
           if (s.location_id) inventoryLocationIds.add(s.location_id);
         });
 
-        // If there are additional locations with inventory, fetch them
         const existingLocationIds = new Set(locations?.map(l => l.id) || []);
         const missingLocationIds = Array.from(inventoryLocationIds).filter(id => !existingLocationIds.has(id));
 
@@ -824,7 +848,6 @@ export function useLocations() {
         }
       }
 
-      // Sort by name
       return (locations || []).sort((a, b) => a.name.localeCompare(b.name));
     },
     staleTime: 0,
