@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { 
   Calculator, 
   Package, 
@@ -8,11 +9,14 @@ import {
   AlertTriangle,
   CheckCircle,
   Clock,
-  DollarSign
+  DollarSign,
+  MapPin
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useLocations } from "@/hooks/construction/useConstructionInventory";
 
 const kpiData = [
   {
@@ -120,13 +124,30 @@ const recentActivities = [
 ];
 
 export default function Dashboard() {
+  const [locationFilter, setLocationFilter] = useState<string>("all");
+  const { data: locations } = useLocations();
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold text-foreground">Enterprise Dashboard</h1>
-        <Badge variant="outline" className="text-sm">
-          Last updated: {new Date().toLocaleTimeString()}
-        </Badge>
+        <div className="flex items-center gap-3">
+          <Select value={locationFilter} onValueChange={setLocationFilter}>
+            <SelectTrigger className="w-[220px]">
+              <MapPin className="h-4 w-4 mr-2 text-muted-foreground" />
+              <SelectValue placeholder="All Locations" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Locations</SelectItem>
+              {locations?.map(loc => (
+                <SelectItem key={loc.id} value={loc.id}>{loc.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Badge variant="outline" className="text-sm">
+            Last updated: {new Date().toLocaleTimeString()}
+          </Badge>
+        </div>
       </div>
 
       {/* KPI Cards */}
