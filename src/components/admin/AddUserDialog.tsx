@@ -60,6 +60,7 @@ export const AddUserDialog: React.FC<AddUserDialogProps> = ({
 }) => {
   const [selectedRole, setSelectedRole] = useState<string>("");
   const [additionalCompanyIds, setAdditionalCompanyIds] = useState<string[]>([]);
+  const [hasCustomizedCompanyAccess, setHasCustomizedCompanyAccess] = useState(false);
   const [moduleAccessState, setModuleAccessState] = useState<ModuleAccessState>({
     inheritedModules: {},
     grantedSubmodules: {},
@@ -90,6 +91,7 @@ export const AddUserDialog: React.FC<AddUserDialogProps> = ({
   // Check if the selected role is admin or super_admin
   const selectedRoleData = roles?.find(r => r.id === selectedRole);
   const isAdminRole = selectedRoleData?.app_role === 'admin' || selectedRoleData?.app_role === 'super_admin';
+  const primaryCompanyId = form.watch("company");
 
   // Create a stable key for roleModules to prevent infinite loops
   const roleModulesKey = JSON.stringify(roleModules.map(rm => ({ key: rm.module_key, subs: rm.submodules })));
@@ -121,6 +123,30 @@ export const AddUserDialog: React.FC<AddUserDialogProps> = ({
       });
     }
   }, [roleModulesKey]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Default admin users to all companies (except primary) so they immediately see relevant module data.
+  useEffect(() => {
+    if (!isAdminRole) {
+      setAdditionalCompanyIds([]);
+      setHasCustomizedCompanyAccess(false);
+      return;
+    }
+
+    if (!primaryCompanyId || !companies?.length) {
+      return;
+    }
+
+    if (hasCustomizedCompanyAccess) {
+      setAdditionalCompanyIds((prev) => prev.filter((id) => id !== primaryCompanyId));
+      return;
+    }
+
+    const defaultAdditionalCompanyIds = companies
+      .map((company) => company.id)
+      .filter((companyId): companyId is string => Boolean(companyId) && companyId !== primaryCompanyId);
+
+    setAdditionalCompanyIds(defaultAdditionalCompanyIds);
+  }, [isAdminRole, primaryCompanyId, companies, hasCustomizedCompanyAccess]);
 
   const onSubmit = async (data: UserFormData) => {
     try {
@@ -184,6 +210,7 @@ export const AddUserDialog: React.FC<AddUserDialogProps> = ({
       form.reset();
       setSelectedRole("");
       setAdditionalCompanyIds([]);
+      setHasCustomizedCompanyAccess(false);
       setModuleAccessState({
         inheritedModules: {},
         grantedSubmodules: {},
@@ -213,6 +240,7 @@ export const AddUserDialog: React.FC<AddUserDialogProps> = ({
     const newRoleData = roles?.find(r => r.id === roleId);
     if (newRoleData?.app_role !== 'admin' && newRoleData?.app_role !== 'super_admin') {
       setAdditionalCompanyIds([]);
+      setHasCustomizedCompanyAccess(false);
     }
   };
 
@@ -272,7 +300,6 @@ export const AddUserDialog: React.FC<AddUserDialogProps> = ({
     });
   };
 
-  const primaryCompanyId = form.watch("company");
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -426,7 +453,10 @@ export const AddUserDialog: React.FC<AddUserDialogProps> = ({
                   companies={companies}
                   primaryCompanyId={primaryCompanyId}
                   selectedCompanyIds={additionalCompanyIds}
-                  onSelectionChange={setAdditionalCompanyIds}
+                  onSelectionChange={(companyIds) => {
+                    setHasCustomizedCompanyAccess(true);
+                    setAdditionalCompanyIds(companyIds.filter((companyId) => companyId !== primaryCompanyId));
+                  }}
                 />
               </div>
             )}
