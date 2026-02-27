@@ -20,8 +20,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Search, ArrowRightLeft, Plus, Clock, CheckCircle2, Truck, XCircle } from "lucide-react";
-import { useTransfers } from "@/hooks/construction/useConstructionInventory";
+import { Search, ArrowRightLeft, Plus, Clock, CheckCircle2, Truck, XCircle, MapPin } from "lucide-react";
+import { useTransfers, useLocations } from "@/hooks/construction/useConstructionInventory";
 import { TRANSFER_STATUSES, type TransferStatus } from "@/types/construction-inventory";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format } from "date-fns";
@@ -31,10 +31,12 @@ export function TransfersView() {
   const [isNewTransferOpen, setIsNewTransferOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [locationFilter, setLocationFilter] = useState<string>("all");
 
   const { data: transfers, isLoading } = useTransfers(
     statusFilter !== "all" ? statusFilter : undefined
   );
+  const { data: locations } = useLocations();
 
   // Get unique user IDs from transfers to fetch their profiles
   const userIds = useMemo(() => {
@@ -68,6 +70,12 @@ export function TransfersView() {
 
   // Filter transfers
   const filteredTransfers = transfers?.filter(transfer => {
+    // Location filter
+    if (locationFilter !== "all") {
+      const fromId = (transfer.from_location as any)?.id;
+      const toId = (transfer.to_location as any)?.id;
+      if (fromId !== locationFilter && toId !== locationFilter) return false;
+    }
     if (!searchTerm) return true;
     const term = searchTerm.toLowerCase();
     return (
@@ -164,6 +172,18 @@ export function TransfersView() {
             <SelectItem value="all">All Statuses</SelectItem>
             {TRANSFER_STATUSES.map(status => (
               <SelectItem key={status.value} value={status.value}>{status.label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select value={locationFilter} onValueChange={setLocationFilter}>
+          <SelectTrigger className="w-[220px]">
+            <MapPin className="h-4 w-4 mr-2 text-muted-foreground" />
+            <SelectValue placeholder="All Locations" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Locations</SelectItem>
+            {locations?.map(loc => (
+              <SelectItem key={loc.id} value={loc.id}>{loc.name}</SelectItem>
             ))}
           </SelectContent>
         </Select>
