@@ -18,12 +18,20 @@ serve(async (req) => {
       throw new Error('No authorization header');
     }
 
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
+    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+
+    console.log('ENV check - URL exists:', !!supabaseUrl, 'ANON exists:', !!supabaseAnonKey, 'SERVICE_ROLE exists:', !!serviceRoleKey, 'SERVICE_ROLE length:', serviceRoleKey.length);
+
+    if (!serviceRoleKey) {
+      throw new Error('Service role key is not configured. Cannot create users.');
+    }
+
     // Verify calling user
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      { global: { headers: { Authorization: authHeader } } }
-    );
+    const supabaseClient = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: authHeader } }
+    });
 
     const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
     if (userError || !user) {
@@ -61,11 +69,11 @@ serve(async (req) => {
     }
 
     // Create user with service role key (bypasses signup_disabled)
-    const supabaseAdmin = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
-      { auth: { autoRefreshToken: false, persistSession: false } }
-    );
+    const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
+      auth: { autoRefreshToken: false, persistSession: false }
+    });
+
+    console.log(`Attempting to create user: ${email} by admin: ${user.id}`);
 
     const { data, error } = await supabaseAdmin.auth.admin.createUser({
       email,
@@ -75,18 +83,21 @@ serve(async (req) => {
     });
 
     if (error) {
-      console.error('Error creating user:', error);
-      throw new Error(`Failed to create user: ${error.message}`);
+      console.error('Error creating user:', error.message, JSON.stringify(error));
+      return new Response(
+        JSON.stringify({ error: `Failed to create user: ${error.message}` }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
-    console.log(`User ${data.user.id} created by admin ${user.id}`);
+    console.log(`User ${data.user.id} created successfully by admin ${user.id}`);
 
     return new Response(
       JSON.stringify({ success: true, userId: data.user.id }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error) {
-    console.error('Error in admin-create-user:', error);
+    console.error('Error in admin-create-user:', error.message);
     return new Response(
       JSON.stringify({ error: error.message }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
