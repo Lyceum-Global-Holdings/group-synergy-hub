@@ -135,11 +135,19 @@ export const AddUserDialog: React.FC<AddUserDialogProps> = ({
 
       const userId = result?.id;
       if (userId) {
-        // Save additional company access for admin users
-        if (isAdminRole && additionalCompanyIds.length > 0) {
+        // Always persist primary company access; include additional companies for admin roles
+        const companyIdsToAssign = Array.from(
+          new Set(
+            [data.company, ...(isAdminRole ? additionalCompanyIds : [])].filter(
+              (companyId): companyId is string => Boolean(companyId)
+            )
+          )
+        );
+
+        if (companyIdsToAssign.length > 0) {
           await assignCompaniesToUser.mutateAsync({
             userId,
-            companyIds: additionalCompanyIds,
+            companyIds: companyIdsToAssign,
           });
         }
 
