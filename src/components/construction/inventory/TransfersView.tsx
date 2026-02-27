@@ -1,4 +1,6 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -33,6 +35,36 @@ export function TransfersView() {
   const { data: transfers, isLoading } = useTransfers(
     statusFilter !== "all" ? statusFilter : undefined
   );
+
+  // Get unique user IDs from transfers to fetch their profiles
+  const userIds = useMemo(() => {
+    if (!transfers) return [];
+    return [...new Set(transfers.map(t => t.initiated_by).filter(Boolean))] as string[];
+  }, [transfers]);
+
+  const { data: profilesMap } = useQuery({
+    queryKey: ["transfer-user-profiles", userIds],
+    queryFn: async () => {
+      if (userIds.length === 0) return {};
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("user_id, full_name, email")
+        .in("user_id", userIds);
+      if (error) throw error;
+      const map: Record<string, { full_name: string | null; email: string | null }> = {};
+      data?.forEach(p => { map[p.user_id] = p; });
+      return map;
+    },
+    enabled: userIds.length > 0,
+  });
+
+  const getTransferredByName = (userId: string | null) => {
+    if (!userId || !profilesMap?.[userId]) return "-";
+    const profile = profilesMap[userId];
+    if (profile.full_name) return profile.full_name.split(' ')[0];
+    if (profile.email) return profile.email.split('@')[0];
+    return "-";
+  };
 
   // Filter transfers
   const filteredTransfers = transfers?.filter(transfer => {
@@ -175,6 +207,7 @@ export function TransfersView() {
                   <TableHead>Date</TableHead>
                   <TableHead>From</TableHead>
                   <TableHead>To</TableHead>
+                  <TableHead>Transferred By</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Completed</TableHead>
                 </TableRow>
@@ -193,6 +226,9 @@ export function TransfersView() {
                     </TableCell>
                     <TableCell>
                       {(transfer.to_location as any)?.name || "-"}
+                    </TableCell>
+                    <TableCell>
+                      {getTransferredByName(transfer.initiated_by)}
                     </TableCell>
                     <TableCell>
                       {getStatusBadge(transfer.status as TransferStatus)}
