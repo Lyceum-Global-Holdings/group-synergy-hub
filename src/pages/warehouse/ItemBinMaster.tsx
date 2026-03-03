@@ -1,36 +1,39 @@
 import { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Package, MapPin, Tag, Ruler, Grid3x3, ShieldAlert } from 'lucide-react';
+import { Package, MapPin, Tag, Ruler, Grid3x3, ShieldAlert, ClipboardList } from 'lucide-react';
 import { ItemMasterTab } from '@/components/warehouse/ItemMasterTab';
 import { BinMasterTab } from '@/components/warehouse/BinMasterTab';
 import { ItemCategoriesTab } from '@/components/warehouse/ItemCategoriesTab';
 import { ItemUnitsTab } from '@/components/warehouse/ItemUnitsTab';
 import { BinAllocationsTab } from '@/components/warehouse/BinAllocationsTab';
 import { StockAuditTab } from '@/components/warehouse/StockAuditTab';
+import { ItemMasterDefinitionTab } from '@/components/warehouse/ItemMasterDefinitionTab';
 import { useRealtimeStockUpdates } from '@/hooks/useRealtimeStockUpdates';
 
 export default function ItemBinMaster() {
-  // Enable real-time stock updates
   useRealtimeStockUpdates();
-
-  const [activeTab, setActiveTab] = useState('items');
+  const [activeTab, setActiveTab] = useState('item-master');
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Item & Bin Master</h1>
+          <h1 className="text-3xl font-bold">Warehouse Management</h1>
           <p className="text-muted-foreground">
-            Manage warehouse items, storage bins, categories, and units
+            Manage item catalog, inventory, storage bins, categories, and units
           </p>
         </div>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList className="grid w-full grid-cols-6">
-          <TabsTrigger value="items" className="flex items-center gap-2">
-            <Package className="h-4 w-4" />
+        <TabsList className="grid w-full grid-cols-7">
+          <TabsTrigger value="item-master" className="flex items-center gap-2">
+            <ClipboardList className="h-4 w-4" />
             Item Master
+          </TabsTrigger>
+          <TabsTrigger value="inventory" className="flex items-center gap-2">
+            <Package className="h-4 w-4" />
+            Inventory
           </TabsTrigger>
           <TabsTrigger value="bins" className="flex items-center gap-2">
             <MapPin className="h-4 w-4" />
@@ -54,7 +57,14 @@ export default function ItemBinMaster() {
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="items">
+        <TabsContent value="item-master">
+          <ItemMasterDefinitionTab
+            onNavigateToInventory={() => setActiveTab('inventory')}
+            onNavigateToBins={() => setActiveTab('allocations')}
+          />
+        </TabsContent>
+
+        <TabsContent value="inventory">
           <ItemMasterTab onGoToAudit={() => setActiveTab('audit')} />
         </TabsContent>
 
