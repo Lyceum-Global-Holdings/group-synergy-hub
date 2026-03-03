@@ -51,6 +51,8 @@ export interface CreateItemMasterData {
   item_name: string;
   category: ItemCategory;
   section: ItemSection;
+  sub_category?: string;
+  color?: string;
   brand?: string;
   model?: string;
   unit_of_measurement?: string;

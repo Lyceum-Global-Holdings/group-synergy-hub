@@ -34,6 +34,8 @@ import {
   ITEM_SECTIONS,
   ITEM_CATEGORIES,
   SERIAL_CONDITIONS,
+  SUB_CATEGORIES,
+  COLOR_OPTIONS,
 } from "@/types/construction-inventory";
 
 // Bulk categories - these are quantity-tracked, not serial-tracked
@@ -43,6 +45,8 @@ const formSchema = z.object({
   item_code: z.string().min(1, "Item code is required"),
   item_name: z.string().min(1, "Item name is required"),
   section: z.enum(["civil", "mep", "aluminium", "mechanical", "carpenter"] as const),
+  sub_category: z.string().min(1, "Sub-category is required"),
+  color: z.string().min(1, "Color is required"),
   brand: z.string().optional(),
   model: z.string().optional(),
   unit_of_measurement: z.string().default("pcs"),
@@ -74,7 +78,6 @@ export function AddItemDialog({ open, onOpenChange, category }: AddItemDialogPro
   const createItemWithSerial = useCreateItemMasterWithSerial();
   const createItemWithStock = useCreateItemMasterWithStock();
   const { data: locations } = useLocations();
-  const { data: nextItemCode, refetch: refetchNextCode } = useNextItemCode(category);
 
   // Machines are serial tracked, others are bulk tracked
   const isMachineCategory = category === "machines";
@@ -86,6 +89,8 @@ export function AddItemDialog({ open, onOpenChange, category }: AddItemDialogPro
       item_code: "",
       item_name: "",
       section: "civil",
+      sub_category: "",
+      color: "",
       brand: "",
       model: "",
       unit_of_measurement: "pcs",
@@ -103,27 +108,41 @@ export function AddItemDialog({ open, onOpenChange, category }: AddItemDialogPro
     },
   });
 
-  // Auto-fill item code when dialog opens or category changes
+  const watchedSubCategory = form.watch("sub_category");
+  const watchedItemName = form.watch("item_name");
+  const watchedColor = form.watch("color");
+
+  const { data: nextItemCode } = useNextItemCode(
+    category,
+    watchedSubCategory,
+    watchedItemName,
+    watchedColor
+  );
+
+  // Auto-fill item code when all fields are available
   useEffect(() => {
     if (open && nextItemCode) {
       form.setValue("item_code", nextItemCode);
     }
   }, [open, nextItemCode, form]);
 
-  // Reset form when category changes
+  // Reset sub_category when category changes (dialog re-opens with different category)
   useEffect(() => {
-    // Refetch next item code when category changes
-    refetchNextCode();
-  }, [category, refetchNextCode]);
+    form.setValue("sub_category", "");
+    form.setValue("color", "");
+  }, [category, form]);
+
+  const availableSubCategories = SUB_CATEGORIES[category] || [];
 
   const onSubmit = async (values: FormOutput) => {
     if (isMachineCategory) {
-      // Machine category - use serial tracking
       await createItemWithSerial.mutateAsync({
         item_code: values.item_code,
         item_name: values.item_name,
         section: values.section,
         category,
+        sub_category: values.sub_category,
+        color: values.color,
         brand: values.brand,
         model: values.model,
         unit_of_measurement: values.unit_of_measurement,
@@ -139,12 +158,13 @@ export function AddItemDialog({ open, onOpenChange, category }: AddItemDialogPro
         asset_value: values.asset_value,
       });
     } else {
-      // Bulk category - use quantity tracking
       await createItemWithStock.mutateAsync({
         item_code: values.item_code,
         item_name: values.item_name,
         section: values.section,
         category,
+        sub_category: values.sub_category,
+        color: values.color,
         brand: values.brand,
         model: values.model,
         unit_of_measurement: values.unit_of_measurement,
@@ -172,26 +192,61 @@ export function AddItemDialog({ open, onOpenChange, category }: AddItemDialogPro
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            {/* Row 1: Sub-Category & Color */}
             <div className="grid grid-cols-2 gap-4">
               <FormField
                 control={form.control}
-                name="item_code"
+                name="sub_category"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Item Code *</FormLabel>
-                    <FormControl>
-                      <Input 
-                        placeholder="Auto-generated" 
-                        {...field} 
-                        readOnly 
-                        className="bg-muted"
-                      />
-                    </FormControl>
+                    <FormLabel>Sub-Category *</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select sub-category" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {availableSubCategories.map(sub => (
+                          <SelectItem key={sub.value} value={sub.value}>
+                            {sub.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                     <FormMessage />
                   </FormItem>
                 )}
               />
 
+              <FormField
+                control={form.control}
+                name="color"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Color *</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select color" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {COLOR_OPTIONS.map(c => (
+                          <SelectItem key={c.value} value={c.value}>
+                            {c.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            {/* Row 2: Item Name & Auto-generated Item Code */}
+            <div className="grid grid-cols-2 gap-4">
               <FormField
                 control={form.control}
                 name="item_name"
@@ -199,7 +254,26 @@ export function AddItemDialog({ open, onOpenChange, category }: AddItemDialogPro
                   <FormItem>
                     <FormLabel>Item Name *</FormLabel>
                     <FormControl>
-                      <Input placeholder={isMachineCategory ? "e.g., Excavator" : "e.g., Safety Helmet - Yellow"} {...field} />
+                      <Input placeholder={isMachineCategory ? "e.g., Excavator" : "e.g., Safety Helmet"} {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="item_code"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Item Code (Auto-generated)</FormLabel>
+                    <FormControl>
+                      <Input 
+                        placeholder="Fill sub-category, color & name" 
+                        {...field} 
+                        readOnly 
+                        className="bg-muted font-mono"
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -207,6 +281,7 @@ export function AddItemDialog({ open, onOpenChange, category }: AddItemDialogPro
               />
             </div>
 
+            {/* Row 3: Section & Unit */}
             <div className="grid grid-cols-2 gap-4">
               <FormField
                 control={form.control}
@@ -260,6 +335,7 @@ export function AddItemDialog({ open, onOpenChange, category }: AddItemDialogPro
               />
             </div>
 
+            {/* Row 4: Brand & Model */}
             <div className="grid grid-cols-2 gap-4">
               <FormField
                 control={form.control}
@@ -290,6 +366,7 @@ export function AddItemDialog({ open, onOpenChange, category }: AddItemDialogPro
               />
             </div>
 
+            {/* Row 5: Unit Cost & Purchase Date */}
             <div className="grid grid-cols-2 gap-4">
               <FormField
                 control={form.control}

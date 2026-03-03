@@ -14,7 +14,7 @@ import {
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Search, Plus, Package, Edit, Eye, Upload, Hash } from "lucide-react";
 import { useItemMaster, useSerialNumbers, useInventoryStock } from "@/hooks/construction/useConstructionInventory";
-import { ITEM_CATEGORIES, ITEM_SECTIONS, type ItemCategory, type ConstructionItemMaster } from "@/types/construction-inventory";
+import { ITEM_CATEGORIES, ITEM_SECTIONS, SUB_CATEGORIES, COLOR_OPTIONS, type ItemCategory, type ConstructionItemMaster } from "@/types/construction-inventory";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AddItemDialog } from "./AddItemDialog";
 import { BulkImportDialog } from "./BulkImportDialog";
@@ -152,6 +152,8 @@ export function ItemMasterView() {
                       <TableHead className="w-12"></TableHead>
                       <TableHead>Item Code</TableHead>
                       <TableHead>Item Name</TableHead>
+                      <TableHead>Sub-Category</TableHead>
+                      <TableHead>Color</TableHead>
                       {/* Show Serial Numbers for machines, Total Quantity for bulk categories */}
                       {activeCategory === "machines" ? (
                         <TableHead>Serial Numbers</TableHead>
@@ -185,6 +187,20 @@ export function ItemMasterView() {
                           <TableCell className="font-mono">{item.item_code}</TableCell>
                           <TableCell className="font-medium">
                             <div>{item.item_name}</div>
+                          </TableCell>
+                          <TableCell>
+                            {item.sub_category ? (
+                              <Badge variant="outline" className="text-xs">
+                                {SUB_CATEGORIES[activeCategory]?.find(s => s.value === item.sub_category)?.label || item.sub_category}
+                              </Badge>
+                            ) : "-"}
+                          </TableCell>
+                          <TableCell>
+                            {item.color ? (
+                              <Badge variant="outline" className="text-xs">
+                                {COLOR_OPTIONS.find(c => c.value === item.color)?.label || item.color}
+                              </Badge>
+                            ) : "-"}
                           </TableCell>
                           {/* Show Serial Numbers for machines, Total Quantity for bulk categories */}
                           {activeCategory === "machines" ? (
