@@ -1,52 +1,68 @@
 
 
-# Fix: Scheduled Telegram Report Delivery Reliability
+# Restructure Item & Bin Master: Separate Item Master from Inventory
 
-## Problem
-The scheduled DSR Telegram delivery at 23:30 IST (18:00 UTC) failed to send on March 2, 2026. The `last_scheduled_send` timestamp confirms it wasn't updated past March 1. The 5-minute matching window is too narrow and offers no retry if the function fails or misses the window.
+## Overview
+Currently, the "Item Master" tab combines item definitions with live stock data. The plan is to split this into two distinct views and add a stock movement graph for visual analytics.
 
-## Solution: Widen Window + Add Catch-Up Logic
+## Changes
 
-### Changes to `supabase/functions/scheduled-telegram-reports/index.ts`
+### 1. Rename Existing Tab: "Item Master" becomes "Inventory"
+- In `src/pages/warehouse/ItemBinMaster.tsx`, rename the first tab from "Item Master" to "Inventory"
+- Update the page title to "Warehouse Management" (more encompassing)
+- The existing `ItemMasterTab` component stays as-is (it already shows stock levels, bin allocations, movement history, adjustments) -- it IS the inventory view
+- Expand the tab grid from 6 to 7 columns to accommodate the new tab
 
-1. **Increase time matching window from 5 minutes to 15 minutes**
-   - Change the `checkTimeMatch` function to allow a 15-minute window instead of 5
-   - This gives the cron ~15 chances (once per minute) to successfully trigger the send
-   - Reduces the chance of missing the window due to cold starts or transient failures
+### 2. Create New "Item Master" Tab
+Create `src/components/warehouse/ItemMasterDefinitionTab.tsx` -- a clean, focused view for item definitions/catalog:
 
-2. **Add catch-up/retry logic for missed sends**
-   - After the normal time-match check, add a secondary check: if `last_scheduled_send` is older than 24 hours AND the current time is past the scheduled time for today, treat it as a missed send and process it
-   - This ensures that if the window was missed entirely, the next cron run (within a configurable catch-up period, e.g., up to 2 hours after scheduled time) will still trigger the send
-   - Log clearly when a catch-up send is triggered vs. a normal on-time send
+**What it shows (table columns):**
+- Photo, Item Code, Name, Description, Category, Unit, Brand, Manufacturer, Supplier, Barcode/SKU, Status, Unit Cost, Selling Price, Reorder Level, Min/Max Stock Levels
 
-3. **Improve logging for debugging**
-   - Add a log line at the start of each cron run with the `last_scheduled_send` value so we can trace missed windows in future logs
-   - Log the exact reason when a send is skipped (time mismatch, already sent, no reports, etc.)
+**Key features:**
+- Search and filter by category, status, supplier
+- Each row has a quick-link button to jump to that item's Inventory view (stock details) and Bin Master view (bin allocations)
+- A "View Stock Movement" button per item that opens the existing `StockMovementDialog`
+- Add/Edit item capabilities (reuses existing `AddItemsDialog`)
 
-### Technical Details
+### 3. Stock Movement Graph
+Add a stock movement trend chart at the top of the new Item Master tab (or as a collapsible section):
 
-**Modified `checkTimeMatch` function:**
-- Window changes from `diff >= 0 && diff < 5` to `diff >= 0 && diff < 15`
+**Component:** `src/components/warehouse/StockMovementChart.tsx`
 
-**New catch-up logic (added after time-match check in the main loop):**
+**What it displays:**
+- A line/area chart (using Recharts, already installed) showing stock movement trends over the last 30 days
+- X-axis: Date, Y-axis: Quantity
+- Lines for: Goods Receipt (in), Material Issue (out), Transfers, Adjustments
+- Data sourced from `stock_transactions` table, aggregated by day and transaction type
+- A dropdown to filter by specific item or view all items combined
+
+**Hook:** `src/hooks/useStockMovementAnalytics.ts`
+- Queries `stock_transactions` for the last 30 days
+- Groups by date and transaction_type
+- Returns daily aggregated data for the chart
+
+### 4. Updated Tab Layout in ItemBinMaster.tsx
+
 ```text
-For each company with scheduled sending:
-  1. Check normal time match (15-min window) -> process if matched
-  2. If NOT matched, check catch-up conditions:
-     - last_scheduled_send is NULL or older than 20 hours
-     - Current UTC time is between scheduled_utc_time and scheduled_utc_time + 2 hours
-     - If both true -> process as catch-up send
+[Item Master] [Inventory] [Bin Master] [Bin Allocations] [Categories] [Units] [Stock Audit]
 ```
 
-**Dedup safeguard remains intact:**
-- The existing dedup check (skip if `last_scheduled_send >= scheduled_window_start`) prevents double-sends even with the wider window
+- "Item Master" (new) -- item catalog/definitions with links to stock data + graph
+- "Inventory" (renamed from Item Master) -- live stock levels, adjustments, movements
+- Rest stays the same
 
-### Files Modified
-- `supabase/functions/scheduled-telegram-reports/index.ts` -- time window + catch-up logic
+## Files to Create
+- `src/components/warehouse/ItemMasterDefinitionTab.tsx` -- New Item Master catalog view
+- `src/components/warehouse/StockMovementChart.tsx` -- Recharts-based movement graph
+- `src/hooks/useStockMovementAnalytics.ts` -- Data hook for the graph
 
-### Expected Outcome
-- Normal sends have 15 chances (15 minutes) instead of 5 to succeed
-- If the entire 15-minute window is missed, catch-up logic triggers within the next 2 hours
-- No double-sends due to existing dedup protection
-- Better logging for future debugging
+## Files to Modify
+- `src/pages/warehouse/ItemBinMaster.tsx` -- Add new tab, rename existing, update grid layout
+
+## Technical Notes
+- The graph uses Recharts (`AreaChart` with multiple `Area` series), already a project dependency
+- Stock movement data comes from the existing `stock_transactions` table (no schema changes needed)
+- The new Item Master tab reuses existing dialogs (`AddItemsDialog`, `StockMovementDialog`, `ItemDetailsDialog`) to avoid duplication
+- Navigation between tabs uses the existing `setActiveTab` state, so clicking "View in Inventory" from Item Master switches to the Inventory tab with the item pre-selected
 
