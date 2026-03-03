@@ -35,13 +35,13 @@ export function LocationSelector() {
   });
 
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex items-center gap-2 shrink-0">
       <MapPin className="h-4 w-4 text-muted-foreground" />
       <Select
         value={globalLocationId || "all"}
         onValueChange={(value) => setGlobalLocationId(value === "all" ? null : value)}
       >
-        <SelectTrigger className="w-[180px]">
+        <SelectTrigger className="w-[160px] shrink-0">
           <SelectValue placeholder="All Locations" />
         </SelectTrigger>
         <SelectContent>

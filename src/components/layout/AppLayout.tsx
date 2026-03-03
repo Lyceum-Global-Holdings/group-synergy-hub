@@ -73,7 +73,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               </div>
             </div>
             
-            <div className="flex items-center gap-4">
+            <div className="flex items-center justify-end gap-3 flex-wrap">
               <LiveClock />
               <CompanySelector />
               <LocationSelector />
