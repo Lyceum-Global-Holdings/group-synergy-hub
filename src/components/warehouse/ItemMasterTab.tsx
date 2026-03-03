@@ -446,10 +446,6 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
                 </DropdownMenuContent>
               </DropdownMenu>
             )}
-            <Button onClick={() => setIsCreateDialogOpen(true)}>
-              <Plus className="mr-2 h-4 w-4" />
-              Add Items
-            </Button>
           </div>
         </div>
       </div>
@@ -680,14 +676,6 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
                         title="View Details"
                       >
                         <Eye className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setEditingItem(item)}
-                        title="Edit"
-                      >
-                        <Edit className="h-4 w-4" />
                       </Button>
                       <Button
                         variant="ghost"
