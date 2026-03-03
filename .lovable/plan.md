@@ -1,57 +1,51 @@
 
 
-# Fix: Location Filter Not Visible in VeBuild Company Dashboard
+# Restructure Item Master and Inventory Tab Responsibilities
 
-## Problem
-The Location Master filter dropdown was added to `Dashboard.tsx` but is reported as not visible when viewing as the VeBuild company. The code exists (lines 135-146) but may not be rendering properly.
+## Current State
+- **Item Master tab** (`ItemMasterDefinitionTab`): Has "Add Item" and a view/edit button (Eye icon), but no dedicated Edit or Delete actions. Navigation-only actions (View in Inventory, View Bin Allocations, Stock Movement History).
+- **Inventory tab** (`ItemMasterTab`): Has "Add Items", Edit, Delete, View, Transfer, Stock Adjustment -- full CRUD operations on items.
 
-## Root Cause Analysis
-After thorough investigation:
-- The filter code exists in Dashboard.tsx and renders unconditionally
-- VeBuild (company ID: `39ff33f9-...`) has **zero** company-specific locations in `warehouse_locations` — all 66 locations have `company_id = NULL` (shared)
-- The `useLocations` hook correctly includes `company_id IS NULL` locations, so data should be available
-- Possible causes: responsive layout hiding the element, or build/cache issue preventing the updated Dashboard from rendering
+This violates the **industrial standard separation** where the Item Master is the single source of truth for item catalog management (CRUD), and the Inventory module focuses on stock operations only.
 
-## Solution
+## Proposed Changes
 
-### 1. Ensure Filter Visibility with Better Layout (Dashboard.tsx)
-- Move the location filter to a more prominent position — place it on its own row below the title instead of squeezed into the header's flex row (which can overflow on smaller screens)
-- Add a fallback message when no locations are available ("No locations configured")
-- Wrap with a visible container so it's clearly identifiable
+### 1. Item Master Tab -- Full CRUD (Single Source of Truth)
+Add proper **Edit** and **Delete** action buttons alongside existing navigation actions:
+- **Edit** (Pencil icon): Opens the existing `AddItemsDialog` in edit mode
+- **Delete** (Trash icon): Opens `DeleteItemConfirmationDialog` with mark-inactive option (admin/moderator only, per existing RBAC rules)
+- Keep existing: Add Item button, View in Inventory, Bin Allocations, Stock Movement History
 
-### 2. Create a Standalone useWarehouseLocations Hook
-- Create a simpler, dedicated `src/hooks/useWarehouseLocations.ts` hook that doesn't depend on construction-specific `useAccessibleCompanyIds`
-- This hook directly queries `warehouse_locations` filtered by the selected company ID or shared (NULL company_id) locations
-- Reduces coupling between the Dashboard and the construction module
+### 2. Inventory Tab -- Stock Operations Only
+Remove item creation capability since that belongs in Item Master:
+- **Remove** the "Add Items" button
+- **Remove** the Edit button (item metadata changes go through Item Master)
+- **Keep**: View Details, Stock Adjustment, Stock Movement History, Transfer, Delete (admin only), Admin Tools, Download/Export
+- This ensures Inventory is purely for stock-level operations (adjustments, transfers, movements, audits)
 
-### 3. Ensure VeBuild Locations Exist
-- The hook should always include shared locations (`company_id IS NULL`) so VeBuild users see the 66 available locations
-- No database changes needed — the 66 shared locations will populate the dropdown
+### 3. Industrial Standard Alignment
+This follows **ERP best practices** (SAP MM, Oracle Inventory):
+- **Master Data Module** (Item Master): Owns item creation, metadata editing, and lifecycle management (active/inactive/discontinued)
+- **Inventory Module**: Owns stock quantities, movements, adjustments, and warehouse operations
+- Clear separation prevents accidental item duplication and ensures a single entry point for catalog management
 
 ## Files to Modify
-- **`src/pages/Dashboard.tsx`** — Restructure header layout to ensure filter is always visible; switch to new hook
-- **`src/hooks/useWarehouseLocations.ts`** (new) — Standalone location fetching hook for the dashboard, independent of construction module
+
+| File | Change |
+|------|--------|
+| `src/components/warehouse/ItemMasterDefinitionTab.tsx` | Add Edit (pencil) and Delete action buttons, import `DeleteItemConfirmationDialog`, `useIsAdminOrHigher`, add delete state and handlers |
+| `src/components/warehouse/ItemMasterTab.tsx` | Remove "Add Items" button and Edit button from actions column; keep stock-focused operations only |
 
 ## Technical Details
 
-**New hook (`useWarehouseLocations.ts`):**
-```text
-- Query: SELECT id, name, type FROM warehouse_locations 
-         WHERE company_id = selectedCompanyId OR company_id IS NULL
-         ORDER BY name
-- Falls back to all locations when no company selected (super admin "All Companies" mode)
-- Simple, no dependency on useAccessibleCompanyIds
-```
+**ItemMasterDefinitionTab.tsx changes:**
+- Import `Edit, Trash2` from lucide-react, `DeleteItemConfirmationDialog`, `useIsAdminOrHigher`
+- Add `deletingItem` state and wire up `deleteItem`/`markItemInactive` from `useWarehouseItems`
+- Add Edit and Delete buttons in the actions column (Edit opens AddItemsDialog via existing `setEditingItem`, Delete opens confirmation dialog)
+- Delete button visibility gated by `canDelete` from `useIsAdminOrHigher` hook (consistent with existing RBAC pattern)
 
-**Dashboard layout change:**
-```text
-Before (single flex row, can overflow):
-  [Title] .............. [Location Filter] [Last Updated Badge]
-
-After (stacked, always visible):
-  [Title] .............. [Last Updated Badge]
-  [Location Filter - full width row with icon and label]
-```
-
-This ensures the dropdown is always visible regardless of screen size and data is always fetched correctly for VeBuild or any other company.
+**ItemMasterTab.tsx changes:**
+- Remove the "Add Items" `Button` (line 449-452)
+- Remove the Edit `Button` from actions column (lines 685-692)
+- Keep View, Transfer, Delete, Stock Adjustment, Stock Movement buttons
 
