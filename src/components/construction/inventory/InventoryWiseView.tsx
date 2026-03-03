@@ -30,6 +30,7 @@ import { ITEM_CATEGORIES, type ItemCategory } from "@/types/construction-invento
 import { Skeleton } from "@/components/ui/skeleton";
 import { AddItemDialog } from "./AddItemDialog";
 import { EditSerialLocationDialog } from "./EditSerialLocationDialog";
+import { useLocationFilter } from "@/contexts/LocationFilterContext";
 
 interface SerialData {
   id: string;
@@ -52,6 +53,7 @@ const CATEGORY_ICONS: Record<ItemCategory, typeof Cog> = {
 };
 
 export function InventoryWiseView() {
+  const { globalLocationId } = useLocationFilter();
   const [searchTerm, setSearchTerm] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [addDialogOpen, setAddDialogOpen] = useState(false);
@@ -62,10 +64,18 @@ export function InventoryWiseView() {
   const { data: items, isLoading: itemsLoading } = useItemMaster(
     categoryFilter !== "all" ? (categoryFilter as ItemCategory) : undefined
   );
-  const { data: serials, isLoading: serialsLoading } = useSerialNumbers();
-  const { data: stocks, isLoading: stocksLoading } = useInventoryStock();
+  const { data: allSerials, isLoading: serialsLoading } = useSerialNumbers();
+  const { data: allStocks, isLoading: stocksLoading } = useInventoryStock();
 
   const isLoading = itemsLoading || serialsLoading || stocksLoading;
+
+  // Filter serials and stocks by global location
+  const serials = globalLocationId
+    ? allSerials?.filter(s => s.current_location_id === globalLocationId)
+    : allSerials;
+  const stocks = globalLocationId
+    ? allStocks?.filter((s: any) => s.location_id === globalLocationId)
+    : allStocks;
 
   // Filter items by search term
   const filteredItems = items?.filter(item =>

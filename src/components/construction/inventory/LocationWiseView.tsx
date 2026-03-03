@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -26,10 +26,17 @@ import {
 import { Search, MapPin, Package } from "lucide-react";
 import { useSerialNumbers, useInventoryStock, useLocations } from "@/hooks/construction/useConstructionInventory";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useLocationFilter } from "@/contexts/LocationFilterContext";
 
 export function LocationWiseView() {
+  const { globalLocationId } = useLocationFilter();
   const [searchTerm, setSearchTerm] = useState("");
-  const [locationFilter, setLocationFilter] = useState<string>("all");
+  const [locationFilter, setLocationFilter] = useState<string>(globalLocationId || "all");
+
+  // Sync from global context when it changes
+  useEffect(() => {
+    setLocationFilter(globalLocationId || "all");
+  }, [globalLocationId]);
 
   const { data: locations, isLoading: locationsLoading } = useLocations();
   const { data: serials, isLoading: serialsLoading } = useSerialNumbers();
