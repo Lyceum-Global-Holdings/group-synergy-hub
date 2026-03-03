@@ -85,8 +85,8 @@ function checkTimeMatch(nowUtc: Date, scheduledTime: string, userTimezone: strin
   if (diff > 720) diff -= 1440; // Handle wraparound (720 = 12 hours, 1440 = 24 hours)
   if (diff < -720) diff += 1440;
   
-  // Allow 5-minute window: match if current time is within 0-5 minutes AFTER scheduled time
-  const isWithinWindow = diff >= 0 && diff < 5;
+  // Allow 15-minute window: match if current time is within 0-15 minutes AFTER scheduled time
+  const isWithinWindow = diff >= 0 && diff < 15;
   
   const expectedUtcHour = Math.floor(utcTotalMinutes / 60);
   const expectedUtcMinute = utcTotalMinutes % 60;
@@ -123,7 +123,7 @@ serve(async (req) => {
     console.log('Checking for scheduled Telegram reports...');
 
     const now = new Date();
-    console.log(`Current UTC time: ${now.toISOString()}`);
+    console.log(`Current UTC time: ${now.toISOString()}, forceMode: ${forceMode}, targetCompany: ${targetCompanyId || 'all'}`);
 
     const { data: settings, error: settingsError } = await supabase
       .from('telegram_settings')
@@ -159,12 +159,43 @@ serve(async (req) => {
       const scheduledTime = setting.scheduled_send_time;
       if (!scheduledTime) continue;
 
+      const lastSendRaw = setting.last_scheduled_send;
+      console.log(`Company ${setting.company_id}: last_scheduled_send=${lastSendRaw || 'never'}, scheduled=${scheduledTime} (${setting.timezone || 'UTC'})`);
+
       // Convert scheduled time from user's timezone to UTC for comparison
       const timeMatches = checkTimeMatch(now, scheduledTime, setting.timezone || 'UTC');
-      const shouldProcess = forceMode || timeMatches;
       const companyMatches = !targetCompanyId || setting.company_id === targetCompanyId;
+
+      // Catch-up logic: if last_scheduled_send is stale (>20 hours old or null)
+      // and we're within 2 hours after the scheduled UTC time, trigger a catch-up send
+      let catchUpMatch = false;
+      if (!timeMatches && !forceMode) {
+        const lastSend = lastSendRaw ? new Date(lastSendRaw) : null;
+        const hoursSinceLastSend = lastSend ? (now.getTime() - lastSend.getTime()) / (1000 * 60 * 60) : Infinity;
+
+        if (hoursSinceLastSend > 20) {
+          // Compute scheduled UTC time for today
+          const [schH, schM] = scheduledTime.split(':').map(Number);
+          const offsetH = TIMEZONE_OFFSETS[setting.timezone || 'UTC'] ?? 0;
+          let utcMin = (schH * 60 + schM) - Math.round(offsetH * 60);
+          if (utcMin < 0) utcMin += 1440;
+          if (utcMin >= 1440) utcMin -= 1440;
+          const currentMin = now.getUTCHours() * 60 + now.getUTCMinutes();
+          let diffMin = currentMin - utcMin;
+          if (diffMin > 720) diffMin -= 1440;
+          if (diffMin < -720) diffMin += 1440;
+
+          // Catch-up window: 0 to 120 minutes after scheduled time
+          if (diffMin >= 0 && diffMin < 120) {
+            catchUpMatch = true;
+            console.log(`CATCH-UP triggered for company ${setting.company_id}: last send was ${hoursSinceLastSend.toFixed(1)}h ago, ${diffMin}min past schedule`);
+          }
+        }
+      }
+
+      const shouldProcess = forceMode || timeMatches || catchUpMatch;
       
-      if (!forceMode) {
+      if (!forceMode && !catchUpMatch) {
         console.log(`Company ${setting.company_id}: scheduled at ${scheduledTime} (${setting.timezone || 'UTC'}), matches: ${timeMatches}`);
       }
       
