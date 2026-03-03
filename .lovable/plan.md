@@ -1,68 +1,57 @@
 
 
-# Restructure Item & Bin Master: Separate Item Master from Inventory
+# Fix: Location Filter Not Visible in VeBuild Company Dashboard
 
-## Overview
-Currently, the "Item Master" tab combines item definitions with live stock data. The plan is to split this into two distinct views and add a stock movement graph for visual analytics.
+## Problem
+The Location Master filter dropdown was added to `Dashboard.tsx` but is reported as not visible when viewing as the VeBuild company. The code exists (lines 135-146) but may not be rendering properly.
 
-## Changes
+## Root Cause Analysis
+After thorough investigation:
+- The filter code exists in Dashboard.tsx and renders unconditionally
+- VeBuild (company ID: `39ff33f9-...`) has **zero** company-specific locations in `warehouse_locations` — all 66 locations have `company_id = NULL` (shared)
+- The `useLocations` hook correctly includes `company_id IS NULL` locations, so data should be available
+- Possible causes: responsive layout hiding the element, or build/cache issue preventing the updated Dashboard from rendering
 
-### 1. Rename Existing Tab: "Item Master" becomes "Inventory"
-- In `src/pages/warehouse/ItemBinMaster.tsx`, rename the first tab from "Item Master" to "Inventory"
-- Update the page title to "Warehouse Management" (more encompassing)
-- The existing `ItemMasterTab` component stays as-is (it already shows stock levels, bin allocations, movement history, adjustments) -- it IS the inventory view
-- Expand the tab grid from 6 to 7 columns to accommodate the new tab
+## Solution
 
-### 2. Create New "Item Master" Tab
-Create `src/components/warehouse/ItemMasterDefinitionTab.tsx` -- a clean, focused view for item definitions/catalog:
+### 1. Ensure Filter Visibility with Better Layout (Dashboard.tsx)
+- Move the location filter to a more prominent position — place it on its own row below the title instead of squeezed into the header's flex row (which can overflow on smaller screens)
+- Add a fallback message when no locations are available ("No locations configured")
+- Wrap with a visible container so it's clearly identifiable
 
-**What it shows (table columns):**
-- Photo, Item Code, Name, Description, Category, Unit, Brand, Manufacturer, Supplier, Barcode/SKU, Status, Unit Cost, Selling Price, Reorder Level, Min/Max Stock Levels
+### 2. Create a Standalone useWarehouseLocations Hook
+- Create a simpler, dedicated `src/hooks/useWarehouseLocations.ts` hook that doesn't depend on construction-specific `useAccessibleCompanyIds`
+- This hook directly queries `warehouse_locations` filtered by the selected company ID or shared (NULL company_id) locations
+- Reduces coupling between the Dashboard and the construction module
 
-**Key features:**
-- Search and filter by category, status, supplier
-- Each row has a quick-link button to jump to that item's Inventory view (stock details) and Bin Master view (bin allocations)
-- A "View Stock Movement" button per item that opens the existing `StockMovementDialog`
-- Add/Edit item capabilities (reuses existing `AddItemsDialog`)
-
-### 3. Stock Movement Graph
-Add a stock movement trend chart at the top of the new Item Master tab (or as a collapsible section):
-
-**Component:** `src/components/warehouse/StockMovementChart.tsx`
-
-**What it displays:**
-- A line/area chart (using Recharts, already installed) showing stock movement trends over the last 30 days
-- X-axis: Date, Y-axis: Quantity
-- Lines for: Goods Receipt (in), Material Issue (out), Transfers, Adjustments
-- Data sourced from `stock_transactions` table, aggregated by day and transaction type
-- A dropdown to filter by specific item or view all items combined
-
-**Hook:** `src/hooks/useStockMovementAnalytics.ts`
-- Queries `stock_transactions` for the last 30 days
-- Groups by date and transaction_type
-- Returns daily aggregated data for the chart
-
-### 4. Updated Tab Layout in ItemBinMaster.tsx
-
-```text
-[Item Master] [Inventory] [Bin Master] [Bin Allocations] [Categories] [Units] [Stock Audit]
-```
-
-- "Item Master" (new) -- item catalog/definitions with links to stock data + graph
-- "Inventory" (renamed from Item Master) -- live stock levels, adjustments, movements
-- Rest stays the same
-
-## Files to Create
-- `src/components/warehouse/ItemMasterDefinitionTab.tsx` -- New Item Master catalog view
-- `src/components/warehouse/StockMovementChart.tsx` -- Recharts-based movement graph
-- `src/hooks/useStockMovementAnalytics.ts` -- Data hook for the graph
+### 3. Ensure VeBuild Locations Exist
+- The hook should always include shared locations (`company_id IS NULL`) so VeBuild users see the 66 available locations
+- No database changes needed — the 66 shared locations will populate the dropdown
 
 ## Files to Modify
-- `src/pages/warehouse/ItemBinMaster.tsx` -- Add new tab, rename existing, update grid layout
+- **`src/pages/Dashboard.tsx`** — Restructure header layout to ensure filter is always visible; switch to new hook
+- **`src/hooks/useWarehouseLocations.ts`** (new) — Standalone location fetching hook for the dashboard, independent of construction module
 
-## Technical Notes
-- The graph uses Recharts (`AreaChart` with multiple `Area` series), already a project dependency
-- Stock movement data comes from the existing `stock_transactions` table (no schema changes needed)
-- The new Item Master tab reuses existing dialogs (`AddItemsDialog`, `StockMovementDialog`, `ItemDetailsDialog`) to avoid duplication
-- Navigation between tabs uses the existing `setActiveTab` state, so clicking "View in Inventory" from Item Master switches to the Inventory tab with the item pre-selected
+## Technical Details
+
+**New hook (`useWarehouseLocations.ts`):**
+```text
+- Query: SELECT id, name, type FROM warehouse_locations 
+         WHERE company_id = selectedCompanyId OR company_id IS NULL
+         ORDER BY name
+- Falls back to all locations when no company selected (super admin "All Companies" mode)
+- Simple, no dependency on useAccessibleCompanyIds
+```
+
+**Dashboard layout change:**
+```text
+Before (single flex row, can overflow):
+  [Title] .............. [Location Filter] [Last Updated Badge]
+
+After (stacked, always visible):
+  [Title] .............. [Last Updated Badge]
+  [Location Filter - full width row with icon and label]
+```
+
+This ensures the dropdown is always visible regardless of screen size and data is always fetched correctly for VeBuild or any other company.
 
