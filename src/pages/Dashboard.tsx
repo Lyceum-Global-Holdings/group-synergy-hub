@@ -16,7 +16,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useLocations } from "@/hooks/construction/useConstructionInventory";
+import { useDashboardLocations } from "@/hooks/useWarehouseLocations";
 
 const kpiData = [
   {
@@ -125,29 +125,36 @@ const recentActivities = [
 
 export default function Dashboard() {
   const [locationFilter, setLocationFilter] = useState<string>("all");
-  const { data: locations } = useLocations();
+  const { data: locations } = useDashboardLocations();
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold text-foreground">Enterprise Dashboard</h1>
-        <div className="flex items-center gap-3">
-          <Select value={locationFilter} onValueChange={setLocationFilter}>
-            <SelectTrigger className="w-[220px]">
-              <MapPin className="h-4 w-4 mr-2 text-muted-foreground" />
-              <SelectValue placeholder="All Locations" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Locations</SelectItem>
-              {locations?.map(loc => (
+        <Badge variant="outline" className="text-sm">
+          Last updated: {new Date().toLocaleTimeString()}
+        </Badge>
+      </div>
+
+      {/* Location Filter - prominent row */}
+      <div className="flex items-center gap-3 p-3 rounded-lg border bg-card">
+        <MapPin className="h-5 w-5 text-primary" />
+        <span className="text-sm font-medium text-muted-foreground">Location:</span>
+        <Select value={locationFilter} onValueChange={setLocationFilter}>
+          <SelectTrigger className="w-[260px]">
+            <SelectValue placeholder="All Locations" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Locations</SelectItem>
+            {locations && locations.length > 0 ? (
+              locations.map(loc => (
                 <SelectItem key={loc.id} value={loc.id}>{loc.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Badge variant="outline" className="text-sm">
-            Last updated: {new Date().toLocaleTimeString()}
-          </Badge>
-        </div>
+              ))
+            ) : (
+              <SelectItem value="none" disabled>No locations configured</SelectItem>
+            )}
+          </SelectContent>
+        </Select>
       </div>
 
       {/* KPI Cards */}

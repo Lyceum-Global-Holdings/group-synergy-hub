@@ -177,3 +177,24 @@ export const useWarehouseLocations = () => {
     isDeleting: deleteLocationMutation.isPending,
   };
 };
+
+/** Lightweight hook for dashboard location filter — includes shared (null company_id) locations */
+export const useDashboardLocations = (selectedCompanyId?: string | null) => {
+  return useQuery({
+    queryKey: ['dashboard-locations', selectedCompanyId],
+    queryFn: async () => {
+      let query = supabase
+        .from('warehouse_locations')
+        .select('id, name, type')
+        .order('name');
+
+      if (selectedCompanyId) {
+        query = query.or(`company_id.eq.${selectedCompanyId},company_id.is.null`);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+      return data;
+    },
+  });
+};
