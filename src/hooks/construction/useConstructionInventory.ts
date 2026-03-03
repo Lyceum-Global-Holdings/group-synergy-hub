@@ -681,12 +681,12 @@ export function useTransactions(limit: number = 50) {
   });
 }
 
-export function useDashboardStats() {
+export function useDashboardStats(locationId?: string | null) {
   const { selectedCompany } = useCompany();
   const { data: accessibleIds } = useAccessibleCompanyIds();
 
   return useQuery({
-    queryKey: ["construction-dashboard-stats", selectedCompany?.id, accessibleIds],
+    queryKey: ["construction-dashboard-stats", selectedCompany?.id, accessibleIds, locationId],
     queryFn: async () => {
       // Build queries based on company filter
       let itemsQuery = supabase
@@ -722,6 +722,13 @@ export function useDashboardStats() {
         stocksQuery = stocksQuery.eq("company_id", selectedCompany.id);
         transfersQuery = transfersQuery.eq("company_id", selectedCompany.id);
         repairsQuery = repairsQuery.eq("company_id", selectedCompany.id);
+      }
+
+      // Apply location filter
+      if (locationId) {
+        serialsQuery = serialsQuery.eq("current_location_id", locationId);
+        stocksQuery = stocksQuery.eq("location_id", locationId);
+        // Transfers and repairs don't have direct location_id - we'll filter client-side
       }
 
       // Execute all queries

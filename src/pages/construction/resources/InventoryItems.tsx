@@ -3,6 +3,14 @@ import { useNavigate } from "react-router-dom";
 import { ArrowLeft, LayoutDashboard, Boxes, MapPin, ArrowRightLeft, Wrench, Package } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   AllocationDashboard,
   InventoryWiseView,
@@ -11,6 +19,8 @@ import {
   ServiceRepairView,
   ItemMasterView,
 } from "@/components/construction/inventory";
+import { useLocationFilter } from "@/contexts/LocationFilterContext";
+import { useLocations } from "@/hooks/construction/useConstructionInventory";
 
 // Allocation sub-tabs
 const ALLOCATION_TABS = [
@@ -25,6 +35,17 @@ export default function InventoryItems() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("allocation");
   const [allocationSubTab, setAllocationSubTab] = useState("dashboard");
+  const { globalLocationId, setGlobalLocationId } = useLocationFilter();
+  const { data: locations } = useLocations();
+
+  const locationFilterValue = globalLocationId || "all";
+  const selectedLocationName = globalLocationId
+    ? locations?.find((l) => l.id === globalLocationId)?.name
+    : null;
+
+  const handleLocationChange = (value: string) => {
+    setGlobalLocationId(value === "all" ? null : value);
+  };
 
   return (
     <div className="space-y-6">
@@ -32,12 +53,34 @@ export default function InventoryItems() {
         <Button variant="ghost" size="icon" onClick={() => navigate("/construction/resource-allocation")}>
           <ArrowLeft className="h-4 w-4" />
         </Button>
-        <div>
+        <div className="flex-1">
           <h1 className="text-3xl font-bold tracking-tight">Inventory Items</h1>
           <p className="text-muted-foreground">
             Inventory Allocation & Tracking System
           </p>
         </div>
+      </div>
+
+      {/* Location Filter Bar */}
+      <div className="flex items-center gap-3 p-3 rounded-lg border bg-card">
+        <MapPin className="h-5 w-5 text-primary" />
+        <span className="text-sm font-medium text-muted-foreground">Location:</span>
+        <Select value={locationFilterValue} onValueChange={handleLocationChange}>
+          <SelectTrigger className="w-[280px]">
+            <SelectValue placeholder="All Locations" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Locations</SelectItem>
+            {locations?.map(loc => (
+              <SelectItem key={loc.id} value={loc.id}>{loc.name}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        {selectedLocationName && (
+          <Badge variant="secondary" className="ml-2">
+            Filtering: {selectedLocationName}
+          </Badge>
+        )}
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">

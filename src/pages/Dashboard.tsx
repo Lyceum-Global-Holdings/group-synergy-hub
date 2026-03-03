@@ -22,6 +22,7 @@ import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useDashboardLocations } from "@/hooks/useWarehouseLocations";
 import { useDashboardLocationData } from "@/hooks/useDashboardLocationData";
+import { useLocationFilter } from "@/contexts/LocationFilterContext";
 
 const kpiData = [
   {
@@ -129,13 +130,20 @@ const recentActivities = [
 ];
 
 export default function Dashboard() {
-  const [locationFilter, setLocationFilter] = useState<string>("all");
+  const { globalLocationId, setGlobalLocationId } = useLocationFilter();
+  const [locationFilter, setLocationFilter] = useState<string>(globalLocationId || "all");
   const { data: locations } = useDashboardLocations();
   const activeLocationId = locationFilter === "all" ? null : locationFilter;
   const { inventory, labour, isLoading: locationDataLoading } = useDashboardLocationData(activeLocationId);
   const selectedLocationName = locationFilter === "all"
     ? "All Locations"
     : locations?.find((l) => l.id === locationFilter)?.name || "Selected Location";
+
+  // Sync local filter to global context
+  const handleLocationChange = (value: string) => {
+    setLocationFilter(value);
+    setGlobalLocationId(value === "all" ? null : value);
+  };
 
   return (
     <div className="space-y-6">
@@ -150,7 +158,7 @@ export default function Dashboard() {
       <div className="flex items-center gap-3 p-3 rounded-lg border bg-card">
         <MapPin className="h-5 w-5 text-primary" />
         <span className="text-sm font-medium text-muted-foreground">Location:</span>
-        <Select value={locationFilter} onValueChange={setLocationFilter}>
+        <Select value={locationFilter} onValueChange={handleLocationChange}>
           <SelectTrigger className="w-[260px]">
             <SelectValue placeholder="All Locations" />
           </SelectTrigger>

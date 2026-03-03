@@ -25,6 +25,7 @@ import { REPAIR_STATUSES, type RepairStatus, type ConstructionRepairRecord } fro
 import { Skeleton } from "@/components/ui/skeleton";
 import { format } from "date-fns";
 import { SendForRepairDialog } from "./SendForRepairDialog";
+import { useLocationFilter } from "@/contexts/LocationFilterContext";
 
 // Dropdown options for status changes
 const STATUS_CHANGE_OPTIONS: { value: RepairStatus; label: string }[] = [
@@ -35,6 +36,7 @@ const STATUS_CHANGE_OPTIONS: { value: RepairStatus; label: string }[] = [
 ];
 
 export function ServiceRepairView() {
+  const { globalLocationId } = useLocationFilter();
   const [showSendForRepairDialog, setShowSendForRepairDialog] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -46,8 +48,10 @@ export function ServiceRepairView() {
 
   const updateStatusMutation = useUpdateRepairStatus();
 
-  // Filter repairs
+  // Filter repairs by location and search
   const filteredRepairs = repairs?.filter(repair => {
+    // Location filter from global context
+    if (globalLocationId && (repair.serial_number as any)?.current_location_id !== globalLocationId) return false;
     if (!searchTerm) return true;
     const term = searchTerm.toLowerCase();
     return (

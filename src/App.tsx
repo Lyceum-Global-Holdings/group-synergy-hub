@@ -7,6 +7,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Outlet } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { CompanyProvider } from "@/contexts/CompanyContext";
+import { LocationFilterProvider } from "@/contexts/LocationFilterContext";
 import ProtectedRoute from "./components/common/ProtectedRoute";
 import { AdminRoute } from "./components/auth/AdminRoute";
 import AppLayout from "./components/layout/AppLayout";
@@ -120,11 +121,13 @@ const ProtectedLayout = () => (
   <AuthProvider>
     <ProtectedRoute>
       <CompanyProvider>
-        <AppLayout>
-          <Suspense fallback={<PageLoader />}>
-            <Outlet />
-          </Suspense>
-        </AppLayout>
+        <LocationFilterProvider>
+          <AppLayout>
+            <Suspense fallback={<PageLoader />}>
+              <Outlet />
+            </Suspense>
+          </AppLayout>
+        </LocationFilterProvider>
       </CompanyProvider>
     </ProtectedRoute>
   </AuthProvider>

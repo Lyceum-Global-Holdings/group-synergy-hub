@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -26,12 +26,18 @@ import { TRANSFER_STATUSES, type TransferStatus } from "@/types/construction-inv
 import { Skeleton } from "@/components/ui/skeleton";
 import { format } from "date-fns";
 import { NewTransferDialog } from "./NewTransferDialog";
+import { useLocationFilter } from "@/contexts/LocationFilterContext";
 
 export function TransfersView() {
+  const { globalLocationId } = useLocationFilter();
   const [isNewTransferOpen, setIsNewTransferOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [locationFilter, setLocationFilter] = useState<string>("all");
+  const [locationFilter, setLocationFilter] = useState<string>(globalLocationId || "all");
+
+  useEffect(() => {
+    setLocationFilter(globalLocationId || "all");
+  }, [globalLocationId]);
 
   const { data: transfers, isLoading } = useTransfers(
     statusFilter !== "all" ? statusFilter : undefined
