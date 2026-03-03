@@ -693,14 +693,6 @@ export function useDashboardStats(locationId?: string | null) {
         .from("construction_item_master")
         .select("category, is_serial_tracked");
       
-      let serialsQuery = supabase
-        .from("construction_serial_numbers")
-        .select("condition, availability");
-      
-      let stocksQuery = supabase
-        .from("construction_inventory_stock")
-        .select("quantity, reserved_quantity");
-      
       let transfersQuery = supabase
         .from("construction_inventory_transfers")
         .select("status");
@@ -712,30 +704,41 @@ export function useDashboardStats(locationId?: string | null) {
       // Apply company filter - use accessible IDs for cross-company visibility
       if (selectedCompany?.id && accessibleIds && accessibleIds.length > 0) {
         itemsQuery = itemsQuery.in("company_id", accessibleIds);
-        serialsQuery = serialsQuery.in("company_id", accessibleIds);
-        stocksQuery = stocksQuery.in("company_id", accessibleIds);
         transfersQuery = transfersQuery.in("company_id", accessibleIds);
         repairsQuery = repairsQuery.in("company_id", accessibleIds);
       } else if (selectedCompany?.id) {
         itemsQuery = itemsQuery.eq("company_id", selectedCompany.id);
-        serialsQuery = serialsQuery.eq("company_id", selectedCompany.id);
-        stocksQuery = stocksQuery.eq("company_id", selectedCompany.id);
         transfersQuery = transfersQuery.eq("company_id", selectedCompany.id);
         repairsQuery = repairsQuery.eq("company_id", selectedCompany.id);
       }
 
-      // Apply location filter
+      // When filtering by location, also fetch serials/stocks with item_master_id to resolve categories
+      let serialsWithItemQuery = supabase
+        .from("construction_serial_numbers")
+        .select("condition, availability, item_master_id, current_location_id");
+      let stocksWithItemQuery = supabase
+        .from("construction_inventory_stock")
+        .select("quantity, reserved_quantity, item_master_id, location_id");
+
+      // Apply same company filters to these queries
+      if (selectedCompany?.id && accessibleIds && accessibleIds.length > 0) {
+        serialsWithItemQuery = serialsWithItemQuery.in("company_id", accessibleIds);
+        stocksWithItemQuery = stocksWithItemQuery.in("company_id", accessibleIds);
+      } else if (selectedCompany?.id) {
+        serialsWithItemQuery = serialsWithItemQuery.eq("company_id", selectedCompany.id);
+        stocksWithItemQuery = stocksWithItemQuery.eq("company_id", selectedCompany.id);
+      }
+
       if (locationId) {
-        serialsQuery = serialsQuery.eq("current_location_id", locationId);
-        stocksQuery = stocksQuery.eq("location_id", locationId);
-        // Transfers and repairs don't have direct location_id - we'll filter client-side
+        serialsWithItemQuery = serialsWithItemQuery.eq("current_location_id", locationId);
+        stocksWithItemQuery = stocksWithItemQuery.eq("location_id", locationId);
       }
 
       // Execute all queries
       const [itemsResult, serialsResult, stocksResult, transfersResult, repairsResult] = await Promise.all([
         itemsQuery,
-        serialsQuery,
-        stocksQuery,
+        serialsWithItemQuery,
+        stocksWithItemQuery,
         transfersQuery,
         repairsQuery,
       ]);
@@ -746,11 +749,45 @@ export function useDashboardStats(locationId?: string | null) {
       const transfers = transfersResult.data;
       const repairs = repairsResult.data;
 
-      // Calculate stats
-      const categoryCount = items?.reduce((acc, item) => {
-        acc[item.category] = (acc[item.category] || 0) + 1;
-        return acc;
-      }, {} as Record<string, number>) || {};
+      // When location is selected, derive item counts from serials/stocks at that location
+      let totalItems: number;
+      let categoryCount: Record<string, number>;
+
+      if (locationId) {
+        // Get unique item_master_ids present at this location
+        const itemIdsAtLocation = new Set<string>();
+        serials?.forEach(s => { if (s.item_master_id) itemIdsAtLocation.add(s.item_master_id); });
+        stocks?.forEach(s => { if (s.item_master_id) itemIdsAtLocation.add(s.item_master_id); });
+
+        // Filter items to only those present at this location
+        const locationItems = items?.filter(item => {
+          // items don't have id in the select, so we need to fetch with id
+          return true; // We'll use a different approach
+        });
+
+        // Fetch item categories for items at this location
+        if (itemIdsAtLocation.size > 0) {
+          const { data: locationItemDetails } = await supabase
+            .from("construction_item_master")
+            .select("id, category")
+            .in("id", Array.from(itemIdsAtLocation));
+
+          totalItems = locationItemDetails?.length || 0;
+          categoryCount = locationItemDetails?.reduce((acc, item) => {
+            acc[item.category] = (acc[item.category] || 0) + 1;
+            return acc;
+          }, {} as Record<string, number>) || {};
+        } else {
+          totalItems = 0;
+          categoryCount = {};
+        }
+      } else {
+        totalItems = items?.length || 0;
+        categoryCount = items?.reduce((acc, item) => {
+          acc[item.category] = (acc[item.category] || 0) + 1;
+          return acc;
+        }, {} as Record<string, number>) || {};
+      }
 
       const serialStats = {
         total: serials?.length || 0,
@@ -777,7 +814,7 @@ export function useDashboardStats(locationId?: string | null) {
       };
 
       return {
-        totalItems: items?.length || 0,
+        totalItems,
         categoryCount,
         serialStats,
         stockStats,
