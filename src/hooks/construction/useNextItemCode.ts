@@ -1,31 +1,41 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useCompany } from "@/contexts/CompanyContext";
-import type { ItemCategory } from "@/types/construction-inventory";
+import {
+  type ItemCategory,
+  CATEGORY_PREFIXES,
+  SUB_CATEGORIES,
+  COLOR_OPTIONS,
+  abbreviateItemName,
+} from "@/types/construction-inventory";
 
-// Prefix mapping for each category
-const CATEGORY_PREFIXES: Record<ItemCategory, string> = {
-  machines: "MAC",
-  tools: "TOL",
-  safety: "SAF",
-  equipment: "EQP",
-  scaffolding: "SCA",
-  others: "OTH",
-};
-
-export function useNextItemCode(category: ItemCategory) {
+export function useNextItemCode(
+  category: ItemCategory,
+  subCategory?: string,
+  itemName?: string,
+  color?: string
+) {
   const { selectedCompany } = useCompany();
-  const prefix = CATEGORY_PREFIXES[category];
+  const catPrefix = CATEGORY_PREFIXES[category];
+  const subCatCode = SUB_CATEGORIES[category]?.find(s => s.value === subCategory)?.code || "";
+  const nameAbbr = abbreviateItemName(itemName || "");
+  const colorCode = COLOR_OPTIONS.find(c => c.value === color)?.code || "";
+
+  // Build composite prefix: MAC-HVY-EXCAV-YLW
+  const allParts = [catPrefix, subCatCode, nameAbbr, colorCode].filter(Boolean);
+  const compositePrefix = allParts.join("-");
+
+  // Only enable when we have at least category + one more field
+  const enabled = Boolean(catPrefix && subCatCode && nameAbbr && colorCode);
 
   return useQuery({
-    queryKey: ["next-item-code", selectedCompany?.id, category],
+    queryKey: ["next-item-code", selectedCompany?.id, compositePrefix],
     queryFn: async () => {
-      // Get all item codes for this category to find the max number
       let query = supabase
         .from("construction_item_master")
         .select("item_code")
         .eq("category", category)
-        .ilike("item_code", `${prefix}-%`);
+        .ilike("item_code", `${compositePrefix}-%`);
 
       if (selectedCompany?.id) {
         query = query.eq("company_id", selectedCompany.id);
@@ -34,27 +44,22 @@ export function useNextItemCode(category: ItemCategory) {
       const { data, error } = await query;
       if (error) throw error;
 
-      // Find the highest number from existing codes
       let maxNumber = 0;
       if (data && data.length > 0) {
         data.forEach((item) => {
-          // Extract number from code like "MAC-006" -> 6
-          const match = item.item_code.match(new RegExp(`^${prefix}-(\\d+)$`, "i"));
+          // Extract trailing sequence number
+          const match = item.item_code.match(new RegExp(`^${compositePrefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}-(\\d+)$`, "i"));
           if (match) {
             const num = parseInt(match[1], 10);
-            if (num > maxNumber) {
-              maxNumber = num;
-            }
+            if (num > maxNumber) maxNumber = num;
           }
         });
       }
 
-      // Generate next code with zero-padded number (3 digits)
       const nextNumber = maxNumber + 1;
-      const nextCode = `${prefix}-${nextNumber.toString().padStart(3, "0")}`;
-      
-      return nextCode;
+      return `${compositePrefix}-${nextNumber.toString().padStart(3, "0")}`;
     },
-    staleTime: 0, // Always refetch to get latest
+    enabled,
+    staleTime: 0,
   });
 }

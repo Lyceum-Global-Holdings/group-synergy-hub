@@ -16,6 +16,8 @@ export interface ConstructionItemMaster {
   item_name: string;
   category: ItemCategory;
   section: ItemSection;
+  sub_category: string | null;
+  color: string | null;
   brand: string | null;
   model: string | null;
   unit_of_measurement: string;
@@ -135,6 +137,87 @@ export const ITEM_SECTIONS: { value: ItemSection; label: string }[] = [
   { value: 'carpenter', label: 'Carpenter' },
 ];
 
+// Sub-category options per category
+export const SUB_CATEGORIES: Record<ItemCategory, { value: string; label: string; code: string }[]> = {
+  machines: [
+    { value: 'heavy', label: 'Heavy', code: 'HVY' },
+    { value: 'light', label: 'Light', code: 'LGT' },
+    { value: 'lifting', label: 'Lifting', code: 'LFT' },
+    { value: 'earthmoving', label: 'Earthmoving', code: 'ERT' },
+    { value: 'compaction', label: 'Compaction', code: 'CMP' },
+    { value: 'concrete', label: 'Concrete', code: 'CON' },
+    { value: 'pumping', label: 'Pumping', code: 'PMP' },
+    { value: 'generator', label: 'Generator', code: 'GEN' },
+  ],
+  tools: [
+    { value: 'power', label: 'Power', code: 'PWR' },
+    { value: 'hand', label: 'Hand', code: 'HND' },
+    { value: 'measuring', label: 'Measuring', code: 'MSR' },
+    { value: 'cutting', label: 'Cutting', code: 'CUT' },
+    { value: 'drilling', label: 'Drilling', code: 'DRL' },
+    { value: 'welding', label: 'Welding', code: 'WLD' },
+    { value: 'plumbing', label: 'Plumbing', code: 'PLM' },
+    { value: 'electrical', label: 'Electrical', code: 'ELC' },
+  ],
+  safety: [
+    { value: 'ppe', label: 'PPE', code: 'PPE' },
+    { value: 'fire', label: 'Fire Safety', code: 'FIR' },
+    { value: 'signage', label: 'Signage', code: 'SGN' },
+    { value: 'fall_protection', label: 'Fall Protection', code: 'FLP' },
+    { value: 'first_aid', label: 'First Aid', code: 'FAD' },
+    { value: 'respiratory', label: 'Respiratory', code: 'RSP' },
+  ],
+  equipment: [
+    { value: 'survey', label: 'Survey', code: 'SRV' },
+    { value: 'testing', label: 'Testing', code: 'TST' },
+    { value: 'temporary', label: 'Temporary', code: 'TMP' },
+    { value: 'formwork', label: 'Formwork', code: 'FRM' },
+    { value: 'dewatering', label: 'Dewatering', code: 'DWT' },
+    { value: 'lighting', label: 'Lighting', code: 'LGH' },
+  ],
+  scaffolding: [
+    { value: 'cup_lock', label: 'Cup Lock', code: 'CPL' },
+    { value: 'h_frame', label: 'H-Frame', code: 'HFR' },
+    { value: 'ringlock', label: 'Ringlock', code: 'RGL' },
+    { value: 'suspended', label: 'Suspended', code: 'SUS' },
+    { value: 'mobile', label: 'Mobile', code: 'MBL' },
+    { value: 'accessories', label: 'Accessories', code: 'ACC' },
+  ],
+  others: [
+    { value: 'consumable', label: 'Consumable', code: 'CSM' },
+    { value: 'furniture', label: 'Furniture', code: 'FRN' },
+    { value: 'it_equipment', label: 'IT Equipment', code: 'ITE' },
+    { value: 'vehicle', label: 'Vehicle', code: 'VHC' },
+    { value: 'miscellaneous', label: 'Miscellaneous', code: 'MSC' },
+  ],
+};
+
+// Standard color options with abbreviation codes
+export const COLOR_OPTIONS: { value: string; label: string; code: string }[] = [
+  { value: 'red', label: 'Red', code: 'RED' },
+  { value: 'blue', label: 'Blue', code: 'BLU' },
+  { value: 'yellow', label: 'Yellow', code: 'YLW' },
+  { value: 'black', label: 'Black', code: 'BLK' },
+  { value: 'white', label: 'White', code: 'WHT' },
+  { value: 'green', label: 'Green', code: 'GRN' },
+  { value: 'orange', label: 'Orange', code: 'ORG' },
+  { value: 'grey', label: 'Grey', code: 'GRY' },
+  { value: 'silver', label: 'Silver', code: 'SLV' },
+  { value: 'brown', label: 'Brown', code: 'BRN' },
+  { value: 'multi', label: 'Multi-Color', code: 'MLT' },
+  { value: 'na', label: 'N/A', code: 'NAC' },
+];
+
+// Category prefix mapping for item codes
+export const CATEGORY_PREFIXES: Record<ItemCategory, string> = {
+  machines: "MAC",
+  tools: "TOL",
+  safety: "SAF",
+  equipment: "EQP",
+  scaffolding: "SCA",
+  others: "OTH",
+};
+
 export const ITEM_STATUSES: { value: ItemStatus; label: string }[] = [
   { value: 'active', label: 'Active' },
   { value: 'scrap', label: 'Scrap' },
@@ -170,3 +253,13 @@ export const REPAIR_STATUSES: { value: RepairStatus; label: string }[] = [
   { value: 'returned', label: 'Returned' },
   { value: 'discarded', label: 'Discarded' },
 ];
+
+// Helper to abbreviate item name for code generation
+export function abbreviateItemName(name: string): string {
+  if (!name) return "";
+  // Remove common words
+  const cleaned = name.replace(/\b(the|and|of|for|with|a|an)\b/gi, "").trim();
+  // Take first 5 chars of cleaned uppercase, remove spaces
+  const abbr = cleaned.replace(/[^a-zA-Z0-9]/g, "").toUpperCase().slice(0, 5);
+  return abbr || name.slice(0, 5).toUpperCase();
+}

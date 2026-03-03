@@ -3745,6 +3745,7 @@ export type Database = {
         Row: {
           brand: string | null
           category: string
+          color: string | null
           company_id: string | null
           created_at: string
           created_by: string | null
@@ -3758,6 +3759,7 @@ export type Database = {
           purchase_date: string | null
           section: string
           status: string
+          sub_category: string | null
           unit_cost: number | null
           unit_of_measurement: string
           updated_at: string
@@ -3765,6 +3767,7 @@ export type Database = {
         Insert: {
           brand?: string | null
           category: string
+          color?: string | null
           company_id?: string | null
           created_at?: string
           created_by?: string | null
@@ -3778,6 +3781,7 @@ export type Database = {
           purchase_date?: string | null
           section: string
           status?: string
+          sub_category?: string | null
           unit_cost?: number | null
           unit_of_measurement?: string
           updated_at?: string
@@ -3785,6 +3789,7 @@ export type Database = {
         Update: {
           brand?: string | null
           category?: string
+          color?: string | null
           company_id?: string | null
           created_at?: string
           created_by?: string | null
@@ -3798,6 +3803,7 @@ export type Database = {
           purchase_date?: string | null
           section?: string
           status?: string
+          sub_category?: string | null
           unit_cost?: number | null
           unit_of_measurement?: string
           updated_at?: string
