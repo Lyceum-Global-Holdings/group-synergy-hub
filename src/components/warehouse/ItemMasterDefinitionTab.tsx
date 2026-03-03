@@ -9,7 +9,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { Search, Plus, Eye, History, Package, MapPin, X, Image as ImageIcon } from 'lucide-react';
+import { Search, Plus, Eye, History, Package, MapPin, X, Image as ImageIcon, Edit, Trash2 } from 'lucide-react';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { useWarehouseItems } from '@/hooks/useWarehouseItems';
 import { useItemCategories } from '@/hooks/useItemCategories';
@@ -18,6 +18,8 @@ import { useCompany } from '@/contexts/CompanyContext';
 import { AddItemsDialog } from '@/components/warehouse/AddItemsDialog';
 import { StockMovementDialog } from '@/components/warehouse/StockMovementDialog';
 import { StockMovementChart } from '@/components/warehouse/StockMovementChart';
+import { DeleteItemConfirmationDialog } from '@/components/warehouse/DeleteItemConfirmationDialog';
+import { useIsAdminOrHigher } from '@/hooks/useIsAdminOrHigher';
 import { WarehouseItem } from '@/types/itemBin';
 
 interface ItemMasterDefinitionTabProps {
@@ -35,7 +37,10 @@ export function ItemMasterDefinitionTab({ onNavigateToInventory, onNavigateToBin
   const [stockMovementItem, setStockMovementItem] = useState<WarehouseItem | null>(null);
   const [previewImage, setPreviewImage] = useState<{ url: string; name: string } | null>(null);
 
-  const { items, isLoading } = useWarehouseItems();
+  const [deletingItem, setDeletingItem] = useState<WarehouseItem | null>(null);
+
+  const { items, isLoading, deleteItem, markItemInactive, isDeleting, isMarkingInactive } = useWarehouseItems();
+  const { canDelete } = useIsAdminOrHigher();
   const { selectedCompany } = useCompany();
   const { categories } = useItemCategories(selectedCompany?.id);
   const { units } = useItemUnits();
@@ -200,6 +205,24 @@ export function ItemMasterDefinitionTab({ onNavigateToInventory, onNavigateToBin
                       <TooltipProvider>
                         <Tooltip>
                           <TooltipTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setEditingItem(item)}>
+                              <Edit className="h-3.5 w-3.5" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Edit Item</TooltipContent>
+                        </Tooltip>
+                        {canDelete && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => setDeletingItem(item)} disabled={isDeleting || isMarkingInactive}>
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Delete Item</TooltipContent>
+                          </Tooltip>
+                        )}
+                        <Tooltip>
+                          <TooltipTrigger asChild>
                             <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onNavigateToInventory?.(item.id)}>
                               <Package className="h-3.5 w-3.5" />
                             </Button>
@@ -221,14 +244,6 @@ export function ItemMasterDefinitionTab({ onNavigateToInventory, onNavigateToBin
                             </Button>
                           </TooltipTrigger>
                           <TooltipContent>Stock Movement History</TooltipContent>
-                        </Tooltip>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setEditingItem(item)}>
-                              <Eye className="h-3.5 w-3.5" />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent>Edit Item</TooltipContent>
                         </Tooltip>
                       </TooltipProvider>
                     </div>
@@ -262,6 +277,15 @@ export function ItemMasterDefinitionTab({ onNavigateToInventory, onNavigateToBin
           currentStock={stockMovementItem.current_stock}
         />
       )}
+
+      <DeleteItemConfirmationDialog
+        open={!!deletingItem}
+        onOpenChange={(open) => { if (!open) setDeletingItem(null); }}
+        item={deletingItem}
+        onConfirmDelete={(itemId, forceDelete) => deleteItem({ id: itemId, forceDelete })}
+        onMarkInactive={markItemInactive}
+        isLoading={isDeleting || isMarkingInactive}
+      />
 
       {previewImage && (
         <Dialog open={!!previewImage} onOpenChange={() => setPreviewImage(null)}>
