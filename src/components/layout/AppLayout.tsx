@@ -60,7 +60,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         
         <div className="flex-1 flex flex-col">
           {/* Header */}
-          <header className="h-16 border-b bg-card flex items-center justify-between px-6 shadow-sm">
+          <header className="min-h-16 border-b bg-card flex items-center justify-between px-6 py-2 shadow-sm flex-wrap gap-2">
             <div className="flex items-center gap-4">
               <SidebarTrigger />
               <div className="flex items-center gap-2">
