@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Warehouse, MapPin, Users, Building, Search, Filter, Plus, Edit2, Trash2, Phone, MapPinned, Eye, Download, FileText } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Warehouse, MapPin, Users, Building, Search, Filter, Plus, Edit2, Trash2, Phone, MapPinned, Eye, Download, FileText, ChevronsUpDown } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -43,6 +43,8 @@ import { useCompanies } from '@/hooks/useCompanies';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { useLocationCompanies } from '@/hooks/useLocationCompanies';
 
 type WarehouseLocation = typeof import('@/hooks/useWarehouseLocations') extends { useWarehouseLocations: () => { locations: (infer T)[] } } ? T : any;
 
@@ -58,6 +60,7 @@ export default function WarehouseManagement() {
   const { locations, isLoading, deleteLocation, updateLocation, bulkDeleteLocations, bulkUpdateStatus, isDeleting, isUpdating } = useWarehouseLocations();
   const { toast } = useToast();
   const { companies } = useCompanies();
+  const { companyIds: editLocationCompanyIds, saveCompanies } = useLocationCompanies(editLocationData?.id);
 
   // Calculate statistics
   const stats = {
@@ -196,9 +199,15 @@ export default function WarehouseManagement() {
       contact_person: location.contact_person || '',
       contact_phone: location.contact_phone || '',
       physical_address: location.physical_address || '',
-      company_id: location.company_id || '',
+      company_ids: [] as string[], // Will be populated by useEffect
     });
   };
+  // Populate company_ids when junction table data loads
+  useEffect(() => {
+    if (editLocationData && editLocationCompanyIds.length > 0) {
+      setEditForm(prev => ({ ...prev, company_ids: editLocationCompanyIds }));
+    }
+  }, [editLocationCompanyIds, editLocationData]);
 
   const handleEditFormChange = (field: string, value: string | number) => {
     setEditForm(prev => ({ ...prev, [field]: value }));
@@ -220,8 +229,12 @@ export default function WarehouseManagement() {
         contact_person: editForm.contact_person || null,
         contact_phone: editForm.contact_phone || null,
         physical_address: editForm.physical_address || null,
-        company_id: editForm.company_id || null,
+        company_id: editForm.company_ids?.[0] || null,
       });
+      // Save multi-company associations
+      if (editForm.company_ids?.length > 0) {
+        await saveCompanies({ locationId: editLocationData.id, companyIds: editForm.company_ids });
+      }
       toast({
         title: 'Location updated',
         description: `${editForm.name} has been successfully updated.`,
@@ -584,17 +597,32 @@ export default function WarehouseManagement() {
           <ScrollArea className="flex-1 pr-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-4">
               <div className="space-y-2">
-                <Label>Company *</Label>
-                <Select value={editForm.company_id || ''} onValueChange={(v) => handleEditFormChange('company_id', v)}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select company" />
-                  </SelectTrigger>
-                  <SelectContent>
+                <Label>Companies *</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" className="w-full justify-between font-normal">
+                      {(editForm.company_ids?.length || 0) > 0
+                        ? `${editForm.company_ids.length} company(ies) selected`
+                        : 'Select companies'}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-full p-2 max-h-60 overflow-y-auto">
                     {companies.map((c) => (
-                      <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                      <div key={c.id} className="flex items-center gap-2 py-1.5 px-2 rounded hover:bg-accent cursor-pointer"
+                        onClick={() => {
+                          const ids = (editForm.company_ids || []) as string[];
+                          const newIds = ids.includes(c.id)
+                            ? ids.filter((id: string) => id !== c.id)
+                            : [...ids, c.id];
+                          setEditForm(prev => ({ ...prev, company_ids: newIds }));
+                        }}>
+                        <Checkbox checked={(editForm.company_ids || []).includes(c.id)} />
+                        <span className="text-sm">{c.name}</span>
+                      </div>
                     ))}
-                  </SelectContent>
-                </Select>
+                  </PopoverContent>
+                </Popover>
               </div>
 
               <div className="space-y-2">
@@ -735,7 +763,7 @@ export default function WarehouseManagement() {
           </ScrollArea>
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditLocationData(null)}>Cancel</Button>
-            <Button onClick={handleSaveEdit} disabled={isUpdating || !editForm.name || !editForm.company_id}>
+            <Button onClick={handleSaveEdit} disabled={isUpdating || !editForm.name || !(editForm.company_ids?.length > 0)}>
               {isUpdating ? 'Saving...' : 'Save Changes'}
             </Button>
           </DialogFooter>

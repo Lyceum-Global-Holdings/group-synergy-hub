@@ -10,7 +10,10 @@ import { Trash2, Plus, Edit2, Building, MapPin, Users } from 'lucide-react';
 import { useWarehouseLocations } from '@/hooks/useWarehouseLocations';
 import { useIsAdminOrHigher } from '@/hooks/useIsAdminOrHigher';
 import { useCompanies } from '@/hooks/useCompanies';
-
+import { useLocationCompanies } from '@/hooks/useLocationCompanies';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { ChevronsUpDown } from 'lucide-react';
 type LocationType = 'location' | 'sublocation' | 'department';
 
 export const LocationManagementDialog = () => {
@@ -28,7 +31,7 @@ export const LocationManagementDialog = () => {
     physical_address: string;
     status: 'active' | 'inactive' | 'maintenance' | 'closed';
     warehouse_category: string;
-    company_id: string;
+    company_ids: string[];
   }>({
     name: '',
     type: 'location',
@@ -41,7 +44,7 @@ export const LocationManagementDialog = () => {
     physical_address: '',
     status: 'active',
     warehouse_category: 'general',
-    company_id: ''
+    company_ids: []
   });
 
   const { 
@@ -55,11 +58,12 @@ export const LocationManagementDialog = () => {
   } = useWarehouseLocations();
   const { companies } = useCompanies();
   const { canDelete } = useIsAdminOrHigher();
+  const { companyIds: editCompanyIds, saveCompanies } = useLocationCompanies(editingLocation);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!formData.name.trim() || !formData.company_id) return;
+    if (!formData.name.trim() || formData.company_ids.length === 0) return;
 
     const locationData = {
       name: formData.name,
@@ -73,13 +77,17 @@ export const LocationManagementDialog = () => {
       physical_address: formData.physical_address || undefined,
       status: formData.status,
       warehouse_category: formData.warehouse_category as any,
-      company_id: formData.company_id
+      company_id: formData.company_ids[0] // Keep first company as primary
     };
 
     if (editingLocation) {
       updateLocation({ id: editingLocation, ...locationData });
+      await saveCompanies({ locationId: editingLocation, companyIds: formData.company_ids });
     } else {
-      createLocation(locationData);
+      const created = await createLocation(locationData);
+      if (created?.id) {
+        await saveCompanies({ locationId: created.id, companyIds: formData.company_ids });
+      }
     }
 
     resetForm();
@@ -98,7 +106,7 @@ export const LocationManagementDialog = () => {
       physical_address: '',
       status: 'active',
       warehouse_category: 'general',
-      company_id: ''
+      company_ids: []
     });
     setEditingLocation(null);
   };
@@ -116,7 +124,7 @@ export const LocationManagementDialog = () => {
       physical_address: location.physical_address || '',
       status: location.status || 'active',
       warehouse_category: location.warehouse_category || 'general',
-      company_id: location.company_id || ''
+      company_ids: editCompanyIds.length > 0 ? editCompanyIds : (location.company_id ? [location.company_id] : [])
     });
     setEditingLocation(location.id);
   };
@@ -149,20 +157,31 @@ export const LocationManagementDialog = () => {
             
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <Label htmlFor="company">Company *</Label>
-                <Select
-                  value={formData.company_id}
-                  onValueChange={(value) => setFormData({ ...formData, company_id: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select company" />
-                  </SelectTrigger>
-                  <SelectContent>
+                <Label>Companies *</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" className="w-full justify-between font-normal">
+                      {formData.company_ids.length > 0
+                        ? `${formData.company_ids.length} company(ies) selected`
+                        : 'Select companies'}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-full p-2 max-h-60 overflow-y-auto">
                     {companies.map((company) => (
-                      <SelectItem key={company.id} value={company.id}>{company.name}</SelectItem>
+                      <div key={company.id} className="flex items-center gap-2 py-1.5 px-2 rounded hover:bg-accent cursor-pointer"
+                        onClick={() => {
+                          const ids = formData.company_ids.includes(company.id)
+                            ? formData.company_ids.filter(id => id !== company.id)
+                            : [...formData.company_ids, company.id];
+                          setFormData({ ...formData, company_ids: ids });
+                        }}>
+                        <Checkbox checked={formData.company_ids.includes(company.id)} />
+                        <span className="text-sm">{company.name}</span>
+                      </div>
                     ))}
-                  </SelectContent>
-                </Select>
+                  </PopoverContent>
+                </Popover>
               </div>
 
               <div>
