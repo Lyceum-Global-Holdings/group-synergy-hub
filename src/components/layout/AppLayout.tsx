@@ -60,29 +60,31 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         
         <div className="flex-1 flex flex-col">
           {/* Header */}
-          <header className="min-h-16 border-b bg-card flex items-center justify-between px-6 py-2 shadow-sm flex-wrap gap-2">
-            <div className="flex items-center gap-4">
-              <SidebarTrigger />
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 bg-gradient-to-br from-primary to-info rounded-lg flex items-center justify-center">
-                  <span className="text-primary-foreground font-bold text-sm">ERP</span>
+          <header className="border-b bg-card px-6 py-2 shadow-sm">
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-4 min-w-0">
+                <SidebarTrigger />
+                <div className="flex items-center gap-2 min-w-0">
+                  <div className="w-8 h-8 bg-gradient-to-br from-primary to-info rounded-lg flex items-center justify-center shrink-0">
+                    <span className="text-primary-foreground font-bold text-sm">ERP</span>
+                  </div>
+                  <h1 className="text-xl font-semibold text-foreground truncate">
+                    Enterprise Management System
+                  </h1>
                 </div>
-                <h1 className="text-xl font-semibold text-foreground">
-                  Enterprise Management System
-                </h1>
               </div>
-            </div>
-            
-            <div className="flex items-center justify-end gap-3 flex-wrap">
-              <LiveClock />
-              <CompanySelector />
-              <LocationSelector />
-              {isSuperAdmin && !isViewingAllCompanies && companies.length > 1 && (
-                <Badge variant="outline" className="text-xs">
-                  Viewing as company
-                </Badge>
-              )}
-              <UserProfile />
+
+              <div className="flex items-center gap-3 shrink-0">
+                <LiveClock />
+                <CompanySelector />
+                <LocationSelector />
+                {isSuperAdmin && !isViewingAllCompanies && companies.length > 1 && (
+                  <Badge variant="outline" className="text-xs">
+                    Viewing as company
+                  </Badge>
+                )}
+                <UserProfile />
+              </div>
             </div>
           </header>
 
