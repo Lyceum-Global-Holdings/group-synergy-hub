@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Trash2, Plus, Edit2, Building, MapPin, Users } from 'lucide-react';
 import { useWarehouseLocations } from '@/hooks/useWarehouseLocations';
 import { useIsAdminOrHigher } from '@/hooks/useIsAdminOrHigher';
+import { useCompanies } from '@/hooks/useCompanies';
 
 type LocationType = 'location' | 'sublocation' | 'department';
 
@@ -27,6 +28,7 @@ export const LocationManagementDialog = () => {
     physical_address: string;
     status: 'active' | 'inactive' | 'maintenance' | 'closed';
     warehouse_category: string;
+    company_id: string;
   }>({
     name: '',
     type: 'location',
@@ -38,7 +40,8 @@ export const LocationManagementDialog = () => {
     contact_phone: '',
     physical_address: '',
     status: 'active',
-    warehouse_category: 'general'
+    warehouse_category: 'general',
+    company_id: ''
   });
 
   const { 
@@ -50,12 +53,13 @@ export const LocationManagementDialog = () => {
     isUpdating,
     isDeleting
   } = useWarehouseLocations();
+  const { companies } = useCompanies();
   const { canDelete } = useIsAdminOrHigher();
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!formData.name.trim()) return;
+    if (!formData.name.trim() || !formData.company_id) return;
 
     const locationData = {
       name: formData.name,
@@ -68,7 +72,8 @@ export const LocationManagementDialog = () => {
       contact_phone: formData.contact_phone || undefined,
       physical_address: formData.physical_address || undefined,
       status: formData.status,
-      warehouse_category: formData.warehouse_category as any
+      warehouse_category: formData.warehouse_category as any,
+      company_id: formData.company_id
     };
 
     if (editingLocation) {
@@ -92,7 +97,8 @@ export const LocationManagementDialog = () => {
       contact_phone: '',
       physical_address: '',
       status: 'active',
-      warehouse_category: 'general'
+      warehouse_category: 'general',
+      company_id: ''
     });
     setEditingLocation(null);
   };
@@ -109,7 +115,8 @@ export const LocationManagementDialog = () => {
       contact_phone: location.contact_phone || '',
       physical_address: location.physical_address || '',
       status: location.status || 'active',
-      warehouse_category: location.warehouse_category || 'general'
+      warehouse_category: location.warehouse_category || 'general',
+      company_id: location.company_id || ''
     });
     setEditingLocation(location.id);
   };
@@ -141,6 +148,23 @@ export const LocationManagementDialog = () => {
             </h3>
             
             <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <Label htmlFor="company">Company *</Label>
+                <Select
+                  value={formData.company_id}
+                  onValueChange={(value) => setFormData({ ...formData, company_id: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select company" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {companies.map((company) => (
+                      <SelectItem key={company.id} value={company.id}>{company.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
               <div>
                 <Label htmlFor="name">Location Name *</Label>
                 <Input
