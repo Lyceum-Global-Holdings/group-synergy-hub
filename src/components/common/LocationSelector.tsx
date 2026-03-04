@@ -18,19 +18,27 @@ export function LocationSelector() {
   const { data: locations } = useQuery({
     queryKey: ['header-locations', selectedCompany?.id],
     queryFn: async () => {
-      let query = supabase
-        .from('warehouse_locations')
-        .select('id, name')
-        .eq('type', 'location')
-        .order('name');
-
       if (selectedCompany?.id) {
-        query = query.or(`company_id.eq.${selectedCompany.id},company_id.is.null`);
+        // Get locations linked to this company via junction table
+        const { data, error } = await supabase
+          .from('warehouse_location_companies')
+          .select('location_id, warehouse_locations!inner(id, name, type)')
+          .eq('company_id', selectedCompany.id)
+          .eq('warehouse_locations.type', 'location');
+        if (error) throw error;
+        return (data || [])
+          .map((d: any) => d.warehouse_locations)
+          .filter(Boolean)
+          .sort((a: any, b: any) => a.name.localeCompare(b.name));
+      } else {
+        const { data, error } = await supabase
+          .from('warehouse_locations')
+          .select('id, name')
+          .eq('type', 'location')
+          .order('name');
+        if (error) throw error;
+        return data;
       }
-
-      const { data, error } = await query;
-      if (error) throw error;
-      return data;
     },
   });
 
