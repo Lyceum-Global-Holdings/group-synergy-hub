@@ -39,6 +39,7 @@ import { LocationDetailsDialog } from '@/components/warehouse/LocationDetailsDia
 import { LocationHierarchyTab } from '@/components/warehouse/LocationHierarchyTab';
 import { CapacityPlanningTab } from '@/components/warehouse/CapacityPlanningTab';
 import { useToast } from '@/hooks/use-toast';
+import { useCompanies } from '@/hooks/useCompanies';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -56,6 +57,7 @@ export default function WarehouseManagement() {
 
   const { locations, isLoading, deleteLocation, updateLocation, bulkDeleteLocations, bulkUpdateStatus, isDeleting, isUpdating } = useWarehouseLocations();
   const { toast } = useToast();
+  const { companies } = useCompanies();
 
   // Calculate statistics
   const stats = {
@@ -194,6 +196,7 @@ export default function WarehouseManagement() {
       contact_person: location.contact_person || '',
       contact_phone: location.contact_phone || '',
       physical_address: location.physical_address || '',
+      company_id: location.company_id || '',
     });
   };
 
@@ -217,6 +220,7 @@ export default function WarehouseManagement() {
         contact_person: editForm.contact_person || null,
         contact_phone: editForm.contact_phone || null,
         physical_address: editForm.physical_address || null,
+        company_id: editForm.company_id || null,
       });
       toast({
         title: 'Location updated',
@@ -580,6 +584,20 @@ export default function WarehouseManagement() {
           <ScrollArea className="flex-1 pr-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-4">
               <div className="space-y-2">
+                <Label>Company *</Label>
+                <Select value={editForm.company_id || ''} onValueChange={(v) => handleEditFormChange('company_id', v)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select company" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {companies.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
                 <Label htmlFor="edit-name">Name *</Label>
                 <Input
                   id="edit-name"
@@ -717,7 +735,7 @@ export default function WarehouseManagement() {
           </ScrollArea>
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditLocationData(null)}>Cancel</Button>
-            <Button onClick={handleSaveEdit} disabled={isUpdating || !editForm.name}>
+            <Button onClick={handleSaveEdit} disabled={isUpdating || !editForm.name || !editForm.company_id}>
               {isUpdating ? 'Saving...' : 'Save Changes'}
             </Button>
           </DialogFooter>
