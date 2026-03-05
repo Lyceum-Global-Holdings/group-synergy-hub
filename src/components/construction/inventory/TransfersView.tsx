@@ -27,6 +27,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { format } from "date-fns";
 import { NewTransferDialog } from "./NewTransferDialog";
 import { useLocationFilter } from "@/contexts/LocationFilterContext";
+import { useCurrentUserLocationPermissions } from "@/hooks/useCurrentUserLocationPermissions";
 
 export function TransfersView() {
   const { globalLocationId } = useLocationFilter();
@@ -42,7 +43,28 @@ export function TransfersView() {
   const { data: transfers, isLoading } = useTransfers(
     statusFilter !== "all" ? statusFilter : undefined
   );
-  const { data: locations } = useLocations();
+  const { data: allLocations } = useLocations();
+  const { data: permissions } = useCurrentUserLocationPermissions();
+
+  // Filter locations by user permissions
+  const locations = useMemo(() => {
+    if (!allLocations || !permissions) return [];
+    if (permissions.viewAllLocations) return allLocations;
+    const permittedIds = new Set([...permissions.viewLocationIds, ...permissions.editLocationIds]);
+    return allLocations.filter(loc => permittedIds.has(loc.id));
+  }, [allLocations, permissions]);
+
+  // Filter transfer history to only show transfers involving user's permitted locations
+  const permittedTransfers = useMemo(() => {
+    if (!transfers || !permissions) return transfers || [];
+    if (permissions.viewAllLocations) return transfers;
+    const permittedIds = new Set([...permissions.viewLocationIds, ...permissions.editLocationIds]);
+    return transfers.filter(t => {
+      const fromId = (t.from_location as any)?.id;
+      const toId = (t.to_location as any)?.id;
+      return (fromId && permittedIds.has(fromId)) || (toId && permittedIds.has(toId));
+    });
+  }, [transfers, permissions]);
 
   // Get unique user IDs from transfers to fetch their profiles
   const userIds = useMemo(() => {
@@ -75,7 +97,7 @@ export function TransfersView() {
   };
 
   // Filter transfers
-  const filteredTransfers = transfers?.filter(transfer => {
+  const filteredTransfers = permittedTransfers?.filter(transfer => {
     // Location filter
     if (locationFilter !== "all") {
       const fromId = (transfer.from_location as any)?.id;
@@ -115,10 +137,10 @@ export function TransfersView() {
     );
   };
 
-  // Summary counts
-  const pendingCount = transfers?.filter(t => t.status === "pending").length || 0;
-  const inTransitCount = transfers?.filter(t => t.status === "in_transit").length || 0;
-  const completedCount = transfers?.filter(t => t.status === "completed").length || 0;
+  // Summary counts (use permitted transfers)
+  const pendingCount = permittedTransfers?.filter(t => t.status === "pending").length || 0;
+  const inTransitCount = permittedTransfers?.filter(t => t.status === "in_transit").length || 0;
+  const completedCount = permittedTransfers?.filter(t => t.status === "completed").length || 0;
 
   return (
     <div className="space-y-4">
