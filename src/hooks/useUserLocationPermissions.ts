@@ -34,8 +34,8 @@ export const useUserViewAllLocations = (userId: string | undefined) => {
       const { data, error } = await supabase
         .from('profiles')
         .select('view_all_locations')
-        .eq('id', userId)
-        .single();
+        .eq('user_id', userId)
+        .maybeSingle();
       if (error) throw error;
       return data?.view_all_locations ?? false;
     },
@@ -62,7 +62,7 @@ export const useSaveUserLocationPermissions = () => {
       const { error: profileError } = await supabase
         .from('profiles')
         .update({ view_all_locations: viewAllLocations })
-        .eq('id', userId);
+        .eq('user_id', userId);
       if (profileError) throw profileError;
 
       // Delete existing permissions
@@ -99,7 +99,8 @@ export const useSaveUserLocationPermissions = () => {
 };
 
 /**
- * Fetch locations filtered by an array of company IDs using the junction table
+ * Fetch locations filtered by an array of company IDs using the junction table,
+ * with legacy company_id fallback support.
  */
 export const useLocationsForCompanies = (companyIds: string[]) => {
   return useQuery({
@@ -107,19 +108,34 @@ export const useLocationsForCompanies = (companyIds: string[]) => {
     queryFn: async () => {
       if (companyIds.length === 0) return [];
 
-      const { data, error } = await supabase
-        .from('warehouse_location_companies')
-        .select('location_id, warehouse_locations!inner(id, name, type)')
-        .in('company_id', companyIds)
-        .eq('warehouse_locations.type', 'location');
+      const [mappedRes, legacyRes] = await Promise.all([
+        supabase
+          .from('warehouse_location_companies')
+          .select('location_id, warehouse_locations!inner(id, name, type)')
+          .in('company_id', companyIds)
+          .eq('warehouse_locations.type', 'location'),
+        supabase
+          .from('warehouse_locations')
+          .select('id, name, type, company_id')
+          .in('company_id', companyIds)
+          .eq('type', 'location'),
+      ]);
 
-      if (error) throw error;
+      if (mappedRes.error) throw mappedRes.error;
+      if (legacyRes.error) throw legacyRes.error;
 
       // Deduplicate locations (a location may appear for multiple companies)
       const locationMap = new Map<string, { id: string; name: string }>();
-      for (const row of data || []) {
+
+      for (const row of mappedRes.data || []) {
         const loc = row.warehouse_locations as any;
-        if (loc && !locationMap.has(loc.id)) {
+        if (loc?.id && !locationMap.has(loc.id)) {
+          locationMap.set(loc.id, { id: loc.id, name: loc.name });
+        }
+      }
+
+      for (const loc of legacyRes.data || []) {
+        if (loc?.id && !locationMap.has(loc.id)) {
           locationMap.set(loc.id, { id: loc.id, name: loc.name });
         }
       }
