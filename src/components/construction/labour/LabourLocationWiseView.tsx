@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Search, MapPin, Users, Filter } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -21,6 +21,7 @@ import {
 import { useLabourMaster } from "@/hooks/construction/useLabourMaster";
 import { useProjects } from "@/hooks/construction/useProjects";
 import { useWarehouseLocations } from "@/hooks/useWarehouseLocations";
+import { useCurrentUserLocationPermissions } from "@/hooks/useCurrentUserLocationPermissions";
 
 interface AggregatedLocation {
   locationId: string | null;
@@ -51,10 +52,22 @@ export function LabourLocationWiseView() {
   const { data: labourMaster, isLoading } = useLabourMaster();
   const { data: projects = [] } = useProjects();
   const { locations: warehouseLocations = [] } = useWarehouseLocations();
+  const { data: permissions } = useCurrentUserLocationPermissions();
+
+  // Filter warehouse locations by user permissions
+  const permittedLocations = useMemo(() => {
+    if (!permissions) return [];
+    if (permissions.viewAllLocations) return warehouseLocations;
+    const permittedIds = new Set([
+      ...permissions.viewLocationIds,
+      ...permissions.editLocationIds,
+    ]);
+    return warehouseLocations.filter(loc => permittedIds.has(loc.id));
+  }, [warehouseLocations, permissions]);
 
   // Create lookup maps
   const projectMap = new Map(projects.map(p => [p.id, p]));
-  const locationMap = new Map(warehouseLocations.map(l => [l.id, l]));
+  const locationMap = new Map(permittedLocations.map(l => [l.id, l]));
 
   // Group by location_id from warehouse_locations
   const groupedByLocation = labourMaster?.reduce((acc, labour) => {
