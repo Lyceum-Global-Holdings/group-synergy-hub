@@ -21,6 +21,9 @@ import {
 } from "@/components/construction/inventory";
 import { useLocationFilter } from "@/contexts/LocationFilterContext";
 import { useLocations } from "@/hooks/construction/useConstructionInventory";
+import { useCompany } from "@/contexts/CompanyContext";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 
 // Allocation sub-tabs
 const ALLOCATION_TABS = [
@@ -36,7 +39,40 @@ export default function InventoryItems() {
   const [activeTab, setActiveTab] = useState("allocation");
   const [allocationSubTab, setAllocationSubTab] = useState("dashboard");
   const { globalLocationId, setGlobalLocationId } = useLocationFilter();
-  const { data: locations } = useLocations();
+  const { selectedCompany } = useCompany();
+
+  // Fetch locations mapped to the selected company
+  const { data: locations } = useQuery({
+    queryKey: ["inventory-page-locations", selectedCompany?.id],
+    queryFn: async () => {
+      if (!selectedCompany?.id) return [];
+
+      const [{ data: mappedRows }, { data: legacyRows }] = await Promise.all([
+        supabase
+          .from("warehouse_location_companies")
+          .select("warehouse_locations!inner(id, name, type)")
+          .eq("company_id", selectedCompany.id)
+          .eq("warehouse_locations.type", "location"),
+        supabase
+          .from("warehouse_locations")
+          .select("id, name, type")
+          .eq("company_id", selectedCompany.id)
+          .eq("type", "location"),
+      ]);
+
+      const merged = new Map<string, { id: string; name: string }>();
+      (mappedRows || []).forEach((row: any) => {
+        const loc = row.warehouse_locations;
+        if (loc?.id) merged.set(loc.id, { id: loc.id, name: loc.name });
+      });
+      (legacyRows || []).forEach((loc: any) => {
+        if (loc?.id) merged.set(loc.id, { id: loc.id, name: loc.name });
+      });
+
+      return Array.from(merged.values()).sort((a, b) => a.name.localeCompare(b.name));
+    },
+    enabled: !!selectedCompany?.id,
+  });
 
   const locationFilterValue = globalLocationId || "all";
   const selectedLocationName = globalLocationId
