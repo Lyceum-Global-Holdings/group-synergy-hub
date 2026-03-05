@@ -32,11 +32,22 @@ import { FloorDrawingsDialog } from "@/components/construction/FloorDrawingsDial
 import { ProjectWarehouseAllocationDialog } from "@/components/construction/ProjectWarehouseAllocationDialog";
 import { FloorWiseStockAllocationDialog } from "@/components/construction/FloorWiseStockAllocationDialog";
 import { useIsAdmin, useSuperAdmin } from "@/hooks/useSuperAdmin";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 
 export default function ProjectMaster() {
   const { data: isSuperAdmin } = useSuperAdmin();
   const { data: isAdmin } = useIsAdmin();
-  const canManageProjects = isSuperAdmin || isAdmin;
+  const { data: hasConstructionAccess } = useQuery({
+    queryKey: ["has-construction-access"],
+    queryFn: async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return false;
+      const { data } = await supabase.rpc("has_construction_access", { _user_id: user.id });
+      return data === true;
+    },
+  });
+  const canManageProjects = isSuperAdmin || isAdmin || hasConstructionAccess;
   const [searchTerm, setSearchTerm] = useState("");
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<ConstructionProject | null>(null);
