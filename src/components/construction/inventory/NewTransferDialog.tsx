@@ -49,8 +49,8 @@ export function NewTransferDialog({ open, onOpenChange }: NewTransferDialogProps
   const { data: stockData } = useInventoryStock();
   const { data: permissions } = useCurrentUserLocationPermissions();
 
-  // Filter locations by user permissions (edit access required for transfers)
-  const locations = useMemo(() => {
+  // Filter locations by user permissions (edit access required for source/from transfers)
+  const permittedLocations = useMemo(() => {
     if (!allLocations || !permissions) return [];
     if (permissions.viewAllLocations) return allLocations;
     const permittedIds = new Set([...permissions.editLocationIds]);
@@ -280,7 +280,7 @@ export function NewTransferDialog({ open, onOpenChange }: NewTransferDialogProps
                 {locationsLoading ? (
                   <div className="p-2 text-center text-muted-foreground">Loading...</div>
                 ) : (
-                  locations?.map(loc => (
+                  permittedLocations?.map(loc => (
                     <SelectItem key={loc.id} value={loc.id}>
                       {loc.name}
                     </SelectItem>
@@ -301,7 +301,7 @@ export function NewTransferDialog({ open, onOpenChange }: NewTransferDialogProps
                 {locationsLoading ? (
                   <div className="p-2 text-center text-muted-foreground">Loading...</div>
                 ) : (
-                  locations?.filter(loc => loc.id !== fromLocationId).map(loc => (
+                  allLocations?.filter(loc => loc.id !== fromLocationId).map(loc => (
                     <SelectItem key={loc.id} value={loc.id}>
                       {loc.name}
                     </SelectItem>
