@@ -1,4 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 import { Warehouse, MapPin, Users, Building, Search, Filter, Plus, Edit2, Trash2, Phone, MapPinned, Eye, Download, FileText, ChevronsUpDown } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -70,6 +72,23 @@ export default function WarehouseManagement() {
   const { toast } = useToast();
   const { companies } = useCompanies();
   const { companyIds: editLocationCompanyIds, saveCompanies } = useLocationCompanies(editLocationData?.id);
+
+  // Fetch all location-company mappings in bulk for the table
+  const { data: allLocationCompanyMap = {} } = useQuery({
+    queryKey: ['all-location-companies'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('warehouse_location_companies')
+        .select('location_id, company_id');
+      if (error) throw error;
+      const map: Record<string, string[]> = {};
+      for (const row of data || []) {
+        if (!map[row.location_id]) map[row.location_id] = [];
+        map[row.location_id].push(row.company_id);
+      }
+      return map;
+    },
+  });
 
   // Calculate statistics
   const stats = {
@@ -453,6 +472,7 @@ export default function WarehouseManagement() {
                   </TableHead>
                   <TableHead>Code</TableHead>
                   <TableHead>Name</TableHead>
+                  <TableHead>Company</TableHead>
                   <TableHead>Type</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Contact</TableHead>
@@ -465,7 +485,7 @@ export default function WarehouseManagement() {
               <TableBody>
                 {filteredLocations.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={11} className="text-center py-8 text-muted-foreground">
                       No locations found. Click "Manage Locations" to add one.
                     </TableCell>
                   </TableRow>
@@ -489,6 +509,19 @@ export default function WarehouseManagement() {
                               {location.description}
                             </div>
                           )}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex flex-wrap gap-1">
+                          {(allLocationCompanyMap[location.id] || (location.company_id ? [location.company_id] : [])).map((cid: string) => {
+                            const comp = companies.find(c => c.id === cid);
+                            return comp ? (
+                              <Badge key={cid} variant="outline" className="text-xs">
+                                {comp.code || comp.name}
+                              </Badge>
+                            ) : null;
+                          })}
+                          {!(allLocationCompanyMap[location.id]?.length || location.company_id) && '-'}
                         </div>
                       </TableCell>
                       <TableCell>{getTypeBadge(location.type)}</TableCell>
