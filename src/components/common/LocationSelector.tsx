@@ -10,12 +10,16 @@ import { useLocationFilter } from "@/contexts/LocationFilterContext";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useCurrentUserLocationPermissions } from "@/hooks/useCurrentUserLocationPermissions";
+import { useMemo } from "react";
 
 export function LocationSelector() {
   const { globalLocationId, setGlobalLocationId } = useLocationFilter();
   const { selectedCompany } = useCompany();
+  const { data: permissions } = useCurrentUserLocationPermissions();
 
-  const { data: locations } = useQuery({
+  // Fetch all locations for the selected company
+  const { data: companyLocations } = useQuery({
     queryKey: ['header-locations', selectedCompany?.id],
     queryFn: async () => {
       if (selectedCompany?.id) {
@@ -58,6 +62,28 @@ export function LocationSelector() {
       }
     },
   });
+
+  // Filter locations by user's view permissions
+  const locations = useMemo(() => {
+    if (!companyLocations) return [];
+    if (!permissions) return companyLocations; // still loading permissions, show all temporarily
+
+    // If user has view_all_locations, show all company locations
+    if (permissions.viewAllLocations) return companyLocations;
+
+    // Otherwise filter to only locations the user has view (or edit) permission for
+    const permittedIds = new Set([
+      ...permissions.viewLocationIds,
+      ...permissions.editLocationIds,
+    ]);
+
+    // If no permissions set at all (empty), show all (legacy/admin users)
+    if (permittedIds.size === 0 && !permissions.viewAllLocations) {
+      return companyLocations;
+    }
+
+    return companyLocations.filter((loc) => permittedIds.has(loc.id));
+  }, [companyLocations, permissions]);
 
   return (
     <div className="flex items-center gap-2 shrink-0">
