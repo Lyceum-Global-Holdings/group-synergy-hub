@@ -29,6 +29,7 @@ import { useItemMaster, useSerialNumbers, useInventoryStock } from "@/hooks/cons
 import { ITEM_CATEGORIES, type ItemCategory } from "@/types/construction-inventory";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AddItemDialog } from "./AddItemDialog";
+import { AddInventoryStockDialog } from "./AddInventoryStockDialog";
 import { EditSerialLocationDialog } from "./EditSerialLocationDialog";
 import { useLocationFilter } from "@/contexts/LocationFilterContext";
 
@@ -57,6 +58,7 @@ export function InventoryWiseView() {
   const [searchTerm, setSearchTerm] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [addDialogOpen, setAddDialogOpen] = useState(false);
+  const [addStockDialogOpen, setAddStockDialogOpen] = useState(false);
   const [addDialogCategory, setAddDialogCategory] = useState<ItemCategory>("machines");
   const [editSerialDialogOpen, setEditSerialDialogOpen] = useState(false);
   const [selectedSerial, setSelectedSerial] = useState<SerialData | null>(null);
@@ -124,7 +126,12 @@ export function InventoryWiseView() {
 
   const handleAddItem = (category: ItemCategory) => {
     setAddDialogCategory(category);
-    setAddDialogOpen(true);
+    // Machines use direct creation (serial tracking), bulk items select from Item Master
+    if (category === "machines") {
+      setAddDialogOpen(true);
+    } else {
+      setAddStockDialogOpen(true);
+    }
   };
 
   // Calculate total quantity for bulk items
@@ -325,10 +332,17 @@ export function InventoryWiseView() {
         </div>
       )}
 
-      {/* Add Item Dialog */}
+      {/* Add Item Dialog (machines only - serial tracking) */}
       <AddItemDialog
         open={addDialogOpen}
         onOpenChange={setAddDialogOpen}
+        category={addDialogCategory}
+      />
+
+      {/* Add Inventory Stock Dialog (bulk items - select from Item Master) */}
+      <AddInventoryStockDialog
+        open={addStockDialogOpen}
+        onOpenChange={setAddStockDialogOpen}
         category={addDialogCategory}
       />
 
