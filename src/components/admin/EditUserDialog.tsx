@@ -95,8 +95,8 @@ export const EditUserDialog: React.FC<EditUserDialogProps> = ({
   const assignModulesToUser = useAssignModulesToUser();
   const removeUserModule = useRemoveUserModule();
   const assignCompaniesToUser = useAssignCompaniesToUser();
-  const { data: locationPermissions = [] } = useUserLocationPermissions(user?.id);
-  const { data: userViewAll = false } = useUserViewAllLocations(user?.id);
+  const { data: locationPermissions = [], isLoading: locationPermissionsLoading } = useUserLocationPermissions(user?.id);
+  const { data: userViewAll = false, isLoading: viewAllLoading } = useUserViewAllLocations(user?.id);
   const saveLocationPermissions = useSaveUserLocationPermissions();
 
   // Effective company IDs for location filtering - must be before early return
@@ -104,14 +104,10 @@ export const EditUserDialog: React.FC<EditUserDialogProps> = ({
   const effectiveCompanyIds = React.useMemo(() => {
     const ids = new Set<string>();
     if (currentPrimaryCompany) ids.add(currentPrimaryCompany);
-    additionalCompanyIds.forEach(id => ids.add(id));
+    additionalCompanyIds.forEach((id) => ids.add(id));
     return Array.from(ids);
   }, [currentPrimaryCompany, additionalCompanyIds]);
   const { data: availableLocations = [], isLoading: locationsLoading } = useLocationsForCompanies(effectiveCompanyIds);
-
-  // Check if the selected role is admin or super_admin
-  const selectedRoleData = roles?.find(r => r.id === selectedRole);
-  const isAdminRole = selectedRoleData?.app_role === 'admin' || selectedRoleData?.app_role === 'super_admin';
 
   const form = useForm<EditUserFormData>({
     resolver: zodResolver(editUserSchema),
@@ -141,15 +137,27 @@ export const EditUserDialog: React.FC<EditUserDialogProps> = ({
     }
   }, [user, form]);
 
+  // Reset local location state when switching users to avoid stale carry-over
+  useEffect(() => {
+    setViewLocationIds([]);
+    setEditLocationIds([]);
+    setViewAllLocations(false);
+  }, [user?.id]);
+
   // Load user's location permissions
   useEffect(() => {
-    if (locationPermissions.length > 0) {
-      setViewLocationIds(locationPermissions.filter(p => p.permission_type === 'view').map(p => p.location_id));
-      setEditLocationIds(locationPermissions.filter(p => p.permission_type === 'edit').map(p => p.location_id));
-    } else {
-      setViewLocationIds([]);
-      setEditLocationIds([]);
-    }
+    const editIds = Array.from(
+      new Set(locationPermissions.filter((p) => p.permission_type === 'edit').map((p) => p.location_id))
+    );
+    const viewIds = Array.from(
+      new Set([
+        ...locationPermissions.filter((p) => p.permission_type === 'view').map((p) => p.location_id),
+        ...editIds,
+      ])
+    );
+
+    setViewLocationIds(viewIds);
+    setEditLocationIds(editIds);
   }, [locationPermissions]);
 
   // Load view all locations flag
@@ -157,15 +165,14 @@ export const EditUserDialog: React.FC<EditUserDialogProps> = ({
     setViewAllLocations(userViewAll);
   }, [userViewAll]);
 
-  // Load user's existing company access
+  // Load user's existing company access (exclude primary company from additional list)
   useEffect(() => {
-    if (userCompanyAccess.length > 0) {
-      const companyIds = userCompanyAccess.map(uca => uca.company_id);
-      setAdditionalCompanyIds(companyIds);
-    } else {
-      setAdditionalCompanyIds([]);
-    }
-  }, [userCompanyAccess]);
+    const companyIds = userCompanyAccess
+      .map((uca) => uca.company_id)
+      .filter((id): id is string => !!id && id !== currentPrimaryCompany);
+
+    setAdditionalCompanyIds(companyIds);
+  }, [userCompanyAccess, currentPrimaryCompany]);
 
   // Load user's module overrides
   useEffect(() => {
@@ -250,19 +257,15 @@ export const EditUserDialog: React.FC<EditUserDialogProps> = ({
         }
       }
 
-      // Handle additional company access for admin users
-      if (isAdminRole) {
-        await assignCompaniesToUser.mutateAsync({
-          userId: user.id,
-          companyIds: additionalCompanyIds,
-        });
-      } else {
-        // If not an admin role, clear any existing company access
-        await assignCompaniesToUser.mutateAsync({
-          userId: user.id,
-          companyIds: [],
-        });
-      }
+      // Handle company access (applies to all roles)
+      const scopedAdditionalCompanyIds = additionalCompanyIds.filter(
+        (companyId) => companyId && companyId !== data.company
+      );
+
+      await assignCompaniesToUser.mutateAsync({
+        userId: user.id,
+        companyIds: scopedAdditionalCompanyIds,
+      });
 
       // Handle module overrides - remove modules no longer in use
       const allOriginalModuleKeys = new Set([
@@ -305,11 +308,15 @@ export const EditUserDialog: React.FC<EditUserDialogProps> = ({
         }
       }
 
-      // Save location permissions
+      // Save location permissions (strictly scoped to currently assigned companies)
+      const allowedLocationIds = new Set(availableLocations.map((location) => location.id));
+      const scopedViewLocationIds = viewLocationIds.filter((id) => allowedLocationIds.has(id));
+      const scopedEditLocationIds = editLocationIds.filter((id) => allowedLocationIds.has(id));
+
       await saveLocationPermissions.mutateAsync({
         userId: user.id,
-        viewLocationIds,
-        editLocationIds,
+        viewLocationIds: scopedViewLocationIds,
+        editLocationIds: scopedEditLocationIds,
         viewAllLocations,
       });
 
@@ -332,11 +339,6 @@ export const EditUserDialog: React.FC<EditUserDialogProps> = ({
   const handleRoleChange = (roleId: string) => {
     setSelectedRole(roleId);
     form.setValue("role", roleId);
-    // Reset additional companies if switching away from admin role
-    const newRoleData = roles?.find(r => r.id === roleId);
-    if (newRoleData?.app_role !== 'admin' && newRoleData?.app_role !== 'super_admin') {
-      setAdditionalCompanyIds([]);
-    }
   };
 
   const handleGrantChange = (moduleKey: string, submoduleKey: string, granted: boolean) => {
@@ -512,13 +514,13 @@ export const EditUserDialog: React.FC<EditUserDialogProps> = ({
               )}
             />
 
-            {/* Additional Company Access - Only shown for admin roles */}
-            {isAdminRole && companies && companies.length > 1 && (
+            {/* Additional Company Access */}
+            {companies && companies.length > 1 && (
               <div className="space-y-3">
                 <div>
                   <FormLabel>Additional Company Access</FormLabel>
                   <FormDescription>
-                    Grant this admin user access to additional companies beyond their primary company.
+                    Grant this user access to additional companies beyond their primary company.
                   </FormDescription>
                 </div>
                 
@@ -548,7 +550,7 @@ export const EditUserDialog: React.FC<EditUserDialogProps> = ({
                 onViewLocationsChange={setViewLocationIds}
                 onEditLocationsChange={setEditLocationIds}
                 onViewAllLocationsChange={setViewAllLocations}
-                isLoading={locationsLoading}
+                isLoading={locationsLoading || locationPermissionsLoading || viewAllLoading}
               />
             </div>
 
@@ -574,9 +576,9 @@ export const EditUserDialog: React.FC<EditUserDialogProps> = ({
               </Button>
               <Button 
                 type="submit" 
-                disabled={updateProfile.isPending || assignRole.isPending || removeRole.isPending || saveLocationPermissions.isPending}
+                disabled={updateProfile.isPending || assignRole.isPending || removeRole.isPending || assignCompaniesToUser.isPending || assignModulesToUser.isPending || removeUserModule.isPending || saveLocationPermissions.isPending}
               >
-                {(updateProfile.isPending || assignRole.isPending || removeRole.isPending) ? "Updating..." : "Update User"}
+                {(updateProfile.isPending || assignRole.isPending || removeRole.isPending || assignCompaniesToUser.isPending || assignModulesToUser.isPending || removeUserModule.isPending || saveLocationPermissions.isPending) ? "Updating..." : "Update User"}
               </Button>
             </DialogFooter>
           </form>

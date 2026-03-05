@@ -21,8 +21,8 @@ export const useCurrentUserLocationPermissions = () => {
         supabase
           .from('profiles')
           .select('view_all_locations')
-          .eq('id', userId)
-          .single(),
+          .eq('user_id', userId)
+          .maybeSingle(),
         supabase
           .from('user_location_permissions')
           .select('location_id, permission_type')
