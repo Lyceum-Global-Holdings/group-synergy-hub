@@ -3,18 +3,20 @@ import { supabase } from '@/integrations/supabase/client';
 import { WarehouseBin, CreateWarehouseBinData } from '@/types/itemBin';
 import { useToast } from '@/hooks/use-toast';
 import { useCompany } from '@/contexts/CompanyContext';
+import { useCurrentUserLocationPermissions } from '@/hooks/useCurrentUserLocationPermissions';
 
 export const useWarehouseBins = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { selectedCompany, isViewingAllCompanies } = useCompany();
+  const { data: permissions } = useCurrentUserLocationPermissions();
 
   const {
     data: bins = [],
     isLoading,
     error
   } = useQuery({
-    queryKey: ['warehouse-bins', selectedCompany?.id, isViewingAllCompanies],
+    queryKey: ['warehouse-bins', selectedCompany?.id, isViewingAllCompanies, permissions?.viewAllLocations, permissions?.viewLocationIds, permissions?.editLocationIds],
     queryFn: async () => {
       let query = supabase
         .from('warehouse_bins')
@@ -24,6 +26,16 @@ export const useWarehouseBins = () => {
       // Filter by company if not viewing all companies
       if (!isViewingAllCompanies && selectedCompany?.id) {
         query = query.eq('company_id', selectedCompany.id);
+      }
+
+      // Filter by permitted locations if user doesn't have view_all_locations
+      if (permissions && !permissions.viewAllLocations) {
+        const permittedLocationIds = [...new Set([...permissions.viewLocationIds, ...permissions.editLocationIds])];
+        if (permittedLocationIds.length > 0) {
+          query = query.in('location_id', permittedLocationIds);
+        } else {
+          return [] as WarehouseBin[];
+        }
       }
 
       const { data, error } = await query;

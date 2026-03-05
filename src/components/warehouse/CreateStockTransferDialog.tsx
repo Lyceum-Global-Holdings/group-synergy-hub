@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -33,6 +33,7 @@ import { useWarehouseBins } from "@/hooks/useWarehouseBins";
 import { useWarehouseItems } from "@/hooks/useWarehouseItems";
 import { useWarehouseLocations } from "@/hooks/useWarehouseLocations";
 import { ItemSelector } from "@/components/common/ItemSelector";
+import { useCurrentUserLocationPermissions } from "@/hooks/useCurrentUserLocationPermissions";
 
 const formSchema = z.object({
   transfer_date: z.string(),
@@ -87,6 +88,14 @@ export function CreateStockTransferDialog({
   const { bins = [] } = useWarehouseBins();
   const { items: warehouseItems = [] } = useWarehouseItems();
   const { locations = [] } = useWarehouseLocations();
+  const { data: permissions } = useCurrentUserLocationPermissions();
+
+  // Filter bins to only show those at locations user can edit
+  const editableBins = useMemo(() => {
+    if (!permissions || permissions.viewAllLocations) return bins;
+    const editLocationIds = new Set(permissions.editLocationIds);
+    return bins.filter(b => editLocationIds.has(b.location_id));
+  }, [bins, permissions]);
 
   // Group bins by location for easier selection
   const getBinDisplayName = (bin: typeof bins[0]) => {
@@ -172,8 +181,8 @@ export function CreateStockTransferDialog({
     }
   };
 
-  const selectedFromBin = bins.find(b => b.id === form.watch("from_bin_id"));
-  const selectedToBin = bins.find(b => b.id === form.watch("to_bin_id"));
+  const selectedFromBin = editableBins.find(b => b.id === form.watch("from_bin_id"));
+  const selectedToBin = editableBins.find(b => b.id === form.watch("to_bin_id"));
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -280,7 +289,7 @@ export function CreateStockTransferDialog({
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {bins.map((bin) => (
+                          {editableBins.map((bin) => (
                             <SelectItem key={bin.id} value={bin.id}>
                               {getBinDisplayName(bin)}
                             </SelectItem>
@@ -313,7 +322,7 @@ export function CreateStockTransferDialog({
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {bins.map((bin) => (
+                          {editableBins.map((bin) => (
                             <SelectItem key={bin.id} value={bin.id}>
                               {getBinDisplayName(bin)}
                             </SelectItem>
