@@ -92,6 +92,8 @@ export const useSaveUserLocationPermissions = () => {
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['user-location-permissions', variables.userId] });
       queryClient.invalidateQueries({ queryKey: ['user-view-all-locations', variables.userId] });
+      queryClient.invalidateQueries({ queryKey: ['current-user-location-permissions'] });
+      queryClient.invalidateQueries({ queryKey: ['header-locations'] });
     },
   });
 };
