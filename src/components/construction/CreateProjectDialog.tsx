@@ -16,6 +16,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   useCreateProject,
   useUpdateProject,
@@ -26,6 +27,8 @@ import {
   PROJECT_STATUSES,
   PROJECT_TYPES,
 } from "@/types/construction";
+import { useCompanies } from "@/hooks/useCompanies";
+import { useLocationsForCompanies } from "@/hooks/useUserLocationPermissions";
 
 interface CreateProjectDialogProps {
   open: boolean;
@@ -41,6 +44,11 @@ export function CreateProjectDialog({
   const createProject = useCreateProject();
   const updateProject = useUpdateProject();
   const isEditing = !!editingProject;
+
+  const { companies = [] } = useCompanies();
+
+  const [selectedCompanyIds, setSelectedCompanyIds] = useState<string[]>([]);
+  const { data: locations = [] } = useLocationsForCompanies(selectedCompanyIds);
 
   const [formData, setFormData] = useState<CreateProjectData>({
     project_name: "",
@@ -59,6 +67,7 @@ export function CreateProjectDialog({
     contract_number: "",
     contract_value: undefined,
     notes: "",
+    location_id: "",
   });
 
   useEffect(() => {
@@ -80,7 +89,9 @@ export function CreateProjectDialog({
         contract_number: editingProject.contract_number || "",
         contract_value: editingProject.contract_value || undefined,
         notes: editingProject.notes || "",
+        location_id: editingProject.location_id || "",
       });
+      setSelectedCompanyIds(editingProject.company_ids || (editingProject.company_id ? [editingProject.company_id] : []));
     } else {
       setFormData({
         project_name: "",
@@ -99,17 +110,26 @@ export function CreateProjectDialog({
         contract_number: "",
         contract_value: undefined,
         notes: "",
+        location_id: "",
       });
+      setSelectedCompanyIds([]);
     }
   }, [editingProject, open]);
+
+  const handleCompanyToggle = (companyId: string, checked: boolean) => {
+    setSelectedCompanyIds((prev) =>
+      checked ? [...prev, companyId] : prev.filter((id) => id !== companyId)
+    );
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    const submitData = {
+    const submitData: CreateProjectData = {
       ...formData,
-      estimated_budget: formData.estimated_budget || null,
-      contract_value: formData.contract_value || null,
+      estimated_budget: formData.estimated_budget || undefined,
+      contract_value: formData.contract_value || undefined,
+      company_ids: selectedCompanyIds,
     };
 
     if (isEditing) {
@@ -141,6 +161,57 @@ export function CreateProjectDialog({
                 }
                 required
               />
+            </div>
+
+            {/* Company Multi-Select */}
+            <div className="col-span-2">
+              <Label>Companies *</Label>
+              <div className="border rounded-md p-3 max-h-40 overflow-y-auto space-y-2 mt-1">
+                {companies.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No companies available</p>
+                ) : (
+                  companies.map((company) => (
+                    <div key={company.id} className="flex items-center gap-2">
+                      <Checkbox
+                        id={`company-${company.id}`}
+                        checked={selectedCompanyIds.includes(company.id)}
+                        onCheckedChange={(checked) =>
+                          handleCompanyToggle(company.id, !!checked)
+                        }
+                      />
+                      <label
+                        htmlFor={`company-${company.id}`}
+                        className="text-sm cursor-pointer"
+                      >
+                        {company.name}
+                      </label>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            {/* Location Select */}
+            <div className="col-span-2">
+              <Label htmlFor="location_id">Location</Label>
+              <Select
+                value={formData.location_id || ""}
+                onValueChange={(value) =>
+                  setFormData({ ...formData, location_id: value === "_none" ? "" : value })
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select location" />
+                </SelectTrigger>
+                <SelectContent className="z-[200]">
+                  <SelectItem value="_none">No location</SelectItem>
+                  {locations.map((loc) => (
+                    <SelectItem key={loc.id} value={loc.id}>
+                      {loc.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="col-span-2">
@@ -182,16 +253,13 @@ export function CreateProjectDialog({
               <Select
                 value={formData.project_type || ""}
                 onValueChange={(value) =>
-                  setFormData({
-                    ...formData,
-                    project_type: value as any,
-                  })
+                  setFormData({ ...formData, project_type: value as any })
                 }
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select type" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="z-[200]">
                   {PROJECT_TYPES.map((type) => (
                     <SelectItem key={type.value} value={type.value}>
                       {type.label}
@@ -206,16 +274,13 @@ export function CreateProjectDialog({
               <Select
                 value={formData.status || "planning"}
                 onValueChange={(value) =>
-                  setFormData({
-                    ...formData,
-                    status: value as any,
-                  })
+                  setFormData({ ...formData, status: value as any })
                 }
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select status" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="z-[200]">
                   {PROJECT_STATUSES.map((status) => (
                     <SelectItem key={status.value} value={status.value}>
                       {status.label}

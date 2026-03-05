@@ -3991,6 +3991,42 @@ export type Database = {
           },
         ]
       }
+      construction_project_companies: {
+        Row: {
+          company_id: string
+          created_at: string
+          id: string
+          project_id: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          id?: string
+          project_id: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          id?: string
+          project_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "construction_project_companies_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "construction_project_companies_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "construction_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       construction_projects: {
         Row: {
           actual_cost: number | null
@@ -4010,6 +4046,7 @@ export type Database = {
           estimated_budget: number | null
           id: string
           latitude: number | null
+          location_id: string | null
           longitude: number | null
           notes: string | null
           project_code: string
@@ -4040,6 +4077,7 @@ export type Database = {
           estimated_budget?: number | null
           id?: string
           latitude?: number | null
+          location_id?: string | null
           longitude?: number | null
           notes?: string | null
           project_code: string
@@ -4070,6 +4108,7 @@ export type Database = {
           estimated_budget?: number | null
           id?: string
           latitude?: number | null
+          location_id?: string | null
           longitude?: number | null
           notes?: string | null
           project_code?: string
@@ -4088,6 +4127,13 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "construction_projects_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "warehouse_locations"
             referencedColumns: ["id"]
           },
         ]
