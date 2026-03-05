@@ -10841,6 +10841,7 @@ export type Database = {
           role: string | null
           updated_at: string
           user_id: string
+          view_all_locations: boolean
         }
         Insert: {
           avatar_url?: string | null
@@ -10853,6 +10854,7 @@ export type Database = {
           role?: string | null
           updated_at?: string
           user_id: string
+          view_all_locations?: boolean
         }
         Update: {
           avatar_url?: string | null
@@ -10865,6 +10867,7 @@ export type Database = {
           role?: string | null
           updated_at?: string
           user_id?: string
+          view_all_locations?: boolean
         }
         Relationships: [
           {
@@ -15852,6 +15855,41 @@ export type Database = {
           },
           {
             foreignKeyName: "user_location_assignments_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "warehouse_locations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_location_permissions: {
+        Row: {
+          created_at: string
+          id: string
+          location_id: string
+          permission_type: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          location_id: string
+          permission_type: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          location_id?: string
+          permission_type?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_location_permissions_location_id_fkey"
             columns: ["location_id"]
             isOneToOne: false
             referencedRelation: "warehouse_locations"
