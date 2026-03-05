@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -47,11 +47,11 @@ export const LocationManagementDialog = () => {
     company_ids: []
   });
 
-  const { 
-    locations, 
-    createLocation, 
-    updateLocation, 
-    deleteLocation,
+  const {
+    locations,
+    createLocation,
+    updateLocationAsync,
+    deleteLocationAsync,
     isCreating,
     isUpdating,
     isDeleting
@@ -62,7 +62,7 @@ export const LocationManagementDialog = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!formData.name.trim() || formData.company_ids.length === 0) return;
 
     const locationData = {
@@ -77,27 +77,31 @@ export const LocationManagementDialog = () => {
       physical_address: formData.physical_address || undefined,
       status: formData.status,
       warehouse_category: formData.warehouse_category as any,
-      company_id: formData.company_ids[0] // Keep first company as primary
+      company_id: formData.company_ids[0],
     };
 
-    if (editingLocation) {
-      updateLocation({ id: editingLocation, ...locationData });
-      await saveCompanies({ locationId: editingLocation, companyIds: formData.company_ids });
-    } else {
-      const created = await createLocation(locationData);
-      if (created?.id) {
-        await saveCompanies({ locationId: created.id, companyIds: formData.company_ids });
+    try {
+      if (editingLocation) {
+        await updateLocationAsync({ id: editingLocation, ...locationData });
+        await saveCompanies({ locationId: editingLocation, companyIds: formData.company_ids });
+      } else {
+        const created = await createLocation(locationData);
+        if (created?.id) {
+          await saveCompanies({ locationId: created.id, companyIds: formData.company_ids });
+        }
       }
-    }
 
-    resetForm();
+      resetForm();
+    } catch (error) {
+      console.error('Failed to save location with company mapping:', error);
+    }
   };
 
   const resetForm = () => {
-    setFormData({ 
-      name: '', 
-      type: 'location', 
-      parent_id: 'none', 
+    setFormData({
+      name: '',
+      type: 'location',
+      parent_id: 'none',
       description: '',
       location_code: '',
       capacity: '',
@@ -111,7 +115,13 @@ export const LocationManagementDialog = () => {
     setEditingLocation(null);
   };
 
+  useEffect(() => {
+    if (!editingLocation || editCompanyIds.length === 0) return;
+    setFormData(prev => ({ ...prev, company_ids: editCompanyIds }));
+  }, [editCompanyIds, editingLocation]);
+
   const handleEdit = (location: any) => {
+    setEditingLocation(location.id);
     setFormData({
       name: location.name,
       type: location.type,
@@ -124,14 +134,17 @@ export const LocationManagementDialog = () => {
       physical_address: location.physical_address || '',
       status: location.status || 'active',
       warehouse_category: location.warehouse_category || 'general',
-      company_ids: editCompanyIds.length > 0 ? editCompanyIds : (location.company_id ? [location.company_id] : [])
+      company_ids: location.company_id ? [location.company_id] : []
     });
-    setEditingLocation(location.id);
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (confirm('Are you sure you want to delete this location?')) {
-      deleteLocation(id);
+      try {
+        await deleteLocationAsync(id);
+      } catch (error) {
+        console.error('Failed to delete location:', error);
+      }
     }
   };
 
@@ -372,7 +385,7 @@ export const LocationManagementDialog = () => {
               <div className="flex gap-2">
                 <Button 
                   type="submit" 
-                  disabled={isCreating || isUpdating}
+                  disabled={isCreating || isUpdating || !formData.name.trim() || formData.company_ids.length === 0}
                   className="flex-1"
                 >
                   <Plus className="h-4 w-4 mr-2" />

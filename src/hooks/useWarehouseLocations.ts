@@ -31,6 +31,15 @@ export const useWarehouseLocations = () => {
     }
   });
 
+  const invalidateLocationQueries = async () => {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['warehouse-locations'] }),
+      queryClient.invalidateQueries({ queryKey: ['header-locations'] }),
+      queryClient.invalidateQueries({ queryKey: ['dashboard-locations'] }),
+      queryClient.invalidateQueries({ queryKey: ['location-companies'] }),
+    ]);
+  };
+
   const createLocationMutation = useMutation({
     mutationFn: async (locationData: CreateWarehouseLocationData) => {
       const { data: { user } } = await supabase.auth.getUser();
@@ -48,8 +57,8 @@ export const useWarehouseLocations = () => {
       if (error) throw error;
       return data;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['warehouse-locations'] });
+    onSuccess: async () => {
+      await invalidateLocationQueries();
       toast({
         title: "Success",
         description: "Location created successfully",
@@ -77,8 +86,8 @@ export const useWarehouseLocations = () => {
       if (error) throw error;
       return data;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['warehouse-locations'] });
+    onSuccess: async () => {
+      await invalidateLocationQueries();
       toast({
         title: "Success",
         description: "Location updated successfully",
@@ -103,8 +112,8 @@ export const useWarehouseLocations = () => {
 
       if (error) throw error;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['warehouse-locations'] });
+    onSuccess: async () => {
+      await invalidateLocationQueries();
       toast({
         title: "Success",
         description: "Location deleted successfully",
@@ -129,8 +138,8 @@ export const useWarehouseLocations = () => {
 
       if (error) throw error;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['warehouse-locations'] });
+    onSuccess: async () => {
+      await invalidateLocationQueries();
     },
     onError: (error) => {
       console.error('Error bulk deleting locations:', error);
@@ -147,8 +156,8 @@ export const useWarehouseLocations = () => {
 
       if (error) throw error;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['warehouse-locations'] });
+    onSuccess: async () => {
+      await invalidateLocationQueries();
     },
     onError: (error) => {
       console.error('Error bulk updating status:', error);
@@ -168,7 +177,9 @@ export const useWarehouseLocations = () => {
     error,
     createLocation: createLocationMutation.mutateAsync,
     updateLocation: updateLocationMutation.mutate,
+    updateLocationAsync: updateLocationMutation.mutateAsync,
     deleteLocation: deleteLocationMutation.mutate,
+    deleteLocationAsync: deleteLocationMutation.mutateAsync,
     bulkDeleteLocations: bulkDeleteLocationsMutation.mutateAsync,
     bulkUpdateStatus: (ids: string[], status: string) => bulkUpdateStatusMutation.mutateAsync({ ids, status }),
     getLocationsByCategory,
@@ -178,23 +189,47 @@ export const useWarehouseLocations = () => {
   };
 };
 
-/** Lightweight hook for dashboard location filter — includes shared (null company_id) locations */
+/** Lightweight hook for dashboard location filter */
 export const useDashboardLocations = (selectedCompanyId?: string | null) => {
   return useQuery({
     queryKey: ['dashboard-locations', selectedCompanyId],
     queryFn: async () => {
-      let query = supabase
-        .from('warehouse_locations')
-        .select('id, name, type')
-        .order('name');
+      if (!selectedCompanyId) {
+        const { data, error } = await supabase
+          .from('warehouse_locations')
+          .select('id, name, type')
+          .order('name');
 
-      if (selectedCompanyId) {
-        query = query.or(`company_id.eq.${selectedCompanyId},company_id.is.null`);
+        if (error) throw error;
+        return data;
       }
 
-      const { data, error } = await query;
-      if (error) throw error;
-      return data;
+      const [{ data: mappedRows, error: mappedError }, { data: legacyRows, error: legacyError }] = await Promise.all([
+        supabase
+          .from('warehouse_location_companies')
+          .select('warehouse_locations!inner(id, name, type)')
+          .eq('company_id', selectedCompanyId),
+        supabase
+          .from('warehouse_locations')
+          .select('id, name, type')
+          .or(`company_id.eq.${selectedCompanyId},company_id.is.null`),
+      ]);
+
+      if (mappedError) throw mappedError;
+      if (legacyError) throw legacyError;
+
+      const merged = new Map<string, { id: string; name: string; type: string }>();
+
+      (mappedRows || []).forEach((row: any) => {
+        const loc = row.warehouse_locations;
+        if (loc?.id) merged.set(loc.id, loc);
+      });
+
+      (legacyRows || []).forEach((loc: any) => {
+        if (loc?.id) merged.set(loc.id, loc);
+      });
+
+      return Array.from(merged.values()).sort((a, b) => a.name.localeCompare(b.name));
     },
   });
 };

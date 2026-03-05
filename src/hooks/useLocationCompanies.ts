@@ -20,23 +20,26 @@ export function useLocationCompanies(locationId?: string | null) {
 
   const saveCompanies = useMutation({
     mutationFn: async ({ locationId, companyIds }: { locationId: string; companyIds: string[] }) => {
-      // Delete existing
-      await supabase
+      const { error: deleteError } = await supabase
         .from('warehouse_location_companies')
         .delete()
         .eq('location_id', locationId);
 
-      // Insert new
+      if (deleteError) throw deleteError;
+
       if (companyIds.length > 0) {
-        const { error } = await supabase
+        const { error: insertError } = await supabase
           .from('warehouse_location_companies')
           .insert(companyIds.map(cid => ({ location_id: locationId, company_id: cid })));
-        if (error) throw error;
+
+        if (insertError) throw insertError;
       }
     },
     onSuccess: (_, vars) => {
       queryClient.invalidateQueries({ queryKey: ['location-companies', vars.locationId] });
       queryClient.invalidateQueries({ queryKey: ['warehouse-locations'] });
+      queryClient.invalidateQueries({ queryKey: ['header-locations'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-locations'] });
     },
   });
 
