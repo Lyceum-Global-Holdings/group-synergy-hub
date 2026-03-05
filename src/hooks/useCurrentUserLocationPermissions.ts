@@ -1,20 +1,30 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useIsAdmin, useSuperAdmin } from '@/hooks/useSuperAdmin';
 
 /**
  * Fetches the current logged-in user's location permissions.
  * Returns { viewAllLocations, viewLocationIds, editLocationIds }
  * so the header LocationSelector and data views can filter accordingly.
+ * 
+ * Admins and Super Admins automatically get viewAllLocations = true.
  */
 export const useCurrentUserLocationPermissions = () => {
   const { user } = useAuth();
   const userId = user?.id;
+  const { data: isAdmin = false } = useIsAdmin();
+  const { data: isSuperAdmin = false } = useSuperAdmin();
 
   return useQuery({
-    queryKey: ['current-user-location-permissions', userId],
+    queryKey: ['current-user-location-permissions', userId, isAdmin, isSuperAdmin],
     queryFn: async () => {
       if (!userId) return { viewAllLocations: false, viewLocationIds: [] as string[], editLocationIds: [] as string[] };
+
+      // Admins/Super Admins always see all locations
+      if (isAdmin || isSuperAdmin) {
+        return { viewAllLocations: true, viewLocationIds: [] as string[], editLocationIds: [] as string[] };
+      }
 
       // Fetch view_all_locations flag and permissions in parallel
       const [profileRes, permRes] = await Promise.all([
