@@ -2,10 +2,21 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Users, Building2, MapPin, FolderOpen, UserCheck, UserX, Briefcase } from "lucide-react";
 import { useLabourDirectory } from "@/hooks/construction/useLabourMaster";
 import { useProjects } from "@/hooks/construction/useProjects";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 
 export function LabourDashboard() {
   const { data: labourMaster, isLoading } = useLabourDirectory();
   const { data: projects = [] } = useProjects();
+  const { data: locations = [] } = useQuery({
+    queryKey: ["warehouse-locations-lookup"],
+    queryFn: async () => {
+      const { data } = await supabase.from("warehouse_locations").select("id, name");
+      return data || [];
+    },
+  });
+
+  const locationMap = new Map(locations.map(l => [l.id, l.name]));
 
   // Create a project lookup map
   const projectMap = new Map(projects.map(p => [p.id, p]));
@@ -31,10 +42,9 @@ export function LabourDashboard() {
     return acc;
   }, {} as Record<string, number>) || {};
 
-  // Location-wise count (using location_id field with joined location name)
+  // Location-wise count (resolve location_id to name via locationMap)
   const locationCount = labourMaster?.reduce((acc, labour) => {
-    const labourWithLocation = labour as typeof labour & { location?: { id: string; name: string } | null };
-    const locationName = labourWithLocation.location?.name || "Unassigned";
+    const locationName = labour.location_id ? (locationMap.get(labour.location_id) || "Unknown Location") : "Unassigned";
     acc[locationName] = (acc[locationName] || 0) + 1;
     return acc;
   }, {} as Record<string, number>) || {};
