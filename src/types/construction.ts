@@ -7,6 +7,7 @@ export type TeamRole = 'project_manager' | 'site_engineer' | 'supervisor' | 'saf
 export interface ConstructionProject {
   id: string;
   company_id: string | null;
+  location_id: string | null;
   project_code: string;
   project_name: string;
   description: string | null;
@@ -33,6 +34,8 @@ export interface ConstructionProject {
   created_by: string | null;
   created_at: string;
   updated_at: string;
+  // Joined from junction table
+  company_ids?: string[];
 }
 
 export interface ProjectSite {
@@ -108,6 +111,8 @@ export interface CreateProjectData {
   contract_number?: string;
   contract_value?: number;
   notes?: string;
+  location_id?: string;
+  company_ids?: string[];
 }
 
 export interface UpdateProjectData extends Partial<CreateProjectData> {
