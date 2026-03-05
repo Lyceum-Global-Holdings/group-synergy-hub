@@ -3,18 +3,20 @@ import { supabase } from '@/integrations/supabase/client';
 import { WarehouseItem, CreateWarehouseItemData } from '@/types/itemBin';
 import { useToast } from '@/hooks/use-toast';
 import { useCompany } from '@/contexts/CompanyContext';
+import { useCurrentUserLocationPermissions } from '@/hooks/useCurrentUserLocationPermissions';
 
 export const useWarehouseItems = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { selectedCompany, isViewingAllCompanies } = useCompany();
+  const { data: permissions } = useCurrentUserLocationPermissions();
 
   const {
     data: items = [],
     isLoading,
     error
   } = useQuery({
-    queryKey: ['warehouse-items', selectedCompany?.id, isViewingAllCompanies],
+    queryKey: ['warehouse-items', selectedCompany?.id, isViewingAllCompanies, permissions?.viewAllLocations, permissions?.viewLocationIds, permissions?.editLocationIds],
     queryFn: async () => {
       let query = supabase
         .from('warehouse_items')
@@ -33,43 +35,51 @@ export const useWarehouseItems = () => {
       if (error) throw error;
 
       // Fetch bin allocations for all items using separate queries (more reliable than nested syntax)
-      // Fetch bin allocations for all items
       const itemIds = data?.map((item: any) => item.id) || [];
       let itemsWithBins = data || [];
 
       if (itemIds.length > 0) {
-        // Fetch all bins first
-        const { data: bins } = await supabase
+        // Fetch all bins with location_id for permission filtering
+        let binsQuery = supabase
           .from('warehouse_bins')
-          .select('id, bin_code, name');
+          .select('id, bin_code, name, location_id');
 
-        // Fetch ALL allocations with stock (avoid .in() URL limit with 665+ items)
+        // Filter bins by permitted locations if user doesn't have view_all_locations
+        if (permissions && !permissions.viewAllLocations) {
+          const permittedLocationIds = [...new Set([...permissions.viewLocationIds, ...permissions.editLocationIds])];
+          if (permittedLocationIds.length > 0) {
+            binsQuery = binsQuery.in('location_id', permittedLocationIds);
+          } else {
+            // No location permissions — return items with no bin data
+            return (data || []).map((item: any) => ({ ...item, bins: null })) as WarehouseItem[];
+          }
+        }
+
+        const { data: bins } = await binsQuery;
+
+        // Create a set of permitted bin IDs for fast lookup
+        const permittedBinIds = new Set(bins?.map(b => b.id) || []);
+
+        // Fetch ALL allocations with stock
         const { data: allocations, error: allocError } = await supabase
           .from('warehouse_bin_allocations')
           .select('warehouse_item_id, bin_id, available_quantity')
           .gt('available_quantity', 0);
 
-        console.log('Bins fetched:', bins?.length);
-        console.log('Allocations fetched:', allocations?.length);
-        
-        // Create Set of item IDs for fast O(1) lookup
         const itemIdSet = new Set(itemIds);
 
         if (!allocError && allocations && bins) {
-          // Create a bin lookup map for O(1) access
           const binLookup = new Map(bins.map(b => [b.id, b]));
 
-          // Group allocations by item_id (only for items in our list)
           const binsByItem: Record<string, Array<{ id: string; bin_code: string; name: string; quantity: number }>> = {};
           allocations.forEach((alloc: any) => {
             const itemId = alloc.warehouse_item_id;
-            
-            // Only process if this allocation belongs to one of our items
             if (!itemIdSet.has(itemId)) return;
             
-            const bin = binLookup.get(alloc.bin_id);
+            // Only include allocations from permitted bins
+            if (!permittedBinIds.has(alloc.bin_id)) return;
             
-            // Skip if bin not found (orphaned allocation)
+            const bin = binLookup.get(alloc.bin_id);
             if (!bin) return;
             
             if (!binsByItem[itemId]) binsByItem[itemId] = [];
@@ -87,9 +97,6 @@ export const useWarehouseItems = () => {
             }
           });
 
-          console.log('Items with bins:', Object.keys(binsByItem).length);
-
-          // Create new array with bins attached (immutable update for React)
           itemsWithBins = data?.map((item: any) => ({
             ...item,
             bins: binsByItem[item.id] || null

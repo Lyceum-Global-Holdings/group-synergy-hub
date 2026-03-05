@@ -3,6 +3,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useQuery } from "@tanstack/react-query";
+import { useCurrentUserLocationPermissions } from "@/hooks/useCurrentUserLocationPermissions";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -90,6 +91,7 @@ export function ItemTransferDialog({
   const { bins = [] } = useWarehouseBins();
   const { locations = [] } = useWarehouseLocations();
   const { units } = useItemUnits();
+  const { data: permissions } = useCurrentUserLocationPermissions();
 
   // State for verification dialog
   const [showVerificationDialog, setShowVerificationDialog] = useState(false);
@@ -132,8 +134,13 @@ export function ItemTransferDialog({
     enabled: !!item?.id && open,
   });
 
-  // Get bins with stock for this item
+  // Get bins with stock for this item, filtered by edit permissions
   const binsWithStock = useMemo(() => {
+    // Build set of edit-permitted location IDs
+    const editLocationIds = permissions && !permissions.viewAllLocations
+      ? new Set([...permissions.editLocationIds])
+      : null; // null means all locations permitted
+
     return itemBinAllocations.map((allocation: any) => {
       const bin = allocation.warehouse_bins;
       const location = locations.find(l => l.id === bin?.location_id);
@@ -141,11 +148,17 @@ export function ItemTransferDialog({
         binId: bin?.id,
         binCode: bin?.bin_code,
         binName: bin?.name,
+        locationId: bin?.location_id,
         locationName: location?.name || "Unassigned",
         availableQty: Number(allocation.available_quantity) || 0,
       };
-    }).filter(b => b.binId);
-  }, [itemBinAllocations, locations]);
+    }).filter(b => {
+      if (!b.binId) return false;
+      // Filter by edit permissions for source bins
+      if (editLocationIds && !editLocationIds.has(b.locationId)) return false;
+      return true;
+    });
+  }, [itemBinAllocations, locations, permissions]);
 
   const getBinDisplayName = (bin: typeof bins[0]) => {
     const location = locations.find(l => l.id === bin.location_id);
