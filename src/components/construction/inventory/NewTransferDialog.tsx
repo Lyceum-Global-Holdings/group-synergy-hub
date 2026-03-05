@@ -22,6 +22,7 @@ import { useItemMaster, useSerialNumbers, useLocations, useInventoryStock } from
 import { useCreateTransfer } from "@/hooks/construction/useCreateTransfer";
 import { ITEM_CATEGORIES, type ItemCategory } from "@/types/construction-inventory";
 import { useCompany } from "@/contexts/CompanyContext";
+import { useCurrentUserLocationPermissions } from "@/hooks/useCurrentUserLocationPermissions";
 import { toast } from "sonner";
 
 interface NewTransferDialogProps {
@@ -43,9 +44,18 @@ export function NewTransferDialog({ open, onOpenChange }: NewTransferDialogProps
 
   // Fetch data
   const { data: allItems, isLoading: itemsLoading } = useItemMaster(category as ItemCategory | undefined);
-  const { data: locations, isLoading: locationsLoading } = useLocations();
+  const { data: allLocations, isLoading: locationsLoading } = useLocations();
   const { data: allSerials, isLoading: serialsLoading } = useSerialNumbers();
   const { data: stockData } = useInventoryStock();
+  const { data: permissions } = useCurrentUserLocationPermissions();
+
+  // Filter locations by user permissions (edit access required for transfers)
+  const locations = useMemo(() => {
+    if (!allLocations || !permissions) return [];
+    if (permissions.viewAllLocations) return allLocations;
+    const permittedIds = new Set([...permissions.editLocationIds]);
+    return allLocations.filter(loc => permittedIds.has(loc.id));
+  }, [allLocations, permissions]);
   
   const createTransfer = useCreateTransfer();
 
