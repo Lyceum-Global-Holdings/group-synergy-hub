@@ -35,6 +35,56 @@ export function useLabourMaster() {
   });
 }
 
+export function useLabourDirectory() {
+  const { selectedCompany } = useCompany();
+
+  return useQuery({
+    queryKey: ["labour-directory", selectedCompany?.id],
+    queryFn: async () => {
+      let query = supabase
+        .from("construction_labour_directory")
+        .select("*")
+        .order("created_at", { ascending: false });
+
+      if (selectedCompany?.id) {
+        query = query.or(`company_id.eq.${selectedCompany.id},company_id.is.null`);
+      } else {
+        query = query.is("company_id", null);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+
+      return (data ?? [])
+        .filter((row) => !!row.id)
+        .map((row) => ({
+          id: row.id!,
+          company_id: row.company_id,
+          employee_id: row.employee_id,
+          epf_no: row.epf_no,
+          name: row.name ?? "Unnamed",
+          trade: row.trade,
+          category: row.category,
+          labour_company: row.labour_company,
+          skill_level: row.skill_level,
+          contact_number: row.contact_number,
+          email: row.email,
+          hourly_rate: row.hourly_rate,
+          daily_rate: row.daily_rate,
+          status: row.status ?? "inactive",
+          notes: row.notes,
+          project_id: row.project_id,
+          location_id: row.location_id,
+          created_by: row.created_by,
+          created_at: row.created_at ?? new Date(0).toISOString(),
+          updated_at: row.updated_at ?? row.created_at ?? new Date(0).toISOString(),
+        })) as LabourMaster[];
+    },
+    staleTime: 0,
+    refetchOnMount: "always",
+  });
+}
+
 export function useCreateLabourMaster() {
   const queryClient = useQueryClient();
   const { toast } = useToast();

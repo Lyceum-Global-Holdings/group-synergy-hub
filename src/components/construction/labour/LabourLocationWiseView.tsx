@@ -18,7 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useLabourMaster } from "@/hooks/construction/useLabourMaster";
+import { useLabourDirectory } from "@/hooks/construction/useLabourMaster";
 import { useProjects } from "@/hooks/construction/useProjects";
 import { useWarehouseLocations } from "@/hooks/useWarehouseLocations";
 import { useCurrentUserLocationPermissions } from "@/hooks/useCurrentUserLocationPermissions";
@@ -49,7 +49,7 @@ export function LabourLocationWiseView() {
   const [locationFilter, setLocationFilter] = useState<string>("all");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
 
-  const { data: labourMaster, isLoading } = useLabourMaster();
+  const { data: labourMaster, isLoading } = useLabourDirectory();
   const { data: projects = [] } = useProjects();
   const { locations: warehouseLocations = [] } = useWarehouseLocations();
   const { data: permissions } = useCurrentUserLocationPermissions();

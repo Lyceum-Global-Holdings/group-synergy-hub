@@ -1,10 +1,10 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Users, Building2, MapPin, FolderOpen, UserCheck, UserX, Briefcase } from "lucide-react";
-import { useLabourMaster } from "@/hooks/construction/useLabourMaster";
+import { useLabourDirectory } from "@/hooks/construction/useLabourMaster";
 import { useProjects } from "@/hooks/construction/useProjects";
 
 export function LabourDashboard() {
-  const { data: labourMaster, isLoading } = useLabourMaster();
+  const { data: labourMaster, isLoading } = useLabourDirectory();
   const { data: projects = [] } = useProjects();
 
   // Create a project lookup map
