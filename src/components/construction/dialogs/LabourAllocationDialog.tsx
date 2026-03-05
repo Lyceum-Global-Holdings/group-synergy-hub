@@ -10,8 +10,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useUpdateLabourMaster } from "@/hooks/construction/useLabourMaster";
 import { useProjects } from "@/hooks/construction/useProjects";
 import { useWarehouseLocations } from "@/hooks/useWarehouseLocations";
+import { useCurrentUserLocationPermissions } from "@/hooks/useCurrentUserLocationPermissions";
 import type { LabourMaster } from "@/types/construction";
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { Badge } from "@/components/ui/badge";
 
 const formSchema = z.object({
@@ -37,14 +38,21 @@ export function LabourAllocationDialog({ open, onOpenChange, labour }: LabourAll
   const updateMutation = useUpdateLabourMaster();
   const { data: projects = [] } = useProjects();
   const { locations: warehouseLocations = [] } = useWarehouseLocations();
+  const { data: permissions } = useCurrentUserLocationPermissions();
 
   // Filter to only active projects
   const activeProjects = projects.filter(p => p.status === 'active' || p.status === 'planning');
   
-  // Filter to active top-level locations
-  const activeLocations = warehouseLocations.filter(loc => 
-    loc.type === 'location' && loc.status === 'active'
-  );
+  // Filter locations to only those the user has edit permission for
+  const activeLocations = useMemo(() => {
+    const allActive = warehouseLocations.filter(loc => 
+      loc.type === 'location' && loc.status === 'active'
+    );
+    if (!permissions) return [];
+    if (permissions.viewAllLocations) return allActive;
+    const permittedIds = new Set([...permissions.editLocationIds]);
+    return allActive.filter(loc => permittedIds.has(loc.id));
+  }, [warehouseLocations, permissions]);
 
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
