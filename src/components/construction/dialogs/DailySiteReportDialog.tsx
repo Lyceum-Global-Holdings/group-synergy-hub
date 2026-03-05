@@ -37,6 +37,7 @@ import { Separator } from "@/components/ui/separator";
 import { useProjects } from "@/hooks/construction/useProjects";
 import { useCreateDailySiteReport, useUpdateDailySiteReport } from "@/hooks/construction/useDailySiteReports";
 import { useDailyMaterialsActivity } from "@/hooks/construction/useDailyMaterialsActivity";
+import { useConstructionSites } from "@/hooks/construction/useConstructionSites";
 import { useWarehouseLocations } from "@/hooks/useWarehouseLocations";
 import { DailySiteReport, WEATHER_CONDITIONS } from "@/types/construction";
 import { useEffect, useState, useCallback } from "react";
@@ -73,13 +74,14 @@ interface DailySiteReportDialogProps {
 }
 
 export function DailySiteReportDialog({ open, onOpenChange, report }: DailySiteReportDialogProps) {
-  const { data: projects } = useProjects();
+  const { data: projects, isLoading: projectsLoading } = useProjects();
   const { selectedCompany } = useCompany();
   const { locations } = useWarehouseLocations();
+  const { data: constructionSites } = useConstructionSites();
   const createReport = useCreateDailySiteReport();
   const [attendanceSummary, setAttendanceSummary] = useState<AttendanceSummary | null>(null);
 
-  // Filter locations to show only project sites
+  // Filter locations to show only project sites - combine warehouse locations and construction sites
   const siteLocations = locations?.filter(loc => loc.type === 'location') || [];
   const updateReport = useUpdateDailySiteReport();
 
@@ -164,22 +166,22 @@ export function DailySiteReportDialog({ open, onOpenChange, report }: DailySiteR
     }
     
     try {
-      const payload = {
+      const payload: Record<string, any> = {
         project_id: data.project_id,
         report_date: data.report_date,
-        location_id: data.location_id || undefined,
-        weather_conditions: data.weather_conditions || undefined,
-        temperature_high: data.temperature_high || undefined,
-        temperature_low: data.temperature_low || undefined,
-        skilled_labor_count: data.skilled_labor_count || undefined,
-        unskilled_labor_count: data.unskilled_labor_count || undefined,
-        subcontractor_count: data.subcontractor_count || undefined,
-        visitor_count: data.visitor_count || undefined,
-        work_summary: data.work_summary || undefined,
-        delays_issues: data.delays_issues || undefined,
-        materials_received: data.materials_received || undefined,
-        equipment_on_site: data.equipment_on_site || undefined,
-        safety_observations: data.safety_observations || undefined,
+        location_id: data.location_id || null,
+        weather_conditions: data.weather_conditions || null,
+        temperature_high: data.temperature_high || null,
+        temperature_low: data.temperature_low || null,
+        skilled_labor_count: data.skilled_labor_count || null,
+        unskilled_labor_count: data.unskilled_labor_count || null,
+        subcontractor_count: data.subcontractor_count || null,
+        visitor_count: data.visitor_count || null,
+        work_summary: data.work_summary || null,
+        delays_issues: data.delays_issues || null,
+        materials_received: data.materials_received || null,
+        equipment_on_site: data.equipment_on_site || null,
+        safety_observations: data.safety_observations || null,
       };
       
       if (report) {
@@ -212,18 +214,24 @@ export function DailySiteReportDialog({ open, onOpenChange, report }: DailySiteR
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Project *</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
+                    <Select onValueChange={field.onChange} value={field.value} defaultValue={field.value}>
                       <FormControl>
                         <SelectTrigger>
-                          <SelectValue placeholder="Select project" />
+                          <SelectValue placeholder={projectsLoading ? "Loading projects..." : "Select project"} />
                         </SelectTrigger>
                       </FormControl>
-                      <SelectContent>
-                        {projects?.map((project) => (
-                          <SelectItem key={project.id} value={project.id}>
-                            {project.project_name}
-                          </SelectItem>
-                        ))}
+                      <SelectContent className="z-[200]">
+                        {projects && projects.length > 0 ? (
+                          projects.map((project) => (
+                            <SelectItem key={project.id} value={project.id}>
+                              {project.project_name}
+                            </SelectItem>
+                          ))
+                        ) : (
+                          <div className="px-3 py-2 text-sm text-muted-foreground">
+                            {projectsLoading ? "Loading..." : "No projects found"}
+                          </div>
+                        )}
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -257,10 +265,15 @@ export function DailySiteReportDialog({ open, onOpenChange, report }: DailySiteR
                           <SelectValue placeholder="Select location" />
                         </SelectTrigger>
                       </FormControl>
-                      <SelectContent>
+                      <SelectContent className="z-[200]">
                         {siteLocations.map((location) => (
                           <SelectItem key={location.id} value={location.id}>
                             {location.name} {location.location_code ? `(${location.location_code})` : ""}
+                          </SelectItem>
+                        ))}
+                        {constructionSites && constructionSites.map((site) => (
+                          <SelectItem key={site.id} value={site.id}>
+                            {site.site_name} {site.site_code ? `(${site.site_code})` : ""}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -284,7 +297,7 @@ export function DailySiteReportDialog({ open, onOpenChange, report }: DailySiteR
                           <SelectValue placeholder="Select weather" />
                         </SelectTrigger>
                       </FormControl>
-                      <SelectContent>
+                      <SelectContent className="z-[200]">
                         {WEATHER_CONDITIONS.map((w) => (
                           <SelectItem key={w} value={w}>
                             {w}

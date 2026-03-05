@@ -57,15 +57,38 @@ export function useCreateDailySiteReport() {
   const { selectedCompany } = useCompany();
 
   return useMutation({
-    mutationFn: async (data: CreateDailySiteReportData) => {
+    mutationFn: async (data: Record<string, any>) => {
       const { data: user } = await supabase.auth.getUser();
-      
-      const insertData = {
-        ...data,
+
+      // Generate report_number: DSR-YYYYMMDD-XXXX
+      const datePart = (data.report_date || format(new Date(), "yyyy-MM-dd")).replace(/-/g, "");
+      const randomSuffix = Math.random().toString(36).substring(2, 6).toUpperCase();
+      const reportNumber = `DSR-${datePart}-${randomSuffix}`;
+
+      const insertData: Record<string, any> = {
+        project_id: data.project_id,
+        report_date: data.report_date,
+        report_number: reportNumber,
         company_id: selectedCompany?.id,
         submitted_by: user.user?.id,
+        status: "draft",
       };
-      
+
+      // Map optional fields
+      if (data.location_id) insertData.location_id = data.location_id;
+      if (data.weather_conditions) insertData.weather_conditions = data.weather_conditions;
+      if (data.temperature_high != null) insertData.temperature_high = data.temperature_high;
+      if (data.temperature_low != null) insertData.temperature_low = data.temperature_low;
+      if (data.skilled_labor_count != null) insertData.skilled_labor_count = data.skilled_labor_count;
+      if (data.unskilled_labor_count != null) insertData.unskilled_labor_count = data.unskilled_labor_count;
+      if (data.subcontractor_count != null) insertData.subcontractor_count = data.subcontractor_count;
+      if (data.visitor_count != null) insertData.visitor_count = data.visitor_count;
+      if (data.work_summary) insertData.work_summary = data.work_summary;
+      if (data.delays_issues) insertData.delays_issues = data.delays_issues;
+      if (data.materials_received) insertData.materials_received = data.materials_received;
+      if (data.equipment_on_site) insertData.equipment_on_site = data.equipment_on_site;
+      if (data.safety_observations) insertData.safety_observations = data.safety_observations;
+
       const { data: result, error } = await supabase
         .from("daily_site_reports")
         .insert(insertData as any)
