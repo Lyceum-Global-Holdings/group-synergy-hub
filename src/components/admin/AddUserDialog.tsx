@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { Eye, EyeOff } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -58,6 +59,7 @@ export const AddUserDialog: React.FC<AddUserDialogProps> = ({
   onOpenChange,
   onUserAdded,
 }) => {
+  const [showPassword, setShowPassword] = useState(false);
   const [selectedRole, setSelectedRole] = useState<string>("");
   const [additionalCompanyIds, setAdditionalCompanyIds] = useState<string[]>([]);
   const [hasCustomizedCompanyAccess, setHasCustomizedCompanyAccess] = useState(false);
@@ -362,7 +364,17 @@ export const AddUserDialog: React.FC<AddUserDialogProps> = ({
                   <FormItem>
                     <FormLabel>Password</FormLabel>
                     <FormControl>
-                      <Input placeholder="Enter password" type="password" {...field} />
+                      <div className="relative">
+                        <Input placeholder="Enter password" type={showPassword ? "text" : "password"} {...field} />
+                        <button
+                          type="button"
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                          onClick={() => setShowPassword(!showPassword)}
+                          tabIndex={-1}
+                        >
+                          {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                        </button>
+                      </div>
                     </FormControl>
                     <FormMessage />
                   </FormItem>
