@@ -50,6 +50,38 @@ async function resolveAttendanceInsertContext(
   return { userId, companyId: resolvedCompanyId };
 }
 
+
+async function attachLabourDirectory(
+  attendanceRows: LabourAttendance[] | null | undefined
+): Promise<LabourAttendanceWithLabour[]> {
+  const rows = (attendanceRows ?? []) as LabourAttendance[];
+  if (rows.length === 0) return [];
+
+  const labourIds = Array.from(
+    new Set(rows.map((row) => row.labour_id).filter((id): id is string => Boolean(id)))
+  );
+
+  if (labourIds.length === 0) return [];
+
+  const { data: labours, error: laboursError } = await supabase
+    .from("construction_labour_directory")
+    .select("*")
+    .in("id", labourIds);
+
+  if (laboursError) throw laboursError;
+
+  const labourMap = new Map(
+    (labours ?? [])
+      .filter((labour): labour is LabourMaster & { id: string } => Boolean(labour?.id))
+      .map((labour) => [labour.id, labour as LabourMaster])
+  );
+
+  return rows.flatMap((row) => {
+    const labour = row.labour_id ? labourMap.get(row.labour_id) : undefined;
+    return labour ? [{ ...row, labour } as LabourAttendanceWithLabour] : [];
+  });
+}
+
 export function useLabourAttendance(siteReportId: string | null | undefined) {
   return useQuery({
     queryKey: ["labour-attendance", siteReportId],
@@ -58,15 +90,12 @@ export function useLabourAttendance(siteReportId: string | null | undefined) {
 
       const { data, error } = await supabase
         .from("site_report_labour_attendance")
-        .select(`
-          *,
-          labour:construction_labour_directory(*)
-        `)
+        .select("*")
         .eq("site_report_id", siteReportId)
         .order("created_at", { ascending: true });
 
       if (error) throw error;
-      return data as LabourAttendanceWithLabour[];
+      return attachLabourDirectory((data ?? []) as LabourAttendance[]);
     },
     enabled: !!siteReportId,
   });
@@ -120,14 +149,14 @@ export function useCreateLabourAttendance() {
           company_id: selectedCompany?.id,
           created_by: user.user?.id,
         })
-        .select(`
-          *,
-          labour:construction_labour_directory(*)
-        `)
+        .select("*")
         .single();
 
       if (error) throw error;
-      return result as LabourAttendanceWithLabour;
+
+      const hydrated = await attachLabourDirectory(result ? [result as LabourAttendance] : []);
+      if (!hydrated[0]) throw new Error("Failed to load labour details for attendance record");
+      return hydrated[0];
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["labour-attendance", data.site_report_id] });
@@ -148,14 +177,14 @@ export function useUpdateLabourAttendance() {
         .from("site_report_labour_attendance")
         .update(data)
         .eq("id", id)
-        .select(`
-          *,
-          labour:construction_labour_directory(*)
-        `)
+        .select("*")
         .single();
 
       if (error) throw error;
-      return result as LabourAttendanceWithLabour;
+
+      const hydrated = await attachLabourDirectory(result ? [result as LabourAttendance] : []);
+      if (!hydrated[0]) throw new Error("Failed to load labour details for attendance record");
+      return hydrated[0];
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["labour-attendance", data.site_report_id] });
@@ -219,14 +248,14 @@ export function useUpsertLabourAttendance() {
           },
           { onConflict: "site_report_id,labour_id,attendance_date" }
         )
-        .select(`
-          *,
-          labour:construction_labour_directory(*)
-        `)
+        .select("*")
         .single();
 
       if (error) throw error;
-      return result as LabourAttendanceWithLabour;
+
+      const hydrated = await attachLabourDirectory(result ? [result as LabourAttendance] : []);
+      if (!hydrated[0]) throw new Error("Failed to load labour details for attendance record");
+      return hydrated[0];
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["labour-attendance", data.site_report_id] });
@@ -308,13 +337,10 @@ export function useBulkCreateAttendance() {
       const { data: result, error } = await supabase
         .from("site_report_labour_attendance")
         .insert(records)
-        .select(`
-          *,
-          labour:construction_labour_directory(*)
-        `);
+        .select("*");
 
       if (error) throw error;
-      return result as LabourAttendanceWithLabour[];
+      return attachLabourDirectory((result ?? []) as LabourAttendance[]);
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ["labour-attendance", variables.siteReportId] });

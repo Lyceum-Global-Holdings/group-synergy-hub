@@ -13241,13 +13241,6 @@ export type Database = {
             foreignKeyName: "site_report_labour_attendance_labour_id_fkey"
             columns: ["labour_id"]
             isOneToOne: false
-            referencedRelation: "construction_labour_directory"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "site_report_labour_attendance_labour_id_fkey"
-            columns: ["labour_id"]
-            isOneToOne: false
             referencedRelation: "construction_labour_master"
             referencedColumns: ["id"]
           },
@@ -16880,73 +16873,7 @@ export type Database = {
           trade: string | null
           updated_at: string | null
         }
-        Insert: {
-          category?: string | null
-          company_id?: string | null
-          contact_number?: never
-          created_at?: string | null
-          created_by?: string | null
-          daily_rate?: number | null
-          email?: never
-          employee_id?: never
-          epf_no?: never
-          hourly_rate?: number | null
-          id?: string | null
-          labour_company?: string | null
-          location_id?: string | null
-          name?: string | null
-          notes?: string | null
-          project_id?: string | null
-          skill_level?: string | null
-          status?: string | null
-          trade?: string | null
-          updated_at?: string | null
-        }
-        Update: {
-          category?: string | null
-          company_id?: string | null
-          contact_number?: never
-          created_at?: string | null
-          created_by?: string | null
-          daily_rate?: number | null
-          email?: never
-          employee_id?: never
-          epf_no?: never
-          hourly_rate?: number | null
-          id?: string | null
-          labour_company?: string | null
-          location_id?: string | null
-          name?: string | null
-          notes?: string | null
-          project_id?: string | null
-          skill_level?: string | null
-          status?: string | null
-          trade?: string | null
-          updated_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "construction_labour_master_company_id_fkey"
-            columns: ["company_id"]
-            isOneToOne: false
-            referencedRelation: "companies"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "construction_labour_master_location_id_fkey"
-            columns: ["location_id"]
-            isOneToOne: false
-            referencedRelation: "warehouse_locations"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "construction_labour_master_project_id_fkey"
-            columns: ["project_id"]
-            isOneToOne: false
-            referencedRelation: "construction_projects"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       customers_directory: {
         Row: {
@@ -17497,6 +17424,31 @@ export type Database = {
       }
       get_company_hod: { Args: { p_company_id: string }; Returns: string }
       get_company_manager: { Args: { p_company_id: string }; Returns: string }
+      get_construction_labour_directory: {
+        Args: never
+        Returns: {
+          category: string
+          company_id: string
+          contact_number: string
+          created_at: string
+          created_by: string
+          daily_rate: number
+          email: string
+          employee_id: string
+          epf_no: string
+          hourly_rate: number
+          id: string
+          labour_company: string
+          location_id: string
+          name: string
+          notes: string
+          project_id: string
+          skill_level: string
+          status: string
+          trade: string
+          updated_at: string
+        }[]
+      }
       get_current_tenant_id: { Args: never; Returns: string }
       get_pending_sap_sync_items: {
         Args: { _company_id: string; _limit?: number; _table_name: string }
