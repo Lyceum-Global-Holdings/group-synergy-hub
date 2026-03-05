@@ -19,17 +19,34 @@ export function LocationSelector() {
     queryKey: ['header-locations', selectedCompany?.id],
     queryFn: async () => {
       if (selectedCompany?.id) {
-        // Get locations linked to this company via junction table
-        const { data, error } = await supabase
-          .from('warehouse_location_companies')
-          .select('location_id, warehouse_locations!inner(id, name, type)')
-          .eq('company_id', selectedCompany.id)
-          .eq('warehouse_locations.type', 'location');
-        if (error) throw error;
-        return (data || [])
-          .map((d: any) => d.warehouse_locations)
-          .filter(Boolean)
-          .sort((a: any, b: any) => a.name.localeCompare(b.name));
+        const [{ data: mappedRows, error: mappedError }, { data: legacyRows, error: legacyError }] = await Promise.all([
+          supabase
+            .from('warehouse_location_companies')
+            .select('warehouse_locations!inner(id, name, type)')
+            .eq('company_id', selectedCompany.id)
+            .eq('warehouse_locations.type', 'location'),
+          supabase
+            .from('warehouse_locations')
+            .select('id, name, type')
+            .eq('company_id', selectedCompany.id)
+            .eq('type', 'location'),
+        ]);
+
+        if (mappedError) throw mappedError;
+        if (legacyError) throw legacyError;
+
+        const merged = new Map<string, { id: string; name: string; type: string }>();
+
+        (mappedRows || []).forEach((row: any) => {
+          const location = row.warehouse_locations;
+          if (location?.id) merged.set(location.id, location);
+        });
+
+        (legacyRows || []).forEach((location: any) => {
+          if (location?.id) merged.set(location.id, location);
+        });
+
+        return Array.from(merged.values()).sort((a, b) => a.name.localeCompare(b.name));
       } else {
         const { data, error } = await supabase
           .from('warehouse_locations')

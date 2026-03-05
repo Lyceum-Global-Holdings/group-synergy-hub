@@ -57,7 +57,16 @@ export default function WarehouseManagement() {
   const [editLocationData, setEditLocationData] = useState<any | null>(null);
   const [editForm, setEditForm] = useState<Record<string, any>>({});
 
-  const { locations, isLoading, deleteLocation, updateLocation, bulkDeleteLocations, bulkUpdateStatus, isDeleting, isUpdating } = useWarehouseLocations();
+  const {
+    locations,
+    isLoading,
+    deleteLocationAsync,
+    updateLocationAsync,
+    bulkDeleteLocations,
+    bulkUpdateStatus,
+    isDeleting,
+    isUpdating,
+  } = useWarehouseLocations();
   const { toast } = useToast();
   const { companies } = useCompanies();
   const { companyIds: editLocationCompanyIds, saveCompanies } = useLocationCompanies(editLocationData?.id);
@@ -82,7 +91,7 @@ export default function WarehouseManagement() {
   const handleDelete = async (id: string, name: string) => {
     if (window.confirm(`Are you sure you want to delete "${name}"? This action cannot be undone.`)) {
       try {
-        await deleteLocation(id);
+        await deleteLocationAsync(id);
         toast({
           title: 'Location deleted',
           description: `${name} has been successfully deleted.`,
@@ -202,12 +211,16 @@ export default function WarehouseManagement() {
       company_ids: [] as string[], // Will be populated by useEffect
     });
   };
-  // Populate company_ids when junction table data loads
+  // Populate company_ids when junction table data loads (with legacy fallback)
   useEffect(() => {
-    if (editLocationData && editLocationCompanyIds.length > 0) {
-      setEditForm(prev => ({ ...prev, company_ids: editLocationCompanyIds }));
-    }
-  }, [editLocationCompanyIds, editLocationData]);
+    if (!editLocationData) return;
+
+    const resolvedCompanyIds = editLocationCompanyIds.length > 0
+      ? editLocationCompanyIds
+      : (editLocationData.company_id ? [editLocationData.company_id] : []);
+
+    setEditForm(prev => ({ ...prev, company_ids: resolvedCompanyIds }));
+  }, [editLocationCompanyIds, editLocationData?.id]);
 
   const handleEditFormChange = (field: string, value: string | number) => {
     setEditForm(prev => ({ ...prev, [field]: value }));
@@ -216,7 +229,7 @@ export default function WarehouseManagement() {
   const handleSaveEdit = async () => {
     if (!editLocationData) return;
     try {
-      await updateLocation({
+      await updateLocationAsync({
         id: editLocationData.id,
         name: editForm.name,
         location_code: editForm.location_code || null,
