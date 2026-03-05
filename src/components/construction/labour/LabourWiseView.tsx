@@ -19,7 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useLabourMaster, useDeleteLabourMaster } from "@/hooks/construction/useLabourMaster";
+import { useLabourDirectory, useDeleteLabourMaster } from "@/hooks/construction/useLabourMaster";
 import { useProjects } from "@/hooks/construction/useProjects";
 import { LabourAllocationDialog } from "@/components/construction/dialogs/LabourAllocationDialog";
 import { LabourDetailsDialog } from "@/components/construction/dialogs/LabourDetailsDialog";
@@ -38,7 +38,7 @@ export function LabourWiseView() {
   const [deletingLabour, setDeletingLabour] = useState<LabourMaster | null>(null);
   const [viewingLabour, setViewingLabour] = useState<LabourMaster | null>(null);
 
-  const { data: labourMaster, isLoading } = useLabourMaster();
+  const { data: labourMaster, isLoading } = useLabourDirectory();
   const { data: projects = [] } = useProjects();
   const deleteLabourMutation = useDeleteLabourMaster();
 
