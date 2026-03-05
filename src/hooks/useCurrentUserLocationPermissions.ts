@@ -1,33 +1,24 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { useIsAdmin, useSuperAdmin } from '@/hooks/useSuperAdmin';
 
 /**
  * Fetches the current logged-in user's location permissions.
- * Returns { viewAllLocations, viewLocationIds, editLocationIds }
- * so the header LocationSelector and data views can filter accordingly.
- * 
  * Admins and Super Admins automatically get viewAllLocations = true.
  */
 export const useCurrentUserLocationPermissions = () => {
   const { user } = useAuth();
   const userId = user?.id;
-  const { data: isAdmin = false } = useIsAdmin();
-  const { data: isSuperAdmin = false } = useSuperAdmin();
 
   return useQuery({
-    queryKey: ['current-user-location-permissions', userId, isAdmin, isSuperAdmin],
+    queryKey: ['current-user-location-permissions', userId],
     queryFn: async () => {
       if (!userId) return { viewAllLocations: false, viewLocationIds: [] as string[], editLocationIds: [] as string[] };
 
-      // Admins/Super Admins always see all locations
-      if (isAdmin || isSuperAdmin) {
-        return { viewAllLocations: true, viewLocationIds: [] as string[], editLocationIds: [] as string[] };
-      }
-
-      // Fetch view_all_locations flag and permissions in parallel
-      const [profileRes, permRes] = await Promise.all([
+      // Check admin status, profile flag, and permissions in parallel
+      const [adminRes, superAdminRes, profileRes, permRes] = await Promise.all([
+        supabase.rpc('is_admin', { _user_id: userId }),
+        supabase.rpc('is_super_admin', { _user_id: userId }),
         supabase
           .from('profiles')
           .select('view_all_locations')
@@ -42,6 +33,14 @@ export const useCurrentUserLocationPermissions = () => {
       if (profileRes.error) throw profileRes.error;
       if (permRes.error) throw permRes.error;
 
+      const isAdmin = adminRes.data === true;
+      const isSuperAdmin = superAdminRes.data === true;
+
+      // Admins/Super Admins always see all locations
+      if (isAdmin || isSuperAdmin) {
+        return { viewAllLocations: true, viewLocationIds: [] as string[], editLocationIds: [] as string[] };
+      }
+
       const viewAllLocations = profileRes.data?.view_all_locations ?? false;
       const viewLocationIds: string[] = [];
       const editLocationIds: string[] = [];
@@ -54,6 +53,6 @@ export const useCurrentUserLocationPermissions = () => {
       return { viewAllLocations, viewLocationIds, editLocationIds };
     },
     enabled: !!userId,
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 5 * 60 * 1000,
   });
 };
