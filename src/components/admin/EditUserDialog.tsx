@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { Eye, EyeOff } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -37,6 +38,8 @@ import { CompanyAccessSelector } from "./CompanyAccessSelector";
 import { UserLocationPermissions } from "./UserLocationPermissions";
 import { useUserLocationPermissions, useUserViewAllLocations, useSaveUserLocationPermissions, useLocationsForCompanies } from "@/hooks/useUserLocationPermissions";
 import type { ModuleOperation } from "@/types/moduleAccess";
+import { useSuperAdmin } from "@/hooks/useSuperAdmin";
+import { useAdminPasswordReset } from "@/hooks/useAdminPasswordReset";
 
 const editUserSchema = z.object({
   firstName: z.string().min(1, "First name is required"),
@@ -66,6 +69,8 @@ export const EditUserDialog: React.FC<EditUserDialogProps> = ({
   const [viewLocationIds, setViewLocationIds] = useState<string[]>([]);
   const [editLocationIds, setEditLocationIds] = useState<string[]>([]);
   const [viewAllLocations, setViewAllLocations] = useState(false);
+  const [newPassword, setNewPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [moduleAccessState, setModuleAccessState] = useState<ModuleAccessState>({
     inheritedModules: {},
     inheritedOperations: {},
@@ -98,6 +103,8 @@ export const EditUserDialog: React.FC<EditUserDialogProps> = ({
   const { data: locationPermissions = [], isLoading: locationPermissionsLoading } = useUserLocationPermissions(user?.id);
   const { data: userViewAll = false, isLoading: viewAllLoading } = useUserViewAllLocations(user?.id);
   const saveLocationPermissions = useSaveUserLocationPermissions();
+  const { data: isSuperAdmin = false } = useSuperAdmin();
+  const resetPassword = useAdminPasswordReset();
 
   // Effective company IDs for location filtering - must be before early return
   const [currentPrimaryCompany, setCurrentPrimaryCompany] = useState(user?.company_id || '');
@@ -553,6 +560,51 @@ export const EditUserDialog: React.FC<EditUserDialogProps> = ({
                 isLoading={locationsLoading || locationPermissionsLoading || viewAllLoading}
               />
             </div>
+
+            {/* Reset Password - Super Admin Only */}
+            {isSuperAdmin && (
+              <div className="space-y-3">
+                <div>
+                  <FormLabel>Reset Password</FormLabel>
+                  <FormDescription>
+                    Set a new password for this user. Only visible to super admins.
+                  </FormDescription>
+                </div>
+                <div className="flex gap-2">
+                  <div className="relative flex-1">
+                    <Input
+                      type={showPassword ? "text" : "password"}
+                      placeholder="Enter new password"
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
+                      onClick={() => setShowPassword(!showPassword)}
+                    >
+                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </Button>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    disabled={!newPassword || newPassword.length < 6 || resetPassword.isPending}
+                    onClick={async () => {
+                      if (user && newPassword) {
+                        await resetPassword.mutateAsync({ userId: user.id, newPassword });
+                        setNewPassword("");
+                        setShowPassword(false);
+                      }
+                    }}
+                  >
+                    {resetPassword.isPending ? "Resetting..." : "Reset"}
+                  </Button>
+                </div>
+              </div>
+            )}
 
             <div className="space-y-3">
               <div>
