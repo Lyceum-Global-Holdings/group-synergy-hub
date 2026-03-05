@@ -43,7 +43,7 @@ import { useEffect, useState, useCallback } from "react";
 import { format } from "date-fns";
 import { useCompany } from "@/contexts/CompanyContext";
 import { toast } from "sonner";
-import { Package, RotateCcw, Loader2, SlidersHorizontal, Wrench, Users } from "lucide-react";
+import { Package, RotateCcw, Loader2, SlidersHorizontal, Wrench, Users, AlertCircle } from "lucide-react";
 import { LabourAttendanceSection, type AttendanceSummary } from "@/components/construction/labour/LabourAttendanceSection";
 
 const formSchema = z.object({
@@ -607,21 +607,26 @@ export function DailySiteReportDialog({ open, onOpenChange, report }: DailySiteR
               )}
             </div>
 
-            {/* Labour Attendance Section - Only shown when editing */}
-            {report && (
-              <div className="border rounded-lg p-4 bg-muted/30">
-                <div className="flex items-center gap-2 mb-3">
-                  <Users className="h-4 w-4 text-primary" />
-                  <h3 className="font-medium">Labour Attendance</h3>
-                </div>
+            {/* Labour Attendance Section */}
+            <div className="border rounded-lg p-4 bg-muted/30">
+              <div className="flex items-center gap-2 mb-3">
+                <Users className="h-4 w-4 text-primary" />
+                <h3 className="font-medium">Labour Attendance</h3>
+              </div>
+              {report ? (
                 <LabourAttendanceSection
                   report={report}
                   locationId={watchedLocationId || null}
                   isEditing={true}
                   onAttendanceChange={handleAttendanceChange}
                 />
-              </div>
-            )}
+              ) : (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground py-3">
+                  <AlertCircle className="h-4 w-4" />
+                  <span>Labour attendance tracking will be available after saving the report. Create the report first, then edit it to manage attendance.</span>
+                </div>
+              )}
+            </div>
 
             <div className="flex justify-end gap-3 pt-4">
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
