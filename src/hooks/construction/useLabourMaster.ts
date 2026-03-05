@@ -18,11 +18,10 @@ export function useLabourMaster() {
         `)
         .order("created_at", { ascending: false });
 
-      // Include records for the selected company OR records with null company_id
+      // Keep selected company scoping when explicitly chosen.
+      // In "All Companies" mode (selectedCompany is null), rely on RLS.
       if (selectedCompany?.id) {
         query = query.or(`company_id.eq.${selectedCompany.id},company_id.is.null`);
-      } else {
-        query = query.is("company_id", null);
       }
 
       const { data, error } = await query;
@@ -48,8 +47,6 @@ export function useLabourDirectory() {
 
       if (selectedCompany?.id) {
         query = query.or(`company_id.eq.${selectedCompany.id},company_id.is.null`);
-      } else {
-        query = query.is("company_id", null);
       }
 
       const { data, error } = await query;
@@ -109,6 +106,7 @@ export function useCreateLabourMaster() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["labour-master"] });
+      queryClient.invalidateQueries({ queryKey: ["labour-directory"] });
       toast({ title: "Labour record created successfully" });
     },
     onError: (error: Error) => {
@@ -142,6 +140,7 @@ export function useBulkCreateLabourMaster() {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["labour-master"] });
+      queryClient.invalidateQueries({ queryKey: ["labour-directory"] });
       toast({ title: `Successfully imported ${data.length} labour records` });
     },
     onError: (error: Error) => {
@@ -168,6 +167,7 @@ export function useUpdateLabourMaster() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["labour-master"] });
+      queryClient.invalidateQueries({ queryKey: ["labour-directory"] });
       toast({ title: "Labour record updated successfully" });
     },
     onError: (error: Error) => {
@@ -191,6 +191,7 @@ export function useDeleteLabourMaster() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["labour-master"] });
+      queryClient.invalidateQueries({ queryKey: ["labour-directory"] });
       toast({ title: "Labour record deleted successfully" });
     },
     onError: (error: Error) => {
