@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useToast } from "@/hooks/use-toast";
+import { assertUserCanEditLocation } from "./locationPermissionGuard";
 
 interface AddStockData {
   item_master_id: string;
@@ -19,6 +20,8 @@ export function useAddStockToExistingItem() {
       const { data: authData, error: authError } = await supabase.auth.getUser();
       if (authError || !authData.user) throw new Error("You must be logged in.");
       if (!selectedCompany?.id) throw new Error("No company selected.");
+
+      await assertUserCanEditLocation(authData.user.id, data.location_id);
 
       // Check if stock record already exists for this item + location
       const { data: existing } = await supabase

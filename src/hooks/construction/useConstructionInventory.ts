@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useToast } from "@/hooks/use-toast";
 import { useAccessibleCompanyIds } from "./useAccessibleCompanyIds";
+import { assertUserCanEditLocation } from "./locationPermissionGuard";
 import type {
   ConstructionItemMaster,
   ConstructionSerialNumber,
@@ -141,6 +142,8 @@ export function useCreateItemMasterWithSerial() {
       // Extract serial number fields
       const { serial_number, current_location_id, condition, availability, warranty_expiry, asset_value, ...itemData } = data;
 
+      await assertUserCanEditLocation(authData.user.id, current_location_id);
+
       // Create item master first
       const { data: itemResult, error: itemError } = await supabase
         .from("construction_item_master")
@@ -238,6 +241,8 @@ export function useCreateItemMasterWithStock() {
 
       // Extract stock fields
       const { initial_quantity, location_id, ...itemData } = data;
+
+      await assertUserCanEditLocation(authData.user.id, location_id);
 
       // Create item master first (ensure is_serial_tracked is false for bulk items)
       const { data: itemResult, error: itemError } = await supabase

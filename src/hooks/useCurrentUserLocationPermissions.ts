@@ -13,7 +13,16 @@ export const useCurrentUserLocationPermissions = () => {
   return useQuery({
     queryKey: ['current-user-location-permissions', userId],
     queryFn: async () => {
-      if (!userId) return { viewAllLocations: false, viewLocationIds: [] as string[], editLocationIds: [] as string[] };
+      if (!userId) {
+        return {
+          viewAllLocations: false,
+          canEditAllLocations: false,
+          isAdmin: false,
+          isSuperAdmin: false,
+          viewLocationIds: [] as string[],
+          editLocationIds: [] as string[],
+        };
+      }
 
       // Check admin status, profile flag, and permissions in parallel
       const [adminRes, superAdminRes, profileRes, permRes] = await Promise.all([
@@ -35,10 +44,18 @@ export const useCurrentUserLocationPermissions = () => {
 
       const isAdmin = adminRes.data === true;
       const isSuperAdmin = superAdminRes.data === true;
+      const canEditAllLocations = isAdmin || isSuperAdmin;
 
-      // Admins/Super Admins always see all locations
-      if (isAdmin || isSuperAdmin) {
-        return { viewAllLocations: true, viewLocationIds: [] as string[], editLocationIds: [] as string[] };
+      // Admins/Super Admins always see and edit all locations
+      if (canEditAllLocations) {
+        return {
+          viewAllLocations: true,
+          canEditAllLocations: true,
+          isAdmin,
+          isSuperAdmin,
+          viewLocationIds: [] as string[],
+          editLocationIds: [] as string[],
+        };
       }
 
       const viewAllLocations = profileRes.data?.view_all_locations ?? false;
@@ -50,7 +67,14 @@ export const useCurrentUserLocationPermissions = () => {
         if (row.permission_type === 'edit') editLocationIds.push(row.location_id);
       }
 
-      return { viewAllLocations, viewLocationIds, editLocationIds };
+      return {
+        viewAllLocations,
+        canEditAllLocations: false,
+        isAdmin: false,
+        isSuperAdmin: false,
+        viewLocationIds,
+        editLocationIds,
+      };
     },
     enabled: !!userId,
     staleTime: 5 * 60 * 1000,
