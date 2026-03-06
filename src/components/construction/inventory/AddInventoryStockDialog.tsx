@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -43,6 +43,7 @@ import { Loader2, ChevronsUpDown, Check, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useItemMaster, useLocations } from "@/hooks/construction/useConstructionInventory";
 import { useAddStockToExistingItem } from "@/hooks/construction/useAddStockToExistingItem";
+import { useCurrentUserLocationPermissions } from "@/hooks/useCurrentUserLocationPermissions";
 import { ITEM_CATEGORIES, type ItemCategory } from "@/types/construction-inventory";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
@@ -64,7 +65,15 @@ export function AddInventoryStockDialog({ open, onOpenChange, category }: AddInv
   const [itemPopoverOpen, setItemPopoverOpen] = useState(false);
   const { data: items, isLoading: itemsLoading } = useItemMaster(category);
   const { data: locations } = useLocations();
+  const { data: permissions } = useCurrentUserLocationPermissions();
   const addStock = useAddStockToExistingItem();
+
+  const permittedLocations = useMemo(() => {
+    if (!locations || !permissions) return [];
+    if (permissions.viewAllLocations) return locations;
+    const permittedIds = new Set(permissions.editLocationIds);
+    return locations.filter(loc => permittedIds.has(loc.id));
+  }, [locations, permissions]);
 
   const categoryLabel = ITEM_CATEGORIES.find(c => c.value === category)?.label || "Items";
 
@@ -223,7 +232,7 @@ export function AddInventoryStockDialog({ open, onOpenChange, category }: AddInv
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {locations?.map(loc => (
+                          {permittedLocations.map(loc => (
                             <SelectItem key={loc.id} value={loc.id}>
                               {loc.name}
                             </SelectItem>
