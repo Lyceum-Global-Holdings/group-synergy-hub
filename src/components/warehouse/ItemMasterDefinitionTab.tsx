@@ -9,7 +9,8 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { Search, Plus, Eye, History, Package, MapPin, X, Image as ImageIcon, Edit, Trash2 } from 'lucide-react';
+import { Search, Plus, Eye, History, Package, MapPin, X, Image as ImageIcon, Edit, Trash2, Download } from 'lucide-react';
+import ExcelJS from 'exceljs';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { useWarehouseItems } from '@/hooks/useWarehouseItems';
 import { useItemCategories } from '@/hooks/useItemCategories';
@@ -78,6 +79,58 @@ export function ItemMasterDefinitionTab({ onNavigateToInventory, onNavigateToBin
     }
   };
 
+  const handleDownloadExcel = async () => {
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet('Item Master');
+
+    sheet.columns = [
+      { header: 'Item Code', key: 'item_code', width: 15 },
+      { header: 'Name', key: 'name', width: 25 },
+      { header: 'Category', key: 'category', width: 15 },
+      { header: 'Unit', key: 'unit', width: 10 },
+      { header: 'Brand', key: 'brand', width: 15 },
+      { header: 'Supplier', key: 'supplier', width: 20 },
+      { header: 'Barcode', key: 'barcode', width: 18 },
+      { header: 'SKU', key: 'sku', width: 15 },
+      { header: 'Unit Cost', key: 'unit_cost', width: 12 },
+      { header: 'Selling Price', key: 'selling_price', width: 14 },
+      { header: 'Reorder Level', key: 'reorder_level', width: 14 },
+      { header: 'Current Stock', key: 'current_stock', width: 14 },
+      { header: 'Status', key: 'status', width: 12 },
+    ];
+
+    // Style header row
+    sheet.getRow(1).font = { bold: true };
+
+    filteredItems.forEach(item => {
+      const cat = categories.find(c => c.id === item.category_id);
+      sheet.addRow({
+        item_code: item.item_code,
+        name: item.name,
+        category: cat?.name || '',
+        unit: units.find(u => u.id === item.unit_id)?.name || '',
+        brand: item.brand || '',
+        supplier: item.supplier?.name || '',
+        barcode: item.barcode || '',
+        sku: item.sku || '',
+        unit_cost: item.unit_cost ?? 0,
+        selling_price: item.selling_price ?? 0,
+        reorder_level: item.reorder_level ?? 0,
+        current_stock: item.current_stock ?? 0,
+        status: item.status,
+      });
+    });
+
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Item_Master_${new Date().toISOString().slice(0, 10)}.xlsx`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="space-y-4">
       {/* Stock Movement Chart */}
@@ -125,9 +178,14 @@ export function ItemMasterDefinitionTab({ onNavigateToInventory, onNavigateToBin
               </Button>
             )}
           </div>
-          <Button onClick={() => setIsCreateDialogOpen(true)}>
-            <Plus className="mr-2 h-4 w-4" /> Add Item
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={handleDownloadExcel}>
+              <Download className="mr-2 h-4 w-4" /> Download Excel
+            </Button>
+            <Button onClick={() => setIsCreateDialogOpen(true)}>
+              <Plus className="mr-2 h-4 w-4" /> Add Item
+            </Button>
+          </div>
         </div>
       </div>
 
