@@ -70,9 +70,11 @@ export function AddInventoryStockDialog({ open, onOpenChange, category }: AddInv
 
   const permittedLocations = useMemo(() => {
     if (!locations || !permissions) return [];
-    if (permissions.viewAllLocations) return locations;
+    // Only show top-level locations (type = 'location'), not sub-locations/departments/floors
+    const topLevelLocations = locations.filter(loc => loc.type === 'location');
+    if (permissions.viewAllLocations) return topLevelLocations;
     const permittedIds = new Set(permissions.editLocationIds);
-    return locations.filter(loc => permittedIds.has(loc.id));
+    return topLevelLocations.filter(loc => permittedIds.has(loc.id));
   }, [locations, permissions]);
 
   const categoryLabel = ITEM_CATEGORIES.find(c => c.value === category)?.label || "Items";
