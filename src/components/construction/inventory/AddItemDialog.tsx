@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -29,6 +29,7 @@ import {
 import { Loader2 } from "lucide-react";
 import { useCreateItemMasterWithSerial, useCreateItemMasterWithStock, useLocations } from "@/hooks/construction/useConstructionInventory";
 import { useNextItemCode } from "@/hooks/construction/useNextItemCode";
+import { useCurrentUserLocationPermissions } from "@/hooks/useCurrentUserLocationPermissions";
 import {
   type ItemCategory,
   ITEM_SECTIONS,
@@ -78,6 +79,14 @@ export function AddItemDialog({ open, onOpenChange, category }: AddItemDialogPro
   const createItemWithSerial = useCreateItemMasterWithSerial();
   const createItemWithStock = useCreateItemMasterWithStock();
   const { data: locations } = useLocations();
+  const { data: permissions } = useCurrentUserLocationPermissions();
+
+  const permittedLocations = useMemo(() => {
+    if (!locations || !permissions) return [];
+    if (permissions.viewAllLocations) return locations;
+    const permittedIds = new Set(permissions.editLocationIds);
+    return locations.filter(loc => permittedIds.has(loc.id));
+  }, [locations, permissions]);
 
   // Machines are serial tracked, others are bulk tracked
   const isMachineCategory = category === "machines";
@@ -451,7 +460,7 @@ export function AddItemDialog({ open, onOpenChange, category }: AddItemDialogPro
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            {locations?.map(loc => (
+                            {permittedLocations.map(loc => (
                               <SelectItem key={loc.id} value={loc.id}>
                                 {loc.name}
                               </SelectItem>
@@ -588,7 +597,7 @@ export function AddItemDialog({ open, onOpenChange, category }: AddItemDialogPro
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            {locations?.map(loc => (
+                            {permittedLocations.map(loc => (
                               <SelectItem key={loc.id} value={loc.id}>
                                 {loc.name}
                               </SelectItem>
