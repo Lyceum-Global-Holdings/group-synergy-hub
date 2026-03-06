@@ -81,15 +81,21 @@ export function TelegramSettingsTab() {
   };
 
   const handleSave = async () => {
-    await saveSettings({
-      bot_token: botToken || null,
+    const data: Record<string, any> = {
       chat_id: chatIds.length > 0 ? chatIds.join(',') : null,
       is_enabled: isEnabled,
       notify_on_report_create: notifyOnCreate,
       scheduled_send_enabled: scheduledSendEnabled,
       scheduled_send_time: scheduledSendEnabled ? `${scheduledSendTime}:00` : null,
       timezone: scheduledSendEnabled ? timezone : null,
-    });
+    };
+
+    // Only update bot_token if user entered a new one
+    if (botToken.trim()) {
+      data.bot_token = botToken;
+    }
+
+    await saveSettings(data);
   };
 
   const handleTest = async () => {
