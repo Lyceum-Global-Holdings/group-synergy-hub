@@ -9,7 +9,10 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { Search, Plus, Eye, History, Package, MapPin, X, Image as ImageIcon, Edit, Trash2, Download } from 'lucide-react';
+import { Search, Plus, Eye, History, Package, MapPin, X, Image as ImageIcon, Edit, Trash2, Download, PackagePlus, CheckCircle2 } from 'lucide-react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 import ExcelJS from 'exceljs';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { useWarehouseItems } from '@/hooks/useWarehouseItems';
@@ -45,6 +48,59 @@ export function ItemMasterDefinitionTab({ onNavigateToInventory, onNavigateToBin
   const { selectedCompany } = useCompany();
   const { categories } = useItemCategories(selectedCompany?.id);
   const { units } = useItemUnits();
+  const queryClient = useQueryClient();
+
+  // Fetch existing item codes for current company to detect duplicates
+  const { data: existingCodes } = useQuery({
+    queryKey: ['warehouse-items-codes', selectedCompany?.id],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('warehouse_items')
+        .select('item_code')
+        .eq('company_id', selectedCompany!.id);
+      return new Set(data?.map(d => d.item_code) || []);
+    },
+    enabled: !!selectedCompany?.id,
+  });
+
+  // Mutation to clone an item into current company's inventory
+  const addToInventoryMutation = useMutation({
+    mutationFn: async (item: WarehouseItem) => {
+      const { error } = await supabase.from('warehouse_items').insert({
+        item_code: item.item_code,
+        name: item.name,
+        description: item.description,
+        category_id: item.category_id,
+        unit_id: item.unit_id,
+        brand: item.brand,
+        manufacturer: item.manufacturer,
+        barcode: item.barcode,
+        sku: item.sku,
+        unit_cost: item.unit_cost,
+        selling_price: item.selling_price,
+        reorder_level: item.reorder_level,
+        min_stock_level: item.min_stock_level,
+        max_stock_level: item.max_stock_level,
+        image_url: item.image_url,
+        is_batch_tracked: item.is_batch_tracked,
+        is_serialized: item.is_serialized,
+        status: 'active',
+        company_id: selectedCompany!.id,
+        current_stock: 0,
+        available_quantity: 0,
+        reserved_quantity: 0,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success('Item added to your inventory');
+      queryClient.invalidateQueries({ queryKey: ['warehouse-items-codes', selectedCompany?.id] });
+      queryClient.invalidateQueries({ queryKey: ['warehouse-items'] });
+    },
+    onError: (err: any) => {
+      toast.error(err.message || 'Failed to add item to inventory');
+    },
+  });
 
   const uniqueSuppliers = useMemo(() => {
     const suppliers = new Set<string>();
@@ -259,52 +315,77 @@ export function ItemMasterDefinitionTab({ onNavigateToInventory, onNavigateToBin
                     </Badge>
                   </TableCell>
                   <TableCell>
-                    <div className="flex items-center justify-end gap-1">
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setEditingItem(item)}>
-                              <Edit className="h-3.5 w-3.5" />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent>Edit Item</TooltipContent>
-                        </Tooltip>
-                        {canDelete && (
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => setDeletingItem(item)} disabled={isDeleting || isMarkingInactive}>
-                                <Trash2 className="h-3.5 w-3.5" />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>Delete Item</TooltipContent>
-                          </Tooltip>
-                        )}
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onNavigateToInventory?.(item.id)}>
-                              <Package className="h-3.5 w-3.5" />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent>View in Inventory</TooltipContent>
-                        </Tooltip>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onNavigateToBins?.(item.id)}>
-                              <MapPin className="h-3.5 w-3.5" />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent>View Bin Allocations</TooltipContent>
-                        </Tooltip>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setStockMovementItem(item)}>
-                              <History className="h-3.5 w-3.5" />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent>Stock Movement History</TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                    </div>
+                    {(() => {
+                      const alreadyInInventory = item.company_id === selectedCompany?.id || existingCodes?.has(item.item_code);
+                      return (
+                        <div className="flex items-center justify-end gap-1">
+                          <TooltipProvider>
+                            {alreadyInInventory ? (
+                              <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 text-[10px] px-1.5 py-0.5 whitespace-nowrap">
+                                <CheckCircle2 className="h-3 w-3 mr-0.5" /> In Inventory
+                              </Badge>
+                            ) : (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-7 w-7 text-primary"
+                                    onClick={() => addToInventoryMutation.mutate(item)}
+                                    disabled={addToInventoryMutation.isPending}
+                                  >
+                                    <PackagePlus className="h-3.5 w-3.5" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>Add to My Inventory</TooltipContent>
+                              </Tooltip>
+                            )}
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setEditingItem(item)}>
+                                  <Edit className="h-3.5 w-3.5" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>Edit Item</TooltipContent>
+                            </Tooltip>
+                            {canDelete && (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => setDeletingItem(item)} disabled={isDeleting || isMarkingInactive}>
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>Delete Item</TooltipContent>
+                              </Tooltip>
+                            )}
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onNavigateToInventory?.(item.id)}>
+                                  <Package className="h-3.5 w-3.5" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>View in Inventory</TooltipContent>
+                            </Tooltip>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onNavigateToBins?.(item.id)}>
+                                  <MapPin className="h-3.5 w-3.5" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>View Bin Allocations</TooltipContent>
+                            </Tooltip>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setStockMovementItem(item)}>
+                                  <History className="h-3.5 w-3.5" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>Stock Movement History</TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        </div>
+                      );
+                    })()}
                   </TableCell>
                 </TableRow>
               );
