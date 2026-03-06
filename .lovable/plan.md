@@ -1,54 +1,48 @@
 
 
-## Plan: Add "Add to My Inventory" from Item Master
+## Plan: Move "Add to Inventory" to Inventory Tab with Quantity & Bin Assignment
 
 ### Problem
-The Item Master Definition tab shows all items globally, but there's no way to import an item from another company's catalog into the current company's inventory. Users must manually recreate item definitions.
+The "Add to Inventory" button is currently on the Item Master Definition tab (global catalog view). It should be in the Inventory tab instead, and when adding an item, users need to specify an initial quantity and assign a bin -- not just clone the item definition with zero stock.
 
 ### Solution
-Add an "Add to Inventory" action button per item row in the Item Master Definition tab. When clicked, it clones the item definition into the current company's `warehouse_items` with the current `company_id`. Items already in the current company's inventory (matched by `item_code`) are marked with an "In Inventory" badge and the button is disabled.
-
-### How It Works
-- The tab already loads ALL items globally (`skipCompanyFilter: true`)
-- On render, cross-reference items against the current company's items to identify which `item_code`s already exist
-- For items not yet in the current company: show an "Add to Inventory" button
-- For items already in the current company: show a green "In Inventory" badge, button disabled
-- The clone copies all definition fields (name, category, unit, brand, SKU, barcode, costs, reorder levels) but sets `company_id` to the current company and resets `current_stock` to 0
-
-### Database Compatibility
-The unique constraint is `UNIQUE (item_code, company_id)`, so the same `item_code` can exist across different companies -- no schema changes needed.
+1. **Remove** the "Add to Inventory" button and related logic from `ItemMasterDefinitionTab.tsx`
+2. **Add** a new "Import from Catalog" button in `ItemMasterTab.tsx` (the Inventory tab)
+3. **Create** a new dialog `AddFromCatalogDialog.tsx` that:
+   - Shows a searchable list of items from the global Item Master that are NOT yet in the current company's inventory (filtered by `item_code` uniqueness)
+   - When the user selects an item, presents fields for: **Quantity** and **Bin** (dropdown of available bins for the company)
+   - On submit: clones the item definition into `warehouse_items` for the current company, then creates a `warehouse_bin_allocations` record with the specified bin and quantity
 
 ### Changes
 
-**1. `src/components/warehouse/ItemMasterDefinitionTab.tsx`**
-- Fetch the current company's item codes using a lightweight query (just `item_code` from `warehouse_items` where `company_id = selectedCompany.id`)
-- Build a `Set<string>` of existing item codes for O(1) lookup
-- Add a new action button (e.g., `PackagePlus` icon) per row:
-  - If `item.company_id === selectedCompany.id` or item code exists in the set: show "In Inventory" indicator, button disabled
-  - Otherwise: clickable "Add to Inventory" button
-- On click: insert a new `warehouse_items` row cloning the item's definition fields with `company_id = selectedCompany.id`, `current_stock = 0`
-- Show success toast and refresh the existing-items set
-- Add a `useMutation` for the clone operation inline
+**1. `src/components/warehouse/AddFromCatalogDialog.tsx`** (new file)
+- Dialog with two steps:
+  - **Step 1**: Searchable dropdown/combobox of global items not yet in current company (fetched with `skipCompanyFilter: true`, cross-referenced against existing company item codes)
+  - **Step 2**: Once item selected, show item details + fields for Quantity (number input) and Bin (select from `warehouse_bins` for the company)
+- On confirm:
+  1. Insert cloned item into `warehouse_items` with `company_id`, `current_stock: quantity`
+  2. Create `warehouse_bin_allocations` record with `warehouse_item_id`, `bin_id`, `allocated_quantity`
+- Uses existing `createAllocation` from `useWarehouseBinAllocations` for step 2
 
-**2. No other file changes needed** -- this is self-contained in the Definition tab.
+**2. `src/components/warehouse/ItemMasterTab.tsx`**
+- Add an "Import from Catalog" button (with `PackagePlus` icon) next to existing action buttons
+- Wire it to open `AddFromCatalogDialog`
 
-### Key Technical Detail
-```typescript
-// Fetch existing item codes for current company
-const { data: existingCodes } = useQuery({
-  queryKey: ['warehouse-items-codes', selectedCompany?.id],
-  queryFn: async () => {
-    const { data } = await supabase
-      .from('warehouse_items')
-      .select('item_code')
-      .eq('company_id', selectedCompany!.id);
-    return new Set(data?.map(d => d.item_code) || []);
-  },
-  enabled: !!selectedCompany?.id,
-});
+**3. `src/components/warehouse/ItemMasterDefinitionTab.tsx`**
+- Remove the `addToInventoryMutation`, `existingCodes` query, and the "Add to Inventory" / "In Inventory" column from the table
+- Clean up unused imports (`PackagePlus`, `CheckCircle2`, `useMutation`)
 
-// In the action column per row:
-const alreadyInInventory = item.company_id === selectedCompany?.id 
-  || existingCodes?.has(item.item_code);
+### Flow
+```text
+Inventory Tab → "Import from Catalog" button → Dialog opens
+  → Search & select item from global catalog
+  → Enter quantity + select bin
+  → Submit → Item cloned + bin allocation created
+  → Inventory list refreshes with new item showing stock
 ```
+
+### Technical Notes
+- The stock sync architecture requires that stock goes through bin allocations (source of truth). The dialog will create the bin allocation which triggers the sync to `warehouse_items.current_stock` automatically.
+- Duplicate prevention stays the same: match by `item_code` per `company_id`.
+- Bins will be fetched from `warehouse_bins` filtered by locations accessible to the user/company.
 
