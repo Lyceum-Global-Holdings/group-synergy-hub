@@ -68,14 +68,20 @@ export function AddInventoryStockDialog({ open, onOpenChange, category }: AddInv
   const { data: permissions } = useCurrentUserLocationPermissions();
   const addStock = useAddStockToExistingItem();
 
+  const editableLocationIds = useMemo(
+    () => new Set(permissions?.editLocationIds ?? []),
+    [permissions?.editLocationIds]
+  );
+
   const permittedLocations = useMemo(() => {
     if (!locations || !permissions) return [];
+
     // Only show top-level locations (type = 'location'), not sub-locations/departments/floors
-    const topLevelLocations = locations.filter(loc => loc.type === 'location');
-    if (permissions.viewAllLocations) return topLevelLocations;
-    const permittedIds = new Set(permissions.editLocationIds);
-    return topLevelLocations.filter(loc => permittedIds.has(loc.id));
-  }, [locations, permissions]);
+    const topLevelLocations = locations.filter((loc) => loc.type === "location");
+
+    if (permissions.canEditAllLocations) return topLevelLocations;
+    return topLevelLocations.filter((loc) => editableLocationIds.has(loc.id));
+  }, [locations, permissions, editableLocationIds]);
 
   const categoryLabel = ITEM_CATEGORIES.find(c => c.value === category)?.label || "Items";
 
@@ -92,6 +98,15 @@ export function AddInventoryStockDialog({ open, onOpenChange, category }: AddInv
   const selectedItem = items?.find(i => i.id === selectedItemId);
 
   const onSubmit = async (values: FormData) => {
+    const canUseLocation = permissions?.canEditAllLocations || editableLocationIds.has(values.location_id);
+    if (!canUseLocation) {
+      form.setError("location_id", {
+        type: "manual",
+        message: "You can only add to edit-permitted locations.",
+      });
+      return;
+    }
+
     await addStock.mutateAsync({
       item_master_id: values.item_master_id,
       quantity: values.quantity,

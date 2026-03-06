@@ -81,14 +81,20 @@ export function AddItemDialog({ open, onOpenChange, category }: AddItemDialogPro
   const { data: locations } = useLocations();
   const { data: permissions } = useCurrentUserLocationPermissions();
 
+  const editableLocationIds = useMemo(
+    () => new Set(permissions?.editLocationIds ?? []),
+    [permissions?.editLocationIds]
+  );
+
   const permittedLocations = useMemo(() => {
     if (!locations || !permissions) return [];
+
     // Only show top-level locations (type = 'location'), not sub-locations/departments/floors
-    const topLevelLocations = locations.filter(loc => loc.type === 'location');
-    if (permissions.viewAllLocations) return topLevelLocations;
-    const permittedIds = new Set(permissions.editLocationIds);
-    return topLevelLocations.filter(loc => permittedIds.has(loc.id));
-  }, [locations, permissions]);
+    const topLevelLocations = locations.filter((loc) => loc.type === "location");
+
+    if (permissions.canEditAllLocations) return topLevelLocations;
+    return topLevelLocations.filter((loc) => editableLocationIds.has(loc.id));
+  }, [locations, permissions, editableLocationIds]);
 
   // Machines are serial tracked, others are bulk tracked
   const isMachineCategory = category === "machines";
@@ -143,9 +149,46 @@ export function AddItemDialog({ open, onOpenChange, category }: AddItemDialogPro
     form.setValue("color", "");
   }, [category, form]);
 
+  // Clear stale location values that are no longer permitted
+  useEffect(() => {
+    if (!permissions || permissions.canEditAllLocations) return;
+
+    const currentLocationId = form.getValues("current_location_id");
+    if (currentLocationId && !editableLocationIds.has(currentLocationId)) {
+      form.setValue("current_location_id", "");
+    }
+
+    const bulkLocationId = form.getValues("location_id");
+    if (bulkLocationId && !editableLocationIds.has(bulkLocationId)) {
+      form.setValue("location_id", "");
+    }
+  }, [permissions, editableLocationIds, form]);
+
   const availableSubCategories = SUB_CATEGORIES[category] || [];
 
   const onSubmit = async (values: FormOutput) => {
+    const canUseLocation = (locationId?: string) => {
+      if (!locationId) return true;
+      if (permissions?.canEditAllLocations) return true;
+      return editableLocationIds.has(locationId);
+    };
+
+    if (isMachineCategory && !canUseLocation(values.current_location_id)) {
+      form.setError("current_location_id", {
+        type: "manual",
+        message: "You can only add to edit-permitted locations.",
+      });
+      return;
+    }
+
+    if (!isMachineCategory && values.location_id && !canUseLocation(values.location_id)) {
+      form.setError("location_id", {
+        type: "manual",
+        message: "You can only add to edit-permitted locations.",
+      });
+      return;
+    }
+
     if (isMachineCategory) {
       await createItemWithSerial.mutateAsync({
         item_code: values.item_code,
