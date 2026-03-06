@@ -19,6 +19,7 @@ const CompanyManagement = lazy(() => import("./pages/admin/CompanyManagement"));
 const UserRoleManagement = lazy(() => import("./pages/admin/UserRoleManagement"));
 const ModuleAllocation = lazy(() => import("./pages/admin/ModuleAllocation"));
 const WarehouseManagement = lazy(() => import("./pages/admin/WarehouseManagement"));
+const BackendDashboard = lazy(() => import("./pages/admin/BackendDashboard"));
 const PurchaseRequisition = lazy(() => import("./pages/procurement/PurchaseRequisition"));
 const PurchaseOrder = lazy(() => import("./pages/procurement/PurchaseOrder"));
 const BillOfMaterials = lazy(() => import("./pages/procurement/BillOfMaterials"));
@@ -161,6 +162,7 @@ function App() {
                 <Route path="/admin/users-roles" element={<AdminRoute><UserRoleManagement /></AdminRoute>} />
                 <Route path="/admin/modules" element={<AdminRoute><ModuleAllocation /></AdminRoute>} />
                 <Route path="/admin/warehouse-management" element={<AdminRoute><WarehouseManagement /></AdminRoute>} />
+                <Route path="/admin/backend" element={<AdminRoute><BackendDashboard /></AdminRoute>} />
                 <Route path="/admin/training" element={<Training />} />
                 <Route path="/admin/training/module-trainings" element={<ModuleTrainings />} />
                 <Route path="/admin/training/video-library" element={<VideoLibrary />} />

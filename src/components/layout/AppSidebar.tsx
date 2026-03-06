@@ -9,6 +9,7 @@ import {
   Settings,
   ChevronDown,
   GraduationCap,
+  Database,
 } from "lucide-react";
 import {
   Sidebar,
@@ -113,6 +114,7 @@ const adminItems = [
   { title: "Module Allocation", url: "/admin/modules", icon: Settings },
   { title: "Warehouse Management", url: "/admin/warehouse-management", icon: Package },
   { title: "Training", url: "/admin/training", icon: GraduationCap },
+  { title: "Backend Monitor", url: "/admin/backend", icon: Database },
 ];
 
 export function AppSidebar() {
