@@ -39,7 +39,7 @@ export function ItemMasterDefinitionTab({ onNavigateToInventory, onNavigateToBin
 
   const [deletingItem, setDeletingItem] = useState<WarehouseItem | null>(null);
 
-  const { items, isLoading, deleteItem, markItemInactive, isDeleting, isMarkingInactive } = useWarehouseItems();
+  const { items, isLoading, deleteItem, markItemInactive, isDeleting, isMarkingInactive } = useWarehouseItems({ skipCompanyFilter: true });
   const { canDelete } = useIsAdminOrHigher();
   const { selectedCompany } = useCompany();
   const { categories } = useItemCategories(selectedCompany?.id);

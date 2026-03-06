@@ -5,7 +5,8 @@ import { useToast } from '@/hooks/use-toast';
 import { useCompany } from '@/contexts/CompanyContext';
 import { useCurrentUserLocationPermissions } from '@/hooks/useCurrentUserLocationPermissions';
 
-export const useWarehouseItems = () => {
+export const useWarehouseItems = (options?: { skipCompanyFilter?: boolean }) => {
+  const skipCompanyFilter = options?.skipCompanyFilter ?? false;
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { selectedCompany, isViewingAllCompanies } = useCompany();
@@ -16,7 +17,7 @@ export const useWarehouseItems = () => {
     isLoading,
     error
   } = useQuery({
-    queryKey: ['warehouse-items', selectedCompany?.id, isViewingAllCompanies, permissions?.viewAllLocations, permissions?.viewLocationIds, permissions?.editLocationIds],
+    queryKey: ['warehouse-items', skipCompanyFilter ? 'all' : selectedCompany?.id, isViewingAllCompanies, permissions?.viewAllLocations, permissions?.viewLocationIds, permissions?.editLocationIds],
     queryFn: async () => {
       let query = supabase
         .from('warehouse_items')
@@ -25,8 +26,8 @@ export const useWarehouseItems = () => {
           supplier:suppliers(id, name)
         `);
 
-      // Filter by company if not viewing all companies
-      if (!isViewingAllCompanies && selectedCompany?.id) {
+      // Filter by company if not viewing all companies (skip for global item master)
+      if (!skipCompanyFilter && !isViewingAllCompanies && selectedCompany?.id) {
         query = query.eq('company_id', selectedCompany.id);
       }
 
@@ -106,7 +107,7 @@ export const useWarehouseItems = () => {
 
       return itemsWithBins as WarehouseItem[];
     },
-    enabled: !!(isViewingAllCompanies || selectedCompany?.id),
+    enabled: skipCompanyFilter || !!(isViewingAllCompanies || selectedCompany?.id),
   });
 
   const createItemMutation = useMutation({
