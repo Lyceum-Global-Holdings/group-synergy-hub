@@ -10,6 +10,7 @@ import { CompanyProvider } from "@/contexts/CompanyContext";
 import { LocationFilterProvider } from "@/contexts/LocationFilterContext";
 import ProtectedRoute from "./components/common/ProtectedRoute";
 import { AdminRoute } from "./components/auth/AdminRoute";
+import { SuperAdminRoute } from "./components/auth/SuperAdminRoute";
 import AppLayout from "./components/layout/AppLayout";
 import { Loader2 } from "lucide-react";
 
@@ -162,7 +163,7 @@ function App() {
                 <Route path="/admin/users-roles" element={<AdminRoute><UserRoleManagement /></AdminRoute>} />
                 <Route path="/admin/modules" element={<AdminRoute><ModuleAllocation /></AdminRoute>} />
                 <Route path="/admin/warehouse-management" element={<AdminRoute><WarehouseManagement /></AdminRoute>} />
-                <Route path="/admin/backend" element={<AdminRoute><BackendDashboard /></AdminRoute>} />
+                <Route path="/admin/backend" element={<SuperAdminRoute><BackendDashboard /></SuperAdminRoute>} />
                 <Route path="/admin/training" element={<Training />} />
                 <Route path="/admin/training/module-trainings" element={<ModuleTrainings />} />
                 <Route path="/admin/training/video-library" element={<VideoLibrary />} />
