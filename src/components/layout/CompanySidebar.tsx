@@ -120,7 +120,7 @@ export function CompanySidebar() {
       const config = moduleConfig[moduleKey];
       if (!config) return null;
       
-      // Filter enabled sub-modules for the selected company
+      // Start from configured sub-modules
       let enabledItems: SidebarItem[] = config.subModules.map(sub => ({
         title: sub.name,
         url: sub.url,
@@ -128,13 +128,22 @@ export function CompanySidebar() {
         children: sub.children
       }));
 
+      // Add super-admin-only Backend Monitor under Administration
+      if (moduleKey === "administration" && isSuperAdmin) {
+        enabledItems.push({
+          title: "Backend Monitor",
+          url: "/admin/backend",
+          key: "backend-monitor"
+        });
+      }
+
       // When viewing a specific company, filter sub-modules based on company settings
-      // When viewing all companies, show all sub-modules for each module
+      // Keep backend-monitor visible for super admins even if not part of company module config
       if (!isViewingAllCompanies && selectedCompany) {
         const companyModules = normalizeCompanyModules(selectedCompany.modules);
         const enabledSubModules = companyModules[moduleKey] || [];
         enabledItems = enabledItems.filter(item => 
-          enabledSubModules.includes(item.key)
+          enabledSubModules.includes(item.key) || (isSuperAdmin && item.key === "backend-monitor")
         );
       }
 
