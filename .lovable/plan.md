@@ -1,45 +1,54 @@
 
 
-## Diagnosis: Scheduled Telegram Reports Not Sending
+## Plan: Add "Add to My Inventory" from Item Master
 
-### Root Cause Found
+### Problem
+The Item Master Definition tab shows all items globally, but there's no way to import an item from another company's catalog into the current company's inventory. Users must manually recreate item definitions.
 
-**The `bot_token` is being wiped to `NULL` every time the user saves Telegram settings.**
+### Solution
+Add an "Add to Inventory" action button per item row in the Item Master Definition tab. When clicked, it clones the item definition into the current company's `warehouse_items` with the current `company_id`. Items already in the current company's inventory (matched by `item_code`) are marked with an "In Inventory" badge and the button is disabled.
 
-Here's the chain of events:
+### How It Works
+- The tab already loads ALL items globally (`skipCompanyFilter: true`)
+- On render, cross-reference items against the current company's items to identify which `item_code`s already exist
+- For items not yet in the current company: show an "Add to Inventory" button
+- For items already in the current company: show a green "In Inventory" badge, button disabled
+- The clone copies all definition fields (name, category, unit, brand, SKU, barcode, costs, reorder levels) but sets `company_id` to the current company and resets `current_stock` to 0
 
-1. In `TelegramSettingsTab.tsx` line 45, the bot token is **never loaded from the server** (for security): `setBotToken("")`
-2. When the user saves **any** setting (e.g., changes the schedule time), line 84-85 runs: `bot_token: botToken || null` -- since `botToken` is always `""`, this sends `null`
-3. The upsert in `useTelegramSettings.ts` overwrites the stored bot_token with `null`
-4. The scheduled function filters with `.not('bot_token', 'is', null)`, so it finds **zero companies** and skips everything
+### Database Compatibility
+The unique constraint is `UNIQUE (item_code, company_id)`, so the same `item_code` can exist across different companies -- no schema changes needed.
 
-**Evidence**: The database currently shows `bot_token: NULL`. At 04:12 UTC today, the user saved settings (changed time from 23:30 to 21:30), and immediately after, the function started returning "No companies with scheduled sending enabled."
+### Changes
 
-The `last_scheduled_send` is stuck at March 3rd for the same reason -- any settings save after that date would have cleared the token.
+**1. `src/components/warehouse/ItemMasterDefinitionTab.tsx`**
+- Fetch the current company's item codes using a lightweight query (just `item_code` from `warehouse_items` where `company_id = selectedCompany.id`)
+- Build a `Set<string>` of existing item codes for O(1) lookup
+- Add a new action button (e.g., `PackagePlus` icon) per row:
+  - If `item.company_id === selectedCompany.id` or item code exists in the set: show "In Inventory" indicator, button disabled
+  - Otherwise: clickable "Add to Inventory" button
+- On click: insert a new `warehouse_items` row cloning the item's definition fields with `company_id = selectedCompany.id`, `current_stock = 0`
+- Show success toast and refresh the existing-items set
+- Add a `useMutation` for the clone operation inline
 
-### Fix
+**2. No other file changes needed** -- this is self-contained in the Definition tab.
 
-**`src/components/construction/TelegramSettingsTab.tsx`** -- Only include `bot_token` in the save payload when the user has actually entered a new token:
-
+### Key Technical Detail
 ```typescript
-const handleSave = async () => {
-  const data: any = {
-    chat_id: chatIds.length > 0 ? chatIds.join(',') : null,
-    is_enabled: isEnabled,
-    notify_on_report_create: notifyOnCreate,
-    scheduled_send_enabled: scheduledSendEnabled,
-    scheduled_send_time: scheduledSendEnabled ? `${scheduledSendTime}:00` : null,
-    timezone: scheduledSendEnabled ? timezone : null,
-  };
+// Fetch existing item codes for current company
+const { data: existingCodes } = useQuery({
+  queryKey: ['warehouse-items-codes', selectedCompany?.id],
+  queryFn: async () => {
+    const { data } = await supabase
+      .from('warehouse_items')
+      .select('item_code')
+      .eq('company_id', selectedCompany!.id);
+    return new Set(data?.map(d => d.item_code) || []);
+  },
+  enabled: !!selectedCompany?.id,
+});
 
-  // Only update bot_token if user entered a new one
-  if (botToken.trim()) {
-    data.bot_token = botToken;
-  }
-
-  await saveSettings(data);
-};
+// In the action column per row:
+const alreadyInInventory = item.company_id === selectedCompany?.id 
+  || existingCodes?.has(item.item_code);
 ```
-
-This is a one-file fix. After applying it, the user will need to **re-enter and save their bot token once** to restore it (since it's currently null in the database).
 
