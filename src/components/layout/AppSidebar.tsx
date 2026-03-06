@@ -1,4 +1,5 @@
 import { NavLink, useLocation } from "react-router-dom";
+import { useSuperAdmin } from "@/hooks/useSuperAdmin";
 import {
   Building2,
   Calculator,
@@ -114,6 +115,9 @@ const adminItems = [
   { title: "Module Allocation", url: "/admin/modules", icon: Settings },
   { title: "Warehouse Management", url: "/admin/warehouse-management", icon: Package },
   { title: "Training", url: "/admin/training", icon: GraduationCap },
+];
+
+const superAdminOnlyItems = [
   { title: "Backend Monitor", url: "/admin/backend", icon: Database },
 ];
 
@@ -121,7 +125,12 @@ export function AppSidebar() {
   const { state } = useSidebar();
   const location = useLocation();
   const currentPath = location.pathname;
+  const { data: isSuperAdmin } = useSuperAdmin();
 
+  const visibleAdminItems = [
+    ...adminItems,
+    ...(isSuperAdmin ? superAdminOnlyItems : []),
+  ];
   const isActive = (path: string) => currentPath === path;
   const isGroupActive = (items: { url: string }[]) =>
     items.some((item) => currentPath.startsWith(item.url));
@@ -194,7 +203,7 @@ export function AppSidebar() {
           <SidebarGroupLabel>Administration</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {adminItems.map((item) => (
+              {visibleAdminItems.map((item) => (
                 <SidebarMenuItem key={item.url}>
                   <SidebarMenuButton asChild isActive={isActive(item.url)}>
                     <NavLink to={item.url} className="flex items-center gap-2">
