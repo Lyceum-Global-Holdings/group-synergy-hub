@@ -260,7 +260,7 @@ serve(async (req) => {
             project:construction_projects(project_name, project_code)
           `;
 
-        const { data: reports, error: reportsError } = await supabase
+        let { data: reports, error: reportsError } = await supabase
           .from('daily_site_reports')
           .select(reportSelect)
           .eq('company_id', setting.company_id)
@@ -272,34 +272,49 @@ serve(async (req) => {
           continue;
         }
 
+        // Yesterday fallback: if no reports for today's local date, check yesterday
         if (!reports || reports.length === 0) {
-          console.log(`No reports found for local date ${todayDateStr} for company ${setting.company_id}`);
+          console.log(`No reports found for local date ${todayDateStr}, checking yesterday as fallback...`);
           
-          // Compute how many minutes past the scheduled UTC time we are
-          const [schH2, schM2] = scheduledTime.split(':').map(Number);
-          const offsetH2 = TIMEZONE_OFFSETS[setting.timezone || 'UTC'] ?? 0;
-          let utcMin2 = (schH2 * 60 + schM2) - Math.round(offsetH2 * 60);
-          if (utcMin2 < 0) utcMin2 += 1440;
-          if (utcMin2 >= 1440) utcMin2 -= 1440;
-          const currentMin2 = now.getUTCHours() * 60 + now.getUTCMinutes();
-          let diffMin2 = currentMin2 - utcMin2;
-          if (diffMin2 > 720) diffMin2 -= 1440;
-          if (diffMin2 < -720) diffMin2 += 1440;
+          const yesterdayLocal = new Date(localTime.getTime() - 24 * 60 * 60 * 1000);
+          const yesterdayDateStr = yesterdayLocal.toISOString().split('T')[0];
           
-          // Only mark as sent if we're more than 3 hours past scheduled time (end-of-day guard)
-          // Otherwise, do NOT update last_scheduled_send so cron retries next run
-          if (diffMin2 > 180) {
-            console.log(`More than 3 hours past schedule (${diffMin2}min). Marking as sent to prevent infinite retries.`);
-            await supabase
-              .from('telegram_settings')
-              .update({ last_scheduled_send: new Date().toISOString() })
-              .eq('id', setting.id);
+          const { data: yesterdayReports, error: yesterdayError } = await supabase
+            .from('daily_site_reports')
+            .select(reportSelect)
+            .eq('company_id', setting.company_id)
+            .eq('report_date', yesterdayDateStr);
+          
+          if (!yesterdayError && yesterdayReports && yesterdayReports.length > 0) {
+            console.log(`Found ${yesterdayReports.length} reports for yesterday (${yesterdayDateStr}), using fallback`);
+            reports = yesterdayReports;
           } else {
-            console.log(`Only ${diffMin2}min past schedule. NOT updating last_scheduled_send — will retry on next cron run.`);
+            console.log(`No reports found for yesterday (${yesterdayDateStr}) either for company ${setting.company_id}`);
+            
+            // Compute how many minutes past the scheduled UTC time we are
+            const [schH2, schM2] = scheduledTime.split(':').map(Number);
+            const offsetH2 = TIMEZONE_OFFSETS[setting.timezone || 'UTC'] ?? 0;
+            let utcMin2 = (schH2 * 60 + schM2) - Math.round(offsetH2 * 60);
+            if (utcMin2 < 0) utcMin2 += 1440;
+            if (utcMin2 >= 1440) utcMin2 -= 1440;
+            const currentMin2 = now.getUTCHours() * 60 + now.getUTCMinutes();
+            let diffMin2 = currentMin2 - utcMin2;
+            if (diffMin2 > 720) diffMin2 -= 1440;
+            if (diffMin2 < -720) diffMin2 += 1440;
+            
+            if (diffMin2 > 180) {
+              console.log(`More than 3 hours past schedule (${diffMin2}min). Marking as sent to prevent infinite retries.`);
+              await supabase
+                .from('telegram_settings')
+                .update({ last_scheduled_send: new Date().toISOString() })
+                .eq('id', setting.id);
+            } else {
+              console.log(`Only ${diffMin2}min past schedule. NOT updating last_scheduled_send — will retry on next cron run.`);
+            }
+            
+            results.push({ company_id: setting.company_id, success: true, message: 'No reports today or yesterday' });
+            continue;
           }
-          
-          results.push({ company_id: setting.company_id, success: true, message: 'No reports today' });
-          continue;
         }
 
         console.log(`Found ${reports.length} reports for company ${setting.company_id}`);
@@ -729,6 +744,9 @@ async function generateReportPdf(
     }
   };
   
+  // Sanitize text for WinAnsi encoding (remove tabs, control chars)
+  const sanitize = (text: string): string => text.replace(/[\x00-\x1f\x7f]/g, ' ').trim();
+
   // Helper to draw a simple table
   const drawTable = (
     headers: string[], 
@@ -737,10 +755,10 @@ async function generateReportPdf(
   ) => {
     const colWidths = headers.map((_, i) => {
       // Calculate column widths based on content
-      const headerWidth = helveticaBold.widthOfTextAtSize(headers[i], 8);
+      const headerWidth = helveticaBold.widthOfTextAtSize(sanitize(headers[i]), 8);
       let maxDataWidth = 0;
       rows.forEach(row => {
-        const dataWidth = helvetica.widthOfTextAtSize(row[i] || '-', 8);
+        const dataWidth = helvetica.widthOfTextAtSize(sanitize(row[i] || '-'), 8);
         maxDataWidth = Math.max(maxDataWidth, dataWidth);
       });
       return Math.max(headerWidth, maxDataWidth) + 10;
@@ -763,7 +781,7 @@ async function generateReportPdf(
     
     let xPos = margin + 3;
     headers.forEach((header, i) => {
-      page.drawText(header, { 
+      page.drawText(sanitize(header), { 
         x: xPos, 
         y: y - 6, 
         size: 8, 
@@ -791,7 +809,7 @@ async function generateReportPdf(
       
       xPos = margin + 3;
       row.forEach((cell, i) => {
-        const truncatedCell = (cell || '-').substring(0, 30);
+        const truncatedCell = sanitize(cell || '-').substring(0, 30);
         page.drawText(truncatedCell, { 
           x: xPos, 
           y: y - 6, 
