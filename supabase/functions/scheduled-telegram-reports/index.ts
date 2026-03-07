@@ -260,7 +260,7 @@ serve(async (req) => {
             project:construction_projects(project_name, project_code)
           `;
 
-        const { data: reports, error: reportsError } = await supabase
+        let { data: reports, error: reportsError } = await supabase
           .from('daily_site_reports')
           .select(reportSelect)
           .eq('company_id', setting.company_id)
