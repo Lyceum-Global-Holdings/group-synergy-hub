@@ -68,6 +68,22 @@ export const useWarehouseAssets = (companyId?: string) => {
     }
   });
 
+  // Helper to apply company + linked location OR filter
+  const applyCompanyFilter = async (query: any) => {
+    if (!companyId) return query;
+    const { data: linkedLocs } = await supabase
+      .from('warehouse_location_companies')
+      .select('location_id')
+      .eq('company_id', companyId);
+    const linkedLocationIds = linkedLocs?.map(r => r.location_id) || [];
+    if (linkedLocationIds.length > 0) {
+      return query.or(
+        `company_id.eq.${companyId},location_id.in.(${linkedLocationIds.join(',')})`
+      );
+    }
+    return query.eq('company_id', companyId);
+  };
+
   // Get accurate counts from server
   const { data: totalCount } = useQuery({
     queryKey: ['warehouse-assets-total-count', companyId],
@@ -75,11 +91,7 @@ export const useWarehouseAssets = (companyId?: string) => {
       let query = supabase
         .from('warehouse_assets')
         .select('*', { count: 'exact', head: true });
-
-      if (companyId) {
-        query = query.eq('company_id', companyId);
-      }
-
+      query = await applyCompanyFilter(query);
       const { count, error } = await query;
       if (error) throw error;
       return count || 0;
@@ -93,11 +105,7 @@ export const useWarehouseAssets = (companyId?: string) => {
         .from('warehouse_assets')
         .select('*', { count: 'exact', head: true })
         .eq('status', 'active');
-
-      if (companyId) {
-        query = query.eq('company_id', companyId);
-      }
-
+      query = await applyCompanyFilter(query);
       const { count, error } = await query;
       if (error) throw error;
       return count || 0;
@@ -111,11 +119,7 @@ export const useWarehouseAssets = (companyId?: string) => {
         .from('warehouse_assets')
         .select('*', { count: 'exact', head: true })
         .eq('status', 'maintenance');
-
-      if (companyId) {
-        query = query.eq('company_id', companyId);
-      }
-
+      query = await applyCompanyFilter(query);
       const { count, error } = await query;
       if (error) throw error;
       return count || 0;
