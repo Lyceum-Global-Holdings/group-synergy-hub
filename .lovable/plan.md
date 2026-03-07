@@ -1,35 +1,46 @@
 
 
-## Plan: Restrict Location Dropdowns to User's Edit-Permitted Locations
+## Problem
 
-### Problem
-The "Add Item" and "Add Stock" dialogs in Construction Inventory show **all** locations, allowing users to add items to locations they don't have edit access to. For example, Shihan (who only has access to "Lyceum Wattala") can currently see and select any location.
+The force-triggered test returned "No reports today" because:
+- Current time: 02:43 UTC = 08:13 IST on **March 7**
+- The function calculates "today" as **March 7** in IST
+- The report is dated **March 6**
+- **The "yesterday fallback" from the approved plan was never implemented**
 
-### Solution
-Filter the location dropdowns in both dialogs using `useCurrentUserLocationPermissions()`, the same pattern already used in `NewTransferDialog.tsx`. Only locations where the user has explicit **edit** permissions will appear.
+The March 6 report (`DSR-20260306-001`, company `11a46626...`) exists in the database but won't be found because the query only looks for `report_date = '2026-03-07'`.
 
-### Changes
+## Fix
 
-**1. `src/components/construction/inventory/AddItemDialog.tsx`**
-- Import `useCurrentUserLocationPermissions`
-- Fetch permissions, then filter `locations` to only those in `editLocationIds`
-- Admin/Super Admin users (who get `viewAllLocations: true`) see all locations (unchanged behavior)
-- Use the filtered list for both the machine `current_location_id` and bulk `location_id` dropdowns
+Add the missing yesterday fallback to `supabase/functions/scheduled-telegram-reports/index.ts`. After the initial query for today's reports returns empty (line 275), query again for yesterday's local date before giving up.
 
-**2. `src/components/construction/inventory/AddInventoryStockDialog.tsx`**
-- Same change: import `useCurrentUserLocationPermissions`, filter the location dropdown to edit-permitted locations only
+### Changes to `supabase/functions/scheduled-telegram-reports/index.ts`
 
-### Pattern (from existing `NewTransferDialog.tsx`)
+At line 275-302 (the "no reports" block), insert a fallback query:
+
 ```typescript
-const { data: permissions } = useCurrentUserLocationPermissions();
-
-const permittedLocations = useMemo(() => {
-  if (!locations || !permissions) return [];
-  if (permissions.viewAllLocations) return locations;
-  const permittedIds = new Set(permissions.editLocationIds);
-  return locations.filter(loc => permittedIds.has(loc.id));
-}, [locations, permissions]);
+if (!reports || reports.length === 0) {
+  console.log(`No reports found for local date ${todayDateStr}, checking yesterday as fallback...`);
+  
+  // Calculate yesterday's local date
+  const yesterdayLocal = new Date(localTime.getTime() - 24 * 60 * 60 * 1000);
+  const yesterdayDateStr = yesterdayLocal.toISOString().split('T')[0];
+  
+  const { data: yesterdayReports, error: yesterdayError } = await supabase
+    .from('daily_site_reports')
+    .select(reportSelect)
+    .eq('company_id', setting.company_id)
+    .eq('report_date', yesterdayDateStr);
+  
+  if (!yesterdayError && yesterdayReports && yesterdayReports.length > 0) {
+    console.log(`Found ${yesterdayReports.length} reports for yesterday (${yesterdayDateStr}), using fallback`);
+    reports = yesterdayReports; // Use yesterday's reports instead
+  } else {
+    // Original "no reports" handling with the 3-hour guard logic
+    // ... keep existing code ...
+  }
+}
 ```
 
-Two files changed, no new files.
+After implementing, redeploy the function and re-trigger with `{"force": true}` to verify the March 6 report is delivered via Telegram.
 
