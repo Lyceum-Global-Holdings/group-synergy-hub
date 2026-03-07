@@ -781,7 +781,7 @@ async function generateReportPdf(
     
     let xPos = margin + 3;
     headers.forEach((header, i) => {
-      page.drawText(header, { 
+      page.drawText(sanitize(header), { 
         x: xPos, 
         y: y - 6, 
         size: 8, 
@@ -809,7 +809,7 @@ async function generateReportPdf(
       
       xPos = margin + 3;
       row.forEach((cell, i) => {
-        const truncatedCell = (cell || '-').substring(0, 30);
+        const truncatedCell = sanitize(cell || '-').substring(0, 30);
         page.drawText(truncatedCell, { 
           x: xPos, 
           y: y - 6, 
