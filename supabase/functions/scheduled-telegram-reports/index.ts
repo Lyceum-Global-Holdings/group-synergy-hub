@@ -744,6 +744,9 @@ async function generateReportPdf(
     }
   };
   
+  // Sanitize text for WinAnsi encoding (remove tabs, control chars)
+  const sanitize = (text: string): string => text.replace(/[\x00-\x1f\x7f]/g, ' ').trim();
+
   // Helper to draw a simple table
   const drawTable = (
     headers: string[], 
@@ -752,10 +755,10 @@ async function generateReportPdf(
   ) => {
     const colWidths = headers.map((_, i) => {
       // Calculate column widths based on content
-      const headerWidth = helveticaBold.widthOfTextAtSize(headers[i], 8);
+      const headerWidth = helveticaBold.widthOfTextAtSize(sanitize(headers[i]), 8);
       let maxDataWidth = 0;
       rows.forEach(row => {
-        const dataWidth = helvetica.widthOfTextAtSize(row[i] || '-', 8);
+        const dataWidth = helvetica.widthOfTextAtSize(sanitize(row[i] || '-'), 8);
         maxDataWidth = Math.max(maxDataWidth, dataWidth);
       });
       return Math.max(headerWidth, maxDataWidth) + 10;
