@@ -14,6 +14,16 @@ export const useWarehouseAssets = (companyId?: string) => {
   } = useQuery({
     queryKey: ['warehouse-assets', companyId],
     queryFn: async () => {
+      // Get locations linked to this company via junction table
+      let linkedLocationIds: string[] = [];
+      if (companyId) {
+        const { data: linkedLocs } = await supabase
+          .from('warehouse_location_companies')
+          .select('location_id')
+          .eq('company_id', companyId);
+        linkedLocationIds = linkedLocs?.map(r => r.location_id) || [];
+      }
+
       const allData: WarehouseAsset[] = [];
       const batchSize = 1000;
       let from = 0;
@@ -27,7 +37,13 @@ export const useWarehouseAssets = (companyId?: string) => {
           .range(from, from + batchSize - 1);
 
         if (companyId) {
-          query = query.eq('company_id', companyId);
+          if (linkedLocationIds.length > 0) {
+            query = query.or(
+              `company_id.eq.${companyId},location_id.in.(${linkedLocationIds.join(',')})`
+            );
+          } else {
+            query = query.eq('company_id', companyId);
+          }
         }
 
         const { data, error } = await query;
@@ -42,7 +58,13 @@ export const useWarehouseAssets = (companyId?: string) => {
         }
       }
 
-      return allData;
+      // Deduplicate in case an asset matches both conditions
+      const seen = new Set<string>();
+      return allData.filter(a => {
+        if (seen.has(a.id)) return false;
+        seen.add(a.id);
+        return true;
+      });
     }
   });
 
