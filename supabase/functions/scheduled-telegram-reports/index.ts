@@ -185,8 +185,8 @@ serve(async (req) => {
           if (diffMin > 720) diffMin -= 1440;
           if (diffMin < -720) diffMin += 1440;
 
-          // Catch-up window: 0 to 120 minutes after scheduled time
-          if (diffMin >= 0 && diffMin < 120) {
+          // Catch-up window: 0 to 240 minutes (4 hours) after scheduled time
+          if (diffMin >= 0 && diffMin < 240) {
             catchUpMatch = true;
             console.log(`CATCH-UP triggered for company ${setting.company_id}: last send was ${hoursSinceLastSend.toFixed(1)}h ago, ${diffMin}min past schedule`);
           }
@@ -231,14 +231,13 @@ serve(async (req) => {
           }
         }
 
-        // Get today's date in YYYY-MM-DD format for report_date comparison
-        const today = new Date();
-        const todayDateStr = today.toISOString().split('T')[0];
-        console.log(`Looking for reports with report_date: ${todayDateStr}`);
+        // Calculate "today" in the company's local timezone (not UTC)
+        const companyOffsetHours = TIMEZONE_OFFSETS[setting.timezone || 'UTC'] ?? 0;
+        const localTime = new Date(now.getTime() + companyOffsetHours * 60 * 60 * 1000);
+        const todayDateStr = localTime.toISOString().split('T')[0];
+        console.log(`Looking for reports with report_date: ${todayDateStr} (local date in ${setting.timezone || 'UTC'})`);
 
-        const { data: reports, error: reportsError } = await supabase
-          .from('daily_site_reports')
-          .select(`
+        const reportSelect = `
             id,
             report_number,
             report_type,
@@ -259,7 +258,11 @@ serve(async (req) => {
             project_id,
             company_id,
             project:construction_projects(project_name, project_code)
-          `)
+          `;
+
+        const { data: reports, error: reportsError } = await supabase
+          .from('daily_site_reports')
+          .select(reportSelect)
           .eq('company_id', setting.company_id)
           .eq('report_date', todayDateStr);
 
@@ -270,14 +273,32 @@ serve(async (req) => {
         }
 
         if (!reports || reports.length === 0) {
-          console.log(`No reports today for company ${setting.company_id}`);
+          console.log(`No reports found for local date ${todayDateStr} for company ${setting.company_id}`);
+          
+          // Compute how many minutes past the scheduled UTC time we are
+          const [schH2, schM2] = scheduledTime.split(':').map(Number);
+          const offsetH2 = TIMEZONE_OFFSETS[setting.timezone || 'UTC'] ?? 0;
+          let utcMin2 = (schH2 * 60 + schM2) - Math.round(offsetH2 * 60);
+          if (utcMin2 < 0) utcMin2 += 1440;
+          if (utcMin2 >= 1440) utcMin2 -= 1440;
+          const currentMin2 = now.getUTCHours() * 60 + now.getUTCMinutes();
+          let diffMin2 = currentMin2 - utcMin2;
+          if (diffMin2 > 720) diffMin2 -= 1440;
+          if (diffMin2 < -720) diffMin2 += 1440;
+          
+          // Only mark as sent if we're more than 3 hours past scheduled time (end-of-day guard)
+          // Otherwise, do NOT update last_scheduled_send so cron retries next run
+          if (diffMin2 > 180) {
+            console.log(`More than 3 hours past schedule (${diffMin2}min). Marking as sent to prevent infinite retries.`);
+            await supabase
+              .from('telegram_settings')
+              .update({ last_scheduled_send: new Date().toISOString() })
+              .eq('id', setting.id);
+          } else {
+            console.log(`Only ${diffMin2}min past schedule. NOT updating last_scheduled_send — will retry on next cron run.`);
+          }
+          
           results.push({ company_id: setting.company_id, success: true, message: 'No reports today' });
-          
-          await supabase
-            .from('telegram_settings')
-            .update({ last_scheduled_send: new Date().toISOString() })
-            .eq('id', setting.id);
-          
           continue;
         }
 
