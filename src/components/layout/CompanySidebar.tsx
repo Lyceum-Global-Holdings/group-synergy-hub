@@ -106,8 +106,9 @@ export function CompanySidebar() {
       : [];
 
   // Filter by user permissions (unless super admin)
+  // Super admins always get "administration" even when viewing a specific company
   const availableModules = isSuperAdmin 
-    ? companyModules 
+    ? (companyModules.includes("administration") ? companyModules : [...companyModules, "administration"])
     : companyModules.filter(moduleKey => 
         userEffectiveModules?.availableModules?.includes(moduleKey)
       );
