@@ -60,7 +60,7 @@ export function TransactionsMonitorPanel() {
       // Stock Transactions
       if (source === "all" || source === "stock") {
         const { data } = await supabase
-          .from("warehouse_stock_transactions")
+          .from("stock_transactions")
           .select("id, transaction_type, reference_type, reference_id, quantity_change, total_value, notes, created_at")
           .order("created_at", { ascending: false })
           .limit(200);
