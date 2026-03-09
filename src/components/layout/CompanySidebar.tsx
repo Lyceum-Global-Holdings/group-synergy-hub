@@ -4,8 +4,7 @@ import {
   BarChart3,
   Settings,
   ChevronDown,
-  Users,
-  Package
+  Database,
 } from "lucide-react";
 import {
   Sidebar,
@@ -29,7 +28,7 @@ import {
 import { useCompany } from "@/contexts/CompanyContext";
 import { Badge } from "@/components/ui/badge";
 import { Company } from "@/types/company";
-import { moduleConfig, normalizeCompanyModules, isModuleEnabled, isSubModuleEnabled } from "@/constants/moduleConfig";
+import { moduleConfig, normalizeCompanyModules } from "@/constants/moduleConfig";
 import { useSuperAdmin } from "@/hooks/useSuperAdmin";
 import { useAuth } from "@/contexts/AuthContext";
 import { useUserEffectiveModules } from "@/hooks/useModuleAccess";
