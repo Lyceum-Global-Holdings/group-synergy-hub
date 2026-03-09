@@ -45,9 +45,13 @@ export const useSuperAdmin = () => {
         return false;
       }
 
-      return (
-        roleRows?.some((row: any) => row.roles?.app_role === "super_admin") ?? false
-      );
+      return roleRows?.some((row: any) => {
+        const roleData = row.roles;
+        if (Array.isArray(roleData)) {
+          return roleData.some((r: any) => r?.app_role === "super_admin");
+        }
+        return roleData?.app_role === "super_admin";
+      }) ?? false;
     },
     retry: 1,
     staleTime: 60 * 1000,
