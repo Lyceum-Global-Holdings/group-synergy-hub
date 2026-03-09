@@ -4,7 +4,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
-import { Loader2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Loader2, ZoomIn, ZoomOut, Maximize2, Move } from "lucide-react";
 
 // Domain groupings
 const DOMAIN_GROUPS: Record<string, { label: string; tables: string[] }> = {
@@ -77,7 +78,6 @@ const DOMAIN_GROUPS: Record<string, { label: string; tables: string[] }> = {
   },
 };
 
-// Relationship data extracted from Supabase types
 interface Relationship {
   from: string;
   fromCol: string;
@@ -86,11 +86,9 @@ interface Relationship {
 }
 
 const RELATIONSHIPS: Relationship[] = [
-  // Approval & Workflow
   { from: "approval_routing_rules", fromCol: "company_id", to: "companies", toCol: "id" },
   { from: "approval_stages", fromCol: "company_id", to: "companies", toCol: "id" },
   { from: "approver_assignments", fromCol: "company_id", to: "companies", toCol: "id" },
-  // Assets
   { from: "asset_categories", fromCol: "parent_id", to: "asset_categories", toCol: "id" },
   { from: "asset_master", fromCol: "category_id", to: "asset_categories", toCol: "id" },
   { from: "asset_master", fromCol: "subcategory_id", to: "asset_categories", toCol: "id" },
@@ -116,7 +114,6 @@ const RELATIONSHIPS: Relationship[] = [
   { from: "asset_transfers", fromCol: "asset_id", to: "warehouse_assets", toCol: "id" },
   { from: "asset_transfers", fromCol: "from_location_id", to: "warehouse_locations", toCol: "id" },
   { from: "asset_transfers", fromCol: "to_location_id", to: "warehouse_locations", toCol: "id" },
-  // Banking & Finance
   { from: "bank_accounts", fromCol: "company_id", to: "companies", toCol: "id" },
   { from: "bank_accounts", fromCol: "gl_account_id", to: "chart_of_accounts", toCol: "id" },
   { from: "bank_reconciliation_sessions", fromCol: "bank_account_id", to: "bank_accounts", toCol: "id" },
@@ -135,10 +132,8 @@ const RELATIONSHIPS: Relationship[] = [
   { from: "bank_transactions", fromCol: "bank_account_id", to: "bank_accounts", toCol: "id" },
   { from: "bank_transactions", fromCol: "company_id", to: "companies", toCol: "id" },
   { from: "bank_transactions", fromCol: "journal_entry_id", to: "journal_entries", toCol: "id" },
-  // Journal
   { from: "journal_entry_lines", fromCol: "journal_entry_id", to: "journal_entries", toCol: "id" },
   { from: "journal_entry_lines", fromCol: "account_id", to: "chart_of_accounts", toCol: "id" },
-  // Warehouse
   { from: "stock_transactions", fromCol: "item_id", to: "warehouse_items", toCol: "id" },
   { from: "stock_transactions", fromCol: "issued_to_location_id", to: "warehouse_locations", toCol: "id" },
   { from: "batch_issue_details", fromCol: "batch_id", to: "item_batches", toCol: "id" },
@@ -147,7 +142,6 @@ const RELATIONSHIPS: Relationship[] = [
   { from: "batch_stock_allocations", fromCol: "bin_id", to: "warehouse_bins", toCol: "id" },
   { from: "material_issue_items", fromCol: "material_issue_id", to: "material_issues", toCol: "id" },
   { from: "material_issue_items", fromCol: "item_id", to: "warehouse_items", toCol: "id" },
-  // Procurement
   { from: "purchase_orders", fromCol: "supplier_id", to: "suppliers", toCol: "id" },
   { from: "purchase_orders", fromCol: "company_id", to: "companies", toCol: "id" },
   { from: "purchase_order_items", fromCol: "purchase_order_id", to: "purchase_orders", toCol: "id" },
@@ -167,16 +161,13 @@ const RELATIONSHIPS: Relationship[] = [
   { from: "blanket_po_release_items", fromCol: "release_id", to: "blanket_po_releases", toCol: "id" },
   { from: "blanket_po_amendments", fromCol: "bpo_id", to: "blanket_purchase_orders", toCol: "id" },
   { from: "blanket_po_spending_analytics", fromCol: "bpo_id", to: "blanket_purchase_orders", toCol: "id" },
-  // BOM
   { from: "bill_of_materials", fromCol: "company_id", to: "companies", toCol: "id" },
   { from: "bill_of_materials", fromCol: "po_id", to: "purchase_orders", toCol: "id" },
   { from: "bill_of_materials", fromCol: "product_master_id", to: "product_master", toCol: "id" },
   { from: "bill_of_materials", fromCol: "warehouse_item_id", to: "warehouse_items", toCol: "id" },
-  // Users & Access
   { from: "company_settings", fromCol: "company_id", to: "companies", toCol: "id" },
 ];
 
-// Abbreviate long table names for mermaid
 function abbr(name: string): string {
   return name.replace(/-/g, "_");
 }
@@ -189,39 +180,23 @@ function buildMermaidDiagram(domain: string): string {
   let rels: Relationship[];
 
   if (domain === "all") {
-    // Overview: show only domain-level connections (inter-domain links)
     const allTables = new Set<string>();
     Object.values(DOMAIN_GROUPS).forEach((g) => g.tables.forEach((t) => allTables.add(t)));
     tables = allTables;
-    rels = RELATIONSHIPS.filter(
-      (r) => allTables.has(r.from) && allTables.has(r.to)
-    );
-    // For "all", limit to cross-domain relations only to keep it readable
+    rels = RELATIONSHIPS.filter((r) => allTables.has(r.from) && allTables.has(r.to));
     const domainOf = (t: string) => {
       for (const [key, val] of Object.entries(DOMAIN_GROUPS)) {
         if (key !== "all" && val.tables.includes(t)) return key;
       }
       return "other";
     };
-    rels = rels.filter((r) => {
-      const d1 = domainOf(r.from);
-      const d2 = domainOf(r.to);
-      return d1 !== d2;
-    });
+    rels = rels.filter((r) => domainOf(r.from) !== domainOf(r.to));
   } else {
     tables = new Set(group.tables);
-    // Include relations where at least one side is in this domain
-    rels = RELATIONSHIPS.filter(
-      (r) => tables.has(r.from) || tables.has(r.to)
-    );
-    // Add referenced tables from other domains
-    rels.forEach((r) => {
-      tables.add(r.from);
-      tables.add(r.to);
-    });
+    rels = RELATIONSHIPS.filter((r) => tables.has(r.from) || tables.has(r.to));
+    rels.forEach((r) => { tables.add(r.from); tables.add(r.to); });
   }
 
-  // Deduplicate relations
   const seen = new Set<string>();
   const uniqueRels = rels.filter((r) => {
     const key = `${r.from}.${r.fromCol}->${r.to}.${r.toCol}`;
@@ -232,12 +207,8 @@ function buildMermaidDiagram(domain: string): string {
 
   let diagram = "erDiagram\n";
 
-  // Add tables that have no relations as standalone
   const mentionedTables = new Set<string>();
-  uniqueRels.forEach((r) => {
-    mentionedTables.add(r.from);
-    mentionedTables.add(r.to);
-  });
+  uniqueRels.forEach((r) => { mentionedTables.add(r.from); mentionedTables.add(r.to); });
 
   tables.forEach((t) => {
     if (!mentionedTables.has(t)) {
@@ -245,7 +216,6 @@ function buildMermaidDiagram(domain: string): string {
     }
   });
 
-  // Add relationships
   uniqueRels.forEach((r) => {
     const label = `${r.fromCol} to ${r.toCol}`;
     diagram += `    ${abbr(r.to)} ||--o{ ${abbr(r.from)} : "${label}"\n`;
@@ -258,8 +228,9 @@ mermaid.initialize({
   startOnLoad: false,
   theme: "default",
   er: {
-    useMaxWidth: true,
+    useMaxWidth: false,
     layoutDirection: "TB",
+    fontSize: 14,
   },
   securityLevel: "loose",
 });
@@ -269,6 +240,11 @@ export function SchemaDiagramPanel() {
   const [svgContent, setSvgContent] = useState<string>("");
   const [loading, setLoading] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const [scale, setScale] = useState(1);
+  const [position, setPosition] = useState({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
 
   const renderDiagram = useCallback(async () => {
     setLoading(true);
@@ -277,6 +253,8 @@ export function SchemaDiagramPanel() {
       const id = `schema-diagram-${Date.now()}`;
       const { svg } = await mermaid.render(id, definition);
       setSvgContent(svg);
+      setScale(0.8);
+      setPosition({ x: 0, y: 0 });
     } catch (err) {
       console.error("Mermaid render error:", err);
       setSvgContent(`<p style="color:red;padding:20px;">Failed to render diagram. Try a specific domain group.</p>`);
@@ -288,12 +266,34 @@ export function SchemaDiagramPanel() {
     renderDiagram();
   }, [renderDiagram]);
 
+  const handleZoomIn = () => setScale((s) => Math.min(s + 0.2, 3));
+  const handleZoomOut = () => setScale((s) => Math.max(s - 0.2, 0.2));
+  const handleFit = () => { setScale(0.6); setPosition({ x: 0, y: 0 }); };
+
+  const handleWheel = useCallback((e: React.WheelEvent) => {
+    e.preventDefault();
+    const delta = e.deltaY > 0 ? -0.1 : 0.1;
+    setScale((s) => Math.min(Math.max(s + delta, 0.2), 3));
+  }, []);
+
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    setIsDragging(true);
+    setDragStart({ x: e.clientX - position.x, y: e.clientY - position.y });
+  }, [position]);
+
+  const handleMouseMove = useCallback((e: React.MouseEvent) => {
+    if (!isDragging) return;
+    setPosition({ x: e.clientX - dragStart.x, y: e.clientY - dragStart.y });
+  }, [isDragging, dragStart]);
+
+  const handleMouseUp = useCallback(() => {
+    setIsDragging(false);
+  }, []);
+
   const group = DOMAIN_GROUPS[domain];
   const relevantRels = domain === "all"
     ? RELATIONSHIPS
-    : RELATIONSHIPS.filter(
-        (r) => group.tables.includes(r.from) || group.tables.includes(r.to)
-      );
+    : RELATIONSHIPS.filter((r) => group.tables.includes(r.from) || group.tables.includes(r.to));
 
   return (
     <div className="space-y-4">
@@ -323,22 +323,56 @@ export function SchemaDiagramPanel() {
             </div>
           </div>
           <p className="text-xs text-muted-foreground mt-1">
-            Entity-Relationship diagram showing foreign key connections between tables.
+            Entity-Relationship diagram showing foreign key connections between tables. Use mouse wheel to zoom, click and drag to pan.
           </p>
         </CardHeader>
         <CardContent>
+          {/* Zoom controls */}
+          <div className="flex items-center gap-1 mb-3">
+            <Button variant="outline" size="sm" onClick={handleZoomIn} title="Zoom In">
+              <ZoomIn className="h-4 w-4" />
+            </Button>
+            <Button variant="outline" size="sm" onClick={handleZoomOut} title="Zoom Out">
+              <ZoomOut className="h-4 w-4" />
+            </Button>
+            <Button variant="outline" size="sm" onClick={handleFit} title="Fit to View">
+              <Maximize2 className="h-4 w-4" />
+            </Button>
+            <span className="text-xs text-muted-foreground ml-2">{Math.round(scale * 100)}%</span>
+            <div className="flex items-center gap-1 ml-3 text-xs text-muted-foreground">
+              <Move className="h-3 w-3" />
+              Drag to pan
+            </div>
+          </div>
+
           {loading ? (
-            <div className="flex items-center justify-center h-64">
+            <div className="flex items-center justify-center h-[600px]">
               <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
             </div>
           ) : (
-            <ScrollArea className="h-[500px]">
+            <div
+              ref={wrapperRef}
+              className="relative border border-border rounded-lg overflow-hidden bg-muted/30"
+              style={{ height: "600px", cursor: isDragging ? "grabbing" : "grab" }}
+              onWheel={handleWheel}
+              onMouseDown={handleMouseDown}
+              onMouseMove={handleMouseMove}
+              onMouseUp={handleMouseUp}
+              onMouseLeave={handleMouseUp}
+            >
               <div
                 ref={containerRef}
-                className="flex justify-center overflow-auto min-h-[400px]"
+                style={{
+                  transform: `translate(${position.x}px, ${position.y}px) scale(${scale})`,
+                  transformOrigin: "top left",
+                  transition: isDragging ? "none" : "transform 0.15s ease",
+                  display: "inline-block",
+                  minWidth: "max-content",
+                  padding: "20px",
+                }}
                 dangerouslySetInnerHTML={{ __html: svgContent }}
               />
-            </ScrollArea>
+            </div>
           )}
         </CardContent>
       </Card>
