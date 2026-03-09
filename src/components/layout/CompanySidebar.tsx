@@ -4,8 +4,7 @@ import {
   BarChart3,
   Settings,
   ChevronDown,
-  Users,
-  Package
+  Database,
 } from "lucide-react";
 import {
   Sidebar,
@@ -29,7 +28,7 @@ import {
 import { useCompany } from "@/contexts/CompanyContext";
 import { Badge } from "@/components/ui/badge";
 import { Company } from "@/types/company";
-import { moduleConfig, normalizeCompanyModules, isModuleEnabled, isSubModuleEnabled } from "@/constants/moduleConfig";
+import { moduleConfig, normalizeCompanyModules } from "@/constants/moduleConfig";
 import { useSuperAdmin } from "@/hooks/useSuperAdmin";
 import { useAuth } from "@/contexts/AuthContext";
 import { useUserEffectiveModules } from "@/hooks/useModuleAccess";
@@ -221,6 +220,25 @@ export function CompanySidebar() {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+
+        {/* Super Admin Tools (always visible for super admins) */}
+        {isSuperAdmin && (
+          <SidebarGroup>
+            <SidebarGroupLabel>Super Admin Tools</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild isActive={currentPath.startsWith("/admin/backend")}>
+                    <NavLink to="/admin/backend" className="flex items-center gap-2">
+                      <Database className="h-4 w-4" />
+                      <span>Backend Monitor</span>
+                    </NavLink>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
 
         {/* Company Modules */}
         {departments.length > 0 && (
