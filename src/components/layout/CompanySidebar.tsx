@@ -221,6 +221,25 @@ export function CompanySidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
 
+        {/* Super Admin Tools (always visible for super admins) */}
+        {isSuperAdmin && (
+          <SidebarGroup>
+            <SidebarGroupLabel>Super Admin Tools</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild isActive={currentPath.startsWith("/admin/backend")}>
+                    <NavLink to="/admin/backend" className="flex items-center gap-2">
+                      <Database className="h-4 w-4" />
+                      <span>Backend Monitor</span>
+                    </NavLink>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
+
         {/* Company Modules */}
         {departments.length > 0 && (
           <SidebarGroup>

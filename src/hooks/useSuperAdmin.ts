@@ -1,28 +1,58 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 
 /**
  * Hook to check if the current user is a super admin
  * Super admins have access to all modules and companies
  */
 export const useSuperAdmin = () => {
+  const { user, loading: authLoading } = useAuth();
+
   return useQuery({
-    queryKey: ['super-admin-status'],
+    queryKey: ["super-admin-status", user?.id],
+    enabled: !authLoading,
     queryFn: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
       if (!user) return false;
 
-      const { data, error } = await supabase
-        .rpc('is_super_admin', { _user_id: user.id });
+      // Primary check via security-definer RPC
+      const { data: isSuperAdminRpc, error: rpcError } = await supabase.rpc("is_super_admin", {
+        _user_id: user.id,
+      });
 
-      if (error) {
-        console.error('Error checking super admin status:', error);
+      if (!rpcError && isSuperAdminRpc === true) {
+        return true;
+      }
+
+      // Fallback #1: generic role-check RPC
+      const { data: hasSuperRole, error: hasRoleError } = await supabase.rpc("has_role", {
+        _user_id: user.id,
+        _app_role: "super_admin",
+      });
+
+      if (!hasRoleError && hasSuperRole === true) {
+        return true;
+      }
+
+      // Fallback #2: direct role join (for resilience when RPCs temporarily fail)
+      const { data: roleRows, error: roleError } = await supabase
+        .from("user_roles")
+        .select("roles!inner(app_role)")
+        .eq("user_id", user.id);
+
+      if (roleError) {
+        console.error("Error checking super admin status:", roleError || rpcError || hasRoleError);
         return false;
       }
 
-      return data === true;
+      return (
+        roleRows?.some((row: any) => row.roles?.app_role === "super_admin") ?? false
+      );
     },
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    retry: 1,
+    staleTime: 60 * 1000,
+    refetchOnWindowFocus: true,
+    refetchOnMount: "always",
   });
 };
 
@@ -31,16 +61,17 @@ export const useSuperAdmin = () => {
  */
 export const useIsAdmin = () => {
   return useQuery({
-    queryKey: ['admin-status'],
+    queryKey: ["admin-status"],
     queryFn: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) return false;
 
-      const { data, error } = await supabase
-        .rpc('is_admin', { _user_id: user.id });
+      const { data, error } = await supabase.rpc("is_admin", { _user_id: user.id });
 
       if (error) {
-        console.error('Error checking admin status:', error);
+        console.error("Error checking admin status:", error);
         return false;
       }
 
