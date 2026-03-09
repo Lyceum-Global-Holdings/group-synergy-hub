@@ -270,11 +270,7 @@ export function SchemaDiagramPanel() {
   const handleZoomOut = () => setScale((s) => Math.max(s - 0.2, 0.2));
   const handleFit = () => { setScale(0.6); setPosition({ x: 0, y: 0 }); };
 
-  const handleWheel = useCallback((e: React.WheelEvent) => {
-    e.preventDefault();
-    const delta = e.deltaY > 0 ? -0.1 : 0.1;
-    setScale((s) => Math.min(Math.max(s + delta, 0.2), 3));
-  }, []);
+  // Removed scroll-wheel zoom — only toolbar buttons control zoom
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     setIsDragging(true);
