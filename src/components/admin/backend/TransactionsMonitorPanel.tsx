@@ -105,7 +105,7 @@ export function TransactionsMonitorPanel() {
       if (source === "all" || source === "journal") {
         const { data } = await supabase
           .from("journal_entries")
-          .select("id, entry_number, description, total_debit, entry_date, status, created_at")
+          .select("id, journal_number, description, total_debit, journal_date, status, created_at")
           .order("created_at", { ascending: false })
           .limit(200);
         data?.forEach((t) =>
@@ -113,12 +113,12 @@ export function TransactionsMonitorPanel() {
             id: t.id,
             source: "Journal",
             type: "Entry",
-            description: t.description || t.entry_number || "—",
+            description: t.description || t.journal_number || "—",
             amount: t.total_debit,
-            date: t.entry_date,
-            reference: t.entry_number,
+            date: t.journal_date,
+            reference: t.journal_number,
             status: t.status,
-            created_at: t.created_at || t.entry_date,
+            created_at: t.created_at || t.journal_date,
           })
         );
       }
