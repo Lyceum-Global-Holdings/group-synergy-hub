@@ -16,6 +16,7 @@ type TransactionSource = "all" | "bank" | "stock" | "asset" | "journal";
 interface UnifiedTransaction {
   id: string;
   source: string;
+  module: string;
   type: string;
   description: string;
   amount: number | null;
@@ -23,6 +24,9 @@ interface UnifiedTransaction {
   reference: string | null;
   status: string | null;
   created_at: string;
+  created_by: string | null;
+  user_name: string | null;
+  user_email: string | null;
 }
 
 export function TransactionsMonitorPanel() {
@@ -34,18 +38,21 @@ export function TransactionsMonitorPanel() {
     queryKey: ["admin-transactions-monitor", source],
     queryFn: async () => {
       const unified: UnifiedTransaction[] = [];
+      const userIds = new Set<string>();
 
       // Bank Transactions
       if (source === "all" || source === "bank") {
         const { data } = await supabase
           .from("bank_transactions")
-          .select("id, transaction_type, description, debit_amount, credit_amount, transaction_date, reference_number, is_reconciled, created_at")
+          .select("id, transaction_type, description, debit_amount, credit_amount, transaction_date, reference_number, is_reconciled, created_at, created_by")
           .order("created_at", { ascending: false })
           .limit(200);
-        data?.forEach((t) =>
+        data?.forEach((t) => {
+          if (t.created_by) userIds.add(t.created_by);
           unified.push({
             id: t.id,
             source: "Bank",
+            module: "Finance",
             type: t.transaction_type || "—",
             description: t.description || "—",
             amount: (t.debit_amount || 0) - (t.credit_amount || 0),
@@ -53,21 +60,26 @@ export function TransactionsMonitorPanel() {
             reference: t.reference_number,
             status: t.is_reconciled ? "Reconciled" : "Unreconciled",
             created_at: t.created_at || t.transaction_date,
-          })
-        );
+            created_by: t.created_by,
+            user_name: null,
+            user_email: null,
+          });
+        });
       }
 
       // Stock Transactions
       if (source === "all" || source === "stock") {
         const { data } = await supabase
           .from("stock_transactions")
-          .select("id, transaction_type, reference_type, reference_id, quantity_change, total_value, notes, created_at")
+          .select("id, transaction_type, reference_type, reference_id, quantity_change, total_value, notes, created_at, created_by")
           .order("created_at", { ascending: false })
           .limit(200);
-        data?.forEach((t) =>
+        data?.forEach((t) => {
+          if (t.created_by) userIds.add(t.created_by);
           unified.push({
             id: t.id,
             source: "Stock",
+            module: "Warehouse",
             type: t.transaction_type || "—",
             description: t.notes || `${t.reference_type || ""} / ${t.reference_id || "—"}`,
             amount: t.total_value,
@@ -75,21 +87,26 @@ export function TransactionsMonitorPanel() {
             reference: t.reference_id,
             status: t.reference_type,
             created_at: t.created_at,
-          })
-        );
+            created_by: t.created_by,
+            user_name: null,
+            user_email: null,
+          });
+        });
       }
 
       // Asset Transactions
       if (source === "all" || source === "asset") {
         const { data } = await supabase
           .from("asset_transactions")
-          .select("id, transaction_type, description, amount, transaction_date, reference_number, created_at")
+          .select("id, transaction_type, description, amount, transaction_date, reference_number, created_at, created_by")
           .order("created_at", { ascending: false })
           .limit(200);
-        data?.forEach((t) =>
+        data?.forEach((t) => {
+          if (t.created_by) userIds.add(t.created_by);
           unified.push({
             id: t.id,
             source: "Asset",
+            module: "Assets",
             type: t.transaction_type || "—",
             description: t.description || "—",
             amount: t.amount,
@@ -97,21 +114,26 @@ export function TransactionsMonitorPanel() {
             reference: t.reference_number,
             status: null,
             created_at: t.created_at || t.transaction_date,
-          })
-        );
+            created_by: t.created_by,
+            user_name: null,
+            user_email: null,
+          });
+        });
       }
 
       // Journal Entries
       if (source === "all" || source === "journal") {
         const { data } = await supabase
           .from("journal_entries")
-          .select("id, journal_number, description, total_debit, journal_date, status, created_at")
+          .select("id, journal_number, description, total_debit, journal_date, status, created_at, created_by")
           .order("created_at", { ascending: false })
           .limit(200);
-        data?.forEach((t) =>
+        data?.forEach((t) => {
+          if (t.created_by) userIds.add(t.created_by);
           unified.push({
             id: t.id,
             source: "Journal",
+            module: "Finance",
             type: "Entry",
             description: t.description || t.journal_number || "—",
             amount: t.total_debit,
@@ -119,8 +141,34 @@ export function TransactionsMonitorPanel() {
             reference: t.journal_number,
             status: t.status,
             created_at: t.created_at || t.journal_date,
-          })
-        );
+            created_by: t.created_by,
+            user_name: null,
+            user_email: null,
+          });
+        });
+      }
+
+      // Batch-fetch profiles for all user IDs
+      const userIdArray = Array.from(userIds);
+      if (userIdArray.length > 0) {
+        const profileMap = new Map<string, { full_name: string | null; email: string | null }>();
+        // Fetch in chunks of 50 to avoid URL length limits
+        for (let i = 0; i < userIdArray.length; i += 50) {
+          const chunk = userIdArray.slice(i, i + 50);
+          const { data: profiles } = await supabase
+            .from("profiles")
+            .select("id, full_name, email")
+            .in("id", chunk);
+          profiles?.forEach((p) => profileMap.set(p.id, { full_name: p.full_name, email: p.email }));
+        }
+        // Attach profile info to transactions
+        unified.forEach((t) => {
+          if (t.created_by && profileMap.has(t.created_by)) {
+            const profile = profileMap.get(t.created_by)!;
+            t.user_name = profile.full_name?.split(" ")[0] || null;
+            t.user_email = profile.email;
+          }
+        });
       }
 
       // Sort by created_at
@@ -141,11 +189,14 @@ export function TransactionsMonitorPanel() {
       t.description.toLowerCase().includes(term) ||
       t.type.toLowerCase().includes(term) ||
       t.reference?.toLowerCase().includes(term) ||
-      t.source.toLowerCase().includes(term)
+      t.source.toLowerCase().includes(term) ||
+      t.module.toLowerCase().includes(term) ||
+      t.user_name?.toLowerCase().includes(term) ||
+      t.user_email?.toLowerCase().includes(term)
     );
   });
 
-  const sourceBadgeVariant = (src: string) => {
+  const sourceBadgeVariant = (src: string): "default" | "secondary" | "outline" | "destructive" => {
     switch (src) {
       case "Bank": return "default";
       case "Stock": return "secondary";
@@ -155,10 +206,21 @@ export function TransactionsMonitorPanel() {
     }
   };
 
+  const moduleBadgeColor = (mod: string) => {
+    switch (mod) {
+      case "Finance": return "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300";
+      case "Warehouse": return "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300";
+      case "Assets": return "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300";
+      default: return "bg-muted text-muted-foreground";
+    }
+  };
+
   const formatAmount = (amount: number | null) => {
     if (amount === null || amount === undefined) return "—";
     return new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(amount);
   };
+
+  const colSpan = 9;
 
   return (
     <Card>
@@ -210,24 +272,26 @@ export function TransactionsMonitorPanel() {
             <TableHeader>
               <TableRow>
                 <TableHead className="w-[80px]">Source</TableHead>
+                <TableHead className="w-[90px]">Module</TableHead>
                 <TableHead className="w-[100px]">Type</TableHead>
                 <TableHead>Description</TableHead>
-                <TableHead className="text-right w-[120px]">Amount</TableHead>
-                <TableHead className="w-[100px]">Date</TableHead>
-                <TableHead className="w-[120px]">Reference</TableHead>
+                <TableHead className="text-right w-[110px]">Amount</TableHead>
+                <TableHead className="w-[95px]">Date</TableHead>
                 <TableHead className="w-[100px]">Status</TableHead>
+                <TableHead className="w-[100px]">User</TableHead>
+                <TableHead className="w-[160px]">Email</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={colSpan} className="text-center py-8 text-muted-foreground">
                     Loading transactions...
                   </TableCell>
                 </TableRow>
               ) : !filtered?.length ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={colSpan} className="text-center py-8 text-muted-foreground">
                     No transactions found.
                   </TableCell>
                 </TableRow>
@@ -236,6 +300,11 @@ export function TransactionsMonitorPanel() {
                   <TableRow key={`${t.source}-${t.id}`}>
                     <TableCell>
                       <Badge variant={sourceBadgeVariant(t.source)}>{t.source}</Badge>
+                    </TableCell>
+                    <TableCell>
+                      <span className={`inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium ${moduleBadgeColor(t.module)}`}>
+                        {t.module}
+                      </span>
                     </TableCell>
                     <TableCell className="text-xs font-medium">{t.type}</TableCell>
                     <TableCell className="text-xs max-w-[200px] truncate" title={t.description}>
@@ -247,13 +316,16 @@ export function TransactionsMonitorPanel() {
                     <TableCell className="text-xs">
                       {t.date ? format(new Date(t.date), "dd MMM yyyy") : "—"}
                     </TableCell>
-                    <TableCell className="text-xs truncate max-w-[120px]" title={t.reference || ""}>
-                      {t.reference || "—"}
-                    </TableCell>
                     <TableCell>
                       {t.status ? (
                         <Badge variant="outline" className="text-xs">{t.status}</Badge>
                       ) : "—"}
+                    </TableCell>
+                    <TableCell className="text-xs font-medium">
+                      {t.user_name || "—"}
+                    </TableCell>
+                    <TableCell className="text-xs text-muted-foreground truncate max-w-[160px]" title={t.user_email || ""}>
+                      {t.user_email || "—"}
                     </TableCell>
                   </TableRow>
                 ))
