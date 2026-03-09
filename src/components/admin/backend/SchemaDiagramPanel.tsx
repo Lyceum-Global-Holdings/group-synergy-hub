@@ -350,7 +350,6 @@ export function SchemaDiagramPanel() {
               ref={wrapperRef}
               className="relative border border-border rounded-lg overflow-hidden bg-muted/30"
               style={{ height: "600px", cursor: isDragging ? "grabbing" : "grab" }}
-              onWheel={handleWheel}
               onMouseDown={handleMouseDown}
               onMouseMove={handleMouseMove}
               onMouseUp={handleMouseUp}
