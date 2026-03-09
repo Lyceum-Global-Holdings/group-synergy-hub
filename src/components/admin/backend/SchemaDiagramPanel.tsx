@@ -319,7 +319,7 @@ export function SchemaDiagramPanel() {
             </div>
           </div>
           <p className="text-xs text-muted-foreground mt-1">
-            Entity-Relationship diagram showing foreign key connections between tables. Use mouse wheel to zoom, click and drag to pan.
+            Entity-Relationship diagram showing foreign key connections between tables. Use toolbar buttons to zoom, click and drag to pan.
           </p>
         </CardHeader>
         <CardContent>
