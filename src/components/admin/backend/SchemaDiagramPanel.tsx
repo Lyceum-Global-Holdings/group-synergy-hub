@@ -270,11 +270,7 @@ export function SchemaDiagramPanel() {
   const handleZoomOut = () => setScale((s) => Math.max(s - 0.2, 0.2));
   const handleFit = () => { setScale(0.6); setPosition({ x: 0, y: 0 }); };
 
-  const handleWheel = useCallback((e: React.WheelEvent) => {
-    e.preventDefault();
-    const delta = e.deltaY > 0 ? -0.1 : 0.1;
-    setScale((s) => Math.min(Math.max(s + delta, 0.2), 3));
-  }, []);
+  // Removed scroll-wheel zoom — only toolbar buttons control zoom
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     setIsDragging(true);
@@ -323,7 +319,7 @@ export function SchemaDiagramPanel() {
             </div>
           </div>
           <p className="text-xs text-muted-foreground mt-1">
-            Entity-Relationship diagram showing foreign key connections between tables. Use mouse wheel to zoom, click and drag to pan.
+            Entity-Relationship diagram showing foreign key connections between tables. Use toolbar buttons to zoom, click and drag to pan.
           </p>
         </CardHeader>
         <CardContent>
@@ -354,7 +350,6 @@ export function SchemaDiagramPanel() {
               ref={wrapperRef}
               className="relative border border-border rounded-lg overflow-hidden bg-muted/30"
               style={{ height: "600px", cursor: isDragging ? "grabbing" : "grab" }}
-              onWheel={handleWheel}
               onMouseDown={handleMouseDown}
               onMouseMove={handleMouseMove}
               onMouseUp={handleMouseUp}
