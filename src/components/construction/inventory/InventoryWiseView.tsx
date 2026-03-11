@@ -326,14 +326,27 @@ export function InventoryWiseView() {
                               <TableCell>{getConditionBadge(serial.condition)}</TableCell>
                               <TableCell>{getAvailabilityBadge(serial.availability)}</TableCell>
                               <TableCell>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => handleEditSerial(serial)}
-                                  title="Edit location & status"
-                                >
-                                  <Pencil className="h-4 w-4" />
-                                </Button>
+                                <div className="flex items-center gap-1">
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => handleEditSerial(serial)}
+                                    title="Edit location & status"
+                                  >
+                                    <Pencil className="h-4 w-4" />
+                                  </Button>
+                                  {isSuperAdmin && (
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      onClick={() => handleDeleteClick("serial", serial.id, serial.serial_number)}
+                                      title="Delete serial number"
+                                      className="text-destructive hover:text-destructive"
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                  )}
+                                </div>
                               </TableCell>
                             </TableRow>
                           ))}
