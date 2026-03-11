@@ -24,8 +24,10 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Search, Plus, Package, Pencil, ChevronDown, Cog, Wrench, HardHat, Box, Construction } from "lucide-react";
-import { useItemMaster, useSerialNumbers, useInventoryStock } from "@/hooks/construction/useConstructionInventory";
+import { Search, Plus, Package, Pencil, ChevronDown, Cog, Wrench, HardHat, Box, Construction, Trash2 } from "lucide-react";
+import { useItemMaster, useSerialNumbers, useInventoryStock, useDeleteSerialNumber, useDeleteInventoryStock } from "@/hooks/construction/useConstructionInventory";
+import { useSuperAdmin } from "@/hooks/useSuperAdmin";
+import { DeleteConfirmDialog } from "@/components/construction/dialogs/DeleteConfirmDialog";
 import { ITEM_CATEGORIES, ITEM_SECTIONS, type ItemCategory } from "@/types/construction-inventory";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AddItemDialog } from "./AddItemDialog";
