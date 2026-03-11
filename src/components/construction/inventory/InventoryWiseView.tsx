@@ -26,7 +26,7 @@ import {
 } from "@/components/ui/table";
 import { Search, Plus, Package, Pencil, ChevronDown, Cog, Wrench, HardHat, Box, Construction } from "lucide-react";
 import { useItemMaster, useSerialNumbers, useInventoryStock } from "@/hooks/construction/useConstructionInventory";
-import { ITEM_CATEGORIES, type ItemCategory } from "@/types/construction-inventory";
+import { ITEM_CATEGORIES, ITEM_SECTIONS, type ItemCategory } from "@/types/construction-inventory";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AddItemDialog } from "./AddItemDialog";
 import { AddInventoryStockDialog } from "./AddInventoryStockDialog";
