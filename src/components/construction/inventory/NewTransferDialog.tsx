@@ -128,6 +128,7 @@ export function NewTransferDialog({ open, onOpenChange }: NewTransferDialogProps
   useEffect(() => {
     setFromLocationId("");
     setToLocationId("");
+    setSelectedItemMasterId("");
     setQuantity(0);
     setSelectedSerialIds([]);
   }, [category]);
