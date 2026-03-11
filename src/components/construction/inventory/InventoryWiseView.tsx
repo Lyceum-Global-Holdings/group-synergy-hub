@@ -57,6 +57,7 @@ export function InventoryWiseView() {
   const { globalLocationId } = useLocationFilter();
   const [searchTerm, setSearchTerm] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
+  const [sectionFilter, setSectionFilter] = useState<string>("all");
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [addStockDialogOpen, setAddStockDialogOpen] = useState(false);
   const [addDialogCategory, setAddDialogCategory] = useState<ItemCategory>("machines");
