@@ -64,6 +64,20 @@ export function NewTransferDialog({ open, onOpenChange }: NewTransferDialogProps
   // Check if selected category is serial-tracked (machines)
   const isSerialTracked = category === "machines";
 
+  // Get items available at the selected from location for non-serial categories
+  const itemsAtFromLocation = useMemo(() => {
+    if (!fromLocationId || !category || isSerialTracked || !stockData || !allItems) return [];
+    const categoryItems = allItems.filter(i => i.category === category);
+    const categoryItemIds = new Set(categoryItems.map(i => i.id));
+    const stockAtLocation = stockData.filter(
+      s => s.location_id === fromLocationId && categoryItemIds.has(s.item_master_id) && (s.quantity || 0) > 0
+    );
+    return stockAtLocation.map(s => {
+      const item = categoryItems.find(i => i.id === s.item_master_id);
+      return { stockId: s.id, itemMasterId: s.item_master_id, itemName: item?.item_name || "Unknown", itemCode: item?.item_code || "", available: s.quantity || 0 };
+    });
+  }, [fromLocationId, category, isSerialTracked, stockData, allItems]);
+
   // Get serial numbers available at the selected from location for this category
   const serialsAtLocation = useMemo(() => {
     if (!fromLocationId || !allSerials || !category) return [];
@@ -80,17 +94,16 @@ export function NewTransferDialog({ open, onOpenChange }: NewTransferDialogProps
     if (!fromLocationId || !category) return 0;
     
     if (isSerialTracked) {
-      // For machines: count available serial numbers at this location
       return serialsAtLocation.length;
     } else {
-      // For non-serial items: sum of all stock at this location for this category
-      if (!stockData || !allItems) return 0;
-      const categoryItemIds = new Set(allItems.map(i => i.id));
-      return stockData
-        .filter(s => s.location_id === fromLocationId && categoryItemIds.has(s.item_master_id))
-        .reduce((sum, s) => sum + (s.quantity || 0), 0);
+      // For non-serial: available quantity of the selected item
+      if (selectedItemMasterId) {
+        const found = itemsAtFromLocation.find(i => i.itemMasterId === selectedItemMasterId);
+        return found?.available || 0;
+      }
+      return 0;
     }
-  }, [fromLocationId, category, isSerialTracked, serialsAtLocation, stockData, allItems]);
+  }, [fromLocationId, category, isSerialTracked, serialsAtLocation, selectedItemMasterId, itemsAtFromLocation]);
 
   // Get available serials for selection (exclude already selected ones)
   const getAvailableSerialsForSlot = (slotIndex: number) => {
