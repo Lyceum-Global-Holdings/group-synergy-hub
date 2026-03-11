@@ -215,7 +215,8 @@ export function LocationWiseView() {
                             <TableHead>Item</TableHead>
                             <TableHead>Serial Number</TableHead>
                             <TableHead>Condition</TableHead>
-                            <TableHead>Status</TableHead>
+                             <TableHead>Status</TableHead>
+                            {isSuperAdmin && <TableHead className="w-[60px]">Actions</TableHead>}
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -229,6 +230,19 @@ export function LocationWiseView() {
                                   {serial.availability.replace(/_/g, " ")}
                                 </Badge>
                               </TableCell>
+                              {isSuperAdmin && (
+                                <TableCell>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="text-destructive hover:text-destructive"
+                                    onClick={() => handleDeleteClick("serial", serial.id, serial.serial_number)}
+                                    title="Delete serial number"
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </TableCell>
+                              )}
                             </TableRow>
                           ))}
                         </TableBody>
@@ -247,6 +261,7 @@ export function LocationWiseView() {
                             <TableHead>Category</TableHead>
                             <TableHead className="text-right">Quantity</TableHead>
                             <TableHead className="text-right">Reserved</TableHead>
+                            {isSuperAdmin && <TableHead className="w-[60px]">Actions</TableHead>}
                           </TableRow>
                         </TableHeader>
                         <TableBody>
