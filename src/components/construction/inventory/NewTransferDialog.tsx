@@ -34,6 +34,7 @@ export function NewTransferDialog({ open, onOpenChange }: NewTransferDialogProps
   const [category, setCategory] = useState<ItemCategory | "">("");
   const [fromLocationId, setFromLocationId] = useState("");
   const [toLocationId, setToLocationId] = useState("");
+  const [selectedItemMasterId, setSelectedItemMasterId] = useState("");
   const [quantity, setQuantity] = useState<number>(0);
   const [selectedSerialIds, setSelectedSerialIds] = useState<string[]>([]);
   const [notes, setNotes] = useState("");
