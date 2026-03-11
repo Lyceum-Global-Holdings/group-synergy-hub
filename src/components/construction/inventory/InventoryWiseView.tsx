@@ -81,10 +81,12 @@ export function InventoryWiseView() {
     : allStocks;
 
   // Filter items by search term
-  const filteredItems = items?.filter(item =>
-    item.item_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    item.item_code.toLowerCase().includes(searchTerm.toLowerCase())
-  ) || [];
+  const filteredItems = items?.filter(item => {
+    const matchesSearch = item.item_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      item.item_code.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesSection = sectionFilter === "all" || item.section === sectionFilter;
+    return matchesSearch && matchesSection;
+  }) || [];
 
   // Group serials by item_master_id
   const serialsByItem = serials?.reduce((acc, serial) => {
