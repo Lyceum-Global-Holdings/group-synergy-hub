@@ -327,7 +327,7 @@ export function AddItemDialog({ open, onOpenChange, category }: AddItemDialogPro
                     <FormLabel>Item Code (Auto-generated)</FormLabel>
                     <FormControl>
                       <Input 
-                        placeholder="Fill sub-category, color & name" 
+                        placeholder="Fill sub-category & name" 
                         {...field} 
                         readOnly 
                         className="bg-muted font-mono"
