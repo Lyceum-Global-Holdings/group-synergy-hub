@@ -189,6 +189,10 @@ export function AddItemDialog({ open, onOpenChange, category }: AddItemDialogPro
       return;
     }
 
+    // Convert empty date strings to undefined so they become NULL in the database
+    const purchaseDate = values.purchase_date?.trim() || undefined;
+    const warrantyExpiry = values.warranty_expiry?.trim() || undefined;
+
     if (isMachineCategory) {
       await createItemWithSerial.mutateAsync({
         item_code: values.item_code,
@@ -202,13 +206,13 @@ export function AddItemDialog({ open, onOpenChange, category }: AddItemDialogPro
         unit_of_measurement: values.unit_of_measurement,
         description: values.description,
         unit_cost: values.unit_cost,
-        purchase_date: values.purchase_date,
+        purchase_date: purchaseDate,
         is_serial_tracked: true,
         serial_number: values.serial_number,
-        current_location_id: values.current_location_id,
+        current_location_id: values.current_location_id || undefined,
         condition: values.condition,
         availability: values.availability,
-        warranty_expiry: values.warranty_expiry,
+        warranty_expiry: warrantyExpiry,
         asset_value: values.asset_value,
       });
     } else {
@@ -224,7 +228,7 @@ export function AddItemDialog({ open, onOpenChange, category }: AddItemDialogPro
         unit_of_measurement: values.unit_of_measurement,
         description: values.description,
         unit_cost: values.unit_cost,
-        purchase_date: values.purchase_date,
+        purchase_date: purchaseDate,
         is_serial_tracked: false,
         initial_quantity: values.initial_quantity,
         location_id: values.location_id,
