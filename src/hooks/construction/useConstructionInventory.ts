@@ -1248,7 +1248,9 @@ export function useDeleteSerialNumber() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["construction-serial-numbers"] });
       queryClient.invalidateQueries({ queryKey: ["construction-inventory-stock"] });
-      toast({ title: "Serial number deleted successfully" });
+      queryClient.invalidateQueries({ queryKey: ["construction-transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["construction-transfers"] });
+      toast({ title: "Serial number and related records deleted successfully" });
     },
     onError: (error: Error) => {
       toast({ title: "Failed to delete serial number", description: error.message, variant: "destructive" });
