@@ -349,8 +349,31 @@ export function NewTransferDialog({ open, onOpenChange }: NewTransferDialogProps
             )}
           </div>
 
-          {/* 4. Quantity - Show available items in brackets */}
-          {toLocationId && (
+          {/* 4. Item Selection - For non-serial items */}
+          {!isSerialTracked && fromLocationId && toLocationId && (
+            <div className="space-y-2">
+              <Label htmlFor="itemSelect">Item</Label>
+              <Select value={selectedItemMasterId} onValueChange={(val) => { setSelectedItemMasterId(val); setQuantity(0); }}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select item to transfer..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {itemsAtFromLocation.length === 0 ? (
+                    <div className="p-2 text-center text-muted-foreground">No items available at this location</div>
+                  ) : (
+                    itemsAtFromLocation.map(item => (
+                      <SelectItem key={item.itemMasterId} value={item.itemMasterId}>
+                        {item.itemCode} - {item.itemName} (Qty: {item.available})
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          {/* 5. Quantity - Show available items in brackets */}
+          {toLocationId && (isSerialTracked || selectedItemMasterId) && (
             <div className="space-y-2">
               <Label htmlFor="quantity">
                 Quantity
