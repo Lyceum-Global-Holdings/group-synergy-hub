@@ -169,6 +169,17 @@ export function InventoryWiseView() {
               ))}
             </SelectContent>
           </Select>
+          <Select value={sectionFilter} onValueChange={setSectionFilter}>
+            <SelectTrigger className="w-full sm:w-[180px]">
+              <SelectValue placeholder="All Sections" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Sections</SelectItem>
+              {ITEM_SECTIONS.map(sec => (
+                <SelectItem key={sec.value} value={sec.value}>{sec.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
         
         {/* Category-specific Add Item Dropdown */}
