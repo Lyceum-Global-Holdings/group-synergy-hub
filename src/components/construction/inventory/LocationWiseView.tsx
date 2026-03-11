@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   Select,
   SelectContent,
@@ -23,10 +24,12 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import { Search, MapPin, Package } from "lucide-react";
-import { useSerialNumbers, useInventoryStock, useLocations } from "@/hooks/construction/useConstructionInventory";
+import { Search, MapPin, Package, Trash2 } from "lucide-react";
+import { useSerialNumbers, useInventoryStock, useLocations, useDeleteSerialNumber, useDeleteInventoryStock } from "@/hooks/construction/useConstructionInventory";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useLocationFilter } from "@/contexts/LocationFilterContext";
+import { useSuperAdmin } from "@/hooks/useSuperAdmin";
+import { DeleteConfirmDialog } from "@/components/construction/dialogs/DeleteConfirmDialog";
 
 export function LocationWiseView() {
   const { globalLocationId } = useLocationFilter();
