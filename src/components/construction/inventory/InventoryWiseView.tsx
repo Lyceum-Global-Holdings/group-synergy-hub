@@ -26,7 +26,7 @@ import {
 } from "@/components/ui/table";
 import { Search, Plus, Package, Pencil, ChevronDown, Cog, Wrench, HardHat, Box, Construction } from "lucide-react";
 import { useItemMaster, useSerialNumbers, useInventoryStock } from "@/hooks/construction/useConstructionInventory";
-import { ITEM_CATEGORIES, type ItemCategory } from "@/types/construction-inventory";
+import { ITEM_CATEGORIES, ITEM_SECTIONS, type ItemCategory } from "@/types/construction-inventory";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AddItemDialog } from "./AddItemDialog";
 import { AddInventoryStockDialog } from "./AddInventoryStockDialog";
@@ -57,6 +57,7 @@ export function InventoryWiseView() {
   const { globalLocationId } = useLocationFilter();
   const [searchTerm, setSearchTerm] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
+  const [sectionFilter, setSectionFilter] = useState<string>("all");
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [addStockDialogOpen, setAddStockDialogOpen] = useState(false);
   const [addDialogCategory, setAddDialogCategory] = useState<ItemCategory>("machines");
@@ -80,10 +81,12 @@ export function InventoryWiseView() {
     : allStocks;
 
   // Filter items by search term
-  const filteredItems = items?.filter(item =>
-    item.item_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    item.item_code.toLowerCase().includes(searchTerm.toLowerCase())
-  ) || [];
+  const filteredItems = items?.filter(item => {
+    const matchesSearch = item.item_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      item.item_code.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesSection = sectionFilter === "all" || item.section === sectionFilter;
+    return matchesSearch && matchesSection;
+  }) || [];
 
   // Group serials by item_master_id
   const serialsByItem = serials?.reduce((acc, serial) => {
@@ -163,6 +166,17 @@ export function InventoryWiseView() {
               <SelectItem value="all">All Categories</SelectItem>
               {ITEM_CATEGORIES.map(cat => (
                 <SelectItem key={cat.value} value={cat.value}>{cat.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={sectionFilter} onValueChange={setSectionFilter}>
+            <SelectTrigger className="w-full sm:w-[180px]">
+              <SelectValue placeholder="All Sections" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Sections</SelectItem>
+              {ITEM_SECTIONS.map(sec => (
+                <SelectItem key={sec.value} value={sec.value}>{sec.label}</SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -257,6 +271,7 @@ export function InventoryWiseView() {
                   </div>
                   <div className="flex items-center gap-2">
                     <Badge variant="outline">{ITEM_CATEGORIES.find(c => c.value === item.category)?.label}</Badge>
+                    <Badge variant="secondary">{ITEM_SECTIONS.find(s => s.value === item.section)?.label || item.section}</Badge>
                     {item.is_serial_tracked ? (
                       <Badge className="bg-purple-100 text-purple-800">Serial Tracked</Badge>
                     ) : (
