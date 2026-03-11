@@ -126,6 +126,20 @@ export function LocationWiseView() {
     return <Badge className={variants[condition] || ""}>{condition.replace(/_/g, " ")}</Badge>;
   };
 
+  const handleDeleteClick = (type: "serial" | "stock", id: string, name: string) => {
+    setDeleteTarget({ type, id, name });
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = () => {
+    if (!deleteTarget) return;
+    if (deleteTarget.type === "serial") {
+      deleteSerial.mutate(deleteTarget.id, { onSettled: () => { setDeleteDialogOpen(false); setDeleteTarget(null); } });
+    } else {
+      deleteStock.mutate(deleteTarget.id, { onSettled: () => { setDeleteDialogOpen(false); setDeleteTarget(null); } });
+    }
+  };
+
   return (
     <div className="space-y-4">
       {/* Filters */}
