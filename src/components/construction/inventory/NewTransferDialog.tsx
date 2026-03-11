@@ -34,6 +34,7 @@ export function NewTransferDialog({ open, onOpenChange }: NewTransferDialogProps
   const [category, setCategory] = useState<ItemCategory | "">("");
   const [fromLocationId, setFromLocationId] = useState("");
   const [toLocationId, setToLocationId] = useState("");
+  const [selectedItemMasterId, setSelectedItemMasterId] = useState("");
   const [quantity, setQuantity] = useState<number>(0);
   const [selectedSerialIds, setSelectedSerialIds] = useState<string[]>([]);
   const [notes, setNotes] = useState("");
@@ -63,6 +64,20 @@ export function NewTransferDialog({ open, onOpenChange }: NewTransferDialogProps
   // Check if selected category is serial-tracked (machines)
   const isSerialTracked = category === "machines";
 
+  // Get items available at the selected from location for non-serial categories
+  const itemsAtFromLocation = useMemo(() => {
+    if (!fromLocationId || !category || isSerialTracked || !stockData || !allItems) return [];
+    const categoryItems = allItems.filter(i => i.category === category);
+    const categoryItemIds = new Set(categoryItems.map(i => i.id));
+    const stockAtLocation = stockData.filter(
+      s => s.location_id === fromLocationId && categoryItemIds.has(s.item_master_id) && (s.quantity || 0) > 0
+    );
+    return stockAtLocation.map(s => {
+      const item = categoryItems.find(i => i.id === s.item_master_id);
+      return { stockId: s.id, itemMasterId: s.item_master_id, itemName: item?.item_name || "Unknown", itemCode: item?.item_code || "", available: s.quantity || 0 };
+    });
+  }, [fromLocationId, category, isSerialTracked, stockData, allItems]);
+
   // Get serial numbers available at the selected from location for this category
   const serialsAtLocation = useMemo(() => {
     if (!fromLocationId || !allSerials || !category) return [];
@@ -79,17 +94,16 @@ export function NewTransferDialog({ open, onOpenChange }: NewTransferDialogProps
     if (!fromLocationId || !category) return 0;
     
     if (isSerialTracked) {
-      // For machines: count available serial numbers at this location
       return serialsAtLocation.length;
     } else {
-      // For non-serial items: sum of all stock at this location for this category
-      if (!stockData || !allItems) return 0;
-      const categoryItemIds = new Set(allItems.map(i => i.id));
-      return stockData
-        .filter(s => s.location_id === fromLocationId && categoryItemIds.has(s.item_master_id))
-        .reduce((sum, s) => sum + (s.quantity || 0), 0);
+      // For non-serial: available quantity of the selected item
+      if (selectedItemMasterId) {
+        const found = itemsAtFromLocation.find(i => i.itemMasterId === selectedItemMasterId);
+        return found?.available || 0;
+      }
+      return 0;
     }
-  }, [fromLocationId, category, isSerialTracked, serialsAtLocation, stockData, allItems]);
+  }, [fromLocationId, category, isSerialTracked, serialsAtLocation, selectedItemMasterId, itemsAtFromLocation]);
 
   // Get available serials for selection (exclude already selected ones)
   const getAvailableSerialsForSlot = (slotIndex: number) => {
@@ -103,6 +117,7 @@ export function NewTransferDialog({ open, onOpenChange }: NewTransferDialogProps
       setCategory("");
       setFromLocationId("");
       setToLocationId("");
+      setSelectedItemMasterId("");
       setQuantity(0);
       setSelectedSerialIds([]);
       setNotes("");
@@ -113,12 +128,14 @@ export function NewTransferDialog({ open, onOpenChange }: NewTransferDialogProps
   useEffect(() => {
     setFromLocationId("");
     setToLocationId("");
+    setSelectedItemMasterId("");
     setQuantity(0);
     setSelectedSerialIds([]);
   }, [category]);
 
   // Reset quantity and selections when from location changes
   useEffect(() => {
+    setSelectedItemMasterId("");
     setQuantity(0);
     setSelectedSerialIds([]);
   }, [fromLocationId]);
@@ -207,16 +224,32 @@ export function NewTransferDialog({ open, onOpenChange }: NewTransferDialogProps
         isSubmittingRef.current = false;
       }
     } else {
-      // For non-serial items, we need to handle differently
-      // This would need item selection - but for now we focus on machines
-      isSubmittingRef.current = false;
-      return;
+      // For non-serial items (bulk quantity transfer)
+      if (!selectedItemMasterId) {
+        toast.error("Please select an item to transfer");
+        isSubmittingRef.current = false;
+        return;
+      }
+
+      try {
+        await createTransfer.mutateAsync({
+          fromLocationId,
+          toLocationId,
+          itemMasterId: selectedItemMasterId,
+          quantity,
+          notes: notes || undefined,
+        });
+        onOpenChange(false);
+      } catch (error) {
+        // Error already handled by mutation onError
+      } finally {
+        isSubmittingRef.current = false;
+      }
     }
   };
 
   // Form validation - include company check
   const isFormValid = useMemo(() => {
-    // Must have a company selected
     if (!selectedCompany?.id) return false;
     
     const baseValid = 
@@ -232,8 +265,9 @@ export function NewTransferDialog({ open, onOpenChange }: NewTransferDialogProps
         selectedSerialIds.every(id => id);
     }
     
-    return baseValid;
-  }, [selectedCompany, fromLocationId, toLocationId, quantity, totalAvailableAtLocation, isSerialTracked, selectedSerialIds]);
+    // Non-serial items require an item to be selected
+    return baseValid && !!selectedItemMasterId;
+  }, [selectedCompany, fromLocationId, toLocationId, quantity, totalAvailableAtLocation, isSerialTracked, selectedSerialIds, selectedItemMasterId]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -315,8 +349,31 @@ export function NewTransferDialog({ open, onOpenChange }: NewTransferDialogProps
             )}
           </div>
 
-          {/* 4. Quantity - Show available items in brackets */}
-          {toLocationId && (
+          {/* 4. Item Selection - For non-serial items */}
+          {!isSerialTracked && fromLocationId && toLocationId && (
+            <div className="space-y-2">
+              <Label htmlFor="itemSelect">Item</Label>
+              <Select value={selectedItemMasterId} onValueChange={(val) => { setSelectedItemMasterId(val); setQuantity(0); }}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select item to transfer..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {itemsAtFromLocation.length === 0 ? (
+                    <div className="p-2 text-center text-muted-foreground">No items available at this location</div>
+                  ) : (
+                    itemsAtFromLocation.map(item => (
+                      <SelectItem key={item.itemMasterId} value={item.itemMasterId}>
+                        {item.itemCode} - {item.itemName} (Qty: {item.available})
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          {/* 5. Quantity - Show available items in brackets */}
+          {toLocationId && (isSerialTracked || selectedItemMasterId) && (
             <div className="space-y-2">
               <Label htmlFor="quantity">
                 Quantity
