@@ -35,6 +35,12 @@ export function LocationWiseView() {
   const { globalLocationId } = useLocationFilter();
   const [searchTerm, setSearchTerm] = useState("");
   const [locationFilter, setLocationFilter] = useState<string>(globalLocationId || "all");
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<{ type: "serial" | "stock"; id: string; name: string } | null>(null);
+
+  const { data: isSuperAdmin } = useSuperAdmin();
+  const deleteSerial = useDeleteSerialNumber();
+  const deleteStock = useDeleteInventoryStock();
 
   // Sync from global context when it changes
   useEffect(() => {
