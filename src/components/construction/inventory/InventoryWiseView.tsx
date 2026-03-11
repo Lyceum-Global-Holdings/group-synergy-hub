@@ -135,6 +135,20 @@ export function InventoryWiseView() {
     setEditSerialDialogOpen(true);
   };
 
+  const handleDeleteClick = (type: "serial" | "stock", id: string, name: string) => {
+    setDeleteTarget({ type, id, name });
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = () => {
+    if (!deleteTarget) return;
+    if (deleteTarget.type === "serial") {
+      deleteSerial.mutate(deleteTarget.id, { onSettled: () => { setDeleteDialogOpen(false); setDeleteTarget(null); } });
+    } else {
+      deleteStock.mutate(deleteTarget.id, { onSettled: () => { setDeleteDialogOpen(false); setDeleteTarget(null); } });
+    }
+  };
+
   const handleAddItem = (category: ItemCategory) => {
     setAddDialogCategory(category);
     // Machines use direct creation (serial tracking), bulk items select from Item Master
