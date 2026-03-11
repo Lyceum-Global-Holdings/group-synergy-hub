@@ -135,6 +135,7 @@ export function NewTransferDialog({ open, onOpenChange }: NewTransferDialogProps
 
   // Reset quantity and selections when from location changes
   useEffect(() => {
+    setSelectedItemMasterId("");
     setQuantity(0);
     setSelectedSerialIds([]);
   }, [fromLocationId]);
