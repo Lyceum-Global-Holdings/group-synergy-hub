@@ -5,7 +5,6 @@ import {
   type ItemCategory,
   CATEGORY_PREFIXES,
   SUB_CATEGORIES,
-  COLOR_OPTIONS,
   abbreviateItemName,
 } from "@/types/construction-inventory";
 
