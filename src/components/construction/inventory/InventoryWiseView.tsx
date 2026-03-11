@@ -65,6 +65,12 @@ export function InventoryWiseView() {
   const [addDialogCategory, setAddDialogCategory] = useState<ItemCategory>("machines");
   const [editSerialDialogOpen, setEditSerialDialogOpen] = useState(false);
   const [selectedSerial, setSelectedSerial] = useState<SerialData | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<{ type: "serial" | "stock"; id: string; name: string } | null>(null);
+
+  const { data: isSuperAdmin } = useSuperAdmin();
+  const deleteSerial = useDeleteSerialNumber();
+  const deleteStock = useDeleteInventoryStock();
 
   const { data: items, isLoading: itemsLoading } = useItemMaster(
     categoryFilter !== "all" ? (categoryFilter as ItemCategory) : undefined
