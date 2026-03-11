@@ -282,7 +282,7 @@ export function AddItemDialog({ open, onOpenChange, category }: AddItemDialogPro
                 name="color"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Color *</FormLabel>
+                    <FormLabel>Color</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
                         <SelectTrigger>
