@@ -47,7 +47,7 @@ const formSchema = z.object({
   item_name: z.string().min(1, "Item name is required"),
   section: z.enum(["civil", "mep", "aluminium", "mechanical", "carpenter"] as const),
   sub_category: z.string().min(1, "Sub-category is required"),
-  color: z.string().min(1, "Color is required"),
+  color: z.string().optional(),
   brand: z.string().optional(),
   model: z.string().optional(),
   unit_of_measurement: z.string().default("pcs"),
