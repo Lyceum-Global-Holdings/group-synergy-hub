@@ -1220,6 +1220,25 @@ export function useDeleteSerialNumber() {
 
   return useMutation({
     mutationFn: async (serialId: string) => {
+      // Delete related records first to avoid FK constraint violations
+      const { error: txError } = await supabase
+        .from("construction_inventory_transactions")
+        .delete()
+        .eq("serial_number_id", serialId);
+      if (txError) throw txError;
+
+      const { error: transferError } = await supabase
+        .from("construction_transfer_items")
+        .delete()
+        .eq("serial_number_id", serialId);
+      if (transferError) throw transferError;
+
+      const { error: repairError } = await supabase
+        .from("construction_repair_records")
+        .delete()
+        .eq("serial_number_id", serialId);
+      if (repairError) throw repairError;
+
       const { error } = await supabase
         .from("construction_serial_numbers")
         .delete()
@@ -1229,7 +1248,9 @@ export function useDeleteSerialNumber() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["construction-serial-numbers"] });
       queryClient.invalidateQueries({ queryKey: ["construction-inventory-stock"] });
-      toast({ title: "Serial number deleted successfully" });
+      queryClient.invalidateQueries({ queryKey: ["construction-transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["construction-transfers"] });
+      toast({ title: "Serial number and related records deleted successfully" });
     },
     onError: (error: Error) => {
       toast({ title: "Failed to delete serial number", description: error.message, variant: "destructive" });
