@@ -415,6 +415,16 @@ export function InventoryWiseView() {
         onOpenChange={setEditSerialDialogOpen}
         serial={selectedSerial}
       />
+
+      {/* Delete Confirm Dialog - Super Admin only */}
+      <DeleteConfirmDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        onConfirm={handleDeleteConfirm}
+        title="Delete Inventory Record"
+        description={`Are you sure you want to delete "${deleteTarget?.name}"? This action cannot be undone.`}
+        isDeleting={deleteSerial.isPending || deleteStock.isPending}
+      />
     </div>
   );
 }
