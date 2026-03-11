@@ -250,15 +250,17 @@ export function TransfersView() {
           ) : (
             <Table>
               <TableHeader>
-                <TableRow>
-                  <TableHead>Transfer #</TableHead>
-                  <TableHead>Date</TableHead>
-                  <TableHead>From</TableHead>
-                  <TableHead>To</TableHead>
-                  <TableHead>Transferred By</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Completed</TableHead>
-                </TableRow>
+                 <TableRow>
+                   <TableHead>Transfer #</TableHead>
+                   <TableHead>Date</TableHead>
+                   <TableHead>Item</TableHead>
+                   <TableHead>Qty</TableHead>
+                   <TableHead>From</TableHead>
+                   <TableHead>To</TableHead>
+                   <TableHead>Transferred By</TableHead>
+                   <TableHead>Status</TableHead>
+                   <TableHead>Completed</TableHead>
+                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredTransfers.map(transfer => (
@@ -268,6 +270,23 @@ export function TransfersView() {
                     </TableCell>
                     <TableCell>
                       {format(new Date(transfer.transfer_date), "MMM d, yyyy")}
+                    </TableCell>
+                    <TableCell>
+                      {(() => {
+                        const items = (transfer as any).construction_transfer_items || [];
+                        if (items.length === 0) return "-";
+                        const names = items.map((i: any) => i.item_master?.item_name || "Unknown");
+                        const unique = [...new Set(names)];
+                        return unique.join(", ");
+                      })()}
+                    </TableCell>
+                    <TableCell>
+                      {(() => {
+                        const items = (transfer as any).construction_transfer_items || [];
+                        if (items.length === 0) return "-";
+                        const total = items.reduce((sum: number, i: any) => sum + (i.quantity || 1), 0);
+                        return total;
+                      })()}
                     </TableCell>
                     <TableCell>
                       {(transfer.from_location as any)?.name || "-"}
