@@ -271,6 +271,7 @@ export function InventoryWiseView() {
                   </div>
                   <div className="flex items-center gap-2">
                     <Badge variant="outline">{ITEM_CATEGORIES.find(c => c.value === item.category)?.label}</Badge>
+                    <Badge variant="secondary">{ITEM_SECTIONS.find(s => s.value === item.section)?.label || item.section}</Badge>
                     {item.is_serial_tracked ? (
                       <Badge className="bg-purple-100 text-purple-800">Serial Tracked</Badge>
                     ) : (
