@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   Select,
   SelectContent,
@@ -23,15 +24,23 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import { Search, MapPin, Package } from "lucide-react";
-import { useSerialNumbers, useInventoryStock, useLocations } from "@/hooks/construction/useConstructionInventory";
+import { Search, MapPin, Package, Trash2 } from "lucide-react";
+import { useSerialNumbers, useInventoryStock, useLocations, useDeleteSerialNumber, useDeleteInventoryStock } from "@/hooks/construction/useConstructionInventory";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useLocationFilter } from "@/contexts/LocationFilterContext";
+import { useSuperAdmin } from "@/hooks/useSuperAdmin";
+import { DeleteConfirmDialog } from "@/components/construction/dialogs/DeleteConfirmDialog";
 
 export function LocationWiseView() {
   const { globalLocationId } = useLocationFilter();
   const [searchTerm, setSearchTerm] = useState("");
   const [locationFilter, setLocationFilter] = useState<string>(globalLocationId || "all");
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<{ type: "serial" | "stock"; id: string; name: string } | null>(null);
+
+  const { data: isSuperAdmin } = useSuperAdmin();
+  const deleteSerial = useDeleteSerialNumber();
+  const deleteStock = useDeleteInventoryStock();
 
   // Sync from global context when it changes
   useEffect(() => {
@@ -117,6 +126,20 @@ export function LocationWiseView() {
     return <Badge className={variants[condition] || ""}>{condition.replace(/_/g, " ")}</Badge>;
   };
 
+  const handleDeleteClick = (type: "serial" | "stock", id: string, name: string) => {
+    setDeleteTarget({ type, id, name });
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = () => {
+    if (!deleteTarget) return;
+    if (deleteTarget.type === "serial") {
+      deleteSerial.mutate(deleteTarget.id, { onSettled: () => { setDeleteDialogOpen(false); setDeleteTarget(null); } });
+    } else {
+      deleteStock.mutate(deleteTarget.id, { onSettled: () => { setDeleteDialogOpen(false); setDeleteTarget(null); } });
+    }
+  };
+
   return (
     <div className="space-y-4">
       {/* Filters */}
@@ -192,7 +215,8 @@ export function LocationWiseView() {
                             <TableHead>Item</TableHead>
                             <TableHead>Serial Number</TableHead>
                             <TableHead>Condition</TableHead>
-                            <TableHead>Status</TableHead>
+                             <TableHead>Status</TableHead>
+                            {isSuperAdmin && <TableHead className="w-[60px]">Actions</TableHead>}
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -206,6 +230,19 @@ export function LocationWiseView() {
                                   {serial.availability.replace(/_/g, " ")}
                                 </Badge>
                               </TableCell>
+                              {isSuperAdmin && (
+                                <TableCell>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="text-destructive hover:text-destructive"
+                                    onClick={() => handleDeleteClick("serial", serial.id, serial.serial_number)}
+                                    title="Delete serial number"
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </TableCell>
+                              )}
                             </TableRow>
                           ))}
                         </TableBody>
@@ -224,6 +261,7 @@ export function LocationWiseView() {
                             <TableHead>Category</TableHead>
                             <TableHead className="text-right">Quantity</TableHead>
                             <TableHead className="text-right">Reserved</TableHead>
+                            {isSuperAdmin && <TableHead className="w-[60px]">Actions</TableHead>}
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -250,6 +288,19 @@ export function LocationWiseView() {
                               <TableCell className="text-right text-muted-foreground">
                                 {stock.reserved_quantity || 0}
                               </TableCell>
+                              {isSuperAdmin && (
+                                <TableCell>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="text-destructive hover:text-destructive"
+                                    onClick={() => handleDeleteClick("stock", stock.id, stock.item_master?.item_name || "Unknown")}
+                                    title="Delete stock record"
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </TableCell>
+                              )}
                             </TableRow>
                           ))}
                         </TableBody>
@@ -262,6 +313,16 @@ export function LocationWiseView() {
           ))}
         </Accordion>
       )}
+
+      {/* Delete Confirm Dialog - Super Admin only */}
+      <DeleteConfirmDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        onConfirm={handleDeleteConfirm}
+        title="Delete Inventory Record"
+        description={`Are you sure you want to delete "${deleteTarget?.name}"? This action cannot be undone.`}
+        isDeleting={deleteSerial.isPending || deleteStock.isPending}
+      />
     </div>
   );
 }

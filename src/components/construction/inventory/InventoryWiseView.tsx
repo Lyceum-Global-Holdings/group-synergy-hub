@@ -24,8 +24,10 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Search, Plus, Package, Pencil, ChevronDown, Cog, Wrench, HardHat, Box, Construction } from "lucide-react";
-import { useItemMaster, useSerialNumbers, useInventoryStock } from "@/hooks/construction/useConstructionInventory";
+import { Search, Plus, Package, Pencil, ChevronDown, Cog, Wrench, HardHat, Box, Construction, Trash2 } from "lucide-react";
+import { useItemMaster, useSerialNumbers, useInventoryStock, useDeleteSerialNumber, useDeleteInventoryStock } from "@/hooks/construction/useConstructionInventory";
+import { useSuperAdmin } from "@/hooks/useSuperAdmin";
+import { DeleteConfirmDialog } from "@/components/construction/dialogs/DeleteConfirmDialog";
 import { ITEM_CATEGORIES, ITEM_SECTIONS, type ItemCategory } from "@/types/construction-inventory";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AddItemDialog } from "./AddItemDialog";
@@ -63,6 +65,12 @@ export function InventoryWiseView() {
   const [addDialogCategory, setAddDialogCategory] = useState<ItemCategory>("machines");
   const [editSerialDialogOpen, setEditSerialDialogOpen] = useState(false);
   const [selectedSerial, setSelectedSerial] = useState<SerialData | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<{ type: "serial" | "stock"; id: string; name: string } | null>(null);
+
+  const { data: isSuperAdmin } = useSuperAdmin();
+  const deleteSerial = useDeleteSerialNumber();
+  const deleteStock = useDeleteInventoryStock();
 
   const { data: items, isLoading: itemsLoading } = useItemMaster(
     categoryFilter !== "all" ? (categoryFilter as ItemCategory) : undefined
@@ -125,6 +133,20 @@ export function InventoryWiseView() {
   const handleEditSerial = (serial: SerialData) => {
     setSelectedSerial(serial);
     setEditSerialDialogOpen(true);
+  };
+
+  const handleDeleteClick = (type: "serial" | "stock", id: string, name: string) => {
+    setDeleteTarget({ type, id, name });
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = () => {
+    if (!deleteTarget) return;
+    if (deleteTarget.type === "serial") {
+      deleteSerial.mutate(deleteTarget.id, { onSettled: () => { setDeleteDialogOpen(false); setDeleteTarget(null); } });
+    } else {
+      deleteStock.mutate(deleteTarget.id, { onSettled: () => { setDeleteDialogOpen(false); setDeleteTarget(null); } });
+    }
   };
 
   const handleAddItem = (category: ItemCategory) => {
@@ -304,14 +326,27 @@ export function InventoryWiseView() {
                               <TableCell>{getConditionBadge(serial.condition)}</TableCell>
                               <TableCell>{getAvailabilityBadge(serial.availability)}</TableCell>
                               <TableCell>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => handleEditSerial(serial)}
-                                  title="Edit location & status"
-                                >
-                                  <Pencil className="h-4 w-4" />
-                                </Button>
+                                <div className="flex items-center gap-1">
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => handleEditSerial(serial)}
+                                    title="Edit location & status"
+                                  >
+                                    <Pencil className="h-4 w-4" />
+                                  </Button>
+                                  {isSuperAdmin && (
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      onClick={() => handleDeleteClick("serial", serial.id, serial.serial_number)}
+                                      title="Delete serial number"
+                                      className="text-destructive hover:text-destructive"
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                  )}
+                                </div>
                               </TableCell>
                             </TableRow>
                           ))}
@@ -327,12 +362,25 @@ export function InventoryWiseView() {
                     <h4 className="text-sm font-medium mb-2">Stock by Location</h4>
                     {stocksByItem[item.id]?.length > 0 ? (
                       <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                        {stocksByItem[item.id].map((stock: any) => (
+                         {stocksByItem[item.id].map((stock: any) => (
                           <div key={stock.id} className="flex items-center justify-between p-3 rounded-lg border">
                             <span className="text-sm">{stock.location?.name || "Unknown"}</span>
-                            <Badge variant="secondary">
-                              {stock.quantity} {item.unit_of_measurement}
-                            </Badge>
+                            <div className="flex items-center gap-2">
+                              <Badge variant="secondary">
+                                {stock.quantity} {item.unit_of_measurement}
+                              </Badge>
+                              {isSuperAdmin && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-7 w-7 text-destructive hover:text-destructive"
+                                  onClick={() => handleDeleteClick("stock", stock.id, `${item.item_name} at ${stock.location?.name || "Unknown"}`)}
+                                  title="Delete stock record"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </Button>
+                              )}
+                            </div>
                           </div>
                         ))}
                       </div>
@@ -366,6 +414,16 @@ export function InventoryWiseView() {
         open={editSerialDialogOpen}
         onOpenChange={setEditSerialDialogOpen}
         serial={selectedSerial}
+      />
+
+      {/* Delete Confirm Dialog - Super Admin only */}
+      <DeleteConfirmDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        onConfirm={handleDeleteConfirm}
+        title="Delete Inventory Record"
+        description={`Are you sure you want to delete "${deleteTarget?.name}"? This action cannot be undone.`}
+        isDeleting={deleteSerial.isPending || deleteStock.isPending}
       />
     </div>
   );

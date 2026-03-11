@@ -1211,3 +1211,52 @@ export function useBulkCreateItemMasterWithStock() {
     },
   });
 }
+
+// ==================== DELETE SERIAL NUMBER ====================
+
+export function useDeleteSerialNumber() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async (serialId: string) => {
+      const { error } = await supabase
+        .from("construction_serial_numbers")
+        .delete()
+        .eq("id", serialId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["construction-serial-numbers"] });
+      queryClient.invalidateQueries({ queryKey: ["construction-inventory-stock"] });
+      toast({ title: "Serial number deleted successfully" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to delete serial number", description: error.message, variant: "destructive" });
+    },
+  });
+}
+
+// ==================== DELETE INVENTORY STOCK ====================
+
+export function useDeleteInventoryStock() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async (stockId: string) => {
+      const { error } = await supabase
+        .from("construction_inventory_stock")
+        .delete()
+        .eq("id", stockId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["construction-inventory-stock"] });
+      toast({ title: "Stock record deleted successfully" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to delete stock record", description: error.message, variant: "destructive" });
+    },
+  });
+}
