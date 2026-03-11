@@ -224,10 +224,27 @@ export function NewTransferDialog({ open, onOpenChange }: NewTransferDialogProps
         isSubmittingRef.current = false;
       }
     } else {
-      // For non-serial items, we need to handle differently
-      // This would need item selection - but for now we focus on machines
-      isSubmittingRef.current = false;
-      return;
+      // For non-serial items (bulk quantity transfer)
+      if (!selectedItemMasterId) {
+        toast.error("Please select an item to transfer");
+        isSubmittingRef.current = false;
+        return;
+      }
+
+      try {
+        await createTransfer.mutateAsync({
+          fromLocationId,
+          toLocationId,
+          itemMasterId: selectedItemMasterId,
+          quantity,
+          notes: notes || undefined,
+        });
+        onOpenChange(false);
+      } catch (error) {
+        // Error already handled by mutation onError
+      } finally {
+        isSubmittingRef.current = false;
+      }
     }
   };
 
