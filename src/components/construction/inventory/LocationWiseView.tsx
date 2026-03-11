@@ -288,6 +288,19 @@ export function LocationWiseView() {
                               <TableCell className="text-right text-muted-foreground">
                                 {stock.reserved_quantity || 0}
                               </TableCell>
+                              {isSuperAdmin && (
+                                <TableCell>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="text-destructive hover:text-destructive"
+                                    onClick={() => handleDeleteClick("stock", stock.id, stock.item_master?.item_name || "Unknown")}
+                                    title="Delete stock record"
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </TableCell>
+                              )}
                             </TableRow>
                           ))}
                         </TableBody>
@@ -300,6 +313,16 @@ export function LocationWiseView() {
           ))}
         </Accordion>
       )}
+
+      {/* Delete Confirm Dialog - Super Admin only */}
+      <DeleteConfirmDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        onConfirm={handleDeleteConfirm}
+        title="Delete Inventory Record"
+        description={`Are you sure you want to delete "${deleteTarget?.name}"? This action cannot be undone.`}
+        isDeleting={deleteSerial.isPending || deleteStock.isPending}
+      />
     </div>
   );
 }
