@@ -117,6 +117,7 @@ export function NewTransferDialog({ open, onOpenChange }: NewTransferDialogProps
       setCategory("");
       setFromLocationId("");
       setToLocationId("");
+      setSelectedItemMasterId("");
       setQuantity(0);
       setSelectedSerialIds([]);
       setNotes("");
