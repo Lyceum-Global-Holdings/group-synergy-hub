@@ -51,10 +51,10 @@ export function NewTransferDialog({ open, onOpenChange }: NewTransferDialogProps
   const { data: permissions } = useCurrentUserLocationPermissions();
 
   // Filter locations by user permissions (edit access required for source/from transfers)
-  // IMPORTANT: Always filter by editLocationIds regardless of viewAllLocations flag.
-  // viewAllLocations only grants VIEW access, not EDIT access for transfers.
   const permittedLocations = useMemo(() => {
     if (!allLocations || !permissions) return [];
+    // Admins/Super Admins can edit all locations
+    if (permissions.canEditAllLocations) return allLocations;
     const permittedIds = new Set([...permissions.editLocationIds]);
     return allLocations.filter(loc => permittedIds.has(loc.id));
   }, [allLocations, permissions]);
