@@ -594,7 +594,8 @@ export function useTransfers(status?: string) {
         .select(`
           *,
           from_location:warehouse_locations!construction_inventory_transfers_from_location_id_fkey(id, name),
-          to_location:warehouse_locations!construction_inventory_transfers_to_location_id_fkey(id, name)
+          to_location:warehouse_locations!construction_inventory_transfers_to_location_id_fkey(id, name),
+          construction_transfer_items(id, quantity, item_master_id, serial_number_id, item_master:construction_item_master(id, item_name))
         `)
         .order("transfer_date", { ascending: false });
 

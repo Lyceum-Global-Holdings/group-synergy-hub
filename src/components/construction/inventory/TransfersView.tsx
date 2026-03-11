@@ -250,15 +250,17 @@ export function TransfersView() {
           ) : (
             <Table>
               <TableHeader>
-                <TableRow>
-                  <TableHead>Transfer #</TableHead>
-                  <TableHead>Date</TableHead>
-                  <TableHead>From</TableHead>
-                  <TableHead>To</TableHead>
-                  <TableHead>Transferred By</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Completed</TableHead>
-                </TableRow>
+                 <TableRow>
+                   <TableHead>Transfer #</TableHead>
+                   <TableHead>Date</TableHead>
+                   <TableHead>Item</TableHead>
+                   <TableHead>Qty</TableHead>
+                   <TableHead>From</TableHead>
+                   <TableHead>To</TableHead>
+                   <TableHead>Transferred By</TableHead>
+                   <TableHead>Status</TableHead>
+                   <TableHead>Completed</TableHead>
+                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredTransfers.map(transfer => (
