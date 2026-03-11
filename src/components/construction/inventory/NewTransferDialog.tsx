@@ -250,7 +250,6 @@ export function NewTransferDialog({ open, onOpenChange }: NewTransferDialogProps
 
   // Form validation - include company check
   const isFormValid = useMemo(() => {
-    // Must have a company selected
     if (!selectedCompany?.id) return false;
     
     const baseValid = 
@@ -266,8 +265,9 @@ export function NewTransferDialog({ open, onOpenChange }: NewTransferDialogProps
         selectedSerialIds.every(id => id);
     }
     
-    return baseValid;
-  }, [selectedCompany, fromLocationId, toLocationId, quantity, totalAvailableAtLocation, isSerialTracked, selectedSerialIds]);
+    // Non-serial items require an item to be selected
+    return baseValid && !!selectedItemMasterId;
+  }, [selectedCompany, fromLocationId, toLocationId, quantity, totalAvailableAtLocation, isSerialTracked, selectedSerialIds, selectedItemMasterId]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
