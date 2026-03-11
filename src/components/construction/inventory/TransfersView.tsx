@@ -272,6 +272,23 @@ export function TransfersView() {
                       {format(new Date(transfer.transfer_date), "MMM d, yyyy")}
                     </TableCell>
                     <TableCell>
+                      {(() => {
+                        const items = (transfer as any).construction_transfer_items || [];
+                        if (items.length === 0) return "-";
+                        const names = items.map((i: any) => i.item_master?.item_name || "Unknown");
+                        const unique = [...new Set(names)];
+                        return unique.join(", ");
+                      })()}
+                    </TableCell>
+                    <TableCell>
+                      {(() => {
+                        const items = (transfer as any).construction_transfer_items || [];
+                        if (items.length === 0) return "-";
+                        const total = items.reduce((sum: number, i: any) => sum + (i.quantity || 1), 0);
+                        return total;
+                      })()}
+                    </TableCell>
+                    <TableCell>
                       {(transfer.from_location as any)?.name || "-"}
                     </TableCell>
                     <TableCell>
