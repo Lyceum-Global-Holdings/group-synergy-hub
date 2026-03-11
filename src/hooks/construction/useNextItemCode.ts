@@ -5,7 +5,6 @@ import {
   type ItemCategory,
   CATEGORY_PREFIXES,
   SUB_CATEGORIES,
-  COLOR_OPTIONS,
   abbreviateItemName,
 } from "@/types/construction-inventory";
 
@@ -13,20 +12,19 @@ export function useNextItemCode(
   category: ItemCategory,
   subCategory?: string,
   itemName?: string,
-  color?: string
+  _color?: string
 ) {
   const { selectedCompany } = useCompany();
   const catPrefix = CATEGORY_PREFIXES[category];
   const subCatCode = SUB_CATEGORIES[category]?.find(s => s.value === subCategory)?.code || "";
   const nameAbbr = abbreviateItemName(itemName || "");
-  const colorCode = COLOR_OPTIONS.find(c => c.value === color)?.code || "";
 
-  // Build composite prefix: MAC-HVY-EXCAV-YLW
-  const allParts = [catPrefix, subCatCode, nameAbbr, colorCode].filter(Boolean);
+  // Build composite prefix: MAC-HVY-EXCAV (color removed from code)
+  const allParts = [catPrefix, subCatCode, nameAbbr].filter(Boolean);
   const compositePrefix = allParts.join("-");
 
-  // Only enable when we have at least category + one more field
-  const enabled = Boolean(catPrefix && subCatCode && nameAbbr && colorCode);
+  // Only enable when we have at least category + sub-category + name
+  const enabled = Boolean(catPrefix && subCatCode && nameAbbr);
 
   return useQuery({
     queryKey: ["next-item-code", selectedCompany?.id, compositePrefix],

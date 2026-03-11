@@ -47,7 +47,7 @@ const formSchema = z.object({
   item_name: z.string().min(1, "Item name is required"),
   section: z.enum(["civil", "mep", "aluminium", "mechanical", "carpenter"] as const),
   sub_category: z.string().min(1, "Sub-category is required"),
-  color: z.string().min(1, "Color is required"),
+  color: z.string().optional(),
   brand: z.string().optional(),
   model: z.string().optional(),
   unit_of_measurement: z.string().default("pcs"),
@@ -282,7 +282,7 @@ export function AddItemDialog({ open, onOpenChange, category }: AddItemDialogPro
                 name="color"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Color *</FormLabel>
+                    <FormLabel>Color</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
                         <SelectTrigger>
@@ -327,7 +327,7 @@ export function AddItemDialog({ open, onOpenChange, category }: AddItemDialogPro
                     <FormLabel>Item Code (Auto-generated)</FormLabel>
                     <FormControl>
                       <Input 
-                        placeholder="Fill sub-category, color & name" 
+                        placeholder="Fill sub-category & name" 
                         {...field} 
                         readOnly 
                         className="bg-muted font-mono"
