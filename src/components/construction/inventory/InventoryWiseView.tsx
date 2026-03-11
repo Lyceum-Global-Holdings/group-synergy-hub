@@ -362,12 +362,25 @@ export function InventoryWiseView() {
                     <h4 className="text-sm font-medium mb-2">Stock by Location</h4>
                     {stocksByItem[item.id]?.length > 0 ? (
                       <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                        {stocksByItem[item.id].map((stock: any) => (
+                         {stocksByItem[item.id].map((stock: any) => (
                           <div key={stock.id} className="flex items-center justify-between p-3 rounded-lg border">
                             <span className="text-sm">{stock.location?.name || "Unknown"}</span>
-                            <Badge variant="secondary">
-                              {stock.quantity} {item.unit_of_measurement}
-                            </Badge>
+                            <div className="flex items-center gap-2">
+                              <Badge variant="secondary">
+                                {stock.quantity} {item.unit_of_measurement}
+                              </Badge>
+                              {isSuperAdmin && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-7 w-7 text-destructive hover:text-destructive"
+                                  onClick={() => handleDeleteClick("stock", stock.id, `${item.item_name} at ${stock.location?.name || "Unknown"}`)}
+                                  title="Delete stock record"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </Button>
+                              )}
+                            </div>
                           </div>
                         ))}
                       </div>
