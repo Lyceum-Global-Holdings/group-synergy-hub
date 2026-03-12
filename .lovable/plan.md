@@ -1,35 +1,28 @@
 
 
-## Plan: Restrict Location Dropdowns to User's Edit-Permitted Locations
+# Auto-Link BOMs When Selecting CPO Items
 
-### Problem
-The "Add Item" and "Add Stock" dialogs in Construction Inventory show **all** locations, allowing users to add items to locations they don't have edit access to. For example, Shihan (who only has access to "Lyceum Wattala") can currently see and select any location.
+## Approach
 
-### Solution
-Filter the location dropdowns in both dialogs using `useCurrentUserLocationPermissions()`, the same pattern already used in `NewTransferDialog.tsx`. Only locations where the user has explicit **edit** permissions will appear.
+When CPO items are displayed in the production order dialog, automatically match each item to a BOM using their shared `product_master_id`. Show the matched BOM in the table and use it per-item during batch creation. No manual BOM dropdown needed when CPO items are present.
 
-### Changes
+## Changes
 
-**1. `src/components/construction/inventory/AddItemDialog.tsx`**
-- Import `useCurrentUserLocationPermissions`
-- Fetch permissions, then filter `locations` to only those in `editLocationIds`
-- Admin/Super Admin users (who get `viewAllLocations: true`) see all locations (unchanged behavior)
-- Use the filtered list for both the machine `current_location_id` and bulk `location_id` dropdowns
+### 1. `src/hooks/useProduction.ts`
 
-**2. `src/components/construction/inventory/AddInventoryStockDialog.tsx`**
-- Same change: import `useCurrentUserLocationPermissions`, filter the location dropdown to edit-permitted locations only
+**`useCPOs` hook (line 452):** Add `product_master_id` to the `customer_po_items` select fields.
 
-### Pattern (from existing `NewTransferDialog.tsx`)
-```typescript
-const { data: permissions } = useCurrentUserLocationPermissions();
+**`useCreateBatchProductionOrders` (lines 225-238):** Change `bom_id` from a shared input field to a per-item field. Each item in the `items` array gets its own `bom_id`. The BOM cost auto-populate logic (lines 274-310) will use the item-specific `bom_id`.
 
-const permittedLocations = useMemo(() => {
-  if (!locations || !permissions) return [];
-  if (permissions.viewAllLocations) return locations;
-  const permittedIds = new Set(permissions.editLocationIds);
-  return locations.filter(loc => permittedIds.has(loc.id));
-}, [locations, permissions]);
-```
+### 2. `src/components/production/CreateProductionOrderDialog.tsx`
 
-Two files changed, no new files.
+- Add `product_master_id` to the fetched CPO item fields
+- When CPO items are loaded, auto-match each item to a BOM by finding `boms.find(b => b.product_master_id === item.product_master_id && b.status === 'active')`
+- Add a "BOM" column to the CPO items checklist table showing the matched BOM number (or "No match")
+- Hide the global "Link to BOM" dropdown when CPO items are present (keep it for manual single-order creation)
+- Pass per-item `bom_id` to the batch creation function
+
+### 3. No database changes needed
+
+Both `customer_po_items.product_master_id` and `bill_of_materials.product_master_id` already exist.
 
