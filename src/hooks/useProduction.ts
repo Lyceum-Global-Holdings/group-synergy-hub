@@ -253,7 +253,7 @@ export function useCreateBatchProductionOrders() {
             target_qty: item.target_qty,
             cpo_id: input.cpo_id,
             cpo_item_id: item.cpo_item_id,
-            bom_id: input.bom_id || null,
+            bom_id: item.bom_id || input.bom_id || null,
             start_date: input.start_date || null,
             due_date: input.due_date || null,
             notes: input.notes || null,
