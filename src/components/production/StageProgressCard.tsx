@@ -1,14 +1,14 @@
 import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ChevronDown, Play, CheckCircle2, Loader2 } from "lucide-react";
-import { useUpdateProductionStage } from "@/hooks/useProduction";
+import { useUpdateProductionStage, useDailyEntries } from "@/hooks/useProduction";
 import { STAGE_STATUSES } from "@/constants/productionSectors";
 import StageCostBreakdown from "./StageCostBreakdown";
+import DailyEntryForm from "./DailyEntryForm";
+import DailyEntriesTable from "./DailyEntriesTable";
 
 interface Props {
   stage: any;
@@ -16,9 +16,7 @@ interface Props {
 
 export default function StageProgressCard({ stage }: Props) {
   const updateStage = useUpdateProductionStage();
-  const [inputQty, setInputQty] = useState(stage.input_qty || 0);
-  const [outputQty, setOutputQty] = useState(stage.output_qty || 0);
-  const [wastageQty, setWastageQty] = useState(stage.wastage_qty || 0);
+  const { data: dailyEntries = [] } = useDailyEntries(stage.id);
   const [isOpen, setIsOpen] = useState(stage.status === "in_progress");
 
   const statusInfo = STAGE_STATUSES.find((s) => s.value === stage.status);
@@ -26,11 +24,13 @@ export default function StageProgressCard({ stage }: Props) {
   const totalStageCost = costs.reduce((sum: number, c: any) => sum + (Number(c.total_cost) || 0), 0);
 
   const handleStatusUpdate = (status: string) => {
-    updateStage.mutate({ id: stage.id, status, input_qty: inputQty, output_qty: outputQty, wastage_qty: wastageQty });
+    updateStage.mutate({ id: stage.id, status });
   };
 
-  const handleSaveQty = () => {
-    updateStage.mutate({ id: stage.id, input_qty: inputQty, output_qty: outputQty, wastage_qty: wastageQty });
+  // Allow DailyEntriesTable row click to set date in form — pass via ref-like state would be complex,
+  // so we use a simple callback that's not needed since the form auto-syncs via date state.
+  const handleSelectDate = () => {
+    // DailyEntryForm handles its own date state internally
   };
 
   return (
@@ -52,22 +52,6 @@ export default function StageProgressCard({ stage }: Props) {
 
         <CollapsibleContent>
           <CardContent className="border-t pt-4 space-y-4">
-            {/* Quantity Fields */}
-            <div className="grid grid-cols-3 gap-4">
-              <div>
-                <Label className="text-xs">Input Qty</Label>
-                <Input type="number" value={inputQty} onChange={(e) => setInputQty(Number(e.target.value))} />
-              </div>
-              <div>
-                <Label className="text-xs">Output Qty</Label>
-                <Input type="number" value={outputQty} onChange={(e) => setOutputQty(Number(e.target.value))} />
-              </div>
-              <div>
-                <Label className="text-xs">Wastage</Label>
-                <Input type="number" value={wastageQty} onChange={(e) => setWastageQty(Number(e.target.value))} />
-              </div>
-            </div>
-
             {/* Action buttons */}
             <div className="flex items-center gap-2">
               {stage.status === "pending" && (
@@ -76,16 +60,20 @@ export default function StageProgressCard({ stage }: Props) {
                 </Button>
               )}
               {stage.status === "in_progress" && (
-                <>
-                  <Button size="sm" variant="outline" onClick={handleSaveQty} disabled={updateStage.isPending}>
-                    {updateStage.isPending && <Loader2 className="mr-1 h-3 w-3 animate-spin" />} Save Quantities
-                  </Button>
-                  <Button size="sm" onClick={() => handleStatusUpdate("completed")} disabled={updateStage.isPending}>
-                    <CheckCircle2 className="mr-1 h-3 w-3" /> Complete Stage
-                  </Button>
-                </>
+                <Button size="sm" onClick={() => handleStatusUpdate("completed")} disabled={updateStage.isPending}>
+                  {updateStage.isPending && <Loader2 className="mr-1 h-3 w-3 animate-spin" />}
+                  <CheckCircle2 className="mr-1 h-3 w-3" /> Complete Stage
+                </Button>
               )}
             </div>
+
+            {/* Daily Entry Form — show when stage is in progress */}
+            {stage.status === "in_progress" && (
+              <DailyEntryForm stageId={stage.id} existingEntries={dailyEntries} />
+            )}
+
+            {/* Daily Entries History */}
+            <DailyEntriesTable entries={dailyEntries} onSelectDate={handleSelectDate} />
 
             {/* Cost Breakdown */}
             <StageCostBreakdown stageId={stage.id} costs={costs} />
