@@ -1,0 +1,1 @@
+ALTER TABLE production_orders ADD COLUMN cpo_item_id uuid REFERENCES customer_po_items(id);
