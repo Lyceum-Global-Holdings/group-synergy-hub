@@ -5,6 +5,7 @@ import ProductionDashboard from "@/components/production/ProductionDashboard";
 import ProductionOrdersList from "@/components/production/ProductionOrdersList";
 import StagePlannerDialog from "@/components/production/StagePlannerDialog";
 import ProductionOrderDetail from "@/components/production/ProductionOrderDetail";
+import DailyProductionSummary from "@/components/production/DailyProductionSummary";
 
 export default function ProductionModule() {
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
@@ -30,12 +31,16 @@ export default function ProductionModule() {
         <TabsList>
           <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
           <TabsTrigger value="orders">Production Orders</TabsTrigger>
+          <TabsTrigger value="daily-summary">Daily Summary</TabsTrigger>
         </TabsList>
         <TabsContent value="dashboard">
           <ProductionDashboard onViewOrder={setSelectedOrderId} />
         </TabsContent>
         <TabsContent value="orders">
           <ProductionOrdersList onViewOrder={setSelectedOrderId} />
+        </TabsContent>
+        <TabsContent value="daily-summary">
+          <DailyProductionSummary />
         </TabsContent>
       </Tabs>
     </div>

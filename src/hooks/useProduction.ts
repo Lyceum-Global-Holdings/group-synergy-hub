@@ -528,6 +528,31 @@ export function useUpsertDailyEntry() {
   });
 }
 
+// ── Daily Summary ──
+export function useDailySummary(date: string) {
+  const { selectedCompany } = useCompany();
+  return useQuery({
+    queryKey: ["production-daily-summary", selectedCompany?.id, date],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("production_daily_entries")
+        .select(`
+          id, entry_date, input_qty, output_qty, wastage_qty, notes,
+          stage:production_order_stages!stage_id (
+            id, stage_name, sequence_order,
+            order:production_orders!order_id (
+              id, order_number, product_name
+            )
+          )
+        `)
+        .eq("entry_date", date);
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!selectedCompany?.id && !!date,
+  });
+}
+
 export function useCPOs() {
   const { selectedCompany } = useCompany();
   return useQuery({
