@@ -5,6 +5,7 @@ import ProductionDashboard from "@/components/production/ProductionDashboard";
 import ProductionOrdersList from "@/components/production/ProductionOrdersList";
 import StagePlannerDialog from "@/components/production/StagePlannerDialog";
 import ProductionOrderDetail from "@/components/production/ProductionOrderDetail";
+import DailyProductionSummary from "@/components/production/DailyProductionSummary";
 
 export default function ProductionModule() {
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
