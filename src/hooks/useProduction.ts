@@ -235,6 +235,7 @@ export function useCreateBatchProductionOrders() {
         item_name: string;
         style_no?: string;
         target_qty: number;
+        bom_id?: string;
       }[];
     }) => {
       const { data: user } = await supabase.auth.getUser();
