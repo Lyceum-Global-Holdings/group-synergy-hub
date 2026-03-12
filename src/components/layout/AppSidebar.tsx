@@ -98,7 +98,6 @@ const departments = [
     ],
   },
   {
-  {
     title: "Production",
     icon: Factory,
     items: [
