@@ -98,6 +98,14 @@ const departments = [
     ],
   },
   {
+  {
+    title: "Production",
+    icon: Factory,
+    items: [
+      { title: "Production Dashboard", url: "/production" },
+    ],
+  },
+  {
     title: "Management",
     icon: BarChart3,
     items: [

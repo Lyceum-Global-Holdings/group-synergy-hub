@@ -242,6 +242,9 @@ function App() {
                 <Route path="/construction/resource-allocation/subcontractors" element={<SubcontractorResources />} />
                 <Route path="/construction/quality-control" element={<QualityControl />} />
                 <Route path="/construction/safety-management" element={<SafetyManagement />} />
+                
+                {/* Production routes */}
+                <Route path="/production" element={<ProductionModule />} />
               </Route>
               
               {/* Catch-all 404 route */}
