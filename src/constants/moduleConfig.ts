@@ -154,6 +154,15 @@ export const moduleConfig: Record<string, ModuleConfig> = {
       { key: 'warehouse-management', name: 'Warehouse Management', description: 'Configure warehouse settings', url: '/admin/warehouse-management' }
     ]
   },
+  production: {
+    key: 'production',
+    name: 'Production',
+    description: 'Work-in-progress tracking and stage-wise cost calculation',
+    icon: Factory,
+    subModules: [
+      { key: 'production-dashboard', name: 'Production Dashboard', description: 'WIP summary, stage tracking, and cost analytics', url: '/production' }
+    ]
+  },
   construction: {
     key: 'construction',
     name: 'Construction',
