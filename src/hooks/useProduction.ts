@@ -449,7 +449,7 @@ export function useCPOs() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("customer_purchase_orders")
-        .select("id, cpo_number, notes, total_amount, items:customer_po_items(id, item_name, style_no, color, size, quantity_ordered, unit_price)")
+        .select("id, cpo_number, notes, total_amount, items:customer_po_items(id, item_name, style_no, color, size, quantity_ordered, unit_price, product_master_id)")
         .eq("company_id", selectedCompany!.id)
         .order("created_at", { ascending: false });
       if (error) throw error;
