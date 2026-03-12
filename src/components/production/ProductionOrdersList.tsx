@@ -86,6 +86,7 @@ export default function ProductionOrdersList({ onViewOrder }: Props) {
                   <TableRow>
                     <TableHead>Order #</TableHead>
                     <TableHead>Product</TableHead>
+                    <TableHead>Details</TableHead>
                     <TableHead>Sector</TableHead>
                     <TableHead>Target Qty</TableHead>
                     <TableHead>Status</TableHead>
@@ -99,10 +100,21 @@ export default function ProductionOrdersList({ onViewOrder }: Props) {
                     const stages = (o as any).production_order_stages || [];
                     const done = stages.filter((s: any) => s.status === "completed").length;
                     const pct = stages.length > 0 ? Math.round((done / stages.length) * 100) : 0;
+                    const cpoItem = (o as any).customer_po_items;
                     return (
                       <TableRow key={o.id} className="cursor-pointer hover:bg-accent/50" onClick={() => onViewOrder(o.id)}>
                         <TableCell className="font-medium">{o.order_number}</TableCell>
                         <TableCell>{o.product_name}{o.style_no ? ` (${o.style_no})` : ""}</TableCell>
+                        <TableCell>
+                          {cpoItem ? (
+                            <div className="flex gap-1 flex-wrap">
+                              {cpoItem.color && <Badge variant="secondary" className="text-xs">{cpoItem.color}</Badge>}
+                              {cpoItem.size && <Badge variant="secondary" className="text-xs">{cpoItem.size}</Badge>}
+                            </div>
+                          ) : (
+                            <span className="text-muted-foreground text-xs">—</span>
+                          )}
+                        </TableCell>
                         <TableCell>{(o as any).production_sectors?.name || "—"}</TableCell>
                         <TableCell>{o.target_qty?.toLocaleString()}</TableCell>
                         <TableCell>{getStatusBadge(o.status)}</TableCell>
