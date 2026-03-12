@@ -11,6 +11,7 @@ import {
   ChevronDown,
   GraduationCap,
   Database,
+  Factory,
 } from "lucide-react";
 import {
   Sidebar,
