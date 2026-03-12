@@ -444,6 +444,90 @@ export function useBOMs() {
   });
 }
 
+// ── Daily Production Entries ──
+export function useDailyEntries(stageId?: string) {
+  return useQuery({
+    queryKey: ["production-daily-entries", stageId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("production_daily_entries")
+        .select("*")
+        .eq("stage_id", stageId!)
+        .order("entry_date", { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!stageId,
+  });
+}
+
+export function useUpsertDailyEntry() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: {
+      stage_id: string;
+      entry_date: string;
+      input_qty: number;
+      output_qty: number;
+      wastage_qty: number;
+      notes?: string;
+    }) => {
+      const { data: user } = await supabase.auth.getUser();
+
+      // Upsert daily entry
+      const { error } = await supabase
+        .from("production_daily_entries")
+        .upsert(
+          {
+            stage_id: input.stage_id,
+            entry_date: input.entry_date,
+            input_qty: input.input_qty,
+            output_qty: input.output_qty,
+            wastage_qty: input.wastage_qty,
+            notes: input.notes || null,
+            created_by: user?.user?.id || null,
+          },
+          { onConflict: "stage_id,entry_date" }
+        );
+      if (error) throw error;
+
+      // Recalculate cumulative totals from all daily entries
+      const { data: allEntries, error: fetchErr } = await supabase
+        .from("production_daily_entries")
+        .select("input_qty, output_qty, wastage_qty")
+        .eq("stage_id", input.stage_id);
+      if (fetchErr) throw fetchErr;
+
+      const totals = (allEntries || []).reduce(
+        (acc, e) => ({
+          input_qty: acc.input_qty + (e.input_qty || 0),
+          output_qty: acc.output_qty + (e.output_qty || 0),
+          wastage_qty: acc.wastage_qty + (e.wastage_qty || 0),
+        }),
+        { input_qty: 0, output_qty: 0, wastage_qty: 0 }
+      );
+
+      const { error: updateErr } = await supabase
+        .from("production_order_stages")
+        .update({
+          input_qty: totals.input_qty,
+          output_qty: totals.output_qty,
+          wastage_qty: totals.wastage_qty,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", input.stage_id);
+      if (updateErr) throw updateErr;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["production-daily-entries"] });
+      qc.invalidateQueries({ queryKey: ["production-order"] });
+      qc.invalidateQueries({ queryKey: ["production-orders"] });
+      toast.success("Daily entry saved");
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+}
+
 export function useCPOs() {
   const { selectedCompany } = useCompany();
   return useQuery({
