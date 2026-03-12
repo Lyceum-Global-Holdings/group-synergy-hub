@@ -11,6 +11,7 @@ import {
   ChevronDown,
   GraduationCap,
   Database,
+  Factory,
 } from "lucide-react";
 import {
   Sidebar,
@@ -94,6 +95,13 @@ const departments = [
       { title: "3-way Match Review", url: "/procurement/three-way-match" },
       { title: "Category Catalogs", url: "/procurement/catalogs" },
       { title: "Price Lists", url: "/procurement/price-lists" },
+    ],
+  },
+  {
+    title: "Production",
+    icon: Factory,
+    items: [
+      { title: "Production Dashboard", url: "/production" },
     ],
   },
   {

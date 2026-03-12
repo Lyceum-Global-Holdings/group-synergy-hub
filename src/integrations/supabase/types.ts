@@ -10875,6 +10875,326 @@ export type Database = {
           },
         ]
       }
+      production_order_stages: {
+        Row: {
+          completed_at: string | null
+          completed_by: string | null
+          created_at: string
+          id: string
+          input_qty: number | null
+          notes: string | null
+          order_id: string
+          output_qty: number | null
+          sequence_order: number
+          stage_name: string
+          stage_template_id: string | null
+          started_at: string | null
+          status: string
+          updated_at: string
+          wastage_qty: number | null
+        }
+        Insert: {
+          completed_at?: string | null
+          completed_by?: string | null
+          created_at?: string
+          id?: string
+          input_qty?: number | null
+          notes?: string | null
+          order_id: string
+          output_qty?: number | null
+          sequence_order: number
+          stage_name: string
+          stage_template_id?: string | null
+          started_at?: string | null
+          status?: string
+          updated_at?: string
+          wastage_qty?: number | null
+        }
+        Update: {
+          completed_at?: string | null
+          completed_by?: string | null
+          created_at?: string
+          id?: string
+          input_qty?: number | null
+          notes?: string | null
+          order_id?: string
+          output_qty?: number | null
+          sequence_order?: number
+          stage_name?: string
+          stage_template_id?: string | null
+          started_at?: string | null
+          status?: string
+          updated_at?: string
+          wastage_qty?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "production_order_stages_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "production_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "production_order_stages_stage_template_id_fkey"
+            columns: ["stage_template_id"]
+            isOneToOne: false
+            referencedRelation: "production_stage_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      production_orders: {
+        Row: {
+          bom_id: string | null
+          company_id: string | null
+          completed_date: string | null
+          cpo_id: string | null
+          created_at: string
+          created_by: string | null
+          due_date: string | null
+          id: string
+          notes: string | null
+          order_number: string
+          product_name: string
+          sector_id: string
+          start_date: string | null
+          status: string
+          style_no: string | null
+          target_qty: number
+          updated_at: string
+        }
+        Insert: {
+          bom_id?: string | null
+          company_id?: string | null
+          completed_date?: string | null
+          cpo_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          due_date?: string | null
+          id?: string
+          notes?: string | null
+          order_number: string
+          product_name: string
+          sector_id: string
+          start_date?: string | null
+          status?: string
+          style_no?: string | null
+          target_qty?: number
+          updated_at?: string
+        }
+        Update: {
+          bom_id?: string | null
+          company_id?: string | null
+          completed_date?: string | null
+          cpo_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          due_date?: string | null
+          id?: string
+          notes?: string | null
+          order_number?: string
+          product_name?: string
+          sector_id?: string
+          start_date?: string | null
+          status?: string
+          style_no?: string | null
+          target_qty?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "production_orders_bom_id_fkey"
+            columns: ["bom_id"]
+            isOneToOne: false
+            referencedRelation: "bill_of_materials"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "production_orders_bom_id_fkey"
+            columns: ["bom_id"]
+            isOneToOne: false
+            referencedRelation: "modern_boms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "production_orders_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "production_orders_cpo_id_fkey"
+            columns: ["cpo_id"]
+            isOneToOne: false
+            referencedRelation: "customer_purchase_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "production_orders_sector_id_fkey"
+            columns: ["sector_id"]
+            isOneToOne: false
+            referencedRelation: "production_sectors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      production_sectors: {
+        Row: {
+          code: string
+          company_id: string | null
+          created_at: string
+          description: string | null
+          id: string
+          is_active: boolean
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          code: string
+          company_id?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          code?: string
+          company_id?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "production_sectors_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      production_stage_costs: {
+        Row: {
+          bom_item_id: string | null
+          created_at: string
+          id: string
+          item_name: string
+          notes: string | null
+          quantity_used: number | null
+          source: string
+          stage_id: string
+          total_cost: number | null
+          unit_cost: number | null
+          unit_of_measure: string | null
+          updated_at: string
+        }
+        Insert: {
+          bom_item_id?: string | null
+          created_at?: string
+          id?: string
+          item_name: string
+          notes?: string | null
+          quantity_used?: number | null
+          source?: string
+          stage_id: string
+          total_cost?: number | null
+          unit_cost?: number | null
+          unit_of_measure?: string | null
+          updated_at?: string
+        }
+        Update: {
+          bom_item_id?: string | null
+          created_at?: string
+          id?: string
+          item_name?: string
+          notes?: string | null
+          quantity_used?: number | null
+          source?: string
+          stage_id?: string
+          total_cost?: number | null
+          unit_cost?: number | null
+          unit_of_measure?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "production_stage_costs_bom_item_id_fkey"
+            columns: ["bom_item_id"]
+            isOneToOne: false
+            referencedRelation: "bom_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "production_stage_costs_stage_id_fkey"
+            columns: ["stage_id"]
+            isOneToOne: false
+            referencedRelation: "production_order_stages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      production_stage_templates: {
+        Row: {
+          bom_categories: Json | null
+          company_id: string | null
+          created_at: string
+          description: string | null
+          id: string
+          is_active: boolean
+          sector_id: string
+          sequence_order: number
+          stage_name: string
+          updated_at: string
+        }
+        Insert: {
+          bom_categories?: Json | null
+          company_id?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          sector_id: string
+          sequence_order: number
+          stage_name: string
+          updated_at?: string
+        }
+        Update: {
+          bom_categories?: Json | null
+          company_id?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          sector_id?: string
+          sequence_order?: number
+          stage_name?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "production_stage_templates_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "production_stage_templates_sector_id_fkey"
+            columns: ["sector_id"]
+            isOneToOne: false
+            referencedRelation: "production_sectors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null
