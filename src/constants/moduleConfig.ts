@@ -8,7 +8,8 @@ import {
   ClipboardList,
   GraduationCap,
   Settings,
-  HardHat
+  HardHat,
+  Factory
 } from "lucide-react";
 
 export interface SubModuleChild {
@@ -151,6 +152,15 @@ export const moduleConfig: Record<string, ModuleConfig> = {
       { key: 'user-role-management', name: 'User & Role Management', description: 'Manage users, roles, and permissions', url: '/admin/users-roles' },
       { key: 'module-allocation', name: 'Module Allocation', description: 'Assign modules to companies', url: '/admin/modules' },
       { key: 'warehouse-management', name: 'Warehouse Management', description: 'Configure warehouse settings', url: '/admin/warehouse-management' }
+    ]
+  },
+  production: {
+    key: 'production',
+    name: 'Production',
+    description: 'Work-in-progress tracking and stage-wise cost calculation',
+    icon: Factory,
+    subModules: [
+      { key: 'production-dashboard', name: 'Production Dashboard', description: 'WIP summary, stage tracking, and cost analytics', url: '/production' }
     ]
   },
   construction: {
