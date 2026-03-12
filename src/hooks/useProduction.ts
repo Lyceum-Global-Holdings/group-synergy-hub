@@ -432,7 +432,7 @@ export function useBOMs() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("bill_of_materials")
-        .select("id, bom_number, product_name, style_no")
+        .select("id, bom_number, product_name, style_no, product_master_id, status")
         .eq("company_id", selectedCompany!.id)
         .order("created_at", { ascending: false });
       if (error) throw error;
