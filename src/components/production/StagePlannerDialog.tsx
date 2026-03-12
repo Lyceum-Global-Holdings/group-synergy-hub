@@ -15,7 +15,7 @@ import { toast } from "sonner";
 
 export default function StagePlannerDialog() {
   const { data: sectors } = useProductionSectors();
-  const { company } = useCompany();
+  const { selectedCompany } = useCompany();
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const [sectorId, setSectorId] = useState("");
@@ -25,12 +25,12 @@ export default function StagePlannerDialog() {
   const { data: templates, isLoading } = useStageTemplates(sectorId || undefined);
 
   const handleAddStage = async () => {
-    if (!newStage || !sectorId || !company?.id) return;
+    if (!newStage || !sectorId || !selectedCompany?.id) return;
     setAdding(true);
     const nextOrder = (templates?.length || 0) + 1;
     const { error } = await supabase.from("production_stage_templates").insert({
       sector_id: sectorId,
-      company_id: company.id,
+      company_id: selectedCompany.id,
       stage_name: newStage,
       sequence_order: nextOrder,
       bom_categories: [],

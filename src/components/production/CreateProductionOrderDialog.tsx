@@ -31,28 +31,16 @@ export default function CreateProductionOrderDialog({ open, onOpenChange }: Prop
 
   const { data: stageTemplates } = useStageTemplates(sectorId || undefined);
 
-  // Auto-fill from CPO
+  // Auto-fill from BOM when selected
   useEffect(() => {
-    if (cpoId && cpos) {
-      const cpo = cpos.find((c) => c.id === cpoId);
-      if (cpo) {
-        if (cpo.product_description) setProductName(cpo.product_description);
-        if (cpo.style_number) setStyleNo(cpo.style_number);
-        if (cpo.total_quantity) setTargetQty(String(cpo.total_quantity));
-      }
-    }
-  }, [cpoId, cpos]);
-
-  // Auto-fill from BOM
-  useEffect(() => {
-    if (bomId && boms && !cpoId) {
+    if (bomId && bomId !== "none" && boms) {
       const bom = boms.find((b) => b.id === bomId);
       if (bom) {
         if (bom.product_name) setProductName(bom.product_name);
-        if (bom.style_no) setStyleNo(bom.style_no || "");
+        if (bom.style_no) setStyleNo(bom.style_no);
       }
     }
-  }, [bomId, boms, cpoId]);
+  }, [bomId, boms]);
 
   const resetForm = () => {
     setSectorId(""); setProductName(""); setStyleNo(""); setTargetQty("");
@@ -73,8 +61,8 @@ export default function CreateProductionOrderDialog({ open, onOpenChange }: Prop
       product_name: productName,
       style_no: styleNo || undefined,
       target_qty: parseInt(targetQty),
-      cpo_id: cpoId || undefined,
-      bom_id: bomId || undefined,
+      cpo_id: cpoId && cpoId !== "none" ? cpoId : undefined,
+      bom_id: bomId && bomId !== "none" ? bomId : undefined,
       start_date: startDate || undefined,
       due_date: dueDate || undefined,
       notes: notes || undefined,
@@ -107,7 +95,7 @@ export default function CreateProductionOrderDialog({ open, onOpenChange }: Prop
               <SelectTrigger><SelectValue placeholder="None" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="none">None</SelectItem>
-                {cpos?.map((c) => <SelectItem key={c.id} value={c.id}>{c.cpo_number} — {c.product_description}</SelectItem>)}
+                {cpos?.map((c) => <SelectItem key={c.id} value={c.id}>{c.cpo_number}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>

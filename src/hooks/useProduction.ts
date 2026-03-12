@@ -6,45 +6,45 @@ import { DEFAULT_SECTORS } from "@/constants/productionSectors";
 
 // ── Sectors ──
 export function useProductionSectors() {
-  const { company } = useCompany();
+  const { selectedCompany } = useCompany();
   return useQuery({
-    queryKey: ["production-sectors", company?.id],
+    queryKey: ["production-sectors", selectedCompany?.id],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("production_sectors")
         .select("*")
-        .eq("company_id", company!.id)
+        .eq("company_id", selectedCompany!.id)
         .eq("is_active", true)
         .order("name");
       if (error) throw error;
       return data;
     },
-    enabled: !!company?.id,
+    enabled: !!selectedCompany?.id,
   });
 }
 
 export function useSeedDefaultSectors() {
-  const { company } = useCompany();
+  const { selectedCompany } = useCompany();
   const qc = useQueryClient();
 
   return useMutation({
     mutationFn: async () => {
-      if (!company?.id) throw new Error("No company");
+      if (!selectedCompany?.id) throw new Error("No company");
 
       for (const sector of DEFAULT_SECTORS) {
         const { data: s, error: sErr } = await supabase
           .from("production_sectors")
-          .insert({ company_id: company.id, name: sector.name, code: sector.code, description: sector.description })
+          .insert({ company_id: selectedCompany.id, name: sector.name, code: sector.code, description: sector.description })
           .select()
           .single();
         if (sErr) throw sErr;
 
         const stages = sector.stages.map((st) => ({
           sector_id: s.id,
-          company_id: company.id,
+          company_id: selectedCompany.id,
           stage_name: st.stage_name,
           sequence_order: st.sequence_order,
-          bom_categories: st.bom_categories,
+          bom_categories: st.bom_categories as unknown as string[],
           description: st.description,
         }));
         const { error: stErr } = await supabase.from("production_stage_templates").insert(stages);
@@ -62,14 +62,14 @@ export function useSeedDefaultSectors() {
 
 // ── Stage Templates ──
 export function useStageTemplates(sectorId?: string) {
-  const { company } = useCompany();
+  const { selectedCompany } = useCompany();
   return useQuery({
     queryKey: ["production-stage-templates", sectorId],
     queryFn: async () => {
       let q = supabase
         .from("production_stage_templates")
         .select("*")
-        .eq("company_id", company!.id)
+        .eq("company_id", selectedCompany!.id)
         .eq("is_active", true)
         .order("sequence_order");
       if (sectorId) q = q.eq("sector_id", sectorId);
@@ -77,25 +77,25 @@ export function useStageTemplates(sectorId?: string) {
       if (error) throw error;
       return data;
     },
-    enabled: !!company?.id,
+    enabled: !!selectedCompany?.id,
   });
 }
 
 // ── Production Orders ──
 export function useProductionOrders() {
-  const { company } = useCompany();
+  const { selectedCompany } = useCompany();
   return useQuery({
-    queryKey: ["production-orders", company?.id],
+    queryKey: ["production-orders", selectedCompany?.id],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("production_orders")
         .select(`*, production_sectors(name, code), production_order_stages(*)`)
-        .eq("company_id", company!.id)
+        .eq("company_id", selectedCompany!.id)
         .order("created_at", { ascending: false });
       if (error) throw error;
       return data;
     },
-    enabled: !!company?.id,
+    enabled: !!selectedCompany?.id,
   });
 }
 
@@ -116,7 +116,7 @@ export function useProductionOrder(orderId?: string) {
 }
 
 export function useCreateProductionOrder() {
-  const { company } = useCompany();
+  const { selectedCompany } = useCompany();
   const qc = useQueryClient();
 
   return useMutation({
@@ -137,7 +137,7 @@ export function useCreateProductionOrder() {
       const { data: order, error } = await supabase
         .from("production_orders")
         .insert({
-          company_id: company!.id,
+          company_id: selectedCompany!.id,
           order_number: "", // trigger will generate
           sector_id: input.sector_id,
           product_name: input.product_name,
@@ -172,7 +172,6 @@ export function useCreateProductionOrder() {
           .eq("bom_id", input.bom_id);
 
         if (bomItems && bomItems.length > 0) {
-          // Get created stages
           const { data: createdStages } = await supabase
             .from("production_order_stages")
             .select("*, production_stage_templates(bom_categories)")
@@ -317,35 +316,35 @@ export function useUpdateProductionOrder() {
 
 // ── Helpers ──
 export function useBOMs() {
-  const { company } = useCompany();
+  const { selectedCompany } = useCompany();
   return useQuery({
-    queryKey: ["boms-for-production", company?.id],
+    queryKey: ["boms-for-production", selectedCompany?.id],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("bill_of_materials")
         .select("id, bom_number, product_name, style_no")
-        .eq("company_id", company!.id)
+        .eq("company_id", selectedCompany!.id)
         .order("created_at", { ascending: false });
       if (error) throw error;
       return data;
     },
-    enabled: !!company?.id,
+    enabled: !!selectedCompany?.id,
   });
 }
 
 export function useCPOs() {
-  const { company } = useCompany();
+  const { selectedCompany } = useCompany();
   return useQuery({
-    queryKey: ["cpos-for-production", company?.id],
+    queryKey: ["cpos-for-production", selectedCompany?.id],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("customer_purchase_orders")
-        .select("id, cpo_number, style_number, product_description, total_quantity")
-        .eq("company_id", company!.id)
+        .select("id, cpo_number, notes, total_amount")
+        .eq("company_id", selectedCompany!.id)
         .order("created_at", { ascending: false });
       if (error) throw error;
       return data;
     },
-    enabled: !!company?.id,
+    enabled: !!selectedCompany?.id,
   });
 }
