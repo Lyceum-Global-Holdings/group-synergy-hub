@@ -10875,6 +10875,50 @@ export type Database = {
           },
         ]
       }
+      production_daily_entries: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          entry_date: string
+          id: string
+          input_qty: number
+          notes: string | null
+          output_qty: number
+          stage_id: string
+          wastage_qty: number
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          entry_date?: string
+          id?: string
+          input_qty?: number
+          notes?: string | null
+          output_qty?: number
+          stage_id: string
+          wastage_qty?: number
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          entry_date?: string
+          id?: string
+          input_qty?: number
+          notes?: string | null
+          output_qty?: number
+          stage_id?: string
+          wastage_qty?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "production_daily_entries_stage_id_fkey"
+            columns: ["stage_id"]
+            isOneToOne: false
+            referencedRelation: "production_order_stages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       production_order_stages: {
         Row: {
           completed_at: string | null
