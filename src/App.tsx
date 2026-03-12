@@ -87,6 +87,7 @@ const InventoryItems = lazy(() => import("./pages/construction/resources/Invento
 const SubcontractorResources = lazy(() => import("./pages/construction/resources/SubcontractorResources"));
 const QualityControl = lazy(() => import("./pages/construction/QualityControl"));
 const SafetyManagement = lazy(() => import("./pages/construction/SafetyManagement"));
+const ProductionModule = lazy(() => import("./pages/production/ProductionModule"));
 
 // Missing module pages
 const RfqManagement = lazy(() => import("./pages/sourcing/RfqManagement"));
