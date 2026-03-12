@@ -1,35 +1,74 @@
 
 
-## Plan: Restrict Location Dropdowns to User's Edit-Permitted Locations
+# Daily Production Progress Tracking
 
-### Problem
-The "Add Item" and "Add Stock" dialogs in Construction Inventory show **all** locations, allowing users to add items to locations they don't have edit access to. For example, Shihan (who only has access to "Lyceum Wattala") can currently see and select any location.
+## Problem
 
-### Solution
-Filter the location dropdowns in both dialogs using `useCurrentUserLocationPermissions()`, the same pattern already used in `NewTransferDialog.tsx`. Only locations where the user has explicit **edit** permissions will appear.
+Currently, stage progress is recorded as a single cumulative `input_qty` / `output_qty` / `wastage_qty` on each stage. There's no history of daily entries — users overwrite the totals each time. For real manufacturing, production happens partially each day and users need a daily log to track progress over time.
 
-### Changes
+## Solution: Daily Production Entries Table
 
-**1. `src/components/construction/inventory/AddItemDialog.tsx`**
-- Import `useCurrentUserLocationPermissions`
-- Fetch permissions, then filter `locations` to only those in `editLocationIds`
-- Admin/Super Admin users (who get `viewAllLocations: true`) see all locations (unchanged behavior)
-- Use the filtered list for both the machine `current_location_id` and bulk `location_id` dropdowns
+Create a `production_daily_entries` table that logs each day's work per stage. The stage's cumulative `input_qty`, `output_qty`, `wastage_qty` become **computed totals** from these daily entries.
 
-**2. `src/components/construction/inventory/AddInventoryStockDialog.tsx`**
-- Same change: import `useCurrentUserLocationPermissions`, filter the location dropdown to edit-permitted locations only
+## Database Change
 
-### Pattern (from existing `NewTransferDialog.tsx`)
-```typescript
-const { data: permissions } = useCurrentUserLocationPermissions();
+New table:
 
-const permittedLocations = useMemo(() => {
-  if (!locations || !permissions) return [];
-  if (permissions.viewAllLocations) return locations;
-  const permittedIds = new Set(permissions.editLocationIds);
-  return locations.filter(loc => permittedIds.has(loc.id));
-}, [locations, permissions]);
+```sql
+CREATE TABLE production_daily_entries (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  stage_id uuid REFERENCES production_order_stages(id) ON DELETE CASCADE NOT NULL,
+  entry_date date NOT NULL DEFAULT CURRENT_DATE,
+  input_qty integer NOT NULL DEFAULT 0,
+  output_qty integer NOT NULL DEFAULT 0,
+  wastage_qty integer NOT NULL DEFAULT 0,
+  notes text,
+  created_by uuid REFERENCES auth.users(id),
+  created_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE(stage_id, entry_date)
+);
+
+ALTER TABLE production_daily_entries ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can manage daily entries"
+  ON production_daily_entries FOR ALL TO authenticated
+  USING (true) WITH CHECK (true);
 ```
 
-Two files changed, no new files.
+The `UNIQUE(stage_id, entry_date)` constraint ensures one entry per stage per day (upsert-friendly).
+
+## Frontend Changes
+
+### 1. `useProduction.ts`
+- Add `useDailyEntries(stageId)` query to fetch entries for a stage
+- Add `useAddDailyEntry` mutation that inserts/upserts into `production_daily_entries`, then updates the parent stage's cumulative totals (`input_qty`, `output_qty`, `wastage_qty`) by summing all entries
+- Fetch daily entries alongside stage data in `useProductionOrder`
+
+### 2. `StageProgressCard.tsx` — Major Redesign
+- Replace the current direct-edit quantity fields with a **daily entry form** (date picker defaulting to today, input/output/wastage fields, notes, "Add Entry" button)
+- Show a **daily entries table** below the form listing all past entries (date, in, out, wastage, notes) with running totals
+- The stage header still shows cumulative totals (sum of all daily entries)
+- Keep existing Start/Complete stage buttons as-is
+
+### 3. New component: `DailyEntryForm.tsx`
+- Date picker (defaults to today), input_qty, output_qty, wastage_qty, notes
+- If an entry already exists for that date, pre-fill for editing (upsert behavior)
+- On save, upsert the daily entry and recalculate stage totals
+
+### 4. New component: `DailyEntriesTable.tsx`
+- Compact table showing all daily entries sorted by date descending
+- Columns: Date, Input, Output, Wastage, Notes
+- Click a row to edit that day's entry
+- Footer row showing cumulative totals
+
+## Summary
+
+| Area | Change |
+|------|--------|
+| Migration | Create `production_daily_entries` table |
+| `useProduction.ts` | Add daily entry hooks, update stage totals on entry save |
+| `DailyEntryForm.tsx` | New — date-based entry form with upsert |
+| `DailyEntriesTable.tsx` | New — historical entries list |
+| `StageProgressCard.tsx` | Replace direct qty fields with daily entry UI |
+| Supabase types | Regenerate to include new table |
 
