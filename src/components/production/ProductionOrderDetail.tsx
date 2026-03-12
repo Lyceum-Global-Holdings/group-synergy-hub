@@ -26,6 +26,7 @@ export default function ProductionOrderDetail({ orderId, onBack }: Props) {
   const progress = stages.length > 0 ? Math.round((completedStages / stages.length) * 100) : 0;
 
   const statusInfo = PRODUCTION_ORDER_STATUSES.find((s) => s.value === order.status);
+  const cpoItem = (order as any).customer_po_items;
 
   const totalCost = stages.reduce((sum: number, s: any) => {
     const stageCosts = (s.production_stage_costs || []).reduce((cs: number, c: any) => cs + (Number(c.total_cost) || 0), 0);
@@ -48,6 +49,15 @@ export default function ProductionOrderDetail({ orderId, onBack }: Props) {
           <p className="text-sm text-muted-foreground">
             {order.product_name}{order.style_no ? ` · Style: ${order.style_no}` : ""} · {(order as any).production_sectors?.name}
           </p>
+          {cpoItem && (
+            <div className="flex items-center gap-2 mt-1 flex-wrap">
+              {cpoItem.color && <Badge variant="secondary" className="text-xs">{cpoItem.color}</Badge>}
+              {cpoItem.size && <Badge variant="secondary" className="text-xs">Size: {cpoItem.size}</Badge>}
+              {cpoItem.unit_price != null && (
+                <Badge variant="outline" className="text-xs">Unit Price: {Number(cpoItem.unit_price).toLocaleString(undefined, { minimumFractionDigits: 2 })}</Badge>
+              )}
+            </div>
+          )}
         </div>
         <div className="flex gap-2">
           {order.status === "planned" && (

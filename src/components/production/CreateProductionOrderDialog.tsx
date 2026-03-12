@@ -1,12 +1,14 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Loader2 } from "lucide-react";
-import { useProductionSectors, useStageTemplates, useCreateProductionOrder, useBOMs, useCPOs } from "@/hooks/useProduction";
+import { useProductionSectors, useStageTemplates, useCreateProductionOrder, useCreateBatchProductionOrders, useBOMs, useCPOs } from "@/hooks/useProduction";
 
 interface Props {
   open: boolean;
@@ -18,6 +20,7 @@ export default function CreateProductionOrderDialog({ open, onOpenChange }: Prop
   const { data: boms } = useBOMs();
   const { data: cpos } = useCPOs();
   const createMutation = useCreateProductionOrder();
+  const batchCreateMutation = useCreateBatchProductionOrders();
 
   const [sectorId, setSectorId] = useState("");
   const [productName, setProductName] = useState("");
@@ -28,53 +31,118 @@ export default function CreateProductionOrderDialog({ open, onOpenChange }: Prop
   const [startDate, setStartDate] = useState("");
   const [dueDate, setDueDate] = useState("");
   const [notes, setNotes] = useState("");
+  const [selectedItemIds, setSelectedItemIds] = useState<Set<string>>(new Set());
 
   const { data: stageTemplates } = useStageTemplates(sectorId || undefined);
+
+  // Get CPO items for selected CPO
+  const selectedCpo = useMemo(() => {
+    if (!cpoId || cpoId === "none" || !cpos) return null;
+    return cpos.find((c) => c.id === cpoId) || null;
+  }, [cpoId, cpos]);
+
+  const cpoItems = selectedCpo?.items || [];
+  const hasCpoItems = cpoItems.length > 0;
+
+  // Auto-select all items when CPO changes
+  useEffect(() => {
+    if (hasCpoItems) {
+      setSelectedItemIds(new Set(cpoItems.map((item: any) => item.id)));
+    } else {
+      setSelectedItemIds(new Set());
+    }
+  }, [cpoId, hasCpoItems]);
 
   // Auto-fill from BOM when selected
   useEffect(() => {
     if (bomId && bomId !== "none" && boms) {
       const bom = boms.find((b) => b.id === bomId);
-      if (bom) {
+      if (bom && !hasCpoItems) {
         if (bom.product_name) setProductName(bom.product_name);
         if (bom.style_no) setStyleNo(bom.style_no);
       }
     }
-  }, [bomId, boms]);
+  }, [bomId, boms, hasCpoItems]);
 
   const resetForm = () => {
     setSectorId(""); setProductName(""); setStyleNo(""); setTargetQty("");
     setCpoId(""); setBomId(""); setStartDate(""); setDueDate(""); setNotes("");
+    setSelectedItemIds(new Set());
   };
 
-  const handleSubmit = async () => {
-    if (!sectorId || !productName || !targetQty) return;
-
-    const stages = (stageTemplates || []).map((st) => ({
-      stage_name: st.stage_name,
-      sequence_order: st.sequence_order,
-      stage_template_id: st.id,
-    }));
-
-    await createMutation.mutateAsync({
-      sector_id: sectorId,
-      product_name: productName,
-      style_no: styleNo || undefined,
-      target_qty: parseInt(targetQty),
-      cpo_id: cpoId && cpoId !== "none" ? cpoId : undefined,
-      bom_id: bomId && bomId !== "none" ? bomId : undefined,
-      start_date: startDate || undefined,
-      due_date: dueDate || undefined,
-      notes: notes || undefined,
-      stages,
+  const toggleItem = (itemId: string) => {
+    setSelectedItemIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(itemId)) next.delete(itemId);
+      else next.add(itemId);
+      return next;
     });
+  };
+
+  const toggleAll = () => {
+    if (selectedItemIds.size === cpoItems.length) {
+      setSelectedItemIds(new Set());
+    } else {
+      setSelectedItemIds(new Set(cpoItems.map((item: any) => item.id)));
+    }
+  };
+
+  const stages = (stageTemplates || []).map((st) => ({
+    stage_name: st.stage_name,
+    sequence_order: st.sequence_order,
+    stage_template_id: st.id,
+  }));
+
+  const handleSubmit = async () => {
+    if (!sectorId) return;
+
+    if (hasCpoItems && selectedItemIds.size > 0) {
+      // Batch create from CPO items
+      const items = cpoItems
+        .filter((item: any) => selectedItemIds.has(item.id))
+        .map((item: any) => ({
+          cpo_item_id: item.id,
+          item_name: item.item_name,
+          style_no: item.style_no || undefined,
+          target_qty: item.quantity_ordered,
+        }));
+
+      await batchCreateMutation.mutateAsync({
+        sector_id: sectorId,
+        cpo_id: cpoId,
+        bom_id: bomId && bomId !== "none" ? bomId : undefined,
+        start_date: startDate || undefined,
+        due_date: dueDate || undefined,
+        notes: notes || undefined,
+        stages,
+        items,
+      });
+    } else {
+      // Single order (manual entry)
+      if (!productName || !targetQty) return;
+      await createMutation.mutateAsync({
+        sector_id: sectorId,
+        product_name: productName,
+        style_no: styleNo || undefined,
+        target_qty: parseInt(targetQty),
+        cpo_id: cpoId && cpoId !== "none" ? cpoId : undefined,
+        bom_id: bomId && bomId !== "none" ? bomId : undefined,
+        start_date: startDate || undefined,
+        due_date: dueDate || undefined,
+        notes: notes || undefined,
+        stages,
+      });
+    }
     resetForm();
     onOpenChange(false);
   };
 
+  const isPending = createMutation.isPending || batchCreateMutation.isPending;
+  const canSubmit = sectorId && (hasCpoItems ? selectedItemIds.size > 0 : productName && targetQty);
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Create Production Order</DialogTitle>
         </DialogHeader>
@@ -100,6 +168,52 @@ export default function CreateProductionOrderDialog({ open, onOpenChange }: Prop
             </Select>
           </div>
 
+          {/* CPO Items Checklist */}
+          {hasCpoItems && (
+            <div>
+              <Label className="text-sm">Select CPO Items to Produce</Label>
+              <div className="rounded-md border mt-1 overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-[40px]">
+                        <Checkbox
+                          checked={selectedItemIds.size === cpoItems.length && cpoItems.length > 0}
+                          onCheckedChange={toggleAll}
+                        />
+                      </TableHead>
+                      <TableHead>Item Name</TableHead>
+                      <TableHead>Style No.</TableHead>
+                      <TableHead>Color</TableHead>
+                      <TableHead>Size</TableHead>
+                      <TableHead className="text-right">Qty</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {cpoItems.map((item: any) => (
+                      <TableRow key={item.id}>
+                        <TableCell>
+                          <Checkbox
+                            checked={selectedItemIds.has(item.id)}
+                            onCheckedChange={() => toggleItem(item.id)}
+                          />
+                        </TableCell>
+                        <TableCell className="font-medium">{item.item_name}</TableCell>
+                        <TableCell>{item.style_no || "—"}</TableCell>
+                        <TableCell>{item.color || "—"}</TableCell>
+                        <TableCell>{item.size || "—"}</TableCell>
+                        <TableCell className="text-right">{item.quantity_ordered?.toLocaleString()}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                {selectedItemIds.size} of {cpoItems.length} items selected — one production order will be created per item
+              </p>
+            </div>
+          )}
+
           <div>
             <Label>Link to BOM (optional)</Label>
             <Select value={bomId} onValueChange={setBomId}>
@@ -111,21 +225,25 @@ export default function CreateProductionOrderDialog({ open, onOpenChange }: Prop
             </Select>
           </div>
 
-          <div>
-            <Label>Product Name *</Label>
-            <Input value={productName} onChange={(e) => setProductName(e.target.value)} />
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label>Style No.</Label>
-              <Input value={styleNo} onChange={(e) => setStyleNo(e.target.value)} />
-            </div>
-            <div>
-              <Label>Target Qty *</Label>
-              <Input type="number" value={targetQty} onChange={(e) => setTargetQty(e.target.value)} />
-            </div>
-          </div>
+          {/* Manual entry fields (only when no CPO items) */}
+          {!hasCpoItems && (
+            <>
+              <div>
+                <Label>Product Name *</Label>
+                <Input value={productName} onChange={(e) => setProductName(e.target.value)} />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>Style No.</Label>
+                  <Input value={styleNo} onChange={(e) => setStyleNo(e.target.value)} />
+                </div>
+                <div>
+                  <Label>Target Qty *</Label>
+                  <Input type="number" value={targetQty} onChange={(e) => setTargetQty(e.target.value)} />
+                </div>
+              </div>
+            </>
+          )}
 
           <div className="grid grid-cols-2 gap-4">
             <div>
@@ -158,9 +276,11 @@ export default function CreateProductionOrderDialog({ open, onOpenChange }: Prop
 
           <div className="flex justify-end gap-2 pt-2">
             <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-            <Button onClick={handleSubmit} disabled={createMutation.isPending || !sectorId || !productName || !targetQty}>
-              {createMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Create Order
+            <Button onClick={handleSubmit} disabled={isPending || !canSubmit}>
+              {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {hasCpoItems && selectedItemIds.size > 0
+                ? `Create ${selectedItemIds.size} Order${selectedItemIds.size > 1 ? "s" : ""}`
+                : "Create Order"}
             </Button>
           </div>
         </div>

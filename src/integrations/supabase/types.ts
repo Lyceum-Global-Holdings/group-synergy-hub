@@ -10950,6 +10950,7 @@ export type Database = {
           company_id: string | null
           completed_date: string | null
           cpo_id: string | null
+          cpo_item_id: string | null
           created_at: string
           created_by: string | null
           due_date: string | null
@@ -10969,6 +10970,7 @@ export type Database = {
           company_id?: string | null
           completed_date?: string | null
           cpo_id?: string | null
+          cpo_item_id?: string | null
           created_at?: string
           created_by?: string | null
           due_date?: string | null
@@ -10988,6 +10990,7 @@ export type Database = {
           company_id?: string | null
           completed_date?: string | null
           cpo_id?: string | null
+          cpo_item_id?: string | null
           created_at?: string
           created_by?: string | null
           due_date?: string | null
@@ -11029,6 +11032,13 @@ export type Database = {
             columns: ["cpo_id"]
             isOneToOne: false
             referencedRelation: "customer_purchase_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "production_orders_cpo_item_id_fkey"
+            columns: ["cpo_item_id"]
+            isOneToOne: false
+            referencedRelation: "customer_po_items"
             referencedColumns: ["id"]
           },
           {
