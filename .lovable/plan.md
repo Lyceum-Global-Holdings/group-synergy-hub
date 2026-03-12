@@ -1,35 +1,30 @@
 
 
-## Plan: Restrict Location Dropdowns to User's Edit-Permitted Locations
+# Daily Production Summary Dashboard
 
-### Problem
-The "Add Item" and "Add Stock" dialogs in Construction Inventory show **all** locations, allowing users to add items to locations they don't have edit access to. For example, Shihan (who only has access to "Lyceum Wattala") can currently see and select any location.
+## What We're Building
 
-### Solution
-Filter the location dropdowns in both dialogs using `useCurrentUserLocationPermissions()`, the same pattern already used in `NewTransferDialog.tsx`. Only locations where the user has explicit **edit** permissions will appear.
+A new "Daily Summary" tab in the Production module that shows aggregated production output across all orders and stages for a selected date. Users pick a date and see total input, output, and wastage broken down by order and stage.
 
-### Changes
+## Changes
 
-**1. `src/components/construction/inventory/AddItemDialog.tsx`**
-- Import `useCurrentUserLocationPermissions`
-- Fetch permissions, then filter `locations` to only those in `editLocationIds`
-- Admin/Super Admin users (who get `viewAllLocations: true`) see all locations (unchanged behavior)
-- Use the filtered list for both the machine `current_location_id` and bulk `location_id` dropdowns
+### 1. New hook: `useDailySummary(date)` in `useProduction.ts`
 
-**2. `src/components/construction/inventory/AddInventoryStockDialog.tsx`**
-- Same change: import `useCurrentUserLocationPermissions`, filter the location dropdown to edit-permitted locations only
+Query `production_daily_entries` filtered by `entry_date`, joining `production_order_stages` and `production_orders` to get order number, product name, and stage name. Returns all entries for that date with their parent context.
 
-### Pattern (from existing `NewTransferDialog.tsx`)
-```typescript
-const { data: permissions } = useCurrentUserLocationPermissions();
+### 2. New component: `DailyProductionSummary.tsx`
 
-const permittedLocations = useMemo(() => {
-  if (!locations || !permissions) return [];
-  if (permissions.viewAllLocations) return locations;
-  const permittedIds = new Set(permissions.editLocationIds);
-  return locations.filter(loc => permittedIds.has(loc.id));
-}, [locations, permissions]);
-```
+- Date picker (defaults to today) at the top
+- KPI row: Total Input, Total Output, Total Wastage for the selected date
+- Table grouped by production order showing per-stage entries (stage name, input, output, wastage, notes)
+- Bar chart showing output by stage name (aggregated across orders)
+- Empty state when no entries exist for the selected date
 
-Two files changed, no new files.
+### 3. Add tab to `ProductionModule.tsx`
+
+Add a "Daily Summary" tab alongside Dashboard and Production Orders tabs, rendering the new `DailyProductionSummary` component.
+
+### No database changes needed
+
+The `production_daily_entries` table already has `entry_date` and `stage_id` with the necessary relationships.
 
