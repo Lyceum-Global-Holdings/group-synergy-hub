@@ -8,7 +8,8 @@ import {
   ClipboardList,
   GraduationCap,
   Settings,
-  HardHat
+  HardHat,
+  Factory
 } from "lucide-react";
 
 export interface SubModuleChild {
