@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
 import { Loader2 } from "lucide-react";
 import { useProductionSectors, useStageTemplates, useCreateProductionOrder, useCreateBatchProductionOrders, useBOMs, useCPOs } from "@/hooks/useProduction";
 
@@ -32,6 +33,8 @@ export default function CreateProductionOrderDialog({ open, onOpenChange }: Prop
   const [dueDate, setDueDate] = useState("");
   const [notes, setNotes] = useState("");
   const [selectedItemIds, setSelectedItemIds] = useState<Set<string>>(new Set());
+  // Per-item BOM overrides: itemId -> bomId
+  const [itemBomOverrides, setItemBomOverrides] = useState<Record<string, string>>({});
 
   const { data: stageTemplates } = useStageTemplates(sectorId || undefined);
 
@@ -44,6 +47,34 @@ export default function CreateProductionOrderDialog({ open, onOpenChange }: Prop
   const cpoItems = selectedCpo?.items || [];
   const hasCpoItems = cpoItems.length > 0;
 
+  // Auto-match BOMs to CPO items by product_master_id
+  const itemBomMatches = useMemo(() => {
+    if (!hasCpoItems || !boms) return {};
+    const matches: Record<string, { id: string; bom_number: string } | null> = {};
+    for (const item of cpoItems as any[]) {
+      if (item.product_master_id) {
+        // Find active BOM matching product_master_id
+        const match = boms.find(
+          (b) => b.product_master_id === item.product_master_id && b.status === "active"
+        ) || boms.find(
+          (b) => b.product_master_id === item.product_master_id
+        );
+        matches[item.id] = match ? { id: match.id, bom_number: match.bom_number } : null;
+      } else {
+        matches[item.id] = null;
+      }
+    }
+    return matches;
+  }, [cpoItems, boms, hasCpoItems]);
+
+  // Get effective BOM for an item (override > auto-match)
+  const getItemBomId = (itemId: string): string | undefined => {
+    const override = itemBomOverrides[itemId];
+    if (override && override !== "none") return override;
+    if (override === "none") return undefined;
+    return itemBomMatches[itemId]?.id;
+  };
+
   // Auto-select all items when CPO changes
   useEffect(() => {
     if (hasCpoItems) {
@@ -51,9 +82,10 @@ export default function CreateProductionOrderDialog({ open, onOpenChange }: Prop
     } else {
       setSelectedItemIds(new Set());
     }
+    setItemBomOverrides({});
   }, [cpoId, hasCpoItems]);
 
-  // Auto-fill from BOM when selected
+  // Auto-fill from BOM when selected (only for manual mode)
   useEffect(() => {
     if (bomId && bomId !== "none" && boms) {
       const bom = boms.find((b) => b.id === bomId);
@@ -68,6 +100,7 @@ export default function CreateProductionOrderDialog({ open, onOpenChange }: Prop
     setSectorId(""); setProductName(""); setStyleNo(""); setTargetQty("");
     setCpoId(""); setBomId(""); setStartDate(""); setDueDate(""); setNotes("");
     setSelectedItemIds(new Set());
+    setItemBomOverrides({});
   };
 
   const toggleItem = (itemId: string) => {
@@ -97,7 +130,7 @@ export default function CreateProductionOrderDialog({ open, onOpenChange }: Prop
     if (!sectorId) return;
 
     if (hasCpoItems && selectedItemIds.size > 0) {
-      // Batch create from CPO items
+      // Batch create from CPO items with per-item BOM
       const items = cpoItems
         .filter((item: any) => selectedItemIds.has(item.id))
         .map((item: any) => ({
@@ -105,6 +138,7 @@ export default function CreateProductionOrderDialog({ open, onOpenChange }: Prop
           item_name: item.item_name,
           style_no: item.style_no || undefined,
           target_qty: item.quantity_ordered,
+          bom_id: getItemBomId(item.id),
         }));
 
       await batchCreateMutation.mutateAsync({
@@ -140,9 +174,14 @@ export default function CreateProductionOrderDialog({ open, onOpenChange }: Prop
   const isPending = createMutation.isPending || batchCreateMutation.isPending;
   const canSubmit = sectorId && (hasCpoItems ? selectedItemIds.size > 0 : productName && targetQty);
 
+  // Count how many selected items have a BOM linked
+  const linkedBomCount = hasCpoItems
+    ? Array.from(selectedItemIds).filter((id) => getItemBomId(id)).length
+    : 0;
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Create Production Order</DialogTitle>
         </DialogHeader>
@@ -168,7 +207,7 @@ export default function CreateProductionOrderDialog({ open, onOpenChange }: Prop
             </Select>
           </div>
 
-          {/* CPO Items Checklist */}
+          {/* CPO Items Checklist with BOM column */}
           {hasCpoItems && (
             <div>
               <Label className="text-sm">Select CPO Items to Produce</Label>
@@ -187,43 +226,82 @@ export default function CreateProductionOrderDialog({ open, onOpenChange }: Prop
                       <TableHead>Color</TableHead>
                       <TableHead>Size</TableHead>
                       <TableHead className="text-right">Qty</TableHead>
+                      <TableHead>BOM</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {cpoItems.map((item: any) => (
-                      <TableRow key={item.id}>
-                        <TableCell>
-                          <Checkbox
-                            checked={selectedItemIds.has(item.id)}
-                            onCheckedChange={() => toggleItem(item.id)}
-                          />
-                        </TableCell>
-                        <TableCell className="font-medium">{item.item_name}</TableCell>
-                        <TableCell>{item.style_no || "—"}</TableCell>
-                        <TableCell>{item.color || "—"}</TableCell>
-                        <TableCell>{item.size || "—"}</TableCell>
-                        <TableCell className="text-right">{item.quantity_ordered?.toLocaleString()}</TableCell>
-                      </TableRow>
-                    ))}
+                    {cpoItems.map((item: any) => {
+                      const autoMatch = itemBomMatches[item.id];
+                      const override = itemBomOverrides[item.id];
+                      const effectiveBomId = getItemBomId(item.id);
+                      const effectiveBom = effectiveBomId
+                        ? boms?.find((b) => b.id === effectiveBomId)
+                        : null;
+
+                      return (
+                        <TableRow key={item.id}>
+                          <TableCell>
+                            <Checkbox
+                              checked={selectedItemIds.has(item.id)}
+                              onCheckedChange={() => toggleItem(item.id)}
+                            />
+                          </TableCell>
+                          <TableCell className="font-medium">{item.item_name}</TableCell>
+                          <TableCell>{item.style_no || "—"}</TableCell>
+                          <TableCell>{item.color || "—"}</TableCell>
+                          <TableCell>{item.size || "—"}</TableCell>
+                          <TableCell className="text-right">{item.quantity_ordered?.toLocaleString()}</TableCell>
+                          <TableCell>
+                            <Select
+                              value={override || (autoMatch?.id ? autoMatch.id : "none")}
+                              onValueChange={(val) =>
+                                setItemBomOverrides((prev) => ({ ...prev, [item.id]: val }))
+                              }
+                            >
+                              <SelectTrigger className="h-8 w-[160px] text-xs">
+                                <SelectValue placeholder="No BOM" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="none">No BOM</SelectItem>
+                                {boms?.map((b) => (
+                                  <SelectItem key={b.id} value={b.id}>
+                                    {b.bom_number}
+                                    {b.id === autoMatch?.id ? " ✓" : ""}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            {autoMatch && !override && (
+                              <span className="text-[10px] text-muted-foreground">auto-linked</span>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
                   </TableBody>
                 </Table>
               </div>
               <p className="text-xs text-muted-foreground mt-1">
-                {selectedItemIds.size} of {cpoItems.length} items selected — one production order will be created per item
+                {selectedItemIds.size} of {cpoItems.length} items selected
+                {linkedBomCount > 0 && ` · ${linkedBomCount} with BOM linked`}
+                {" — one production order per item"}
               </p>
             </div>
           )}
 
-          <div>
-            <Label>Link to BOM (optional)</Label>
-            <Select value={bomId} onValueChange={setBomId}>
-              <SelectTrigger><SelectValue placeholder="None" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">None</SelectItem>
-                {boms?.map((b) => <SelectItem key={b.id} value={b.id}>{b.bom_number} — {b.product_name}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
+          {/* Global BOM dropdown only when no CPO items */}
+          {!hasCpoItems && (
+            <div>
+              <Label>Link to BOM (optional)</Label>
+              <Select value={bomId} onValueChange={setBomId}>
+                <SelectTrigger><SelectValue placeholder="None" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">None</SelectItem>
+                  {boms?.map((b) => <SelectItem key={b.id} value={b.id}>{b.bom_number} — {b.product_name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           {/* Manual entry fields (only when no CPO items) */}
           {!hasCpoItems && (

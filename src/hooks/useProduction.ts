@@ -235,6 +235,7 @@ export function useCreateBatchProductionOrders() {
         item_name: string;
         style_no?: string;
         target_qty: number;
+        bom_id?: string;
       }[];
     }) => {
       const { data: user } = await supabase.auth.getUser();
@@ -252,7 +253,7 @@ export function useCreateBatchProductionOrders() {
             target_qty: item.target_qty,
             cpo_id: input.cpo_id,
             cpo_item_id: item.cpo_item_id,
-            bom_id: input.bom_id || null,
+            bom_id: item.bom_id || input.bom_id || null,
             start_date: input.start_date || null,
             due_date: input.due_date || null,
             notes: input.notes || null,
@@ -271,12 +272,13 @@ export function useCreateBatchProductionOrders() {
         const { error: stErr } = await supabase.from("production_order_stages").insert(stageInserts);
         if (stErr) throw stErr;
 
-        // BOM cost auto-populate
-        if (input.bom_id) {
+        // BOM cost auto-populate (use per-item bom_id first, fall back to shared)
+        const effectiveBomId = item.bom_id || input.bom_id;
+        if (effectiveBomId) {
           const { data: bomItems } = await supabase
             .from("bom_items")
             .select("*")
-            .eq("bom_id", input.bom_id);
+            .eq("bom_id", effectiveBomId);
 
           if (bomItems && bomItems.length > 0) {
             const { data: createdStages } = await supabase
@@ -432,7 +434,7 @@ export function useBOMs() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("bill_of_materials")
-        .select("id, bom_number, product_name, style_no")
+        .select("id, bom_number, product_name, style_no, product_master_id, status")
         .eq("company_id", selectedCompany!.id)
         .order("created_at", { ascending: false });
       if (error) throw error;
@@ -449,7 +451,7 @@ export function useCPOs() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("customer_purchase_orders")
-        .select("id, cpo_number, notes, total_amount, items:customer_po_items(id, item_name, style_no, color, size, quantity_ordered, unit_price)")
+        .select("id, cpo_number, notes, total_amount, items:customer_po_items(id, item_name, style_no, color, size, quantity_ordered, unit_price, product_master_id)")
         .eq("company_id", selectedCompany!.id)
         .order("created_at", { ascending: false });
       if (error) throw error;
