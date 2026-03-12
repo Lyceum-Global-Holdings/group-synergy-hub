@@ -271,12 +271,13 @@ export function useCreateBatchProductionOrders() {
         const { error: stErr } = await supabase.from("production_order_stages").insert(stageInserts);
         if (stErr) throw stErr;
 
-        // BOM cost auto-populate
-        if (input.bom_id) {
+        // BOM cost auto-populate (use per-item bom_id first, fall back to shared)
+        const effectiveBomId = item.bom_id || input.bom_id;
+        if (effectiveBomId) {
           const { data: bomItems } = await supabase
             .from("bom_items")
             .select("*")
-            .eq("bom_id", input.bom_id);
+            .eq("bom_id", effectiveBomId);
 
           if (bomItems && bomItems.length > 0) {
             const { data: createdStages } = await supabase
