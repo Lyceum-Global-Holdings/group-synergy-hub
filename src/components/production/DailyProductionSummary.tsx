@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { format } from "date-fns";
-import { CalendarIcon, Package, TrendingUp, AlertTriangle, Inbox } from "lucide-react";
+import { CalendarIcon, Package, TrendingUp, AlertTriangle, Inbox, DollarSign } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useDailySummary } from "@/hooks/useProduction";
 import { Button } from "@/components/ui/button";
@@ -10,22 +10,37 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 
+const fmt = (v: number) => v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+function getUnitCost(entry: any): number {
+  const stageCosts = entry.stage?.production_stage_costs || [];
+  const totalStageCost = stageCosts.reduce((sum: number, c: any) => sum + (Number(c.total_cost) || 0), 0);
+  const targetQty = entry.stage?.order?.target_qty || 0;
+  return targetQty > 0 ? totalStageCost / targetQty : 0;
+}
+
 export default function DailyProductionSummary() {
   const [date, setDate] = useState<Date>(new Date());
   const dateStr = format(date, "yyyy-MM-dd");
   const { data: entries, isLoading } = useDailySummary(dateStr);
 
   const totals = (entries || []).reduce(
-    (acc, e) => ({
-      input: acc.input + (e.input_qty || 0),
-      output: acc.output + (e.output_qty || 0),
-      wastage: acc.wastage + (e.wastage_qty || 0),
-    }),
-    { input: 0, output: 0, wastage: 0 }
+    (acc, e: any) => {
+      const uc = getUnitCost(e);
+      return {
+        input: acc.input + (e.input_qty || 0),
+        output: acc.output + (e.output_qty || 0),
+        wastage: acc.wastage + (e.wastage_qty || 0),
+        inputCost: acc.inputCost + (e.input_qty || 0) * uc,
+        outputCost: acc.outputCost + (e.output_qty || 0) * uc,
+        wastageCost: acc.wastageCost + (e.wastage_qty || 0) * uc,
+      };
+    },
+    { input: 0, output: 0, wastage: 0, inputCost: 0, outputCost: 0, wastageCost: 0 }
   );
 
   // Group by order
-  const orderMap = new Map<string, { orderNumber: string; productName: string; entries: typeof entries }>();
+  const orderMap = new Map<string, { orderNumber: string; productName: string; entries: any[] }>();
   (entries || []).forEach((e: any) => {
     const order = e.stage?.order;
     if (!order) return;
@@ -33,10 +48,10 @@ export default function DailyProductionSummary() {
     if (!orderMap.has(key)) {
       orderMap.set(key, { orderNumber: order.order_number, productName: order.product_name, entries: [] });
     }
-    orderMap.get(key)!.entries!.push(e);
+    orderMap.get(key)!.entries.push(e);
   });
 
-  // Chart data: aggregate output by stage name
+  // Chart data
   const stageAgg = new Map<string, number>();
   (entries || []).forEach((e: any) => {
     const name = e.stage?.stage_name || "Unknown";
@@ -63,7 +78,7 @@ export default function DailyProductionSummary() {
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">Total Input</CardTitle>
@@ -85,6 +100,27 @@ export default function DailyProductionSummary() {
           </CardHeader>
           <CardContent><p className="text-2xl font-bold">{totals.wastage}</p></CardContent>
         </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">Input Cost</CardTitle>
+            <DollarSign className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent><p className="text-2xl font-bold">{fmt(totals.inputCost)}</p></CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">Output Cost</CardTitle>
+            <DollarSign className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent><p className="text-2xl font-bold">{fmt(totals.outputCost)}</p></CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">Wastage Cost</CardTitle>
+            <DollarSign className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent><p className="text-2xl font-bold text-destructive">{fmt(totals.wastageCost)}</p></CardContent>
+        </Card>
       </div>
 
       {isLoading ? (
@@ -98,7 +134,6 @@ export default function DailyProductionSummary() {
         </Card>
       ) : (
         <>
-          {/* Table grouped by order */}
           {Array.from(orderMap.entries()).map(([orderId, group]) => (
             <Card key={orderId}>
               <CardHeader className="pb-2">
@@ -110,28 +145,36 @@ export default function DailyProductionSummary() {
                     <TableRow>
                       <TableHead>Stage</TableHead>
                       <TableHead className="text-right">Input</TableHead>
+                      <TableHead className="text-right">Input Cost</TableHead>
                       <TableHead className="text-right">Output</TableHead>
+                      <TableHead className="text-right">Output Cost</TableHead>
                       <TableHead className="text-right">Wastage</TableHead>
+                      <TableHead className="text-right">Wastage Cost</TableHead>
                       <TableHead>Notes</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {(group.entries || []).map((e: any) => (
-                      <TableRow key={e.id}>
-                        <TableCell className="font-medium">{e.stage?.stage_name}</TableCell>
-                        <TableCell className="text-right">{e.input_qty}</TableCell>
-                        <TableCell className="text-right">{e.output_qty}</TableCell>
-                        <TableCell className="text-right">{e.wastage_qty}</TableCell>
-                        <TableCell className="text-muted-foreground text-sm">{e.notes || "—"}</TableCell>
-                      </TableRow>
-                    ))}
+                    {group.entries.map((e: any) => {
+                      const uc = getUnitCost(e);
+                      return (
+                        <TableRow key={e.id}>
+                          <TableCell className="font-medium">{e.stage?.stage_name}</TableCell>
+                          <TableCell className="text-right">{e.input_qty}</TableCell>
+                          <TableCell className="text-right">{fmt(e.input_qty * uc)}</TableCell>
+                          <TableCell className="text-right">{e.output_qty}</TableCell>
+                          <TableCell className="text-right">{fmt(e.output_qty * uc)}</TableCell>
+                          <TableCell className="text-right">{e.wastage_qty}</TableCell>
+                          <TableCell className="text-right">{fmt(e.wastage_qty * uc)}</TableCell>
+                          <TableCell className="text-muted-foreground text-sm">{e.notes || "—"}</TableCell>
+                        </TableRow>
+                      );
+                    })}
                   </TableBody>
                 </Table>
               </CardContent>
             </Card>
           ))}
 
-          {/* Bar Chart */}
           {chartData.length > 0 && (
             <Card>
               <CardHeader>

@@ -540,8 +540,9 @@ export function useDailySummary(date: string) {
           id, entry_date, input_qty, output_qty, wastage_qty, notes,
           stage:production_order_stages!stage_id (
             id, stage_name, sequence_order,
+            production_stage_costs (total_cost),
             order:production_orders!order_id (
-              id, order_number, product_name
+              id, order_number, product_name, target_qty
             )
           )
         `)

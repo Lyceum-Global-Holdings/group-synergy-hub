@@ -12,9 +12,10 @@ import DailyEntriesTable from "./DailyEntriesTable";
 
 interface Props {
   stage: any;
+  targetQty?: number;
 }
 
-export default function StageProgressCard({ stage }: Props) {
+export default function StageProgressCard({ stage, targetQty = 0 }: Props) {
   const updateStage = useUpdateProductionStage();
   const { data: dailyEntries = [] } = useDailyEntries(stage.id);
   const [isOpen, setIsOpen] = useState(stage.status === "in_progress");
@@ -22,16 +23,13 @@ export default function StageProgressCard({ stage }: Props) {
   const statusInfo = STAGE_STATUSES.find((s) => s.value === stage.status);
   const costs = stage.production_stage_costs || [];
   const totalStageCost = costs.reduce((sum: number, c: any) => sum + (Number(c.total_cost) || 0), 0);
+  const unitCost = targetQty > 0 ? totalStageCost / targetQty : 0;
 
   const handleStatusUpdate = (status: string) => {
     updateStage.mutate({ id: stage.id, status });
   };
 
-  // Allow DailyEntriesTable row click to set date in form — pass via ref-like state would be complex,
-  // so we use a simple callback that's not needed since the form auto-syncs via date state.
-  const handleSelectDate = () => {
-    // DailyEntryForm handles its own date state internally
-  };
+  const handleSelectDate = () => {};
 
   return (
     <Collapsible open={isOpen} onOpenChange={setIsOpen}>
@@ -44,6 +42,7 @@ export default function StageProgressCard({ stage }: Props) {
             </div>
             <div className="flex items-center gap-4">
               <span className="text-sm text-muted-foreground">Cost: {totalStageCost.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+              {unitCost > 0 && <span className="text-xs text-muted-foreground">(Unit: {unitCost.toFixed(2)})</span>}
               <span className="text-sm text-muted-foreground">In: {stage.input_qty} → Out: {stage.output_qty}</span>
               <ChevronDown className={`h-4 w-4 transition-transform ${isOpen ? "rotate-180" : ""}`} />
             </div>
@@ -52,7 +51,6 @@ export default function StageProgressCard({ stage }: Props) {
 
         <CollapsibleContent>
           <CardContent className="border-t pt-4 space-y-4">
-            {/* Action buttons */}
             <div className="flex items-center gap-2">
               {stage.status === "pending" && (
                 <Button size="sm" onClick={() => handleStatusUpdate("in_progress")} disabled={updateStage.isPending}>
@@ -67,15 +65,12 @@ export default function StageProgressCard({ stage }: Props) {
               )}
             </div>
 
-            {/* Daily Entry Form — show when stage is in progress */}
             {stage.status === "in_progress" && (
-              <DailyEntryForm stageId={stage.id} existingEntries={dailyEntries} />
+              <DailyEntryForm stageId={stage.id} existingEntries={dailyEntries} unitCost={unitCost} />
             )}
 
-            {/* Daily Entries History */}
-            <DailyEntriesTable entries={dailyEntries} onSelectDate={handleSelectDate} />
+            <DailyEntriesTable entries={dailyEntries} onSelectDate={handleSelectDate} unitCost={unitCost} />
 
-            {/* Cost Breakdown */}
             <StageCostBreakdown stageId={stage.id} costs={costs} />
           </CardContent>
         </CollapsibleContent>

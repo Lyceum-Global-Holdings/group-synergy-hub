@@ -139,7 +139,7 @@ export default function ProductionOrderDetail({ orderId, onBack }: Props) {
           {/* Stage Details */}
           <div className="space-y-4">
             {stages.map((stage: any) => (
-              <StageProgressCard key={stage.id} stage={stage} />
+              <StageProgressCard key={stage.id} stage={stage} targetQty={order.target_qty || 0} />
             ))}
           </div>
         </CardContent>

@@ -13,9 +13,12 @@ import { useUpsertDailyEntry } from "@/hooks/useProduction";
 interface Props {
   stageId: string;
   existingEntries: any[];
+  unitCost?: number;
 }
 
-export default function DailyEntryForm({ stageId, existingEntries }: Props) {
+const fmt = (v: number) => v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+export default function DailyEntryForm({ stageId, existingEntries, unitCost = 0 }: Props) {
   const upsert = useUpsertDailyEntry();
   const [date, setDate] = useState<Date>(new Date());
   const [inputQty, setInputQty] = useState(0);
@@ -23,7 +26,6 @@ export default function DailyEntryForm({ stageId, existingEntries }: Props) {
   const [wastageQty, setWastageQty] = useState(0);
   const [notes, setNotes] = useState("");
 
-  // Pre-fill if entry exists for selected date
   useEffect(() => {
     const dateStr = format(date, "yyyy-MM-dd");
     const existing = existingEntries?.find((e) => e.entry_date === dateStr);
@@ -53,6 +55,10 @@ export default function DailyEntryForm({ stageId, existingEntries }: Props) {
 
   const dateStr = format(date, "yyyy-MM-dd");
   const isEdit = existingEntries?.some((e) => e.entry_date === dateStr);
+
+  const inputCost = inputQty * unitCost;
+  const outputCost = outputQty * unitCost;
+  const wastageCost = wastageQty * unitCost;
 
   return (
     <div className="space-y-3 rounded-lg border border-border bg-muted/30 p-4">
@@ -87,14 +93,17 @@ export default function DailyEntryForm({ stageId, existingEntries }: Props) {
         <div>
           <Label className="text-xs text-muted-foreground">Input Qty</Label>
           <Input type="number" value={inputQty} onChange={(e) => setInputQty(Number(e.target.value))} className="h-8" />
+          {unitCost > 0 && <p className="text-[10px] text-muted-foreground mt-0.5">Cost: {fmt(inputCost)}</p>}
         </div>
         <div>
           <Label className="text-xs text-muted-foreground">Output Qty</Label>
           <Input type="number" value={outputQty} onChange={(e) => setOutputQty(Number(e.target.value))} className="h-8" />
+          {unitCost > 0 && <p className="text-[10px] text-muted-foreground mt-0.5">Cost: {fmt(outputCost)}</p>}
         </div>
         <div>
           <Label className="text-xs text-muted-foreground">Wastage</Label>
           <Input type="number" value={wastageQty} onChange={(e) => setWastageQty(Number(e.target.value))} className="h-8" />
+          {unitCost > 0 && <p className="text-[10px] text-muted-foreground mt-0.5">Cost: {fmt(wastageCost)}</p>}
         </div>
         <div className="flex items-end">
           <Button size="sm" onClick={handleSubmit} disabled={upsert.isPending} className="w-full">
@@ -103,6 +112,11 @@ export default function DailyEntryForm({ stageId, existingEntries }: Props) {
           </Button>
         </div>
       </div>
+      {unitCost > 0 && (
+        <p className="text-xs font-medium text-muted-foreground">
+          Total Daily Cost: {fmt(inputCost + wastageCost)}
+        </p>
+      )}
       <div>
         <Label className="text-xs text-muted-foreground">Notes</Label>
         <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={1} className="resize-none text-sm" placeholder="Optional notes..." />
