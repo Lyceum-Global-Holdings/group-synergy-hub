@@ -1,9 +1,9 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Plus, Search, Edit, Trash2, History, Settings, Eye, ArrowLeftRight, MapPin, BarChart3, Wrench, Image as ImageIcon, X, Package, FileWarning, ChevronDown, Download, FileSpreadsheet, PackagePlus } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, History, Settings, Eye, ArrowLeftRight, MapPin, BarChart3, Wrench, Image as ImageIcon, X, Package, FileWarning, ChevronDown, Download, FileSpreadsheet, PackagePlus, Loader2 } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -28,6 +28,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useWarehouseItems } from '@/hooks/useWarehouseItems';
+import { useWarehouseItemsLazyInventory } from '@/hooks/useWarehouseItemsLazyInventory';
 import { useItemCategories } from '@/hooks/useItemCategories';
 import { useItemUnits } from '@/hooks/useItemUnits';
 import { useCompany } from '@/contexts/CompanyContext';
@@ -68,9 +69,9 @@ interface ItemMasterTabProps {
 }
 
 export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
-  // Enable real-time stock updates
   useRealtimeStockUpdates();
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<WarehouseItem | null>(null);
   const [viewingItem, setViewingItem] = useState<WarehouseItem | null>(null);
@@ -89,21 +90,75 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [supplierFilter, setSupplierFilter] = useState<string>("all");
   const [previewImage, setPreviewImage] = useState<{ url: string; name: string } | null>(null);
-  
+
+  // Debounce search
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(searchTerm), 300);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  // Lazy loading hook for inventory items
+  const {
+    data: lazyData,
+    isLoading,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useWarehouseItemsLazyInventory({
+    pageSize: 100,
+    search: debouncedSearch,
+    categoryId: categoryFilter,
+    status: statusFilter,
+    supplierId: supplierFilter,
+  });
+
+  // Keep mutations via the old hook with fetching disabled
   const { 
-    items, 
-    isLoading, 
     deleteItem, 
     markItemInactive, 
     isDeleting, 
     isMarkingInactive 
-  } = useWarehouseItems();
+  } = useWarehouseItems({ disableFetch: true });
+
   const { companies, selectedCompany } = useCompany();
   const { categories } = useItemCategories(selectedCompany?.id);
   const { units } = useItemUnits();
   const { migrateAllocationsToCorrectLocation, isMigrating, reconcileStock, isReconciling, fixAllocationsFromHistory, isFixingFromHistory } = useWarehouseBinAllocations();
   const { canDelete } = useIsAdminOrHigher();
   const { summary } = useStockAudit();
+
+  // Flatten all pages into a single items array
+  const allItems = useMemo(() => {
+    if (!lazyData?.pages) return [];
+    return lazyData.pages.flatMap((page) => page.items);
+  }, [lazyData]);
+
+  const totalLoaded = allItems.length;
+
+  // Bin filter is client-side since bins come from enrichment
+  const filteredItems = useMemo(() => {
+    if (binFilter === 'all') return allItems;
+    return allItems.filter(item => item.bins?.some(b => b.bin_code === binFilter));
+  }, [allItems, binFilter]);
+
+  // IntersectionObserver sentinel for infinite scroll
+  const sentinelRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const sentinel = sentinelRef.current;
+    if (!sentinel) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasNextPage && !isFetchingNextPage) {
+          fetchNextPage();
+        }
+      },
+      { rootMargin: '200px' }
+    );
+
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
   // Fetch all top-level warehouse locations
   const { data: allLocations = [] } = useQuery({
@@ -120,11 +175,10 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
     },
   });
 
-  // Fetch stock by location for all items - using separate queries to avoid nested join issues
+  // Fetch stock by location for all items
   const { data: itemLocationStock = {} } = useQuery<ItemLocationStockMap>({
     queryKey: ['all-items-location-stock'],
     queryFn: async () => {
-      // Step 1: Fetch all allocations with stock
       const { data: allocations, error: allocError } = await supabase
         .from('warehouse_bin_allocations')
         .select('warehouse_item_id, bin_id, available_quantity')
@@ -133,11 +187,9 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
       if (allocError) throw allocError;
       if (!allocations || allocations.length === 0) return {};
       
-      // Step 2: Get unique bin IDs
       const binIds = [...new Set(allocations.map(a => a.bin_id).filter(Boolean))];
       if (binIds.length === 0) return {};
       
-      // Step 3: Fetch bins with their location_id
       const { data: bins, error: binsError } = await supabase
         .from('warehouse_bins')
         .select('id, location_id')
@@ -146,11 +198,9 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
       if (binsError) throw binsError;
       if (!bins || bins.length === 0) return {};
       
-      // Step 4: Get unique location IDs (filter out nulls)
       const locationIds = [...new Set(bins.map(b => b.location_id).filter(Boolean))] as string[];
       if (locationIds.length === 0) return {};
       
-      // Step 5: Fetch locations
       const { data: locations, error: locError } = await supabase
         .from('warehouse_locations')
         .select('id, name')
@@ -158,11 +208,9 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
       
       if (locError) throw locError;
       
-      // Step 6: Create lookup maps
       const binLocationMap = new Map(bins.map(b => [b.id, b.location_id]));
       const locationNameMap = new Map(locations?.map(l => [l.id, l.name]) || []);
       
-      // Step 7: Group by item_id and location_id
       const grouped: ItemLocationStockMap = {};
       
       allocations.forEach((alloc) => {
@@ -194,24 +242,25 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
     },
   });
 
-  // Extract unique values for filters
+  // Extract unique bins from loaded items for client-side bin filter
   const uniqueBins = useMemo(() => {
     const binMap = new Map<string, string>();
-    items.forEach(item => {
+    allItems.forEach(item => {
       item.bins?.forEach(bin => {
         binMap.set(bin.bin_code, bin.name);
       });
     });
     return Array.from(binMap.entries()).map(([code, name]) => ({ code, name }));
-  }, [items]);
+  }, [allItems]);
 
+  // Extract unique suppliers from loaded items for the supplier filter dropdown
   const uniqueSuppliers = useMemo(() => {
     const suppliers = new Set<string>();
-    items.forEach(item => {
+    allItems.forEach(item => {
       if (item.supplier?.name) suppliers.add(item.supplier.name);
     });
     return Array.from(suppliers).sort();
-  }, [items]);
+  }, [allItems]);
 
   const hasActiveFilters = categoryFilter !== "all" || binFilter !== "all" || statusFilter !== "all" || supplierFilter !== "all";
 
@@ -221,26 +270,6 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
     setStatusFilter("all");
     setSupplierFilter("all");
   };
-
-  const filteredItems = items.filter(item => {
-    const matchesSearch = 
-      item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.item_code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.brand?.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesCategory = categoryFilter === "all" || 
-      categories.find(c => c.id === item.category_id)?.name === categoryFilter;
-    
-    const matchesBin = binFilter === "all" || 
-      item.bins?.some(b => b.bin_code === binFilter);
-    
-    const matchesStatus = statusFilter === "all" || item.status === statusFilter;
-    
-    const matchesSupplier = supplierFilter === "all" || 
-      item.supplier?.name === supplierFilter;
-    
-    return matchesSearch && matchesCategory && matchesBin && matchesStatus && matchesSupplier;
-  });
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -253,12 +282,12 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
 
   const handleDownloadItemMaster = async () => {
     try {
-      if (items.length === 0) {
+      if (allItems.length === 0) {
         toast.error('No items to export');
         return;
       }
 
-      const exportData = items.map(item => {
+      const exportData = allItems.map(item => {
         const category = categories.find(c => c.id === item.category_id);
         const unit = units.find(u => u.id === item.unit_id);
         const company = companies.find(c => c.id === item.company_id);
@@ -294,7 +323,7 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
       const fileName = `item-master-${companyName}-${dateStr}.xlsx`;
 
       await writeExcelFromJSON(exportData, fileName, 'Item Master');
-      toast.success(`Exported ${items.length} items to Excel`);
+      toast.success(`Exported ${allItems.length} items to Excel`);
     } catch (error) {
       console.error('Failed to export item master:', error);
       toast.error('Failed to export item master');
@@ -345,7 +374,7 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
               <SelectContent>
                 <SelectItem value="all">All Categories</SelectItem>
                 {categories.map(category => (
-                  <SelectItem key={category.id} value={category.name}>
+                  <SelectItem key={category.id} value={category.id}>
                     {category.name}
                   </SelectItem>
                 ))}
@@ -398,6 +427,11 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
                 Clear
               </Button>
             )}
+
+            <span className="text-xs text-muted-foreground ml-2">
+              Loaded {totalLoaded} items
+              {isFetchingNextPage && ' • Loading more...'}
+            </span>
           </div>
           <div className="flex items-center gap-2">
             {canDelete && (
@@ -708,6 +742,22 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
             )}
           </TableBody>
         </Table>
+
+        {/* Infinite scroll sentinel */}
+        <div ref={sentinelRef} className="h-1" />
+
+        {isFetchingNextPage && (
+          <div className="flex items-center justify-center py-4 gap-2 text-sm text-muted-foreground">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Loading more items...
+          </div>
+        )}
+
+        {!hasNextPage && totalLoaded > 0 && !isLoading && (
+          <div className="text-center py-3 text-xs text-muted-foreground">
+            All {totalLoaded} items loaded
+          </div>
+        )}
       </div>
 
       <AddItemsDialog
