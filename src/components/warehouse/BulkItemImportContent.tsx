@@ -407,7 +407,17 @@ export function BulkItemImportContent({ onSuccess, onCancel }: BulkItemImportCon
 
       // --- Insert new items ---
       if (newItems.length > 0) {
-        const validData = newItems.map(({ rowNumber, errors, warnings, initial_stock, bin_id, importStatus, existingId, existingItemCode, updateCodeEnabled, ...item }) => item as CreateWarehouseItemData);
+        const validData = newItems.map(({ rowNumber, errors, warnings, initial_stock, bin_id, importStatus, existingId, existingItemCode, updateCodeEnabled, ...item }) => {
+          // Sanitize empty strings to null for optional fields to avoid unique constraint violations
+          const sanitized = { ...item } as any;
+          const nullableFields = ['sku', 'barcode', 'description', 'brand', 'manufacturer', 'notes', 'image_url'];
+          for (const field of nullableFields) {
+            if (sanitized[field] !== undefined && (!sanitized[field] || String(sanitized[field]).trim() === '')) {
+              sanitized[field] = null;
+            }
+          }
+          return sanitized as CreateWarehouseItemData;
+        });
         const createdItems = await bulkCreateItemsAsync(validData);
         createdCount = createdItems.length;
 
