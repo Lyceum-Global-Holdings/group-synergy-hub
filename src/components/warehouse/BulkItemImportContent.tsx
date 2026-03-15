@@ -466,6 +466,41 @@ export function BulkItemImportContent({ onSuccess, onCancel }: BulkItemImportCon
         return;
       }
 
+      // --- Pre-import safety gate: re-check item_code uniqueness ---
+      if (newItems.length > 0) {
+        const targetCompanyItems = allExistingItems.filter(
+          existing => existing.company_id === selectedCompany?.id
+        );
+        const existingCodesSet = new Set(
+          targetCompanyItems
+            .filter(i => i.item_code)
+            .map(i => i.item_code!.toLowerCase().trim())
+        );
+
+        // Check for intra-batch duplicates and DB conflicts
+        const batchCodesSeen = new Set<string>();
+        const conflictRows: string[] = [];
+        for (const item of newItems) {
+          if (!item.item_code) continue;
+          const normalized = item.item_code.toLowerCase().trim();
+          if (existingCodesSet.has(normalized) || batchCodesSeen.has(normalized)) {
+            conflictRows.push(item.item_code);
+          }
+          batchCodesSeen.add(normalized);
+        }
+
+        if (conflictRows.length > 0) {
+          toast({
+            title: "Item code conflict",
+            description: `${conflictRows.length} item code(s) conflict with existing items in this company: ${conflictRows.slice(0, 3).join(', ')}${conflictRows.length > 3 ? '...' : ''}`,
+            variant: "destructive",
+          });
+          setIsImporting(false);
+          setShowConfirmation(false);
+          return;
+        }
+      }
+
       let createdCount = 0;
       let updatedCount = 0;
 
