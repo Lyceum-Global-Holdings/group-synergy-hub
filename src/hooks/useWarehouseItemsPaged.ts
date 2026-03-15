@@ -75,7 +75,7 @@ export function useWarehouseItemsLazy({
       const { data, error } = await query;
       if (error) throw error;
 
-      const items = (data || []) as WarehouseItem[];
+      const items = (data || []) as unknown as WarehouseItem[];
       let nextCursor: Cursor | null = null;
 
       if (items.length === pageSize) {
