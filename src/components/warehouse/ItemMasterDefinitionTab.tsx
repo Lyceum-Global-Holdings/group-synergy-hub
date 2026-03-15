@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -9,13 +9,14 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { Search, Plus, Eye, History, Package, MapPin, X, Image as ImageIcon, Edit, Trash2, Download, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
+import { Search, Plus, Eye, History, Package, MapPin, X, Image as ImageIcon, Edit, Trash2, Download, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Loader2 } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import ExcelJS from 'exceljs';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { useWarehouseItems } from '@/hooks/useWarehouseItems';
+import { useWarehouseItemsPaged, fetchAllWarehouseItemsBatched } from '@/hooks/useWarehouseItemsPaged';
 import { useItemCategories } from '@/hooks/useItemCategories';
 import { useItemUnits } from '@/hooks/useItemUnits';
 import { useCompany } from '@/contexts/CompanyContext';
@@ -33,6 +34,7 @@ interface ItemMasterDefinitionTabProps {
 
 export function ItemMasterDefinitionTab({ onNavigateToInventory, onNavigateToBins }: ItemMasterDefinitionTabProps) {
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
   const [supplierFilter, setSupplierFilter] = useState('all');
@@ -40,53 +42,71 @@ export function ItemMasterDefinitionTab({ onNavigateToInventory, onNavigateToBin
   const [editingItem, setEditingItem] = useState<WarehouseItem | null>(null);
   const [stockMovementItem, setStockMovementItem] = useState<WarehouseItem | null>(null);
   const [previewImage, setPreviewImage] = useState<{ url: string; name: string } | null>(null);
-
   const [deletingItem, setDeletingItem] = useState<WarehouseItem | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [isExporting, setIsExporting] = useState(false);
+  const pageSize = 100;
 
-  const { items, isLoading, deleteItem, markItemInactive, isDeleting, isMarkingInactive } = useWarehouseItems({ skipCompanyFilter: true });
+  // Debounce search to avoid excessive queries
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(searchTerm), 300);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  // Reset page on filter change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [debouncedSearch, categoryFilter, statusFilter, supplierFilter]);
+
+  // Use mutations from the original hook (no list query needed)
+  const { deleteItem, markItemInactive, isDeleting, isMarkingInactive } = useWarehouseItems({ skipCompanyFilter: true });
   const { canDelete } = useIsAdminOrHigher();
   const { selectedCompany } = useCompany();
   const { categories } = useItemCategories(selectedCompany?.id);
   const { units } = useItemUnits();
   const queryClient = useQueryClient();
 
+  // Resolve supplier filter to supplier_id
+  const { data: suppliers = [] } = useQuery({
+    queryKey: ['all-supplier-names'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('suppliers')
+        .select('id, name')
+        .order('name');
+      if (error) throw error;
+      return data || [];
+    },
+  });
 
+  const selectedSupplierId = useMemo(() => {
+    if (supplierFilter === 'all') return 'all';
+    return suppliers.find(s => s.name === supplierFilter)?.id || 'all';
+  }, [supplierFilter, suppliers]);
 
-  const uniqueSuppliers = useMemo(() => {
-    const suppliers = new Set<string>();
-    items.forEach(i => { if (i.supplier?.name) suppliers.add(i.supplier.name); });
-    return Array.from(suppliers).sort();
-  }, [items]);
+  // Resolve category filter to category_id
+  const selectedCategoryId = useMemo(() => {
+    if (categoryFilter === 'all') return 'all';
+    return categories.find(c => c.name === categoryFilter)?.id || 'all';
+  }, [categoryFilter, categories]);
+
+  // Server-side paged query
+  const { data: pagedResult, isLoading } = useWarehouseItemsPaged({
+    page: currentPage,
+    pageSize,
+    search: debouncedSearch,
+    categoryId: selectedCategoryId,
+    status: statusFilter,
+    supplierId: selectedSupplierId,
+  });
+
+  const items = pagedResult?.items ?? [];
+  const totalCount = pagedResult?.totalCount ?? 0;
+  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+  const showingFrom = totalCount === 0 ? 0 : (currentPage - 1) * pageSize + 1;
+  const showingTo = Math.min(currentPage * pageSize, totalCount);
 
   const hasActiveFilters = categoryFilter !== 'all' || statusFilter !== 'all' || supplierFilter !== 'all';
-
-  const filteredItems = useMemo(() => items.filter(item => {
-    const matchesSearch =
-      item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.item_code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.brand?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.barcode?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.sku?.toLowerCase().includes(searchTerm.toLowerCase());
-
-    const matchesCategory = categoryFilter === 'all' ||
-      categories.find(c => c.id === item.category_id)?.name === categoryFilter;
-    const matchesStatus = statusFilter === 'all' || item.status === statusFilter;
-    const matchesSupplier = supplierFilter === 'all' || item.supplier?.name === supplierFilter;
-
-    return matchesSearch && matchesCategory && matchesStatus && matchesSupplier;
-  }), [items, searchTerm, categoryFilter, statusFilter, supplierFilter, categories]);
-
-  const [currentPage, setCurrentPage] = useState(1);
-  const pageSize = 100;
-
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [searchTerm, categoryFilter, statusFilter, supplierFilter]);
-
-  const totalPages = Math.max(1, Math.ceil(filteredItems.length / pageSize));
-  const paginatedItems = filteredItems.slice((currentPage - 1) * pageSize, currentPage * pageSize);
-  const showingFrom = filteredItems.length === 0 ? 0 : (currentPage - 1) * pageSize + 1;
-  const showingTo = Math.min(currentPage * pageSize, filteredItems.length);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -97,57 +117,73 @@ export function ItemMasterDefinitionTab({ onNavigateToInventory, onNavigateToBin
     }
   };
 
-  const handleDownloadExcel = async () => {
-    const workbook = new ExcelJS.Workbook();
-    const sheet = workbook.addWorksheet('Item Master');
-
-    sheet.columns = [
-      { header: 'Item Code', key: 'item_code', width: 15 },
-      { header: 'Name', key: 'name', width: 25 },
-      { header: 'Category', key: 'category', width: 15 },
-      { header: 'Unit', key: 'unit', width: 10 },
-      { header: 'Brand', key: 'brand', width: 15 },
-      { header: 'Supplier', key: 'supplier', width: 20 },
-      { header: 'Barcode', key: 'barcode', width: 18 },
-      { header: 'SKU', key: 'sku', width: 15 },
-      { header: 'Unit Cost', key: 'unit_cost', width: 12 },
-      { header: 'Selling Price', key: 'selling_price', width: 14 },
-      { header: 'Reorder Level', key: 'reorder_level', width: 14 },
-      { header: 'Current Stock', key: 'current_stock', width: 14 },
-      { header: 'Status', key: 'status', width: 12 },
-    ];
-
-    // Style header row
-    sheet.getRow(1).font = { bold: true };
-
-    filteredItems.forEach(item => {
-      const cat = categories.find(c => c.id === item.category_id);
-      sheet.addRow({
-        item_code: item.item_code,
-        name: item.name,
-        category: cat?.name || '',
-        unit: units.find(u => u.id === item.unit_id)?.name || '',
-        brand: item.brand || '',
-        supplier: item.supplier?.name || '',
-        barcode: item.barcode || '',
-        sku: item.sku || '',
-        unit_cost: item.unit_cost ?? 0,
-        selling_price: item.selling_price ?? 0,
-        reorder_level: item.reorder_level ?? 0,
-        current_stock: item.current_stock ?? 0,
-        status: item.status,
+  const handleDownloadExcel = useCallback(async () => {
+    setIsExporting(true);
+    try {
+      toast.info('Fetching all items for export...');
+      const allItems = await fetchAllWarehouseItemsBatched({
+        search: debouncedSearch,
+        categoryId: selectedCategoryId,
+        status: statusFilter,
+        supplierId: selectedSupplierId,
       });
-    });
 
-    const buffer = await workbook.xlsx.writeBuffer();
-    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `Item_Master_${new Date().toISOString().slice(0, 10)}.xlsx`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
+      const workbook = new ExcelJS.Workbook();
+      const sheet = workbook.addWorksheet('Item Master');
+
+      sheet.columns = [
+        { header: 'Item Code', key: 'item_code', width: 15 },
+        { header: 'Name', key: 'name', width: 25 },
+        { header: 'Category', key: 'category', width: 15 },
+        { header: 'Unit', key: 'unit', width: 10 },
+        { header: 'Brand', key: 'brand', width: 15 },
+        { header: 'Supplier', key: 'supplier', width: 20 },
+        { header: 'Barcode', key: 'barcode', width: 18 },
+        { header: 'SKU', key: 'sku', width: 15 },
+        { header: 'Unit Cost', key: 'unit_cost', width: 12 },
+        { header: 'Selling Price', key: 'selling_price', width: 14 },
+        { header: 'Reorder Level', key: 'reorder_level', width: 14 },
+        { header: 'Current Stock', key: 'current_stock', width: 14 },
+        { header: 'Status', key: 'status', width: 12 },
+      ];
+
+      sheet.getRow(1).font = { bold: true };
+
+      allItems.forEach(item => {
+        const cat = categories.find(c => c.id === item.category_id);
+        sheet.addRow({
+          item_code: item.item_code,
+          name: item.name,
+          category: cat?.name || '',
+          unit: units.find(u => u.id === item.unit_id)?.name || '',
+          brand: item.brand || '',
+          supplier: item.supplier?.name || '',
+          barcode: item.barcode || '',
+          sku: item.sku || '',
+          unit_cost: item.unit_cost ?? 0,
+          selling_price: item.selling_price ?? 0,
+          reorder_level: item.reorder_level ?? 0,
+          current_stock: item.current_stock ?? 0,
+          status: item.status,
+        });
+      });
+
+      const buffer = await workbook.xlsx.writeBuffer();
+      const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Item_Master_${new Date().toISOString().slice(0, 10)}.xlsx`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success(`Exported ${allItems.length} items`);
+    } catch (err) {
+      console.error('Export error:', err);
+      toast.error('Failed to export items');
+    } finally {
+      setIsExporting(false);
+    }
+  }, [debouncedSearch, selectedCategoryId, statusFilter, selectedSupplierId, categories, units]);
 
   return (
     <div className="space-y-4">
@@ -187,7 +223,7 @@ export function ItemMasterDefinitionTab({ onNavigateToInventory, onNavigateToBin
               <SelectTrigger className="w-[140px]"><SelectValue placeholder="Supplier" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Suppliers</SelectItem>
-                {uniqueSuppliers.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                {suppliers.map(s => <SelectItem key={s.id} value={s.name}>{s.name}</SelectItem>)}
               </SelectContent>
             </Select>
             {hasActiveFilters && (
@@ -197,8 +233,9 @@ export function ItemMasterDefinitionTab({ onNavigateToInventory, onNavigateToBin
             )}
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="outline" onClick={handleDownloadExcel}>
-              <Download className="mr-2 h-4 w-4" /> Download Excel
+            <Button variant="outline" onClick={handleDownloadExcel} disabled={isExporting}>
+              {isExporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
+              {isExporting ? 'Exporting...' : 'Download Excel'}
             </Button>
             <Button onClick={() => setIsCreateDialogOpen(true)}>
               <Plus className="mr-2 h-4 w-4" /> Add Item
@@ -233,11 +270,11 @@ export function ItemMasterDefinitionTab({ onNavigateToInventory, onNavigateToBin
               <TableRow>
                 <TableCell colSpan={14} className="text-center py-8 text-muted-foreground">Loading items...</TableCell>
               </TableRow>
-            ) : paginatedItems.length === 0 ? (
+            ) : items.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={14} className="text-center py-8 text-muted-foreground">No items found</TableCell>
               </TableRow>
-            ) : paginatedItems.map(item => {
+            ) : items.map(item => {
               const category = categories.find(c => c.id === item.category_id);
               const unit = units.find(u => u.id === item.unit_id);
               return (
@@ -333,8 +370,7 @@ export function ItemMasterDefinitionTab({ onNavigateToInventory, onNavigateToBin
 
       <div className="flex items-center justify-between">
         <div className="text-sm text-muted-foreground">
-          Showing {showingFrom}–{showingTo} of {filteredItems.length} items
-          {filteredItems.length !== items.length && ` (filtered from ${items.length})`}
+          Showing {showingFrom}–{showingTo} of {totalCount.toLocaleString()} items
         </div>
         {totalPages > 1 && (
           <div className="flex items-center gap-1">
