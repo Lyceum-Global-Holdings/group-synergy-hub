@@ -737,17 +737,95 @@ export function BulkItemImportContent({ onSuccess, onCancel }: BulkItemImportCon
             </Table>
           </ScrollArea>
 
-          <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={onCancel} disabled={busy}>
-              Cancel
-            </Button>
-            <Button
-              onClick={handleImport}
-              disabled={(newItems.length === 0 && enabledUpdateItems.length === 0) || busy}
-            >
-              {busy ? 'Importing...' : `Import ${newItems.length} New${enabledUpdateItems.length > 0 ? ` + Update ${enabledUpdateItems.length} Codes` : ''}`}
-            </Button>
-          </div>
+          {showConfirmation ? (
+            <div className="space-y-4 rounded-lg border bg-card p-4">
+              <h3 className="text-lg font-semibold text-card-foreground">Confirm Import</h3>
+              <p className="text-sm text-muted-foreground">Review the summary below before proceeding.</p>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                {newItems.length > 0 && (
+                  <div className="rounded-md border border-green-200 bg-green-50 p-3 dark:border-green-800 dark:bg-green-950/30">
+                    <div className="flex items-center gap-2 mb-2">
+                      <CheckCircle2 className="h-4 w-4 text-green-600" />
+                      <span className="font-medium text-green-800 dark:text-green-300">Create ({newItems.length})</span>
+                    </div>
+                    <ScrollArea className="max-h-32">
+                      <ul className="space-y-1 text-xs text-green-700 dark:text-green-400">
+                        {newItems.map(item => (
+                          <li key={item.rowNumber} className="truncate">
+                            {item.item_code ? <span className="font-mono">{item.item_code}</span> : null}
+                            {item.item_code && item.name ? ' — ' : ''}
+                            {item.name}
+                          </li>
+                        ))}
+                      </ul>
+                    </ScrollArea>
+                  </div>
+                )}
+
+                {enabledUpdateItems.length > 0 && (
+                  <div className="rounded-md border border-amber-200 bg-amber-50 p-3 dark:border-amber-800 dark:bg-amber-950/30">
+                    <div className="flex items-center gap-2 mb-2">
+                      <RefreshCw className="h-4 w-4 text-amber-600" />
+                      <span className="font-medium text-amber-800 dark:text-amber-300">Update Code ({enabledUpdateItems.length})</span>
+                    </div>
+                    <ScrollArea className="max-h-32">
+                      <ul className="space-y-1 text-xs text-amber-700 dark:text-amber-400">
+                        {enabledUpdateItems.map(item => (
+                          <li key={item.rowNumber} className="flex items-center gap-1 truncate">
+                            <span className="font-mono line-through">{item.existingItemCode || '(none)'}</span>
+                            <ArrowRight className="h-3 w-3 shrink-0" />
+                            <span className="font-mono font-medium">{item.item_code}</span>
+                            <span className="text-muted-foreground ml-1">({item.name})</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </ScrollArea>
+                  </div>
+                )}
+
+                {duplicateItems.length > 0 && (
+                  <div className="rounded-md border bg-muted/30 p-3">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="font-medium text-muted-foreground">Skipped — Duplicates ({duplicateItems.length})</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground">These items already exist and will not be changed.</p>
+                  </div>
+                )}
+
+                {errorItems.length > 0 && (
+                  <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3">
+                    <div className="flex items-center gap-2 mb-1">
+                      <AlertCircle className="h-4 w-4 text-destructive" />
+                      <span className="font-medium text-destructive">Errors ({errorItems.length})</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground">These items have validation errors and will be skipped.</p>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <Button variant="outline" onClick={() => setShowConfirmation(false)} disabled={busy}>
+                  Back
+                </Button>
+                <Button onClick={handleImport} disabled={busy}>
+                  {busy ? 'Importing...' : 'Confirm Import'}
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={onCancel} disabled={busy}>
+                Cancel
+              </Button>
+              <Button
+                onClick={() => setShowConfirmation(true)}
+                disabled={(newItems.length === 0 && enabledUpdateItems.length === 0) || busy}
+              >
+                {`Import ${newItems.length} New${enabledUpdateItems.length > 0 ? ` + Update ${enabledUpdateItems.length} Codes` : ''}`}
+              </Button>
+            </div>
+          )}
         </div>
       )}
 
