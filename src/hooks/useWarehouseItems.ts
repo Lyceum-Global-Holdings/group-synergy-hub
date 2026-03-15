@@ -108,7 +108,7 @@ export const useWarehouseItems = (options?: { skipCompanyFilter?: boolean; disab
 
       return itemsWithBins as WarehouseItem[];
     },
-    enabled: skipCompanyFilter || !!(isViewingAllCompanies || selectedCompany?.id),
+    enabled: !disableFetch && (skipCompanyFilter || !!(isViewingAllCompanies || selectedCompany?.id)),
   });
 
   const createItemMutation = useMutation({

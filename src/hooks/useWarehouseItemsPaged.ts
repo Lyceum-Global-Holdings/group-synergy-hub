@@ -140,7 +140,7 @@ export async function fetchAllWarehouseItemsBatched(filters: {
     const { data, error } = await query;
     if (error) throw error;
 
-    const batch = (data || []) as WarehouseItem[];
+    const batch = (data || []) as unknown as WarehouseItem[];
     for (const item of batch) {
       if (!seenIds.has(item.id)) {
         seenIds.add(item.id);
