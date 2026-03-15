@@ -1,35 +1,21 @@
 
 
-## Plan: Restrict Location Dropdowns to User's Edit-Permitted Locations
+# Fix: RLS violation on `warehouse_items` insert
 
-### Problem
-The "Add Item" and "Add Stock" dialogs in Construction Inventory show **all** locations, allowing users to add items to locations they don't have edit access to. For example, Shihan (who only has access to "Lyceum Wattala") can currently see and select any location.
+## Root Cause
 
-### Solution
-Filter the location dropdowns in both dialogs using `useCurrentUserLocationPermissions()`, the same pattern already used in `NewTransferDialog.tsx`. Only locations where the user has explicit **edit** permissions will appear.
+The INSERT RLS policy on `warehouse_items` requires `created_by = auth.uid()`. The `AddFromCatalogDialog.tsx` insert (line 88-112) does not set `created_by`, so it fails the policy check.
 
-### Changes
+## Change
 
-**1. `src/components/construction/inventory/AddItemDialog.tsx`**
-- Import `useCurrentUserLocationPermissions`
-- Fetch permissions, then filter `locations` to only those in `editLocationIds`
-- Admin/Super Admin users (who get `viewAllLocations: true`) see all locations (unchanged behavior)
-- Use the filtered list for both the machine `current_location_id` and bulk `location_id` dropdowns
+### `src/components/warehouse/AddFromCatalogDialog.tsx`
 
-**2. `src/components/construction/inventory/AddInventoryStockDialog.tsx`**
-- Same change: import `useCurrentUserLocationPermissions`, filter the location dropdown to edit-permitted locations only
+Add `created_by` to the insert payload. This requires fetching the current user's ID first (via `supabase.auth.getUser()` or using an existing auth hook).
 
-### Pattern (from existing `NewTransferDialog.tsx`)
+Add to the insert object at line ~109:
 ```typescript
-const { data: permissions } = useCurrentUserLocationPermissions();
-
-const permittedLocations = useMemo(() => {
-  if (!locations || !permissions) return [];
-  if (permissions.viewAllLocations) return locations;
-  const permittedIds = new Set(permissions.editLocationIds);
-  return locations.filter(loc => permittedIds.has(loc.id));
-}, [locations, permissions]);
+created_by: (await supabase.auth.getUser()).data.user?.id,
 ```
 
-Two files changed, no new files.
+This is a one-line fix that resolves the RLS violation.
 
