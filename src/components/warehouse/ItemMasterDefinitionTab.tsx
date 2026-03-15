@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -9,7 +9,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { Search, Plus, Eye, History, Package, MapPin, X, Image as ImageIcon, Edit, Trash2, Download } from 'lucide-react';
+import { Search, Plus, Eye, History, Package, MapPin, X, Image as ImageIcon, Edit, Trash2, Download, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -75,6 +75,18 @@ export function ItemMasterDefinitionTab({ onNavigateToInventory, onNavigateToBin
 
     return matchesSearch && matchesCategory && matchesStatus && matchesSupplier;
   }), [items, searchTerm, categoryFilter, statusFilter, supplierFilter, categories]);
+
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 100;
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, categoryFilter, statusFilter, supplierFilter]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredItems.length / pageSize));
+  const paginatedItems = filteredItems.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+  const showingFrom = filteredItems.length === 0 ? 0 : (currentPage - 1) * pageSize + 1;
+  const showingTo = Math.min(currentPage * pageSize, filteredItems.length);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -221,11 +233,11 @@ export function ItemMasterDefinitionTab({ onNavigateToInventory, onNavigateToBin
               <TableRow>
                 <TableCell colSpan={14} className="text-center py-8 text-muted-foreground">Loading items...</TableCell>
               </TableRow>
-            ) : filteredItems.length === 0 ? (
+            ) : paginatedItems.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={14} className="text-center py-8 text-muted-foreground">No items found</TableCell>
               </TableRow>
-            ) : filteredItems.map(item => {
+            ) : paginatedItems.map(item => {
               const category = categories.find(c => c.id === item.category_id);
               const unit = units.find(u => u.id === item.unit_id);
               return (
@@ -319,8 +331,30 @@ export function ItemMasterDefinitionTab({ onNavigateToInventory, onNavigateToBin
         </Table>
       </div>
 
-      <div className="text-sm text-muted-foreground">
-        Showing {filteredItems.length} of {items.length} items
+      <div className="flex items-center justify-between">
+        <div className="text-sm text-muted-foreground">
+          Showing {showingFrom}–{showingTo} of {filteredItems.length} items
+          {filteredItems.length !== items.length && ` (filtered from ${items.length})`}
+        </div>
+        {totalPages > 1 && (
+          <div className="flex items-center gap-1">
+            <Button variant="outline" size="icon" className="h-8 w-8" disabled={currentPage === 1} onClick={() => setCurrentPage(1)}>
+              <ChevronsLeft className="h-4 w-4" />
+            </Button>
+            <Button variant="outline" size="icon" className="h-8 w-8" disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)}>
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <span className="text-sm text-muted-foreground px-2">
+              Page {currentPage} of {totalPages}
+            </span>
+            <Button variant="outline" size="icon" className="h-8 w-8" disabled={currentPage === totalPages} onClick={() => setCurrentPage(p => p + 1)}>
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+            <Button variant="outline" size="icon" className="h-8 w-8" disabled={currentPage === totalPages} onClick={() => setCurrentPage(totalPages)}>
+              <ChevronsRight className="h-4 w-4" />
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* Dialogs */}

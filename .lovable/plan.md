@@ -1,32 +1,35 @@
 
 
-# Add Pagination to Item Master Table
+## Plan: Restrict Location Dropdowns to User's Edit-Permitted Locations
 
-## Problem
-The table renders all items at once, which is slow for large datasets. The DB query already fetches up to 20,000 rows, but the UI needs to paginate the display.
+### Problem
+The "Add Item" and "Add Stock" dialogs in Construction Inventory show **all** locations, allowing users to add items to locations they don't have edit access to. For example, Shihan (who only has access to "Lyceum Wattala") can currently see and select any location.
 
-## Approach: Client-side pagination (100 items per page)
+### Solution
+Filter the location dropdowns in both dialogs using `useCurrentUserLocationPermissions()`, the same pattern already used in `NewTransferDialog.tsx`. Only locations where the user has explicit **edit** permissions will appear.
 
-All items are already fetched into memory (needed for filters, search, Excel export). The bottleneck is DOM rendering, so client-side pagination with 100 items per page is the right solution.
+### Changes
 
-### Changes in `src/components/warehouse/ItemMasterDefinitionTab.tsx`
+**1. `src/components/construction/inventory/AddItemDialog.tsx`**
+- Import `useCurrentUserLocationPermissions`
+- Fetch permissions, then filter `locations` to only those in `editLocationIds`
+- Admin/Super Admin users (who get `viewAllLocations: true`) see all locations (unchanged behavior)
+- Use the filtered list for both the machine `current_location_id` and bulk `location_id` dropdowns
 
-1. **Add pagination state**: `currentPage` (default 1), reset to 1 whenever `filteredItems` changes (search/filter change).
+**2. `src/components/construction/inventory/AddInventoryStockDialog.tsx`**
+- Same change: import `useCurrentUserLocationPermissions`, filter the location dropdown to edit-permitted locations only
 
-2. **Slice filtered items for display**: 
-   - `const pageSize = 100`
-   - `const totalPages = Math.ceil(filteredItems.length / pageSize)`
-   - `const paginatedItems = filteredItems.slice((currentPage - 1) * pageSize, currentPage * pageSize)`
+### Pattern (from existing `NewTransferDialog.tsx`)
+```typescript
+const { data: permissions } = useCurrentUserLocationPermissions();
 
-3. **Render `paginatedItems`** instead of `filteredItems` in the table body.
+const permittedLocations = useMemo(() => {
+  if (!locations || !permissions) return [];
+  if (permissions.viewAllLocations) return locations;
+  const permittedIds = new Set(permissions.editLocationIds);
+  return locations.filter(loc => permittedIds.has(loc.id));
+}, [locations, permissions]);
+```
 
-4. **Add pagination controls** below the table (replacing the current "Showing X of Y" text):
-   - Previous / Next buttons
-   - Page number display: "Page 1 of 12"
-   - Updated count: "Showing 1-100 of 1,200 items"
-   - Jump to first/last page buttons for large datasets
-
-5. **Reset page to 1** when search term or any filter changes (via `useEffect` on those dependencies).
-
-No changes to the hook or DB query needed — the 20,000 limit stays as-is.
+Two files changed, no new files.
 
