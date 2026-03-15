@@ -31,7 +31,7 @@ export const useWarehouseItems = (options?: { skipCompanyFilter?: boolean }) => 
         query = query.eq('company_id', selectedCompany.id);
       }
 
-      const { data, error } = await query.order('created_at', { ascending: false });
+      const { data, error } = await query.order('created_at', { ascending: false }).limit(20000);
 
       if (error) throw error;
 
