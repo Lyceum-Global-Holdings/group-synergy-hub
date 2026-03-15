@@ -47,7 +47,8 @@ export function BulkItemImportContent({ onSuccess, onCancel }: BulkItemImportCon
   const [showPreview, setShowPreview] = useState(false);
 
   const { toast } = useToast();
-  const { bulkCreateItemsAsync, isBulkCreating, items: existingItems = [] } = useWarehouseItems();
+  const { bulkCreateItemsAsync, isBulkCreating } = useWarehouseItems();
+  const { items: allExistingItems = [] } = useWarehouseItems({ skipCompanyFilter: true });
   const { categories } = useItemCategories();
   const { units } = useItemUnits();
   const { data: suppliers = [] } = useSuppliers();
@@ -343,14 +344,14 @@ export function BulkItemImportContent({ onSuccess, onCancel }: BulkItemImportCon
           return;
         }
 
-        const existingByName = existingItems.find(
+        const existingByName = allExistingItems.find(
           existing =>
             existing.name?.toLowerCase() === item.name!.toLowerCase()
         );
 
         if (!existingByName) {
           // Check item_code uniqueness for new items
-          const existsCodeInDb = existingItems.some(
+          const existsCodeInDb = allExistingItems.some(
             existing =>
               existing.item_code?.toLowerCase() === item.item_code?.toLowerCase()
           );
@@ -361,7 +362,7 @@ export function BulkItemImportContent({ onSuccess, onCancel }: BulkItemImportCon
           // Check SKU uniqueness against DB for new items
           const itemSku = (item as any).sku;
           if (itemSku && typeof itemSku === 'string' && itemSku.trim()) {
-            const existsSkuInDb = existingItems.some(
+            const existsSkuInDb = allExistingItems.some(
               existing =>
                 (existing as any).sku?.toLowerCase() === itemSku.toLowerCase()
             );
