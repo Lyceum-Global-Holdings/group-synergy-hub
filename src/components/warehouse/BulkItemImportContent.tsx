@@ -210,23 +210,6 @@ export function BulkItemImportContent({ onSuccess, onCancel }: BulkItemImportCon
                 else item.warnings.push(`Warehouse location "${value}" not found`);
               }
               break;
-            case 'initial_stock':
-              if (value) {
-                const num = parseFloat(value);
-                if (isNaN(num) || num < 0) item.errors.push('Initial stock must be a positive number');
-                else item.initial_stock = num;
-              }
-              break;
-            case 'bin':
-              if (value) {
-                const bin = bins.find(b =>
-                  b.bin_code.toLowerCase() === value.toLowerCase() ||
-                  b.name.toLowerCase() === value.toLowerCase()
-                );
-                if (bin) item.bin_id = bin.id;
-                else item.warnings.push(`Bin "${value}" not found`);
-              }
-              break;
             case 'supplier':
               if (value) {
                 const supplier = suppliers.find(s => s.name.toLowerCase() === value.toLowerCase());
