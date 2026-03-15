@@ -361,12 +361,12 @@ export function useWarehouseBinAllocations() {
           }
         }
 
-        // If no bin at location, get any bin in the company
+        // If no bin at location, get any active bin
         if (!targetBinId) {
           const { data: anyBins } = await supabase
             .from('warehouse_bins')
             .select('id')
-            .eq('company_id', selectedCompany.id)
+            .eq('status', 'active')
             .limit(1);
           
           if (anyBins && anyBins.length > 0) {

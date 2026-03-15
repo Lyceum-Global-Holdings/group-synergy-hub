@@ -50,10 +50,8 @@ export function ReturnStockFromSublocationDialog({
   // Filter items with stock
   const activeItems = items?.filter(item => item.status === 'active') || [];
 
-  // Filter bins by company
-  const companyBins = selectedCompany?.id 
-    ? bins?.filter(bin => bin.company_id === selectedCompany.id) || []
-    : bins || [];
+  // Bins are shared across all companies
+  const companyBins = bins || [];
 
   // Get existing allocation for selected item and bin
   const existingAllocation = binAllocations?.find(
