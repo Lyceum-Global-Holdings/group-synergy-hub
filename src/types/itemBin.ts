@@ -118,7 +118,6 @@ export interface CreateWarehouseBinData {
   status: 'active' | 'inactive' | 'maintenance' | 'full';
   description?: string;
   notes?: string;
-  company_id?: string;
 }
 
 export interface CreateWarehouseItemData {

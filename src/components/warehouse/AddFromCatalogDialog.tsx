@@ -108,7 +108,6 @@ export function AddFromCatalogDialog({ open, onOpenChange }: AddFromCatalogDialo
           status: 'active',
           company_id: selectedCompany.id,
           current_stock: quantity,
-          available_quantity: quantity,
           reserved_quantity: 0,
         })
         .select()
