@@ -1,29 +1,35 @@
 
 
-# Add Confirmation Summary Before Executing Bulk Import
+## Plan: Restrict Location Dropdowns to User's Edit-Permitted Locations
 
-## Current Behavior
-When the user clicks the "Import" button, the import executes immediately. There's already a preview table showing parsed items, but no final confirmation step.
+### Problem
+The "Add Item" and "Add Stock" dialogs in Construction Inventory show **all** locations, allowing users to add items to locations they don't have edit access to. For example, Shihan (who only has access to "Lyceum Wattala") can currently see and select any location.
 
-## Plan
+### Solution
+Filter the location dropdowns in both dialogs using `useCurrentUserLocationPermissions()`, the same pattern already used in `NewTransferDialog.tsx`. Only locations where the user has explicit **edit** permissions will appear.
 
-### Add a confirmation step between preview and import
+### Changes
 
-**File: `src/components/warehouse/BulkItemImportContent.tsx`**
+**1. `src/components/construction/inventory/AddItemDialog.tsx`**
+- Import `useCurrentUserLocationPermissions`
+- Fetch permissions, then filter `locations` to only those in `editLocationIds`
+- Admin/Super Admin users (who get `viewAllLocations: true`) see all locations (unchanged behavior)
+- Use the filtered list for both the machine `current_location_id` and bulk `location_id` dropdowns
 
-1. Add a `showConfirmation` state (boolean, default false).
+**2. `src/components/construction/inventory/AddInventoryStockDialog.tsx`**
+- Same change: import `useCurrentUserLocationPermissions`, filter the location dropdown to edit-permitted locations only
 
-2. When the user clicks "Import", instead of calling `handleImport` directly, set `showConfirmation = true` to show a confirmation summary dialog/card.
+### Pattern (from existing `NewTransferDialog.tsx`)
+```typescript
+const { data: permissions } = useCurrentUserLocationPermissions();
 
-3. Render a confirmation summary (as an overlay card or replacing the preview table) that shows:
-   - **Items to Create**: count + list of item names/codes
-   - **Items to Update (code change)**: count + list showing old code → new code
-   - **Items Skipped (duplicates)**: count
-   - **Items Skipped (errors)**: count
-   - A "Confirm Import" button that calls `handleImport`
-   - A "Back" button that sets `showConfirmation = false`
+const permittedLocations = useMemo(() => {
+  if (!locations || !permissions) return [];
+  if (permissions.viewAllLocations) return locations;
+  const permittedIds = new Set(permissions.editLocationIds);
+  return locations.filter(loc => permittedIds.has(loc.id));
+}, [locations, permissions]);
+```
 
-4. The confirmation view uses a clean card layout with sections for each action type, making it easy to review at a glance before committing.
-
-This is a UI-only addition — no backend or logic changes needed.
+Two files changed, no new files.
 
