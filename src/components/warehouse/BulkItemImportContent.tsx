@@ -295,14 +295,20 @@ export function BulkItemImportContent({ onSuccess, onCancel }: BulkItemImportCon
 
       // --- Name-based duplicate detection within CSV ---
       const csvNameCounts = new Map<string, number>();
+      const csvSkuCounts = new Map<string, number>();
       parsed.forEach(item => {
         if (item.name) {
           const key = item.name.toLowerCase();
           csvNameCounts.set(key, (csvNameCounts.get(key) || 0) + 1);
         }
+        if ((item as any).sku) {
+          const skuKey = String((item as any).sku).toLowerCase();
+          csvSkuCounts.set(skuKey, (csvSkuCounts.get(skuKey) || 0) + 1);
+        }
       });
 
       const seenNames = new Set<string>();
+      const seenSkus = new Set<string>();
       parsed.forEach(item => {
         if (item.name) {
           const nameKey = item.name.toLowerCase();
@@ -311,6 +317,15 @@ export function BulkItemImportContent({ onSuccess, onCancel }: BulkItemImportCon
               item.errors.push(`Duplicate name "${item.name}" within CSV`);
             }
             seenNames.add(nameKey);
+          }
+        }
+        if ((item as any).sku) {
+          const skuKey = String((item as any).sku).toLowerCase();
+          if ((csvSkuCounts.get(skuKey) || 0) > 1) {
+            if (seenSkus.has(skuKey)) {
+              item.errors.push(`Duplicate SKU "${(item as any).sku}" within CSV`);
+            }
+            seenSkus.add(skuKey);
           }
         }
       });
