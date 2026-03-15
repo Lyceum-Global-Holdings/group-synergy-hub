@@ -9,8 +9,6 @@ import { useItemCategories } from '@/hooks/useItemCategories';
 import { useItemUnits } from '@/hooks/useItemUnits';
 import { useSuppliers } from '@/hooks/useSuppliers';
 import { useCompany } from '@/contexts/CompanyContext';
-import { useWarehouseLocations } from '@/hooks/useWarehouseLocations';
-import { useWarehouseBins } from '@/hooks/useWarehouseBins';
 import { CreateWarehouseItemData } from '@/types/itemBin';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
