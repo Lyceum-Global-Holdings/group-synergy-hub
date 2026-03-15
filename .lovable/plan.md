@@ -1,35 +1,36 @@
 
 
-## Plan: Restrict Location Dropdowns to User's Edit-Permitted Locations
+# Fix: Bulk Import Name-Based Duplicate Detection Not Working
 
-### Problem
-The "Add Item" and "Add Stock" dialogs in Construction Inventory show **all** locations, allowing users to add items to locations they don't have edit access to. For example, Shihan (who only has access to "Lyceum Wattala") can currently see and select any location.
+## Root Cause
 
-### Solution
-Filter the location dropdowns in both dialogs using `useCurrentUserLocationPermissions()`, the same pattern already used in `NewTransferDialog.tsx`. Only locations where the user has explicit **edit** permissions will appear.
+The name matching logic at line 346-349 of `BulkItemImportContent.tsx` has a company_id mismatch problem:
 
-### Changes
-
-**1. `src/components/construction/inventory/AddItemDialog.tsx`**
-- Import `useCurrentUserLocationPermissions`
-- Fetch permissions, then filter `locations` to only those in `editLocationIds`
-- Admin/Super Admin users (who get `viewAllLocations: true`) see all locations (unchanged behavior)
-- Use the filtered list for both the machine `current_location_id` and bulk `location_id` dropdowns
-
-**2. `src/components/construction/inventory/AddInventoryStockDialog.tsx`**
-- Same change: import `useCurrentUserLocationPermissions`, filter the location dropdown to edit-permitted locations only
-
-### Pattern (from existing `NewTransferDialog.tsx`)
 ```typescript
-const { data: permissions } = useCurrentUserLocationPermissions();
-
-const permittedLocations = useMemo(() => {
-  if (!locations || !permissions) return [];
-  if (permissions.viewAllLocations) return locations;
-  const permittedIds = new Set(permissions.editLocationIds);
-  return locations.filter(loc => permittedIds.has(loc.id));
-}, [locations, permissions]);
+const existingByName = existingItems.find(
+  existing =>
+    existing.name?.toLowerCase() === item.name!.toLowerCase() &&
+    existing.company_id === (item.company_id || companyId)  // ← THIS FAILS
+);
 ```
 
-Two files changed, no new files.
+- `existingItems` is already filtered by the `useWarehouseItems` query (company-filtered or all)
+- But the comparison re-checks `company_id` using `selectedCompany?.id || ''`
+- When "viewing all companies," `selectedCompany` may be null → `companyId = ''` → never matches any existing item
+- When the CSV row has no `company` column, `item.company_id` is undefined, fallback to `companyId` which may not match the existing item's actual company_id
+- Result: every item is treated as "new" and inserted as a duplicate
+
+## Fix
+
+### `BulkItemImportContent.tsx`
+
+**Remove the redundant company_id check from name matching.** The `existingItems` list is already company-filtered by `useWarehouseItems`. Double-checking company_id is unnecessary and causes false negatives.
+
+Change the matching logic to:
+
+1. **Name matching**: Match by name only (case-insensitive) against `existingItems` — the query already handles company scoping
+2. **Item code uniqueness check**: Same fix — remove redundant company_id check since items are pre-filtered
+3. **SKU uniqueness check**: Same fix
+
+This is a 3-line change affecting the `find`/`some` calls at lines 346-349, 354-358, and 366-370.
 
