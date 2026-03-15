@@ -24,8 +24,6 @@ interface ParsedItem extends Partial<CreateWarehouseItemData> {
   rowNumber: number;
   errors: string[];
   warnings: string[];
-  initial_stock?: number;
-  bin_id?: string;
   importStatus: ImportStatus;
   existingId?: string;
   existingItemCode?: string;
