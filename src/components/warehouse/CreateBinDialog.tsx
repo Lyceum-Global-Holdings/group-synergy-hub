@@ -62,12 +62,16 @@ export function CreateBinDialog({ open, onOpenChange, editingBin }: CreateBinDia
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
+    if (!formData.location_id) {
+      return;
+    }
+
     const binData = {
       bin_code: formData.bin_code,
       name: formData.name,
       description: formData.description || null,
       capacity: formData.capacity ? Number(formData.capacity) : null,
-      location_id: formData.location_id || null,
+      location_id: formData.location_id,
       notes: formData.notes || null,
       status: formData.status as 'active' | 'inactive' | 'maintenance' | 'full'
     };
