@@ -9,8 +9,6 @@ import { useItemCategories } from '@/hooks/useItemCategories';
 import { useItemUnits } from '@/hooks/useItemUnits';
 import { useSuppliers } from '@/hooks/useSuppliers';
 import { useCompany } from '@/contexts/CompanyContext';
-import { useWarehouseLocations } from '@/hooks/useWarehouseLocations';
-import { useWarehouseBins } from '@/hooks/useWarehouseBins';
 import { CreateWarehouseItemData } from '@/types/itemBin';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
@@ -19,15 +17,13 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Checkbox } from '@/components/ui/checkbox';
 import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
-
+import { useWarehouseLocations } from '@/hooks/useWarehouseLocations';
 type ImportStatus = 'new' | 'duplicate' | 'update_code' | 'error';
 
 interface ParsedItem extends Partial<CreateWarehouseItemData> {
   rowNumber: number;
   errors: string[];
   warnings: string[];
-  initial_stock?: number;
-  bin_id?: string;
   importStatus: ImportStatus;
   existingId?: string;
   existingItemCode?: string;
@@ -55,20 +51,19 @@ export function BulkItemImportContent({ onSuccess, onCancel }: BulkItemImportCon
   const { data: suppliers = [] } = useSuppliers();
   const { companies, selectedCompany } = useCompany();
   const { locations } = useWarehouseLocations();
-  const { bins } = useWarehouseBins();
   const queryClient = useQueryClient();
 
   const downloadTemplate = () => {
     const headers = [
       'item_code', 'name', 'description', 'category', 'unit', 'location',
-      'initial_stock', 'bin', 'reorder_level', 'min_stock_level', 'max_stock_level',
+      'reorder_level', 'min_stock_level', 'max_stock_level',
       'unit_cost', 'selling_price', 'barcode', 'sku', 'brand', 'manufacturer',
       'supplier', 'status', 'is_serialized', 'is_batch_tracked', 'notes', 'company'
     ];
 
     const sampleRow = [
       'ITEM001', 'Sample Item', 'This is a sample item', 'Electronics', 'PCS',
-      'Main Warehouse', '100', 'BIN-001', '10', '5', '100', '50.00', '75.00',
+      'Main Warehouse', '10', '5', '100', '50.00', '75.00',
       '123456789', 'SKU001', 'Sample Brand', 'Sample Manufacturer', 'Sample Supplier',
       'active', 'false', 'false', 'Sample notes', 'Sample Company'
     ];
@@ -215,23 +210,6 @@ export function BulkItemImportContent({ onSuccess, onCancel }: BulkItemImportCon
                 else item.warnings.push(`Warehouse location "${value}" not found`);
               }
               break;
-            case 'initial_stock':
-              if (value) {
-                const num = parseFloat(value);
-                if (isNaN(num) || num < 0) item.errors.push('Initial stock must be a positive number');
-                else item.initial_stock = num;
-              }
-              break;
-            case 'bin':
-              if (value) {
-                const bin = bins.find(b =>
-                  b.bin_code.toLowerCase() === value.toLowerCase() ||
-                  b.name.toLowerCase() === value.toLowerCase()
-                );
-                if (bin) item.bin_id = bin.id;
-                else item.warnings.push(`Bin "${value}" not found`);
-              }
-              break;
             case 'supplier':
               if (value) {
                 const supplier = suppliers.find(s => s.name.toLowerCase() === value.toLowerCase());
@@ -288,9 +266,6 @@ export function BulkItemImportContent({ onSuccess, onCancel }: BulkItemImportCon
           }
         });
 
-        if (item.initial_stock && item.initial_stock > 0 && !item.bin_id) {
-          item.warnings.push('Initial stock specified but no valid bin provided - stock will not be set');
-        }
 
         parsed.push(item);
       }
@@ -506,7 +481,7 @@ export function BulkItemImportContent({ onSuccess, onCancel }: BulkItemImportCon
 
       // --- Insert new items ---
       if (newItems.length > 0) {
-        const validData = newItems.map(({ rowNumber, errors, warnings, initial_stock, bin_id, importStatus, existingId, existingItemCode, updateCodeEnabled, ...item }) => {
+        const validData = newItems.map(({ rowNumber, errors, warnings, importStatus, existingId, existingItemCode, updateCodeEnabled, ...item }) => {
           // Sanitize empty strings to null for optional fields to avoid unique constraint violations
           const sanitized = { ...item } as any;
           const nullableFields = ['sku', 'barcode', 'description', 'brand', 'manufacturer', 'notes', 'image_url'];
@@ -520,76 +495,6 @@ export function BulkItemImportContent({ onSuccess, onCancel }: BulkItemImportCon
         const createdItems = await bulkCreateItemsAsync(validData);
         createdCount = createdItems.length;
 
-        // Handle bin allocations and stock transactions for new items
-        const binAllocations: Array<{
-          warehouse_item_id: string;
-          bin_id: string;
-          allocated_quantity: number;
-          company_id?: string;
-          created_by?: string;
-        }> = [];
-
-        const stockTransactions: Array<{
-          item_id: string;
-          transaction_type: 'opening_stock';
-          reference_type: 'manual';
-          quantity_change: number;
-          quantity_before: number;
-          quantity_after: number;
-          unit_cost?: number;
-          total_value?: number;
-          notes: string;
-          company_id?: string;
-          created_by?: string;
-        }> = [];
-
-        for (const createdItem of createdItems) {
-          const originalItem = newItems.find(p => p.item_code === createdItem.item_code);
-
-          if (originalItem?.initial_stock && originalItem.initial_stock > 0 && originalItem?.bin_id) {
-            binAllocations.push({
-              warehouse_item_id: createdItem.id,
-              bin_id: originalItem.bin_id,
-              allocated_quantity: originalItem.initial_stock,
-              company_id: selectedCompany?.id,
-              created_by: user.id,
-            });
-          }
-
-          if (originalItem?.initial_stock && originalItem.initial_stock > 0) {
-            await supabase
-              .from('warehouse_items')
-              .update({ current_stock: originalItem.initial_stock })
-              .eq('id', createdItem.id);
-
-            const unitCost = originalItem.unit_cost || 0;
-            stockTransactions.push({
-              item_id: createdItem.id,
-              transaction_type: 'opening_stock',
-              reference_type: 'manual',
-              quantity_change: originalItem.initial_stock,
-              quantity_before: 0,
-              quantity_after: originalItem.initial_stock,
-              unit_cost: unitCost > 0 ? unitCost : undefined,
-              total_value: unitCost > 0 ? unitCost * originalItem.initial_stock : undefined,
-              notes: 'Opening stock balance (bulk import)',
-              company_id: selectedCompany?.id,
-              created_by: user.id,
-            });
-          }
-        }
-
-        if (binAllocations.length > 0) {
-          const { error } = await supabase.from('warehouse_bin_allocations').insert(binAllocations);
-          if (error) console.error('Error creating bin allocations:', error);
-          queryClient.invalidateQueries({ queryKey: ['warehouse-bin-allocations'] });
-        }
-
-        if (stockTransactions.length > 0) {
-          const { error } = await supabase.from('stock_transactions').insert(stockTransactions);
-          if (error) console.error('Error creating stock transactions:', error);
-          queryClient.invalidateQueries({ queryKey: ['stock-transactions'] });
-        }
       }
 
       // --- Update item codes ---
