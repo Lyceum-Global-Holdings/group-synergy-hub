@@ -266,9 +266,6 @@ export function BulkItemImportContent({ onSuccess, onCancel }: BulkItemImportCon
           }
         });
 
-        if (item.initial_stock && item.initial_stock > 0 && !item.bin_id) {
-          item.warnings.push('Initial stock specified but no valid bin provided - stock will not be set');
-        }
 
         parsed.push(item);
       }
