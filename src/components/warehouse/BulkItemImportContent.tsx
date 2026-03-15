@@ -17,7 +17,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Checkbox } from '@/components/ui/checkbox';
 import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
-
+import { useWarehouseLocations } from '@/hooks/useWarehouseLocations';
 type ImportStatus = 'new' | 'duplicate' | 'update_code' | 'error';
 
 interface ParsedItem extends Partial<CreateWarehouseItemData> {
