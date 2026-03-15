@@ -9,7 +9,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { Search, Plus, Eye, History, Package, MapPin, X, Image as ImageIcon, Edit, Trash2, Download } from 'lucide-react';
+import { Search, Plus, Eye, History, Package, MapPin, X, Image as ImageIcon, Edit, Trash2, Download, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
