@@ -295,25 +295,31 @@ export function BulkItemImportContent({ onSuccess, onCancel }: BulkItemImportCon
         parsed.push(item);
       }
 
-      // --- Name-based duplicate detection within CSV ---
+      // --- Duplicate detection within CSV (names, SKUs, and item_codes) ---
       const csvNameCounts = new Map<string, number>();
       const csvSkuCounts = new Map<string, number>();
+      const csvCodeCounts = new Map<string, number>();
       parsed.forEach(item => {
         if (item.name) {
-          const key = item.name.toLowerCase();
+          const key = item.name.toLowerCase().trim();
           csvNameCounts.set(key, (csvNameCounts.get(key) || 0) + 1);
         }
         if ((item as any).sku) {
-          const skuKey = String((item as any).sku).toLowerCase();
+          const skuKey = String((item as any).sku).toLowerCase().trim();
           csvSkuCounts.set(skuKey, (csvSkuCounts.get(skuKey) || 0) + 1);
+        }
+        if (item.item_code) {
+          const codeKey = item.item_code.toLowerCase().trim();
+          csvCodeCounts.set(codeKey, (csvCodeCounts.get(codeKey) || 0) + 1);
         }
       });
 
       const seenNames = new Set<string>();
       const seenSkus = new Set<string>();
+      const seenCodes = new Set<string>();
       parsed.forEach(item => {
         if (item.name) {
-          const nameKey = item.name.toLowerCase();
+          const nameKey = item.name.toLowerCase().trim();
           if ((csvNameCounts.get(nameKey) || 0) > 1) {
             if (seenNames.has(nameKey)) {
               item.errors.push(`Duplicate name "${item.name}" within CSV`);
@@ -322,12 +328,21 @@ export function BulkItemImportContent({ onSuccess, onCancel }: BulkItemImportCon
           }
         }
         if ((item as any).sku) {
-          const skuKey = String((item as any).sku).toLowerCase();
+          const skuKey = String((item as any).sku).toLowerCase().trim();
           if ((csvSkuCounts.get(skuKey) || 0) > 1) {
             if (seenSkus.has(skuKey)) {
               item.errors.push(`Duplicate SKU "${(item as any).sku}" within CSV`);
             }
             seenSkus.add(skuKey);
+          }
+        }
+        if (item.item_code) {
+          const codeKey = item.item_code.toLowerCase().trim();
+          if ((csvCodeCounts.get(codeKey) || 0) > 1) {
+            if (seenCodes.has(codeKey)) {
+              item.errors.push(`Duplicate item code "${item.item_code}" within CSV`);
+            }
+            seenCodes.add(codeKey);
           }
         }
       });
