@@ -333,6 +333,10 @@ export const useWarehouseItems = (options?: { skipCompanyFilter?: boolean }) => 
         errorMessage = "One or more items have duplicate barcode";
       } else if (error?.message?.includes('warehouse_items_item_code_key')) {
         errorMessage = "One or more items have duplicate item code";
+      } else if (error?.message?.includes('row-level security')) {
+        errorMessage = "Permission denied: row-level security policy violation";
+      } else if (error?.message) {
+        errorMessage = `Import failed: ${error.message}`;
       }
       
       toast({

@@ -295,14 +295,20 @@ export function BulkItemImportContent({ onSuccess, onCancel }: BulkItemImportCon
 
       // --- Name-based duplicate detection within CSV ---
       const csvNameCounts = new Map<string, number>();
+      const csvSkuCounts = new Map<string, number>();
       parsed.forEach(item => {
         if (item.name) {
           const key = item.name.toLowerCase();
           csvNameCounts.set(key, (csvNameCounts.get(key) || 0) + 1);
         }
+        if ((item as any).sku) {
+          const skuKey = String((item as any).sku).toLowerCase();
+          csvSkuCounts.set(skuKey, (csvSkuCounts.get(skuKey) || 0) + 1);
+        }
       });
 
       const seenNames = new Set<string>();
+      const seenSkus = new Set<string>();
       parsed.forEach(item => {
         if (item.name) {
           const nameKey = item.name.toLowerCase();
@@ -311,6 +317,15 @@ export function BulkItemImportContent({ onSuccess, onCancel }: BulkItemImportCon
               item.errors.push(`Duplicate name "${item.name}" within CSV`);
             }
             seenNames.add(nameKey);
+          }
+        }
+        if ((item as any).sku) {
+          const skuKey = String((item as any).sku).toLowerCase();
+          if ((csvSkuCounts.get(skuKey) || 0) > 1) {
+            if (seenSkus.has(skuKey)) {
+              item.errors.push(`Duplicate SKU "${(item as any).sku}" within CSV`);
+            }
+            seenSkus.add(skuKey);
           }
         }
       });
@@ -335,7 +350,7 @@ export function BulkItemImportContent({ onSuccess, onCancel }: BulkItemImportCon
         );
 
         if (!existingByName) {
-          // Also check item_code uniqueness for new items
+          // Check item_code uniqueness for new items
           const existsCodeInDb = existingItems.some(
             existing =>
               existing.item_code?.toLowerCase() === item.item_code?.toLowerCase() &&
@@ -344,7 +359,21 @@ export function BulkItemImportContent({ onSuccess, onCancel }: BulkItemImportCon
           if (existsCodeInDb) {
             item.errors.push(`Item code "${item.item_code}" already exists in database`);
             item.importStatus = 'error';
-          } else {
+          }
+          // Check SKU uniqueness against DB for new items
+          const itemSku = (item as any).sku;
+          if (itemSku && typeof itemSku === 'string' && itemSku.trim()) {
+            const existsSkuInDb = existingItems.some(
+              existing =>
+                (existing as any).sku?.toLowerCase() === itemSku.toLowerCase() &&
+                existing.company_id === (item.company_id || companyId)
+            );
+            if (existsSkuInDb) {
+              item.errors.push(`SKU "${itemSku}" already exists in database`);
+              item.importStatus = 'error';
+            }
+          }
+          if (item.importStatus !== 'error') {
             item.importStatus = 'new';
           }
         } else if (
@@ -407,7 +436,17 @@ export function BulkItemImportContent({ onSuccess, onCancel }: BulkItemImportCon
 
       // --- Insert new items ---
       if (newItems.length > 0) {
-        const validData = newItems.map(({ rowNumber, errors, warnings, initial_stock, bin_id, importStatus, existingId, existingItemCode, updateCodeEnabled, ...item }) => item as CreateWarehouseItemData);
+        const validData = newItems.map(({ rowNumber, errors, warnings, initial_stock, bin_id, importStatus, existingId, existingItemCode, updateCodeEnabled, ...item }) => {
+          // Sanitize empty strings to null for optional fields to avoid unique constraint violations
+          const sanitized = { ...item } as any;
+          const nullableFields = ['sku', 'barcode', 'description', 'brand', 'manufacturer', 'notes', 'image_url'];
+          for (const field of nullableFields) {
+            if (sanitized[field] !== undefined && (!sanitized[field] || String(sanitized[field]).trim() === '')) {
+              sanitized[field] = null;
+            }
+          }
+          return sanitized as CreateWarehouseItemData;
+        });
         const createdItems = await bulkCreateItemsAsync(validData);
         createdCount = createdItems.length;
 
