@@ -8,7 +8,6 @@ import { useCurrentUserLocationPermissions } from '@/hooks/useCurrentUserLocatio
 export const useWarehouseBins = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { selectedCompany, isViewingAllCompanies } = useCompany();
   const { data: permissions } = useCurrentUserLocationPermissions();
 
   const {
@@ -16,17 +15,12 @@ export const useWarehouseBins = () => {
     isLoading,
     error
   } = useQuery({
-    queryKey: ['warehouse-bins', selectedCompany?.id, isViewingAllCompanies, permissions?.viewAllLocations, permissions?.viewLocationIds, permissions?.editLocationIds],
+    queryKey: ['warehouse-bins', permissions?.viewAllLocations, permissions?.viewLocationIds, permissions?.editLocationIds],
     queryFn: async () => {
       let query = supabase
         .from('warehouse_bins')
         .select('*')
         .order('bin_code');
-
-      // Filter by company if not viewing all companies
-      if (!isViewingAllCompanies && selectedCompany?.id) {
-        query = query.eq('company_id', selectedCompany.id);
-      }
 
       // Filter by permitted locations if user doesn't have view_all_locations
       if (permissions && !permissions.viewAllLocations) {
@@ -43,7 +37,6 @@ export const useWarehouseBins = () => {
       if (error) throw error;
       return data as WarehouseBin[];
     },
-    enabled: !!(isViewingAllCompanies || selectedCompany?.id),
   });
 
   const createBinMutation = useMutation({
