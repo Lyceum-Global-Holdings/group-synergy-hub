@@ -1,35 +1,39 @@
 
 
-## Plan: Restrict Location Dropdowns to User's Edit-Permitted Locations
+# Add Lazy Loading to Inventory Tab
 
-### Problem
-The "Add Item" and "Add Stock" dialogs in Construction Inventory show **all** locations, allowing users to add items to locations they don't have edit access to. For example, Shihan (who only has access to "Lyceum Wattala") can currently see and select any location.
+## Problem
+The Inventory tab (`ItemMasterTab`) uses `useWarehouseItems()` which hits the Supabase 1,000-row cap. All filtering is client-side, so only the first 1,000 items are visible.
 
-### Solution
-Filter the location dropdowns in both dialogs using `useCurrentUserLocationPermissions()`, the same pattern already used in `NewTransferDialog.tsx`. Only locations where the user has explicit **edit** permissions will appear.
+## Approach
+Apply the same cursor-based infinite scroll pattern already working in Item Master Definition tab, but adapted for Inventory's needs (bin data, location stock, etc.).
 
-### Changes
+## Changes
 
-**1. `src/components/construction/inventory/AddItemDialog.tsx`**
-- Import `useCurrentUserLocationPermissions`
-- Fetch permissions, then filter `locations` to only those in `editLocationIds`
-- Admin/Super Admin users (who get `viewAllLocations: true`) see all locations (unchanged behavior)
-- Use the filtered list for both the machine `current_location_id` and bulk `location_id` dropdowns
+### 1. Create `useWarehouseItemsLazyInventory` hook (new file or extend `useWarehouseItemsPaged.ts`)
+- Same cursor-based `useInfiniteQuery` pattern as `useWarehouseItemsLazy`
+- Key difference: the select clause includes `*, supplier:suppliers(id, name)` and post-fetches bin allocation data per batch
+- Server-side filters: search, categoryId, status, supplierId
+- 100 items per page, cursor by `(created_at DESC, id DESC)`
+- Bin data fetched per batch (bin allocations + bin codes for each page of item IDs)
 
-**2. `src/components/construction/inventory/AddInventoryStockDialog.tsx`**
-- Same change: import `useCurrentUserLocationPermissions`, filter the location dropdown to edit-permitted locations only
+### 2. Update `ItemMasterTab.tsx`
+- Replace `useWarehouseItems()` with the new lazy hook (keep mutations via `useWarehouseItems({ disableFetch: true })`)
+- Move search/category/status/supplier filters to server-side (debounced search)
+- Remove client-side `filteredItems` logic for search/category/status/supplier (bin filter stays client-side since it depends on joined data)
+- Add `IntersectionObserver` sentinel at bottom of table for auto-loading next 100 items
+- Add "Load more" button fallback and "Loaded X items" counter
+- Keep all existing dialogs, admin tools, and actions unchanged
 
-### Pattern (from existing `NewTransferDialog.tsx`)
-```typescript
-const { data: permissions } = useCurrentUserLocationPermissions();
+### 3. Location stock data
+- The `itemLocationStock` query fetches all allocations globally — this stays as-is since it's a separate aggregation query not limited by the items query
+- Bin filter remains client-side (applied after lazy-loaded items arrive) since bin assignments come from a separate join
 
-const permittedLocations = useMemo(() => {
-  if (!locations || !permissions) return [];
-  if (permissions.viewAllLocations) return locations;
-  const permittedIds = new Set(permissions.editLocationIds);
-  return locations.filter(loc => permittedIds.has(loc.id));
-}, [locations, permissions]);
-```
+### 4. Excel export
+- Use batched cursor fetch (same pattern as Item Master Definition) to export all filtered items, not just currently loaded ones
 
-Two files changed, no new files.
+### Files to modify
+- `src/hooks/useWarehouseItemsPaged.ts` — add `useWarehouseItemsLazyInventory` export with bin-enrichment per batch
+- `src/components/warehouse/ItemMasterTab.tsx` — switch to lazy hook, add infinite scroll sentinel, server-side filters
+- `src/hooks/useWarehouseItems.ts` — already has `disableFetch`, no changes needed
 
