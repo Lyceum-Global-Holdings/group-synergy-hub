@@ -76,6 +76,18 @@ export function ItemMasterDefinitionTab({ onNavigateToInventory, onNavigateToBin
     return matchesSearch && matchesCategory && matchesStatus && matchesSupplier;
   }), [items, searchTerm, categoryFilter, statusFilter, supplierFilter, categories]);
 
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 100;
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, categoryFilter, statusFilter, supplierFilter]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredItems.length / pageSize));
+  const paginatedItems = filteredItems.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+  const showingFrom = filteredItems.length === 0 ? 0 : (currentPage - 1) * pageSize + 1;
+  const showingTo = Math.min(currentPage * pageSize, filteredItems.length);
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'active': return 'bg-green-100 text-green-800 border-green-200';
