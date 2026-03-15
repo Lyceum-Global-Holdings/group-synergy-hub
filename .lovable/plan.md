@@ -1,35 +1,23 @@
 
 
-## Plan: Restrict Location Dropdowns to User's Edit-Permitted Locations
+# Fix: "cannot insert a non-DEFAULT value into column available_quantity"
 
-### Problem
-The "Add Item" and "Add Stock" dialogs in Construction Inventory show **all** locations, allowing users to add items to locations they don't have edit access to. For example, Shihan (who only has access to "Lyceum Wattala") can currently see and select any location.
+## Root Cause
 
-### Solution
-Filter the location dropdowns in both dialogs using `useCurrentUserLocationPermissions()`, the same pattern already used in `NewTransferDialog.tsx`. Only locations where the user has explicit **edit** permissions will appear.
+`available_quantity` is a **GENERATED ALWAYS** column on both:
+- `warehouse_items`: computed as `current_stock - COALESCE(reserved_quantity, 0)`
+- `warehouse_bin_allocations`: computed as `allocated_quantity - reserved_quantity`
 
-### Changes
+PostgreSQL rejects any INSERT or UPDATE that explicitly sets a generated column. The code has multiple places that attempt to write to these columns.
 
-**1. `src/components/construction/inventory/AddItemDialog.tsx`**
-- Import `useCurrentUserLocationPermissions`
-- Fetch permissions, then filter `locations` to only those in `editLocationIds`
-- Admin/Super Admin users (who get `viewAllLocations: true`) see all locations (unchanged behavior)
-- Use the filtered list for both the machine `current_location_id` and bulk `location_id` dropdowns
+## Changes
 
-**2. `src/components/construction/inventory/AddInventoryStockDialog.tsx`**
-- Same change: import `useCurrentUserLocationPermissions`, filter the location dropdown to edit-permitted locations only
+### 1. `src/hooks/useStockAudit.ts`
+Remove `available_quantity` from both UPDATE calls to `warehouse_bin_allocations` (lines 201 and 253). The database computes this automatically.
 
-### Pattern (from existing `NewTransferDialog.tsx`)
-```typescript
-const { data: permissions } = useCurrentUserLocationPermissions();
+### 2. `src/integrations/supabase/types.ts`
+Remove `available_quantity` from the `Insert` and `Update` types for both `warehouse_bin_allocations` and `warehouse_items` tables. This prevents any future accidental writes to the generated column. (The `Row` type keeps it for reads.)
 
-const permittedLocations = useMemo(() => {
-  if (!locations || !permissions) return [];
-  if (permissions.viewAllLocations) return locations;
-  const permittedIds = new Set(permissions.editLocationIds);
-  return locations.filter(loc => permittedIds.has(loc.id));
-}, [locations, permissions]);
-```
-
-Two files changed, no new files.
+### 3. Verify no other writes
+Other files writing `available_quantity` (`useWarehouseTools.ts`, `useToolIssues.ts`, `useToolAdjustments.ts`, `useToolReturns.ts`) target `warehouse_tools`, which has a regular (non-generated) column — those are fine and stay unchanged.
 
