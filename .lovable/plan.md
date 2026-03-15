@@ -1,52 +1,35 @@
 
 
-# Fix: Make Bins Fully Available Across All Companies
+## Plan: Restrict Location Dropdowns to User's Edit-Permitted Locations
 
-## Problem
+### Problem
+The "Add Item" and "Add Stock" dialogs in Construction Inventory show **all** locations, allowing users to add items to locations they don't have edit access to. For example, Shihan (who only has access to "Lyceum Wattala") can currently see and select any location.
 
-While the main Bin Master tab and hook were fixed, there are still two places in the code that filter bins by `company_id`, preventing bins from being fully shared.
+### Solution
+Filter the location dropdowns in both dialogs using `useCurrentUserLocationPermissions()`, the same pattern already used in `NewTransferDialog.tsx`. Only locations where the user has explicit **edit** permissions will appear.
 
-## Changes
+### Changes
 
-### 1. `src/components/warehouse/ReturnStockFromSublocationDialog.tsx` (line 53-56)
+**1. `src/components/construction/inventory/AddItemDialog.tsx`**
+- Import `useCurrentUserLocationPermissions`
+- Fetch permissions, then filter `locations` to only those in `editLocationIds`
+- Admin/Super Admin users (who get `viewAllLocations: true`) see all locations (unchanged behavior)
+- Use the filtered list for both the machine `current_location_id` and bulk `location_id` dropdowns
 
-Remove the company-based bin filtering. Since bins are shared, all bins should be available regardless of company selection.
+**2. `src/components/construction/inventory/AddInventoryStockDialog.tsx`**
+- Same change: import `useCurrentUserLocationPermissions`, filter the location dropdown to edit-permitted locations only
 
-**Before:**
+### Pattern (from existing `NewTransferDialog.tsx`)
 ```typescript
-const companyBins = selectedCompany?.id 
-  ? bins?.filter(bin => bin.company_id === selectedCompany.id) || []
-  : bins || [];
+const { data: permissions } = useCurrentUserLocationPermissions();
+
+const permittedLocations = useMemo(() => {
+  if (!locations || !permissions) return [];
+  if (permissions.viewAllLocations) return locations;
+  const permittedIds = new Set(permissions.editLocationIds);
+  return locations.filter(loc => permittedIds.has(loc.id));
+}, [locations, permissions]);
 ```
 
-**After:**
-```typescript
-const companyBins = bins || [];
-```
-
-### 2. `src/hooks/useWarehouseBinAllocations.ts` (line 364-374)
-
-The fallback bin lookup queries `warehouse_bins` filtered by `company_id`. Since bins no longer have a meaningful `company_id`, this fallback will fail. Change it to find any active bin (without company filter), or better yet, skip the fallback since location-based lookup (lines 350-361) should be the primary method.
-
-**Before:**
-```typescript
-// If no bin at location, get any bin in the company
-const { data: anyBins } = await supabase
-  .from('warehouse_bins')
-  .select('id')
-  .eq('company_id', selectedCompany.id)
-  .limit(1);
-```
-
-**After:**
-```typescript
-// If no bin at location, get any active bin
-const { data: anyBins } = await supabase
-  .from('warehouse_bins')
-  .select('id')
-  .eq('status', 'active')
-  .limit(1);
-```
-
-These are two small, targeted fixes. No database changes needed.
+Two files changed, no new files.
 
