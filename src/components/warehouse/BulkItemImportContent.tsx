@@ -45,6 +45,7 @@ export function BulkItemImportContent({ onSuccess, onCancel }: BulkItemImportCon
   const [isProcessing, setIsProcessing] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
+  const [showConfirmation, setShowConfirmation] = useState(false);
 
   const { toast } = useToast();
   const { bulkCreateItemsAsync, isBulkCreating } = useWarehouseItems();
