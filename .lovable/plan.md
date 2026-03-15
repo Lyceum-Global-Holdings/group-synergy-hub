@@ -1,35 +1,42 @@
 
 
-## Plan: Restrict Location Dropdowns to User's Edit-Permitted Locations
+# Make Bin Master Common Across All Companies
 
-### Problem
-The "Add Item" and "Add Stock" dialogs in Construction Inventory show **all** locations, allowing users to add items to locations they don't have edit access to. For example, Shihan (who only has access to "Lyceum Wattala") can currently see and select any location.
+## Problem
 
-### Solution
-Filter the location dropdowns in both dialogs using `useCurrentUserLocationPermissions()`, the same pattern already used in `NewTransferDialog.tsx`. Only locations where the user has explicit **edit** permissions will appear.
+Bins are currently scoped per company (`company_id` column + unique constraint on `(bin_code, company_id)`). This causes duplicate bins when multiple companies use the same warehouse locations. Bins should be shared — they represent physical storage locations, not company-specific resources.
 
-### Changes
+## Solution
 
-**1. `src/components/construction/inventory/AddItemDialog.tsx`**
-- Import `useCurrentUserLocationPermissions`
-- Fetch permissions, then filter `locations` to only those in `editLocationIds`
-- Admin/Super Admin users (who get `viewAllLocations: true`) see all locations (unchanged behavior)
-- Use the filtered list for both the machine `current_location_id` and bulk `location_id` dropdowns
+Bins are already tied to `location_id` (warehouse locations), which are shared across companies via the `warehouse_location_companies` junction table. We make bins **location-scoped instead of company-scoped**.
 
-**2. `src/components/construction/inventory/AddInventoryStockDialog.tsx`**
-- Same change: import `useCurrentUserLocationPermissions`, filter the location dropdown to edit-permitted locations only
+## Database Changes
 
-### Pattern (from existing `NewTransferDialog.tsx`)
-```typescript
-const { data: permissions } = useCurrentUserLocationPermissions();
+1. **Drop** the unique constraint `warehouse_bins_bin_code_company_id_key`
+2. **Add** a new unique constraint `warehouse_bins_bin_code_location_id_key` on `(bin_code, location_id)` — prevents duplicate bin codes within the same location
+3. **Set** `company_id = NULL` on all existing bins (optional cleanup, keeps backward compat)
 
-const permittedLocations = useMemo(() => {
-  if (!locations || !permissions) return [];
-  if (permissions.viewAllLocations) return locations;
-  const permittedIds = new Set(permissions.editLocationIds);
-  return locations.filter(loc => permittedIds.has(loc.id));
-}, [locations, permissions]);
-```
+## Code Changes
 
-Two files changed, no new files.
+### `useWarehouseBins.ts`
+- **Remove company filtering** from the query — fetch all bins regardless of selected company (like Item Master Definition does with `skipCompanyFilter`)
+- **Remove `company_id` assignment** in `createBinMutation` — bins no longer belong to a company
+- Keep location-based permission filtering (already in place)
+
+### `BinMasterTab.tsx`
+- **Remove** the `isViewingAllCompanies` disabled state on the "Add Bin" button — bins can be created regardless of company selection
+- **Remove** the "Viewing bins from all companies" alert
+- **Add** a note: "Bins are shared across all companies and scoped by location"
+
+### `CreateBinDialog.tsx`
+- **Make location mandatory** — since bins are no longer company-scoped, location becomes the primary grouping. Require `location_id` before saving.
+
+### `BinAllocationsTab.tsx` (no changes expected)
+- Bin allocations already have their own `company_id` for multi-tenant scoping of stock — this remains unchanged. The bin itself is shared, but the stock allocated in it is company-specific.
+
+## Data Integrity
+
+- `warehouse_bin_allocations` keeps its own `company_id` — stock ownership remains company-scoped
+- The bin is just a physical container; which company's items are in it is tracked at the allocation level
+- Existing references (`bin_id` foreign keys) remain valid — no data migration needed
 
