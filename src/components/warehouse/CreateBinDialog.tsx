@@ -62,12 +62,16 @@ export function CreateBinDialog({ open, onOpenChange, editingBin }: CreateBinDia
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
+    if (!formData.location_id) {
+      return;
+    }
+
     const binData = {
       bin_code: formData.bin_code,
       name: formData.name,
       description: formData.description || null,
       capacity: formData.capacity ? Number(formData.capacity) : null,
-      location_id: formData.location_id || null,
+      location_id: formData.location_id,
       notes: formData.notes || null,
       status: formData.status as 'active' | 'inactive' | 'maintenance' | 'full'
     };
@@ -145,7 +149,7 @@ export function CreateBinDialog({ open, onOpenChange, editingBin }: CreateBinDia
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="location_id">Location</Label>
+              <Label htmlFor="location_id">Location *</Label>
               <Select value={formData.location_id} onValueChange={(value) => handleChange('location_id', value)}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select location" />

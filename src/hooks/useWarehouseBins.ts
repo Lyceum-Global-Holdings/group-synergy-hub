@@ -2,13 +2,11 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { WarehouseBin, CreateWarehouseBinData } from '@/types/itemBin';
 import { useToast } from '@/hooks/use-toast';
-import { useCompany } from '@/contexts/CompanyContext';
 import { useCurrentUserLocationPermissions } from '@/hooks/useCurrentUserLocationPermissions';
 
 export const useWarehouseBins = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { selectedCompany, isViewingAllCompanies } = useCompany();
   const { data: permissions } = useCurrentUserLocationPermissions();
 
   const {
@@ -16,17 +14,12 @@ export const useWarehouseBins = () => {
     isLoading,
     error
   } = useQuery({
-    queryKey: ['warehouse-bins', selectedCompany?.id, isViewingAllCompanies, permissions?.viewAllLocations, permissions?.viewLocationIds, permissions?.editLocationIds],
+    queryKey: ['warehouse-bins', permissions?.viewAllLocations, permissions?.viewLocationIds, permissions?.editLocationIds],
     queryFn: async () => {
       let query = supabase
         .from('warehouse_bins')
         .select('*')
         .order('bin_code');
-
-      // Filter by company if not viewing all companies
-      if (!isViewingAllCompanies && selectedCompany?.id) {
-        query = query.eq('company_id', selectedCompany.id);
-      }
 
       // Filter by permitted locations if user doesn't have view_all_locations
       if (permissions && !permissions.viewAllLocations) {
@@ -43,7 +36,6 @@ export const useWarehouseBins = () => {
       if (error) throw error;
       return data as WarehouseBin[];
     },
-    enabled: !!(isViewingAllCompanies || selectedCompany?.id),
   });
 
   const createBinMutation = useMutation({
@@ -51,15 +43,10 @@ export const useWarehouseBins = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User not authenticated');
 
-      if (!selectedCompany?.id) {
-        throw new Error('Please select a company first');
-      }
-
       const { data, error } = await supabase
         .from('warehouse_bins')
         .insert({
           ...binData,
-          company_id: selectedCompany.id,
           created_by: user.id
         })
         .select()
