@@ -1,35 +1,27 @@
 
 
-## Plan: Restrict Location Dropdowns to User's Edit-Permitted Locations
+# Remove Inventory/Stock Operations from Bulk Item Import
 
-### Problem
-The "Add Item" and "Add Stock" dialogs in Construction Inventory show **all** locations, allowing users to add items to locations they don't have edit access to. For example, Shihan (who only has access to "Lyceum Wattala") can currently see and select any location.
+## Problem
+When items are bulk imported in Item Master, the system currently allows setting initial stock, bin assignments, and creates stock movement records. The user wants bulk import to only create item catalog definitions — inventory will be managed separately.
 
-### Solution
-Filter the location dropdowns in both dialogs using `useCurrentUserLocationPermissions()`, the same pattern already used in `NewTransferDialog.tsx`. Only locations where the user has explicit **edit** permissions will appear.
+## Changes
 
-### Changes
+### File: `src/components/warehouse/BulkItemImportContent.tsx`
 
-**1. `src/components/construction/inventory/AddItemDialog.tsx`**
-- Import `useCurrentUserLocationPermissions`
-- Fetch permissions, then filter `locations` to only those in `editLocationIds`
-- Admin/Super Admin users (who get `viewAllLocations: true`) see all locations (unchanged behavior)
-- Use the filtered list for both the machine `current_location_id` and bulk `location_id` dropdowns
+1. **Remove from CSV template**: Drop `initial_stock` and `bin` columns from the generated template headers.
 
-**2. `src/components/construction/inventory/AddInventoryStockDialog.tsx`**
-- Same change: import `useCurrentUserLocationPermissions`, filter the location dropdown to edit-permitted locations only
+2. **Remove parsing logic**: Skip the `initial_stock` and `bin` case branches in the CSV parser. Remove the warning about "Initial stock specified but no valid bin provided."
 
-### Pattern (from existing `NewTransferDialog.tsx`)
-```typescript
-const { data: permissions } = useCurrentUserLocationPermissions();
+3. **Remove stock operations after insert**: After inserting new items, remove the block that:
+   - Creates `warehouse_bin_allocations` entries
+   - Updates `warehouse_items.current_stock`
+   - Inserts `warehouse_stock_movements` (opening_stock records)
+   - Invalidates `warehouse-bin-allocations` query cache
 
-const permittedLocations = useMemo(() => {
-  if (!locations || !permissions) return [];
-  if (permissions.viewAllLocations) return locations;
-  const permittedIds = new Set(permissions.editLocationIds);
-  return locations.filter(loc => permittedIds.has(loc.id));
-}, [locations, permissions]);
-```
+4. **Remove unused imports/hooks**: Remove `useWarehouseLocations`, `useWarehouseBins` if only used for bin lookups in bulk import. Remove `bin_id` and `initial_stock` from the `ParsedItem` interface.
 
-Two files changed, no new files.
+5. **Remove from preview table**: Strip any columns showing initial stock or bin assignment in the pre-import confirmation view.
+
+This keeps bulk import focused purely on catalog definition (item code, name, category, unit, pricing, supplier, etc.) with no side effects on inventory.
 
