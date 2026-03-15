@@ -1,82 +1,118 @@
-import { useQuery } from '@tanstack/react-query';
+import { useInfiniteQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { WarehouseItem } from '@/types/itemBin';
 
-interface UseWarehouseItemsPagedOptions {
-  page: number;
-  pageSize: number;
+interface Cursor {
+  created_at: string;
+  id: string;
+}
+
+interface UseWarehouseItemsLazyOptions {
+  pageSize?: number;
   search?: string;
   categoryId?: string;
   status?: string;
   supplierId?: string;
 }
 
-export function useWarehouseItemsPaged({
-  page,
-  pageSize,
+function buildFilteredQuery(
+  filters: { search?: string; categoryId?: string; status?: string; supplierId?: string },
+  selectClause: string,
+  countOption?: { count: 'exact' }
+) {
+  let query = countOption
+    ? supabase.from('warehouse_items').select(selectClause, countOption)
+    : supabase.from('warehouse_items').select(selectClause);
+
+  if (filters.search?.trim()) {
+    const term = `%${filters.search.trim()}%`;
+    query = query.or(
+      `name.ilike.${term},item_code.ilike.${term},brand.ilike.${term},barcode.ilike.${term},sku.ilike.${term}`
+    );
+  }
+  if (filters.categoryId && filters.categoryId !== 'all') {
+    query = query.eq('category_id', filters.categoryId);
+  }
+  if (filters.status && filters.status !== 'all') {
+    query = query.eq('status', filters.status);
+  }
+  if (filters.supplierId && filters.supplierId !== 'all') {
+    query = query.eq('supplier_id', filters.supplierId);
+  }
+  return query;
+}
+
+/**
+ * Infinite-scroll hook: fetches warehouse items in batches using cursor-based (keyset) pagination.
+ * This reliably bypasses the 1,000-row Supabase/PostgREST per-request cap.
+ */
+export function useWarehouseItemsLazy({
+  pageSize = 100,
   search,
   categoryId,
   status,
   supplierId,
-}: UseWarehouseItemsPagedOptions) {
-  return useQuery({
-    queryKey: [
-      'warehouse-items',
-      'paged',
-      page,
-      pageSize,
-      search,
-      categoryId,
-      status,
-      supplierId,
-    ],
-    queryFn: async () => {
-      let query = supabase
-        .from('warehouse_items')
-        .select(
-          `*, supplier:suppliers(id, name)`,
-          { count: 'exact' }
-        );
+}: UseWarehouseItemsLazyOptions) {
+  return useInfiniteQuery({
+    queryKey: ['warehouse-items', 'lazy', search, categoryId, status, supplierId],
+    queryFn: async ({ pageParam }: { pageParam: Cursor | null }) => {
+      const filters = { search, categoryId, status, supplierId };
+      let query = buildFilteredQuery(filters, `*, supplier:suppliers(id, name)`);
 
-      // Server-side filters
-      if (search && search.trim()) {
-        const term = `%${search.trim()}%`;
+      // Deterministic ordering: created_at DESC, id DESC
+      query = query.order('created_at', { ascending: false }).order('id', { ascending: false });
+
+      // Cursor condition for keyset pagination
+      if (pageParam) {
+        // Items where (created_at < cursor) OR (created_at = cursor AND id < cursor_id)
         query = query.or(
-          `name.ilike.${term},item_code.ilike.${term},brand.ilike.${term},barcode.ilike.${term},sku.ilike.${term}`
+          `created_at.lt.${pageParam.created_at},and(created_at.eq.${pageParam.created_at},id.lt.${pageParam.id})`
         );
       }
 
-      if (categoryId && categoryId !== 'all') {
-        query = query.eq('category_id', categoryId);
-      }
+      query = query.limit(pageSize);
 
-      if (status && status !== 'all') {
-        query = query.eq('status', status);
-      }
-
-      if (supplierId && supplierId !== 'all') {
-        query = query.eq('supplier_id', supplierId);
-      }
-
-      const from = (page - 1) * pageSize;
-      const to = from + pageSize - 1;
-
-      const { data, count, error } = await query
-        .order('created_at', { ascending: false })
-        .range(from, to);
-
+      const { data, error } = await query;
       if (error) throw error;
 
-      return {
-        items: (data || []) as WarehouseItem[],
-        totalCount: count ?? 0,
-      };
+      const items = (data || []) as unknown as WarehouseItem[];
+      let nextCursor: Cursor | null = null;
+
+      if (items.length === pageSize) {
+        const last = items[items.length - 1];
+        nextCursor = { created_at: last.created_at!, id: last.id };
+      }
+
+      return { items, nextCursor };
     },
+    initialPageParam: null as Cursor | null,
+    getNextPageParam: (lastPage) => lastPage.nextCursor,
   });
 }
 
 /**
- * Fetch ALL items matching filters in batches of 1000 (for Excel export).
+ * Fetch a total count for display purposes (separate lightweight query).
+ */
+export function useWarehouseItemsCount(filters: {
+  search?: string;
+  categoryId?: string;
+  status?: string;
+  supplierId?: string;
+}) {
+  // Use a regular select with head:true + count for a lightweight count-only query
+  return {
+    queryKey: ['warehouse-items', 'count', filters.search, filters.categoryId, filters.status, filters.supplierId],
+    queryFn: async () => {
+      const query = buildFilteredQuery(filters, '*', { count: 'exact' });
+      const { count, error } = await query.limit(0);
+      if (error) throw error;
+      return count ?? 0;
+    },
+  };
+}
+
+/**
+ * Fetch ALL items matching filters using cursor-based batching (for Excel export).
  */
 export async function fetchAllWarehouseItemsBatched(filters: {
   search?: string;
@@ -85,43 +121,37 @@ export async function fetchAllWarehouseItemsBatched(filters: {
   supplierId?: string;
 }): Promise<WarehouseItem[]> {
   const batchSize = 1000;
-  let allItems: WarehouseItem[] = [];
-  let from = 0;
-  let hasMore = true;
+  const allItems: WarehouseItem[] = [];
+  let cursor: Cursor | null = null;
+  const seenIds = new Set<string>();
 
-  while (hasMore) {
-    let query = supabase
-      .from('warehouse_items')
-      .select(`*, supplier:suppliers(id, name)`);
+  while (true) {
+    let query = buildFilteredQuery(filters, `*, supplier:suppliers(id, name)`);
+    query = query.order('created_at', { ascending: false }).order('id', { ascending: false });
 
-    if (filters.search?.trim()) {
-      const term = `%${filters.search.trim()}%`;
+    if (cursor) {
       query = query.or(
-        `name.ilike.${term},item_code.ilike.${term},brand.ilike.${term},barcode.ilike.${term},sku.ilike.${term}`
+        `created_at.lt.${cursor.created_at},and(created_at.eq.${cursor.created_at},id.lt.${cursor.id})`
       );
     }
-    if (filters.categoryId && filters.categoryId !== 'all') {
-      query = query.eq('category_id', filters.categoryId);
-    }
-    if (filters.status && filters.status !== 'all') {
-      query = query.eq('status', filters.status);
-    }
-    if (filters.supplierId && filters.supplierId !== 'all') {
-      query = query.eq('supplier_id', filters.supplierId);
-    }
 
-    const { data, error } = await query
-      .order('created_at', { ascending: false })
-      .range(from, from + batchSize - 1);
+    query = query.limit(batchSize);
 
+    const { data, error } = await query;
     if (error) throw error;
 
-    allItems = allItems.concat((data || []) as WarehouseItem[]);
-    if (!data || data.length < batchSize) {
-      hasMore = false;
-    } else {
-      from += batchSize;
+    const batch = (data || []) as unknown as WarehouseItem[];
+    for (const item of batch) {
+      if (!seenIds.has(item.id)) {
+        seenIds.add(item.id);
+        allItems.push(item);
+      }
     }
+
+    if (batch.length < batchSize) break;
+
+    const last = batch[batch.length - 1];
+    cursor = { created_at: last.created_at!, id: last.id };
   }
 
   return allItems;

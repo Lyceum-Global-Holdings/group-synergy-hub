@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback } from 'react';
+import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -9,14 +9,14 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { Search, Plus, Eye, History, Package, MapPin, X, Image as ImageIcon, Edit, Trash2, Download, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Loader2 } from 'lucide-react';
+import { Search, Plus, Eye, History, Package, MapPin, X, Image as ImageIcon, Edit, Trash2, Download, Loader2 } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import ExcelJS from 'exceljs';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { useWarehouseItems } from '@/hooks/useWarehouseItems';
-import { useWarehouseItemsPaged, fetchAllWarehouseItemsBatched } from '@/hooks/useWarehouseItemsPaged';
+import { useWarehouseItemsLazy, useWarehouseItemsCount, fetchAllWarehouseItemsBatched } from '@/hooks/useWarehouseItemsPaged';
 import { useItemCategories } from '@/hooks/useItemCategories';
 import { useItemUnits } from '@/hooks/useItemUnits';
 import { useCompany } from '@/contexts/CompanyContext';
@@ -43,9 +43,8 @@ export function ItemMasterDefinitionTab({ onNavigateToInventory, onNavigateToBin
   const [stockMovementItem, setStockMovementItem] = useState<WarehouseItem | null>(null);
   const [previewImage, setPreviewImage] = useState<{ url: string; name: string } | null>(null);
   const [deletingItem, setDeletingItem] = useState<WarehouseItem | null>(null);
-  const [currentPage, setCurrentPage] = useState(1);
   const [isExporting, setIsExporting] = useState(false);
-  const pageSize = 100;
+  const sentinelRef = useRef<HTMLDivElement>(null);
 
   // Debounce search to avoid excessive queries
   useEffect(() => {
@@ -53,13 +52,8 @@ export function ItemMasterDefinitionTab({ onNavigateToInventory, onNavigateToBin
     return () => clearTimeout(timer);
   }, [searchTerm]);
 
-  // Reset page on filter change
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [debouncedSearch, categoryFilter, statusFilter, supplierFilter]);
-
-  // Use mutations from the original hook (no list query needed)
-  const { deleteItem, markItemInactive, isDeleting, isMarkingInactive } = useWarehouseItems({ skipCompanyFilter: true });
+  // Use mutations from the original hook (disable list fetch)
+  const { deleteItem, markItemInactive, isDeleting, isMarkingInactive } = useWarehouseItems({ skipCompanyFilter: true, disableFetch: true });
   const { canDelete } = useIsAdminOrHigher();
   const { selectedCompany } = useCompany();
   const { categories } = useItemCategories(selectedCompany?.id);
@@ -84,27 +78,57 @@ export function ItemMasterDefinitionTab({ onNavigateToInventory, onNavigateToBin
     return suppliers.find(s => s.name === supplierFilter)?.id || 'all';
   }, [supplierFilter, suppliers]);
 
-  // Resolve category filter to category_id
   const selectedCategoryId = useMemo(() => {
     if (categoryFilter === 'all') return 'all';
     return categories.find(c => c.name === categoryFilter)?.id || 'all';
   }, [categoryFilter, categories]);
 
-  // Server-side paged query
-  const { data: pagedResult, isLoading } = useWarehouseItemsPaged({
-    page: currentPage,
-    pageSize,
-    search: debouncedSearch,
-    categoryId: selectedCategoryId,
-    status: statusFilter,
-    supplierId: selectedSupplierId,
-  });
+  const filterParams = { search: debouncedSearch, categoryId: selectedCategoryId, status: statusFilter, supplierId: selectedSupplierId };
 
-  const items = pagedResult?.items ?? [];
-  const totalCount = pagedResult?.totalCount ?? 0;
-  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
-  const showingFrom = totalCount === 0 ? 0 : (currentPage - 1) * pageSize + 1;
-  const showingTo = Math.min(currentPage * pageSize, totalCount);
+  // Cursor-based infinite query
+  const {
+    data: infiniteData,
+    isLoading,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useWarehouseItemsLazy(filterParams);
+
+  // Lightweight count query
+  const countConfig = useWarehouseItemsCount(filterParams);
+  const { data: totalCount = 0 } = useQuery(countConfig);
+
+  // Flatten all pages into a single list, dedupe by id
+  const items = useMemo(() => {
+    if (!infiniteData?.pages) return [];
+    const seen = new Set<string>();
+    const result: WarehouseItem[] = [];
+    for (const page of infiniteData.pages) {
+      for (const item of page.items) {
+        if (!seen.has(item.id)) {
+          seen.add(item.id);
+          result.push(item);
+        }
+      }
+    }
+    return result;
+  }, [infiniteData]);
+
+  // Auto-load via IntersectionObserver
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasNextPage && !isFetchingNextPage) {
+          fetchNextPage();
+        }
+      },
+      { threshold: 0.1 }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
   const hasActiveFilters = categoryFilter !== 'all' || statusFilter !== 'all' || supplierFilter !== 'all';
 
@@ -368,28 +392,24 @@ export function ItemMasterDefinitionTab({ onNavigateToInventory, onNavigateToBin
         </Table>
       </div>
 
-      <div className="flex items-center justify-between">
+      {/* Lazy load sentinel & status */}
+      <div className="flex flex-col items-center gap-2">
         <div className="text-sm text-muted-foreground">
-          Showing {showingFrom}–{showingTo} of {totalCount.toLocaleString()} items
+          Loaded {items.length.toLocaleString()} of {totalCount.toLocaleString()} items
         </div>
-        {totalPages > 1 && (
-          <div className="flex items-center gap-1">
-            <Button variant="outline" size="icon" className="h-8 w-8" disabled={currentPage === 1} onClick={() => setCurrentPage(1)}>
-              <ChevronsLeft className="h-4 w-4" />
-            </Button>
-            <Button variant="outline" size="icon" className="h-8 w-8" disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)}>
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <span className="text-sm text-muted-foreground px-2">
-              Page {currentPage} of {totalPages}
-            </span>
-            <Button variant="outline" size="icon" className="h-8 w-8" disabled={currentPage === totalPages} onClick={() => setCurrentPage(p => p + 1)}>
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-            <Button variant="outline" size="icon" className="h-8 w-8" disabled={currentPage === totalPages} onClick={() => setCurrentPage(totalPages)}>
-              <ChevronsRight className="h-4 w-4" />
-            </Button>
+        <div ref={sentinelRef} className="h-1" />
+        {isFetchingNextPage && (
+          <div className="flex items-center gap-2 text-sm text-muted-foreground py-2">
+            <Loader2 className="h-4 w-4 animate-spin" /> Loading more items...
           </div>
+        )}
+        {hasNextPage && !isFetchingNextPage && (
+          <Button variant="outline" size="sm" onClick={() => fetchNextPage()}>
+            Load more items
+          </Button>
+        )}
+        {!hasNextPage && items.length > 0 && (
+          <div className="text-sm text-muted-foreground">All items loaded</div>
         )}
       </div>
 
