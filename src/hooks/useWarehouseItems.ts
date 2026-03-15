@@ -156,6 +156,8 @@ export const useWarehouseItems = (options?: { skipCompanyFilter?: boolean }) => 
         errorMessage = "An item with this SKU already exists for the selected company";
       } else if (error?.message?.includes('warehouse_items_barcode_key')) {
         errorMessage = "An item with this barcode already exists";
+      } else if (error?.message?.includes('warehouse_items_item_code_company_id_key')) {
+        errorMessage = "An item with this code already exists in this company";
       } else if (error?.message?.includes('warehouse_items_item_code_key')) {
         errorMessage = "An item with this code already exists";
       }
@@ -204,6 +206,8 @@ export const useWarehouseItems = (options?: { skipCompanyFilter?: boolean }) => 
         errorMessage = "An item with this SKU already exists for the selected company";
       } else if (error?.message?.includes('warehouse_items_barcode_key')) {
         errorMessage = "An item with this barcode already exists";
+      } else if (error?.message?.includes('warehouse_items_item_code_company_id_key')) {
+        errorMessage = "An item with this code already exists in this company";
       } else if (error?.message?.includes('warehouse_items_item_code_key')) {
         errorMessage = "An item with this code already exists";
       }
@@ -331,6 +335,8 @@ export const useWarehouseItems = (options?: { skipCompanyFilter?: boolean }) => 
         errorMessage = "One or more items have duplicate SKU for the company";
       } else if (error?.message?.includes('warehouse_items_barcode_key')) {
         errorMessage = "One or more items have duplicate barcode";
+      } else if (error?.message?.includes('warehouse_items_item_code_company_id_key')) {
+        errorMessage = "One or more items have an item code that already exists in this company";
       } else if (error?.message?.includes('warehouse_items_item_code_key')) {
         errorMessage = "One or more items have duplicate item code";
       } else if (error?.message?.includes('row-level security')) {
