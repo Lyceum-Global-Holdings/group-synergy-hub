@@ -63,7 +63,7 @@ export function BulkItemImportContent({ onSuccess, onCancel }: BulkItemImportCon
 
     const sampleRow = [
       'ITEM001', 'Sample Item', 'This is a sample item', 'Electronics', 'PCS',
-      'Main Warehouse', '100', 'BIN-001', '10', '5', '100', '50.00', '75.00',
+      'Main Warehouse', '10', '5', '100', '50.00', '75.00',
       '123456789', 'SKU001', 'Sample Brand', 'Sample Manufacturer', 'Sample Supplier',
       'active', 'false', 'false', 'Sample notes', 'Sample Company'
     ];
