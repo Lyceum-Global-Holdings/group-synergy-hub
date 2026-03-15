@@ -350,7 +350,7 @@ export function BulkItemImportContent({ onSuccess, onCancel }: BulkItemImportCon
         );
 
         if (!existingByName) {
-          // Also check item_code uniqueness for new items
+          // Check item_code uniqueness for new items
           const existsCodeInDb = existingItems.some(
             existing =>
               existing.item_code?.toLowerCase() === item.item_code?.toLowerCase() &&
@@ -359,7 +359,21 @@ export function BulkItemImportContent({ onSuccess, onCancel }: BulkItemImportCon
           if (existsCodeInDb) {
             item.errors.push(`Item code "${item.item_code}" already exists in database`);
             item.importStatus = 'error';
-          } else {
+          }
+          // Check SKU uniqueness against DB for new items
+          const itemSku = (item as any).sku;
+          if (itemSku && typeof itemSku === 'string' && itemSku.trim()) {
+            const existsSkuInDb = existingItems.some(
+              existing =>
+                (existing as any).sku?.toLowerCase() === itemSku.toLowerCase() &&
+                existing.company_id === (item.company_id || companyId)
+            );
+            if (existsSkuInDb) {
+              item.errors.push(`SKU "${itemSku}" already exists in database`);
+              item.importStatus = 'error';
+            }
+          }
+          if (item.importStatus !== 'error') {
             item.importStatus = 'new';
           }
         } else if (
