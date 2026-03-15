@@ -149,7 +149,7 @@ export function CreateBinDialog({ open, onOpenChange, editingBin }: CreateBinDia
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="location_id">Location</Label>
+              <Label htmlFor="location_id">Location *</Label>
               <Select value={formData.location_id} onValueChange={(value) => handleChange('location_id', value)}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select location" />

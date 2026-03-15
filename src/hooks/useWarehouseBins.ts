@@ -44,15 +44,10 @@ export const useWarehouseBins = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User not authenticated');
 
-      if (!selectedCompany?.id) {
-        throw new Error('Please select a company first');
-      }
-
       const { data, error } = await supabase
         .from('warehouse_bins')
         .insert({
           ...binData,
-          company_id: selectedCompany.id,
           created_by: user.id
         })
         .select()

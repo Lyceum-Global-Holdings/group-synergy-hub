@@ -58,24 +58,18 @@ export function BinMasterTab() {
             />
           </div>
         </div>
-        <Button 
-          onClick={() => setIsCreateDialogOpen(true)}
-          disabled={isViewingAllCompanies}
-          title={isViewingAllCompanies ? "Select a specific company to add bins" : ""}
-        >
+        <Button onClick={() => setIsCreateDialogOpen(true)}>
           <Plus className="mr-2 h-4 w-4" />
           Add Bin
         </Button>
       </div>
 
-      {isViewingAllCompanies && (
-        <Alert>
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription>
-            Viewing bins from all companies. Select a specific company to create or manage bins.
-          </AlertDescription>
-        </Alert>
-      )}
+      <Alert>
+        <AlertCircle className="h-4 w-4" />
+        <AlertDescription>
+          Bins are shared across all companies and scoped by warehouse location.
+        </AlertDescription>
+      </Alert>
 
       <div className="border rounded-lg">
         <Table>
