@@ -109,6 +109,7 @@ export function AddFromCatalogDialog({ open, onOpenChange }: AddFromCatalogDialo
           company_id: selectedCompany.id,
           current_stock: quantity,
           reserved_quantity: 0,
+          created_by: (await supabase.auth.getUser()).data.user?.id,
         })
         .select()
         .single();

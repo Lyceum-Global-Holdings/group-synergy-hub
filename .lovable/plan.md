@@ -1,21 +1,35 @@
 
 
-# Fix: RLS violation on `warehouse_items` insert
+## Plan: Restrict Location Dropdowns to User's Edit-Permitted Locations
 
-## Root Cause
+### Problem
+The "Add Item" and "Add Stock" dialogs in Construction Inventory show **all** locations, allowing users to add items to locations they don't have edit access to. For example, Shihan (who only has access to "Lyceum Wattala") can currently see and select any location.
 
-The INSERT RLS policy on `warehouse_items` requires `created_by = auth.uid()`. The `AddFromCatalogDialog.tsx` insert (line 88-112) does not set `created_by`, so it fails the policy check.
+### Solution
+Filter the location dropdowns in both dialogs using `useCurrentUserLocationPermissions()`, the same pattern already used in `NewTransferDialog.tsx`. Only locations where the user has explicit **edit** permissions will appear.
 
-## Change
+### Changes
 
-### `src/components/warehouse/AddFromCatalogDialog.tsx`
+**1. `src/components/construction/inventory/AddItemDialog.tsx`**
+- Import `useCurrentUserLocationPermissions`
+- Fetch permissions, then filter `locations` to only those in `editLocationIds`
+- Admin/Super Admin users (who get `viewAllLocations: true`) see all locations (unchanged behavior)
+- Use the filtered list for both the machine `current_location_id` and bulk `location_id` dropdowns
 
-Add `created_by` to the insert payload. This requires fetching the current user's ID first (via `supabase.auth.getUser()` or using an existing auth hook).
+**2. `src/components/construction/inventory/AddInventoryStockDialog.tsx`**
+- Same change: import `useCurrentUserLocationPermissions`, filter the location dropdown to edit-permitted locations only
 
-Add to the insert object at line ~109:
+### Pattern (from existing `NewTransferDialog.tsx`)
 ```typescript
-created_by: (await supabase.auth.getUser()).data.user?.id,
+const { data: permissions } = useCurrentUserLocationPermissions();
+
+const permittedLocations = useMemo(() => {
+  if (!locations || !permissions) return [];
+  if (permissions.viewAllLocations) return locations;
+  const permittedIds = new Set(permissions.editLocationIds);
+  return locations.filter(loc => permittedIds.has(loc.id));
+}, [locations, permissions]);
 ```
 
-This is a one-line fix that resolves the RLS violation.
+Two files changed, no new files.
 
