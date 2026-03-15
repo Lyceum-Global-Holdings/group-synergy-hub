@@ -56,7 +56,7 @@ export function BulkItemImportContent({ onSuccess, onCancel }: BulkItemImportCon
   const downloadTemplate = () => {
     const headers = [
       'item_code', 'name', 'description', 'category', 'unit', 'location',
-      'initial_stock', 'bin', 'reorder_level', 'min_stock_level', 'max_stock_level',
+      'reorder_level', 'min_stock_level', 'max_stock_level',
       'unit_cost', 'selling_price', 'barcode', 'sku', 'brand', 'manufacturer',
       'supplier', 'status', 'is_serialized', 'is_batch_tracked', 'notes', 'company'
     ];
