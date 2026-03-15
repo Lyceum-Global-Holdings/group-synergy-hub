@@ -1,35 +1,46 @@
 
+Goal: eliminate the `warehouse_items_item_code_company_id_key` crash during bulk import by catching all same-company `item_code` conflicts before any DB insert.
 
-## Plan: Restrict Location Dropdowns to User's Edit-Permitted Locations
+What I found
+- The failure happens in `BulkItemImportContent.tsx` during `bulkCreateItemsAsync(...)` (confirmed by console trace).
+- Current validation checks DB conflicts for `new` rows, but it does not fully prevent insert-time collisions inside the import batch itself.
+- This is why preview can still look valid, but import fails atomically with a unique-constraint error.
 
-### Problem
-The "Add Item" and "Add Stock" dialogs in Construction Inventory show **all** locations, allowing users to add items to locations they don't have edit access to. For example, Shihan (who only has access to "Lyceum Wattala") can currently see and select any location.
+Implementation plan
 
-### Solution
-Filter the location dropdowns in both dialogs using `useCurrentUserLocationPermissions()`, the same pattern already used in `NewTransferDialog.tsx`. Only locations where the user has explicit **edit** permissions will appear.
+1) Reintroduce strict CSV `item_code` collision validation (same company)
+- File: `src/components/warehouse/BulkItemImportContent.tsx`
+- Add normalized code helper (`trim + lowercase`) and build per-company code maps during parse.
+- Detect duplicate `item_code` values within the CSV for the target company and mark later rows as `error` (same behavior pattern already used for duplicate names/SKUs).
+- Keep current behavior of allowing the first valid row and skipping conflicting later rows.
 
-### Changes
+2) Strengthen DB conflict checks with deterministic indexing
+- In parse flow, precompute `targetCompanyItems` once (outside per-row loop) and build a `Set` for existing codes.
+- Validate `new` rows against this set (same-company only), consistently using normalized code values.
+- Keep name-based global detection logic as-is for existing item matching, but make code conflict checks strictly company-scoped.
 
-**1. `src/components/construction/inventory/AddItemDialog.tsx`**
-- Import `useCurrentUserLocationPermissions`
-- Fetch permissions, then filter `locations` to only those in `editLocationIds`
-- Admin/Super Admin users (who get `viewAllLocations: true`) see all locations (unchanged behavior)
-- Use the filtered list for both the machine `current_location_id` and bulk `location_id` dropdowns
+3) Add a final pre-import safety gate before `bulkCreateItemsAsync`
+- In `handleImport`, before insert:
+  - Re-check `newItems` for duplicate normalized `item_code` values.
+  - Re-check `newItems` against current selected-company DB codes.
+- If conflicts exist, do not call insert; update row errors in `parsedData`, set those rows to `error`, and show a clear toast like “X item codes conflict in this company”.
 
-**2. `src/components/construction/inventory/AddInventoryStockDialog.tsx`**
-- Same change: import `useCurrentUserLocationPermissions`, filter the location dropdown to edit-permitted locations only
+4) Improve user-facing error mapping (fallback protection)
+- File: `src/hooks/useWarehouseItems.ts`
+- Extend constraint parsing to include `warehouse_items_item_code_company_id_key` so users see a friendly message instead of raw Postgres text if a conflict ever slips through.
 
-### Pattern (from existing `NewTransferDialog.tsx`)
-```typescript
-const { data: permissions } = useCurrentUserLocationPermissions();
+Technical details
+- Primary file: `src/components/warehouse/BulkItemImportContent.tsx`
+  - Add normalized keying (`code + companyId`) for all code uniqueness checks.
+  - Add lightweight preflight guard in `handleImport` to prevent atomic insert failure.
+- Secondary file: `src/hooks/useWarehouseItems.ts`
+  - Add explicit message mapping for `warehouse_items_item_code_company_id_key`.
+- No DB schema/RLS migration needed.
 
-const permittedLocations = useMemo(() => {
-  if (!locations || !permissions) return [];
-  if (permissions.viewAllLocations) return locations;
-  const permittedIds = new Set(permissions.editLocationIds);
-  return locations.filter(loc => permittedIds.has(loc.id));
-}, [locations, permissions]);
-```
-
-Two files changed, no new files.
-
+Acceptance checks
+- Import CSV with two new rows sharing same `item_code` in selected company:
+  - Preview shows one as error, import proceeds without DB crash.
+- Import CSV where `item_code` already exists in selected company:
+  - Row marked error, no insert crash.
+- Import CSV with valid unique codes:
+  - Successful import and confirmation summary remains intact.
