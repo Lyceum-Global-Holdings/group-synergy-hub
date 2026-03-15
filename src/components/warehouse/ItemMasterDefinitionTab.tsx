@@ -221,11 +221,11 @@ export function ItemMasterDefinitionTab({ onNavigateToInventory, onNavigateToBin
               <TableRow>
                 <TableCell colSpan={14} className="text-center py-8 text-muted-foreground">Loading items...</TableCell>
               </TableRow>
-            ) : filteredItems.length === 0 ? (
+            ) : paginatedItems.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={14} className="text-center py-8 text-muted-foreground">No items found</TableCell>
               </TableRow>
-            ) : filteredItems.map(item => {
+            ) : paginatedItems.map(item => {
               const category = categories.find(c => c.id === item.category_id);
               const unit = units.find(u => u.id === item.unit_id);
               return (
