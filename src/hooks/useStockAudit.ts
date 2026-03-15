@@ -198,7 +198,6 @@ export function useStockAudit() {
         .update({
           allocated_quantity: newPrimaryQty,
           reserved_quantity: newReserved,
-          available_quantity: Math.max(0, newPrimaryQty - newReserved),
           updated_at: new Date().toISOString(),
         })
         .eq('id', primaryAlloc.id);
@@ -250,7 +249,6 @@ export function useStockAudit() {
             .update({
               allocated_quantity: newPrimaryQty,
               reserved_quantity: newReserved,
-              available_quantity: Math.max(0, newPrimaryQty - newReserved),
               updated_at: new Date().toISOString(),
             })
             .eq('id', primaryAlloc.id);
