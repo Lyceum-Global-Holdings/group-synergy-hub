@@ -349,15 +349,22 @@ export function BulkItemImportContent({ onSuccess, onCancel }: BulkItemImportCon
             existing.name?.toLowerCase() === item.name!.toLowerCase()
         );
 
+        // Filter items scoped to target company for per-company uniqueness checks
+        const targetCompanyItems = allExistingItems.filter(
+          existing => existing.company_id === selectedCompany?.id
+        );
+
         if (!existingByName) {
-          // Check item_code uniqueness for new items
-          const existsCodeInDb = allExistingItems.some(
-            existing =>
-              existing.item_code?.toLowerCase() === item.item_code?.toLowerCase()
-          );
-          if (existsCodeInDb) {
-            item.errors.push(`Item code "${item.item_code}" already exists in database`);
-            item.importStatus = 'error';
+          // Check item_code uniqueness only within target company (constraint is per-company)
+          if (item.item_code) {
+            const existsCodeInCompany = targetCompanyItems.some(
+              existing =>
+                existing.item_code?.toLowerCase() === item.item_code?.toLowerCase()
+            );
+            if (existsCodeInCompany) {
+              item.errors.push(`Item code "${item.item_code}" already exists in this company`);
+              item.importStatus = 'error';
+            }
           }
           // Check SKU uniqueness against DB for new items
           const itemSku = (item as any).sku;
@@ -378,9 +385,23 @@ export function BulkItemImportContent({ onSuccess, onCancel }: BulkItemImportCon
           existingByName.item_code?.toLowerCase() !== item.item_code?.toLowerCase() &&
           item.item_code
         ) {
-          item.importStatus = 'update_code';
-          item.existingId = existingByName.id;
-          item.existingItemCode = existingByName.item_code || '';
+          // Validate that the new code doesn't conflict within the existing item's company
+          const existingItemCompanyItems = allExistingItems.filter(
+            existing => existing.company_id === existingByName.company_id
+          );
+          const codeConflict = existingItemCompanyItems.some(
+            existing =>
+              existing.id !== existingByName.id &&
+              existing.item_code?.toLowerCase() === item.item_code?.toLowerCase()
+          );
+          if (codeConflict) {
+            item.errors.push(`Item code "${item.item_code}" already exists for this item's company`);
+            item.importStatus = 'error';
+          } else {
+            item.importStatus = 'update_code';
+            item.existingId = existingByName.id;
+            item.existingItemCode = existingByName.item_code || '';
+          }
         } else {
           item.importStatus = 'duplicate';
         }
