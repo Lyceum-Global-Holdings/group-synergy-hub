@@ -392,28 +392,24 @@ export function ItemMasterDefinitionTab({ onNavigateToInventory, onNavigateToBin
         </Table>
       </div>
 
-      <div className="flex items-center justify-between">
+      {/* Lazy load sentinel & status */}
+      <div className="flex flex-col items-center gap-2">
         <div className="text-sm text-muted-foreground">
-          Showing {showingFrom}–{showingTo} of {totalCount.toLocaleString()} items
+          Loaded {items.length.toLocaleString()} of {totalCount.toLocaleString()} items
         </div>
-        {totalPages > 1 && (
-          <div className="flex items-center gap-1">
-            <Button variant="outline" size="icon" className="h-8 w-8" disabled={currentPage === 1} onClick={() => setCurrentPage(1)}>
-              <ChevronsLeft className="h-4 w-4" />
-            </Button>
-            <Button variant="outline" size="icon" className="h-8 w-8" disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)}>
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <span className="text-sm text-muted-foreground px-2">
-              Page {currentPage} of {totalPages}
-            </span>
-            <Button variant="outline" size="icon" className="h-8 w-8" disabled={currentPage === totalPages} onClick={() => setCurrentPage(p => p + 1)}>
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-            <Button variant="outline" size="icon" className="h-8 w-8" disabled={currentPage === totalPages} onClick={() => setCurrentPage(totalPages)}>
-              <ChevronsRight className="h-4 w-4" />
-            </Button>
+        <div ref={sentinelRef} className="h-1" />
+        {isFetchingNextPage && (
+          <div className="flex items-center gap-2 text-sm text-muted-foreground py-2">
+            <Loader2 className="h-4 w-4 animate-spin" /> Loading more items...
           </div>
+        )}
+        {hasNextPage && !isFetchingNextPage && (
+          <Button variant="outline" size="sm" onClick={() => fetchNextPage()}>
+            Load more items
+          </Button>
+        )}
+        {!hasNextPage && items.length > 0 && (
+          <div className="text-sm text-muted-foreground">All items loaded</div>
         )}
       </div>
 
