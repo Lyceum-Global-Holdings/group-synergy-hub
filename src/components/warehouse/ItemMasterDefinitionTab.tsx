@@ -319,8 +319,30 @@ export function ItemMasterDefinitionTab({ onNavigateToInventory, onNavigateToBin
         </Table>
       </div>
 
-      <div className="text-sm text-muted-foreground">
-        Showing {filteredItems.length} of {items.length} items
+      <div className="flex items-center justify-between">
+        <div className="text-sm text-muted-foreground">
+          Showing {showingFrom}–{showingTo} of {filteredItems.length} items
+          {filteredItems.length !== items.length && ` (filtered from ${items.length})`}
+        </div>
+        {totalPages > 1 && (
+          <div className="flex items-center gap-1">
+            <Button variant="outline" size="icon" className="h-8 w-8" disabled={currentPage === 1} onClick={() => setCurrentPage(1)}>
+              <ChevronsLeft className="h-4 w-4" />
+            </Button>
+            <Button variant="outline" size="icon" className="h-8 w-8" disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)}>
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <span className="text-sm text-muted-foreground px-2">
+              Page {currentPage} of {totalPages}
+            </span>
+            <Button variant="outline" size="icon" className="h-8 w-8" disabled={currentPage === totalPages} onClick={() => setCurrentPage(p => p + 1)}>
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+            <Button variant="outline" size="icon" className="h-8 w-8" disabled={currentPage === totalPages} onClick={() => setCurrentPage(totalPages)}>
+              <ChevronsRight className="h-4 w-4" />
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* Dialogs */}
