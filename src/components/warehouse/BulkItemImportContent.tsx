@@ -51,7 +51,6 @@ export function BulkItemImportContent({ onSuccess, onCancel }: BulkItemImportCon
   const { data: suppliers = [] } = useSuppliers();
   const { companies, selectedCompany } = useCompany();
   const { locations } = useWarehouseLocations();
-  const { bins } = useWarehouseBins();
   const queryClient = useQueryClient();
 
   const downloadTemplate = () => {
