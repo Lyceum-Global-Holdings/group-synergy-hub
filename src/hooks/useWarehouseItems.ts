@@ -5,8 +5,9 @@ import { useToast } from '@/hooks/use-toast';
 import { useCompany } from '@/contexts/CompanyContext';
 import { useCurrentUserLocationPermissions } from '@/hooks/useCurrentUserLocationPermissions';
 
-export const useWarehouseItems = (options?: { skipCompanyFilter?: boolean }) => {
+export const useWarehouseItems = (options?: { skipCompanyFilter?: boolean; disableFetch?: boolean }) => {
   const skipCompanyFilter = options?.skipCompanyFilter ?? false;
+  const disableFetch = options?.disableFetch ?? false;
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { selectedCompany, isViewingAllCompanies } = useCompany();
