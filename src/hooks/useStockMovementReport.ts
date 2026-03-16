@@ -102,7 +102,6 @@ export const useStockMovementReport = () => {
         if (data) items.push(...data);
       }
       
-      if (itemsError) throw itemsError;
 
       // Get unique supplier IDs and fetch supplier names
       const supplierIds = [...new Set(

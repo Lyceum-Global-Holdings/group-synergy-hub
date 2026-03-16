@@ -264,7 +264,6 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
         if (data) locations.push(...data);
       }
       
-      if (locError) throw locError;
       
       const binLocationMap = new Map(bins.map(b => [b.id, b.location_id]));
       const locationNameMap = new Map(locations?.map(l => [l.id, l.name]) || []);
