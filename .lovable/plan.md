@@ -1,35 +1,28 @@
 
 
-## Plan: Restrict Location Dropdowns to User's Edit-Permitted Locations
+# Fix: Import from Catalog dialog UI alignment
 
-### Problem
-The "Add Item" and "Add Stock" dialogs in Construction Inventory show **all** locations, allowing users to add items to locations they don't have edit access to. For example, Shihan (who only has access to "Lyceum Wattala") can currently see and select any location.
+## Problem
 
-### Solution
-Filter the location dropdowns in both dialogs using `useCurrentUserLocationPermissions()`, the same pattern already used in `NewTransferDialog.tsx`. Only locations where the user has explicit **edit** permissions will appear.
+Looking at the screenshot, the item list rows lack visual structure — no "Select" badge is visible, items appear as plain text blocks without clear separation or interactive affordance. The dialog width (`sm:max-w-lg` = 512px) may be too narrow for the content, causing the badge to be pushed off or hidden.
 
-### Changes
+## Changes
 
-**1. `src/components/construction/inventory/AddItemDialog.tsx`**
-- Import `useCurrentUserLocationPermissions`
-- Fetch permissions, then filter `locations` to only those in `editLocationIds`
-- Admin/Super Admin users (who get `viewAllLocations: true`) see all locations (unchanged behavior)
-- Use the filtered list for both the machine `current_location_id` and bulk `location_id` dropdowns
+### File: `src/components/warehouse/AddFromCatalogDialog.tsx`
 
-**2. `src/components/construction/inventory/AddInventoryStockDialog.tsx`**
-- Same change: import `useCurrentUserLocationPermissions`, filter the location dropdown to edit-permitted locations only
+1. **Widen dialog**: Change `sm:max-w-lg` to `sm:max-w-2xl` (~672px) so item names, codes, and the Select badge all fit comfortably.
 
-### Pattern (from existing `NewTransferDialog.tsx`)
-```typescript
-const { data: permissions } = useCurrentUserLocationPermissions();
+2. **Improve item row structure**: Add a subtle border/background on hover, ensure the Select badge is always visible by giving it a distinct color, and add consistent padding:
+   - Add `rounded-md` to each button for cleaner row separation
+   - Change from `divide-y` on the container to individual row styling with `border-b last:border-b-0`
+   - Make the Badge more visible: use `variant="secondary"` or add a colored background
 
-const permittedLocations = useMemo(() => {
-  if (!locations || !permissions) return [];
-  if (permissions.viewAllLocations) return locations;
-  const permittedIds = new Set(permissions.editLocationIds);
-  return locations.filter(loc => permittedIds.has(loc.id));
-}, [locations, permissions]);
-```
+3. **Improve secondary text**: Show item code in a slightly styled mono badge-like container for better visual hierarchy:
+   ```
+   <span className="font-mono bg-muted px-1 rounded">{item.item_code}</span>
+   ```
 
-Two files changed, no new files.
+4. **Add hover cursor**: Add `cursor-pointer` to buttons.
+
+These are small CSS/class changes to the existing JSX structure (lines 281-299, line 254).
 
