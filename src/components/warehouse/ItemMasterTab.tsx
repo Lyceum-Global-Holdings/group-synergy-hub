@@ -45,7 +45,7 @@ import { StockMovementReportDialog } from '@/components/warehouse/StockMovementR
 import { AddFromCatalogDialog } from '@/components/warehouse/AddFromCatalogDialog';
 import { WarehouseItem } from '@/types/itemBin';
 import { supabase } from '@/integrations/supabase/client';
-import { useRealtimeStockUpdates } from '@/hooks/useRealtimeStockUpdates';
+
 import { useLocationFilter } from '@/contexts/LocationFilterContext';
 import { useWarehouseBinAllocations } from '@/hooks/useWarehouseBinAllocations';
 import { useIsAdminOrHigher } from '@/hooks/useIsAdminOrHigher';
