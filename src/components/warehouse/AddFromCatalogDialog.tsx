@@ -278,22 +278,22 @@ export function AddFromCatalogDialog({ open, onOpenChange }: AddFromCatalogDialo
                   {searchTerm ? 'No matching items found' : 'All catalog items are already in your inventory'}
                 </div>
               ) : (
-                <div className="divide-y">
+                <div>
                   {availableItems.map(item => (
                     <button
                       key={item.id}
-                      className="w-full text-left px-3 py-2.5 hover:bg-accent transition-colors flex items-start justify-between gap-3"
+                      className="w-full text-left px-4 py-3 hover:bg-accent transition-colors flex items-start justify-between gap-4 border-b last:border-b-0 cursor-pointer"
                       onClick={() => handleSelectItem(item)}
                     >
-                      <div className="flex-1 min-w-0 space-y-0.5">
-                        <div className="font-medium text-sm truncate">{item.name}</div>
-                        <div className="text-xs text-muted-foreground truncate">
-                          <span className="font-mono">{item.item_code}</span>
-                          {item.brand && <span> • {item.brand}</span>}
-                          <span> • {categoryName(item.category_id)}</span>
+                      <div className="flex-1 min-w-0 space-y-1">
+                        <div className="font-medium text-sm truncate text-foreground">{item.name}</div>
+                        <div className="text-xs text-muted-foreground flex items-center gap-2 truncate">
+                          <span className="font-mono bg-muted px-1 rounded text-[10px]">{item.item_code}</span>
+                          {item.brand && <span>• {item.brand}</span>}
+                          <span>• {categoryName(item.category_id)}</span>
                         </div>
                       </div>
-                      <Badge variant="outline" className="shrink-0 text-[10px] mt-0.5">Select</Badge>
+                      <Badge variant="secondary" className="shrink-0 text-[10px] mt-0.5">Select</Badge>
                     </button>
                   ))}
                 </div>
