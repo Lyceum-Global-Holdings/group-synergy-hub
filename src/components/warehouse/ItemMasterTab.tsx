@@ -3,7 +3,7 @@ import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Plus, Search, Edit, Trash2, History, Settings, Eye, ArrowLeftRight, MapPin, BarChart3, Wrench, Image as ImageIcon, X, Package, FileWarning, ChevronDown, Download, FileSpreadsheet, PackagePlus, Loader2 } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, History, Settings, Eye, ArrowLeftRight, MapPin, BarChart3, Wrench, Image as ImageIcon, X, Package, FileWarning, ChevronDown, Download, FileSpreadsheet, PackagePlus, Loader2, Columns3 } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -27,6 +27,7 @@ import {
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Checkbox } from '@/components/ui/checkbox';
 import { useWarehouseItems } from '@/hooks/useWarehouseItems';
 import { useWarehouseItemsLazyInventory } from '@/hooks/useWarehouseItemsLazyInventory';
 import { useItemCategories } from '@/hooks/useItemCategories';
@@ -53,6 +54,28 @@ import { AlertTriangle, ShieldAlert } from 'lucide-react';
 import { writeExcelFromJSON } from '@/utils/excelUtils';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
+
+const INV_COLUMN_DEFS = [
+  { key: 'photo', label: 'Photo', fixed: false },
+  { key: 'item_code', label: 'Item Code', fixed: false },
+  { key: 'name', label: 'Name', fixed: true },
+  { key: 'category', label: 'Category', fixed: false },
+  { key: 'unit', label: 'Unit', fixed: false },
+  { key: 'brand', label: 'Brand', fixed: false },
+  { key: 'supplier', label: 'Supplier', fixed: false },
+  { key: 'bin', label: 'Bin', fixed: false },
+  { key: 'company', label: 'Company', fixed: false },
+  { key: 'current_stock', label: 'Current Stock', fixed: false },
+  { key: 'unit_cost', label: 'Unit Cost', fixed: false },
+  { key: 'status', label: 'Status', fixed: false },
+  { key: 'actions', label: 'Actions', fixed: true },
+] as const;
+
+type InvColumnKey = typeof INV_COLUMN_DEFS[number]['key'];
+
+const INV_DEFAULT_VISIBLE: Record<InvColumnKey, boolean> = Object.fromEntries(
+  INV_COLUMN_DEFS.map(c => [c.key, true])
+) as Record<InvColumnKey, boolean>;
 
 interface LocationStock {
   locationId: string;
@@ -83,6 +106,7 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
   const [isFixOpeningStockDialogOpen, setIsFixOpeningStockDialogOpen] = useState(false);
   const [isStockMovementReportOpen, setIsStockMovementReportOpen] = useState(false);
   const [isImportCatalogOpen, setIsImportCatalogOpen] = useState(false);
+  const [visibleColumns, setVisibleColumns] = useState<Record<InvColumnKey, boolean>>(INV_DEFAULT_VISIBLE);
   
   // Filter states
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
@@ -90,6 +114,13 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [supplierFilter, setSupplierFilter] = useState<string>("all");
   const [previewImage, setPreviewImage] = useState<{ url: string; name: string } | null>(null);
+
+  const toggleColumn = (key: InvColumnKey) => {
+    setVisibleColumns(prev => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  const col = (key: InvColumnKey) => visibleColumns[key];
+  const visibleCount = Object.values(visibleColumns).filter(Boolean).length;
 
   // Debounce search
   useEffect(() => {
@@ -434,6 +465,26 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
             </span>
           </div>
           <div className="flex items-center gap-2">
+            {/* Column visibility toggle */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm">
+                  <Columns3 className="mr-2 h-4 w-4" />
+                  Columns
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48 p-2 space-y-1">
+                {INV_COLUMN_DEFS.filter(c => !c.fixed).map(colDef => (
+                  <label key={colDef.key} className="flex items-center gap-2 px-2 py-1 text-sm cursor-pointer hover:bg-accent rounded">
+                    <Checkbox
+                      checked={visibleColumns[colDef.key]}
+                      onCheckedChange={() => toggleColumn(colDef.key)}
+                    />
+                    {colDef.label}
+                  </label>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
             {canDelete && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -490,64 +541,66 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
       </div>
 
       <div className="border rounded-lg">
-        <Table>
+        <Table className="[&_td]:py-1.5 [&_th]:py-2">
           <TableHeader>
             <TableRow>
-              <TableHead className="w-[60px]">Photo</TableHead>
-              <TableHead>Item Code</TableHead>
+              {col('photo') && <TableHead className="w-[50px]">Photo</TableHead>}
+              {col('item_code') && <TableHead>Item Code</TableHead>}
               <TableHead>Name</TableHead>
-              <TableHead>Category</TableHead>
-              <TableHead>Unit</TableHead>
-              <TableHead>Brand</TableHead>
-              <TableHead>Supplier</TableHead>
-              <TableHead>Bin</TableHead>
-              <TableHead>Company</TableHead>
-              <TableHead className="text-right">Current Stock</TableHead>
-              <TableHead>Unit Cost</TableHead>
-              <TableHead>Status</TableHead>
+              {col('category') && <TableHead>Category</TableHead>}
+              {col('unit') && <TableHead>Unit</TableHead>}
+              {col('brand') && <TableHead>Brand</TableHead>}
+              {col('supplier') && <TableHead>Supplier</TableHead>}
+              {col('bin') && <TableHead>Bin</TableHead>}
+              {col('company') && <TableHead>Company</TableHead>}
+              {col('current_stock') && <TableHead className="text-right">Current Stock</TableHead>}
+              {col('unit_cost') && <TableHead>Unit Cost</TableHead>}
+              {col('status') && <TableHead>Status</TableHead>}
               <TableHead className="w-[100px]">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading ? (
               <TableRow>
-              <TableCell colSpan={13} className="text-center py-8">
+              <TableCell colSpan={visibleCount} className="text-center py-8">
                   Loading items...
                 </TableCell>
               </TableRow>
             ) : filteredItems.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={13} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={visibleCount} className="text-center py-8 text-muted-foreground">
                   No items found. Create your first item to get started.
                 </TableCell>
               </TableRow>
             ) : (
               filteredItems.map((item) => (
                 <TableRow key={item.id}>
-                  <TableCell>
-                    <div 
-                      className={`w-10 h-10 rounded border overflow-hidden bg-muted flex items-center justify-center ${item.image_url ? 'cursor-pointer hover:ring-2 hover:ring-primary transition-all' : ''}`}
-                      onClick={() => {
-                        if (item.image_url) {
-                          setPreviewImage({ url: item.image_url, name: item.name });
-                        }
-                      }}
-                    >
-                      {item.image_url ? (
-                        <img 
-                          src={item.image_url} 
-                          alt={item.name}
-                          className="w-full h-full object-cover"
-                          onError={(e) => {
-                            e.currentTarget.style.display = 'none';
-                            (e.currentTarget.parentElement?.querySelector('.placeholder-icon') as HTMLElement)?.classList.remove('hidden');
-                          }}
-                        />
-                      ) : null}
-                      <ImageIcon className={`h-5 w-5 text-muted-foreground placeholder-icon ${item.image_url ? 'hidden' : ''}`} />
-                    </div>
-                  </TableCell>
-                  <TableCell className="font-medium">{item.item_code}</TableCell>
+                  {col('photo') && (
+                    <TableCell>
+                      <div 
+                        className={`w-8 h-8 rounded border overflow-hidden bg-muted flex items-center justify-center ${item.image_url ? 'cursor-pointer hover:ring-2 hover:ring-primary transition-all' : ''}`}
+                        onClick={() => {
+                          if (item.image_url) {
+                            setPreviewImage({ url: item.image_url, name: item.name });
+                          }
+                        }}
+                      >
+                        {item.image_url ? (
+                          <img 
+                            src={item.image_url} 
+                            alt={item.name}
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                              e.currentTarget.style.display = 'none';
+                              (e.currentTarget.parentElement?.querySelector('.placeholder-icon') as HTMLElement)?.classList.remove('hidden');
+                            }}
+                          />
+                        ) : null}
+                        <ImageIcon className={`h-4 w-4 text-muted-foreground placeholder-icon ${item.image_url ? 'hidden' : ''}`} />
+                      </div>
+                    </TableCell>
+                  )}
+                  {col('item_code') && <TableCell className="font-medium">{item.item_code}</TableCell>}
                   <TableCell>
                     <div className="space-y-0.5">
                       <div className="font-medium">{item.name}</div>
@@ -558,154 +611,166 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
                       )}
                     </div>
                   </TableCell>
-                  <TableCell>
-                    {item.category_id 
-                      ? categories.find(c => c.id === item.category_id)?.name || '-'
-                      : '-'
-                    }
-                  </TableCell>
-                  <TableCell>
-                    {item.unit_id 
-                      ? units.find(u => u.id === item.unit_id)?.abbreviation || '-'
-                      : '-'
-                    }
-                  </TableCell>
-                  <TableCell>{item.brand || '-'}</TableCell>
-                  <TableCell>{item.supplier?.name || '-'}</TableCell>
-                  <TableCell>
-                    {item.bins && item.bins.length > 0 ? (
-                      <TooltipProvider>
-                        <div className="flex flex-wrap gap-1">
-                          {item.bins.slice(0, 2).map(bin => (
-                            <Tooltip key={bin.id}>
-                              <TooltipTrigger asChild>
-                                <Badge variant="outline" className="text-xs cursor-help">
-                                  <Package className="h-3 w-3 mr-1" />
-                                  {bin.bin_code}
-                                  <span className="ml-1 text-muted-foreground">({bin.quantity})</span>
-                                </Badge>
-                              </TooltipTrigger>
-                              <TooltipContent>
-                                <p>{bin.name} - Qty: {bin.quantity}</p>
-                              </TooltipContent>
-                            </Tooltip>
-                          ))}
-                          {item.bins.length > 2 && (
-                            <span className="text-xs text-muted-foreground">
-                              +{item.bins.length - 2} more
-                            </span>
-                          )}
-                        </div>
-                      </TooltipProvider>
-                    ) : (
-                      <span className="text-muted-foreground">-</span>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    {item.company_id 
-                      ? companies.find(c => c.id === item.company_id)?.name || '-'
-                      : 'All Companies'
-                    }
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex items-center justify-end gap-2">
-                      <div className="space-y-1 text-right min-w-[140px]">
-                        {itemLocationStock[item.id]?.length > 0 ? (
-                          <>
-                            {itemLocationStock[item.id].slice(0, 3).map((loc) => (
-                              <div key={loc.locationId} className="flex items-center justify-end gap-1.5 text-xs">
-                                <MapPin className="h-3 w-3 text-primary flex-shrink-0" />
-                                <span className="text-muted-foreground truncate max-w-[80px]">{loc.locationName}:</span>
-                                <span className={`font-medium ${
-                                  loc.stock <= (item.reorder_level || 0) ? 'text-destructive' : 'text-green-600'
-                                }`}>
-                                  {loc.stock}
-                                </span>
-                              </div>
+                  {col('category') && (
+                    <TableCell>
+                      {item.category_id 
+                        ? categories.find(c => c.id === item.category_id)?.name || '-'
+                        : '-'
+                      }
+                    </TableCell>
+                  )}
+                  {col('unit') && (
+                    <TableCell>
+                      {item.unit_id 
+                        ? units.find(u => u.id === item.unit_id)?.abbreviation || '-'
+                        : '-'
+                      }
+                    </TableCell>
+                  )}
+                  {col('brand') && <TableCell>{item.brand || '-'}</TableCell>}
+                  {col('supplier') && <TableCell>{item.supplier?.name || '-'}</TableCell>}
+                  {col('bin') && (
+                    <TableCell>
+                      {item.bins && item.bins.length > 0 ? (
+                        <TooltipProvider>
+                          <div className="flex flex-wrap gap-1">
+                            {item.bins.slice(0, 2).map(bin => (
+                              <Tooltip key={bin.id}>
+                                <TooltipTrigger asChild>
+                                  <Badge variant="outline" className="text-xs cursor-help">
+                                    <Package className="h-3 w-3 mr-1" />
+                                    {bin.bin_code}
+                                    <span className="ml-1 text-muted-foreground">({bin.quantity})</span>
+                                  </Badge>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p>{bin.name} - Qty: {bin.quantity}</p>
+                                </TooltipContent>
+                              </Tooltip>
                             ))}
-                            {itemLocationStock[item.id].length > 3 && (
-                              <div className="text-xs text-muted-foreground">
-                                +{itemLocationStock[item.id].length - 3} more locations
-                              </div>
-                            )}
-                            {(() => {
-                              const calculatedTotal = itemLocationStock[item.id]?.reduce((sum, loc) => sum + loc.stock, 0) || 0;
-                              const isOutOfSync = calculatedTotal !== (item.current_stock || 0);
-                              return (
-                                <div className="text-xs border-t border-border pt-1 mt-1 text-muted-foreground flex items-center justify-end gap-2">
-                                  {isOutOfSync && (
-                                    <span className="text-yellow-600" title={`DB shows ${item.current_stock || 0}, allocations total ${calculatedTotal}. Run Reconcile Stock to fix.`}>
-                                      ⚠️
-                                    </span>
-                                  )}
-                                  <span>Total: <span className="font-semibold text-foreground">{calculatedTotal}</span></span>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => setStockDetailsItem(item)}
-                                    className="p-0.5 h-5 w-5"
-                                    title="View Stock Details"
-                                  >
-                                    <BarChart3 className="h-3.5 w-3.5" />
-                                  </Button>
-                                </div>
-                              );
-                            })()}
-                          </>
-                        ) : (
-                          <div className="flex items-center justify-end gap-2">
-                            {(item.current_stock || 0) > 0 && (
-                              <span className="text-yellow-600" title={`Stock exists (${item.current_stock}) but no bin allocations. Run Reconcile Stock to fix.`}>
-                                ⚠️
+                            {item.bins.length > 2 && (
+                              <span className="text-xs text-muted-foreground">
+                                +{item.bins.length - 2} more
                               </span>
                             )}
-                            <span className={`font-medium ${
-                              (item.current_stock || 0) <= (item.reorder_level || 0) ? 'text-destructive' : 
-                              (item.current_stock || 0) <= (item.min_stock_level || 0) ? 'text-yellow-600' : 
-                              'text-green-600'
-                            }`}>
-                              {item.current_stock || 0}
-                            </span>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => setStockDetailsItem(item)}
-                              className="p-0.5 h-5 w-5"
-                              title="View Stock Details"
-                            >
-                              <BarChart3 className="h-3.5 w-3.5" />
-                            </Button>
                           </div>
-                        )}
+                        </TooltipProvider>
+                      ) : (
+                        <span className="text-muted-foreground">-</span>
+                      )}
+                    </TableCell>
+                  )}
+                  {col('company') && (
+                    <TableCell>
+                      {item.company_id 
+                        ? companies.find(c => c.id === item.company_id)?.name || '-'
+                        : 'All Companies'
+                      }
+                    </TableCell>
+                  )}
+                  {col('current_stock') && (
+                    <TableCell className="text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        <div className="space-y-1 text-right min-w-[140px]">
+                          {itemLocationStock[item.id]?.length > 0 ? (
+                            <>
+                              {itemLocationStock[item.id].slice(0, 3).map((loc) => (
+                                <div key={loc.locationId} className="flex items-center justify-end gap-1.5 text-xs">
+                                  <MapPin className="h-3 w-3 text-primary flex-shrink-0" />
+                                  <span className="text-muted-foreground truncate max-w-[80px]">{loc.locationName}:</span>
+                                  <span className={`font-medium ${
+                                    loc.stock <= (item.reorder_level || 0) ? 'text-destructive' : 'text-green-600'
+                                  }`}>
+                                    {loc.stock}
+                                  </span>
+                                </div>
+                              ))}
+                              {itemLocationStock[item.id].length > 3 && (
+                                <div className="text-xs text-muted-foreground">
+                                  +{itemLocationStock[item.id].length - 3} more locations
+                                </div>
+                              )}
+                              {(() => {
+                                const calculatedTotal = itemLocationStock[item.id]?.reduce((sum, loc) => sum + loc.stock, 0) || 0;
+                                const isOutOfSync = calculatedTotal !== (item.current_stock || 0);
+                                return (
+                                  <div className="text-xs border-t border-border pt-1 mt-1 text-muted-foreground flex items-center justify-end gap-2">
+                                    {isOutOfSync && (
+                                      <span className="text-yellow-600" title={`DB shows ${item.current_stock || 0}, allocations total ${calculatedTotal}. Run Reconcile Stock to fix.`}>
+                                        ⚠️
+                                      </span>
+                                    )}
+                                    <span>Total: <span className="font-semibold text-foreground">{calculatedTotal}</span></span>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => setStockDetailsItem(item)}
+                                      className="p-0.5 h-5 w-5"
+                                      title="View Stock Details"
+                                    >
+                                      <BarChart3 className="h-3.5 w-3.5" />
+                                    </Button>
+                                  </div>
+                                );
+                              })()}
+                            </>
+                          ) : (
+                            <div className="flex items-center justify-end gap-2">
+                              {(item.current_stock || 0) > 0 && (
+                                <span className="text-yellow-600" title={`Stock exists (${item.current_stock}) but no bin allocations. Run Reconcile Stock to fix.`}>
+                                  ⚠️
+                                </span>
+                              )}
+                              <span className={`font-medium ${
+                                (item.current_stock || 0) <= (item.reorder_level || 0) ? 'text-destructive' : 
+                                (item.current_stock || 0) <= (item.min_stock_level || 0) ? 'text-yellow-600' : 
+                                'text-green-600'
+                              }`}>
+                                {item.current_stock || 0}
+                              </span>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setStockDetailsItem(item)}
+                                className="p-0.5 h-5 w-5"
+                                title="View Stock Details"
+                              >
+                                <BarChart3 className="h-3.5 w-3.5" />
+                              </Button>
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex flex-col gap-0.5">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setStockAdjustmentItem(item)}
+                            className="p-1 h-6 w-6"
+                            title="Adjust Stock"
+                          >
+                            <Settings className="h-3 w-3" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setStockMovementItem(item)}
+                            className="p-1 h-6 w-6"
+                            title="View History"
+                          >
+                            <History className="h-3 w-3" />
+                          </Button>
+                        </div>
                       </div>
-                      <div className="flex flex-col gap-0.5">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setStockAdjustmentItem(item)}
-                          className="p-1 h-6 w-6"
-                          title="Adjust Stock"
-                        >
-                          <Settings className="h-3 w-3" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setStockMovementItem(item)}
-                          className="p-1 h-6 w-6"
-                          title="View History"
-                        >
-                          <History className="h-3 w-3" />
-                        </Button>
-                      </div>
-                    </div>
-                  </TableCell>
-                  <TableCell>{item.unit_cost ? `LKR ${item.unit_cost}` : '-'}</TableCell>
-                  <TableCell>
-                    <Badge className={getStatusColor(item.status)}>
-                      {item.status}
-                    </Badge>
-                  </TableCell>
+                    </TableCell>
+                  )}
+                  {col('unit_cost') && <TableCell>{item.unit_cost ? `LKR ${item.unit_cost}` : '-'}</TableCell>}
+                  {col('status') && (
+                    <TableCell>
+                      <Badge className={getStatusColor(item.status)}>
+                        {item.status}
+                      </Badge>
+                    </TableCell>
+                  )}
                   <TableCell>
                     <div className="flex items-center space-x-1">
                       <Button
