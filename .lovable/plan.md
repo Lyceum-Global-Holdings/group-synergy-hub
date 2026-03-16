@@ -1,35 +1,19 @@
 
 
-## Plan: Restrict Location Dropdowns to User's Edit-Permitted Locations
+# Fix: Allow re-importing catalog items after inventory removal
 
-### Problem
-The "Add Item" and "Add Stock" dialogs in Construction Inventory show **all** locations, allowing users to add items to locations they don't have edit access to. For example, Shihan (who only has access to "Lyceum Wattala") can currently see and select any location.
+## Problem
+Line 56-60 in `AddFromCatalogDialog.tsx` fetches ALL `warehouse_items` for the company with a non-null `catalog_item_id` — including items with `current_stock = 0` (removed items). These are added to the exclusion set, preventing re-import.
 
-### Solution
-Filter the location dropdowns in both dialogs using `useCurrentUserLocationPermissions()`, the same pattern already used in `NewTransferDialog.tsx`. Only locations where the user has explicit **edit** permissions will appear.
+## Fix
+Add `.gt('current_stock', 0)` to the query on line 59 so that removed items (stock = 0) are not excluded from the catalog import list.
 
-### Changes
-
-**1. `src/components/construction/inventory/AddItemDialog.tsx`**
-- Import `useCurrentUserLocationPermissions`
-- Fetch permissions, then filter `locations` to only those in `editLocationIds`
-- Admin/Super Admin users (who get `viewAllLocations: true`) see all locations (unchanged behavior)
-- Use the filtered list for both the machine `current_location_id` and bulk `location_id` dropdowns
-
-**2. `src/components/construction/inventory/AddInventoryStockDialog.tsx`**
-- Same change: import `useCurrentUserLocationPermissions`, filter the location dropdown to edit-permitted locations only
-
-### Pattern (from existing `NewTransferDialog.tsx`)
+### File: `src/components/warehouse/AddFromCatalogDialog.tsx`
+**Line 59** — add filter:
 ```typescript
-const { data: permissions } = useCurrentUserLocationPermissions();
-
-const permittedLocations = useMemo(() => {
-  if (!locations || !permissions) return [];
-  if (permissions.viewAllLocations) return locations;
-  const permittedIds = new Set(permissions.editLocationIds);
-  return locations.filter(loc => permittedIds.has(loc.id));
-}, [locations, permissions]);
+.not('catalog_item_id', 'is', null)
+.gt('current_stock', 0);   // ← add this line
 ```
 
-Two files changed, no new files.
+Single line change. No other files affected.
 
