@@ -278,7 +278,7 @@ export function AddFromCatalogDialog({ open, onOpenChange }: AddFromCatalogDialo
                   {searchTerm ? 'No matching items found' : 'All catalog items are already in your inventory'}
                 </div>
               ) : (
-                <div>
+                <div className="overflow-hidden">
                   {availableItems.map(item => (
                     <button
                       key={item.id}
