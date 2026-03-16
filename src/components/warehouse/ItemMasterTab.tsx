@@ -155,9 +155,8 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
   const { companies, selectedCompany } = useCompany();
   const { categories } = useItemCategories(selectedCompany?.id);
   const { units } = useItemUnits();
-  const { migrateAllocationsToCorrectLocation, isMigrating, reconcileStock, isReconciling, fixAllocationsFromHistory, isFixingFromHistory } = useWarehouseBinAllocations();
+  const { migrateAllocationsToCorrectLocation, isMigrating, reconcileStock, isReconciling, fixAllocationsFromHistory, isFixingFromHistory } = useWarehouseBinAllocations({ disableFetch: true });
   const { canDelete } = useIsAdminOrHigher();
-  const { summary } = useStockAudit();
 
   // Flatten all pages into a single items array
   const allItems = useMemo(() => {
