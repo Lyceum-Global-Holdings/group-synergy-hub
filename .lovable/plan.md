@@ -1,35 +1,25 @@
 
 
-## Plan: Restrict Location Dropdowns to User's Edit-Permitted Locations
+# Status: Already Implemented
 
-### Problem
-The "Add Item" and "Add Stock" dialogs in Construction Inventory show **all** locations, allowing users to add items to locations they don't have edit access to. For example, Shihan (who only has access to "Lyceum Wattala") can currently see and select any location.
+The 2-table separation was fully implemented in the previous response. Here is the current state:
 
-### Solution
-Filter the location dropdowns in both dialogs using `useCurrentUserLocationPermissions()`, the same pattern already used in `NewTransferDialog.tsx`. Only locations where the user has explicit **edit** permissions will appear.
+## Database (confirmed via live queries)
+- `warehouse_item_catalog`: **14,655 rows** (global catalog, no company_id)
+- `warehouse_items`: **14,654 rows**, all with `catalog_item_id` backfilled
+- RLS policies active on both tables
+- Migration already applied successfully
 
-### Changes
+## Code (confirmed via file inspection)
+- **`useWarehouseItemCatalog.ts`** — CRUD hook for catalog table (created)
+- **`useWarehouseItemsPaged.ts`** — queries `warehouse_item_catalog` for Item Master tab (updated)
+- **`ItemMasterDefinitionTab.tsx`** — uses catalog hook for delete/inactive (updated)
+- **`SingleItemForm.tsx`** — supports `mode='catalog'` vs `mode='inventory'` (updated)
+- **`AddFromCatalogDialog.tsx`** — queries catalog, creates inventory rows with `catalog_item_id` (updated)
+- **`BulkItemImportContent.tsx`** — inserts into catalog table (updated)
+- **`CatalogItem` type** — defined in `src/types/itemBin.ts` (created)
 
-**1. `src/components/construction/inventory/AddItemDialog.tsx`**
-- Import `useCurrentUserLocationPermissions`
-- Fetch permissions, then filter `locations` to only those in `editLocationIds`
-- Admin/Super Admin users (who get `viewAllLocations: true`) see all locations (unchanged behavior)
-- Use the filtered list for both the machine `current_location_id` and bulk `location_id` dropdowns
+## No further changes needed
 
-**2. `src/components/construction/inventory/AddInventoryStockDialog.tsx`**
-- Same change: import `useCurrentUserLocationPermissions`, filter the location dropdown to edit-permitted locations only
-
-### Pattern (from existing `NewTransferDialog.tsx`)
-```typescript
-const { data: permissions } = useCurrentUserLocationPermissions();
-
-const permittedLocations = useMemo(() => {
-  if (!locations || !permissions) return [];
-  if (permissions.viewAllLocations) return locations;
-  const permittedIds = new Set(permissions.editLocationIds);
-  return locations.filter(loc => permittedIds.has(loc.id));
-}, [locations, permissions]);
-```
-
-Two files changed, no new files.
+Everything from the approved plan has been executed. If something is not working as expected, please describe the specific issue (e.g., "items don't show up", "import fails") so I can diagnose and fix it.
 
