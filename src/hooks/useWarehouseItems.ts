@@ -20,19 +20,46 @@ export const useWarehouseItems = (options?: { skipCompanyFilter?: boolean; disab
   } = useQuery({
     queryKey: ['warehouse-items', skipCompanyFilter ? 'all' : selectedCompany?.id, isViewingAllCompanies, permissions?.viewAllLocations, permissions?.viewLocationIds, permissions?.editLocationIds],
     queryFn: async () => {
-      let query = supabase
-        .from('warehouse_items')
-        .select(`
-          *,
-          supplier:suppliers(id, name)
-        `);
+      // Cursor-based batching to bypass the 1,000-row Supabase limit
+      const BATCH_SIZE = 1000;
+      const allData: any[] = [];
+      let cursor: { created_at: string; id: string } | null = null;
 
-      // Filter by company if not viewing all companies (skip for global item master)
-      if (!skipCompanyFilter && !isViewingAllCompanies && selectedCompany?.id) {
-        query = query.eq('company_id', selectedCompany.id);
+      while (true) {
+        let query = supabase
+          .from('warehouse_items')
+          .select(`
+            *,
+            supplier:suppliers(id, name)
+          `);
+
+        // Filter by company if not viewing all companies (skip for global item master)
+        if (!skipCompanyFilter && !isViewingAllCompanies && selectedCompany?.id) {
+          query = query.eq('company_id', selectedCompany.id);
+        }
+
+        query = query.order('created_at', { ascending: false }).order('id', { ascending: false });
+
+        if (cursor) {
+          query = query.or(
+            `created_at.lt.${cursor.created_at},and(created_at.eq.${cursor.created_at},id.lt.${cursor.id})`
+          );
+        }
+
+        query = query.limit(BATCH_SIZE);
+
+        const { data: batch, error: batchError } = await query;
+        if (batchError) throw batchError;
+
+        const rows = batch || [];
+        allData.push(...rows);
+
+        if (rows.length < BATCH_SIZE) break;
+        const last = rows[rows.length - 1];
+        cursor = { created_at: last.created_at, id: last.id };
       }
 
-      const { data, error } = await query.order('created_at', { ascending: false }).limit(20000);
+      const data = allData;
 
       if (error) throw error;
 
