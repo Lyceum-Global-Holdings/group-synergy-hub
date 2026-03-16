@@ -16,9 +16,10 @@ interface AddItemsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   editingItem?: WarehouseItem | null;
+  mode?: 'catalog' | 'inventory';
 }
 
-export function AddItemsDialog({ open, onOpenChange, editingItem }: AddItemsDialogProps) {
+export function AddItemsDialog({ open, onOpenChange, editingItem, mode = 'inventory' }: AddItemsDialogProps) {
   const [activeTab, setActiveTab] = useState<string>('single');
 
   // Force single tab when editing and reset tab on close
