@@ -90,10 +90,28 @@ export const useWarehouseItems = (options?: { skipCompanyFilter?: boolean; disab
         const permittedBinIds = new Set(bins?.map(b => b.id) || []);
 
         // Fetch ALL allocations with stock
-        const { data: allocations, error: allocError } = await supabase
-          .from('warehouse_bin_allocations')
-          .select('warehouse_item_id, bin_id, available_quantity')
-          .gt('available_quantity', 0);
+        // Batch-fetch allocations to bypass 1,000-row limit
+        const allAllocations: any[] = [];
+        let allocCursor: { id: string } | null = null;
+        let allocError: any = null;
+        while (true) {
+          let aq = supabase
+            .from('warehouse_bin_allocations')
+            .select('id, warehouse_item_id, bin_id, available_quantity')
+            .gt('available_quantity', 0)
+            .order('id', { ascending: true });
+          if (allocCursor) {
+            aq = aq.gt('id', allocCursor.id);
+          }
+          aq = aq.limit(1000);
+          const { data: aBatch, error: aErr } = await aq;
+          if (aErr) { allocError = aErr; break; }
+          const aRows = aBatch || [];
+          allAllocations.push(...aRows);
+          if (aRows.length < 1000) break;
+          allocCursor = { id: aRows[aRows.length - 1].id };
+        }
+        const allocations = allAllocations;
 
         const itemIdSet = new Set(itemIds);
 
