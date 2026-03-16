@@ -45,7 +45,7 @@ export function BulkItemImportContent({ onSuccess, onCancel }: BulkItemImportCon
 
   const { toast } = useToast();
   const { bulkCreateItemsAsync, isBulkCreating, items: allExistingItems } = useWarehouseItemCatalog();
-  const { items: allExistingItems = [] } = useWarehouseItems({ skipCompanyFilter: true });
+  // allExistingItems comes from useWarehouseItemCatalog above
   const { categories } = useItemCategories();
   const { units } = useItemUnits();
   const { data: suppliers = [] } = useSuppliers();
