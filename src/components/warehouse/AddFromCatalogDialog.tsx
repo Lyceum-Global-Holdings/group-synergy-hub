@@ -282,18 +282,18 @@ export function AddFromCatalogDialog({ open, onOpenChange }: AddFromCatalogDialo
                   {availableItems.map(item => (
                     <button
                       key={item.id}
-                      className="w-full text-left px-3 py-2.5 hover:bg-accent transition-colors flex items-center justify-between gap-2"
+                      className="w-full text-left px-3 py-2.5 hover:bg-accent transition-colors flex items-start justify-between gap-3"
                       onClick={() => handleSelectItem(item)}
                     >
-                      <div className="min-w-0">
+                      <div className="flex-1 min-w-0 space-y-0.5">
                         <div className="font-medium text-sm truncate">{item.name}</div>
-                        <div className="text-xs text-muted-foreground flex items-center gap-2">
+                        <div className="text-xs text-muted-foreground truncate">
                           <span className="font-mono">{item.item_code}</span>
-                          {item.brand && <span>• {item.brand}</span>}
-                          <span>• {categoryName(item.category_id)}</span>
+                          {item.brand && <span> • {item.brand}</span>}
+                          <span> • {categoryName(item.category_id)}</span>
                         </div>
                       </div>
-                      <Badge variant="outline" className="shrink-0 text-[10px]">Select</Badge>
+                      <Badge variant="outline" className="shrink-0 text-[10px] mt-0.5">Select</Badge>
                     </button>
                   ))}
                 </div>
