@@ -17,8 +17,9 @@ interface UseWarehouseItemsLazyOptions {
 
 function getSearchOrString(search?: string): string | null {
   if (!search?.trim()) return null;
-  const term = `%${search.trim()}%`;
-  return `name.ilike.${term},item_code.ilike.${term},brand.ilike.${term},barcode.ilike.${term},sku.ilike.${term}`;
+  const escaped = search.trim().replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+  const term = `%${escaped}%`;
+  return `name.ilike."${term}",item_code.ilike."${term}",brand.ilike."${term}",barcode.ilike."${term}",sku.ilike."${term}"`;
 }
 
 function buildFilteredQuery(
