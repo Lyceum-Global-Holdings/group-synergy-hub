@@ -93,6 +93,7 @@ interface ItemMasterTabProps {
 
 export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
   useRealtimeStockUpdates();
+  const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
