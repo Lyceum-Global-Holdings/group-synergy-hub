@@ -144,3 +144,59 @@ export interface CreateWarehouseItemData {
   image_url?: string;
   company_id?: string;
 }
+
+export interface CatalogItem {
+  id: string;
+  item_code: string;
+  name: string;
+  description: string | null;
+  category_id: string | null;
+  unit_id: string | null;
+  location_id: string | null;
+  brand: string | null;
+  manufacturer: string | null;
+  supplier_id: string | null;
+  supplier?: {
+    id: string;
+    name: string;
+  } | null;
+  barcode: string | null;
+  sku: string | null;
+  unit_cost: number | null;
+  selling_price: number | null;
+  reorder_level: number | null;
+  min_stock_level: number | null;
+  max_stock_level: number | null;
+  image_url: string | null;
+  is_serialized: boolean;
+  is_batch_tracked: boolean;
+  status: 'active' | 'inactive' | 'discontinued';
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+  created_by: string | null;
+}
+
+export interface CreateCatalogItemData {
+  item_code: string;
+  name: string;
+  description?: string;
+  category_id?: string;
+  unit_id?: string;
+  location_id?: string;
+  brand?: string;
+  manufacturer?: string;
+  supplier_id?: string;
+  barcode?: string;
+  sku?: string;
+  unit_cost?: number;
+  selling_price?: number;
+  reorder_level?: number;
+  min_stock_level?: number;
+  max_stock_level?: number;
+  image_url?: string;
+  is_serialized?: boolean;
+  is_batch_tracked?: boolean;
+  status: 'active' | 'inactive' | 'discontinued';
+  notes?: string;
+}
