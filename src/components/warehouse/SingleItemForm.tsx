@@ -549,7 +549,7 @@ export function SingleItemForm({ editingItem, onSuccess, onCancel, mode = 'inven
         </div>
       </div>
 
-      {!editingItem && (
+      {!editingItem && mode === 'inventory' && (
         <>
           <div className="space-y-2">
             <Label htmlFor="initial_stock">Initial Stock (Opening Balance)</Label>
