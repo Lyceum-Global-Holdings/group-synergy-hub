@@ -20,21 +20,48 @@ export const useWarehouseItems = (options?: { skipCompanyFilter?: boolean; disab
   } = useQuery({
     queryKey: ['warehouse-items', skipCompanyFilter ? 'all' : selectedCompany?.id, isViewingAllCompanies, permissions?.viewAllLocations, permissions?.viewLocationIds, permissions?.editLocationIds],
     queryFn: async () => {
-      let query = supabase
-        .from('warehouse_items')
-        .select(`
-          *,
-          supplier:suppliers(id, name)
-        `);
+      // Cursor-based batching to bypass the 1,000-row Supabase limit
+      const BATCH_SIZE = 1000;
+      const allData: any[] = [];
+      let cursor: { created_at: string; id: string } | null = null;
 
-      // Filter by company if not viewing all companies (skip for global item master)
-      if (!skipCompanyFilter && !isViewingAllCompanies && selectedCompany?.id) {
-        query = query.eq('company_id', selectedCompany.id);
+      while (true) {
+        let query = supabase
+          .from('warehouse_items')
+          .select(`
+            *,
+            supplier:suppliers(id, name)
+          `);
+
+        // Filter by company if not viewing all companies (skip for global item master)
+        if (!skipCompanyFilter && !isViewingAllCompanies && selectedCompany?.id) {
+          query = query.eq('company_id', selectedCompany.id);
+        }
+
+        query = query.order('created_at', { ascending: false }).order('id', { ascending: false });
+
+        if (cursor) {
+          query = query.or(
+            `created_at.lt.${cursor.created_at},and(created_at.eq.${cursor.created_at},id.lt.${cursor.id})`
+          );
+        }
+
+        query = query.limit(BATCH_SIZE);
+
+        const { data: batch, error: batchError } = await query;
+        if (batchError) throw batchError;
+
+        const rows = batch || [];
+        allData.push(...rows);
+
+        if (rows.length < BATCH_SIZE) break;
+        const last = rows[rows.length - 1];
+        cursor = { created_at: last.created_at, id: last.id };
       }
 
-      const { data, error } = await query.order('created_at', { ascending: false }).limit(20000);
+      const data = allData;
 
-      if (error) throw error;
+      // error handling is done per-batch above
 
       // Fetch bin allocations for all items using separate queries (more reliable than nested syntax)
       const itemIds = data?.map((item: any) => item.id) || [];
@@ -63,10 +90,28 @@ export const useWarehouseItems = (options?: { skipCompanyFilter?: boolean; disab
         const permittedBinIds = new Set(bins?.map(b => b.id) || []);
 
         // Fetch ALL allocations with stock
-        const { data: allocations, error: allocError } = await supabase
-          .from('warehouse_bin_allocations')
-          .select('warehouse_item_id, bin_id, available_quantity')
-          .gt('available_quantity', 0);
+        // Batch-fetch allocations to bypass 1,000-row limit
+        const allAllocations: any[] = [];
+        let allocCursor: { id: string } | null = null;
+        let allocError: any = null;
+        while (true) {
+          let aq = supabase
+            .from('warehouse_bin_allocations')
+            .select('id, warehouse_item_id, bin_id, available_quantity')
+            .gt('available_quantity', 0)
+            .order('id', { ascending: true });
+          if (allocCursor) {
+            aq = aq.gt('id', allocCursor.id);
+          }
+          aq = aq.limit(1000);
+          const { data: aBatch, error: aErr } = await aq;
+          if (aErr) { allocError = aErr; break; }
+          const aRows = aBatch || [];
+          allAllocations.push(...aRows);
+          if (aRows.length < 1000) break;
+          allocCursor = { id: aRows[aRows.length - 1].id };
+        }
+        const allocations = allAllocations;
 
         const itemIdSet = new Set(itemIds);
 

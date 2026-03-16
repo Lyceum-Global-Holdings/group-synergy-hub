@@ -12,12 +12,38 @@ export function useWarehouseItemCatalog(options?: { disableFetch?: boolean }) {
   const { data: items = [], isLoading, error } = useQuery({
     queryKey: CATALOG_QUERY_KEY,
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('warehouse_item_catalog')
-        .select('*, supplier:suppliers(id, name)')
-        .order('created_at', { ascending: false });
-      if (error) throw error;
-      return (data || []) as unknown as CatalogItem[];
+      // Cursor-based batching to bypass the 1,000-row Supabase limit
+      const BATCH_SIZE = 1000;
+      const allData: any[] = [];
+      let cursor: { created_at: string; id: string } | null = null;
+
+      while (true) {
+        let query = supabase
+          .from('warehouse_item_catalog')
+          .select('*, supplier:suppliers(id, name)')
+          .order('created_at', { ascending: false })
+          .order('id', { ascending: false });
+
+        if (cursor) {
+          query = query.or(
+            `created_at.lt.${cursor.created_at},and(created_at.eq.${cursor.created_at},id.lt.${cursor.id})`
+          );
+        }
+
+        query = query.limit(BATCH_SIZE);
+
+        const { data: batch, error: batchError } = await query;
+        if (batchError) throw batchError;
+
+        const rows = batch || [];
+        allData.push(...rows);
+
+        if (rows.length < BATCH_SIZE) break;
+        const last = rows[rows.length - 1];
+        cursor = { created_at: last.created_at, id: last.id };
+      }
+
+      return allData as unknown as CatalogItem[];
     },
     enabled: !(options?.disableFetch),
   });
