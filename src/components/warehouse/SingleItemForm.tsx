@@ -99,7 +99,7 @@ export function SingleItemForm({ editingItem, onSuccess, onCancel, mode = 'inven
         brand: editingItem.brand || '',
         manufacturer: editingItem.manufacturer || '',
         supplier_id: editingItem.supplier_id || '',
-        company_id: editingItem.company_id || '',
+        company_id: ('company_id' in editingItem ? editingItem.company_id : '') || '',
         unit_cost: editingItem.unit_cost?.toString() || '',
         selling_price: editingItem.selling_price?.toString() || '',
         reorder_level: editingItem.reorder_level?.toString() || '',
