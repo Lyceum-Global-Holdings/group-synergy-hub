@@ -46,6 +46,7 @@ import { AddFromCatalogDialog } from '@/components/warehouse/AddFromCatalogDialo
 import { WarehouseItem } from '@/types/itemBin';
 import { supabase } from '@/integrations/supabase/client';
 import { useRealtimeStockUpdates } from '@/hooks/useRealtimeStockUpdates';
+import { useLocationFilter } from '@/contexts/LocationFilterContext';
 import { useWarehouseBinAllocations } from '@/hooks/useWarehouseBinAllocations';
 import { useIsAdminOrHigher } from '@/hooks/useIsAdminOrHigher';
 import { useStockAudit } from '@/hooks/useStockAudit';
@@ -94,6 +95,7 @@ interface ItemMasterTabProps {
 export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
   useRealtimeStockUpdates();
   const queryClient = useQueryClient();
+  const { globalLocationId } = useLocationFilter();
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
@@ -142,6 +144,7 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
     categoryId: categoryFilter,
     status: statusFilter,
     supplierId: supplierFilter,
+    locationId: globalLocationId,
   });
 
   // Keep mutations via the old hook with fetching disabled
@@ -209,8 +212,19 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
 
   // Fetch stock by location for all items
   const { data: itemLocationStock = {} } = useQuery<ItemLocationStockMap>({
-    queryKey: ['all-items-location-stock'],
+    queryKey: ['all-items-location-stock', globalLocationId],
     queryFn: async () => {
+      // When a specific location is selected, pre-fetch its bin IDs for scoping
+      let locationBinIds: string[] | null = null;
+      if (globalLocationId) {
+        const { data: locBins } = await supabase
+          .from('warehouse_bins')
+          .select('id')
+          .eq('location_id', globalLocationId);
+        locationBinIds = locBins?.map(b => b.id) || [];
+        if (locationBinIds.length === 0) return {};
+      }
+
       // Fetch allocations with cursor-based batching
       const allocations: { warehouse_item_id: string; bin_id: string; available_quantity: number }[] = [];
       let lastAllocId: string | null = null;
@@ -222,6 +236,11 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
           .order('id')
           .limit(1000);
         if (lastAllocId) q = q.gt('id', lastAllocId);
+        // Scope to location bins if a location is selected
+        if (locationBinIds) {
+          // Chunk bin IDs in case there are many
+          q = q.in('bin_id', locationBinIds.slice(0, 500));
+        }
         const { data, error: allocError } = await q;
         if (allocError) throw allocError;
         if (!data || data.length === 0) break;

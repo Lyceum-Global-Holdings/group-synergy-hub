@@ -15,6 +15,7 @@ interface UseWarehouseItemsLazyInventoryOptions {
   categoryId?: string;
   status?: string;
   supplierId?: string;
+  locationId?: string | null;
 }
 
 const MAX_ITEMS = 20000;
@@ -29,6 +30,7 @@ export function useWarehouseItemsLazyInventory({
   categoryId,
   status,
   supplierId,
+  locationId,
 }: UseWarehouseItemsLazyInventoryOptions) {
   const { selectedCompany, isViewingAllCompanies } = useCompany();
   const { data: permissions } = useCurrentUserLocationPermissions();
@@ -40,6 +42,7 @@ export function useWarehouseItemsLazyInventory({
       selectedCompany?.id,
       isViewingAllCompanies,
       permissions?.viewAllLocations,
+      locationId,
       search,
       categoryId,
       status,
@@ -104,7 +107,10 @@ export function useWarehouseItemsLazyInventory({
           .from('warehouse_bins')
           .select('id, bin_code, name, location_id');
 
-        if (permissions && !permissions.viewAllLocations) {
+        // If a specific location is selected, scope bins to that location
+        if (locationId) {
+          binsQuery = binsQuery.eq('location_id', locationId);
+        } else if (permissions && !permissions.viewAllLocations) {
           const permittedLocationIds = [
             ...new Set([
               ...permissions.viewLocationIds,
