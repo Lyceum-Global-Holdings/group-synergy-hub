@@ -90,7 +90,7 @@ interface ItemMasterTabProps {
 }
 
 export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
-  useRealtimeStockUpdates();
+  
   const queryClient = useQueryClient();
   const { globalLocationId } = useLocationFilter();
   const [searchTerm, setSearchTerm] = useState('');
