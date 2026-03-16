@@ -218,10 +218,9 @@ export function BulkItemImportContent({ onSuccess, onCancel }: BulkItemImportCon
               }
               break;
             case 'company':
+              // Company column ignored for catalog imports (catalog is global)
               if (value) {
-                const company = companies.find(c => c.name.toLowerCase() === value.toLowerCase());
-                if (company) item.company_id = company.id;
-                else item.warnings.push(`Company "${value}" not found`);
+                item.warnings.push('Company column ignored — catalog items are global');
               }
               break;
             case 'reorder_level':
