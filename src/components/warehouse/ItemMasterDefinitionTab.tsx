@@ -9,7 +9,13 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { Search, Plus, Eye, History, Package, MapPin, X, Image as ImageIcon, Edit, Trash2, Download, Loader2 } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Search, Plus, Eye, History, Package, MapPin, X, Image as ImageIcon, Edit, Trash2, Download, Loader2, Columns3 } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -26,6 +32,29 @@ import { StockMovementChart } from '@/components/warehouse/StockMovementChart';
 import { DeleteItemConfirmationDialog } from '@/components/warehouse/DeleteItemConfirmationDialog';
 import { useIsAdminOrHigher } from '@/hooks/useIsAdminOrHigher';
 import { WarehouseItem } from '@/types/itemBin';
+
+const COLUMN_DEFS = [
+  { key: 'photo', label: 'Photo', fixed: false },
+  { key: 'item_code', label: 'Item Code', fixed: false },
+  { key: 'name', label: 'Name', fixed: true },
+  { key: 'category', label: 'Category', fixed: false },
+  { key: 'unit', label: 'Unit', fixed: false },
+  { key: 'brand', label: 'Brand', fixed: false },
+  { key: 'supplier', label: 'Supplier', fixed: false },
+  { key: 'barcode_sku', label: 'Barcode / SKU', fixed: false },
+  { key: 'unit_cost', label: 'Unit Cost', fixed: false },
+  { key: 'selling_price', label: 'Selling Price', fixed: false },
+  { key: 'reorder_level', label: 'Reorder Lvl', fixed: false },
+  { key: 'current_stock', label: 'Current Stock', fixed: false },
+  { key: 'status', label: 'Status', fixed: false },
+  { key: 'actions', label: 'Actions', fixed: true },
+] as const;
+
+type ColumnKey = typeof COLUMN_DEFS[number]['key'];
+
+const DEFAULT_VISIBLE: Record<ColumnKey, boolean> = Object.fromEntries(
+  COLUMN_DEFS.map(c => [c.key, true])
+) as Record<ColumnKey, boolean>;
 
 interface ItemMasterDefinitionTabProps {
   onNavigateToInventory?: (itemId?: string) => void;
@@ -44,7 +73,15 @@ export function ItemMasterDefinitionTab({ onNavigateToInventory, onNavigateToBin
   const [previewImage, setPreviewImage] = useState<{ url: string; name: string } | null>(null);
   const [deletingItem, setDeletingItem] = useState<WarehouseItem | null>(null);
   const [isExporting, setIsExporting] = useState(false);
+  const [visibleColumns, setVisibleColumns] = useState<Record<ColumnKey, boolean>>(DEFAULT_VISIBLE);
   const sentinelRef = useRef<HTMLDivElement>(null);
+
+  const toggleColumn = (key: ColumnKey) => {
+    setVisibleColumns(prev => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  const col = (key: ColumnKey) => visibleColumns[key];
+  const visibleCount = Object.values(visibleColumns).filter(Boolean).length;
 
   // Debounce search to avoid excessive queries
   useEffect(() => {
@@ -257,6 +294,26 @@ export function ItemMasterDefinitionTab({ onNavigateToInventory, onNavigateToBin
             )}
           </div>
           <div className="flex items-center gap-2">
+            {/* Column visibility toggle */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm">
+                  <Columns3 className="mr-2 h-4 w-4" />
+                  Columns
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48 p-2 space-y-1">
+                {COLUMN_DEFS.filter(c => !c.fixed).map(col => (
+                  <label key={col.key} className="flex items-center gap-2 px-2 py-1 text-sm cursor-pointer hover:bg-accent rounded">
+                    <Checkbox
+                      checked={visibleColumns[col.key]}
+                      onCheckedChange={() => toggleColumn(col.key)}
+                    />
+                    {col.label}
+                  </label>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
             <Button variant="outline" onClick={handleDownloadExcel} disabled={isExporting}>
               {isExporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
               {isExporting ? 'Exporting...' : 'Download Excel'}
@@ -270,73 +327,79 @@ export function ItemMasterDefinitionTab({ onNavigateToInventory, onNavigateToBin
 
       {/* Table */}
       <div className="rounded-md border overflow-auto">
-        <Table>
+        <Table className="[&_td]:py-1.5 [&_th]:py-2">
           <TableHeader>
             <TableRow>
-              <TableHead className="w-10"></TableHead>
-              <TableHead>Item Code</TableHead>
+              {col('photo') && <TableHead className="w-10"></TableHead>}
+              {col('item_code') && <TableHead>Item Code</TableHead>}
               <TableHead>Name</TableHead>
-              <TableHead>Category</TableHead>
-              <TableHead>Unit</TableHead>
-              <TableHead>Brand</TableHead>
-              <TableHead>Supplier</TableHead>
-              <TableHead>Barcode / SKU</TableHead>
-              <TableHead className="text-right">Unit Cost</TableHead>
-              <TableHead className="text-right">Selling Price</TableHead>
-              <TableHead className="text-right">Reorder Lvl</TableHead>
-              <TableHead className="text-right">Current Stock</TableHead>
-              <TableHead>Status</TableHead>
+              {col('category') && <TableHead>Category</TableHead>}
+              {col('unit') && <TableHead>Unit</TableHead>}
+              {col('brand') && <TableHead>Brand</TableHead>}
+              {col('supplier') && <TableHead>Supplier</TableHead>}
+              {col('barcode_sku') && <TableHead>Barcode / SKU</TableHead>}
+              {col('unit_cost') && <TableHead className="text-right">Unit Cost</TableHead>}
+              {col('selling_price') && <TableHead className="text-right">Selling Price</TableHead>}
+              {col('reorder_level') && <TableHead className="text-right">Reorder Lvl</TableHead>}
+              {col('current_stock') && <TableHead className="text-right">Current Stock</TableHead>}
+              {col('status') && <TableHead>Status</TableHead>}
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={14} className="text-center py-8 text-muted-foreground">Loading items...</TableCell>
+                <TableCell colSpan={visibleCount} className="text-center py-8 text-muted-foreground">Loading items...</TableCell>
               </TableRow>
             ) : items.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={14} className="text-center py-8 text-muted-foreground">No items found</TableCell>
+                <TableCell colSpan={visibleCount} className="text-center py-8 text-muted-foreground">No items found</TableCell>
               </TableRow>
             ) : items.map(item => {
               const category = categories.find(c => c.id === item.category_id);
               const unit = units.find(u => u.id === item.unit_id);
               return (
                 <TableRow key={item.id}>
-                  <TableCell>
-                    {item.image_url ? (
-                      <button onClick={() => setPreviewImage({ url: item.image_url!, name: item.name })} className="cursor-pointer">
-                        <img src={item.image_url} alt={item.name} className="h-8 w-8 rounded object-cover" />
-                      </button>
-                    ) : (
-                      <div className="h-8 w-8 rounded bg-muted flex items-center justify-center">
-                        <ImageIcon className="h-4 w-4 text-muted-foreground" />
-                      </div>
-                    )}
-                  </TableCell>
-                  <TableCell className="font-mono text-xs">{item.item_code}</TableCell>
-                  <TableCell className="font-medium max-w-[180px] truncate">{item.name}</TableCell>
-                  <TableCell>{category?.name || '-'}</TableCell>
-                  <TableCell>{unit?.abbreviation || '-'}</TableCell>
-                  <TableCell>{item.brand || '-'}</TableCell>
-                  <TableCell>{item.supplier?.name || '-'}</TableCell>
-                  <TableCell className="text-xs">
-                    {item.barcode || item.sku ? (
-                      <div className="space-y-0.5">
-                        {item.barcode && <div>{item.barcode}</div>}
-                        {item.sku && <div className="text-muted-foreground">{item.sku}</div>}
-                      </div>
-                    ) : '-'}
-                  </TableCell>
-                  <TableCell className="text-right">{item.unit_cost?.toFixed(2) || '-'}</TableCell>
-                  <TableCell className="text-right">{item.selling_price?.toFixed(2) || '-'}</TableCell>
-                  <TableCell className="text-right">{item.reorder_level ?? '-'}</TableCell>
-                  <TableCell className="text-right font-medium">{item.current_stock ?? 0}</TableCell>
-                  <TableCell>
-                    <Badge variant="outline" className={getStatusColor(item.status || 'active')}>
-                      {item.status || 'active'}
-                    </Badge>
-                  </TableCell>
+                  {col('photo') && (
+                    <TableCell>
+                      {item.image_url ? (
+                        <button onClick={() => setPreviewImage({ url: item.image_url!, name: item.name })} className="cursor-pointer">
+                          <img src={item.image_url} alt={item.name} className="h-7 w-7 rounded object-cover" />
+                        </button>
+                      ) : (
+                        <div className="h-7 w-7 rounded bg-muted flex items-center justify-center">
+                          <ImageIcon className="h-3.5 w-3.5 text-muted-foreground" />
+                        </div>
+                      )}
+                    </TableCell>
+                  )}
+                  {col('item_code') && <TableCell className="font-mono text-xs">{item.item_code}</TableCell>}
+                  <TableCell className="font-medium">{item.name}</TableCell>
+                  {col('category') && <TableCell>{category?.name || '-'}</TableCell>}
+                  {col('unit') && <TableCell>{unit?.abbreviation || '-'}</TableCell>}
+                  {col('brand') && <TableCell>{item.brand || '-'}</TableCell>}
+                  {col('supplier') && <TableCell>{item.supplier?.name || '-'}</TableCell>}
+                  {col('barcode_sku') && (
+                    <TableCell className="text-xs">
+                      {item.barcode || item.sku ? (
+                        <div className="space-y-0.5">
+                          {item.barcode && <div>{item.barcode}</div>}
+                          {item.sku && <div className="text-muted-foreground">{item.sku}</div>}
+                        </div>
+                      ) : '-'}
+                    </TableCell>
+                  )}
+                  {col('unit_cost') && <TableCell className="text-right">{item.unit_cost?.toFixed(2) || '-'}</TableCell>}
+                  {col('selling_price') && <TableCell className="text-right">{item.selling_price?.toFixed(2) || '-'}</TableCell>}
+                  {col('reorder_level') && <TableCell className="text-right">{item.reorder_level ?? '-'}</TableCell>}
+                  {col('current_stock') && <TableCell className="text-right font-medium">{item.current_stock ?? 0}</TableCell>}
+                  {col('status') && (
+                    <TableCell>
+                      <Badge variant="outline" className={getStatusColor(item.status || 'active')}>
+                        {item.status || 'active'}
+                      </Badge>
+                    </TableCell>
+                  )}
                   <TableCell>
                     <div className="flex items-center justify-end gap-1">
                       <TooltipProvider>
