@@ -1,28 +1,35 @@
 
-Fix the import dialog visibility bug by refreshing the catalog-exclusion cache when an item is removed from inventory.
 
-What I found:
-- `AddFromCatalogDialog.tsx` already excludes only inventory rows with `current_stock > 0`, which is correct.
-- The dialog also already uses restore-or-insert logic, so re-import itself is not the main blocker anymore.
-- In the database, “Scapel Blade” is still active in `warehouse_item_catalog` and no longer exists in `warehouse_items`, so it should be available to import.
-- The likely issue is stale React Query state:
-  - `AddFromCatalogDialog` builds its hidden-item set from query key `['warehouse-items-catalog-ids', selectedCompany?.id]`.
-  - When deleting/removing from inventory in `ItemMasterTab.tsx`, the app invalidates only `['warehouse-items-inventory']`.
-  - It does not invalidate `['warehouse-items-catalog-ids', companyId]`, so the dialog can keep using the old exclusion set and hide the item until a hard refresh.
+## Plan: Restrict Location Dropdowns to User's Edit-Permitted Locations
 
-Plan:
-1. Update the inventory removal success path in `src/components/warehouse/ItemMasterTab.tsx`.
-2. After `remove_item_from_inventory` succeeds, also invalidate:
-   - `['warehouse-items-catalog-ids', selectedCompany?.id]`
-   - `['warehouse-items']` if needed for any shared inventory lists
-   - optionally `['warehouse-bin-allocations']` since removal clears allocations
-3. Keep the existing `current_stock > 0` filter and restore-or-insert logic in `AddFromCatalogDialog.tsx` unchanged unless testing reveals a second issue.
-4. Verify the flow:
-   - remove “Scapel Blade” from inventory
-   - open Import from Catalog without refreshing
-   - confirm it appears immediately
-   - re-import it successfully
+### Problem
+The "Add Item" and "Add Stock" dialogs in Construction Inventory show **all** locations, allowing users to add items to locations they don't have edit access to. For example, Shihan (who only has access to "Lyceum Wattala") can currently see and select any location.
 
-Technical detail:
-- Root cause is not the SQL filter anymore; it is cache invalidation mismatch between the delete flow and the import dialog’s exclusion query.
-- This is why the item can exist correctly in the database but still remain hidden in the UI.
+### Solution
+Filter the location dropdowns in both dialogs using `useCurrentUserLocationPermissions()`, the same pattern already used in `NewTransferDialog.tsx`. Only locations where the user has explicit **edit** permissions will appear.
+
+### Changes
+
+**1. `src/components/construction/inventory/AddItemDialog.tsx`**
+- Import `useCurrentUserLocationPermissions`
+- Fetch permissions, then filter `locations` to only those in `editLocationIds`
+- Admin/Super Admin users (who get `viewAllLocations: true`) see all locations (unchanged behavior)
+- Use the filtered list for both the machine `current_location_id` and bulk `location_id` dropdowns
+
+**2. `src/components/construction/inventory/AddInventoryStockDialog.tsx`**
+- Same change: import `useCurrentUserLocationPermissions`, filter the location dropdown to edit-permitted locations only
+
+### Pattern (from existing `NewTransferDialog.tsx`)
+```typescript
+const { data: permissions } = useCurrentUserLocationPermissions();
+
+const permittedLocations = useMemo(() => {
+  if (!locations || !permissions) return [];
+  if (permissions.viewAllLocations) return locations;
+  const permittedIds = new Set(permissions.editLocationIds);
+  return locations.filter(loc => permittedIds.has(loc.id));
+}, [locations, permissions]);
+```
+
+Two files changed, no new files.
+
