@@ -1,31 +1,35 @@
 
 
-# Fix: Item list content overflowing dialog frame
+## Plan: Restrict Location Dropdowns to User's Edit-Permitted Locations
 
-## Problem
+### Problem
+The "Add Item" and "Add Stock" dialogs in Construction Inventory show **all** locations, allowing users to add items to locations they don't have edit access to. For example, Shihan (who only has access to "Lyceum Wattala") can currently see and select any location.
 
-From the screenshot, the "Select" badges on the right side are rendering **outside** the dialog's border frame. This happens because the Radix `ScrollAreaPrimitive.Viewport` only manages vertical overflow — it doesn't constrain horizontal width, allowing flex content to push beyond the visible boundary.
+### Solution
+Filter the location dropdowns in both dialogs using `useCurrentUserLocationPermissions()`, the same pattern already used in `NewTransferDialog.tsx`. Only locations where the user has explicit **edit** permissions will appear.
 
-## Root Cause
+### Changes
 
-In `scroll-area.tsx` line 11, the Viewport has `h-full w-full` but no explicit `overflow-x-hidden`. The Radix viewport uses `overflow: scroll` in the scroll direction but doesn't clip the cross-axis.
+**1. `src/components/construction/inventory/AddItemDialog.tsx`**
+- Import `useCurrentUserLocationPermissions`
+- Fetch permissions, then filter `locations` to only those in `editLocationIds`
+- Admin/Super Admin users (who get `viewAllLocations: true`) see all locations (unchanged behavior)
+- Use the filtered list for both the machine `current_location_id` and bulk `location_id` dropdowns
 
-## Fix
+**2. `src/components/construction/inventory/AddInventoryStockDialog.tsx`**
+- Same change: import `useCurrentUserLocationPermissions`, filter the location dropdown to edit-permitted locations only
 
-### File: `src/components/ui/scroll-area.tsx` (line 11)
+### Pattern (from existing `NewTransferDialog.tsx`)
+```typescript
+const { data: permissions } = useCurrentUserLocationPermissions();
 
-Add `overflow-x-hidden` to the Viewport so all ScrollAreas clip horizontal overflow:
-
-```tsx
-// Before
-<ScrollAreaPrimitive.Viewport className="h-full w-full rounded-[inherit]">
-
-// After  
-<ScrollAreaPrimitive.Viewport className="h-full w-full rounded-[inherit] !overflow-x-hidden">
+const permittedLocations = useMemo(() => {
+  if (!locations || !permissions) return [];
+  if (permissions.viewAllLocations) return locations;
+  const permittedIds = new Set(permissions.editLocationIds);
+  return locations.filter(loc => permittedIds.has(loc.id));
+}, [locations, permissions]);
 ```
 
-This is the minimal, correct fix — it ensures the Viewport clips content horizontally while preserving vertical scrolling. The `!` important modifier overrides Radix's inline style.
-
-### Files to modify
-- `src/components/ui/scroll-area.tsx` — 1 line change
+Two files changed, no new files.
 
