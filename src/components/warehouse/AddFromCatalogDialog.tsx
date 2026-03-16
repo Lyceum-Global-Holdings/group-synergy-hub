@@ -270,7 +270,7 @@ export function AddFromCatalogDialog({ open, onOpenChange }: AddFromCatalogDialo
                 className="pl-8"
               />
             </div>
-            <ScrollArea className="h-[400px] border rounded-md">
+            <ScrollArea className="h-[400px] border rounded-md overflow-hidden">
               {isLoadingCatalog ? (
                 <div className="p-4 text-center text-muted-foreground">Loading catalog...</div>
               ) : availableItems.length === 0 ? (
