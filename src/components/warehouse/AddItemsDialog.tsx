@@ -7,7 +7,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { WarehouseItem } from '@/types/itemBin';
+import { WarehouseItem, CatalogItem } from '@/types/itemBin';
 import { SingleItemForm } from './SingleItemForm';
 import { BulkItemImportContent } from './BulkItemImportContent';
 import { Package, Upload } from 'lucide-react';
@@ -15,7 +15,7 @@ import { Package, Upload } from 'lucide-react';
 interface AddItemsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  editingItem?: WarehouseItem | null;
+  editingItem?: WarehouseItem | CatalogItem | null;
   mode?: 'catalog' | 'inventory';
 }
 

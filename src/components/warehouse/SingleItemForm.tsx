@@ -20,14 +20,15 @@ import { useWarehouseLocations } from '@/hooks/useWarehouseLocations';
 import { useWarehouseBins } from '@/hooks/useWarehouseBins';
 import { useWarehouseBinAllocations } from '@/hooks/useWarehouseBinAllocations';
 import { useCompany } from '@/contexts/CompanyContext';
-import { WarehouseItem } from '@/types/itemBin';
+import { WarehouseItem, CatalogItem } from '@/types/itemBin';
 import { supabase } from '@/integrations/supabase/client';
 import { Upload, X, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import { QuickCreateSupplierDialog } from './QuickCreateSupplierDialog';
+import { useWarehouseItemCatalog } from '@/hooks/useWarehouseItemCatalog';
 
 interface SingleItemFormProps {
-  editingItem?: WarehouseItem | null;
+  editingItem?: WarehouseItem | CatalogItem | null;
   onSuccess: () => void;
   onCancel: () => void;
   mode?: 'catalog' | 'inventory';
