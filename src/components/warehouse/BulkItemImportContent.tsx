@@ -502,7 +502,7 @@ export function BulkItemImportContent({ onSuccess, onCancel }: BulkItemImportCon
         }
       }
 
-      queryClient.invalidateQueries({ queryKey: ['warehouse-items'] });
+      queryClient.invalidateQueries({ queryKey: ['warehouse-item-catalog'] });
 
       toast({
         title: "Import Complete",
