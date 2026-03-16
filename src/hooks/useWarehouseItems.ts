@@ -61,7 +61,7 @@ export const useWarehouseItems = (options?: { skipCompanyFilter?: boolean; disab
 
       const data = allData;
 
-      if (error) throw error;
+      // error handling is done per-batch above
 
       // Fetch bin allocations for all items using separate queries (more reliable than nested syntax)
       const itemIds = data?.map((item: any) => item.id) || [];
