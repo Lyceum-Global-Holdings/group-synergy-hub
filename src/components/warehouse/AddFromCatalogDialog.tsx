@@ -282,7 +282,7 @@ export function AddFromCatalogDialog({ open, onOpenChange }: AddFromCatalogDialo
                   {availableItems.map(item => (
                     <button
                       key={item.id}
-                      className="w-full text-left px-4 py-3 hover:bg-accent transition-colors flex items-start justify-between gap-4 border-b last:border-b-0 cursor-pointer"
+                      className="w-full max-w-full text-left px-4 py-3 hover:bg-accent transition-colors flex items-start justify-between gap-4 border-b last:border-b-0 cursor-pointer overflow-hidden"
                       onClick={() => handleSelectItem(item)}
                     >
                       <div className="flex-1 min-w-0 space-y-1">
