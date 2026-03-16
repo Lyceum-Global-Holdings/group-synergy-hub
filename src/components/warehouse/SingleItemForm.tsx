@@ -67,6 +67,7 @@ export function SingleItemForm({ editingItem, onSuccess, onCancel, mode = 'inven
   const [isQuickSupplierDialogOpen, setIsQuickSupplierDialogOpen] = useState(false);
 
   const { createItemAsync, updateItem, isCreating, isUpdating } = useWarehouseItems();
+  const { createItemAsync: createCatalogItemAsync, updateItem: updateCatalogItem, isCreating: isCatalogCreating, isUpdating: isCatalogUpdating } = useWarehouseItemCatalog({ disableFetch: true });
   const { companies, selectedCompany } = useCompany();
   const { categories } = useItemCategories(selectedCompany?.id);
   const { data: companySuppliers = [], refetch: refetchSuppliers } = useApprovedCompanySuppliers(selectedCompany?.id);
