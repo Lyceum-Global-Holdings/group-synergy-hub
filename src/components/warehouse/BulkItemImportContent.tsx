@@ -44,7 +44,7 @@ export function BulkItemImportContent({ onSuccess, onCancel }: BulkItemImportCon
   const [showConfirmation, setShowConfirmation] = useState(false);
 
   const { toast } = useToast();
-  const { bulkCreateItemsAsync, isBulkCreating } = useWarehouseItems();
+  const { bulkCreateItemsAsync, isBulkCreating, items: allExistingItems } = useWarehouseItemCatalog();
   const { items: allExistingItems = [] } = useWarehouseItems({ skipCompanyFilter: true });
   const { categories } = useItemCategories();
   const { units } = useItemUnits();
