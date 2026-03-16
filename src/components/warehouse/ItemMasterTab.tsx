@@ -212,7 +212,7 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
 
   // Fetch stock by location for all items
   const { data: itemLocationStock = {} } = useQuery<ItemLocationStockMap>({
-    queryKey: ['all-items-location-stock'],
+    queryKey: ['all-items-location-stock', globalLocationId],
     queryFn: async () => {
       // Fetch allocations with cursor-based batching
       const allocations: { warehouse_item_id: string; bin_id: string; available_quantity: number }[] = [];
