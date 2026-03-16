@@ -214,6 +214,17 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
   const { data: itemLocationStock = {} } = useQuery<ItemLocationStockMap>({
     queryKey: ['all-items-location-stock', globalLocationId],
     queryFn: async () => {
+      // When a specific location is selected, pre-fetch its bin IDs for scoping
+      let locationBinIds: string[] | null = null;
+      if (globalLocationId) {
+        const { data: locBins } = await supabase
+          .from('warehouse_bins')
+          .select('id')
+          .eq('location_id', globalLocationId);
+        locationBinIds = locBins?.map(b => b.id) || [];
+        if (locationBinIds.length === 0) return {};
+      }
+
       // Fetch allocations with cursor-based batching
       const allocations: { warehouse_item_id: string; bin_id: string; available_quantity: number }[] = [];
       let lastAllocId: string | null = null;
@@ -225,6 +236,11 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
           .order('id')
           .limit(1000);
         if (lastAllocId) q = q.gt('id', lastAllocId);
+        // Scope to location bins if a location is selected
+        if (locationBinIds) {
+          // Chunk bin IDs in case there are many
+          q = q.in('bin_id', locationBinIds.slice(0, 500));
+        }
         const { data, error: allocError } = await q;
         if (allocError) throw allocError;
         if (!data || data.length === 0) break;
