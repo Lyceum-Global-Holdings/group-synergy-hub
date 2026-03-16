@@ -107,7 +107,10 @@ export function useWarehouseItemsLazyInventory({
           .from('warehouse_bins')
           .select('id, bin_code, name, location_id');
 
-        if (permissions && !permissions.viewAllLocations) {
+        // If a specific location is selected, scope bins to that location
+        if (locationId) {
+          binsQuery = binsQuery.eq('location_id', locationId);
+        } else if (permissions && !permissions.viewAllLocations) {
           const permittedLocationIds = [
             ...new Set([
               ...permissions.viewLocationIds,
