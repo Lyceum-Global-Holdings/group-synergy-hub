@@ -211,32 +211,58 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
   const { data: itemLocationStock = {} } = useQuery<ItemLocationStockMap>({
     queryKey: ['all-items-location-stock'],
     queryFn: async () => {
-      const { data: allocations, error: allocError } = await supabase
-        .from('warehouse_bin_allocations')
-        .select('warehouse_item_id, bin_id, available_quantity')
-        .gt('available_quantity', 0);
-      
-      if (allocError) throw allocError;
-      if (!allocations || allocations.length === 0) return {};
+      // Fetch allocations with cursor-based batching
+      const allocations: { warehouse_item_id: string; bin_id: string; available_quantity: number }[] = [];
+      let lastAllocId: string | null = null;
+      while (true) {
+        let q = supabase
+          .from('warehouse_bin_allocations')
+          .select('id, warehouse_item_id, bin_id, available_quantity')
+          .gt('available_quantity', 0)
+          .order('id')
+          .limit(1000);
+        if (lastAllocId) q = q.gt('id', lastAllocId);
+        const { data, error: allocError } = await q;
+        if (allocError) throw allocError;
+        if (!data || data.length === 0) break;
+        allocations.push(...data);
+        if (data.length < 1000) break;
+        lastAllocId = data[data.length - 1].id;
+      }
+
+      if (allocations.length === 0) return {};
       
       const binIds = [...new Set(allocations.map(a => a.bin_id).filter(Boolean))];
       if (binIds.length === 0) return {};
       
-      const { data: bins, error: binsError } = await supabase
-        .from('warehouse_bins')
-        .select('id, location_id')
-        .in('id', binIds);
+      // Fetch bins in chunks of 500
+      const bins: { id: string; location_id: string | null }[] = [];
+      for (let i = 0; i < binIds.length; i += 500) {
+        const chunk = binIds.slice(i, i + 500);
+        const { data, error: binsError } = await supabase
+          .from('warehouse_bins')
+          .select('id, location_id')
+          .in('id', chunk);
+        if (binsError) throw binsError;
+        if (data) bins.push(...data);
+      }
       
-      if (binsError) throw binsError;
-      if (!bins || bins.length === 0) return {};
+      if (bins.length === 0) return {};
       
       const locationIds = [...new Set(bins.map(b => b.location_id).filter(Boolean))] as string[];
       if (locationIds.length === 0) return {};
       
-      const { data: locations, error: locError } = await supabase
-        .from('warehouse_locations')
-        .select('id, name')
-        .in('id', locationIds);
+      // Fetch locations in chunks of 500
+      const locations: { id: string; name: string }[] = [];
+      for (let i = 0; i < locationIds.length; i += 500) {
+        const chunk = locationIds.slice(i, i + 500);
+        const { data, error: locError } = await supabase
+          .from('warehouse_locations')
+          .select('id, name')
+          .in('id', chunk);
+        if (locError) throw locError;
+        if (data) locations.push(...data);
+      }
       
       if (locError) throw locError;
       
