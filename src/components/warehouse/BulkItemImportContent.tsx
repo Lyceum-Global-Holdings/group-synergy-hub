@@ -20,7 +20,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useWarehouseLocations } from '@/hooks/useWarehouseLocations';
 type ImportStatus = 'new' | 'duplicate' | 'update_code' | 'error';
 
-interface ParsedItem extends Partial<CreateWarehouseItemData> {
+interface ParsedItem extends Partial<CreateCatalogItemData> {
   rowNumber: number;
   errors: string[];
   warnings: string[];
