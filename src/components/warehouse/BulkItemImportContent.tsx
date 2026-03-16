@@ -4,7 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Download, FileText, AlertCircle, CheckCircle2, ArrowRight, RefreshCw } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { useWarehouseItems } from '@/hooks/useWarehouseItems';
+import { useWarehouseItemCatalog } from '@/hooks/useWarehouseItemCatalog';
 import { useItemCategories } from '@/hooks/useItemCategories';
 import { useItemUnits } from '@/hooks/useItemUnits';
 import { useSuppliers } from '@/hooks/useSuppliers';
