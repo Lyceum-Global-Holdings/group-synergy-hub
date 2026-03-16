@@ -270,7 +270,7 @@ export function AddFromCatalogDialog({ open, onOpenChange }: AddFromCatalogDialo
                 className="pl-8"
               />
             </div>
-            <ScrollArea className="h-[400px] border rounded-md">
+            <ScrollArea className="h-[400px] border rounded-md overflow-hidden">
               {isLoadingCatalog ? (
                 <div className="p-4 text-center text-muted-foreground">Loading catalog...</div>
               ) : availableItems.length === 0 ? (
@@ -278,11 +278,11 @@ export function AddFromCatalogDialog({ open, onOpenChange }: AddFromCatalogDialo
                   {searchTerm ? 'No matching items found' : 'All catalog items are already in your inventory'}
                 </div>
               ) : (
-                <div>
+                <div className="overflow-hidden">
                   {availableItems.map(item => (
                     <button
                       key={item.id}
-                      className="w-full text-left px-4 py-3 hover:bg-accent transition-colors flex items-start justify-between gap-4 border-b last:border-b-0 cursor-pointer"
+                      className="w-full max-w-full text-left px-4 py-3 hover:bg-accent transition-colors flex items-start justify-between gap-4 border-b last:border-b-0 cursor-pointer overflow-hidden"
                       onClick={() => handleSelectItem(item)}
                     >
                       <div className="flex-1 min-w-0 space-y-1">
