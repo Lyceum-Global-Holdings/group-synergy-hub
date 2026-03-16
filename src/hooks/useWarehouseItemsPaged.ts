@@ -73,14 +73,9 @@ export function useWarehouseItemsLazy({
 
       query = query.order('created_at', { ascending: false }).order('id', { ascending: false });
 
-      // Apply search and cursor as a single filter to avoid double .or() issue
-      if (searchOr && cursorOr) {
-        query = query.or(searchOr).filter('or', `(${cursorOr})`, '');
-      } else if (searchOr) {
-        query = query.or(searchOr);
-      } else if (cursorOr) {
-        query = query.or(cursorOr);
-      }
+      // Apply search and cursor as independent .or() calls (PostgREST ANDs them)
+      if (searchOr) query = query.or(searchOr);
+      if (cursorOr) query = query.or(cursorOr);
 
       query = query.limit(pageSize);
 
@@ -145,13 +140,9 @@ export async function fetchAllWarehouseItemsBatched(filters: {
     let query = buildFilteredQuery(filters, `*, supplier:suppliers(id, name)`, undefined, false);
     query = query.order('created_at', { ascending: false }).order('id', { ascending: false });
 
-    if (searchOr && cursorOr) {
-      query = query.or(searchOr).filter('or', `(${cursorOr})`, '');
-    } else if (searchOr) {
-      query = query.or(searchOr);
-    } else if (cursorOr) {
-      query = query.or(cursorOr);
-    }
+    // Apply search and cursor as independent .or() calls (PostgREST ANDs them)
+    if (searchOr) query = query.or(searchOr);
+    if (cursorOr) query = query.or(cursorOr);
 
     query = query.limit(batchSize);
 

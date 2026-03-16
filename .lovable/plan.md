@@ -1,33 +1,35 @@
 
 
-# Fix: Dual `.or()` in Inventory tab (and Item Master tab)
+## Plan: Restrict Location Dropdowns to User's Edit-Permitted Locations
 
-## Problem
+### Problem
+The "Add Item" and "Add Stock" dialogs in Construction Inventory show **all** locations, allowing users to add items to locations they don't have edit access to. For example, Shihan (who only has access to "Lyceum Wattala") can currently see and select any location.
 
-Both `useWarehouseItemsLazyInventory.ts` and `useWarehouseItemsPaged.ts` currently use a broken workaround for the "combined search + cursor" case:
+### Solution
+Filter the location dropdowns in both dialogs using `useCurrentUserLocationPermissions()`, the same pattern already used in `NewTransferDialog.tsx`. Only locations where the user has explicit **edit** permissions will appear.
 
+### Changes
+
+**1. `src/components/construction/inventory/AddItemDialog.tsx`**
+- Import `useCurrentUserLocationPermissions`
+- Fetch permissions, then filter `locations` to only those in `editLocationIds`
+- Admin/Super Admin users (who get `viewAllLocations: true`) see all locations (unchanged behavior)
+- Use the filtered list for both the machine `current_location_id` and bulk `location_id` dropdowns
+
+**2. `src/components/construction/inventory/AddInventoryStockDialog.tsx`**
+- Same change: import `useCurrentUserLocationPermissions`, filter the location dropdown to edit-permitted locations only
+
+### Pattern (from existing `NewTransferDialog.tsx`)
 ```typescript
-query = query.or(searchOr).filter('or', `(${cursorOr})`, '');
+const { data: permissions } = useCurrentUserLocationPermissions();
+
+const permittedLocations = useMemo(() => {
+  if (!locations || !permissions) return [];
+  if (permissions.viewAllLocations) return locations;
+  const permittedIds = new Set(permissions.editLocationIds);
+  return locations.filter(loc => permittedIds.has(loc.id));
+}, [locations, permissions]);
 ```
 
-The `.filter('or', ...)` call is invalid — `.filter(column, operator, value)` expects a real column name, not `'or'`. This produces broken queries on page 2+ when search is active.
-
-## Fix
-
-The correct approach is simply **two separate `.or()` calls**. In PostgREST, multiple `or` query parameters are ANDed together, so `?or=(search_conditions)&or=(cursor_conditions)` correctly produces `(search match) AND (past cursor)`. The supabase-js client supports this.
-
-Replace the combined filter block in both files with:
-
-```typescript
-if (searchOr) query = query.or(searchOr);
-if (cursorOr) query = query.or(cursorOr);
-```
-
-### Files to change
-
-| File | Lines | Change |
-|------|-------|--------|
-| `src/hooks/useWarehouseItemsLazyInventory.ts` | 89-96 | Replace combined filter block with two independent `.or()` calls |
-| `src/hooks/useWarehouseItemsPaged.ts` | 76-83 | Same fix in `useWarehouseItemsLazy` |
-| `src/hooks/useWarehouseItemsPaged.ts` | 148-154 | Same fix in `fetchAllWarehouseItemsBatched` |
+Two files changed, no new files.
 
