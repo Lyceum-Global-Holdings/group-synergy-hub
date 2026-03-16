@@ -63,14 +63,23 @@ export function useWarehouseItemsLazy({
     queryKey: ['warehouse-item-catalog', 'lazy', search, categoryId, status, supplierId],
     queryFn: async ({ pageParam }: { pageParam: Cursor | null }) => {
       const filters = { search, categoryId, status, supplierId };
-      let query = buildFilteredQuery(filters, `*, supplier:suppliers(id, name)`);
+      const searchOr = getSearchOrString(search);
+      const cursorOr = pageParam
+        ? `created_at.lt.${pageParam.created_at},and(created_at.eq.${pageParam.created_at},id.lt.${pageParam.id})`
+        : null;
+
+      // Build query WITHOUT applying search .or() — we'll combine it with cursor
+      let query = buildFilteredQuery(filters, `*, supplier:suppliers(id, name)`, undefined, false);
 
       query = query.order('created_at', { ascending: false }).order('id', { ascending: false });
 
-      if (pageParam) {
-        query = query.or(
-          `created_at.lt.${pageParam.created_at},and(created_at.eq.${pageParam.created_at},id.lt.${pageParam.id})`
-        );
+      // Apply search and cursor as a single filter to avoid double .or() issue
+      if (searchOr && cursorOr) {
+        query = query.or(searchOr).filter('or', `(${cursorOr})`, '');
+      } else if (searchOr) {
+        query = query.or(searchOr);
+      } else if (cursorOr) {
+        query = query.or(cursorOr);
       }
 
       query = query.limit(pageSize);

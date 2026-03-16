@@ -59,13 +59,18 @@ export function useWarehouseItemsLazyInventory({
         query = query.eq('company_id', selectedCompany.id);
       }
 
-      // Server-side filters
-      if (search?.trim()) {
-        const term = `%${search.trim()}%`;
-        query = query.or(
-          `name.ilike.${term},item_code.ilike.${term},brand.ilike.${term},barcode.ilike.${term},sku.ilike.${term}`
-        );
-      }
+      // Build search and cursor OR strings
+      const searchOr = search?.trim()
+        ? (() => {
+            const term = `%${search.trim()}%`;
+            return `name.ilike.${term},item_code.ilike.${term},brand.ilike.${term},barcode.ilike.${term},sku.ilike.${term}`;
+          })()
+        : null;
+
+      const cursorOr = pageParam
+        ? `created_at.lt.${pageParam.created_at},and(created_at.eq.${pageParam.created_at},id.lt.${pageParam.id})`
+        : null;
+
       if (categoryId && categoryId !== 'all') {
         query = query.eq('category_id', categoryId);
       }
@@ -81,10 +86,13 @@ export function useWarehouseItemsLazyInventory({
         .order('created_at', { ascending: false })
         .order('id', { ascending: false });
 
-      if (pageParam) {
-        query = query.or(
-          `created_at.lt.${pageParam.created_at},and(created_at.eq.${pageParam.created_at},id.lt.${pageParam.id})`
-        );
+      // Apply search and cursor as a single combined filter to avoid double .or()
+      if (searchOr && cursorOr) {
+        query = query.or(searchOr).filter('or', `(${cursorOr})`, '');
+      } else if (searchOr) {
+        query = query.or(searchOr);
+      } else if (cursorOr) {
+        query = query.or(cursorOr);
       }
 
       query = query.limit(pageSize);
