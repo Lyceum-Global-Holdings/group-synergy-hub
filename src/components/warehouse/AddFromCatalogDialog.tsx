@@ -57,7 +57,8 @@ export function AddFromCatalogDialog({ open, onOpenChange }: AddFromCatalogDialo
         .from('warehouse_items')
         .select('catalog_item_id')
         .eq('company_id', selectedCompany!.id)
-        .not('catalog_item_id', 'is', null);
+        .not('catalog_item_id', 'is', null)
+        .gt('current_stock', 0);
       return new Set(data?.map(d => d.catalog_item_id).filter(Boolean) || []);
     },
     enabled: open && !!selectedCompany?.id,
