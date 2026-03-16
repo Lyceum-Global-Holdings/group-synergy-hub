@@ -1,35 +1,41 @@
 
 
-## Plan: Restrict Location Dropdowns to User's Edit-Permitted Locations
+## Fix: Search fails for item names/codes containing special characters
 
-### Problem
-The "Add Item" and "Add Stock" dialogs in Construction Inventory show **all** locations, allowing users to add items to locations they don't have edit access to. For example, Shihan (who only has access to "Lyceum Wattala") can currently see and select any location.
+### Root Cause
 
-### Solution
-Filter the location dropdowns in both dialogs using `useCurrentUserLocationPermissions()`, the same pattern already used in `NewTransferDialog.tsx`. Only locations where the user has explicit **edit** permissions will appear.
-
-### Changes
-
-**1. `src/components/construction/inventory/AddItemDialog.tsx`**
-- Import `useCurrentUserLocationPermissions`
-- Fetch permissions, then filter `locations` to only those in `editLocationIds`
-- Admin/Super Admin users (who get `viewAllLocations: true`) see all locations (unchanged behavior)
-- Use the filtered list for both the machine `current_location_id` and bulk `location_id` dropdowns
-
-**2. `src/components/construction/inventory/AddInventoryStockDialog.tsx`**
-- Same change: import `useCurrentUserLocationPermissions`, filter the location dropdown to edit-permitted locations only
-
-### Pattern (from existing `NewTransferDialog.tsx`)
-```typescript
-const { data: permissions } = useCurrentUserLocationPermissions();
-
-const permittedLocations = useMemo(() => {
-  if (!locations || !permissions) return [];
-  if (permissions.viewAllLocations) return locations;
-  const permittedIds = new Set(permissions.editLocationIds);
-  return locations.filter(loc => permittedIds.has(loc.id));
-}, [locations, permissions]);
+The search filter uses PostgREST's `.or()` string syntax like:
+```
+name.ilike.%PVC Socket | Bend - 4" (110mm)%,item_code.ilike.%PVC Socket | Bend - 4" (110mm)%
 ```
 
-Two files changed, no new files.
+Characters like `|`, `(`, `)`, `"`, and `,` are **PostgREST filter syntax delimiters**. They break the `.or()` parser — the pipe `|` looks like an OR operator, parentheses look like grouping, commas separate filter conditions, and quotes are value delimiters. This causes the query to silently return zero results instead of matching.
+
+The database itself handles these characters fine (verified: `ilike '%PVC Socket | Bend%'` returns 18 rows). The problem is purely in how the search term is passed through the `.or()` string.
+
+### Fix
+
+Wrap search values in **double quotes** within the `.or()` string, and escape any `"` or `\` in the search term. This is the official PostgREST approach for values containing special characters.
+
+**Before:**
+```typescript
+const term = `%${search.trim()}%`;
+return `name.ilike.${term},item_code.ilike.${term},...`;
+```
+
+**After:**
+```typescript
+const escaped = search.trim().replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+const term = `%${escaped}%`;
+return `name.ilike."${term}",item_code.ilike."${term}",...`;
+```
+
+### Files to change
+
+| File | Change |
+|------|--------|
+| `src/hooks/useWarehouseItemsPaged.ts` | Update `getSearchOrString()` (line 18-22) to quote and escape the search term |
+| `src/hooks/useWarehouseItemsLazyInventory.ts` | Update inline search string builder (lines 63-67) with the same quoting logic |
+
+Two small, surgical edits. No architectural changes needed.
 
