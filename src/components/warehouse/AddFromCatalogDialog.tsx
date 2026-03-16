@@ -85,48 +85,94 @@ export function AddFromCatalogDialog({ open, onOpenChange }: AddFromCatalogDialo
         throw new Error('Please fill in all required fields');
       }
 
-      // Create inventory row linked to catalog item
-      const { data: newItem, error: insertError } = await supabase
-        .from('warehouse_items')
-        .insert({
-          catalog_item_id: selectedItem.id,
-          item_code: selectedItem.item_code,
-          name: selectedItem.name,
-          description: selectedItem.description,
-          category_id: selectedItem.category_id,
-          unit_id: selectedItem.unit_id,
-          brand: selectedItem.brand,
-          manufacturer: selectedItem.manufacturer,
-          barcode: selectedItem.barcode,
-          sku: selectedItem.sku,
-          unit_cost: selectedItem.unit_cost,
-          selling_price: selectedItem.selling_price,
-          reorder_level: selectedItem.reorder_level,
-          min_stock_level: selectedItem.min_stock_level,
-          max_stock_level: selectedItem.max_stock_level,
-          image_url: selectedItem.image_url,
-          is_batch_tracked: selectedItem.is_batch_tracked,
-          is_serialized: selectedItem.is_serialized,
-          status: 'active',
-          company_id: selectedCompany.id,
-          current_stock: quantity,
-          reserved_quantity: 0,
-          created_by: (await supabase.auth.getUser()).data.user?.id,
-        })
-        .select()
-        .single();
+      const userId = (await supabase.auth.getUser()).data.user?.id;
 
-      if (insertError) throw insertError;
+      // Check if an existing inventory row exists (even with 0 stock)
+      const { data: existingRow } = await supabase
+        .from('warehouse_items')
+        .select('id')
+        .eq('company_id', selectedCompany.id)
+        .eq('catalog_item_id', selectedItem.id)
+        .maybeSingle();
+
+      let itemId: string;
+
+      if (existingRow) {
+        // Reactivate existing row
+        const { data: updated, error: updateError } = await supabase
+          .from('warehouse_items')
+          .update({
+            current_stock: quantity,
+            reserved_quantity: 0,
+            status: 'active',
+            name: selectedItem.name,
+            description: selectedItem.description,
+            category_id: selectedItem.category_id,
+            unit_id: selectedItem.unit_id,
+            brand: selectedItem.brand,
+            manufacturer: selectedItem.manufacturer,
+            barcode: selectedItem.barcode,
+            sku: selectedItem.sku,
+            unit_cost: selectedItem.unit_cost,
+            selling_price: selectedItem.selling_price,
+            reorder_level: selectedItem.reorder_level,
+            min_stock_level: selectedItem.min_stock_level,
+            max_stock_level: selectedItem.max_stock_level,
+            image_url: selectedItem.image_url,
+            is_batch_tracked: selectedItem.is_batch_tracked,
+            is_serialized: selectedItem.is_serialized,
+          })
+          .eq('id', existingRow.id)
+          .select()
+          .single();
+
+        if (updateError) throw updateError;
+        itemId = updated.id;
+      } else {
+        // Fresh insert
+        const { data: newItem, error: insertError } = await supabase
+          .from('warehouse_items')
+          .insert({
+            catalog_item_id: selectedItem.id,
+            item_code: selectedItem.item_code,
+            name: selectedItem.name,
+            description: selectedItem.description,
+            category_id: selectedItem.category_id,
+            unit_id: selectedItem.unit_id,
+            brand: selectedItem.brand,
+            manufacturer: selectedItem.manufacturer,
+            barcode: selectedItem.barcode,
+            sku: selectedItem.sku,
+            unit_cost: selectedItem.unit_cost,
+            selling_price: selectedItem.selling_price,
+            reorder_level: selectedItem.reorder_level,
+            min_stock_level: selectedItem.min_stock_level,
+            max_stock_level: selectedItem.max_stock_level,
+            image_url: selectedItem.image_url,
+            is_batch_tracked: selectedItem.is_batch_tracked,
+            is_serialized: selectedItem.is_serialized,
+            status: 'active',
+            company_id: selectedCompany.id,
+            current_stock: quantity,
+            reserved_quantity: 0,
+            created_by: userId,
+          })
+          .select()
+          .single();
+
+        if (insertError) throw insertError;
+        itemId = newItem.id;
+      }
 
       // Create bin allocation
       await createAllocation({
-        warehouse_item_id: newItem.id,
+        warehouse_item_id: itemId,
         bin_id: selectedBinId,
         allocated_quantity: quantity,
         company_id: selectedCompany.id,
       });
 
-      return newItem;
+      return { id: itemId };
     },
     onSuccess: () => {
       toast.success('Item imported to inventory with bin allocation');
