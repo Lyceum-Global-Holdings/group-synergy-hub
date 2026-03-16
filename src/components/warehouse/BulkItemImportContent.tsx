@@ -431,18 +431,14 @@ export function BulkItemImportContent({ onSuccess, onCancel }: BulkItemImportCon
         return;
       }
 
-      // --- Pre-import safety gate: re-check item_code uniqueness ---
+      // --- Pre-import safety gate: re-check item_code uniqueness in catalog ---
       if (newItems.length > 0) {
-        const targetCompanyItems = allExistingItems.filter(
-          existing => existing.company_id === selectedCompany?.id
-        );
         const existingCodesSet = new Set(
-          targetCompanyItems
+          allExistingItems
             .filter(i => i.item_code)
             .map(i => i.item_code!.toLowerCase().trim())
         );
 
-        // Check for intra-batch duplicates and DB conflicts
         const batchCodesSeen = new Set<string>();
         const conflictRows: string[] = [];
         for (const item of newItems) {
@@ -457,7 +453,7 @@ export function BulkItemImportContent({ onSuccess, onCancel }: BulkItemImportCon
         if (conflictRows.length > 0) {
           toast({
             title: "Item code conflict",
-            description: `${conflictRows.length} item code(s) conflict with existing items in this company: ${conflictRows.slice(0, 3).join(', ')}${conflictRows.length > 3 ? '...' : ''}`,
+            description: `${conflictRows.length} item code(s) conflict with existing catalog items: ${conflictRows.slice(0, 3).join(', ')}${conflictRows.length > 3 ? '...' : ''}`,
             variant: "destructive",
           });
           setIsImporting(false);
