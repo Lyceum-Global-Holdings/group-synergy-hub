@@ -871,6 +871,7 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
             if (error) throw error;
             toast.success('Item removed from inventory (catalog entry preserved)');
             setDeletingItem(null);
+            queryClient.invalidateQueries({ queryKey: ['warehouse-items-inventory'] });
           } catch (error: any) {
             console.error('Error removing from inventory:', error);
             toast.error(error?.message || 'Failed to remove item from inventory');
