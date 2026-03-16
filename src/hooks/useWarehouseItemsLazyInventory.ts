@@ -113,6 +113,7 @@ export function useWarehouseItemsLazyInventory({
           if (permittedLocationIds.length > 0) {
             binsQuery = binsQuery.in('location_id', permittedLocationIds);
           }
+          // No else — show all bins when no location permissions configured
         }
 
         const { data: bins } = await binsQuery;

@@ -26,9 +26,8 @@ export const useWarehouseBins = () => {
         const permittedLocationIds = [...new Set([...permissions.viewLocationIds, ...permissions.editLocationIds])];
         if (permittedLocationIds.length > 0) {
           query = query.in('location_id', permittedLocationIds);
-        } else {
-          return [] as WarehouseBin[];
         }
+        // No else — show all bins when no location permissions configured
       }
 
       const { data, error } = await query;
