@@ -657,7 +657,7 @@ export function SingleItemForm({ editingItem, onSuccess, onCancel, mode = 'inven
         <Button type="button" variant="outline" onClick={onCancel}>
           Cancel
         </Button>
-        <Button type="submit" disabled={isCreating || isUpdating || uploading}>
+        <Button type="submit" disabled={isCreating || isUpdating || isCatalogCreating || isCatalogUpdating || uploading}>
           {uploading ? 'Uploading...' : editingItem ? 'Update Item' : 'Create Item'}
         </Button>
       </div>
