@@ -238,11 +238,11 @@ export function SingleItemForm({ editingItem, onSuccess, onCancel, mode = 'inven
       try {
         const result = await createItemAsync({
           ...createData,
-          initialStock: initialStock ? parseFloat(initialStock) : undefined,
-          initialUnitCost: formData.unit_cost ? parseFloat(formData.unit_cost) : undefined,
+          initialStock: mode === 'inventory' && initialStock ? parseFloat(initialStock) : undefined,
+          initialUnitCost: mode === 'inventory' && formData.unit_cost ? parseFloat(formData.unit_cost) : undefined,
         });
 
-        if (initialStock && parseFloat(initialStock) > 0) {
+        if (mode === 'inventory' && initialStock && parseFloat(initialStock) > 0) {
           const stockQuantity = parseFloat(initialStock);
           const unitCostValue = formData.unit_cost ? parseFloat(formData.unit_cost) : 0;
           

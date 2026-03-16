@@ -81,6 +81,7 @@ export function AddItemsDialog({ open, onOpenChange, editingItem, mode = 'invent
                 editingItem={editingItem}
                 onSuccess={handleSuccess}
                 onCancel={handleCancel}
+                mode={mode}
               />
             </TabsContent>
 

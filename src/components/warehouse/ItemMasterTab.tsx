@@ -864,7 +864,19 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
           if (!open) setDeletingItem(null);
         }}
         item={deletingItem}
-        onConfirmDelete={(itemId, forceDelete) => deleteItem({ id: itemId, forceDelete })}
+        onConfirmDelete={async (itemId) => {
+          try {
+            // Remove inventory data only — keep the catalog item intact
+            await supabase.from('warehouse_bin_allocations').delete().eq('warehouse_item_id', itemId);
+            await supabase.from('warehouse_stock_transactions').delete().eq('item_id', itemId);
+            await supabase.from('warehouse_items').update({ current_stock: 0 }).eq('id', itemId);
+            toast.success('Item removed from inventory (catalog entry preserved)');
+            setDeletingItem(null);
+          } catch (error) {
+            console.error('Error removing from inventory:', error);
+            toast.error('Failed to remove item from inventory');
+          }
+        }}
         onMarkInactive={markItemInactive}
         isLoading={isDeleting || isMarkingInactive}
       />
