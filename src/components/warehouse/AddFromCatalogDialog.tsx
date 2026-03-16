@@ -34,32 +34,78 @@ export function AddFromCatalogDialog({ open, onOpenChange }: AddFromCatalogDialo
   const [quantity, setQuantity] = useState<number>(1);
   const [selectedBinId, setSelectedBinId] = useState<string>('');
 
-  // Fetch all catalog items
+  // Fetch all catalog items using cursor-based batching to bypass 1,000-row limit
   const { data: catalogItems = [], isLoading: isLoadingCatalog } = useQuery({
     queryKey: ['warehouse-item-catalog-for-import'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('warehouse_item_catalog')
-        .select('*')
-        .eq('status', 'active')
-        .order('name');
-      if (error) throw error;
-      return data as unknown as CatalogItem[];
+      const batchSize = 1000;
+      const allItems: CatalogItem[] = [];
+      let lastId: string | null = null;
+
+      while (true) {
+        let q = supabase
+          .from('warehouse_item_catalog')
+          .select('*')
+          .eq('status', 'active')
+          .order('id')
+          .limit(batchSize);
+
+        if (lastId) {
+          q = q.gt('id', lastId);
+        }
+
+        const { data, error } = await q;
+        if (error) throw error;
+
+        const batch = (data || []) as unknown as CatalogItem[];
+        allItems.push(...batch);
+
+        if (batch.length < batchSize) break;
+        lastId = batch[batch.length - 1].id;
+      }
+
+      // Sort by name client-side for display
+      allItems.sort((a, b) => a.name.localeCompare(b.name));
+      return allItems;
     },
     enabled: open,
   });
 
-  // Fetch existing catalog_item_ids for current company's inventory
+  // Fetch existing catalog_item_ids using cursor-based batching
   const { data: existingCatalogIds } = useQuery({
     queryKey: ['warehouse-items-catalog-ids', selectedCompany?.id],
     queryFn: async () => {
-      const { data } = await supabase
-        .from('warehouse_items')
-        .select('catalog_item_id')
-        .eq('company_id', selectedCompany!.id)
-        .not('catalog_item_id', 'is', null)
-        .gt('current_stock', 0);
-      return new Set(data?.map(d => d.catalog_item_id).filter(Boolean) || []);
+      const batchSize = 1000;
+      const allIds: string[] = [];
+      let lastId: string | null = null;
+
+      while (true) {
+        let q = supabase
+          .from('warehouse_items')
+          .select('id, catalog_item_id')
+          .eq('company_id', selectedCompany!.id)
+          .not('catalog_item_id', 'is', null)
+          .gt('current_stock', 0)
+          .order('id')
+          .limit(batchSize);
+
+        if (lastId) {
+          q = q.gt('id', lastId);
+        }
+
+        const { data, error } = await q;
+        if (error) throw error;
+
+        const batch = data || [];
+        for (const d of batch) {
+          if (d.catalog_item_id) allIds.push(d.catalog_item_id);
+        }
+
+        if (batch.length < batchSize) break;
+        lastId = batch[batch.length - 1].id;
+      }
+
+      return new Set(allIds);
     },
     enabled: open && !!selectedCompany?.id,
   });
