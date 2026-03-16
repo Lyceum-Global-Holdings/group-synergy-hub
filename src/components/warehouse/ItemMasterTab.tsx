@@ -144,6 +144,7 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
     categoryId: categoryFilter,
     status: statusFilter,
     supplierId: supplierFilter,
+    locationId: globalLocationId,
   });
 
   // Keep mutations via the old hook with fetching disabled
