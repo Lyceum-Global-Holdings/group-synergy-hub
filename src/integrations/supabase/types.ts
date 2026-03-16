@@ -18008,6 +18008,10 @@ export type Database = {
         }
         Returns: undefined
       }
+      remove_item_from_inventory: {
+        Args: { p_item_id: string }
+        Returns: undefined
+      }
       run_fx_revaluation: {
         Args: {
           p_as_of_date: string
