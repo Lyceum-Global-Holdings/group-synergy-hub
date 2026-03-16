@@ -86,14 +86,9 @@ export function useWarehouseItemsLazyInventory({
         .order('created_at', { ascending: false })
         .order('id', { ascending: false });
 
-      // Apply search and cursor as a single combined filter to avoid double .or()
-      if (searchOr && cursorOr) {
-        query = query.or(searchOr).filter('or', `(${cursorOr})`, '');
-      } else if (searchOr) {
-        query = query.or(searchOr);
-      } else if (cursorOr) {
-        query = query.or(cursorOr);
-      }
+      // Apply search and cursor as independent .or() calls (PostgREST ANDs them)
+      if (searchOr) query = query.or(searchOr);
+      if (cursorOr) query = query.or(cursorOr);
 
       query = query.limit(pageSize);
 
