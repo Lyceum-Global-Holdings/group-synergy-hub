@@ -15,20 +15,27 @@ interface UseWarehouseItemsLazyOptions {
   supplierId?: string;
 }
 
+function getSearchOrString(search?: string): string | null {
+  if (!search?.trim()) return null;
+  const term = `%${search.trim()}%`;
+  return `name.ilike.${term},item_code.ilike.${term},brand.ilike.${term},barcode.ilike.${term},sku.ilike.${term}`;
+}
+
 function buildFilteredQuery(
   filters: { search?: string; categoryId?: string; status?: string; supplierId?: string },
   selectClause: string,
-  countOption?: { count: 'exact' }
+  countOption?: { count: 'exact' },
+  applySearch = true
 ) {
   let query = countOption
     ? supabase.from('warehouse_item_catalog').select(selectClause, countOption)
     : supabase.from('warehouse_item_catalog').select(selectClause);
 
-  if (filters.search?.trim()) {
-    const term = `%${filters.search.trim()}%`;
-    query = query.or(
-      `name.ilike.${term},item_code.ilike.${term},brand.ilike.${term},barcode.ilike.${term},sku.ilike.${term}`
-    );
+  if (applySearch) {
+    const searchOr = getSearchOrString(filters.search);
+    if (searchOr) {
+      query = query.or(searchOr);
+    }
   }
   if (filters.categoryId && filters.categoryId !== 'all') {
     query = query.eq('category_id', filters.categoryId);
