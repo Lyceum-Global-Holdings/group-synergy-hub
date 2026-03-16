@@ -468,7 +468,6 @@ export function BulkItemImportContent({ onSuccess, onCancel }: BulkItemImportCon
       // --- Insert new items ---
       if (newItems.length > 0) {
         const validData = newItems.map(({ rowNumber, errors, warnings, importStatus, existingId, existingItemCode, updateCodeEnabled, ...item }) => {
-          // Sanitize empty strings to null for optional fields to avoid unique constraint violations
           const sanitized = { ...item } as any;
           const nullableFields = ['sku', 'barcode', 'description', 'brand', 'manufacturer', 'notes', 'image_url'];
           for (const field of nullableFields) {
@@ -476,7 +475,9 @@ export function BulkItemImportContent({ onSuccess, onCancel }: BulkItemImportCon
               sanitized[field] = null;
             }
           }
-          return sanitized as CreateWarehouseItemData;
+          // Ensure status is set
+          if (!sanitized.status) sanitized.status = 'active';
+          return sanitized as CreateCatalogItemData;
         });
         const createdItems = await bulkCreateItemsAsync(validData);
         createdCount = createdItems.length;
