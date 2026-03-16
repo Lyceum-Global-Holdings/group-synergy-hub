@@ -230,9 +230,26 @@ export function SingleItemForm({ editingItem, onSuccess, onCancel, mode = 'inven
     };
 
     if (editingItem) {
-      updateItem({ id: editingItem.id, ...baseData });
+      if (mode === 'catalog') {
+        updateCatalogItem({ id: editingItem.id, ...baseData, company_id: undefined } as any);
+      } else {
+        updateItem({ id: editingItem.id, ...baseData });
+      }
       onSuccess();
+    } else if (mode === 'catalog') {
+      // Catalog mode: insert into warehouse_item_catalog (no company_id, no stock)
+      try {
+        const { company_id, ...catalogData } = baseData;
+        await createCatalogItemAsync({
+          ...catalogData,
+          status: catalogData.status || 'active',
+        } as any);
+        onSuccess();
+      } catch (error) {
+        console.error('Error creating catalog item:', error);
+      }
     } else {
+      // Inventory mode: insert into warehouse_items
       const createData = {
         ...baseData,
         current_stock: 0,
@@ -240,11 +257,11 @@ export function SingleItemForm({ editingItem, onSuccess, onCancel, mode = 'inven
       try {
         const result = await createItemAsync({
           ...createData,
-          initialStock: mode === 'inventory' && initialStock ? parseFloat(initialStock) : undefined,
-          initialUnitCost: mode === 'inventory' && formData.unit_cost ? parseFloat(formData.unit_cost) : undefined,
+          initialStock: initialStock ? parseFloat(initialStock) : undefined,
+          initialUnitCost: formData.unit_cost ? parseFloat(formData.unit_cost) : undefined,
         });
 
-        if (mode === 'inventory' && initialStock && parseFloat(initialStock) > 0) {
+        if (initialStock && parseFloat(initialStock) > 0) {
           const stockQuantity = parseFloat(initialStock);
           const unitCostValue = formData.unit_cost ? parseFloat(formData.unit_cost) : 0;
           
