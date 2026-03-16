@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Plus, Search, Edit, Trash2, History, Settings, Eye, ArrowLeftRight, MapPin, BarChart3, Wrench, Image as ImageIcon, X, Package, FileWarning, ChevronDown, Download, FileSpreadsheet, PackagePlus, Loader2, Columns3 } from 'lucide-react';
@@ -93,6 +93,7 @@ interface ItemMasterTabProps {
 
 export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
   useRealtimeStockUpdates();
+  const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
@@ -870,6 +871,7 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
             if (error) throw error;
             toast.success('Item removed from inventory (catalog entry preserved)');
             setDeletingItem(null);
+            queryClient.invalidateQueries({ queryKey: ['warehouse-items-inventory'] });
           } catch (error: any) {
             console.error('Error removing from inventory:', error);
             toast.error(error?.message || 'Failed to remove item from inventory');
