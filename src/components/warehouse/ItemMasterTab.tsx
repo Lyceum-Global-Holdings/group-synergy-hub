@@ -45,13 +45,10 @@ import { StockMovementReportDialog } from '@/components/warehouse/StockMovementR
 import { AddFromCatalogDialog } from '@/components/warehouse/AddFromCatalogDialog';
 import { WarehouseItem } from '@/types/itemBin';
 import { supabase } from '@/integrations/supabase/client';
-import { useRealtimeStockUpdates } from '@/hooks/useRealtimeStockUpdates';
+
 import { useLocationFilter } from '@/contexts/LocationFilterContext';
 import { useWarehouseBinAllocations } from '@/hooks/useWarehouseBinAllocations';
 import { useIsAdminOrHigher } from '@/hooks/useIsAdminOrHigher';
-import { useStockAudit } from '@/hooks/useStockAudit';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertTriangle, ShieldAlert } from 'lucide-react';
 import { writeExcelFromJSON } from '@/utils/excelUtils';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
@@ -93,7 +90,7 @@ interface ItemMasterTabProps {
 }
 
 export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
-  useRealtimeStockUpdates();
+  
   const queryClient = useQueryClient();
   const { globalLocationId } = useLocationFilter();
   const [searchTerm, setSearchTerm] = useState('');
@@ -158,9 +155,8 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
   const { companies, selectedCompany } = useCompany();
   const { categories } = useItemCategories(selectedCompany?.id);
   const { units } = useItemUnits();
-  const { migrateAllocationsToCorrectLocation, isMigrating, reconcileStock, isReconciling, fixAllocationsFromHistory, isFixingFromHistory } = useWarehouseBinAllocations();
+  const { migrateAllocationsToCorrectLocation, isMigrating, reconcileStock, isReconciling, fixAllocationsFromHistory, isFixingFromHistory } = useWarehouseBinAllocations({ disableFetch: true });
   const { canDelete } = useIsAdminOrHigher();
-  const { summary } = useStockAudit();
 
   // Flatten all pages into a single items array
   const allItems = useMemo(() => {
@@ -210,7 +206,8 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
     },
   });
 
-  // Fetch stock by location for all items
+  // Fetch stock by location — only after initial items have loaded
+  const locationStockEnabled = totalLoaded > 0;
   const { data: itemLocationStock = {} } = useQuery<ItemLocationStockMap>({
     queryKey: ['all-items-location-stock', globalLocationId],
     queryFn: async () => {
@@ -236,9 +233,7 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
           .order('id')
           .limit(1000);
         if (lastAllocId) q = q.gt('id', lastAllocId);
-        // Scope to location bins if a location is selected
         if (locationBinIds) {
-          // Chunk bin IDs in case there are many
           q = q.in('bin_id', locationBinIds.slice(0, 500));
         }
         const { data, error: allocError } = await q;
@@ -254,7 +249,6 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
       const binIds = [...new Set(allocations.map(a => a.bin_id).filter(Boolean))];
       if (binIds.length === 0) return {};
       
-      // Fetch bins in chunks of 500
       const bins: { id: string; location_id: string | null }[] = [];
       for (let i = 0; i < binIds.length; i += 500) {
         const chunk = binIds.slice(i, i + 500);
@@ -271,7 +265,6 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
       const locationIds = [...new Set(bins.map(b => b.location_id).filter(Boolean))] as string[];
       if (locationIds.length === 0) return {};
       
-      // Fetch locations in chunks of 500
       const locations: { id: string; name: string }[] = [];
       for (let i = 0; i < locationIds.length; i += 500) {
         const chunk = locationIds.slice(i, i + 500);
@@ -282,7 +275,6 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
         if (locError) throw locError;
         if (data) locations.push(...data);
       }
-      
       
       const binLocationMap = new Map(bins.map(b => [b.id, b.location_id]));
       const locationNameMap = new Map(locations?.map(l => [l.id, l.name]) || []);
@@ -316,6 +308,7 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
       
       return grouped;
     },
+    enabled: locationStockEnabled,
   });
 
   // Extract unique bins from loaded items for client-side bin filter
@@ -408,28 +401,6 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
 
   return (
     <div className="space-y-4">
-      {summary.desynced > 0 && (
-        <Alert className="border-yellow-300 bg-yellow-50 text-yellow-900 dark:border-yellow-700 dark:bg-yellow-950/30 dark:text-yellow-200">
-          <AlertTriangle className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
-          <AlertDescription className="flex items-center justify-between">
-            <span>
-              <strong>{summary.desynced} item{summary.desynced > 1 ? 's have' : ' has'} a stock desync</strong>
-              {' '}— item master stock does not match bin allocation totals.
-            </span>
-            {onGoToAudit && (
-              <Button
-                variant="outline"
-                size="sm"
-                className="ml-4 shrink-0 border-yellow-400 text-yellow-800 hover:bg-yellow-100 dark:border-yellow-600 dark:text-yellow-300 dark:hover:bg-yellow-900/50"
-                onClick={onGoToAudit}
-              >
-                <ShieldAlert className="mr-1 h-3 w-3" />
-                Go to Stock Audit
-              </Button>
-            )}
-          </AlertDescription>
-        </Alert>
-      )}
       <div className="flex flex-col gap-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 flex-wrap">

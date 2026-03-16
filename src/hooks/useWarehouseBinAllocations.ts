@@ -8,7 +8,7 @@ import type {
   BinAllocationWithDetails 
 } from '@/types/warehouseReservation';
 
-export function useWarehouseBinAllocations() {
+export function useWarehouseBinAllocations(options?: { disableFetch?: boolean }) {
   const queryClient = useQueryClient();
   const { selectedCompany, isViewingAllCompanies } = useCompany();
 
@@ -44,7 +44,7 @@ export function useWarehouseBinAllocations() {
 
       return allAllocations as BinAllocationWithDetails[];
     },
-    enabled: !!(isViewingAllCompanies || selectedCompany?.id),
+    enabled: !options?.disableFetch && !!(isViewingAllCompanies || selectedCompany?.id),
   });
 
   // Get allocations for a specific item
