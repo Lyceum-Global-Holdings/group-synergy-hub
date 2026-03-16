@@ -42,6 +42,7 @@ export function useWarehouseItemsLazyInventory({
       selectedCompany?.id,
       isViewingAllCompanies,
       permissions?.viewAllLocations,
+      locationId,
       search,
       categoryId,
       status,
