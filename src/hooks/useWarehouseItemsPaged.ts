@@ -1,6 +1,6 @@
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { WarehouseItem } from '@/types/itemBin';
+import { CatalogItem } from '@/types/itemBin';
 
 interface Cursor {
   created_at: string;
@@ -21,8 +21,8 @@ function buildFilteredQuery(
   countOption?: { count: 'exact' }
 ) {
   let query = countOption
-    ? supabase.from('warehouse_items').select(selectClause, countOption)
-    : supabase.from('warehouse_items').select(selectClause);
+    ? supabase.from('warehouse_item_catalog').select(selectClause, countOption)
+    : supabase.from('warehouse_item_catalog').select(selectClause);
 
   if (filters.search?.trim()) {
     const term = `%${filters.search.trim()}%`;
@@ -43,8 +43,7 @@ function buildFilteredQuery(
 }
 
 /**
- * Infinite-scroll hook: fetches warehouse items in batches using cursor-based (keyset) pagination.
- * This reliably bypasses the 1,000-row Supabase/PostgREST per-request cap.
+ * Infinite-scroll hook: fetches catalog items in batches using cursor-based (keyset) pagination.
  */
 export function useWarehouseItemsLazy({
   pageSize = 100,
@@ -54,17 +53,14 @@ export function useWarehouseItemsLazy({
   supplierId,
 }: UseWarehouseItemsLazyOptions) {
   return useInfiniteQuery({
-    queryKey: ['warehouse-items', 'lazy', search, categoryId, status, supplierId],
+    queryKey: ['warehouse-item-catalog', 'lazy', search, categoryId, status, supplierId],
     queryFn: async ({ pageParam }: { pageParam: Cursor | null }) => {
       const filters = { search, categoryId, status, supplierId };
       let query = buildFilteredQuery(filters, `*, supplier:suppliers(id, name)`);
 
-      // Deterministic ordering: created_at DESC, id DESC
       query = query.order('created_at', { ascending: false }).order('id', { ascending: false });
 
-      // Cursor condition for keyset pagination
       if (pageParam) {
-        // Items where (created_at < cursor) OR (created_at = cursor AND id < cursor_id)
         query = query.or(
           `created_at.lt.${pageParam.created_at},and(created_at.eq.${pageParam.created_at},id.lt.${pageParam.id})`
         );
@@ -75,7 +71,7 @@ export function useWarehouseItemsLazy({
       const { data, error } = await query;
       if (error) throw error;
 
-      const items = (data || []) as unknown as WarehouseItem[];
+      const items = (data || []) as unknown as CatalogItem[];
       let nextCursor: Cursor | null = null;
 
       if (items.length === pageSize) {
@@ -91,7 +87,7 @@ export function useWarehouseItemsLazy({
 }
 
 /**
- * Fetch a total count for display purposes (separate lightweight query).
+ * Fetch a total count for display purposes.
  */
 export function useWarehouseItemsCount(filters: {
   search?: string;
@@ -99,9 +95,8 @@ export function useWarehouseItemsCount(filters: {
   status?: string;
   supplierId?: string;
 }) {
-  // Use a regular select with head:true + count for a lightweight count-only query
   return {
-    queryKey: ['warehouse-items', 'count', filters.search, filters.categoryId, filters.status, filters.supplierId],
+    queryKey: ['warehouse-item-catalog', 'count', filters.search, filters.categoryId, filters.status, filters.supplierId],
     queryFn: async () => {
       const query = buildFilteredQuery(filters, '*', { count: 'exact' });
       const { count, error } = await query.limit(0);
@@ -112,16 +107,16 @@ export function useWarehouseItemsCount(filters: {
 }
 
 /**
- * Fetch ALL items matching filters using cursor-based batching (for Excel export).
+ * Fetch ALL catalog items matching filters using cursor-based batching (for Excel export).
  */
 export async function fetchAllWarehouseItemsBatched(filters: {
   search?: string;
   categoryId?: string;
   status?: string;
   supplierId?: string;
-}): Promise<WarehouseItem[]> {
+}): Promise<CatalogItem[]> {
   const batchSize = 1000;
-  const allItems: WarehouseItem[] = [];
+  const allItems: CatalogItem[] = [];
   let cursor: Cursor | null = null;
   const seenIds = new Set<string>();
 
@@ -140,7 +135,7 @@ export async function fetchAllWarehouseItemsBatched(filters: {
     const { data, error } = await query;
     if (error) throw error;
 
-    const batch = (data || []) as unknown as WarehouseItem[];
+    const batch = (data || []) as unknown as CatalogItem[];
     for (const item of batch) {
       if (!seenIds.has(item.id)) {
         seenIds.add(item.id);
