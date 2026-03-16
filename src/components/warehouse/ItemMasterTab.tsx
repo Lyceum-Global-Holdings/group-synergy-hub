@@ -868,7 +868,7 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
           try {
             // Remove inventory data only — keep the catalog item intact
             await supabase.from('warehouse_bin_allocations').delete().eq('warehouse_item_id', itemId);
-            await supabase.from('warehouse_stock_transactions').delete().eq('item_id', itemId);
+            await supabase.from('stock_transactions').delete().eq('item_id', itemId);
             await supabase.from('warehouse_items').update({ current_stock: 0 }).eq('id', itemId);
             toast.success('Item removed from inventory (catalog entry preserved)');
             setDeletingItem(null);
