@@ -16678,6 +16678,119 @@ export type Database = {
           },
         ]
       }
+      warehouse_item_catalog: {
+        Row: {
+          barcode: string | null
+          brand: string | null
+          category_id: string | null
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          image_url: string | null
+          is_batch_tracked: boolean
+          is_serialized: boolean
+          item_code: string
+          location_id: string | null
+          manufacturer: string | null
+          max_stock_level: number | null
+          min_stock_level: number | null
+          name: string
+          notes: string | null
+          reorder_level: number | null
+          selling_price: number | null
+          sku: string | null
+          status: string
+          supplier_id: string | null
+          unit_cost: number | null
+          unit_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          barcode?: string | null
+          brand?: string | null
+          category_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          image_url?: string | null
+          is_batch_tracked?: boolean
+          is_serialized?: boolean
+          item_code: string
+          location_id?: string | null
+          manufacturer?: string | null
+          max_stock_level?: number | null
+          min_stock_level?: number | null
+          name: string
+          notes?: string | null
+          reorder_level?: number | null
+          selling_price?: number | null
+          sku?: string | null
+          status?: string
+          supplier_id?: string | null
+          unit_cost?: number | null
+          unit_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          barcode?: string | null
+          brand?: string | null
+          category_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          image_url?: string | null
+          is_batch_tracked?: boolean
+          is_serialized?: boolean
+          item_code?: string
+          location_id?: string | null
+          manufacturer?: string | null
+          max_stock_level?: number | null
+          min_stock_level?: number | null
+          name?: string
+          notes?: string | null
+          reorder_level?: number | null
+          selling_price?: number | null
+          sku?: string | null
+          status?: string
+          supplier_id?: string | null
+          unit_cost?: number | null
+          unit_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "warehouse_item_catalog_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "item_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "warehouse_item_catalog_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "warehouse_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "warehouse_item_catalog_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "warehouse_item_catalog_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "item_units"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       warehouse_item_reservations: {
         Row: {
           bin_allocation_id: string | null
@@ -16816,6 +16929,7 @@ export type Database = {
           available_quantity: number | null
           barcode: string | null
           brand: string | null
+          catalog_item_id: string | null
           category_id: string | null
           company_id: string | null
           created_at: string
@@ -16847,6 +16961,7 @@ export type Database = {
           available_quantity?: number | null
           barcode?: string | null
           brand?: string | null
+          catalog_item_id?: string | null
           category_id?: string | null
           company_id?: string | null
           created_at?: string
@@ -16878,6 +16993,7 @@ export type Database = {
           available_quantity?: number | null
           barcode?: string | null
           brand?: string | null
+          catalog_item_id?: string | null
           category_id?: string | null
           company_id?: string | null
           created_at?: string
@@ -16906,6 +17022,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "warehouse_items_catalog_item_id_fkey"
+            columns: ["catalog_item_id"]
+            isOneToOne: false
+            referencedRelation: "warehouse_item_catalog"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "warehouse_items_category_id_fkey"
             columns: ["category_id"]

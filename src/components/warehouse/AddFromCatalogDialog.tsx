@@ -14,7 +14,7 @@ import { useWarehouseBins } from '@/hooks/useWarehouseBins';
 import { useWarehouseBinAllocations } from '@/hooks/useWarehouseBinAllocations';
 import { useItemCategories } from '@/hooks/useItemCategories';
 import { toast } from 'sonner';
-import { WarehouseItem } from '@/types/itemBin';
+import { CatalogItem } from '@/types/itemBin';
 
 interface AddFromCatalogDialogProps {
   open: boolean;
@@ -30,43 +30,43 @@ export function AddFromCatalogDialog({ open, onOpenChange }: AddFromCatalogDialo
 
   const [step, setStep] = useState<'select' | 'configure'>('select');
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedItem, setSelectedItem] = useState<WarehouseItem | null>(null);
+  const [selectedItem, setSelectedItem] = useState<CatalogItem | null>(null);
   const [quantity, setQuantity] = useState<number>(1);
   const [selectedBinId, setSelectedBinId] = useState<string>('');
 
-  // Fetch all global items
-  const { data: globalItems = [], isLoading: isLoadingGlobal } = useQuery({
-    queryKey: ['global-catalog-items'],
+  // Fetch all catalog items
+  const { data: catalogItems = [], isLoading: isLoadingCatalog } = useQuery({
+    queryKey: ['warehouse-item-catalog-for-import'],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('warehouse_items')
+        .from('warehouse_item_catalog')
         .select('*')
         .eq('status', 'active')
         .order('name');
       if (error) throw error;
-      return data as WarehouseItem[];
+      return data as unknown as CatalogItem[];
     },
     enabled: open,
   });
 
-  // Fetch existing item codes for current company
-  const { data: existingCodes } = useQuery({
-    queryKey: ['warehouse-items-codes', selectedCompany?.id],
+  // Fetch existing catalog_item_ids for current company's inventory
+  const { data: existingCatalogIds } = useQuery({
+    queryKey: ['warehouse-items-catalog-ids', selectedCompany?.id],
     queryFn: async () => {
       const { data } = await supabase
         .from('warehouse_items')
-        .select('item_code')
-        .eq('company_id', selectedCompany!.id);
-      return new Set(data?.map(d => d.item_code) || []);
+        .select('catalog_item_id')
+        .eq('company_id', selectedCompany!.id)
+        .not('catalog_item_id', 'is', null);
+      return new Set(data?.map(d => d.catalog_item_id).filter(Boolean) || []);
     },
     enabled: open && !!selectedCompany?.id,
   });
 
-  // Filter to only items NOT in current company
+  // Filter to only items NOT already in current company's inventory
   const availableItems = useMemo(() => {
-    return globalItems.filter(item => {
-      if (item.company_id === selectedCompany?.id) return false;
-      if (existingCodes?.has(item.item_code)) return false;
+    return catalogItems.filter(item => {
+      if (existingCatalogIds?.has(item.id)) return false;
       if (!searchTerm) return true;
       const term = searchTerm.toLowerCase();
       return (
@@ -76,7 +76,7 @@ export function AddFromCatalogDialog({ open, onOpenChange }: AddFromCatalogDialo
         item.sku?.toLowerCase().includes(term)
       );
     });
-  }, [globalItems, existingCodes, selectedCompany?.id, searchTerm]);
+  }, [catalogItems, existingCatalogIds, searchTerm]);
 
   const importMutation = useMutation({
     mutationFn: async () => {
@@ -84,10 +84,11 @@ export function AddFromCatalogDialog({ open, onOpenChange }: AddFromCatalogDialo
         throw new Error('Please fill in all required fields');
       }
 
-      // 1. Clone item into current company
+      // Create inventory row linked to catalog item
       const { data: newItem, error: insertError } = await supabase
         .from('warehouse_items')
         .insert({
+          catalog_item_id: selectedItem.id,
           item_code: selectedItem.item_code,
           name: selectedItem.name,
           description: selectedItem.description,
@@ -116,7 +117,7 @@ export function AddFromCatalogDialog({ open, onOpenChange }: AddFromCatalogDialo
 
       if (insertError) throw insertError;
 
-      // 2. Create bin allocation
+      // Create bin allocation
       await createAllocation({
         warehouse_item_id: newItem.id,
         bin_id: selectedBinId,
@@ -129,8 +130,9 @@ export function AddFromCatalogDialog({ open, onOpenChange }: AddFromCatalogDialo
     onSuccess: () => {
       toast.success('Item imported to inventory with bin allocation');
       queryClient.invalidateQueries({ queryKey: ['warehouse-items'] });
-      queryClient.invalidateQueries({ queryKey: ['warehouse-items-codes', selectedCompany?.id] });
+      queryClient.invalidateQueries({ queryKey: ['warehouse-items-catalog-ids', selectedCompany?.id] });
       queryClient.invalidateQueries({ queryKey: ['warehouse-bin-allocations'] });
+      queryClient.invalidateQueries({ queryKey: ['warehouse-items-inventory'] });
       handleClose();
     },
     onError: (err: any) => {
@@ -147,7 +149,7 @@ export function AddFromCatalogDialog({ open, onOpenChange }: AddFromCatalogDialo
     onOpenChange(false);
   };
 
-  const handleSelectItem = (item: WarehouseItem) => {
+  const handleSelectItem = (item: CatalogItem) => {
     setSelectedItem(item);
     setStep('configure');
   };
@@ -176,7 +178,7 @@ export function AddFromCatalogDialog({ open, onOpenChange }: AddFromCatalogDialo
               />
             </div>
             <ScrollArea className="h-[300px] border rounded-md">
-              {isLoadingGlobal ? (
+              {isLoadingCatalog ? (
                 <div className="p-4 text-center text-muted-foreground">Loading catalog...</div>
               ) : availableItems.length === 0 ? (
                 <div className="p-4 text-center text-muted-foreground">

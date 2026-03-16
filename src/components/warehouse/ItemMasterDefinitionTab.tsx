@@ -21,7 +21,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import ExcelJS from 'exceljs';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
-import { useWarehouseItems } from '@/hooks/useWarehouseItems';
+import { useWarehouseItemCatalog } from '@/hooks/useWarehouseItemCatalog';
 import { useWarehouseItemsLazy, useWarehouseItemsCount, fetchAllWarehouseItemsBatched } from '@/hooks/useWarehouseItemsPaged';
 import { useItemCategories } from '@/hooks/useItemCategories';
 import { useItemUnits } from '@/hooks/useItemUnits';
@@ -31,7 +31,7 @@ import { StockMovementDialog } from '@/components/warehouse/StockMovementDialog'
 import { StockMovementChart } from '@/components/warehouse/StockMovementChart';
 import { DeleteItemConfirmationDialog } from '@/components/warehouse/DeleteItemConfirmationDialog';
 import { useIsAdminOrHigher } from '@/hooks/useIsAdminOrHigher';
-import { WarehouseItem } from '@/types/itemBin';
+import { CatalogItem } from '@/types/itemBin';
 
 const COLUMN_DEFS = [
   { key: 'photo', label: 'Photo', fixed: false },
@@ -45,7 +45,6 @@ const COLUMN_DEFS = [
   { key: 'unit_cost', label: 'Unit Cost', fixed: false },
   { key: 'selling_price', label: 'Selling Price', fixed: false },
   { key: 'reorder_level', label: 'Reorder Lvl', fixed: false },
-  { key: 'current_stock', label: 'Current Stock', fixed: false },
   { key: 'status', label: 'Status', fixed: false },
   { key: 'actions', label: 'Actions', fixed: true },
 ] as const;
@@ -68,10 +67,10 @@ export function ItemMasterDefinitionTab({ onNavigateToInventory, onNavigateToBin
   const [statusFilter, setStatusFilter] = useState('all');
   const [supplierFilter, setSupplierFilter] = useState('all');
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
-  const [editingItem, setEditingItem] = useState<WarehouseItem | null>(null);
-  const [stockMovementItem, setStockMovementItem] = useState<WarehouseItem | null>(null);
+  const [editingItem, setEditingItem] = useState<CatalogItem | null>(null);
+  const [stockMovementItem, setStockMovementItem] = useState<CatalogItem | null>(null);
   const [previewImage, setPreviewImage] = useState<{ url: string; name: string } | null>(null);
-  const [deletingItem, setDeletingItem] = useState<WarehouseItem | null>(null);
+  const [deletingItem, setDeletingItem] = useState<CatalogItem | null>(null);
   const [isExporting, setIsExporting] = useState(false);
   const [visibleColumns, setVisibleColumns] = useState<Record<ColumnKey, boolean>>(DEFAULT_VISIBLE);
   const sentinelRef = useRef<HTMLDivElement>(null);
@@ -83,21 +82,19 @@ export function ItemMasterDefinitionTab({ onNavigateToInventory, onNavigateToBin
   const col = (key: ColumnKey) => visibleColumns[key];
   const visibleCount = Object.values(visibleColumns).filter(Boolean).length;
 
-  // Debounce search to avoid excessive queries
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(searchTerm), 300);
     return () => clearTimeout(timer);
   }, [searchTerm]);
 
-  // Use mutations from the original hook (disable list fetch)
-  const { deleteItem, markItemInactive, isDeleting, isMarkingInactive } = useWarehouseItems({ skipCompanyFilter: true, disableFetch: true });
+  // Use catalog mutations (disable list fetch since we use paged hook)
+  const { deleteItem, markItemInactive, isDeleting, isMarkingInactive } = useWarehouseItemCatalog({ disableFetch: true });
   const { canDelete } = useIsAdminOrHigher();
   const { selectedCompany } = useCompany();
   const { categories } = useItemCategories(selectedCompany?.id);
   const { units } = useItemUnits();
   const queryClient = useQueryClient();
 
-  // Resolve supplier filter to supplier_id
   const { data: suppliers = [] } = useQuery({
     queryKey: ['all-supplier-names'],
     queryFn: async () => {
@@ -122,7 +119,6 @@ export function ItemMasterDefinitionTab({ onNavigateToInventory, onNavigateToBin
 
   const filterParams = { search: debouncedSearch, categoryId: selectedCategoryId, status: statusFilter, supplierId: selectedSupplierId };
 
-  // Cursor-based infinite query
   const {
     data: infiniteData,
     isLoading,
@@ -131,15 +127,13 @@ export function ItemMasterDefinitionTab({ onNavigateToInventory, onNavigateToBin
     isFetchingNextPage,
   } = useWarehouseItemsLazy(filterParams);
 
-  // Lightweight count query
   const countConfig = useWarehouseItemsCount(filterParams);
   const { data: totalCount = 0 } = useQuery(countConfig);
 
-  // Flatten all pages into a single list, dedupe by id
   const items = useMemo(() => {
     if (!infiniteData?.pages) return [];
     const seen = new Set<string>();
-    const result: WarehouseItem[] = [];
+    const result: CatalogItem[] = [];
     for (const page of infiniteData.pages) {
       for (const item of page.items) {
         if (!seen.has(item.id)) {
@@ -151,7 +145,6 @@ export function ItemMasterDefinitionTab({ onNavigateToInventory, onNavigateToBin
     return result;
   }, [infiniteData]);
 
-  // Auto-load via IntersectionObserver
   useEffect(() => {
     const el = sentinelRef.current;
     if (!el) return;
@@ -204,7 +197,6 @@ export function ItemMasterDefinitionTab({ onNavigateToInventory, onNavigateToBin
         { header: 'Unit Cost', key: 'unit_cost', width: 12 },
         { header: 'Selling Price', key: 'selling_price', width: 14 },
         { header: 'Reorder Level', key: 'reorder_level', width: 14 },
-        { header: 'Current Stock', key: 'current_stock', width: 14 },
         { header: 'Status', key: 'status', width: 12 },
       ];
 
@@ -224,7 +216,6 @@ export function ItemMasterDefinitionTab({ onNavigateToInventory, onNavigateToBin
           unit_cost: item.unit_cost ?? 0,
           selling_price: item.selling_price ?? 0,
           reorder_level: item.reorder_level ?? 0,
-          current_stock: item.current_stock ?? 0,
           status: item.status,
         });
       });
@@ -248,10 +239,8 @@ export function ItemMasterDefinitionTab({ onNavigateToInventory, onNavigateToBin
 
   return (
     <div className="space-y-4">
-      {/* Stock Movement Chart */}
       <StockMovementChart />
 
-      {/* Filters */}
       <div className="flex flex-col gap-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 flex-wrap">
@@ -294,7 +283,6 @@ export function ItemMasterDefinitionTab({ onNavigateToInventory, onNavigateToBin
             )}
           </div>
           <div className="flex items-center gap-2">
-            {/* Column visibility toggle */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" size="sm">
@@ -303,13 +291,13 @@ export function ItemMasterDefinitionTab({ onNavigateToInventory, onNavigateToBin
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-48 p-2 space-y-1">
-                {COLUMN_DEFS.filter(c => !c.fixed).map(col => (
-                  <label key={col.key} className="flex items-center gap-2 px-2 py-1 text-sm cursor-pointer hover:bg-accent rounded">
+                {COLUMN_DEFS.filter(c => !c.fixed).map(colDef => (
+                  <label key={colDef.key} className="flex items-center gap-2 px-2 py-1 text-sm cursor-pointer hover:bg-accent rounded">
                     <Checkbox
-                      checked={visibleColumns[col.key]}
-                      onCheckedChange={() => toggleColumn(col.key)}
+                      checked={visibleColumns[colDef.key]}
+                      onCheckedChange={() => toggleColumn(colDef.key)}
                     />
-                    {col.label}
+                    {colDef.label}
                   </label>
                 ))}
               </DropdownMenuContent>
@@ -325,7 +313,6 @@ export function ItemMasterDefinitionTab({ onNavigateToInventory, onNavigateToBin
         </div>
       </div>
 
-      {/* Table */}
       <div className="rounded-md border overflow-auto">
         <Table className="[&_td]:py-1.5 [&_th]:py-2">
           <TableHeader>
@@ -341,7 +328,6 @@ export function ItemMasterDefinitionTab({ onNavigateToInventory, onNavigateToBin
               {col('unit_cost') && <TableHead className="text-right">Unit Cost</TableHead>}
               {col('selling_price') && <TableHead className="text-right">Selling Price</TableHead>}
               {col('reorder_level') && <TableHead className="text-right">Reorder Lvl</TableHead>}
-              {col('current_stock') && <TableHead className="text-right">Current Stock</TableHead>}
               {col('status') && <TableHead>Status</TableHead>}
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
@@ -392,7 +378,6 @@ export function ItemMasterDefinitionTab({ onNavigateToInventory, onNavigateToBin
                   {col('unit_cost') && <TableCell className="text-right">{item.unit_cost?.toFixed(2) || '-'}</TableCell>}
                   {col('selling_price') && <TableCell className="text-right">{item.selling_price?.toFixed(2) || '-'}</TableCell>}
                   {col('reorder_level') && <TableCell className="text-right">{item.reorder_level ?? '-'}</TableCell>}
-                  {col('current_stock') && <TableCell className="text-right font-medium">{item.current_stock ?? 0}</TableCell>}
                   {col('status') && (
                     <TableCell>
                       <Badge variant="outline" className={getStatusColor(item.status || 'active')}>
@@ -455,7 +440,6 @@ export function ItemMasterDefinitionTab({ onNavigateToInventory, onNavigateToBin
         </Table>
       </div>
 
-      {/* Lazy load sentinel & status */}
       <div className="flex flex-col items-center gap-2">
         <div className="text-sm text-muted-foreground">
           Loaded {items.length.toLocaleString()} of {totalCount.toLocaleString()} items
@@ -476,7 +460,6 @@ export function ItemMasterDefinitionTab({ onNavigateToInventory, onNavigateToBin
         )}
       </div>
 
-      {/* Dialogs */}
       <AddItemsDialog
         open={isCreateDialogOpen || editingItem !== null}
         onOpenChange={(open) => {
@@ -492,7 +475,7 @@ export function ItemMasterDefinitionTab({ onNavigateToInventory, onNavigateToBin
           onOpenChange={(open) => { if (!open) setStockMovementItem(null); }}
           itemId={stockMovementItem.id}
           itemName={stockMovementItem.name}
-          currentStock={stockMovementItem.current_stock}
+          currentStock={0}
         />
       )}
 

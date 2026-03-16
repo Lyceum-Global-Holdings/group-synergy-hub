@@ -4,12 +4,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Download, FileText, AlertCircle, CheckCircle2, ArrowRight, RefreshCw } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { useWarehouseItems } from '@/hooks/useWarehouseItems';
+import { useWarehouseItemCatalog } from '@/hooks/useWarehouseItemCatalog';
 import { useItemCategories } from '@/hooks/useItemCategories';
 import { useItemUnits } from '@/hooks/useItemUnits';
 import { useSuppliers } from '@/hooks/useSuppliers';
 import { useCompany } from '@/contexts/CompanyContext';
-import { CreateWarehouseItemData } from '@/types/itemBin';
+import { CreateCatalogItemData } from '@/types/itemBin';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -20,7 +20,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useWarehouseLocations } from '@/hooks/useWarehouseLocations';
 type ImportStatus = 'new' | 'duplicate' | 'update_code' | 'error';
 
-interface ParsedItem extends Partial<CreateWarehouseItemData> {
+interface ParsedItem extends Partial<CreateCatalogItemData> {
   rowNumber: number;
   errors: string[];
   warnings: string[];
@@ -44,8 +44,8 @@ export function BulkItemImportContent({ onSuccess, onCancel }: BulkItemImportCon
   const [showConfirmation, setShowConfirmation] = useState(false);
 
   const { toast } = useToast();
-  const { bulkCreateItemsAsync, isBulkCreating } = useWarehouseItems();
-  const { items: allExistingItems = [] } = useWarehouseItems({ skipCompanyFilter: true });
+  const { bulkCreateItemsAsync, isBulkCreating, items: allExistingItems } = useWarehouseItemCatalog();
+  // allExistingItems comes from useWarehouseItemCatalog above
   const { categories } = useItemCategories();
   const { units } = useItemUnits();
   const { data: suppliers = [] } = useSuppliers();
@@ -218,10 +218,9 @@ export function BulkItemImportContent({ onSuccess, onCancel }: BulkItemImportCon
               }
               break;
             case 'company':
+              // Company column ignored for catalog imports (catalog is global)
               if (value) {
-                const company = companies.find(c => c.name.toLowerCase() === value.toLowerCase());
-                if (company) item.company_id = company.id;
-                else item.warnings.push(`Company "${value}" not found`);
+                item.warnings.push('Company column ignored — catalog items are global');
               }
               break;
             case 'reorder_level':
@@ -322,8 +321,7 @@ export function BulkItemImportContent({ onSuccess, onCancel }: BulkItemImportCon
         }
       });
 
-      // --- Name-based matching against DB ---
-      const companyId = selectedCompany?.id || '';
+      // --- Name-based matching against global catalog ---
       parsed.forEach(item => {
         if (item.errors.length > 0) {
           item.importStatus = 'error';
@@ -340,24 +338,19 @@ export function BulkItemImportContent({ onSuccess, onCancel }: BulkItemImportCon
             existing.name?.toLowerCase() === item.name!.toLowerCase()
         );
 
-        // Filter items scoped to target company for per-company uniqueness checks
-        const targetCompanyItems = allExistingItems.filter(
-          existing => existing.company_id === selectedCompany?.id
-        );
-
         if (!existingByName) {
-          // Check item_code uniqueness only within target company (constraint is per-company)
+          // Check item_code uniqueness globally (catalog has unique item_code)
           if (item.item_code) {
-            const existsCodeInCompany = targetCompanyItems.some(
+            const existsCode = allExistingItems.some(
               existing =>
                 existing.item_code?.toLowerCase() === item.item_code?.toLowerCase()
             );
-            if (existsCodeInCompany) {
-              item.errors.push(`Item code "${item.item_code}" already exists in this company`);
+            if (existsCode) {
+              item.errors.push(`Item code "${item.item_code}" already exists in catalog`);
               item.importStatus = 'error';
             }
           }
-          // Check SKU uniqueness against DB for new items
+          // Check SKU uniqueness against catalog
           const itemSku = (item as any).sku;
           if (itemSku && typeof itemSku === 'string' && itemSku.trim()) {
             const existsSkuInDb = allExistingItems.some(
@@ -365,7 +358,7 @@ export function BulkItemImportContent({ onSuccess, onCancel }: BulkItemImportCon
                 (existing as any).sku?.toLowerCase() === itemSku.toLowerCase()
             );
             if (existsSkuInDb) {
-              item.errors.push(`SKU "${itemSku}" already exists in database`);
+              item.errors.push(`SKU "${itemSku}" already exists in catalog`);
               item.importStatus = 'error';
             }
           }
@@ -376,17 +369,14 @@ export function BulkItemImportContent({ onSuccess, onCancel }: BulkItemImportCon
           existingByName.item_code?.toLowerCase() !== item.item_code?.toLowerCase() &&
           item.item_code
         ) {
-          // Validate that the new code doesn't conflict within the existing item's company
-          const existingItemCompanyItems = allExistingItems.filter(
-            existing => existing.company_id === existingByName.company_id
-          );
-          const codeConflict = existingItemCompanyItems.some(
+          // Check if new code conflicts with another catalog item
+          const codeConflict = allExistingItems.some(
             existing =>
               existing.id !== existingByName.id &&
               existing.item_code?.toLowerCase() === item.item_code?.toLowerCase()
           );
           if (codeConflict) {
-            item.errors.push(`Item code "${item.item_code}" already exists for this item's company`);
+            item.errors.push(`Item code "${item.item_code}" already exists in catalog`);
             item.importStatus = 'error';
           } else {
             item.importStatus = 'update_code';
@@ -441,18 +431,14 @@ export function BulkItemImportContent({ onSuccess, onCancel }: BulkItemImportCon
         return;
       }
 
-      // --- Pre-import safety gate: re-check item_code uniqueness ---
+      // --- Pre-import safety gate: re-check item_code uniqueness in catalog ---
       if (newItems.length > 0) {
-        const targetCompanyItems = allExistingItems.filter(
-          existing => existing.company_id === selectedCompany?.id
-        );
         const existingCodesSet = new Set(
-          targetCompanyItems
+          allExistingItems
             .filter(i => i.item_code)
             .map(i => i.item_code!.toLowerCase().trim())
         );
 
-        // Check for intra-batch duplicates and DB conflicts
         const batchCodesSeen = new Set<string>();
         const conflictRows: string[] = [];
         for (const item of newItems) {
@@ -467,7 +453,7 @@ export function BulkItemImportContent({ onSuccess, onCancel }: BulkItemImportCon
         if (conflictRows.length > 0) {
           toast({
             title: "Item code conflict",
-            description: `${conflictRows.length} item code(s) conflict with existing items in this company: ${conflictRows.slice(0, 3).join(', ')}${conflictRows.length > 3 ? '...' : ''}`,
+            description: `${conflictRows.length} item code(s) conflict with existing catalog items: ${conflictRows.slice(0, 3).join(', ')}${conflictRows.length > 3 ? '...' : ''}`,
             variant: "destructive",
           });
           setIsImporting(false);
@@ -482,7 +468,6 @@ export function BulkItemImportContent({ onSuccess, onCancel }: BulkItemImportCon
       // --- Insert new items ---
       if (newItems.length > 0) {
         const validData = newItems.map(({ rowNumber, errors, warnings, importStatus, existingId, existingItemCode, updateCodeEnabled, ...item }) => {
-          // Sanitize empty strings to null for optional fields to avoid unique constraint violations
           const sanitized = { ...item } as any;
           const nullableFields = ['sku', 'barcode', 'description', 'brand', 'manufacturer', 'notes', 'image_url'];
           for (const field of nullableFields) {
@@ -490,7 +475,9 @@ export function BulkItemImportContent({ onSuccess, onCancel }: BulkItemImportCon
               sanitized[field] = null;
             }
           }
-          return sanitized as CreateWarehouseItemData;
+          // Ensure status is set
+          if (!sanitized.status) sanitized.status = 'active';
+          return sanitized as CreateCatalogItemData;
         });
         const createdItems = await bulkCreateItemsAsync(validData);
         createdCount = createdItems.length;
@@ -502,7 +489,7 @@ export function BulkItemImportContent({ onSuccess, onCancel }: BulkItemImportCon
         for (const item of enabledUpdateItems) {
           if (item.existingId && item.item_code) {
             const { error } = await supabase
-              .from('warehouse_items')
+              .from('warehouse_item_catalog')
               .update({ item_code: item.item_code })
               .eq('id', item.existingId);
 
@@ -515,7 +502,7 @@ export function BulkItemImportContent({ onSuccess, onCancel }: BulkItemImportCon
         }
       }
 
-      queryClient.invalidateQueries({ queryKey: ['warehouse-items'] });
+      queryClient.invalidateQueries({ queryKey: ['warehouse-item-catalog'] });
 
       toast({
         title: "Import Complete",

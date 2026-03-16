@@ -12,12 +12,12 @@ import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertTriangle, Archive, Trash2 } from 'lucide-react';
 import { useItemReferences } from '@/hooks/useItemReferences';
-import { WarehouseItem } from '@/types/itemBin';
+import { WarehouseItem, CatalogItem } from '@/types/itemBin';
 
 interface DeleteItemConfirmationDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  item: WarehouseItem | null;
+  item: WarehouseItem | CatalogItem | null;
   onConfirmDelete: (itemId: string, forceDelete: boolean) => void;
   onMarkInactive: (itemId: string) => void;
   isLoading: boolean;

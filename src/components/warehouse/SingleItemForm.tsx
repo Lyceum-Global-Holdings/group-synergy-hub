@@ -20,14 +20,15 @@ import { useWarehouseLocations } from '@/hooks/useWarehouseLocations';
 import { useWarehouseBins } from '@/hooks/useWarehouseBins';
 import { useWarehouseBinAllocations } from '@/hooks/useWarehouseBinAllocations';
 import { useCompany } from '@/contexts/CompanyContext';
-import { WarehouseItem } from '@/types/itemBin';
+import { WarehouseItem, CatalogItem } from '@/types/itemBin';
 import { supabase } from '@/integrations/supabase/client';
 import { Upload, X, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import { QuickCreateSupplierDialog } from './QuickCreateSupplierDialog';
+import { useWarehouseItemCatalog } from '@/hooks/useWarehouseItemCatalog';
 
 interface SingleItemFormProps {
-  editingItem?: WarehouseItem | null;
+  editingItem?: WarehouseItem | CatalogItem | null;
   onSuccess: () => void;
   onCancel: () => void;
   mode?: 'catalog' | 'inventory';
@@ -66,6 +67,7 @@ export function SingleItemForm({ editingItem, onSuccess, onCancel, mode = 'inven
   const [isQuickSupplierDialogOpen, setIsQuickSupplierDialogOpen] = useState(false);
 
   const { createItemAsync, updateItem, isCreating, isUpdating } = useWarehouseItems();
+  const { createItemAsync: createCatalogItemAsync, updateItem: updateCatalogItem, isCreating: isCatalogCreating, isUpdating: isCatalogUpdating } = useWarehouseItemCatalog({ disableFetch: true });
   const { companies, selectedCompany } = useCompany();
   const { categories } = useItemCategories(selectedCompany?.id);
   const { data: companySuppliers = [], refetch: refetchSuppliers } = useApprovedCompanySuppliers(selectedCompany?.id);
@@ -98,7 +100,7 @@ export function SingleItemForm({ editingItem, onSuccess, onCancel, mode = 'inven
         brand: editingItem.brand || '',
         manufacturer: editingItem.manufacturer || '',
         supplier_id: editingItem.supplier_id || '',
-        company_id: editingItem.company_id || '',
+        company_id: ('company_id' in editingItem ? editingItem.company_id : '') || '',
         unit_cost: editingItem.unit_cost?.toString() || '',
         selling_price: editingItem.selling_price?.toString() || '',
         reorder_level: editingItem.reorder_level?.toString() || '',
@@ -228,9 +230,26 @@ export function SingleItemForm({ editingItem, onSuccess, onCancel, mode = 'inven
     };
 
     if (editingItem) {
-      updateItem({ id: editingItem.id, ...baseData });
+      if (mode === 'catalog') {
+        updateCatalogItem({ id: editingItem.id, ...baseData, company_id: undefined } as any);
+      } else {
+        updateItem({ id: editingItem.id, ...baseData });
+      }
       onSuccess();
+    } else if (mode === 'catalog') {
+      // Catalog mode: insert into warehouse_item_catalog (no company_id, no stock)
+      try {
+        const { company_id, ...catalogData } = baseData;
+        await createCatalogItemAsync({
+          ...catalogData,
+          status: catalogData.status || 'active',
+        } as any);
+        onSuccess();
+      } catch (error) {
+        console.error('Error creating catalog item:', error);
+      }
     } else {
+      // Inventory mode: insert into warehouse_items
       const createData = {
         ...baseData,
         current_stock: 0,
@@ -238,11 +257,11 @@ export function SingleItemForm({ editingItem, onSuccess, onCancel, mode = 'inven
       try {
         const result = await createItemAsync({
           ...createData,
-          initialStock: mode === 'inventory' && initialStock ? parseFloat(initialStock) : undefined,
-          initialUnitCost: mode === 'inventory' && formData.unit_cost ? parseFloat(formData.unit_cost) : undefined,
+          initialStock: initialStock ? parseFloat(initialStock) : undefined,
+          initialUnitCost: formData.unit_cost ? parseFloat(formData.unit_cost) : undefined,
         });
 
-        if (mode === 'inventory' && initialStock && parseFloat(initialStock) > 0) {
+        if (initialStock && parseFloat(initialStock) > 0) {
           const stockQuantity = parseFloat(initialStock);
           const unitCostValue = formData.unit_cost ? parseFloat(formData.unit_cost) : 0;
           
@@ -638,7 +657,7 @@ export function SingleItemForm({ editingItem, onSuccess, onCancel, mode = 'inven
         <Button type="button" variant="outline" onClick={onCancel}>
           Cancel
         </Button>
-        <Button type="submit" disabled={isCreating || isUpdating || uploading}>
+        <Button type="submit" disabled={isCreating || isUpdating || isCatalogCreating || isCatalogUpdating || uploading}>
           {uploading ? 'Uploading...' : editingItem ? 'Update Item' : 'Create Item'}
         </Button>
       </div>
