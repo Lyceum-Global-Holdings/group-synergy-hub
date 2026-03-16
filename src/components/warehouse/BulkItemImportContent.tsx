@@ -489,7 +489,7 @@ export function BulkItemImportContent({ onSuccess, onCancel }: BulkItemImportCon
         for (const item of enabledUpdateItems) {
           if (item.existingId && item.item_code) {
             const { error } = await supabase
-              .from('warehouse_items')
+              .from('warehouse_item_catalog')
               .update({ item_code: item.item_code })
               .eq('id', item.existingId);
 
