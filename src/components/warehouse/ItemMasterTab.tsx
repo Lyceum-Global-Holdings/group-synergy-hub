@@ -46,6 +46,7 @@ import { AddFromCatalogDialog } from '@/components/warehouse/AddFromCatalogDialo
 import { WarehouseItem } from '@/types/itemBin';
 import { supabase } from '@/integrations/supabase/client';
 import { useRealtimeStockUpdates } from '@/hooks/useRealtimeStockUpdates';
+import { useLocationFilter } from '@/contexts/LocationFilterContext';
 import { useWarehouseBinAllocations } from '@/hooks/useWarehouseBinAllocations';
 import { useIsAdminOrHigher } from '@/hooks/useIsAdminOrHigher';
 import { useStockAudit } from '@/hooks/useStockAudit';
