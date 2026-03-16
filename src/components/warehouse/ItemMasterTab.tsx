@@ -206,8 +206,8 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
     },
   });
 
-  // Fetch stock by location for all items — lazy-loaded, only when location columns are visible
-  const [locationStockEnabled, setLocationStockEnabled] = useState(false);
+  // Fetch stock by location — only after initial items have loaded
+  const locationStockEnabled = totalLoaded > 0;
   const { data: itemLocationStock = {} } = useQuery<ItemLocationStockMap>({
     queryKey: ['all-items-location-stock', globalLocationId],
     queryFn: async () => {
