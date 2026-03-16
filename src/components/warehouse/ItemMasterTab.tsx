@@ -206,7 +206,8 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
     },
   });
 
-  // Fetch stock by location for all items
+  // Fetch stock by location for all items — lazy-loaded, only when location columns are visible
+  const [locationStockEnabled, setLocationStockEnabled] = useState(false);
   const { data: itemLocationStock = {} } = useQuery<ItemLocationStockMap>({
     queryKey: ['all-items-location-stock', globalLocationId],
     queryFn: async () => {
@@ -232,9 +233,7 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
           .order('id')
           .limit(1000);
         if (lastAllocId) q = q.gt('id', lastAllocId);
-        // Scope to location bins if a location is selected
         if (locationBinIds) {
-          // Chunk bin IDs in case there are many
           q = q.in('bin_id', locationBinIds.slice(0, 500));
         }
         const { data, error: allocError } = await q;
@@ -250,7 +249,6 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
       const binIds = [...new Set(allocations.map(a => a.bin_id).filter(Boolean))];
       if (binIds.length === 0) return {};
       
-      // Fetch bins in chunks of 500
       const bins: { id: string; location_id: string | null }[] = [];
       for (let i = 0; i < binIds.length; i += 500) {
         const chunk = binIds.slice(i, i + 500);
@@ -267,7 +265,6 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
       const locationIds = [...new Set(bins.map(b => b.location_id).filter(Boolean))] as string[];
       if (locationIds.length === 0) return {};
       
-      // Fetch locations in chunks of 500
       const locations: { id: string; name: string }[] = [];
       for (let i = 0; i < locationIds.length; i += 500) {
         const chunk = locationIds.slice(i, i + 500);
@@ -278,7 +275,6 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
         if (locError) throw locError;
         if (data) locations.push(...data);
       }
-      
       
       const binLocationMap = new Map(bins.map(b => [b.id, b.location_id]));
       const locationNameMap = new Map(locations?.map(l => [l.id, l.name]) || []);
@@ -312,6 +308,7 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
       
       return grouped;
     },
+    enabled: locationStockEnabled,
   });
 
   // Extract unique bins from loaded items for client-side bin filter

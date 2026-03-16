@@ -44,7 +44,7 @@ export function useWarehouseBinAllocations(options?: { disableFetch?: boolean })
 
       return allAllocations as BinAllocationWithDetails[];
     },
-    enabled: !!(isViewingAllCompanies || selectedCompany?.id),
+    enabled: !options?.disableFetch && !!(isViewingAllCompanies || selectedCompany?.id),
   });
 
   // Get allocations for a specific item

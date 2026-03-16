@@ -16,12 +16,9 @@ import { AlertCircle } from 'lucide-react';
 import { useWarehouseBins } from '@/hooks/useWarehouseBins';
 import { CreateBinDialog } from '@/components/warehouse/CreateBinDialog';
 import { WarehouseBin } from '@/types/itemBin';
-import { useRealtimeStockUpdates } from '@/hooks/useRealtimeStockUpdates';
 import { useIsAdminOrHigher } from '@/hooks/useIsAdminOrHigher';
 
 export function BinMasterTab() {
-  // Enable real-time stock updates
-  useRealtimeStockUpdates();
   const [searchTerm, setSearchTerm] = useState('');
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [editingBin, setEditingBin] = useState<WarehouseBin | null>(null);
