@@ -15,20 +15,27 @@ interface UseWarehouseItemsLazyOptions {
   supplierId?: string;
 }
 
+function getSearchOrString(search?: string): string | null {
+  if (!search?.trim()) return null;
+  const term = `%${search.trim()}%`;
+  return `name.ilike.${term},item_code.ilike.${term},brand.ilike.${term},barcode.ilike.${term},sku.ilike.${term}`;
+}
+
 function buildFilteredQuery(
   filters: { search?: string; categoryId?: string; status?: string; supplierId?: string },
   selectClause: string,
-  countOption?: { count: 'exact' }
+  countOption?: { count: 'exact' },
+  applySearch = true
 ) {
   let query = countOption
     ? supabase.from('warehouse_item_catalog').select(selectClause, countOption)
     : supabase.from('warehouse_item_catalog').select(selectClause);
 
-  if (filters.search?.trim()) {
-    const term = `%${filters.search.trim()}%`;
-    query = query.or(
-      `name.ilike.${term},item_code.ilike.${term},brand.ilike.${term},barcode.ilike.${term},sku.ilike.${term}`
-    );
+  if (applySearch) {
+    const searchOr = getSearchOrString(filters.search);
+    if (searchOr) {
+      query = query.or(searchOr);
+    }
   }
   if (filters.categoryId && filters.categoryId !== 'all') {
     query = query.eq('category_id', filters.categoryId);
@@ -56,14 +63,23 @@ export function useWarehouseItemsLazy({
     queryKey: ['warehouse-item-catalog', 'lazy', search, categoryId, status, supplierId],
     queryFn: async ({ pageParam }: { pageParam: Cursor | null }) => {
       const filters = { search, categoryId, status, supplierId };
-      let query = buildFilteredQuery(filters, `*, supplier:suppliers(id, name)`);
+      const searchOr = getSearchOrString(search);
+      const cursorOr = pageParam
+        ? `created_at.lt.${pageParam.created_at},and(created_at.eq.${pageParam.created_at},id.lt.${pageParam.id})`
+        : null;
+
+      // Build query WITHOUT applying search .or() — we'll combine it with cursor
+      let query = buildFilteredQuery(filters, `*, supplier:suppliers(id, name)`, undefined, false);
 
       query = query.order('created_at', { ascending: false }).order('id', { ascending: false });
 
-      if (pageParam) {
-        query = query.or(
-          `created_at.lt.${pageParam.created_at},and(created_at.eq.${pageParam.created_at},id.lt.${pageParam.id})`
-        );
+      // Apply search and cursor as a single filter to avoid double .or() issue
+      if (searchOr && cursorOr) {
+        query = query.or(searchOr).filter('or', `(${cursorOr})`, '');
+      } else if (searchOr) {
+        query = query.or(searchOr);
+      } else if (cursorOr) {
+        query = query.or(cursorOr);
       }
 
       query = query.limit(pageSize);
@@ -121,13 +137,20 @@ export async function fetchAllWarehouseItemsBatched(filters: {
   const seenIds = new Set<string>();
 
   while (true) {
-    let query = buildFilteredQuery(filters, `*, supplier:suppliers(id, name)`);
+    const searchOr = getSearchOrString(filters.search);
+    const cursorOr = cursor
+      ? `created_at.lt.${cursor.created_at},and(created_at.eq.${cursor.created_at},id.lt.${cursor.id})`
+      : null;
+
+    let query = buildFilteredQuery(filters, `*, supplier:suppliers(id, name)`, undefined, false);
     query = query.order('created_at', { ascending: false }).order('id', { ascending: false });
 
-    if (cursor) {
-      query = query.or(
-        `created_at.lt.${cursor.created_at},and(created_at.eq.${cursor.created_at},id.lt.${cursor.id})`
-      );
+    if (searchOr && cursorOr) {
+      query = query.or(searchOr).filter('or', `(${cursorOr})`, '');
+    } else if (searchOr) {
+      query = query.or(searchOr);
+    } else if (cursorOr) {
+      query = query.or(cursorOr);
     }
 
     query = query.limit(batchSize);
