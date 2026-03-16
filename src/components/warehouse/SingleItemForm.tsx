@@ -30,9 +30,10 @@ interface SingleItemFormProps {
   editingItem?: WarehouseItem | null;
   onSuccess: () => void;
   onCancel: () => void;
+  mode?: 'catalog' | 'inventory';
 }
 
-export function SingleItemForm({ editingItem, onSuccess, onCancel }: SingleItemFormProps) {
+export function SingleItemForm({ editingItem, onSuccess, onCancel, mode = 'inventory' }: SingleItemFormProps) {
   const [formData, setFormData] = useState({
     item_code: '',
     name: '',
