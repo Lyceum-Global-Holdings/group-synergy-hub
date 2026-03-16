@@ -35,41 +35,52 @@ export function useStockAudit() {
   const { data: auditItems = [], isLoading, error, refetch } = useQuery({
     queryKey: ['stock-audit', selectedCompany?.id, isViewingAllCompanies],
     queryFn: async (): Promise<StockAuditItem[]> => {
-      // Fetch active warehouse items
-      let itemsQuery = supabase
-        .from('warehouse_items')
-        .select('id, item_code, name, current_stock')
-        .eq('status', 'active');
+      // Fetch active warehouse items with cursor-based batching
+      const items: { id: string; item_code: string; name: string; current_stock: number }[] = [];
+      let lastItemId: string | null = null;
+      while (true) {
+        let itemsQuery = supabase
+          .from('warehouse_items')
+          .select('id, item_code, name, current_stock')
+          .eq('status', 'active')
+          .order('id')
+          .limit(1000);
 
-      if (!isViewingAllCompanies && selectedCompany?.id) {
-        itemsQuery = itemsQuery.eq('company_id', selectedCompany.id);
+        if (!isViewingAllCompanies && selectedCompany?.id) {
+          itemsQuery = itemsQuery.eq('company_id', selectedCompany.id);
+        }
+        if (lastItemId) {
+          itemsQuery = itemsQuery.gt('id', lastItemId);
+        }
+
+        const { data, error: itemsError } = await itemsQuery;
+        if (itemsError) throw itemsError;
+        if (!data || data.length === 0) break;
+        items.push(...data);
+        if (data.length < 1000) break;
+        lastItemId = data[data.length - 1].id;
       }
 
-      const { data: items, error: itemsError } = await itemsQuery;
-      if (itemsError) throw itemsError;
-      if (!items || items.length === 0) return [];
+      if (items.length === 0) return [];
 
-      // Fetch bin allocations in chunks of 100 to avoid URL length limits
-      const itemIds = items.map((i) => i.id);
-      const CHUNK_SIZE = 100;
-      const chunks: string[][] = [];
-      for (let i = 0; i < itemIds.length; i += CHUNK_SIZE) {
-        chunks.push(itemIds.slice(i, i + CHUNK_SIZE));
+      // Fetch bin allocations with cursor-based batching (no chunk-by-item needed)
+      const allocations: { warehouse_item_id: string; allocated_quantity: number }[] = [];
+      let lastAllocId: string | null = null;
+      while (true) {
+        let q = supabase
+          .from('warehouse_bin_allocations')
+          .select('id, warehouse_item_id, allocated_quantity')
+          .order('id')
+          .limit(1000);
+        if (lastAllocId) q = q.gt('id', lastAllocId);
+
+        const { data, error: allocError } = await q;
+        if (allocError) throw allocError;
+        if (!data || data.length === 0) break;
+        allocations.push(...data);
+        if (data.length < 1000) break;
+        lastAllocId = data[data.length - 1].id;
       }
-
-      const chunkResults = await Promise.all(
-        chunks.map((chunk) =>
-          supabase
-            .from('warehouse_bin_allocations')
-            .select('warehouse_item_id, allocated_quantity')
-            .in('warehouse_item_id', chunk)
-            .then((r) => {
-              if (r.error) throw r.error;
-              return r.data || [];
-            })
-        )
-      );
-      const allocations = chunkResults.flat();
 
       // Group allocations by item id
       const allocationsByItem = new Map<string, number[]>();

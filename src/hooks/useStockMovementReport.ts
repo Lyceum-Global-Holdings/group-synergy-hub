@@ -78,25 +78,30 @@ export const useStockMovementReport = () => {
       // Get unique item IDs
       const itemIds = [...new Set(transactions.map(t => t.item_id).filter(Boolean))];
       
-      // Fetch warehouse items with categories
-      const { data: items, error: itemsError } = await supabase
-        .from('warehouse_items')
-        .select(`
-          id,
-          item_code,
-          name,
-          brand,
-          category_id,
-          supplier_id,
-          location_id,
-          item_categories (
+      // Fetch warehouse items with categories in chunks of 500
+      const items: any[] = [];
+      for (let i = 0; i < itemIds.length; i += 500) {
+        const chunk = itemIds.slice(i, i + 500);
+        const { data, error: itemsError } = await supabase
+          .from('warehouse_items')
+          .select(`
             id,
-            name
-          )
-        `)
-        .in('id', itemIds);
+            item_code,
+            name,
+            brand,
+            category_id,
+            supplier_id,
+            location_id,
+            item_categories (
+              id,
+              name
+            )
+          `)
+          .in('id', chunk);
+        if (itemsError) throw itemsError;
+        if (data) items.push(...data);
+      }
       
-      if (itemsError) throw itemsError;
 
       // Get unique supplier IDs and fetch supplier names
       const supplierIds = [...new Set(
