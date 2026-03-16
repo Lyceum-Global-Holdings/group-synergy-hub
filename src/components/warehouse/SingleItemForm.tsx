@@ -30,9 +30,10 @@ interface SingleItemFormProps {
   editingItem?: WarehouseItem | null;
   onSuccess: () => void;
   onCancel: () => void;
+  mode?: 'catalog' | 'inventory';
 }
 
-export function SingleItemForm({ editingItem, onSuccess, onCancel }: SingleItemFormProps) {
+export function SingleItemForm({ editingItem, onSuccess, onCancel, mode = 'inventory' }: SingleItemFormProps) {
   const [formData, setFormData] = useState({
     item_code: '',
     name: '',
@@ -237,11 +238,11 @@ export function SingleItemForm({ editingItem, onSuccess, onCancel }: SingleItemF
       try {
         const result = await createItemAsync({
           ...createData,
-          initialStock: initialStock ? parseFloat(initialStock) : undefined,
-          initialUnitCost: formData.unit_cost ? parseFloat(formData.unit_cost) : undefined,
+          initialStock: mode === 'inventory' && initialStock ? parseFloat(initialStock) : undefined,
+          initialUnitCost: mode === 'inventory' && formData.unit_cost ? parseFloat(formData.unit_cost) : undefined,
         });
 
-        if (initialStock && parseFloat(initialStock) > 0) {
+        if (mode === 'inventory' && initialStock && parseFloat(initialStock) > 0) {
           const stockQuantity = parseFloat(initialStock);
           const unitCostValue = formData.unit_cost ? parseFloat(formData.unit_cost) : 0;
           
@@ -548,7 +549,7 @@ export function SingleItemForm({ editingItem, onSuccess, onCancel }: SingleItemF
         </div>
       </div>
 
-      {!editingItem && (
+      {!editingItem && mode === 'inventory' && (
         <>
           <div className="space-y-2">
             <Label htmlFor="initial_stock">Initial Stock (Opening Balance)</Label>

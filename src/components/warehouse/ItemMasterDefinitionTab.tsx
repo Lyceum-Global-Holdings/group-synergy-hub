@@ -483,6 +483,7 @@ export function ItemMasterDefinitionTab({ onNavigateToInventory, onNavigateToBin
           if (!open) { setIsCreateDialogOpen(false); setEditingItem(null); }
         }}
         editingItem={editingItem || undefined}
+        mode="catalog"
       />
 
       {stockMovementItem && (
