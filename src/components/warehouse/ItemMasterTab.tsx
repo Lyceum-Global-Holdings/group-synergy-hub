@@ -866,7 +866,7 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
         item={deletingItem}
         onConfirmDelete={async (itemId) => {
           try {
-            const { error } = await supabase.rpc('remove_item_from_inventory', { p_item_id: itemId });
+            const { error } = await supabase.rpc('remove_item_from_inventory' as any, { p_item_id: itemId });
             if (error) throw error;
             toast.success('Item removed from inventory (catalog entry preserved)');
             setDeletingItem(null);
