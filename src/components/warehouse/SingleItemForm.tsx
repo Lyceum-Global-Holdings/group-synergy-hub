@@ -249,12 +249,21 @@ export function SingleItemForm({ editingItem, onSuccess, onCancel, mode = 'inven
         console.error('Error creating catalog item:', error);
       }
     } else {
-      // Inventory mode: insert into warehouse_items
-      const createData = {
-        ...baseData,
-        current_stock: 0,
-      };
+      // Inventory mode: first create catalog entry, then inventory row linked to it
       try {
+        // Step 1: Create the global catalog entry
+        const { company_id: _companyId, ...catalogFields } = baseData;
+        const catalogResult = await createCatalogItemAsync({
+          ...catalogFields,
+          status: catalogFields.status || 'active',
+        } as any);
+
+        // Step 2: Create the inventory row linked to the catalog entry
+        const createData = {
+          ...baseData,
+          current_stock: 0,
+          catalog_item_id: catalogResult.id,
+        };
         const result = await createItemAsync({
           ...createData,
           initialStock: initialStock ? parseFloat(initialStock) : undefined,
