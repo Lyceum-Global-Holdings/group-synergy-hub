@@ -137,13 +137,20 @@ export async function fetchAllWarehouseItemsBatched(filters: {
   const seenIds = new Set<string>();
 
   while (true) {
-    let query = buildFilteredQuery(filters, `*, supplier:suppliers(id, name)`);
+    const searchOr = getSearchOrString(filters.search);
+    const cursorOr = cursor
+      ? `created_at.lt.${cursor.created_at},and(created_at.eq.${cursor.created_at},id.lt.${cursor.id})`
+      : null;
+
+    let query = buildFilteredQuery(filters, `*, supplier:suppliers(id, name)`, undefined, false);
     query = query.order('created_at', { ascending: false }).order('id', { ascending: false });
 
-    if (cursor) {
-      query = query.or(
-        `created_at.lt.${cursor.created_at},and(created_at.eq.${cursor.created_at},id.lt.${cursor.id})`
-      );
+    if (searchOr && cursorOr) {
+      query = query.or(searchOr).filter('or', `(${cursorOr})`, '');
+    } else if (searchOr) {
+      query = query.or(searchOr);
+    } else if (cursorOr) {
+      query = query.or(cursorOr);
     }
 
     query = query.limit(batchSize);
