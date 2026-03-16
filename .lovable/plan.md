@@ -1,35 +1,44 @@
 
 
-## Plan: Restrict Location Dropdowns to User's Edit-Permitted Locations
+# Fix: Item list misalignment within the Import from Catalog dialog frame
 
-### Problem
-The "Add Item" and "Add Stock" dialogs in Construction Inventory show **all** locations, allowing users to add items to locations they don't have edit access to. For example, Shihan (who only has access to "Lyceum Wattala") can currently see and select any location.
+## Problem
 
-### Solution
-Filter the location dropdowns in both dialogs using `useCurrentUserLocationPermissions()`, the same pattern already used in `NewTransferDialog.tsx`. Only locations where the user has explicit **edit** permissions will appear.
+The item list rows inside the `ScrollArea` are not properly constrained to the dialog frame, causing visual misalignment. The Radix `ScrollAreaPrimitive.Viewport` sets `w-full` but the inner content div has no width constraint, allowing button content to push beyond the visible frame boundary.
 
-### Changes
+## Changes
 
-**1. `src/components/construction/inventory/AddItemDialog.tsx`**
-- Import `useCurrentUserLocationPermissions`
-- Fetch permissions, then filter `locations` to only those in `editLocationIds`
-- Admin/Super Admin users (who get `viewAllLocations: true`) see all locations (unchanged behavior)
-- Use the filtered list for both the machine `current_location_id` and bulk `location_id` dropdowns
+### File: `src/components/warehouse/AddFromCatalogDialog.tsx`
 
-**2. `src/components/construction/inventory/AddInventoryStockDialog.tsx`**
-- Same change: import `useCurrentUserLocationPermissions`, filter the location dropdown to edit-permitted locations only
+**Line 281**: Add `overflow-hidden` to the inner wrapper div so item rows are clipped to the ScrollArea boundary:
 
-### Pattern (from existing `NewTransferDialog.tsx`)
 ```typescript
-const { data: permissions } = useCurrentUserLocationPermissions();
+// Before:
+<div>
 
-const permittedLocations = useMemo(() => {
-  if (!locations || !permissions) return [];
-  if (permissions.viewAllLocations) return locations;
-  const permittedIds = new Set(permissions.editLocationIds);
-  return locations.filter(loc => permittedIds.has(loc.id));
-}, [locations, permissions]);
+// After:
+<div className="overflow-hidden">
 ```
 
-Two files changed, no new files.
+**Line 273**: Add `overflow-hidden` to the ScrollArea to ensure the border frame clips content:
+
+```typescript
+// Before:
+<ScrollArea className="h-[400px] border rounded-md">
+
+// After:
+<ScrollArea className="h-[400px] border rounded-md overflow-hidden">
+```
+
+**Line 285**: Constrain button width with `max-w-full` to prevent flex children from expanding beyond the container:
+
+```typescript
+// Before:
+<button className="w-full text-left px-4 py-3 hover:bg-accent transition-colors flex items-start justify-between gap-4 border-b last:border-b-0 cursor-pointer"
+
+// After:
+<button className="w-full max-w-full text-left px-4 py-3 hover:bg-accent transition-colors flex items-start justify-between gap-4 border-b last:border-b-0 cursor-pointer overflow-hidden"
+```
+
+These three small class additions ensure the item list stays within the dialog frame boundary.
 
