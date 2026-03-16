@@ -48,7 +48,8 @@ export function useWarehouseItemsLazyInventory({
     queryFn: async ({ pageParam }: { pageParam: Cursor | null }) => {
       let query = supabase
         .from('warehouse_items')
-        .select(`*, supplier:suppliers(id, name)`);
+        .select(`*, supplier:suppliers(id, name)`)
+        .gt('current_stock', 0);
 
       // Company filter
       if (!isViewingAllCompanies && selectedCompany?.id) {
