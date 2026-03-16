@@ -138,7 +138,7 @@ export function AddFromCatalogDialog({ open, onOpenChange }: AddFromCatalogDialo
         .from('warehouse_items')
         .select('id')
         .eq('company_id', selectedCompany.id)
-        .eq('catalog_item_id', selectedItem.id)
+        .or(`catalog_item_id.eq.${selectedItem.id},item_code.eq.${selectedItem.item_code}`)
         .maybeSingle();
 
       let itemId: string;
