@@ -321,8 +321,7 @@ export function BulkItemImportContent({ onSuccess, onCancel }: BulkItemImportCon
         }
       });
 
-      // --- Name-based matching against DB ---
-      const companyId = selectedCompany?.id || '';
+      // --- Name-based matching against global catalog ---
       parsed.forEach(item => {
         if (item.errors.length > 0) {
           item.importStatus = 'error';
@@ -339,24 +338,19 @@ export function BulkItemImportContent({ onSuccess, onCancel }: BulkItemImportCon
             existing.name?.toLowerCase() === item.name!.toLowerCase()
         );
 
-        // Filter items scoped to target company for per-company uniqueness checks
-        const targetCompanyItems = allExistingItems.filter(
-          existing => existing.company_id === selectedCompany?.id
-        );
-
         if (!existingByName) {
-          // Check item_code uniqueness only within target company (constraint is per-company)
+          // Check item_code uniqueness globally (catalog has unique item_code)
           if (item.item_code) {
-            const existsCodeInCompany = targetCompanyItems.some(
+            const existsCode = allExistingItems.some(
               existing =>
                 existing.item_code?.toLowerCase() === item.item_code?.toLowerCase()
             );
-            if (existsCodeInCompany) {
-              item.errors.push(`Item code "${item.item_code}" already exists in this company`);
+            if (existsCode) {
+              item.errors.push(`Item code "${item.item_code}" already exists in catalog`);
               item.importStatus = 'error';
             }
           }
-          // Check SKU uniqueness against DB for new items
+          // Check SKU uniqueness against catalog
           const itemSku = (item as any).sku;
           if (itemSku && typeof itemSku === 'string' && itemSku.trim()) {
             const existsSkuInDb = allExistingItems.some(
@@ -364,7 +358,7 @@ export function BulkItemImportContent({ onSuccess, onCancel }: BulkItemImportCon
                 (existing as any).sku?.toLowerCase() === itemSku.toLowerCase()
             );
             if (existsSkuInDb) {
-              item.errors.push(`SKU "${itemSku}" already exists in database`);
+              item.errors.push(`SKU "${itemSku}" already exists in catalog`);
               item.importStatus = 'error';
             }
           }
@@ -375,17 +369,14 @@ export function BulkItemImportContent({ onSuccess, onCancel }: BulkItemImportCon
           existingByName.item_code?.toLowerCase() !== item.item_code?.toLowerCase() &&
           item.item_code
         ) {
-          // Validate that the new code doesn't conflict within the existing item's company
-          const existingItemCompanyItems = allExistingItems.filter(
-            existing => existing.company_id === existingByName.company_id
-          );
-          const codeConflict = existingItemCompanyItems.some(
+          // Check if new code conflicts with another catalog item
+          const codeConflict = allExistingItems.some(
             existing =>
               existing.id !== existingByName.id &&
               existing.item_code?.toLowerCase() === item.item_code?.toLowerCase()
           );
           if (codeConflict) {
-            item.errors.push(`Item code "${item.item_code}" already exists for this item's company`);
+            item.errors.push(`Item code "${item.item_code}" already exists in catalog`);
             item.importStatus = 'error';
           } else {
             item.importStatus = 'update_code';
