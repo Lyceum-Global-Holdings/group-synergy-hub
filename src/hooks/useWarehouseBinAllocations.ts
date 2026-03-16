@@ -8,7 +8,7 @@ import type {
   BinAllocationWithDetails 
 } from '@/types/warehouseReservation';
 
-export function useWarehouseBinAllocations() {
+export function useWarehouseBinAllocations(options?: { disableFetch?: boolean }) {
   const queryClient = useQueryClient();
   const { selectedCompany, isViewingAllCompanies } = useCompany();
 
