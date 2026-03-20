@@ -347,6 +347,29 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
     setSupplierFilter("all");
   };
 
+  // Selection helpers
+  const toggleSelectItem = (id: string) => {
+    setSelectedItemIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedItemIds.size === filteredItems.length) {
+      setSelectedItemIds(new Set());
+    } else {
+      setSelectedItemIds(new Set(filteredItems.map(i => i.id)));
+    }
+  };
+
+  const clearSelection = () => setSelectedItemIds(new Set());
+
+  const selectedItems = useMemo(() => {
+    return filteredItems.filter(i => selectedItemIds.has(i.id));
+  }, [filteredItems, selectedItemIds]);
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'active': return 'bg-green-100 text-green-800 border-green-200';
