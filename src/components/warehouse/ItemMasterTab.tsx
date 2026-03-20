@@ -1005,6 +1005,35 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
         open={isBulkStockUploadOpen}
         onOpenChange={setIsBulkStockUploadOpen}
       />
+
+      {/* Floating selection action bar */}
+      {selectedItemIds.size > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-background border rounded-lg shadow-lg px-4 py-3 flex items-center gap-3">
+          <CheckSquare className="h-4 w-4 text-primary" />
+          <span className="text-sm font-medium">{selectedItemIds.size} item(s) selected</span>
+          <Button size="sm" variant="outline" onClick={() => setIsBulkUpdateOpen(true)}>Bulk Update</Button>
+          {canDelete && (
+            <Button size="sm" variant="destructive" onClick={() => setIsBulkDeleteOpen(true)}>Bulk Delete</Button>
+          )}
+          <Button size="sm" variant="ghost" onClick={clearSelection}>
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
+      )}
+
+      <BulkInventoryUpdateDialog
+        open={isBulkUpdateOpen}
+        onOpenChange={setIsBulkUpdateOpen}
+        selectedIds={selectedItemIds}
+        onComplete={clearSelection}
+      />
+
+      <BulkInventoryDeleteDialog
+        open={isBulkDeleteOpen}
+        onOpenChange={setIsBulkDeleteOpen}
+        selectedItems={selectedItems}
+        onComplete={clearSelection}
+      />
     </div>
   );
 }
