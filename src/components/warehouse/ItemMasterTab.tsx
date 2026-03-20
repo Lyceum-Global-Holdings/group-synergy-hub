@@ -3,7 +3,7 @@ import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Plus, Search, Edit, Trash2, History, Settings, Eye, ArrowLeftRight, MapPin, BarChart3, Wrench, Image as ImageIcon, X, Package, FileWarning, ChevronDown, Download, FileSpreadsheet, PackagePlus, Loader2, Columns3, Upload } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, History, Settings, Eye, ArrowLeftRight, MapPin, BarChart3, Wrench, Image as ImageIcon, X, Package, FileWarning, ChevronDown, Download, FileSpreadsheet, PackagePlus, Loader2, Columns3, Upload, CheckSquare } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -44,6 +44,8 @@ import { FixMissingOpeningStockDialog } from '@/components/warehouse/FixMissingO
 import { StockMovementReportDialog } from '@/components/warehouse/StockMovementReportDialog';
 import { AddFromCatalogDialog } from '@/components/warehouse/AddFromCatalogDialog';
 import { BulkStockUploadDialog } from '@/components/warehouse/BulkStockUploadDialog';
+import { BulkInventoryUpdateDialog } from '@/components/warehouse/BulkInventoryUpdateDialog';
+import { BulkInventoryDeleteDialog } from '@/components/warehouse/BulkInventoryDeleteDialog';
 import { WarehouseItem } from '@/types/itemBin';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -109,6 +111,9 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
   const [isImportCatalogOpen, setIsImportCatalogOpen] = useState(false);
   const [isBulkStockUploadOpen, setIsBulkStockUploadOpen] = useState(false);
   const [visibleColumns, setVisibleColumns] = useState<Record<InvColumnKey, boolean>>(INV_DEFAULT_VISIBLE);
+  const [selectedItemIds, setSelectedItemIds] = useState<Set<string>>(new Set());
+  const [isBulkUpdateOpen, setIsBulkUpdateOpen] = useState(false);
+  const [isBulkDeleteOpen, setIsBulkDeleteOpen] = useState(false);
   
   // Filter states
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
@@ -342,6 +347,29 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
     setSupplierFilter("all");
   };
 
+  // Selection helpers
+  const toggleSelectItem = (id: string) => {
+    setSelectedItemIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedItemIds.size === filteredItems.length) {
+      setSelectedItemIds(new Set());
+    } else {
+      setSelectedItemIds(new Set(filteredItems.map(i => i.id)));
+    }
+  };
+
+  const clearSelection = () => setSelectedItemIds(new Set());
+
+  const selectedItems = useMemo(() => {
+    return filteredItems.filter(i => selectedItemIds.has(i.id));
+  }, [filteredItems, selectedItemIds]);
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'active': return 'bg-green-100 text-green-800 border-green-200';
@@ -565,6 +593,12 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
         <Table className="[&_td]:py-1.5 [&_th]:py-2">
           <TableHeader>
             <TableRow>
+              <TableHead className="w-[40px]">
+                <Checkbox
+                  checked={filteredItems.length > 0 && selectedItemIds.size === filteredItems.length}
+                  onCheckedChange={toggleSelectAll}
+                />
+              </TableHead>
               {col('photo') && <TableHead className="w-[50px]">Photo</TableHead>}
               {col('item_code') && <TableHead>Item Code</TableHead>}
               <TableHead>Name</TableHead>
@@ -583,19 +617,25 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
           <TableBody>
             {isLoading ? (
               <TableRow>
-              <TableCell colSpan={visibleCount} className="text-center py-8">
+              <TableCell colSpan={visibleCount + 1} className="text-center py-8">
                   Loading items...
                 </TableCell>
               </TableRow>
             ) : filteredItems.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={visibleCount} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={visibleCount + 1} className="text-center py-8 text-muted-foreground">
                   No items found. Create your first item to get started.
                 </TableCell>
               </TableRow>
             ) : (
               filteredItems.map((item) => (
-                <TableRow key={item.id}>
+                <TableRow key={item.id} data-state={selectedItemIds.has(item.id) ? 'selected' : undefined}>
+                  <TableCell>
+                    <Checkbox
+                      checked={selectedItemIds.has(item.id)}
+                      onCheckedChange={() => toggleSelectItem(item.id)}
+                    />
+                  </TableCell>
                   {col('photo') && (
                     <TableCell>
                       <div 
@@ -964,6 +1004,35 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
       <BulkStockUploadDialog
         open={isBulkStockUploadOpen}
         onOpenChange={setIsBulkStockUploadOpen}
+      />
+
+      {/* Floating selection action bar */}
+      {selectedItemIds.size > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-background border rounded-lg shadow-lg px-4 py-3 flex items-center gap-3">
+          <CheckSquare className="h-4 w-4 text-primary" />
+          <span className="text-sm font-medium">{selectedItemIds.size} item(s) selected</span>
+          <Button size="sm" variant="outline" onClick={() => setIsBulkUpdateOpen(true)}>Bulk Update</Button>
+          {canDelete && (
+            <Button size="sm" variant="destructive" onClick={() => setIsBulkDeleteOpen(true)}>Bulk Delete</Button>
+          )}
+          <Button size="sm" variant="ghost" onClick={clearSelection}>
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
+      )}
+
+      <BulkInventoryUpdateDialog
+        open={isBulkUpdateOpen}
+        onOpenChange={setIsBulkUpdateOpen}
+        selectedIds={selectedItemIds}
+        onComplete={clearSelection}
+      />
+
+      <BulkInventoryDeleteDialog
+        open={isBulkDeleteOpen}
+        onOpenChange={setIsBulkDeleteOpen}
+        selectedItems={selectedItems}
+        onComplete={clearSelection}
       />
     </div>
   );
