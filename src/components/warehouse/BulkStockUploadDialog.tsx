@@ -88,12 +88,12 @@ export function BulkStockUploadDialog({ open, onOpenChange }: BulkStockUploadDia
     queryKey: ['warehouse-bins-for-location', effectiveLocationId],
     queryFn: async (): Promise<{ id: string; bin_code: string; description: string | null }[]> => {
       if (!effectiveLocationId) return [];
-      const { data, error } = await supabase
+      const { data, error } = await (supabase
         .from('warehouse_bins')
         .select('id, bin_code, description')
         .eq('location_id', effectiveLocationId)
         .eq('is_active', true)
-        .order('bin_code');
+        .order('bin_code') as any);
       if (error) throw error;
       return (data || []) as { id: string; bin_code: string; description: string | null }[];
     },
