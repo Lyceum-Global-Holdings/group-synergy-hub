@@ -154,8 +154,8 @@ export function BulkStockUploadDialog({ open, onOpenChange }: BulkStockUploadDia
       }
 
       const dataRows = rows.slice(1);
-      const itemCodes = [...new Set(dataRows.map(r => (r[codeIdx] || '').toLowerCase().trim()).filter(Boolean))];
-      const binCodes = [...new Set(dataRows.map(r => (r[binIdx] || '').toLowerCase().trim()).filter(Boolean))];
+      const itemCodesOriginal = [...new Set(dataRows.map(r => (r[codeIdx] || '').trim()).filter(Boolean))];
+      const binCodesOriginal = [...new Set(dataRows.map(r => (r[binIdx] || '').trim()).filter(Boolean))];
 
       // Fetch items from global catalog by item_code (batch)
       const catalogMap = new Map<string, CatalogItem>();
