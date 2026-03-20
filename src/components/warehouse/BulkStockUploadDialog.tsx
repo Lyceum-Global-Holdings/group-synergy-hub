@@ -242,8 +242,9 @@ export function BulkStockUploadDialog({ open, onOpenChange }: BulkStockUploadDia
     }
   };
 
-  const matchedRows = parsedRows.filter(r => r.status === 'matched');
-  const errorRows = parsedRows.filter(r => r.status !== 'matched');
+  const importableRows = parsedRows.filter(r => r.status === 'matched' || r.status === 'new_to_inventory');
+  const errorRows = parsedRows.filter(r => r.status !== 'matched' && r.status !== 'new_to_inventory');
+  const newToInventoryRows = parsedRows.filter(r => r.status === 'new_to_inventory');
 
   const handleImport = async () => {
     if (matchedRows.length === 0) return;
