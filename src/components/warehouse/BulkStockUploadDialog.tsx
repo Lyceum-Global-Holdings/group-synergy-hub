@@ -154,13 +154,13 @@ export function BulkStockUploadDialog({ open, onOpenChange }: BulkStockUploadDia
       }
 
       const dataRows = rows.slice(1);
-      const itemCodes = [...new Set(dataRows.map(r => (r[codeIdx] || '').toLowerCase().trim()).filter(Boolean))];
-      const binCodes = [...new Set(dataRows.map(r => (r[binIdx] || '').toLowerCase().trim()).filter(Boolean))];
+      const itemCodesOriginal = [...new Set(dataRows.map(r => (r[codeIdx] || '').trim()).filter(Boolean))];
+      const binCodesOriginal = [...new Set(dataRows.map(r => (r[binIdx] || '').trim()).filter(Boolean))];
 
       // Fetch items from global catalog by item_code (batch)
       const catalogMap = new Map<string, CatalogItem>();
-      for (let i = 0; i < itemCodes.length; i += 500) {
-        const chunk = itemCodes.slice(i, i + 500);
+      for (let i = 0; i < itemCodesOriginal.length; i += 500) {
+        const chunk = itemCodesOriginal.slice(i, i + 500);
         const { data } = await supabase
           .from('warehouse_item_catalog')
           .select('id, item_code, name, description, category_id, unit_id, brand, manufacturer, barcode, sku, unit_cost, selling_price, reorder_level, min_stock_level, max_stock_level, image_url, is_batch_tracked, is_serialized')
@@ -188,8 +188,8 @@ export function BulkStockUploadDialog({ open, onOpenChange }: BulkStockUploadDia
 
       // Fetch bins for this location
       const binMap = new Map<string, string>();
-      for (let i = 0; i < binCodes.length; i += 500) {
-        const chunk = binCodes.slice(i, i + 500);
+      for (let i = 0; i < binCodesOriginal.length; i += 500) {
+        const chunk = binCodesOriginal.slice(i, i + 500);
         const { data } = await supabase
           .from('warehouse_bins')
           .select('id, bin_code')
