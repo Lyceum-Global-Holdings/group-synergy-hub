@@ -44,6 +44,8 @@ import { FixMissingOpeningStockDialog } from '@/components/warehouse/FixMissingO
 import { StockMovementReportDialog } from '@/components/warehouse/StockMovementReportDialog';
 import { AddFromCatalogDialog } from '@/components/warehouse/AddFromCatalogDialog';
 import { BulkStockUploadDialog } from '@/components/warehouse/BulkStockUploadDialog';
+import { BulkInventoryUpdateDialog } from '@/components/warehouse/BulkInventoryUpdateDialog';
+import { BulkInventoryDeleteDialog } from '@/components/warehouse/BulkInventoryDeleteDialog';
 import { WarehouseItem } from '@/types/itemBin';
 import { supabase } from '@/integrations/supabase/client';
 
