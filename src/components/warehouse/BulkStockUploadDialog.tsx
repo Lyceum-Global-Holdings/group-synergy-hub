@@ -498,8 +498,13 @@ export function BulkStockUploadDialog({ open, onOpenChange }: BulkStockUploadDia
           <div className="space-y-3 flex-1 overflow-hidden flex flex-col">
             <div className="flex items-center gap-4">
               <Badge variant="outline" className="text-green-700">
-                <CheckCircle2 className="mr-1 h-3 w-3" /> {matchedRows.length} matched
+                <CheckCircle2 className="mr-1 h-3 w-3" /> {importableRows.length} ready
               </Badge>
+              {newToInventoryRows.length > 0 && (
+                <Badge variant="outline" className="text-blue-700">
+                  {newToInventoryRows.length} new to inventory
+                </Badge>
+              )}
               {errorRows.length > 0 && (
                 <Badge variant="destructive">
                   <AlertCircle className="mr-1 h-3 w-3" /> {errorRows.length} errors
