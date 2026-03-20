@@ -593,6 +593,12 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
         <Table className="[&_td]:py-1.5 [&_th]:py-2">
           <TableHeader>
             <TableRow>
+              <TableHead className="w-[40px]">
+                <Checkbox
+                  checked={filteredItems.length > 0 && selectedItemIds.size === filteredItems.length}
+                  onCheckedChange={toggleSelectAll}
+                />
+              </TableHead>
               {col('photo') && <TableHead className="w-[50px]">Photo</TableHead>}
               {col('item_code') && <TableHead>Item Code</TableHead>}
               <TableHead>Name</TableHead>
