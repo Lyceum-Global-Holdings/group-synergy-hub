@@ -90,7 +90,7 @@ export function BulkStockUploadDialog({ open, onOpenChange }: BulkStockUploadDia
       if (!effectiveLocationId) return [];
       const { data, error } = await supabase
         .from('warehouse_bins')
-        .select('id, bin_code, bin_name')
+        .select('id, bin_code, description')
         .eq('location_id', effectiveLocationId)
         .eq('is_active', true)
         .order('bin_code');
