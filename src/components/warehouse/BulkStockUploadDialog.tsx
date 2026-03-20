@@ -529,7 +529,7 @@ export function BulkStockUploadDialog({ open, onOpenChange }: BulkStockUploadDia
                 </TableHeader>
                 <TableBody>
                   {parsedRows.map((row, idx) => (
-                    <TableRow key={idx} className={row.status !== 'matched' ? 'bg-destructive/5' : ''}>
+                    <TableRow key={idx} className={row.status !== 'matched' && row.status !== 'new_to_inventory' ? 'bg-destructive/5' : ''}>
                       <TableCell className="text-xs text-muted-foreground">{row.rowNumber}</TableCell>
                       <TableCell className="font-mono text-xs">{row.item_code}</TableCell>
                       <TableCell className="text-sm">{row.item_name || '-'}</TableCell>
