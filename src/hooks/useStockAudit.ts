@@ -184,13 +184,58 @@ export function useStockAudit() {
     onError: () => {},
   });
 
-  // Fix a single desynced item: adjust the largest bin allocation so SUM = current_stock
+  // Helper: create a bin allocation for an item with no bins
+  const createAllocationForNoBinsItem = async (item: StockAuditItem) => {
+    // Look up the item's location_id
+    const { data: itemData, error: itemError } = await supabase
+      .from('warehouse_items')
+      .select('location_id, company_id')
+      .eq('id', item.id)
+      .single();
+
+    if (itemError || !itemData?.location_id) {
+      throw new Error('Could not determine item location.');
+    }
+
+    // Find the first active bin at this location (alphabetical by bin_code)
+    const { data: bins, error: binError } = await supabase
+      .from('warehouse_bins')
+      .select('id')
+      .eq('location_id', itemData.location_id)
+      .eq('status', 'active')
+      .order('bin_code')
+      .limit(1);
+
+    if (binError || !bins || bins.length === 0) {
+      throw new Error('No active bins found at item location. Create a bin first.');
+    }
+
+    const { data: { user } } = await supabase.auth.getUser();
+
+    const { error: insertError } = await supabase
+      .from('warehouse_bin_allocations')
+      .insert({
+        warehouse_item_id: item.id,
+        bin_id: bins[0].id,
+        allocated_quantity: item.current_stock,
+        reserved_quantity: 0,
+        company_id: itemData.company_id,
+        created_by: user?.id || null,
+      });
+
+    if (insertError) throw insertError;
+  };
+
+  // Fix a single desynced or no_bins item
   const fixDesyncMutation = useMutation({
     mutationFn: async (item: StockAuditItem) => {
+      // Handle no_bins: create a new allocation
       if (item.bin_count === 0) {
-        throw new Error('No bin allocations exist for this item. Create a bin allocation first.');
+        await createAllocationForNoBinsItem(item);
+        return;
       }
 
+      // Handle desync: adjust the largest bin allocation so SUM = current_stock
       const { data: allocations, error: fetchError } = await supabase
         .from('warehouse_bin_allocations')
         .select('id, allocated_quantity, reserved_quantity')
@@ -225,7 +270,7 @@ export function useStockAudit() {
       queryClient.invalidateQueries({ queryKey: ['stock-audit'] });
       queryClient.invalidateQueries({ queryKey: ['warehouse-bin-allocations'] });
       queryClient.invalidateQueries({ queryKey: ['warehouse-items'] });
-      toast.success('Desync fixed — bin allocation updated to match item master');
+      toast.success('Stock reconciled — bin allocation updated to match item master');
     },
     onError: (error: Error) => {
       toast.error(`Fix failed: ${error.message}`);
