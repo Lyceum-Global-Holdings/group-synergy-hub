@@ -247,7 +247,7 @@ export function BulkStockUploadDialog({ open, onOpenChange }: BulkStockUploadDia
   const newToInventoryRows = parsedRows.filter(r => r.status === 'new_to_inventory');
 
   const handleImport = async () => {
-    if (matchedRows.length === 0) return;
+    if (importableRows.length === 0) return;
     setIsImporting(true);
 
     let successCount = 0;
@@ -256,13 +256,92 @@ export function BulkStockUploadDialog({ open, onOpenChange }: BulkStockUploadDia
     try {
       const { data: { user } } = await supabase.auth.getUser();
 
-      for (const row of matchedRows) {
+      for (const row of importableRows) {
         try {
+          let itemId = row.item_id;
+
+          // Auto-import from catalog if needed
+          if (row.needs_import && row.catalog_item) {
+            const cat = row.catalog_item;
+
+            // Check if existing row exists (may have been zeroed out)
+            const { data: existingRow } = await supabase
+              .from('warehouse_items')
+              .select('id')
+              .eq('company_id', selectedCompany!.id)
+              .or(`catalog_item_id.eq.${cat.id},item_code.eq.${cat.item_code}`)
+              .maybeSingle();
+
+            if (existingRow) {
+              // Reactivate existing row
+              await supabase
+                .from('warehouse_items')
+                .update({
+                  current_stock: 0,
+                  reserved_quantity: 0,
+                  status: 'active',
+                  name: cat.name,
+                  description: cat.description,
+                  category_id: cat.category_id,
+                  unit_id: cat.unit_id,
+                  brand: cat.brand,
+                  manufacturer: cat.manufacturer,
+                  barcode: cat.barcode,
+                  sku: cat.sku,
+                  unit_cost: cat.unit_cost,
+                  selling_price: cat.selling_price,
+                  reorder_level: cat.reorder_level,
+                  min_stock_level: cat.min_stock_level,
+                  max_stock_level: cat.max_stock_level,
+                  image_url: cat.image_url,
+                  is_batch_tracked: cat.is_batch_tracked,
+                  is_serialized: cat.is_serialized,
+                })
+                .eq('id', existingRow.id);
+              itemId = existingRow.id;
+            } else {
+              // Fresh insert from catalog
+              const { data: newItem, error: insertError } = await supabase
+                .from('warehouse_items')
+                .insert({
+                  catalog_item_id: cat.id,
+                  item_code: cat.item_code,
+                  name: cat.name,
+                  description: cat.description,
+                  category_id: cat.category_id,
+                  unit_id: cat.unit_id,
+                  brand: cat.brand,
+                  manufacturer: cat.manufacturer,
+                  barcode: cat.barcode,
+                  sku: cat.sku,
+                  unit_cost: cat.unit_cost,
+                  selling_price: cat.selling_price,
+                  reorder_level: cat.reorder_level,
+                  min_stock_level: cat.min_stock_level,
+                  max_stock_level: cat.max_stock_level,
+                  image_url: cat.image_url,
+                  is_batch_tracked: cat.is_batch_tracked,
+                  is_serialized: cat.is_serialized,
+                  status: 'active',
+                  company_id: selectedCompany!.id,
+                  current_stock: 0,
+                  reserved_quantity: 0,
+                  created_by: user?.id,
+                })
+                .select('id')
+                .single();
+              if (insertError) throw insertError;
+              itemId = newItem.id;
+            }
+          }
+
+          if (!itemId) throw new Error('Could not resolve item ID');
+
           // Check existing allocation
           const { data: existing } = await supabase
             .from('warehouse_bin_allocations')
             .select('id, allocated_quantity')
-            .eq('warehouse_item_id', row.item_id!)
+            .eq('warehouse_item_id', itemId)
             .eq('bin_id', row.bin_id!)
             .maybeSingle();
 
@@ -276,7 +355,7 @@ export function BulkStockUploadDialog({ open, onOpenChange }: BulkStockUploadDia
             await supabase
               .from('warehouse_bin_allocations')
               .insert({
-                warehouse_item_id: row.item_id!,
+                warehouse_item_id: itemId,
                 bin_id: row.bin_id!,
                 allocated_quantity: row.quantity,
                 available_quantity: row.quantity,
@@ -288,7 +367,7 @@ export function BulkStockUploadDialog({ open, onOpenChange }: BulkStockUploadDia
           const { data: itemData } = await supabase
             .from('warehouse_items')
             .select('current_stock')
-            .eq('id', row.item_id!)
+            .eq('id', itemId)
             .single();
 
           const qtyBefore = itemData?.current_stock || 0;
@@ -297,7 +376,7 @@ export function BulkStockUploadDialog({ open, onOpenChange }: BulkStockUploadDia
           await supabase
             .from('stock_transactions')
             .insert({
-              item_id: row.item_id!,
+              item_id: itemId,
               transaction_type: 'opening_stock',
               reference_type: 'manual',
               quantity_change: row.quantity,
@@ -320,6 +399,7 @@ export function BulkStockUploadDialog({ open, onOpenChange }: BulkStockUploadDia
       queryClient.invalidateQueries({ queryKey: ['warehouse-bin-allocations'] });
       queryClient.invalidateQueries({ queryKey: ['all-items-location-stock'] });
       queryClient.invalidateQueries({ queryKey: ['warehouse-items-lazy-inventory'] });
+      queryClient.invalidateQueries({ queryKey: ['warehouse-items-catalog-ids'] });
 
       if (failCount === 0) {
         toast.success(`Successfully uploaded stock for ${successCount} items`);
