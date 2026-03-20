@@ -1,43 +1,40 @@
 
 
-# Fix: Bulk Stock Upload should match items from Item Master (Catalog)
+## Fix: Bulk Stock Upload item code matching is case-sensitive
 
-## Problem
+### Root Cause
 
-The Bulk Stock Upload currently matches `item_code` against `warehouse_items` (company-specific inventory). If an item exists in the global Item Master (`warehouse_item_catalog`) but hasn't been imported into the company's inventory yet, it shows "Item Not Found."
+On line 157, item codes extracted from the CSV are lowercased:
+```typescript
+const itemCodes = [...new Set(dataRows.map(r => (r[codeIdx] || '').toLowerCase().trim()).filter(Boolean))];
+```
 
-The "Import from Catalog" dialog works correctly because it queries `warehouse_item_catalog` first, then creates/restores the company inventory entry.
+These lowercased values are then passed to `.in('item_code', chunk)` on line 168, which performs a **case-sensitive** match against the database. The catalog stores codes like `INV-PLB-000-0226`, but the query sends `inv-plb-000-0226` — no match.
 
-## Solution
+The same issue affects `binCodes` on line 158.
 
-Change the matching logic in `BulkStockUploadDialog.tsx` to:
+### Fix
 
-1. **Match `item_code` against `warehouse_item_catalog`** (global catalog) instead of `warehouse_items`
-2. **For each matched catalog item**, check if a `warehouse_items` row already exists for this company (by `catalog_item_id` or `item_code`)
-3. **If inventory row exists** → use it directly for bin allocation
-4. **If inventory row doesn't exist** → auto-create it (same insert logic as `AddFromCatalogDialog`) during import
-5. Then proceed with bin allocation upsert and stock transaction as before
+**File: `src/components/warehouse/BulkStockUploadDialog.tsx`**
 
-## File to modify
+Collect **original-case** codes for the database query, while still using lowercase keys for the local lookup maps.
 
-| File | Change |
-|------|--------|
-| `src/components/warehouse/BulkStockUploadDialog.tsx` | Change item matching from `warehouse_items` to `warehouse_item_catalog`, add auto-import logic during the import step |
+1. **Lines 157-158**: Collect original-case unique codes for querying, separately from lowercase keys
+2. **Lines 162-172 (catalog query)**: Use original-case codes in `.in()`, but still key the map by lowercase
+3. **Lines 191-201 (bin query)**: Same approach — original-case codes for query, lowercase for map keys
 
-## Technical details
+Specifically:
+```typescript
+// Collect original-case codes for DB queries
+const itemCodesOriginal = [...new Set(dataRows.map(r => (r[codeIdx] || '').trim()).filter(Boolean))];
+const binCodesOriginal = [...new Set(dataRows.map(r => (r[binIdx] || '').trim()).filter(Boolean))];
 
-**Validation phase** (existing `handleFileUpload`):
-- Replace the `warehouse_items` query with a `warehouse_item_catalog` query matching on `item_code` (case-insensitive, status = active)
-- Store catalog item details (id, name, item_code, and all fields needed for inventory insert) in the parsed rows
-- Also fetch existing `warehouse_items` for the company to know which items need auto-import vs which already exist
+// Query with original case
+.in('item_code', itemCodesOriginalChunk)
 
-**Import phase** (existing `handleImport`):
-- For each matched row, check if a `warehouse_items` entry exists for the company (by `catalog_item_id` or `item_code`)
-- If not, insert a new `warehouse_items` row (mirroring `AddFromCatalogDialog`'s insert logic with catalog fields)
-- If exists but was zeroed out, reactivate it (like the catalog dialog's restore logic)
-- Then proceed with bin allocation upsert and stock transaction as before
+// Map keyed by lowercase for case-insensitive local lookup
+catalogMap.set((item.item_code || '').toLowerCase().trim(), item);
+```
 
-**Preview status** will gain a new indicator: "New to inventory" vs "Already in inventory" so the user can see which items will be auto-imported.
-
-This is a single-file change. The matching, auto-import, and upsert logic all stay within `BulkStockUploadDialog.tsx`.
+Single file, ~6 lines changed. The map lookups on lines 217, 222, 227 already use `.toLowerCase()` so those remain correct.
 
