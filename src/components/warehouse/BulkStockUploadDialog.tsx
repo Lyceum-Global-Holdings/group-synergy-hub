@@ -550,7 +550,7 @@ export function BulkStockUploadDialog({ open, onOpenChange }: BulkStockUploadDia
                   <SelectContent>
                     {locationBins.map(bin => (
                       <SelectItem key={bin.id} value={bin.id}>
-                        {bin.bin_code}{bin.bin_name ? ` — ${bin.bin_name}` : ''}
+                        {bin.bin_code}{bin.description ? ` — ${bin.description}` : ''}
                       </SelectItem>
                     ))}
                   </SelectContent>
