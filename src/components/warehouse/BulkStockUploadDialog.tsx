@@ -157,17 +157,32 @@ export function BulkStockUploadDialog({ open, onOpenChange }: BulkStockUploadDia
       const itemCodes = [...new Set(dataRows.map(r => (r[codeIdx] || '').toLowerCase().trim()).filter(Boolean))];
       const binCodes = [...new Set(dataRows.map(r => (r[binIdx] || '').toLowerCase().trim()).filter(Boolean))];
 
-      // Fetch items for this company by item_code (batch)
-      const itemMap = new Map<string, { id: string; name: string }>();
+      // Fetch items from global catalog by item_code (batch)
+      const catalogMap = new Map<string, CatalogItem>();
       for (let i = 0; i < itemCodes.length; i += 500) {
         const chunk = itemCodes.slice(i, i + 500);
         const { data } = await supabase
-          .from('warehouse_items')
-          .select('id, name, item_code')
-          .eq('company_id', selectedCompany.id)
+          .from('warehouse_item_catalog')
+          .select('id, item_code, name, description, category_id, unit_id, brand, manufacturer, barcode, sku, unit_cost, selling_price, reorder_level, min_stock_level, max_stock_level, image_url, is_batch_tracked, is_serialized')
+          .eq('status', 'active')
           .in('item_code', chunk);
         data?.forEach(item => {
-          itemMap.set((item.item_code || '').toLowerCase().trim(), { id: item.id, name: item.name });
+          catalogMap.set((item.item_code || '').toLowerCase().trim(), item as CatalogItem);
+        });
+      }
+
+      // Fetch existing inventory items for this company to check which already exist
+      const inventoryMap = new Map<string, string>(); // item_code -> warehouse_items.id
+      const allCatalogIds = [...catalogMap.values()].map(c => c.id);
+      for (let i = 0; i < allCatalogIds.length; i += 500) {
+        const chunk = allCatalogIds.slice(i, i + 500);
+        const { data } = await supabase
+          .from('warehouse_items')
+          .select('id, item_code, catalog_item_id')
+          .eq('company_id', selectedCompany.id)
+          .in('catalog_item_id', chunk);
+        data?.forEach(item => {
+          inventoryMap.set((item.item_code || '').toLowerCase().trim(), item.id);
         });
       }
 
@@ -199,17 +214,22 @@ export function BulkStockUploadDialog({ open, onOpenChange }: BulkStockUploadDia
           return { rowNumber: idx + 2, item_code: itemCode, quantity: 0, bin_code: binCode, status: 'error' as const, error: 'Quantity must be a positive number' };
         }
 
-        const item = itemMap.get(itemCode.toLowerCase());
-        if (!item) {
-          return { rowNumber: idx + 2, item_code: itemCode, quantity: qty, bin_code: binCode, status: 'item_not_found' as const, error: `Item code "${itemCode}" not found in inventory` };
+        const catalogItem = catalogMap.get(itemCode.toLowerCase());
+        if (!catalogItem) {
+          return { rowNumber: idx + 2, item_code: itemCode, quantity: qty, bin_code: binCode, status: 'item_not_found' as const, error: `Item code "${itemCode}" not found in Item Master` };
         }
 
         const binId = binMap.get(binCode.toLowerCase());
         if (!binId) {
-          return { rowNumber: idx + 2, item_code: itemCode, quantity: qty, bin_code: binCode, item_id: item.id, item_name: item.name, status: 'bin_not_found' as const, error: `Bin "${binCode}" not found at this location` };
+          return { rowNumber: idx + 2, item_code: itemCode, quantity: qty, bin_code: binCode, item_name: catalogItem.name, catalog_item: catalogItem, status: 'bin_not_found' as const, error: `Bin "${binCode}" not found at this location` };
         }
 
-        return { rowNumber: idx + 2, item_code: itemCode, quantity: qty, bin_code: binCode, item_id: item.id, item_name: item.name, bin_id: binId, status: 'matched' as const };
+        const existingId = inventoryMap.get(itemCode.toLowerCase());
+        if (existingId) {
+          return { rowNumber: idx + 2, item_code: itemCode, quantity: qty, bin_code: binCode, item_id: existingId, item_name: catalogItem.name, bin_id: binId, catalog_item: catalogItem, existing_inventory_id: existingId, status: 'matched' as const };
+        } else {
+          return { rowNumber: idx + 2, item_code: itemCode, quantity: qty, bin_code: binCode, item_name: catalogItem.name, bin_id: binId, catalog_item: catalogItem, needs_import: true, status: 'new_to_inventory' as const };
+        }
       });
 
       setParsedRows(parsed);
