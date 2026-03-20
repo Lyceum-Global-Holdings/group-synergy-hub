@@ -623,7 +623,7 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
               </TableRow>
             ) : filteredItems.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={visibleCount} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={visibleCount + 1} className="text-center py-8 text-muted-foreground">
                   No items found. Create your first item to get started.
                 </TableCell>
               </TableRow>
