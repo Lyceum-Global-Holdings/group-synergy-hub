@@ -91,7 +91,7 @@ export function BulkStockUploadDialog({ open, onOpenChange }: BulkStockUploadDia
       let query: any = supabase
         .from('warehouse_bins')
         .select('id, bin_code, description');
-      query = query.eq('location_id', effectiveLocationId).eq('is_active', true).order('bin_code');
+      query = query.eq('location_id', effectiveLocationId).eq('status', 'active').order('bin_code');
       const { data, error } = await query;
       if (error) throw error;
       return (data || []) as { id: string; bin_code: string; description: string | null }[];
