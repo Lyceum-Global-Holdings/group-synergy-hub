@@ -86,7 +86,7 @@ export function BulkStockUploadDialog({ open, onOpenChange }: BulkStockUploadDia
   // Fetch bins for the selected location
   const { data: locationBins = [] } = useQuery({
     queryKey: ['warehouse-bins-for-location', effectiveLocationId],
-    queryFn: async () => {
+    queryFn: async (): Promise<{ id: string; bin_code: string; description: string | null }[]> => {
       if (!effectiveLocationId) return [];
       const { data, error } = await supabase
         .from('warehouse_bins')
@@ -95,7 +95,7 @@ export function BulkStockUploadDialog({ open, onOpenChange }: BulkStockUploadDia
         .eq('is_active', true)
         .order('bin_code');
       if (error) throw error;
-      return data || [];
+      return (data || []) as { id: string; bin_code: string; description: string | null }[];
     },
     enabled: !!effectiveLocationId,
   });
