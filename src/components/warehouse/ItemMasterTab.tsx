@@ -629,7 +629,13 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
               </TableRow>
             ) : (
               filteredItems.map((item) => (
-                <TableRow key={item.id}>
+                <TableRow key={item.id} data-state={selectedItemIds.has(item.id) ? 'selected' : undefined}>
+                  <TableCell>
+                    <Checkbox
+                      checked={selectedItemIds.has(item.id)}
+                      onCheckedChange={() => toggleSelectItem(item.id)}
+                    />
+                  </TableCell>
                   {col('photo') && (
                     <TableCell>
                       <div 
