@@ -159,8 +159,8 @@ export function BulkStockUploadDialog({ open, onOpenChange }: BulkStockUploadDia
 
       // Fetch items from global catalog by item_code (batch)
       const catalogMap = new Map<string, CatalogItem>();
-      for (let i = 0; i < itemCodes.length; i += 500) {
-        const chunk = itemCodes.slice(i, i + 500);
+      for (let i = 0; i < itemCodesOriginal.length; i += 500) {
+        const chunk = itemCodesOriginal.slice(i, i + 500);
         const { data } = await supabase
           .from('warehouse_item_catalog')
           .select('id, item_code, name, description, category_id, unit_id, brand, manufacturer, barcode, sku, unit_cost, selling_price, reorder_level, min_stock_level, max_stock_level, image_url, is_batch_tracked, is_serialized')
