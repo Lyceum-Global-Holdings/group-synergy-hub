@@ -515,7 +515,7 @@ export function BulkStockUploadDialog({ open, onOpenChange }: BulkStockUploadDia
               </span>
             </div>
 
-            <ScrollArea className="flex-1 max-h-[400px] border rounded">
+            <ScrollArea className="h-[400px] border rounded">
               <Table>
                 <TableHeader>
                   <TableRow>
