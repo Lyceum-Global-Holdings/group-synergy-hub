@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,13 +8,14 @@ import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Download, Upload, AlertCircle, CheckCircle2, Loader2 } from 'lucide-react';
 import { useCompany } from '@/contexts/CompanyContext';
 import { useWarehouseLocations } from '@/hooks/useWarehouseLocations';
 import { useLocationFilter } from '@/contexts/LocationFilterContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQueryClient, useQuery } from '@tanstack/react-query';
 
 interface CatalogItem {
   id: string;
@@ -65,6 +66,8 @@ export function BulkStockUploadDialog({ open, onOpenChange }: BulkStockUploadDia
   const [isValidating, setIsValidating] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const [selectedLocationId, setSelectedLocationId] = useState<string>('');
+  const [binMode, setBinMode] = useState<'single' | 'per-row'>('per-row');
+  const [selectedBinId, setSelectedBinId] = useState<string>('');
 
   const { selectedCompany } = useCompany();
   const { locations } = useWarehouseLocations();
@@ -80,8 +83,37 @@ export function BulkStockUploadDialog({ open, onOpenChange }: BulkStockUploadDia
   // Pre-select from global filter
   const effectiveLocationId = selectedLocationId || globalLocationId || '';
 
+  // Fetch bins for the selected location
+  const { data: locationBins = [] } = useQuery({
+    queryKey: ['warehouse-bins-for-location', effectiveLocationId],
+    queryFn: async () => {
+      if (!effectiveLocationId) return [];
+      const { data, error } = await supabase
+        .from('warehouse_bins')
+        .select('id, bin_code, bin_name')
+        .eq('location_id', effectiveLocationId)
+        .eq('is_active', true)
+        .order('bin_code');
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!effectiveLocationId,
+  });
+
+  // Reset selected bin when location changes
+  useEffect(() => {
+    setSelectedBinId('');
+  }, [effectiveLocationId]);
+
+  const selectedBinLabel = useMemo(() => {
+    const bin = locationBins.find(b => b.id === selectedBinId);
+    return bin ? bin.bin_code : '';
+  }, [locationBins, selectedBinId]);
+
   const downloadTemplate = () => {
-    const csv = 'item_code,quantity,bin_code\nITEM001,50,BIN-A1\nITEM002,100,BIN-B2';
+    const csv = binMode === 'single'
+      ? 'item_code,quantity\nITEM001,50\nITEM002,100'
+      : 'item_code,quantity,bin_code\nITEM001,50,BIN-A1\nITEM002,100,BIN-B2';
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -131,6 +163,10 @@ export function BulkStockUploadDialog({ open, onOpenChange }: BulkStockUploadDia
       toast.error('Please select a location first');
       return;
     }
+    if (binMode === 'single' && !selectedBinId) {
+      toast.error('Please select a bin first');
+      return;
+    }
 
     setIsValidating(true);
     try {
@@ -147,15 +183,20 @@ export function BulkStockUploadDialog({ open, onOpenChange }: BulkStockUploadDia
       const qtyIdx = headers.indexOf('quantity');
       const binIdx = headers.indexOf('bin_code');
 
-      if (codeIdx === -1 || qtyIdx === -1 || binIdx === -1) {
-        toast.error('CSV must have columns: item_code, quantity, bin_code');
+      if (codeIdx === -1 || qtyIdx === -1) {
+        toast.error('CSV must have columns: item_code, quantity' + (binMode === 'per-row' ? ', bin_code' : ''));
+        setIsValidating(false);
+        return;
+      }
+
+      if (binMode === 'per-row' && binIdx === -1) {
+        toast.error('CSV must have a bin_code column when using per-row bin mode');
         setIsValidating(false);
         return;
       }
 
       const dataRows = rows.slice(1);
       const itemCodesOriginal = [...new Set(dataRows.map(r => (r[codeIdx] || '').trim()).filter(Boolean))];
-      const binCodesOriginal = [...new Set(dataRows.map(r => (r[binIdx] || '').trim()).filter(Boolean))];
 
       // Fetch items from global catalog by item_code (batch)
       const catalogMap = new Map<string, CatalogItem>();
@@ -186,29 +227,36 @@ export function BulkStockUploadDialog({ open, onOpenChange }: BulkStockUploadDia
         });
       }
 
-      // Fetch bins for this location
+      // Fetch bins for this location (only needed for per-row mode)
       const binMap = new Map<string, string>();
-      for (let i = 0; i < binCodesOriginal.length; i += 500) {
-        const chunk = binCodesOriginal.slice(i, i + 500);
-        const { data } = await supabase
-          .from('warehouse_bins')
-          .select('id, bin_code')
-          .eq('location_id', effectiveLocationId)
-          .in('bin_code', chunk);
-        data?.forEach(bin => {
-          binMap.set((bin.bin_code || '').toLowerCase().trim(), bin.id);
-        });
+      if (binMode === 'per-row') {
+        const binCodesOriginal = [...new Set(dataRows.map(r => (r[binIdx] || '').trim()).filter(Boolean))];
+        for (let i = 0; i < binCodesOriginal.length; i += 500) {
+          const chunk = binCodesOriginal.slice(i, i + 500);
+          const { data } = await supabase
+            .from('warehouse_bins')
+            .select('id, bin_code')
+            .eq('location_id', effectiveLocationId)
+            .in('bin_code', chunk);
+          data?.forEach(bin => {
+            binMap.set((bin.bin_code || '').toLowerCase().trim(), bin.id);
+          });
+        }
       }
 
       // Parse and validate
       const parsed: ParsedRow[] = dataRows.map((row, idx) => {
         const itemCode = (row[codeIdx] || '').trim();
         const qtyStr = (row[qtyIdx] || '').trim();
-        const binCode = (row[binIdx] || '').trim();
+        const binCode = binMode === 'single' ? selectedBinLabel : (row[binIdx] || '').trim();
+        const binId = binMode === 'single' ? selectedBinId : binMap.get(binCode.toLowerCase());
         const qty = parseFloat(qtyStr);
 
-        if (!itemCode || !binCode || !qtyStr) {
+        if (!itemCode || !qtyStr) {
           return { rowNumber: idx + 2, item_code: itemCode, quantity: 0, bin_code: binCode, status: 'error' as const, error: 'Missing required fields' };
+        }
+        if (binMode === 'per-row' && !binCode) {
+          return { rowNumber: idx + 2, item_code: itemCode, quantity: 0, bin_code: '', status: 'error' as const, error: 'Missing bin_code' };
         }
         if (isNaN(qty) || qty <= 0) {
           return { rowNumber: idx + 2, item_code: itemCode, quantity: 0, bin_code: binCode, status: 'error' as const, error: 'Quantity must be a positive number' };
@@ -219,7 +267,6 @@ export function BulkStockUploadDialog({ open, onOpenChange }: BulkStockUploadDia
           return { rowNumber: idx + 2, item_code: itemCode, quantity: qty, bin_code: binCode, status: 'item_not_found' as const, error: `Item code "${itemCode}" not found in Item Master` };
         }
 
-        const binId = binMap.get(binCode.toLowerCase());
         if (!binId) {
           return { rowNumber: idx + 2, item_code: itemCode, quantity: qty, bin_code: binCode, item_name: catalogItem.name, catalog_item: catalogItem, status: 'bin_not_found' as const, error: `Bin "${binCode}" not found at this location` };
         }
@@ -469,10 +516,55 @@ export function BulkStockUploadDialog({ open, onOpenChange }: BulkStockUploadDia
               </div>
             </div>
 
+            {/* Bin Selection Mode */}
+            <div className="space-y-3 rounded-md border p-3">
+              <Label className="text-sm font-medium">Bin Assignment</Label>
+              <RadioGroup
+                value={binMode}
+                onValueChange={(v) => setBinMode(v as 'single' | 'per-row')}
+                className="flex gap-4"
+              >
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="single" id="bin-single" />
+                  <Label htmlFor="bin-single" className="text-sm font-normal cursor-pointer">
+                    Single bin for all rows
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="per-row" id="bin-per-row" />
+                  <Label htmlFor="bin-per-row" className="text-sm font-normal cursor-pointer">
+                    Per-row bin (from CSV)
+                  </Label>
+                </div>
+              </RadioGroup>
+
+              {binMode === 'single' && (
+                <Select
+                  value={selectedBinId}
+                  onValueChange={setSelectedBinId}
+                  disabled={!effectiveLocationId}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder={effectiveLocationId ? 'Select bin' : 'Select a location first'} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {locationBins.map(bin => (
+                      <SelectItem key={bin.id} value={bin.id}>
+                        {bin.bin_code}{bin.bin_name ? ` — ${bin.bin_name}` : ''}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            </div>
+
             <div className="flex items-center gap-3">
               <Button variant="outline" size="sm" onClick={downloadTemplate}>
                 <Download className="mr-2 h-4 w-4" /> Download Template
               </Button>
+              <span className="text-xs text-muted-foreground">
+                {binMode === 'single' ? 'Template: item_code, quantity' : 'Template: item_code, quantity, bin_code'}
+              </span>
             </div>
 
             <div>
@@ -484,7 +576,7 @@ export function BulkStockUploadDialog({ open, onOpenChange }: BulkStockUploadDia
                   const file = e.target.files?.[0];
                   if (file) handleFileUpload(file);
                 }}
-                disabled={isValidating || !selectedCompany?.id || !effectiveLocationId}
+                disabled={isValidating || !selectedCompany?.id || !effectiveLocationId || (binMode === 'single' && !selectedBinId)}
               />
             </div>
 
@@ -496,7 +588,7 @@ export function BulkStockUploadDialog({ open, onOpenChange }: BulkStockUploadDia
           </div>
         ) : (
           <div className="space-y-3 flex-1 overflow-hidden flex flex-col">
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-4 flex-wrap">
               <Badge variant="outline" className="text-green-700">
                 <CheckCircle2 className="mr-1 h-3 w-3" /> {importableRows.length} ready
               </Badge>
@@ -513,6 +605,11 @@ export function BulkStockUploadDialog({ open, onOpenChange }: BulkStockUploadDia
               <span className="text-xs text-muted-foreground">
                 Total: {parsedRows.length} rows
               </span>
+              {binMode === 'single' && selectedBinLabel && (
+                <Badge variant="secondary">
+                  Bin: {selectedBinLabel}
+                </Badge>
+              )}
             </div>
 
             <ScrollArea className="h-[400px] border rounded">
@@ -523,7 +620,7 @@ export function BulkStockUploadDialog({ open, onOpenChange }: BulkStockUploadDia
                     <TableHead>Item Code</TableHead>
                     <TableHead>Item Name</TableHead>
                     <TableHead className="text-right">Quantity</TableHead>
-                    <TableHead>Bin</TableHead>
+                    {binMode === 'per-row' && <TableHead>Bin</TableHead>}
                     <TableHead>Status</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -534,7 +631,7 @@ export function BulkStockUploadDialog({ open, onOpenChange }: BulkStockUploadDia
                       <TableCell className="font-mono text-xs">{row.item_code}</TableCell>
                       <TableCell className="text-sm">{row.item_name || '-'}</TableCell>
                       <TableCell className="text-right">{row.quantity || '-'}</TableCell>
-                      <TableCell className="font-mono text-xs">{row.bin_code}</TableCell>
+                      {binMode === 'per-row' && <TableCell className="font-mono text-xs">{row.bin_code}</TableCell>}
                       <TableCell>
                         <div className="flex flex-col gap-1">
                           {statusBadge(row.status)}
