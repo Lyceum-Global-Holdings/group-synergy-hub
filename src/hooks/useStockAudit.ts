@@ -63,7 +63,7 @@ export function useStockAudit() {
 
       if (items.length === 0) return [];
 
-      // Fetch bin allocations with cursor-based batching (no chunk-by-item needed)
+      // Fetch bin allocations with cursor-based batching, filtered by company
       const allocations: { warehouse_item_id: string; allocated_quantity: number }[] = [];
       let lastAllocId: string | null = null;
       while (true) {
@@ -72,6 +72,12 @@ export function useStockAudit() {
           .select('id, warehouse_item_id, allocated_quantity')
           .order('id')
           .limit(1000);
+
+        // Filter by company to prevent cross-company inflation
+        if (!isViewingAllCompanies && selectedCompany?.id) {
+          q = q.eq('company_id', selectedCompany.id);
+        }
+
         if (lastAllocId) q = q.gt('id', lastAllocId);
 
         const { data, error: allocError } = await q;
