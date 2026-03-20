@@ -558,12 +558,12 @@ export function BulkStockUploadDialog({ open, onOpenChange }: BulkStockUploadDia
           <Button variant="outline" onClick={() => { onOpenChange(false); handleReset(); }} disabled={isImporting}>
             Cancel
           </Button>
-          {showPreview && matchedRows.length > 0 && (
+          {showPreview && importableRows.length > 0 && (
             <Button onClick={handleImport} disabled={isImporting}>
               {isImporting ? (
                 <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Importing...</>
               ) : (
-                <><Upload className="mr-2 h-4 w-4" /> Import {matchedRows.length} Items</>
+                <><Upload className="mr-2 h-4 w-4" /> Import {importableRows.length} Items</>
               )}
             </Button>
           )}
