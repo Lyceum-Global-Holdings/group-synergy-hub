@@ -445,7 +445,7 @@ export function BulkStockUploadDialog({ open, onOpenChange }: BulkStockUploadDia
             <Alert>
               <AlertCircle className="h-4 w-4" />
               <AlertDescription>
-                Upload a CSV to add stock quantities to existing inventory items. Items are matched by <strong>item_code</strong> and bins by <strong>bin_code</strong>.
+                Upload a CSV to add stock quantities. Items are matched by <strong>item_code</strong> from the Item Master catalog. Items not yet in this company's inventory will be auto-imported.
               </AlertDescription>
             </Alert>
 
