@@ -3,7 +3,7 @@ import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Plus, Search, Edit, Trash2, History, Settings, Eye, ArrowLeftRight, MapPin, BarChart3, Wrench, Image as ImageIcon, X, Package, FileWarning, ChevronDown, Download, FileSpreadsheet, PackagePlus, Loader2, Columns3 } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, History, Settings, Eye, ArrowLeftRight, MapPin, BarChart3, Wrench, Image as ImageIcon, X, Package, FileWarning, ChevronDown, Download, FileSpreadsheet, PackagePlus, Loader2, Columns3, Upload } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -43,6 +43,7 @@ import { ItemStockDetailsDialog } from '@/components/warehouse/ItemStockDetailsD
 import { FixMissingOpeningStockDialog } from '@/components/warehouse/FixMissingOpeningStockDialog';
 import { StockMovementReportDialog } from '@/components/warehouse/StockMovementReportDialog';
 import { AddFromCatalogDialog } from '@/components/warehouse/AddFromCatalogDialog';
+import { BulkStockUploadDialog } from '@/components/warehouse/BulkStockUploadDialog';
 import { WarehouseItem } from '@/types/itemBin';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -106,6 +107,7 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
   const [isFixOpeningStockDialogOpen, setIsFixOpeningStockDialogOpen] = useState(false);
   const [isStockMovementReportOpen, setIsStockMovementReportOpen] = useState(false);
   const [isImportCatalogOpen, setIsImportCatalogOpen] = useState(false);
+  const [isBulkStockUploadOpen, setIsBulkStockUploadOpen] = useState(false);
   const [visibleColumns, setVisibleColumns] = useState<Record<InvColumnKey, boolean>>(INV_DEFAULT_VISIBLE);
   
   // Filter states
@@ -549,6 +551,9 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
                 </DropdownMenuContent>
               </DropdownMenu>
             )}
+            <Button variant="outline" onClick={() => setIsBulkStockUploadOpen(true)}>
+              <Upload className="mr-2 h-4 w-4" /> Upload Stock
+            </Button>
             <Button onClick={() => setIsImportCatalogOpen(true)}>
               <PackagePlus className="mr-2 h-4 w-4" /> Import from Catalog
             </Button>
@@ -954,6 +959,11 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
       <AddFromCatalogDialog
         open={isImportCatalogOpen}
         onOpenChange={setIsImportCatalogOpen}
+      />
+
+      <BulkStockUploadDialog
+        open={isBulkStockUploadOpen}
+        onOpenChange={setIsBulkStockUploadOpen}
       />
     </div>
   );
