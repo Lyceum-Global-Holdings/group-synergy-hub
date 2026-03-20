@@ -1,49 +1,43 @@
 
 
-# Bulk Stock Upload via CSV (per Company + Location)
+# Fix: Bulk Stock Upload should match items from Item Master (Catalog)
 
-## What it does
+## Problem
 
-A new dialog that lets users upload a CSV file to set/update stock levels for **existing inventory items**. The user selects a company and location, then uploads a CSV with columns: `item_code`, `quantity`, `bin_code`. The system matches each row's `item_code` against `warehouse_items` for that company, finds or creates the bin allocation, and updates stock accordingly.
+The Bulk Stock Upload currently matches `item_code` against `warehouse_items` (company-specific inventory). If an item exists in the global Item Master (`warehouse_item_catalog`) but hasn't been imported into the company's inventory yet, it shows "Item Not Found."
 
-This is different from the existing bulk item import (which creates new catalog/inventory items). This feature only touches stock quantities and bin allocations for items already in the inventory.
+The "Import from Catalog" dialog works correctly because it queries `warehouse_item_catalog` first, then creates/restores the company inventory entry.
 
-## CSV Template
+## Solution
 
-```
-item_code,quantity,bin_code
-ITEM001,50,BIN-A1
-ITEM002,100,BIN-B2
-```
+Change the matching logic in `BulkStockUploadDialog.tsx` to:
 
-## User Flow
+1. **Match `item_code` against `warehouse_item_catalog`** (global catalog) instead of `warehouse_items`
+2. **For each matched catalog item**, check if a `warehouse_items` row already exists for this company (by `catalog_item_id` or `item_code`)
+3. **If inventory row exists** → use it directly for bin allocation
+4. **If inventory row doesn't exist** → auto-create it (same insert logic as `AddFromCatalogDialog`) during import
+5. Then proceed with bin allocation upsert and stock transaction as before
 
-1. User opens the dialog from the Inventory tab toolbar (new "Upload Stock" button)
-2. User selects target **company** and **location** (pre-filled from current selection)
-3. User downloads CSV template or uploads their CSV
-4. System parses and validates:
-   - `item_code` matched against `warehouse_items` for the selected company
-   - `bin_code` matched against `warehouse_bins` for the selected location
-   - Quantity must be a positive number
-5. Preview table shows: item_code, name (resolved), quantity, bin, status (matched/not found/error)
-6. User confirms → system processes each row:
-   - **Upsert bin allocation**: If allocation exists for (item_id, bin_id), update `allocated_quantity`; if not, insert new allocation
-   - **Create stock transaction**: Insert `stock_transactions` record with type `opening_stock`
-   - Stock sync triggers handle `current_stock` on `warehouse_items`
-
-## Files to create/modify
+## File to modify
 
 | File | Change |
 |------|--------|
-| `src/components/warehouse/BulkStockUploadDialog.tsx` | **New** — Full dialog component with CSV parsing, validation, preview, and import logic |
-| `src/components/warehouse/ItemMasterTab.tsx` | Add "Upload Stock" button to the toolbar dropdown menu |
+| `src/components/warehouse/BulkStockUploadDialog.tsx` | Change item matching from `warehouse_items` to `warehouse_item_catalog`, add auto-import logic during the import step |
 
-## Technical Details
+## Technical details
 
-- **Matching**: Items matched via `item_code` (case-insensitive) filtered by `company_id`. Bins matched via `bin_code` (case-insensitive) filtered by `location_id`.
-- **Upsert logic**: For each CSV row, check if `warehouse_bin_allocations` row exists for `(warehouse_item_id, bin_id)`. If yes, update `allocated_quantity += csv_quantity`. If no, insert new allocation.
-- **Stock transaction**: Each row creates a `stock_transactions` record (`opening_stock` type) for audit trail.
-- **No new DB migrations needed** — uses existing tables and patterns.
-- Reuses the CSV parser pattern from `BulkItemImportContent.tsx`.
-- Company and location selectors use existing `useCompany` and `useWarehouseLocations` hooks.
+**Validation phase** (existing `handleFileUpload`):
+- Replace the `warehouse_items` query with a `warehouse_item_catalog` query matching on `item_code` (case-insensitive, status = active)
+- Store catalog item details (id, name, item_code, and all fields needed for inventory insert) in the parsed rows
+- Also fetch existing `warehouse_items` for the company to know which items need auto-import vs which already exist
+
+**Import phase** (existing `handleImport`):
+- For each matched row, check if a `warehouse_items` entry exists for the company (by `catalog_item_id` or `item_code`)
+- If not, insert a new `warehouse_items` row (mirroring `AddFromCatalogDialog`'s insert logic with catalog fields)
+- If exists but was zeroed out, reactivate it (like the catalog dialog's restore logic)
+- Then proceed with bin allocation upsert and stock transaction as before
+
+**Preview status** will gain a new indicator: "New to inventory" vs "Already in inventory" so the user can see which items will be auto-imported.
+
+This is a single-file change. The matching, auto-import, and upsert logic all stay within `BulkStockUploadDialog.tsx`.
 
