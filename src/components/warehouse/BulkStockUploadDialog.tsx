@@ -188,8 +188,8 @@ export function BulkStockUploadDialog({ open, onOpenChange }: BulkStockUploadDia
 
       // Fetch bins for this location
       const binMap = new Map<string, string>();
-      for (let i = 0; i < binCodes.length; i += 500) {
-        const chunk = binCodes.slice(i, i + 500);
+      for (let i = 0; i < binCodesOriginal.length; i += 500) {
+        const chunk = binCodesOriginal.slice(i, i + 500);
         const { data } = await supabase
           .from('warehouse_bins')
           .select('id, bin_code')
