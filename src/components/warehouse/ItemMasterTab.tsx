@@ -107,6 +107,7 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
   const [isFixOpeningStockDialogOpen, setIsFixOpeningStockDialogOpen] = useState(false);
   const [isStockMovementReportOpen, setIsStockMovementReportOpen] = useState(false);
   const [isImportCatalogOpen, setIsImportCatalogOpen] = useState(false);
+  const [isBulkStockUploadOpen, setIsBulkStockUploadOpen] = useState(false);
   const [visibleColumns, setVisibleColumns] = useState<Record<InvColumnKey, boolean>>(INV_DEFAULT_VISIBLE);
   
   // Filter states
