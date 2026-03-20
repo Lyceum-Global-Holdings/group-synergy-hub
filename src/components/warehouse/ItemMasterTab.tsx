@@ -960,6 +960,11 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
         open={isImportCatalogOpen}
         onOpenChange={setIsImportCatalogOpen}
       />
+
+      <BulkStockUploadDialog
+        open={isBulkStockUploadOpen}
+        onOpenChange={setIsBulkStockUploadOpen}
+      />
     </div>
   );
 }
