@@ -43,6 +43,7 @@ import { ItemStockDetailsDialog } from '@/components/warehouse/ItemStockDetailsD
 import { FixMissingOpeningStockDialog } from '@/components/warehouse/FixMissingOpeningStockDialog';
 import { StockMovementReportDialog } from '@/components/warehouse/StockMovementReportDialog';
 import { AddFromCatalogDialog } from '@/components/warehouse/AddFromCatalogDialog';
+import { BulkStockUploadDialog } from '@/components/warehouse/BulkStockUploadDialog';
 import { WarehouseItem } from '@/types/itemBin';
 import { supabase } from '@/integrations/supabase/client';
 
