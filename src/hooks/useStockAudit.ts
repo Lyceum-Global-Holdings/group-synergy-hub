@@ -63,7 +63,7 @@ export function useStockAudit() {
 
       if (items.length === 0) return [];
 
-      // Fetch bin allocations with cursor-based batching (no chunk-by-item needed)
+      // Fetch bin allocations with cursor-based batching, filtered by company
       const allocations: { warehouse_item_id: string; allocated_quantity: number }[] = [];
       let lastAllocId: string | null = null;
       while (true) {
@@ -72,6 +72,12 @@ export function useStockAudit() {
           .select('id, warehouse_item_id, allocated_quantity')
           .order('id')
           .limit(1000);
+
+        // Filter by company to prevent cross-company inflation
+        if (!isViewingAllCompanies && selectedCompany?.id) {
+          q = q.eq('company_id', selectedCompany.id);
+        }
+
         if (lastAllocId) q = q.gt('id', lastAllocId);
 
         const { data, error: allocError } = await q;
@@ -178,13 +184,58 @@ export function useStockAudit() {
     onError: () => {},
   });
 
-  // Fix a single desynced item: adjust the largest bin allocation so SUM = current_stock
+  // Helper: create a bin allocation for an item with no bins
+  const createAllocationForNoBinsItem = async (item: StockAuditItem) => {
+    // Look up the item's location_id
+    const { data: itemData, error: itemError } = await supabase
+      .from('warehouse_items')
+      .select('location_id, company_id')
+      .eq('id', item.id)
+      .single();
+
+    if (itemError || !itemData?.location_id) {
+      throw new Error('Could not determine item location.');
+    }
+
+    // Find the first active bin at this location (alphabetical by bin_code)
+    const { data: bins, error: binError } = await supabase
+      .from('warehouse_bins')
+      .select('id')
+      .eq('location_id', itemData.location_id)
+      .eq('status', 'active')
+      .order('bin_code')
+      .limit(1);
+
+    if (binError || !bins || bins.length === 0) {
+      throw new Error('No active bins found at item location. Create a bin first.');
+    }
+
+    const { data: { user } } = await supabase.auth.getUser();
+
+    const { error: insertError } = await supabase
+      .from('warehouse_bin_allocations')
+      .insert({
+        warehouse_item_id: item.id,
+        bin_id: bins[0].id,
+        allocated_quantity: item.current_stock,
+        reserved_quantity: 0,
+        company_id: itemData.company_id,
+        created_by: user?.id || null,
+      });
+
+    if (insertError) throw insertError;
+  };
+
+  // Fix a single desynced or no_bins item
   const fixDesyncMutation = useMutation({
     mutationFn: async (item: StockAuditItem) => {
+      // Handle no_bins: create a new allocation
       if (item.bin_count === 0) {
-        throw new Error('No bin allocations exist for this item. Create a bin allocation first.');
+        await createAllocationForNoBinsItem(item);
+        return;
       }
 
+      // Handle desync: adjust the largest bin allocation so SUM = current_stock
       const { data: allocations, error: fetchError } = await supabase
         .from('warehouse_bin_allocations')
         .select('id, allocated_quantity, reserved_quantity')
@@ -219,53 +270,60 @@ export function useStockAudit() {
       queryClient.invalidateQueries({ queryKey: ['stock-audit'] });
       queryClient.invalidateQueries({ queryKey: ['warehouse-bin-allocations'] });
       queryClient.invalidateQueries({ queryKey: ['warehouse-items'] });
-      toast.success('Desync fixed — bin allocation updated to match item master');
+      toast.success('Stock reconciled — bin allocation updated to match item master');
     },
     onError: (error: Error) => {
       toast.error(`Fix failed: ${error.message}`);
     },
   });
 
-  // Fix all desynced items at once
+  // Fix all desynced and no_bins items at once
   const fixAllDesyncsMutation = useMutation({
     mutationFn: async () => {
-      const desynced = auditItems.filter((i) => i.status === 'desync');
-      if (desynced.length === 0) throw new Error('No desynced items to fix.');
+      const itemsToFix = auditItems.filter((i) => i.status === 'desync' || i.status === 'no_bins');
+      if (itemsToFix.length === 0) throw new Error('No items to fix.');
 
       let fixed = 0;
       let failed = 0;
 
-      for (const item of desynced) {
+      for (const item of itemsToFix) {
         try {
-          const { data: allocations, error: fetchError } = await supabase
-            .from('warehouse_bin_allocations')
-            .select('id, allocated_quantity, reserved_quantity')
-            .eq('warehouse_item_id', item.id)
-            .order('allocated_quantity', { ascending: false });
+          if (item.bin_count === 0) {
+            // no_bins: create allocation
+            await createAllocationForNoBinsItem(item);
+            fixed++;
+          } else {
+            // desync: adjust largest allocation
+            const { data: allocations, error: fetchError } = await supabase
+              .from('warehouse_bin_allocations')
+              .select('id, allocated_quantity, reserved_quantity')
+              .eq('warehouse_item_id', item.id)
+              .order('allocated_quantity', { ascending: false });
 
-          if (fetchError || !allocations || allocations.length === 0) {
-            failed++;
-            continue;
+            if (fetchError || !allocations || allocations.length === 0) {
+              failed++;
+              continue;
+            }
+
+            const otherTotal = allocations
+              .slice(1)
+              .reduce((sum, a) => sum + (a.allocated_quantity || 0), 0);
+            const newPrimaryQty = Math.max(0, item.current_stock - otherTotal);
+            const primaryAlloc = allocations[0];
+            const newReserved = Math.min(primaryAlloc.reserved_quantity || 0, newPrimaryQty);
+
+            const { error: updateError } = await supabase
+              .from('warehouse_bin_allocations')
+              .update({
+                allocated_quantity: newPrimaryQty,
+                reserved_quantity: newReserved,
+                updated_at: new Date().toISOString(),
+              })
+              .eq('id', primaryAlloc.id);
+
+            if (updateError) failed++;
+            else fixed++;
           }
-
-          const otherTotal = allocations
-            .slice(1)
-            .reduce((sum, a) => sum + (a.allocated_quantity || 0), 0);
-          const newPrimaryQty = Math.max(0, item.current_stock - otherTotal);
-          const primaryAlloc = allocations[0];
-          const newReserved = Math.min(primaryAlloc.reserved_quantity || 0, newPrimaryQty);
-
-          const { error: updateError } = await supabase
-            .from('warehouse_bin_allocations')
-            .update({
-              allocated_quantity: newPrimaryQty,
-              reserved_quantity: newReserved,
-              updated_at: new Date().toISOString(),
-            })
-            .eq('id', primaryAlloc.id);
-
-          if (updateError) failed++;
-          else fixed++;
         } catch {
           failed++;
         }
@@ -277,7 +335,7 @@ export function useStockAudit() {
       queryClient.invalidateQueries({ queryKey: ['stock-audit'] });
       queryClient.invalidateQueries({ queryKey: ['warehouse-bin-allocations'] });
       queryClient.invalidateQueries({ queryKey: ['warehouse-items'] });
-      if (result.fixed > 0) toast.success(`Fixed ${result.fixed} desynced item(s)`);
+      if (result.fixed > 0) toast.success(`Fixed ${result.fixed} item(s)`);
       if (result.failed > 0) toast.warning(`${result.failed} item(s) could not be fixed`);
     },
     onError: (error: Error) => {
