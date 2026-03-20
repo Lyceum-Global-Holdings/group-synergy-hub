@@ -325,10 +325,10 @@ export function useWarehouseBinAllocations(options?: { disableFetch?: boolean })
         
         console.log(`\nProcessing item: ${item.item_code} (current_stock: ${currentStock})`);
 
-        // Step 2: Get existing allocations for this item
+        // Step 2: Get existing allocations for this item WITH bin location info
         const { data: allocations, error: allocError } = await supabase
           .from('warehouse_bin_allocations')
-          .select('id, bin_id, allocated_quantity, reserved_quantity')
+          .select('id, bin_id, allocated_quantity, reserved_quantity, warehouse_bins!inner(location_id, bin_code)')
           .eq('warehouse_item_id', item.id);
 
         if (allocError) {
@@ -347,59 +347,55 @@ export function useWarehouseBinAllocations(options?: { disableFetch?: boolean })
 
         console.log(`Item ${item.item_code}: mismatch - current_stock=${currentStock}, total_allocated=${totalAllocated}`);
 
-        // Step 3: Get the correct bin for this item's location
-        let targetBinId: string | null = null;
-        if (item.location_id) {
-          const { data: bins } = await supabase
-            .from('warehouse_bins')
-            .select('id')
-            .eq('location_id', item.location_id)
-            .limit(1);
-          
-          if (bins && bins.length > 0) {
-            targetBinId = bins[0].id;
-          }
-        }
-
-        // If no bin at location, get any active bin
-        if (!targetBinId) {
-          const { data: anyBins } = await supabase
-            .from('warehouse_bins')
-            .select('id')
-            .eq('status', 'active')
-            .limit(1);
-          
-          if (anyBins && anyBins.length > 0) {
-            targetBinId = anyBins[0].id;
-          }
-        }
-
-        if (!targetBinId) {
-          console.warn(`No bin found for item ${item.item_code}, skipping`);
-          skippedCount++;
-          continue;
-        }
+        // Step 3: Filter allocations to only those at the item's location
+        const locationAllocations = (allocations || []).filter(
+          (a: any) => a.warehouse_bins?.location_id === item.location_id
+        );
 
         // Step 4: Update or create allocation
-        if (allocations && allocations.length > 0) {
-          // Update the first allocation to have the correct total
-          const otherAllocationsTotal = allocations.slice(1).reduce((sum, a) => sum + (a.allocated_quantity || 0), 0);
+        if (locationAllocations.length > 0) {
+          // Adjust the first location-matching allocation to make totals match
+          const otherAllocationsTotal = (allocations || [])
+            .filter((a: any) => a.id !== locationAllocations[0].id)
+            .reduce((sum, a) => sum + (a.allocated_quantity || 0), 0);
           const firstAllocationNewQty = Math.max(0, currentStock - otherAllocationsTotal);
           
           const { error: updateError } = await supabase
             .from('warehouse_bin_allocations')
             .update({ allocated_quantity: firstAllocationNewQty })
-            .eq('id', allocations[0].id);
+            .eq('id', locationAllocations[0].id);
 
           if (updateError) {
             console.error(`Error updating allocation for ${item.item_code}:`, updateError);
             skippedCount++;
           } else {
-            console.log(`✓ Updated allocation for ${item.item_code}: ${allocations[0].allocated_quantity} -> ${firstAllocationNewQty}`);
+            console.log(`✓ Updated allocation for ${item.item_code}: ${locationAllocations[0].allocated_quantity} -> ${firstAllocationNewQty} (bin: ${locationAllocations[0].bin_id})`);
             updatedCount++;
           }
         } else {
-          // Create new allocation
+          // No allocation at correct location — find the primary bin at item's location
+          let targetBinId: string | null = null;
+          if (item.location_id) {
+            const { data: bins } = await supabase
+              .from('warehouse_bins')
+              .select('id')
+              .eq('location_id', item.location_id)
+              .eq('status', 'active')
+              .order('bin_code', { ascending: true })
+              .limit(1);
+            
+            if (bins && bins.length > 0) {
+              targetBinId = bins[0].id;
+            }
+          }
+
+          if (!targetBinId) {
+            console.warn(`No bin found at location for item ${item.item_code} (location_id: ${item.location_id}), skipping`);
+            skippedCount++;
+            continue;
+          }
+
+          // Create new allocation at the correct location bin
           const { error: insertError } = await supabase
             .from('warehouse_bin_allocations')
             .insert({
@@ -415,7 +411,7 @@ export function useWarehouseBinAllocations(options?: { disableFetch?: boolean })
             console.error(`Error creating allocation for ${item.item_code}:`, insertError);
             skippedCount++;
           } else {
-            console.log(`✓ Created allocation for ${item.item_code}: ${currentStock}`);
+            console.log(`✓ Created allocation for ${item.item_code}: ${currentStock} at location bin ${targetBinId}`);
             createdCount++;
           }
         }
