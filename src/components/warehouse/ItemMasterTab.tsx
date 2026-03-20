@@ -551,6 +551,9 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
                 </DropdownMenuContent>
               </DropdownMenu>
             )}
+            <Button variant="outline" onClick={() => setIsBulkStockUploadOpen(true)}>
+              <Upload className="mr-2 h-4 w-4" /> Upload Stock
+            </Button>
             <Button onClick={() => setIsImportCatalogOpen(true)}>
               <PackagePlus className="mr-2 h-4 w-4" /> Import from Catalog
             </Button>
