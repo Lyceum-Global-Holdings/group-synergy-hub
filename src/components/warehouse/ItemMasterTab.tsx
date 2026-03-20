@@ -617,7 +617,7 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
           <TableBody>
             {isLoading ? (
               <TableRow>
-              <TableCell colSpan={visibleCount} className="text-center py-8">
+              <TableCell colSpan={visibleCount + 1} className="text-center py-8">
                   Loading items...
                 </TableCell>
               </TableRow>
