@@ -277,46 +277,53 @@ export function useStockAudit() {
     },
   });
 
-  // Fix all desynced items at once
+  // Fix all desynced and no_bins items at once
   const fixAllDesyncsMutation = useMutation({
     mutationFn: async () => {
-      const desynced = auditItems.filter((i) => i.status === 'desync');
-      if (desynced.length === 0) throw new Error('No desynced items to fix.');
+      const itemsToFix = auditItems.filter((i) => i.status === 'desync' || i.status === 'no_bins');
+      if (itemsToFix.length === 0) throw new Error('No items to fix.');
 
       let fixed = 0;
       let failed = 0;
 
-      for (const item of desynced) {
+      for (const item of itemsToFix) {
         try {
-          const { data: allocations, error: fetchError } = await supabase
-            .from('warehouse_bin_allocations')
-            .select('id, allocated_quantity, reserved_quantity')
-            .eq('warehouse_item_id', item.id)
-            .order('allocated_quantity', { ascending: false });
+          if (item.bin_count === 0) {
+            // no_bins: create allocation
+            await createAllocationForNoBinsItem(item);
+            fixed++;
+          } else {
+            // desync: adjust largest allocation
+            const { data: allocations, error: fetchError } = await supabase
+              .from('warehouse_bin_allocations')
+              .select('id, allocated_quantity, reserved_quantity')
+              .eq('warehouse_item_id', item.id)
+              .order('allocated_quantity', { ascending: false });
 
-          if (fetchError || !allocations || allocations.length === 0) {
-            failed++;
-            continue;
+            if (fetchError || !allocations || allocations.length === 0) {
+              failed++;
+              continue;
+            }
+
+            const otherTotal = allocations
+              .slice(1)
+              .reduce((sum, a) => sum + (a.allocated_quantity || 0), 0);
+            const newPrimaryQty = Math.max(0, item.current_stock - otherTotal);
+            const primaryAlloc = allocations[0];
+            const newReserved = Math.min(primaryAlloc.reserved_quantity || 0, newPrimaryQty);
+
+            const { error: updateError } = await supabase
+              .from('warehouse_bin_allocations')
+              .update({
+                allocated_quantity: newPrimaryQty,
+                reserved_quantity: newReserved,
+                updated_at: new Date().toISOString(),
+              })
+              .eq('id', primaryAlloc.id);
+
+            if (updateError) failed++;
+            else fixed++;
           }
-
-          const otherTotal = allocations
-            .slice(1)
-            .reduce((sum, a) => sum + (a.allocated_quantity || 0), 0);
-          const newPrimaryQty = Math.max(0, item.current_stock - otherTotal);
-          const primaryAlloc = allocations[0];
-          const newReserved = Math.min(primaryAlloc.reserved_quantity || 0, newPrimaryQty);
-
-          const { error: updateError } = await supabase
-            .from('warehouse_bin_allocations')
-            .update({
-              allocated_quantity: newPrimaryQty,
-              reserved_quantity: newReserved,
-              updated_at: new Date().toISOString(),
-            })
-            .eq('id', primaryAlloc.id);
-
-          if (updateError) failed++;
-          else fixed++;
         } catch {
           failed++;
         }
@@ -328,7 +335,7 @@ export function useStockAudit() {
       queryClient.invalidateQueries({ queryKey: ['stock-audit'] });
       queryClient.invalidateQueries({ queryKey: ['warehouse-bin-allocations'] });
       queryClient.invalidateQueries({ queryKey: ['warehouse-items'] });
-      if (result.fixed > 0) toast.success(`Fixed ${result.fixed} desynced item(s)`);
+      if (result.fixed > 0) toast.success(`Fixed ${result.fixed} item(s)`);
       if (result.failed > 0) toast.warning(`${result.failed} item(s) could not be fixed`);
     },
     onError: (error: Error) => {
