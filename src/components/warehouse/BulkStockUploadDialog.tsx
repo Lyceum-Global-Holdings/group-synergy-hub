@@ -16,6 +16,27 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
 
+interface CatalogItem {
+  id: string;
+  item_code: string;
+  name: string;
+  description: string | null;
+  category_id: string | null;
+  unit_id: string | null;
+  brand: string | null;
+  manufacturer: string | null;
+  barcode: string | null;
+  sku: string | null;
+  unit_cost: number | null;
+  selling_price: number | null;
+  reorder_level: number | null;
+  min_stock_level: number | null;
+  max_stock_level: number | null;
+  image_url: string | null;
+  is_batch_tracked: boolean | null;
+  is_serialized: boolean | null;
+}
+
 interface ParsedRow {
   rowNumber: number;
   item_code: string;
@@ -25,7 +46,10 @@ interface ParsedRow {
   item_id?: string;
   item_name?: string;
   bin_id?: string;
-  status: 'matched' | 'item_not_found' | 'bin_not_found' | 'error';
+  catalog_item?: CatalogItem;
+  existing_inventory_id?: string;
+  needs_import?: boolean;
+  status: 'matched' | 'new_to_inventory' | 'item_not_found' | 'bin_not_found' | 'error';
   error?: string;
 }
 
