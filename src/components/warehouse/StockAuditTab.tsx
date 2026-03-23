@@ -250,17 +250,15 @@ export function StockAuditTab() {
   };
 
   const handleLocationAssignmentComplete = (overrides: Map<string, ReconcileOverride>) => {
-    // After locations + bins are assigned, proceed with reconciliation using overrides
-    refetch().then(() => {
-      if (pendingFixMode === 'single' && pendingFixItem) {
-        const override = overrides.get(pendingFixItem.id);
-        fixDesync(pendingFixItem, override);
-      } else {
-        fixAllDesyncs(overrides);
-      }
-      setPendingLocationItems([]);
-      setPendingFixItem(null);
-    });
+    // Pass overrides directly — no refetch needed, the engine uses overrides for location/bin
+    if (pendingFixMode === 'single' && pendingFixItem) {
+      const override = overrides.get(pendingFixItem.id);
+      fixDesync(pendingFixItem, override);
+    } else {
+      fixAllDesyncs(overrides);
+    }
+    setPendingLocationItems([]);
+    setPendingFixItem(null);
   };
 
   const hasLogged = useRef(false);
