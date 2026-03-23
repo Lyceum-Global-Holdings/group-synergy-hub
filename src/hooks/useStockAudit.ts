@@ -36,93 +36,21 @@ export function useStockAudit() {
   const { data: auditItems = [], isLoading, error, refetch } = useQuery({
     queryKey: ['stock-audit', selectedCompany?.id, isViewingAllCompanies],
     queryFn: async (): Promise<StockAuditItem[]> => {
-      // Fetch active warehouse items with cursor-based batching
-      const items: { id: string; item_code: string; name: string; current_stock: number }[] = [];
-      let lastItemId: string | null = null;
-      while (true) {
-        let itemsQuery = supabase
-          .from('warehouse_items')
-          .select('id, item_code, name, current_stock')
-          .eq('status', 'active')
-          .order('id')
-          .limit(1000);
-
-        if (!isViewingAllCompanies && selectedCompany?.id) {
-          itemsQuery = itemsQuery.eq('company_id', selectedCompany.id);
-        }
-        if (lastItemId) {
-          itemsQuery = itemsQuery.gt('id', lastItemId);
-        }
-
-        const { data, error: itemsError } = await itemsQuery;
-        if (itemsError) throw itemsError;
-        if (!data || data.length === 0) break;
-        items.push(...data);
-        if (data.length < 1000) break;
-        lastItemId = data[data.length - 1].id;
-      }
-
-      if (items.length === 0) return [];
-
-      // Fetch bin allocations with cursor-based batching, filtered by company
-      const allocations: { warehouse_item_id: string; allocated_quantity: number }[] = [];
-      let lastAllocId: string | null = null;
-      while (true) {
-        let q = supabase
-          .from('warehouse_bin_allocations')
-          .select('id, warehouse_item_id, allocated_quantity')
-          .order('id')
-          .limit(1000);
-
-        if (!isViewingAllCompanies && selectedCompany?.id) {
-          q = q.eq('company_id', selectedCompany.id);
-        }
-
-        if (lastAllocId) q = q.gt('id', lastAllocId);
-
-        const { data, error: allocError } = await q;
-        if (allocError) throw allocError;
-        if (!data || data.length === 0) break;
-        allocations.push(...data);
-        if (data.length < 1000) break;
-        lastAllocId = data[data.length - 1].id;
-      }
-
-      // Group allocations by item id
-      const allocationsByItem = new Map<string, number[]>();
-      allocations.forEach((alloc) => {
-        if (!allocationsByItem.has(alloc.warehouse_item_id)) {
-          allocationsByItem.set(alloc.warehouse_item_id, []);
-        }
-        allocationsByItem.get(alloc.warehouse_item_id)!.push(alloc.allocated_quantity || 0);
+      const companyId = (!isViewingAllCompanies && selectedCompany?.id) ? selectedCompany.id : null;
+      const { data, error: rpcError } = await supabase.rpc('stock_audit_summary', {
+        p_company_id: companyId,
       });
-
-      // Compute audit result for each item
-      return items.map((item) => {
-        const binQtys = allocationsByItem.get(item.id) || [];
-        const binTotal = binQtys.reduce((sum, q) => sum + q, 0);
-        const binCount = binQtys.length;
-        const currentStock = item.current_stock || 0;
-        const variance = currentStock - binTotal;
-
-        let status: StockAuditStatus;
-        if (binCount === 0) {
-          status = currentStock === 0 ? 'ok' : 'no_bins';
-        } else {
-          status = Math.abs(variance) < 0.001 ? 'ok' : 'desync';
-        }
-
-        return {
-          id: item.id,
-          item_code: item.item_code,
-          name: item.name,
-          current_stock: currentStock,
-          bin_total: binTotal,
-          bin_count: binCount,
-          variance,
-          status,
-        };
-      });
+      if (rpcError) throw rpcError;
+      return (data || []).map((row: any) => ({
+        id: row.id,
+        item_code: row.item_code,
+        name: row.name,
+        current_stock: Number(row.current_stock),
+        bin_total: Number(row.bin_total),
+        bin_count: Number(row.bin_count),
+        variance: Number(row.variance),
+        status: row.status as StockAuditStatus,
+      }));
     },
     enabled: !!(isViewingAllCompanies || selectedCompany?.id),
   });
