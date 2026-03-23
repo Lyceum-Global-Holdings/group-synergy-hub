@@ -1,35 +1,55 @@
 
 
-## Fix: Bulk Stock Upload — Opening Stock Not Working
+## Fix: Stock Reconciliation Still Using Old Sequential Code
 
-### Root Causes
+### Root Cause
 
-**1. Wrong `quantity_before` / `quantity_after` in stock transactions**
-The `sync_item_stock_from_bins` trigger fires immediately when a bin allocation is inserted/updated (lines 394-410). By the time the code reads `current_stock` at line 413-419, the trigger has already updated it to include the new allocation. So:
-- `quantity_before` = already-updated value (includes the new stock)
-- `quantity_after` = quantity_before + row.quantity = **double-counted**
+There are **two separate reconciliation paths** and the user is hitting the old slow one:
 
-This corrupts the stock transaction audit trail and makes opening stock records meaningless.
+1. **Stock Audit Tab** (`StockAuditTab.tsx`) → calls `useStockAudit.fixAllDesyncs` → uses the new batch RPC `reconcile_stock_batch` — this is fast
+2. **Item Master Tab** (`ItemMasterTab.tsx`) → calls `useWarehouseBinAllocations.reconcileStock` → uses the OLD sequential per-item loop with 120+ HTTP calls — this is what the console logs show
 
-**2. `location_id` never set on items**
-New items created at lines 349-381 and reactivated items at lines 321-346 never set `location_id`. This means all bulk-uploaded items have `location_id = null`, which then breaks the stock audit/reconciliation (the exact issue we've been fixing).
+The console logs prove the old path is being used: "Processing item: FIX-MNT-000-0017 (current_stock: 0)" comes from `useWarehouseBinAllocations.ts` line 326.
 
-**3. No error handling on Supabase calls**
-The bin allocation insert (line 401-409) and update (line 396-399) don't check for errors. A silent RLS or constraint failure means the item appears "processed" but no allocation was actually created.
+### Fix
 
-### Fix Plan
+**File: `src/hooks/useWarehouseBinAllocations.ts`**
 
-**File: `src/components/warehouse/BulkStockUploadDialog.tsx`**
+Replace the `reconcileStockMutation` (lines 221–440+) with a call to the batch RPC `reconcile_stock_batch`. The mutation currently:
+- Fetches all active items (1 call)
+- Consolidates duplicate allocations (N calls)
+- Loops through every item sequentially (3 calls per item)
 
-**Fix 1 — Read `current_stock` BEFORE updating bin allocation**
-Move the `current_stock` read (lines 413-419) to BEFORE the bin allocation insert/update (lines 386-410). This captures the true pre-change value before the trigger fires.
+Replace with:
+1. Keep Step 0 (consolidate duplicates) — move it to a separate RPC or keep as-is since it only runs for actual duplicates
+2. Replace the per-item loop (Step 1 onward) with a single `supabase.rpc('reconcile_stock_batch', ...)` call
 
-**Fix 2 — Set `location_id` on items**
-When creating new items (line 352) or reactivating existing items (line 325), include `location_id: effectiveLocationId` (the selected warehouse location).
+Specifically:
+- Fetch all active item IDs for the company
+- Pass them to `reconcile_stock_batch` RPC
+- Parse results and show toast summary
 
-**Fix 3 — Add error handling on allocation operations**
-Check for errors on the bin allocation insert and update calls. Throw on failure so the item correctly counts as failed.
+**File: `src/components/warehouse/ItemMasterTab.tsx`** — no changes needed, it already calls `reconcileStock()` which will now use the fast path.
+
+### Implementation Detail
+
+```typescript
+// In reconcileStockMutation.mutationFn, after duplicate consolidation:
+const { data: items } = await supabase
+  .from('warehouse_items')
+  .select('id')
+  .eq('company_id', selectedCompany.id)
+  .eq('status', 'active');
+
+const itemIds = (items || []).map(i => i.id);
+const { data, error } = await supabase.rpc('reconcile_stock_batch', {
+  p_item_ids: itemIds,
+  p_company_id: selectedCompany.id,
+  p_overrides: {},
+  p_user_id: user?.data?.user?.id || null,
+});
+```
 
 ### Files Modified
-- `src/components/warehouse/BulkStockUploadDialog.tsx` — all three fixes in this single file
+- `src/hooks/useWarehouseBinAllocations.ts` — replace sequential loop in `reconcileStockMutation` with batch RPC call
 
