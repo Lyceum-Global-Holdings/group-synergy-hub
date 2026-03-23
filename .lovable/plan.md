@@ -1,55 +1,76 @@
 
+Fix stock reconciliation by making the Inventory/Item Master reconcile path honor the user’s selected warehouse location instead of calling the batch RPC with empty overrides.
 
-## Fix: Stock Reconciliation Still Using Old Sequential Code
+What I found
+- The blocked results are real, not just UI noise: many Lustra items have `current_stock > 0`, `alloc_count = 0`, and `location_id = null`.
+- `reconcile_stock_batch` only creates a bin allocation when it has either:
+  - an override bin/location, or
+  - an existing `warehouse_items.location_id`.
+  Otherwise it returns `blocked - No location/bin available`.
+- `useStockAudit` can pass overrides from `AssignLocationDialog`, but `useWarehouseBinAllocations.reconcileStock` currently sends:
+  ```ts
+  p_overrides: {}
+  ```
+  so the selected location is ignored there.
+- The current Inventory page already has access to `globalLocationId` from `LocationFilterContext`, but reconciliation does not use it.
+- Data check shows the affected company has many items with null `location_id`, while available warehouse locations/bins are limited by company mapping. So if the selected location is meant to be the target, it must be passed explicitly into reconciliation.
 
-### Root Cause
+Best solution
+Use the selected global location as an explicit reconciliation target in the Item Master flow, and reuse the same “location + first active bin” logic before calling the batch RPC.
 
-There are **two separate reconciliation paths** and the user is hitting the old slow one:
+Implementation plan
 
-1. **Stock Audit Tab** (`StockAuditTab.tsx`) → calls `useStockAudit.fixAllDesyncs` → uses the new batch RPC `reconcile_stock_batch` — this is fast
-2. **Item Master Tab** (`ItemMasterTab.tsx`) → calls `useWarehouseBinAllocations.reconcileStock` → uses the OLD sequential per-item loop with 120+ HTTP calls — this is what the console logs show
+1. Update `src/hooks/useWarehouseBinAllocations.ts`
+- Accept a reconciliation context/argument for the selected location ID.
+- Before calling `reconcile_stock_batch`, fetch:
+  - all active items for the company
+  - items missing `location_id`
+  - first active bin for the selected location
+- Build `p_overrides` for items that need help:
+  - if item has no `location_id` and a global location is selected, set:
+    ```text
+    { itemId: { locationId: selectedLocationId, binId: firstActiveBinAtSelectedLocation } }
+    ```
+- If no active bin exists at the selected location, fail fast with a clear error instead of silently skipping.
 
-The console logs prove the old path is being used: "Processing item: FIX-MNT-000-0017 (current_stock: 0)" comes from `useWarehouseBinAllocations.ts` line 326.
+2. Persist the selected location onto affected items
+- For items reconciled via selected location, update `warehouse_items.location_id` before or as part of reconciliation flow.
+- This ensures future audits and stock operations use the same warehouse location consistently.
 
-### Fix
+3. Update `src/components/warehouse/ItemMasterTab.tsx`
+- Pass `globalLocationId` into `reconcileStock(...)`.
+- If no location is selected, block reconciliation with a clear message like:
+  “Select a warehouse location first to reconcile items without locations.”
+- Keep the current button behavior, but make it deterministic.
 
-**File: `src/hooks/useWarehouseBinAllocations.ts`**
+4. Tighten the reconciliation result handling
+- Align client-side action parsing with actual RPC return values (`fixed`, `created`, `blocked`, `failed`) so success/skipped counts are correct.
+- Show a better summary:
+  - allocations created
+  - allocations adjusted
+  - blocked because no active bin at selected location
+  - failed
 
-Replace the `reconcileStockMutation` (lines 221–440+) with a call to the batch RPC `reconcile_stock_batch`. The mutation currently:
-- Fetches all active items (1 call)
-- Consolidates duplicate allocations (N calls)
-- Loops through every item sequentially (3 calls per item)
+5. Optional hardening in `reconcile_stock_batch`
+- Make the RPC slightly more defensive:
+  - if an override location/bin is provided, always use it for no-allocation items
+  - keep updating `warehouse_items.location_id` when override location is used
+- This preserves one source of truth and avoids drift between client and RPC behavior.
 
-Replace with:
-1. Keep Step 0 (consolidate duplicates) — move it to a separate RPC or keep as-is since it only runs for actual duplicates
-2. Replace the per-item loop (Step 1 onward) with a single `supabase.rpc('reconcile_stock_batch', ...)` call
+Why this fixes the issue
+- Right now the selected location exists only in UI state and is never sent to reconciliation.
+- After this change, null-location items will no longer be skipped: they will be assigned to the selected location and added to that location’s first active bin.
+- This matches the expected behavior the user described and keeps the batch reconciliation fast.
 
-Specifically:
-- Fetch all active item IDs for the company
-- Pass them to `reconcile_stock_batch` RPC
-- Parse results and show toast summary
+Files to update
+- `src/hooks/useWarehouseBinAllocations.ts`
+- `src/components/warehouse/ItemMasterTab.tsx`
+- possibly `supabase` migration for a small RPC hardening update if needed
 
-**File: `src/components/warehouse/ItemMasterTab.tsx`** — no changes needed, it already calls `reconcileStock()` which will now use the fast path.
-
-### Implementation Detail
-
-```typescript
-// In reconcileStockMutation.mutationFn, after duplicate consolidation:
-const { data: items } = await supabase
-  .from('warehouse_items')
-  .select('id')
-  .eq('company_id', selectedCompany.id)
-  .eq('status', 'active');
-
-const itemIds = (items || []).map(i => i.id);
-const { data, error } = await supabase.rpc('reconcile_stock_batch', {
-  p_item_ids: itemIds,
-  p_company_id: selectedCompany.id,
-  p_overrides: {},
-  p_user_id: user?.data?.user?.id || null,
-});
-```
-
-### Files Modified
-- `src/hooks/useWarehouseBinAllocations.ts` — replace sequential loop in `reconcileStockMutation` with batch RPC call
-
+Technical notes
+- Keep `warehouse_bin_allocations` as the operational source of truth.
+- Use company-scoped allocations, but location-scoped bins.
+- Bin selection should be deterministic:
+  - selected location’s first active bin by `bin_code ASC`
+  - otherwise block with a clear error
+- Do not rely on `warehouse_items.location_id = null` items being auto-resolved by the RPC without explicit overrides.
