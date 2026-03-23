@@ -34,8 +34,11 @@ import {
 } from 'lucide-react';
 import { useStockAudit, type StockAuditItem, type StockAuditStatus, type StockAuditLogEntry } from '@/hooks/useStockAudit';
 import { useIsAdminOrHigher } from '@/hooks/useIsAdminOrHigher';
+import { useCompany } from '@/contexts/CompanyContext';
 import { format, parseISO } from 'date-fns';
 import type { ColumnDef } from '@tanstack/react-table';
+import { AssignLocationDialog } from './AssignLocationDialog';
+import { supabase } from '@/integrations/supabase/client';
 
 type FilterValue = 'all' | StockAuditStatus;
 
@@ -195,13 +198,85 @@ function AuditHistoryPanel({ history }: { history: StockAuditLogEntry[] }) {
 export function StockAuditTab() {
   const { auditItems, isLoading, refetch, summary, auditHistory, logSnapshot, fixDesync, isFixingDesync, fixAllDesyncs, isFixingAll } = useStockAudit();
   const { canDelete: isAdmin } = useIsAdminOrHigher();
+  const { selectedCompany } = useCompany();
 
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<FilterValue>('all');
   const [fixItem, setFixItem] = useState<StockAuditItem | null>(null);
   const [showFixAllDialog, setShowFixAllDialog] = useState(false);
+  const [showAssignLocationDialog, setShowAssignLocationDialog] = useState(false);
+  const [pendingLocationItems, setPendingLocationItems] = useState<StockAuditItem[]>([]);
+  const [pendingFixMode, setPendingFixMode] = useState<'single' | 'all'>('all');
+  const [pendingFixItem, setPendingFixItem] = useState<StockAuditItem | null>(null);
 
-  // Log a snapshot once per mount, after data finishes loading
+  // Check if no_bins items need location assignment before fixing
+  const checkAndFixItems = async (itemsToCheck: StockAuditItem[], mode: 'single' | 'all', singleItem?: StockAuditItem) => {
+    const noBinsItems = itemsToCheck.filter(i => i.status === 'no_bins');
+    
+    if (noBinsItems.length === 0) {
+      // No location assignment needed, proceed directly
+      if (mode === 'single' && singleItem) {
+        setFixItem(singleItem);
+      } else {
+        setShowFixAllDialog(true);
+      }
+      return;
+    }
+
+    // Check which items are missing location_id
+    const itemIds = noBinsItems.map(i => i.id);
+    const { data: itemsWithLocation } = await supabase
+      .from('warehouse_items')
+      .select('id, location_id')
+      .in('id', itemIds);
+
+    const missingLocationItems = noBinsItems.filter(item => {
+      const dbItem = itemsWithLocation?.find(d => d.id === item.id);
+      return !dbItem?.location_id;
+    });
+
+    if (missingLocationItems.length > 0) {
+      // Show location assignment dialog first
+      setPendingLocationItems(missingLocationItems);
+      setPendingFixMode(mode);
+      setPendingFixItem(singleItem || null);
+      setShowAssignLocationDialog(true);
+    } else {
+      // All items have locations, proceed
+      if (mode === 'single' && singleItem) {
+        setFixItem(singleItem);
+      } else {
+        setShowFixAllDialog(true);
+      }
+    }
+  };
+
+  const handleFixAllClick = () => {
+    const itemsToFix = auditItems.filter(i => i.status === 'desync' || i.status === 'no_bins');
+    checkAndFixItems(itemsToFix, 'all');
+  };
+
+  const handleFixSingleClick = (item: StockAuditItem) => {
+    if (item.status === 'no_bins') {
+      checkAndFixItems([item], 'single', item);
+    } else {
+      setFixItem(item);
+    }
+  };
+
+  const handleLocationAssignmentComplete = () => {
+    // After locations are assigned, refetch audit data and then proceed with fix
+    refetch().then(() => {
+      if (pendingFixMode === 'single' && pendingFixItem) {
+        fixDesync(pendingFixItem);
+      } else {
+        fixAllDesyncs(undefined);
+      }
+      setPendingLocationItems([]);
+      setPendingFixItem(null);
+    });
+  };
+
   const hasLogged = useRef(false);
   useEffect(() => {
     if (!isLoading && auditItems.length > 0 && !hasLogged.current) {
@@ -316,12 +391,12 @@ export function StockAuditTab() {
             id: 'actions',
             header: 'Fix',
             cell: ({ row }: { row: { original: StockAuditItem } }) => {
-              if (row.original.status !== 'desync') return null;
+              if (row.original.status === 'ok') return null;
               return (
                 <Button
                   size="sm"
                   variant="outline"
-                  onClick={() => setFixItem(row.original)}
+                  onClick={() => handleFixSingleClick(row.original)}
                   disabled={isFixingDesync}
                   className="h-7 text-xs gap-1"
                 >
@@ -424,16 +499,16 @@ export function StockAuditTab() {
             </Button>
 
             {/* Fix All (admin only) */}
-            {isAdmin && summary.desynced > 0 && (
+            {isAdmin && (summary.desynced + summary.noBins) > 0 && (
               <Button
                 variant="destructive"
                 size="sm"
-                onClick={() => setShowFixAllDialog(true)}
+                onClick={() => handleFixAllClick()}
                 disabled={isFixingAll}
                 className="gap-1"
               >
                 <Wrench className="h-4 w-4" />
-                Fix All ({summary.desynced})
+                Fix All ({summary.desynced + summary.noBins})
               </Button>
             )}
           </div>
@@ -487,10 +562,11 @@ export function StockAuditTab() {
       <AlertDialog open={showFixAllDialog} onOpenChange={setShowFixAllDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Fix All Desynced Items</AlertDialogTitle>
+            <AlertDialogTitle>Fix All Items</AlertDialogTitle>
             <AlertDialogDescription>
-              This will update bin allocations for all{' '}
-              <span className="font-semibold">{summary.desynced}</span> desynced item(s) so that
+              This will update bin allocations for{' '}
+              <span className="font-semibold">{summary.desynced}</span> desynced and{' '}
+              <span className="font-semibold">{summary.noBins}</span> no-bin item(s) so that
               their bin totals match the item master stock values. This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -503,11 +579,20 @@ export function StockAuditTab() {
               }}
               disabled={isFixingAll}
             >
-              Fix All {summary.desynced} Items
+              Fix All {summary.desynced + summary.noBins} Items
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Assign Location Dialog (pre-fix for items missing location) */}
+      <AssignLocationDialog
+        items={pendingLocationItems}
+        open={showAssignLocationDialog}
+        onOpenChange={setShowAssignLocationDialog}
+        onComplete={handleLocationAssignmentComplete}
+        companyId={selectedCompany?.id}
+      />
     </div>
   );
 }
