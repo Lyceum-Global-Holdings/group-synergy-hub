@@ -326,6 +326,7 @@ export function BulkStockUploadDialog({ open, onOpenChange }: BulkStockUploadDia
                   current_stock: 0,
                   reserved_quantity: 0,
                   status: 'active',
+                  location_id: effectiveLocationId || null,
                   name: cat.name,
                   description: cat.description,
                   category_id: cat.category_id,
