@@ -50,10 +50,7 @@ export async function reconcileItem(
     }
 
     const effectiveLocationId = override?.locationId || itemData?.location_id;
-
-    if (!effectiveLocationId) {
-      return { itemId: item.id, itemCode: item.item_code, action: 'blocked', message: 'No warehouse location assigned' };
-    }
+    // Note: effectiveLocationId may be null — handled below per case
 
     // 2. Load allocations scoped by company
     const { data: allocations, error: allocError } = await supabase
@@ -71,6 +68,10 @@ export async function reconcileItem(
 
     // 3. No allocations → create one
     if (!allocations || allocations.length === 0) {
+      if (!effectiveLocationId) {
+        return { itemId: item.id, itemCode: item.item_code, action: 'blocked', message: 'No warehouse location assigned' };
+      }
+
       const targetBinId = override?.binId || await findFirstActiveBin(effectiveLocationId);
 
       if (!targetBinId) {
@@ -95,65 +96,35 @@ export async function reconcileItem(
       return { itemId: item.id, itemCode: item.item_code, action: 'created', message: 'Bin allocation created' };
     }
 
-    // 4. Allocations exist → adjust the primary location-matching one
-    const locationAllocations = allocations.filter(
-      (a: any) => a.warehouse_bins?.location_id === effectiveLocationId
-    );
+    // 4. Allocations exist → adjust the primary one
+    // Try location-matching allocations first
+    const locationAllocations = effectiveLocationId
+      ? allocations.filter((a: any) => a.warehouse_bins?.location_id === effectiveLocationId)
+      : [];
 
-    if (locationAllocations.length > 0) {
-      // Adjust the first location-matching allocation
-      const primaryAlloc = locationAllocations[0];
-      const otherTotal = allocations
-        .filter((a: any) => a.id !== primaryAlloc.id)
-        .reduce((sum, a) => sum + (a.allocated_quantity || 0), 0);
-      const newPrimaryQty = Math.max(0, item.current_stock - otherTotal);
-      const newReserved = Math.min(primaryAlloc.reserved_quantity || 0, newPrimaryQty);
+    // Pick primary allocation: prefer location-matched, otherwise use first existing
+    const primaryAlloc = locationAllocations.length > 0 ? locationAllocations[0] : allocations[0];
 
-      const { error: updateError } = await supabase
-        .from('warehouse_bin_allocations')
-        .update({
-          allocated_quantity: newPrimaryQty,
-          reserved_quantity: newReserved,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', primaryAlloc.id);
+    const otherTotal = allocations
+      .filter((a: any) => a.id !== primaryAlloc.id)
+      .reduce((sum, a) => sum + (a.allocated_quantity || 0), 0);
+    const newPrimaryQty = Math.max(0, item.current_stock - otherTotal);
+    const newReserved = Math.min(primaryAlloc.reserved_quantity || 0, newPrimaryQty);
 
-      if (updateError) {
-        return { itemId: item.id, itemCode: item.item_code, action: 'failed', message: updateError.message };
-      }
+    const { error: updateError } = await supabase
+      .from('warehouse_bin_allocations')
+      .update({
+        allocated_quantity: newPrimaryQty,
+        reserved_quantity: newReserved,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', primaryAlloc.id);
 
-      return { itemId: item.id, itemCode: item.item_code, action: 'fixed', message: 'Allocation adjusted' };
+    if (updateError) {
+      return { itemId: item.id, itemCode: item.item_code, action: 'failed', message: updateError.message };
     }
 
-    // 5. No allocation at the correct location → create one there
-    const targetBinId = override?.binId || await findFirstActiveBin(effectiveLocationId);
-
-    if (!targetBinId) {
-      return { itemId: item.id, itemCode: item.item_code, action: 'blocked', message: 'No active bins at item location' };
-    }
-
-    // Sum of existing allocations at OTHER locations
-    const existingTotal = allocations.reduce((sum, a) => sum + (a.allocated_quantity || 0), 0);
-    const newQty = Math.max(0, item.current_stock - existingTotal);
-
-    if (newQty > 0) {
-      const { error: insertError } = await supabase
-        .from('warehouse_bin_allocations')
-        .insert({
-          warehouse_item_id: item.id,
-          bin_id: targetBinId,
-          allocated_quantity: newQty,
-          reserved_quantity: 0,
-          company_id: companyId,
-          created_by: user?.id || null,
-        });
-
-      if (insertError) {
-        return { itemId: item.id, itemCode: item.item_code, action: 'failed', message: insertError.message };
-      }
-    }
-
-    return { itemId: item.id, itemCode: item.item_code, action: 'created', message: 'New allocation at correct location' };
+    return { itemId: item.id, itemCode: item.item_code, action: 'fixed', message: 'Allocation adjusted' };
   } catch (err: any) {
     return { itemId: item.id, itemCode: item.item_code, action: 'failed', message: err.message || 'Unknown error' };
   }

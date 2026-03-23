@@ -199,12 +199,12 @@ export function StockAuditTab() {
   const [pendingFixMode, setPendingFixMode] = useState<'single' | 'all'>('all');
   const [pendingFixItem, setPendingFixItem] = useState<StockAuditItem | null>(null);
 
-  // Check if no_bins items need location assignment before fixing
+  // Check if ANY items (desync or no_bins) need location assignment before fixing
   const checkAndFixItems = async (itemsToCheck: StockAuditItem[], mode: 'single' | 'all', singleItem?: StockAuditItem) => {
-    const noBinsItems = itemsToCheck.filter(i => i.status === 'no_bins');
+    // Check ALL items for missing location_id, not just no_bins
+    const itemIds = itemsToCheck.map(i => i.id);
     
-    if (noBinsItems.length === 0) {
-      // No location assignment needed, proceed directly
+    if (itemIds.length === 0) {
       if (mode === 'single' && singleItem) {
         setFixItem(singleItem);
       } else {
@@ -213,14 +213,12 @@ export function StockAuditTab() {
       return;
     }
 
-    // Check which items are missing location_id
-    const itemIds = noBinsItems.map(i => i.id);
     const { data: itemsWithLocation } = await supabase
       .from('warehouse_items')
       .select('id, location_id')
       .in('id', itemIds);
 
-    const missingLocationItems = noBinsItems.filter(item => {
+    const missingLocationItems = itemsToCheck.filter(item => {
       const dbItem = itemsWithLocation?.find(d => d.id === item.id);
       return !dbItem?.location_id;
     });
@@ -247,25 +245,20 @@ export function StockAuditTab() {
   };
 
   const handleFixSingleClick = (item: StockAuditItem) => {
-    if (item.status === 'no_bins') {
-      checkAndFixItems([item], 'single', item);
-    } else {
-      setFixItem(item);
-    }
+    // Check location for ALL non-ok items, not just no_bins
+    checkAndFixItems([item], 'single', item);
   };
 
   const handleLocationAssignmentComplete = (overrides: Map<string, ReconcileOverride>) => {
-    // After locations + bins are assigned, proceed with reconciliation using overrides
-    refetch().then(() => {
-      if (pendingFixMode === 'single' && pendingFixItem) {
-        const override = overrides.get(pendingFixItem.id);
-        fixDesync(pendingFixItem, override);
-      } else {
-        fixAllDesyncs(overrides);
-      }
-      setPendingLocationItems([]);
-      setPendingFixItem(null);
-    });
+    // Pass overrides directly — no refetch needed, the engine uses overrides for location/bin
+    if (pendingFixMode === 'single' && pendingFixItem) {
+      const override = overrides.get(pendingFixItem.id);
+      fixDesync(pendingFixItem, override);
+    } else {
+      fixAllDesyncs(overrides);
+    }
+    setPendingLocationItems([]);
+    setPendingFixItem(null);
   };
 
   const hasLogged = useRef(false);
