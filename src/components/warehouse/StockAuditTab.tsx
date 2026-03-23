@@ -34,8 +34,11 @@ import {
 } from 'lucide-react';
 import { useStockAudit, type StockAuditItem, type StockAuditStatus, type StockAuditLogEntry } from '@/hooks/useStockAudit';
 import { useIsAdminOrHigher } from '@/hooks/useIsAdminOrHigher';
+import { useCompany } from '@/contexts/CompanyContext';
 import { format, parseISO } from 'date-fns';
 import type { ColumnDef } from '@tanstack/react-table';
+import { AssignLocationDialog } from './AssignLocationDialog';
+import { supabase } from '@/integrations/supabase/client';
 
 type FilterValue = 'all' | StockAuditStatus;
 
