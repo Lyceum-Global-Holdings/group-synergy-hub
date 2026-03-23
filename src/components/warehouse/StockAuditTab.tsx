@@ -396,7 +396,7 @@ export function StockAuditTab() {
                 <Button
                   size="sm"
                   variant="outline"
-                  onClick={() => setFixItem(row.original)}
+                  onClick={() => handleFixSingleClick(row.original)}
                   disabled={isFixingDesync}
                   className="h-7 text-xs gap-1"
                 >
