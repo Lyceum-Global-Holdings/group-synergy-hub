@@ -219,7 +219,7 @@ export function useWarehouseBinAllocations(options?: { disableFetch?: boolean })
 
   // Reconcile stock: sync bin allocations with warehouse_items.current_stock
   const reconcileStockMutation = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (selectedLocationId?: string | null) => {
       console.log('=== Starting stock reconciliation ===');
       toast.info('Starting stock reconciliation...');
       
@@ -301,7 +301,7 @@ export function useWarehouseBinAllocations(options?: { disableFetch?: boolean })
       // ============ STEP 1: Batch reconcile via RPC ============
       const { data: items, error: itemsError } = await supabase
         .from('warehouse_items')
-        .select('id')
+        .select('id, location_id')
         .eq('company_id', selectedCompany.id)
         .eq('status', 'active');
 
@@ -317,10 +317,54 @@ export function useWarehouseBinAllocations(options?: { disableFetch?: boolean })
         return { reconciled: 0, created: 0, updated: 0, skipped: 0, consolidated: consolidatedCount };
       }
 
+      // ============ Build overrides for items missing location_id ============
+      let overrides: Record<string, { locationId: string; binId: string }> = {};
+
+      if (selectedLocationId) {
+        // Find items without a location_id
+        const itemsNeedingLocation = (items || []).filter(i => !i.location_id);
+        
+        if (itemsNeedingLocation.length > 0) {
+          console.log(`${itemsNeedingLocation.length} items missing location_id, resolving bin at selected location`);
+          
+          // Find first active bin at the selected location
+          const { data: binAtLocation, error: binError } = await supabase
+            .from('warehouse_bins')
+            .select('id, bin_code')
+            .eq('location_id', selectedLocationId)
+            .eq('status', 'active')
+            .order('bin_code', { ascending: true })
+            .limit(1)
+            .maybeSingle();
+
+          if (binError) {
+            console.error('Failed to find bin at selected location:', binError);
+          }
+
+          if (binAtLocation) {
+            console.log(`Using bin ${binAtLocation.bin_code} (${binAtLocation.id}) for ${itemsNeedingLocation.length} items`);
+            for (const item of itemsNeedingLocation) {
+              overrides[item.id] = {
+                locationId: selectedLocationId,
+                binId: binAtLocation.id,
+              };
+            }
+          } else {
+            console.warn('No active bin found at selected location, items without location will be skipped');
+            toast.warning('No active bin found at the selected location. Items without a location will be skipped.');
+          }
+        }
+      } else {
+        const itemsWithoutLocation = (items || []).filter(i => !i.location_id);
+        if (itemsWithoutLocation.length > 0) {
+          console.warn(`${itemsWithoutLocation.length} items have no location_id and no location selected — these will be skipped`);
+        }
+      }
+
       const { data: rpcResults, error: rpcError } = await supabase.rpc('reconcile_stock_batch', {
         p_item_ids: itemIds,
         p_company_id: selectedCompany.id,
-        p_overrides: {},
+        p_overrides: overrides as any,
         p_user_id: user.user?.id || null,
       });
 
