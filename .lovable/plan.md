@@ -1,38 +1,65 @@
 
 
-## Fix: Stock Reconciliation Not Working
+## Fix: Stock Reconciliation and Bin Allocation Creation
 
-### Root Cause
+### Root Causes Identified
 
-The `useStockAudit` hook has a critical bug: when fetching bin allocations (lines 66-83), it fetches **all allocations across all companies** without any `company_id` filter. This means:
+**1. Items with `location_id = null` break reconciliation silently**
+Many active items with stock > 0 have no `location_id` set. Both `reconcileStock` (in `useWarehouseBinAllocations.ts`) and `createAllocationForNoBinsItem` (in `useStockAudit.ts`) check `if (!itemData?.location_id)` and skip/throw — so these items never get allocations.
 
-1. Allocations from other companies inflate the `bin_total` for shared catalog items
-2. Items appear "desynced" when they are actually correct for the selected company
-3. Fixing these false desyncs corrupts the data by adjusting allocations based on wrong totals
+**2. Stock Audit "Fix" button only appears for `desync` status, not `no_bins`**
+In `StockAuditTab.tsx` line 319: `if (row.original.status !== 'desync') return null;` — the Fix button is hidden for `no_bins` items, even though the backend `fixDesyncMutation` already handles them.
 
-Additionally, the "no_bins" fix path is not handled — clicking "Fix" on a `no_bins` item throws an error instead of creating the missing allocation.
+**3. "Fix All" button only counts desynced items, ignores `no_bins`**
+Line 427: `{isAdmin && summary.desynced > 0 && (` — the button only appears when there are desynced items. The count shown also excludes `no_bins`. The mutation itself already handles both statuses (line 283), but the UI gates it.
 
-### Fix — `src/hooks/useStockAudit.ts`
+### Fix Plan
 
-**1. Filter allocations by company (lines 66-83)**
+**File 1: `src/components/warehouse/StockAuditTab.tsx`**
 
-Add a `company_id` filter to the allocation query when a specific company is selected. When viewing "All Companies", scope allocations to only the item IDs fetched in step 1 (using the item ID set).
+- **Line 319**: Change condition from `status !== 'desync'` to `status === 'ok'` so Fix button shows for both `desync` and `no_bins` items
+- **Line 427**: Change condition to `summary.desynced + summary.noBins > 0`
+- **Line 436**: Update button label to show combined count: `Fix All ({summary.desynced + summary.noBins})`
+- **Line 493**: Update dialog description to mention "no bins" items too
 
-```
-// When fetching allocations, add:
-if (!isViewingAllCompanies && selectedCompany?.id) {
-  q = q.eq('company_id', selectedCompany.id);
-}
-```
+**File 2: `src/hooks/useStockAudit.ts` — Add location prompt support**
 
-**2. Fix "no_bins" items (fixDesyncMutation, lines 182-227)**
+- Update `createAllocationForNoBinsItem` to accept an optional `locationId` override parameter
+- When `location_id` is null and no override is provided, throw a descriptive error: `"Item has no warehouse location assigned. Please assign a location first."`
 
-When `item.bin_count === 0` and `item.current_stock > 0`, instead of throwing an error, look up the item's `location_id`, find the first active bin at that location, and create a new allocation — same logic as `reconcileStock` in `useWarehouseBinAllocations.ts`.
+**File 3: `src/components/warehouse/StockAuditTab.tsx` — Guided location assignment for no-location items**
 
-**3. Fix "no_bins" in bulk fix (fixAllDesyncsMutation, lines 230-286)**
+Before running Fix or Fix All, check if any target items have `no_bins` status. For those, show a pre-fix dialog that:
+1. Fetches the item's `location_id` from `warehouse_items`
+2. If null, shows a dropdown for the user to pick a warehouse location + bin
+3. Saves the location to the item (`warehouse_items.update`) before proceeding with allocation creation
+4. Once all items have locations assigned, proceeds with the normal fix flow
 
-Extend the loop to also process `no_bins` items (not just `desync`), applying the same create-allocation logic from point 2.
+Implementation:
+- New component `AssignLocationDialog.tsx` — a modal listing items missing locations with a location dropdown per row
+- When user confirms, batch-updates `warehouse_items.location_id` for each item, then triggers the original fix mutation
+- For Fix All: filter items needing location assignment, show dialog first if any exist, then run fixAll after
 
-### Files Modified
-- `src/hooks/useStockAudit.ts` — all three fixes in this single file
+**File 4: `src/hooks/useStockAudit.ts` — Company-scoped allocation queries for fix mutations**
+
+- `fixDesyncMutation` (line 239-243): Add `.eq('company_id', selectedCompany.id)` filter when fetching allocations for the desync fix
+- `fixAllDesyncsMutation` (line 297-300): Same company filter
+- This prevents adjusting allocations belonging to other companies
+
+### Summary of Changes
+
+| File | Change |
+|------|--------|
+| `StockAuditTab.tsx` | Show Fix button for `no_bins` items; Fix All includes `no_bins` count; pre-fix location assignment dialog |
+| `useStockAudit.ts` | Company-scope allocation queries in fix mutations; better error for missing locations |
+| `AssignLocationDialog.tsx` (new) | Guided dialog for assigning warehouse location + bin to items missing `location_id` before reconciliation |
+
+### New Component: `AssignLocationDialog.tsx`
+
+Props: `items: StockAuditItem[]`, `open`, `onOpenChange`, `onComplete: () => void`
+
+For each item without a location:
+- Row shows item code, name, current stock
+- Location dropdown (warehouse locations only)
+- On submit: updates each item's `location_id` in `warehouse_items`, then calls `onComplete`
 
