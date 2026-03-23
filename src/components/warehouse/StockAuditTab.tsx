@@ -245,11 +245,8 @@ export function StockAuditTab() {
   };
 
   const handleFixSingleClick = (item: StockAuditItem) => {
-    if (item.status === 'no_bins') {
-      checkAndFixItems([item], 'single', item);
-    } else {
-      setFixItem(item);
-    }
+    // Check location for ALL non-ok items, not just no_bins
+    checkAndFixItems([item], 'single', item);
   };
 
   const handleLocationAssignmentComplete = (overrides: Map<string, ReconcileOverride>) => {
