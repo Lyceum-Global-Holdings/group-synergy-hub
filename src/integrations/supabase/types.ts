@@ -18167,6 +18167,19 @@ export type Database = {
           unrealized_gain_loss: number
         }[]
       }
+      stock_audit_summary: {
+        Args: { p_company_id?: string }
+        Returns: {
+          bin_count: number
+          bin_total: number
+          current_stock: number
+          id: string
+          item_code: string
+          name: string
+          status: string
+          variance: number
+        }[]
+      }
       transfer_assets_to_department: {
         Args: { p_request_id: string }
         Returns: Json
