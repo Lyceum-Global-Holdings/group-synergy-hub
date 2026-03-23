@@ -324,7 +324,7 @@ export function StockAuditTab() {
             id: 'actions',
             header: 'Fix',
             cell: ({ row }: { row: { original: StockAuditItem } }) => {
-              if (row.original.status !== 'desync') return null;
+              if (row.original.status === 'ok') return null;
               return (
                 <Button
                   size="sm"
