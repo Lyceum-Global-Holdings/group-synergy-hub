@@ -50,10 +50,7 @@ export async function reconcileItem(
     }
 
     const effectiveLocationId = override?.locationId || itemData?.location_id;
-
-    if (!effectiveLocationId) {
-      return { itemId: item.id, itemCode: item.item_code, action: 'blocked', message: 'No warehouse location assigned' };
-    }
+    // Note: effectiveLocationId may be null — handled below per case
 
     // 2. Load allocations scoped by company
     const { data: allocations, error: allocError } = await supabase
