@@ -198,11 +198,16 @@ function AuditHistoryPanel({ history }: { history: StockAuditLogEntry[] }) {
 export function StockAuditTab() {
   const { auditItems, isLoading, refetch, summary, auditHistory, logSnapshot, fixDesync, isFixingDesync, fixAllDesyncs, isFixingAll } = useStockAudit();
   const { canDelete: isAdmin } = useIsAdminOrHigher();
+  const { selectedCompany } = useCompany();
 
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<FilterValue>('all');
   const [fixItem, setFixItem] = useState<StockAuditItem | null>(null);
   const [showFixAllDialog, setShowFixAllDialog] = useState(false);
+  const [showAssignLocationDialog, setShowAssignLocationDialog] = useState(false);
+  const [pendingLocationItems, setPendingLocationItems] = useState<StockAuditItem[]>([]);
+  const [pendingFixMode, setPendingFixMode] = useState<'single' | 'all'>('all');
+  const [pendingFixItem, setPendingFixItem] = useState<StockAuditItem | null>(null);
 
   // Log a snapshot once per mount, after data finishes loading
   const hasLogged = useRef(false);
