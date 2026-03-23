@@ -7,17 +7,24 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { MapPin, Loader2 } from 'lucide-react';
 import type { StockAuditItem } from '@/hooks/useStockAudit';
+import type { ReconcileOverride } from '@/utils/stockReconciliation';
 
 interface AssignLocationDialogProps {
   items: StockAuditItem[];
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onComplete: () => void;
+  onComplete: (overrides: Map<string, ReconcileOverride>) => void;
   companyId: string | undefined;
 }
 
 interface LocationOption {
   id: string;
+  name: string;
+}
+
+interface BinOption {
+  id: string;
+  bin_code: string;
   name: string;
 }
 
@@ -27,10 +34,12 @@ interface ItemAssignment {
   itemName: string;
   currentStock: number;
   locationId: string;
+  binId: string;
 }
 
 export function AssignLocationDialog({ items, open, onOpenChange, onComplete, companyId }: AssignLocationDialogProps) {
   const [locations, setLocations] = useState<LocationOption[]>([]);
+  const [binsByLocation, setBinsByLocation] = useState<Map<string, BinOption[]>>(new Map());
   const [assignments, setAssignments] = useState<ItemAssignment[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [isLoadingLocations, setIsLoadingLocations] = useState(false);
@@ -40,29 +49,38 @@ export function AssignLocationDialog({ items, open, onOpenChange, onComplete, co
     
     setIsLoadingLocations(true);
     
-    // Fetch locations linked to this company
-    supabase
-      .from('warehouse_location_companies')
-      .select('location_id, warehouse_locations!inner(id, name)')
-      .eq('company_id', companyId)
-      .then(({ data, error }) => {
-        if (error) {
-          console.error('Failed to fetch locations:', error);
-          setLocations([]);
-        } else {
-          const locs: LocationOption[] = (data || [])
-            .map((d: any) => ({
-              id: d.warehouse_locations?.id,
-              name: d.warehouse_locations?.name,
-            }))
-            .filter((l: LocationOption) => l.id && l.name);
-          
-          // Deduplicate
-          const seen = new Set<string>();
-          setLocations(locs.filter(l => { if (seen.has(l.id)) return false; seen.add(l.id); return true; }));
+    // Fetch locations from both junction table AND legacy company_id
+    Promise.all([
+      supabase
+        .from('warehouse_location_companies')
+        .select('location_id, warehouse_locations!inner(id, name, type)')
+        .eq('company_id', companyId),
+      supabase
+        .from('warehouse_locations')
+        .select('id, name, type')
+        .eq('company_id', companyId)
+        .eq('type', 'location'),
+    ]).then(([junctionRes, legacyRes]) => {
+      const locMap = new Map<string, LocationOption>();
+      
+      // From junction table
+      (junctionRes.data || []).forEach((d: any) => {
+        const loc = d.warehouse_locations;
+        if (loc?.id && loc?.name && loc?.type === 'location') {
+          locMap.set(loc.id, { id: loc.id, name: loc.name });
         }
-        setIsLoadingLocations(false);
       });
+      
+      // From legacy company_id
+      (legacyRes.data || []).forEach((loc: any) => {
+        if (loc.id && loc.name) {
+          locMap.set(loc.id, { id: loc.id, name: loc.name });
+        }
+      });
+      
+      setLocations(Array.from(locMap.values()));
+      setIsLoadingLocations(false);
+    });
 
     // Initialize assignments
     setAssignments(items.map(item => ({
@@ -71,24 +89,48 @@ export function AssignLocationDialog({ items, open, onOpenChange, onComplete, co
       itemName: item.name,
       currentStock: item.current_stock,
       locationId: '',
+      binId: '',
     })));
   }, [open, items, companyId]);
 
-  const updateAssignment = (itemId: string, locationId: string) => {
-    setAssignments(prev => prev.map(a => a.itemId === itemId ? { ...a, locationId } : a));
+  const fetchBinsForLocation = async (locationId: string) => {
+    if (binsByLocation.has(locationId)) return;
+    
+    const { data } = await supabase
+      .from('warehouse_bins')
+      .select('id, bin_code, name')
+      .eq('location_id', locationId)
+      .eq('status', 'active')
+      .order('bin_code');
+    
+    setBinsByLocation(prev => new Map(prev).set(locationId, (data || []) as BinOption[]));
   };
 
-  const allAssigned = assignments.every(a => a.locationId !== '');
+  const updateLocation = (itemId: string, locationId: string) => {
+    setAssignments(prev => prev.map(a =>
+      a.itemId === itemId ? { ...a, locationId, binId: '' } : a
+    ));
+    fetchBinsForLocation(locationId);
+  };
+
+  const updateBin = (itemId: string, binId: string) => {
+    setAssignments(prev => prev.map(a =>
+      a.itemId === itemId ? { ...a, binId } : a
+    ));
+  };
+
+  const allAssigned = assignments.every(a => a.locationId !== '' && a.binId !== '');
 
   const handleSave = async () => {
     if (!allAssigned) {
-      toast.error('Please assign a location to all items');
+      toast.error('Please assign a location and bin to all items');
       return;
     }
 
     setIsSaving(true);
     let failed = 0;
 
+    // Update location_id on warehouse_items
     for (const assignment of assignments) {
       const { error } = await supabase
         .from('warehouse_items')
@@ -105,25 +147,29 @@ export function AssignLocationDialog({ items, open, onOpenChange, onComplete, co
 
     if (failed > 0) {
       toast.error(`Failed to assign location for ${failed} item(s)`);
-    } else {
-      toast.success(`Locations assigned for ${assignments.length} item(s)`);
+    }
+
+    // Build overrides map for reconciliation engine
+    const overrides = new Map<string, ReconcileOverride>();
+    for (const a of assignments) {
+      overrides.set(a.itemId, { locationId: a.locationId, binId: a.binId });
     }
     
-    onComplete();
+    onComplete(overrides);
     onOpenChange(false);
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+      <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <MapPin className="h-5 w-5" />
-            Assign Warehouse Locations
+            Assign Location & Bin
           </DialogTitle>
           <DialogDescription>
-            The following {items.length} item(s) have stock but no warehouse location assigned.
-            Please select a location for each item before reconciliation can proceed.
+            {items.length} item(s) have stock but no warehouse location or bin allocation.
+            Select a location and bin for each item to proceed with reconciliation.
           </DialogDescription>
         </DialogHeader>
 
@@ -137,34 +183,49 @@ export function AssignLocationDialog({ items, open, onOpenChange, onComplete, co
           </div>
         ) : (
           <div className="space-y-3">
-            {assignments.map((assignment) => (
-              <div key={assignment.itemId} className="flex items-center gap-3 p-3 rounded-lg border bg-muted/30">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono text-sm font-medium">{assignment.itemCode}</span>
-                    <Badge variant="secondary" className="text-xs">
-                      Stock: {assignment.currentStock.toFixed(2)}
-                    </Badge>
+            {assignments.map((assignment) => {
+              const bins = binsByLocation.get(assignment.locationId) || [];
+              return (
+                <div key={assignment.itemId} className="flex items-center gap-3 p-3 rounded-lg border bg-muted/30 flex-wrap">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-sm font-medium">{assignment.itemCode}</span>
+                      <Badge variant="secondary" className="text-xs">
+                        Stock: {assignment.currentStock.toFixed(2)}
+                      </Badge>
+                    </div>
+                    <p className="text-sm text-muted-foreground truncate">{assignment.itemName}</p>
                   </div>
-                  <p className="text-sm text-muted-foreground truncate">{assignment.itemName}</p>
+                  <Select
+                    value={assignment.locationId}
+                    onValueChange={(v) => updateLocation(assignment.itemId, v)}
+                  >
+                    <SelectTrigger className="w-44">
+                      <SelectValue placeholder="Location" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {locations.map((loc) => (
+                        <SelectItem key={loc.id} value={loc.id}>{loc.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Select
+                    value={assignment.binId}
+                    onValueChange={(v) => updateBin(assignment.itemId, v)}
+                    disabled={!assignment.locationId}
+                  >
+                    <SelectTrigger className="w-44">
+                      <SelectValue placeholder={assignment.locationId ? (bins.length === 0 ? 'No bins' : 'Select bin') : 'Pick location first'} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {bins.map((bin) => (
+                        <SelectItem key={bin.id} value={bin.id}>{bin.bin_code} — {bin.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
-                <Select
-                  value={assignment.locationId}
-                  onValueChange={(v) => updateAssignment(assignment.itemId, v)}
-                >
-                  <SelectTrigger className="w-48">
-                    <SelectValue placeholder="Select location" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {locations.map((loc) => (
-                      <SelectItem key={loc.id} value={loc.id}>
-                        {loc.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
 
@@ -174,7 +235,7 @@ export function AssignLocationDialog({ items, open, onOpenChange, onComplete, co
           </Button>
           <Button onClick={handleSave} disabled={!allAssigned || isSaving || locations.length === 0}>
             {isSaving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-            Assign & Continue Fix
+            Assign & Reconcile
           </Button>
         </DialogFooter>
       </DialogContent>
