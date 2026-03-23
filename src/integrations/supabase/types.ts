@@ -18122,6 +18122,20 @@ export type Database = {
             }
             Returns: undefined
           }
+      reconcile_stock_batch: {
+        Args: {
+          p_company_id: string
+          p_item_ids: string[]
+          p_overrides?: Json
+          p_user_id?: string
+        }
+        Returns: {
+          action: string
+          item_code: string
+          item_id: string
+          message: string
+        }[]
+      }
       record_workflow_action: {
         Args: {
           p_comments?: string
