@@ -1,75 +1,65 @@
 
 
-## Fix: Stock Reconciliation Not Working
+## Fix: Slow Stock Reconciliation
 
-### Root Causes Found
+### Problem
+`reconcileItems` processes items **one at a time sequentially**. Each item makes 3–4 separate Supabase HTTP requests (fetch item, fetch allocations, get user, insert/update). For 40+ items, that's 120–160 sequential network round-trips — extremely slow.
 
-**1. Desync items with `location_id = null` skip the location prompt**
-`checkAndFixItems` (StockAuditTab.tsx line 204) only filters for `no_bins` items when checking which items need location assignment. Desync items with existing allocations but `location_id = null` go straight to reconciliation — which then returns "blocked" because it can't determine a location.
+### Solution: Server-side batch reconciliation via Supabase RPC
 
-**2. Reconciliation engine fails on items with existing allocations but null location**
-In `stockReconciliation.ts`, the engine filters allocations by `warehouse_bins.location_id === effectiveLocationId`. When `effectiveLocationId` is null, zero allocations match. It then tries `findFirstActiveBin(null)` which queries for bins with `location_id = null` — returns nothing. Result: "blocked".
+Move the reconciliation logic into a single PostgreSQL function that processes all items in one database call instead of hundreds of client-side round-trips.
 
-The engine should handle the case where allocations already exist: just adjust the first existing allocation directly, regardless of location matching.
+### Implementation
 
-**3. Race condition in handleLocationAssignmentComplete**
-After `refetch().then(...)`, the `fixAllDesyncs` mutation reads `auditItems` from hook state, but React state may not have updated yet after the refetch promise resolves.
+**1. New database migration — `reconcile_stock_batch` RPC**
 
-### Database evidence
-- Item `8zipperG`: `current_stock=993`, `location_id=null`, has 1 allocation with `qty=1000` → engine can't match location, returns blocked
-- Item `INV-LUS-000-002`: `current_stock=415`, `location_id=null`, no allocations → engine returns blocked
-- ~40 Lustra items: all have `location_id=null`, zero allocations, stock > 0
+A PL/pgSQL function that:
+- Accepts an array of item IDs, a company_id, and an optional JSONB overrides map `{itemId: {locationId, binId}}`
+- For each item in a single DB transaction:
+  - Reads `current_stock` and `location_id` from `warehouse_items`
+  - Sums allocations from `warehouse_bin_allocations` scoped by company
+  - If no allocations exist: creates one at the override bin or first active bin at item's location
+  - If allocations exist with desync: adjusts the primary allocation
+- Returns a table of results: `(item_id, item_code, action, message)`
 
-### Fix Plan
+This replaces 3N+ HTTP calls with 1 single RPC call.
 
-**File 1: `src/utils/stockReconciliation.ts`**
+**2. Update `src/utils/stockReconciliation.ts`**
 
-Update `reconcileItem` logic at step 4 (allocations exist):
-- If allocations exist but none match the item's location, AND no location is known (null effectiveLocationId with no override), adjust the **first existing allocation** directly instead of trying to create a new one at an unknown location
-- Only return "blocked" when there are truly no allocations AND no location
+- Keep `reconcileItem` for single-item fixes (still useful, 3 calls is fine for one item)
+- Replace `reconcileItems` loop with a single `supabase.rpc('reconcile_stock_batch', {...})` call
+- Parse the RPC response into the existing `ReconcileResult[]` format
 
-```text
-Current flow:
-  allocations exist → filter by location → none match → findFirstActiveBin(null) → blocked
+**3. Update `src/hooks/useStockAudit.ts`**
 
-New flow:
-  allocations exist → filter by location → none match → 
-    if effectiveLocationId is null: adjust first allocation directly
-    else: create at effectiveLocationId (existing behavior)
+- `fixAllDesyncsMutation`: pass item IDs + overrides to the new batch function
+- No change to `fixDesyncMutation` (single item is already fast enough)
+
+### Technical Details
+
+The RPC function signature:
+```sql
+create or replace function reconcile_stock_batch(
+  p_item_ids uuid[],
+  p_company_id uuid,
+  p_overrides jsonb default '{}'::jsonb,
+  p_user_id uuid default null
+) returns table(item_id uuid, item_code text, action text, message text)
 ```
 
-**File 2: `src/components/warehouse/StockAuditTab.tsx`**
+Key SQL logic inside the function:
+- Uses a `FOREACH` loop over the array (all in one DB transaction)
+- Queries allocations with `SELECT ... WHERE warehouse_item_id = v_item_id AND company_id = p_company_id`
+- Handles insert vs update with standard SQL
+- Uses `GREATEST(0, ...)` to prevent negative quantities
+- Returns results via `RETURN NEXT`
 
-Update `checkAndFixItems` (line 204):
-- Check ALL items (not just `no_bins`) for missing `location_id`
-- This ensures desync items with null location also get the location prompt
+### Files
+- **New migration**: `reconcile_stock_batch` RPC function
+- **Modified**: `src/utils/stockReconciliation.ts` — new `reconcileItemsBatch` using RPC
+- **Modified**: `src/hooks/useStockAudit.ts` — `fixAllDesyncsMutation` calls batch function
 
-```typescript
-// Change from:
-const noBinsItems = itemsToCheck.filter(i => i.status === 'no_bins');
-// To:
-const itemsNeedingLocationCheck = itemsToCheck; // check all items
-```
-
-Then in the location check query result, filter for items where `location_id` is null.
-
-Update `handleLocationAssignmentComplete`:
-- Remove the `refetch().then(...)` pattern — pass overrides directly to the mutation without waiting for refetch (the overrides already contain the location/bin data the engine needs)
-
-```typescript
-const handleLocationAssignmentComplete = (overrides: Map<string, ReconcileOverride>) => {
-  if (pendingFixMode === 'single' && pendingFixItem) {
-    const override = overrides.get(pendingFixItem.id);
-    fixDesync(pendingFixItem, override);
-  } else {
-    fixAllDesyncs(overrides);
-  }
-  setPendingLocationItems([]);
-  setPendingFixItem(null);
-};
-```
-
-### Files Modified
-- `src/utils/stockReconciliation.ts` — handle desync items with existing allocations but null location
-- `src/components/warehouse/StockAuditTab.tsx` — prompt location for ALL items missing it (not just no_bins); fix race condition
+### Performance Impact
+- Before: ~120–160 sequential HTTP requests for 40 items (~30–60 seconds)
+- After: 1 RPC call (~1–2 seconds)
 
