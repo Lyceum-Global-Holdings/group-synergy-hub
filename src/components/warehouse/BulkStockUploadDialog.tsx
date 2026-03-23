@@ -371,6 +371,7 @@ export function BulkStockUploadDialog({ open, onOpenChange }: BulkStockUploadDia
                   is_serialized: cat.is_serialized,
                   status: 'active',
                   company_id: selectedCompany!.id,
+                  location_id: effectiveLocationId || null,
                   current_stock: 0,
                   reserved_quantity: 0,
                   created_by: user?.id,
