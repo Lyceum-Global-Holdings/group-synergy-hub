@@ -736,7 +736,7 @@ export function useWarehouseBinAllocations(options?: { disableFetch?: boolean })
     deleteAllocation: deleteAllocationMutation.mutate,
     adjustAllocation: adjustAllocationMutation.mutate,
     migrateAllocationsToCorrectLocation: migrateAllocationsMutation.mutate,
-    reconcileStock: reconcileStockMutation.mutate,
+    reconcileStock: (locationId?: string | null) => reconcileStockMutation.mutate(locationId),
     fixAllocationsFromHistory: fixAllocationsFromHistoryMutation.mutate,
     isCreating: createAllocationMutation.isPending,
     isUpdating: updateAllocationMutation.isPending,

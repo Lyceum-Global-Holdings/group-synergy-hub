@@ -542,7 +542,13 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
                   <DropdownMenuItem
-                    onClick={() => reconcileStock()}
+                    onClick={() => {
+                      if (!globalLocationId) {
+                        toast.warning('Please select a warehouse location first to reconcile items without locations.');
+                        return;
+                      }
+                      reconcileStock(globalLocationId);
+                    }}
                     disabled={isReconciling}
                   >
                     <BarChart3 className="mr-2 h-4 w-4" />
