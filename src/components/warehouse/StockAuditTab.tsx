@@ -209,7 +209,74 @@ export function StockAuditTab() {
   const [pendingFixMode, setPendingFixMode] = useState<'single' | 'all'>('all');
   const [pendingFixItem, setPendingFixItem] = useState<StockAuditItem | null>(null);
 
-  // Log a snapshot once per mount, after data finishes loading
+  // Check if no_bins items need location assignment before fixing
+  const checkAndFixItems = async (itemsToCheck: StockAuditItem[], mode: 'single' | 'all', singleItem?: StockAuditItem) => {
+    const noBinsItems = itemsToCheck.filter(i => i.status === 'no_bins');
+    
+    if (noBinsItems.length === 0) {
+      // No location assignment needed, proceed directly
+      if (mode === 'single' && singleItem) {
+        setFixItem(singleItem);
+      } else {
+        setShowFixAllDialog(true);
+      }
+      return;
+    }
+
+    // Check which items are missing location_id
+    const itemIds = noBinsItems.map(i => i.id);
+    const { data: itemsWithLocation } = await supabase
+      .from('warehouse_items')
+      .select('id, location_id')
+      .in('id', itemIds);
+
+    const missingLocationItems = noBinsItems.filter(item => {
+      const dbItem = itemsWithLocation?.find(d => d.id === item.id);
+      return !dbItem?.location_id;
+    });
+
+    if (missingLocationItems.length > 0) {
+      // Show location assignment dialog first
+      setPendingLocationItems(missingLocationItems);
+      setPendingFixMode(mode);
+      setPendingFixItem(singleItem || null);
+      setShowAssignLocationDialog(true);
+    } else {
+      // All items have locations, proceed
+      if (mode === 'single' && singleItem) {
+        setFixItem(singleItem);
+      } else {
+        setShowFixAllDialog(true);
+      }
+    }
+  };
+
+  const handleFixAllClick = () => {
+    const itemsToFix = auditItems.filter(i => i.status === 'desync' || i.status === 'no_bins');
+    checkAndFixItems(itemsToFix, 'all');
+  };
+
+  const handleFixSingleClick = (item: StockAuditItem) => {
+    if (item.status === 'no_bins') {
+      checkAndFixItems([item], 'single', item);
+    } else {
+      setFixItem(item);
+    }
+  };
+
+  const handleLocationAssignmentComplete = () => {
+    // After locations are assigned, refetch audit data and then proceed with fix
+    refetch().then(() => {
+      if (pendingFixMode === 'single' && pendingFixItem) {
+        fixDesync(pendingFixItem);
+      } else {
+        fixAllDesyncs(undefined);
+      }
+      setPendingLocationItems([]);
+      setPendingFixItem(null);
+    });
+  };
+
   const hasLogged = useRef(false);
   useEffect(() => {
     if (!isLoading && auditItems.length > 0 && !hasLogged.current) {
