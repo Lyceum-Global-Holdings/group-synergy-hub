@@ -146,20 +146,48 @@ async function findFirstActiveBin(locationId: string): Promise<string | null> {
 }
 
 /**
- * Reconcile multiple items. Returns summary of results.
+ * Reconcile multiple items via server-side batch RPC.
+ * Single DB call instead of N sequential client-side requests.
  */
 export async function reconcileItems(
   items: ReconcileItemInput[],
   companyId: string,
   overrides?: Map<string, ReconcileOverride>
 ): Promise<{ results: ReconcileResult[]; fixed: number; created: number; blocked: number; failed: number }> {
-  const results: ReconcileResult[] = [];
+  const { data: { user } } = await supabase.auth.getUser();
 
-  for (const item of items) {
-    const override = overrides?.get(item.id);
-    const result = await reconcileItem(item, companyId, override);
-    results.push(result);
+  // Build overrides JSONB: { "item-uuid": { "locationId": "...", "binId": "..." } }
+  const overridesObj: Record<string, { locationId: string; binId: string }> = {};
+  if (overrides) {
+    overrides.forEach((val, key) => {
+      overridesObj[key] = val;
+    });
   }
+
+  const { data, error } = await supabase.rpc('reconcile_stock_batch', {
+    p_item_ids: items.map(i => i.id),
+    p_company_id: companyId,
+    p_overrides: overridesObj,
+    p_user_id: user?.id || null,
+  });
+
+  if (error) {
+    // Fallback: if RPC fails, return all as failed
+    const results: ReconcileResult[] = items.map(i => ({
+      itemId: i.id,
+      itemCode: i.item_code,
+      action: 'failed' as const,
+      message: error.message,
+    }));
+    return { results, fixed: 0, created: 0, blocked: 0, failed: items.length };
+  }
+
+  const results: ReconcileResult[] = (data || []).map((row: any) => ({
+    itemId: row.item_id,
+    itemCode: row.item_code,
+    action: row.action as ReconcileResult['action'],
+    message: row.message,
+  }));
 
   return {
     results,
