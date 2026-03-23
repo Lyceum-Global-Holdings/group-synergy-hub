@@ -562,10 +562,11 @@ export function StockAuditTab() {
       <AlertDialog open={showFixAllDialog} onOpenChange={setShowFixAllDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Fix All Desynced Items</AlertDialogTitle>
+            <AlertDialogTitle>Fix All Items</AlertDialogTitle>
             <AlertDialogDescription>
-              This will update bin allocations for all{' '}
-              <span className="font-semibold">{summary.desynced}</span> desynced item(s) so that
+              This will update bin allocations for{' '}
+              <span className="font-semibold">{summary.desynced}</span> desynced and{' '}
+              <span className="font-semibold">{summary.noBins}</span> no-bin item(s) so that
               their bin totals match the item master stock values. This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -578,11 +579,20 @@ export function StockAuditTab() {
               }}
               disabled={isFixingAll}
             >
-              Fix All {summary.desynced} Items
+              Fix All {summary.desynced + summary.noBins} Items
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Assign Location Dialog (pre-fix for items missing location) */}
+      <AssignLocationDialog
+        items={pendingLocationItems}
+        open={showAssignLocationDialog}
+        onOpenChange={setShowAssignLocationDialog}
+        onComplete={handleLocationAssignmentComplete}
+        companyId={selectedCompany?.id}
+      />
     </div>
   );
 }
