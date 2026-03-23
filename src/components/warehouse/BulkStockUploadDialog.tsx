@@ -326,6 +326,7 @@ export function BulkStockUploadDialog({ open, onOpenChange }: BulkStockUploadDia
                   current_stock: 0,
                   reserved_quantity: 0,
                   status: 'active',
+                  location_id: effectiveLocationId || null,
                   name: cat.name,
                   description: cat.description,
                   category_id: cat.category_id,
@@ -370,6 +371,7 @@ export function BulkStockUploadDialog({ open, onOpenChange }: BulkStockUploadDia
                   is_serialized: cat.is_serialized,
                   status: 'active',
                   company_id: selectedCompany!.id,
+                  location_id: effectiveLocationId || null,
                   current_stock: 0,
                   reserved_quantity: 0,
                   created_by: user?.id,
@@ -383,6 +385,14 @@ export function BulkStockUploadDialog({ open, onOpenChange }: BulkStockUploadDia
 
           if (!itemId) throw new Error('Could not resolve item ID');
 
+          // Read current_stock BEFORE updating allocation (trigger will change it)
+          const { data: itemData } = await supabase
+            .from('warehouse_items')
+            .select('current_stock')
+            .eq('id', itemId)
+            .single();
+          const qtyBefore = Number(itemData?.current_stock || 0);
+
           // Check existing allocation
           const { data: existing } = await supabase
             .from('warehouse_bin_allocations')
@@ -393,12 +403,13 @@ export function BulkStockUploadDialog({ open, onOpenChange }: BulkStockUploadDia
 
           if (existing) {
             const newQty = (existing.allocated_quantity || 0) + row.quantity;
-            await supabase
+            const { error: allocErr } = await supabase
               .from('warehouse_bin_allocations')
               .update({ allocated_quantity: newQty, available_quantity: newQty })
               .eq('id', existing.id);
+            if (allocErr) throw allocErr;
           } else {
-            await supabase
+            const { error: allocErr } = await supabase
               .from('warehouse_bin_allocations')
               .insert({
                 warehouse_item_id: itemId,
@@ -407,18 +418,10 @@ export function BulkStockUploadDialog({ open, onOpenChange }: BulkStockUploadDia
                 available_quantity: row.quantity,
                 company_id: selectedCompany?.id,
               });
+            if (allocErr) throw allocErr;
           }
 
-          // Get current stock for transaction record
-          const { data: itemData } = await supabase
-            .from('warehouse_items')
-            .select('current_stock')
-            .eq('id', itemId)
-            .single();
-
-          const qtyBefore = itemData?.current_stock || 0;
-
-          // Create stock transaction
+          // Create stock transaction with correct before/after values
           await supabase
             .from('stock_transactions')
             .insert({
