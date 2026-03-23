@@ -1,65 +1,119 @@
 
+## Best fix: unify the reconciliation engine and complete the missing pieces
 
-## Fix: Stock Reconciliation and Bin Allocation Creation
+### What I found
+The current “fix” flow is only partially implemented, so reconciliation still fails for real cases:
 
-### Root Causes Identified
+1. `useStockAudit.ts` still has its own reconciliation logic and it is incomplete:
+   - single-item fix and bulk fix still fetch `warehouse_bin_allocations` without `company_id` scoping
+   - `createAllocationForNoBinsItem` still only auto-picks the first bin and does not support the guided bin choice
+   - it throws when location is missing instead of using the dialog result
 
-**1. Items with `location_id = null` break reconciliation silently**
-Many active items with stock > 0 have no `location_id` set. Both `reconcileStock` (in `useWarehouseBinAllocations.ts`) and `createAllocationForNoBinsItem` (in `useStockAudit.ts`) check `if (!itemData?.location_id)` and skip/throw — so these items never get allocations.
+2. `AssignLocationDialog.tsx` is incomplete:
+   - it only assigns a **location**, not a **bin**
+   - it fetches locations only from `warehouse_location_companies`, but this app still supports legacy `warehouse_locations.company_id` fallback elsewhere
+   - that means valid warehouse locations/bins can be missing from the dialog
 
-**2. Stock Audit "Fix" button only appears for `desync` status, not `no_bins`**
-In `StockAuditTab.tsx` line 319: `if (row.original.status !== 'desync') return null;` — the Fix button is hidden for `no_bins` items, even though the backend `fixDesyncMutation` already handles them.
+3. There are real data cases blocking reconciliation:
+   - multiple active stock items still have `location_id = null`
+   - some items have stock mismatches while location is null
+   - some active bins belong to locations that are not present in the junction table, so the current dialog can hide them
 
-**3. "Fix All" button only counts desynced items, ignores `no_bins`**
-Line 427: `{isAdmin && summary.desynced > 0 && (` — the button only appears when there are desynced items. The count shown also excludes `no_bins`. The mutation itself already handles both statuses (line 283), but the UI gates it.
+4. Reconciliation logic is duplicated in two places:
+   - `useStockAudit.ts`
+   - `useWarehouseBinAllocations.ts`
+   
+   That duplication is why one path gets fixed while the other stays broken.
 
-### Fix Plan
+### Best solution
+Use **one shared reconciliation engine** and make Stock Audit call that engine instead of maintaining a second, separate fix implementation.
 
-**File 1: `src/components/warehouse/StockAuditTab.tsx`**
+### Implementation plan
 
-- **Line 319**: Change condition from `status !== 'desync'` to `status === 'ok'` so Fix button shows for both `desync` and `no_bins` items
-- **Line 427**: Change condition to `summary.desynced + summary.noBins > 0`
-- **Line 436**: Update button label to show combined count: `Fix All ({summary.desynced + summary.noBins})`
-- **Line 493**: Update dialog description to mention "no bins" items too
+#### 1) Centralize reconciliation logic
+Move the actual fix logic into shared helper functions inside `src/hooks/useWarehouseBinAllocations.ts` (or a small shared warehouse utility used by both hooks).
 
-**File 2: `src/hooks/useStockAudit.ts` — Add location prompt support**
+Create a single deterministic flow:
 
-- Update `createAllocationForNoBinsItem` to accept an optional `locationId` override parameter
-- When `location_id` is null and no override is provided, throw a descriptive error: `"Item has no warehouse location assigned. Please assign a location first."`
+```text
+For an item:
+  1. Load item with company_id + location_id
+  2. Load allocations scoped by warehouse_item_id + company_id
+  3. If item has no location:
+       require explicit location/bin input
+  4. If item has no allocations:
+       create allocation in chosen bin / first active bin at item location
+  5. If item has allocations:
+       prefer allocations whose bin.location_id matches item.location_id
+       adjust the primary location-matching allocation
+  6. If no matching-location allocation exists:
+       create one at the chosen/correct bin
+```
 
-**File 3: `src/components/warehouse/StockAuditTab.tsx` — Guided location assignment for no-location items**
+This removes divergence between Stock Audit fixes and Inventory reconciliation fixes.
 
-Before running Fix or Fix All, check if any target items have `no_bins` status. For those, show a pre-fix dialog that:
-1. Fetches the item's `location_id` from `warehouse_items`
-2. If null, shows a dropdown for the user to pick a warehouse location + bin
-3. Saves the location to the item (`warehouse_items.update`) before proceeding with allocation creation
-4. Once all items have locations assigned, proceeds with the normal fix flow
+#### 2) Finish the guided repair flow
+Update `src/components/warehouse/AssignLocationDialog.tsx` so each affected item can select:
 
-Implementation:
-- New component `AssignLocationDialog.tsx` — a modal listing items missing locations with a location dropdown per row
-- When user confirms, batch-updates `warehouse_items.location_id` for each item, then triggers the original fix mutation
-- For Fix All: filter items needing location assignment, show dialog first if any exist, then run fixAll after
+- warehouse location
+- bin within that location
 
-**File 4: `src/hooks/useStockAudit.ts` — Company-scoped allocation queries for fix mutations**
+This should:
+- show bins filtered by the selected location
+- support both junction-linked locations and legacy `warehouse_locations.company_id`
+- only allow active bins
+- return `{ itemId, locationId, binId }` for each item
 
-- `fixDesyncMutation` (line 239-243): Add `.eq('company_id', selectedCompany.id)` filter when fetching allocations for the desync fix
-- `fixAllDesyncsMutation` (line 297-300): Same company filter
-- This prevents adjusting allocations belonging to other companies
+#### 3) Pass explicit overrides into reconciliation
+Update `src/hooks/useStockAudit.ts` so the dialog result is passed into the shared engine as an override map.
 
-### Summary of Changes
+That means:
+- no more “guessing” a bin after the user already picked one
+- no more throwing “Could not determine item location” for items that were just assigned
+- no stale behavior after refetch
 
-| File | Change |
-|------|--------|
-| `StockAuditTab.tsx` | Show Fix button for `no_bins` items; Fix All includes `no_bins` count; pre-fix location assignment dialog |
-| `useStockAudit.ts` | Company-scope allocation queries in fix mutations; better error for missing locations |
-| `AssignLocationDialog.tsx` (new) | Guided dialog for assigning warehouse location + bin to items missing `location_id` before reconciliation |
+#### 4) Fix company/location scoping everywhere
+In the shared reconciliation engine and Stock Audit:
+- always scope allocation reads by `company_id`
+- when adjusting allocations, prefer bins at the item’s `location_id`
+- never fall back to a bin at a different location
+- if no active bin exists at the chosen location, report that item as blocked
 
-### New Component: `AssignLocationDialog.tsx`
+#### 5) Improve Stock Audit UI behavior
+Update `src/components/warehouse/StockAuditTab.tsx` to:
+- continue showing Fix / Fix All for both `desync` and `no_bins`
+- after location/bin assignment, call the shared engine directly
+- show a result summary:
+  - fixed
+  - created allocations
+  - blocked (missing active bin)
+  - failed
 
-Props: `items: StockAuditItem[]`, `open`, `onOpenChange`, `onComplete: () => void`
+#### 6) Add visibility for blocked items
+Add clearer error/reporting for items that still cannot be reconciled, for example:
+- missing location
+- no active bins at selected location
+- RLS/database write failure
 
-For each item without a location:
-- Row shows item code, name, current stock
-- Location dropdown (warehouse locations only)
-- On submit: updates each item's `location_id` in `warehouse_items`, then calls `onComplete`
+This prevents silent failure and makes the next action obvious.
 
+### Files to update
+- `src/hooks/useWarehouseBinAllocations.ts`
+- `src/hooks/useStockAudit.ts`
+- `src/components/warehouse/AssignLocationDialog.tsx`
+- `src/components/warehouse/StockAuditTab.tsx`
+
+### Technical notes
+- Keep `warehouse_bin_allocations` as the operational source of truth
+- Deterministic bin choice should be:
+  - explicit user-selected bin when provided
+  - otherwise first active bin by `bin_code ASC` at the item location
+- The location picker should reuse the same “junction + legacy fallback” pattern already used elsewhere in the warehouse module
+- Do not keep separate reconciliation math in both hooks anymore
+
+### Why this is the best fix
+This solves the real issue, not just one symptom:
+- fixes missing location/bin assignment
+- fixes company-scoping bugs
+- fixes hidden locations caused by incomplete location lookup
+- eliminates duplicated reconciliation code that keeps drifting out of sync
