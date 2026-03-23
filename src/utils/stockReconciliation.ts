@@ -68,6 +68,10 @@ export async function reconcileItem(
 
     // 3. No allocations → create one
     if (!allocations || allocations.length === 0) {
+      if (!effectiveLocationId) {
+        return { itemId: item.id, itemCode: item.item_code, action: 'blocked', message: 'No warehouse location assigned' };
+      }
+
       const targetBinId = override?.binId || await findFirstActiveBin(effectiveLocationId);
 
       if (!targetBinId) {
