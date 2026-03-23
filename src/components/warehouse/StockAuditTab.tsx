@@ -432,16 +432,16 @@ export function StockAuditTab() {
             </Button>
 
             {/* Fix All (admin only) */}
-            {isAdmin && summary.desynced > 0 && (
+            {isAdmin && (summary.desynced + summary.noBins) > 0 && (
               <Button
                 variant="destructive"
                 size="sm"
-                onClick={() => setShowFixAllDialog(true)}
+                onClick={() => handleFixAllClick()}
                 disabled={isFixingAll}
                 className="gap-1"
               >
                 <Wrench className="h-4 w-4" />
-                Fix All ({summary.desynced})
+                Fix All ({summary.desynced + summary.noBins})
               </Button>
             )}
           </div>
