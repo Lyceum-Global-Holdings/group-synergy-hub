@@ -298,10 +298,10 @@ export function useWarehouseBinAllocations(options?: { disableFetch?: boolean })
         toast.info(`Consolidated ${consolidatedCount} duplicate allocations`);
       }
 
-      // ============ STEP 1: Get all warehouse items ============
+      // ============ STEP 1: Batch reconcile via RPC ============
       const { data: items, error: itemsError } = await supabase
         .from('warehouse_items')
-        .select('id, item_code, name, current_stock, location_id, company_id')
+        .select('id')
         .eq('company_id', selectedCompany.id)
         .eq('status', 'active');
 
@@ -310,112 +310,38 @@ export function useWarehouseBinAllocations(options?: { disableFetch?: boolean })
         throw itemsError;
       }
 
-      console.log(`Found ${items?.length || 0} active items`);
+      const itemIds = (items || []).map(i => i.id);
+      console.log(`Found ${itemIds.length} active items, sending to batch RPC`);
 
-      if (!items || items.length === 0) {
+      if (itemIds.length === 0) {
         return { reconciled: 0, created: 0, updated: 0, skipped: 0, consolidated: consolidatedCount };
+      }
+
+      const { data: rpcResults, error: rpcError } = await supabase.rpc('reconcile_stock_batch', {
+        p_item_ids: itemIds,
+        p_company_id: selectedCompany.id,
+        p_overrides: {},
+        p_user_id: user.user?.id || null,
+      });
+
+      if (rpcError) {
+        console.error('Batch reconciliation RPC failed:', rpcError);
+        throw rpcError;
       }
 
       let createdCount = 0;
       let updatedCount = 0;
       let skippedCount = 0;
 
-      for (const item of items) {
-        const currentStock = item.current_stock || 0;
-        
-        console.log(`\nProcessing item: ${item.item_code} (current_stock: ${currentStock})`);
-
-        // Step 2: Get existing allocations for this item WITH bin location info
-        const { data: allocations, error: allocError } = await supabase
-          .from('warehouse_bin_allocations')
-          .select('id, bin_id, allocated_quantity, reserved_quantity, warehouse_bins!inner(location_id, bin_code)')
-          .eq('warehouse_item_id', item.id);
-
-        if (allocError) {
-          console.error(`Error fetching allocations for ${item.item_code}:`, allocError);
+      (rpcResults || []).forEach((r: any) => {
+        if (r.action === 'adjusted' || r.action === 'created') {
+          if (r.action === 'created') createdCount++;
+          else updatedCount++;
+        } else if (r.action === 'blocked' || r.action === 'error') {
           skippedCount++;
-          continue;
         }
-
-        const totalAllocated = allocations?.reduce((sum, a) => sum + (a.allocated_quantity || 0), 0) || 0;
-
-        // If totals match, skip
-        if (totalAllocated === currentStock) {
-          console.log(`Item ${item.item_code}: allocations already match current_stock (${currentStock})`);
-          continue;
-        }
-
-        console.log(`Item ${item.item_code}: mismatch - current_stock=${currentStock}, total_allocated=${totalAllocated}`);
-
-        // Step 3: Filter allocations to only those at the item's location
-        const locationAllocations = (allocations || []).filter(
-          (a: any) => a.warehouse_bins?.location_id === item.location_id
-        );
-
-        // Step 4: Update or create allocation
-        if (locationAllocations.length > 0) {
-          // Adjust the first location-matching allocation to make totals match
-          const otherAllocationsTotal = (allocations || [])
-            .filter((a: any) => a.id !== locationAllocations[0].id)
-            .reduce((sum, a) => sum + (a.allocated_quantity || 0), 0);
-          const firstAllocationNewQty = Math.max(0, currentStock - otherAllocationsTotal);
-          
-          const { error: updateError } = await supabase
-            .from('warehouse_bin_allocations')
-            .update({ allocated_quantity: firstAllocationNewQty })
-            .eq('id', locationAllocations[0].id);
-
-          if (updateError) {
-            console.error(`Error updating allocation for ${item.item_code}:`, updateError);
-            skippedCount++;
-          } else {
-            console.log(`✓ Updated allocation for ${item.item_code}: ${locationAllocations[0].allocated_quantity} -> ${firstAllocationNewQty} (bin: ${locationAllocations[0].bin_id})`);
-            updatedCount++;
-          }
-        } else {
-          // No allocation at correct location — find the primary bin at item's location
-          let targetBinId: string | null = null;
-          if (item.location_id) {
-            const { data: bins } = await supabase
-              .from('warehouse_bins')
-              .select('id')
-              .eq('location_id', item.location_id)
-              .eq('status', 'active')
-              .order('bin_code', { ascending: true })
-              .limit(1);
-            
-            if (bins && bins.length > 0) {
-              targetBinId = bins[0].id;
-            }
-          }
-
-          if (!targetBinId) {
-            console.warn(`No bin found at location for item ${item.item_code} (location_id: ${item.location_id}), skipping`);
-            skippedCount++;
-            continue;
-          }
-
-          // Create new allocation at the correct location bin
-          const { error: insertError } = await supabase
-            .from('warehouse_bin_allocations')
-            .insert({
-              warehouse_item_id: item.id,
-              bin_id: targetBinId,
-              allocated_quantity: currentStock,
-              reserved_quantity: 0,
-              company_id: selectedCompany.id,
-              created_by: user.user?.id,
-            });
-
-          if (insertError) {
-            console.error(`Error creating allocation for ${item.item_code}:`, insertError);
-            skippedCount++;
-          } else {
-            console.log(`✓ Created allocation for ${item.item_code}: ${currentStock} at location bin ${targetBinId}`);
-            createdCount++;
-          }
-        }
-      }
+        console.log(`${r.item_code}: ${r.action} - ${r.message}`);
+      });
 
       console.log(`\n=== Reconciliation complete ===`);
       console.log(`Created: ${createdCount}, Updated: ${updatedCount}, Skipped: ${skippedCount}, Consolidated: ${consolidatedCount}`);
