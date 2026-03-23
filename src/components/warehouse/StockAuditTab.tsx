@@ -39,6 +39,7 @@ import { format, parseISO } from 'date-fns';
 import type { ColumnDef } from '@tanstack/react-table';
 import { AssignLocationDialog } from './AssignLocationDialog';
 import { supabase } from '@/integrations/supabase/client';
+import type { ReconcileOverride } from '@/utils/stockReconciliation';
 
 type FilterValue = 'all' | StockAuditStatus;
 
@@ -128,33 +129,22 @@ function AuditHistoryPanel({ history }: { history: StockAuditLogEntry[] }) {
                     const hasDesyncs = entry.desync_count > 0;
                     return (
                       <tr key={entry.id} className="border-b last:border-0 hover:bg-muted/30 transition-colors">
-                        {/* Date */}
                         <td className="px-3 py-2 whitespace-nowrap font-mono text-xs text-muted-foreground">
                           {format(parseISO(entry.recorded_at), 'yyyy-MM-dd HH:mm')}
                         </td>
-
-                        {/* Total */}
                         <td className="px-3 py-2 text-right tabular-nums">{entry.total_items}</td>
-
-                        {/* In Sync */}
                         <td className="px-3 py-2 text-right tabular-nums text-success">{entry.in_sync_count}</td>
-
-                        {/* Desynced */}
                         <td className="px-3 py-2 text-right tabular-nums">
                           <span className={`inline-flex items-center gap-1 font-medium ${hasDesyncs ? 'text-destructive' : 'text-success'}`}>
                             {entry.desync_count}
                             <TrendIndicator current={entry.desync_count} previous={prev?.desync_count} />
                           </span>
                         </td>
-
-                        {/* No Bins */}
                         <td className="px-3 py-2 text-right tabular-nums">
                           <span className={entry.no_bins_count > 0 ? 'text-warning' : 'text-muted-foreground'}>
                             {entry.no_bins_count}
                           </span>
                         </td>
-
-                        {/* Desynced Items list */}
                         <td className="px-3 py-2">
                           {entry.desynced_items.length === 0 ? (
                             <span className="text-muted-foreground italic text-xs">—</span>
@@ -236,7 +226,7 @@ export function StockAuditTab() {
     });
 
     if (missingLocationItems.length > 0) {
-      // Show location assignment dialog first
+      // Show location+bin assignment dialog first
       setPendingLocationItems(missingLocationItems);
       setPendingFixMode(mode);
       setPendingFixItem(singleItem || null);
@@ -264,13 +254,14 @@ export function StockAuditTab() {
     }
   };
 
-  const handleLocationAssignmentComplete = () => {
-    // After locations are assigned, refetch audit data and then proceed with fix
+  const handleLocationAssignmentComplete = (overrides: Map<string, ReconcileOverride>) => {
+    // After locations + bins are assigned, proceed with reconciliation using overrides
     refetch().then(() => {
       if (pendingFixMode === 'single' && pendingFixItem) {
-        fixDesync(pendingFixItem);
+        const override = overrides.get(pendingFixItem.id);
+        fixDesync(pendingFixItem, override);
       } else {
-        fixAllDesyncs(undefined);
+        fixAllDesyncs(overrides);
       }
       setPendingLocationItems([]);
       setPendingFixItem(null);
@@ -574,7 +565,7 @@ export function StockAuditTab() {
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => {
-                fixAllDesyncs(undefined);
+                fixAllDesyncs();
                 setShowFixAllDialog(false);
               }}
               disabled={isFixingAll}
@@ -585,7 +576,7 @@ export function StockAuditTab() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Assign Location Dialog (pre-fix for items missing location) */}
+      {/* Assign Location + Bin Dialog (pre-fix for items missing location) */}
       <AssignLocationDialog
         items={pendingLocationItems}
         open={showAssignLocationDialog}

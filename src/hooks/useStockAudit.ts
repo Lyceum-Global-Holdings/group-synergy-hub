@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useCompany } from '@/contexts/CompanyContext';
+import { reconcileItem, reconcileItems, type ReconcileOverride, type ReconcileResult } from '@/utils/stockReconciliation';
 
 export type StockAuditStatus = 'ok' | 'desync' | 'no_bins';
 
@@ -73,7 +74,6 @@ export function useStockAudit() {
           .order('id')
           .limit(1000);
 
-        // Filter by company to prevent cross-company inflation
         if (!isViewingAllCompanies && selectedCompany?.id) {
           q = q.eq('company_id', selectedCompany.id);
         }
@@ -90,7 +90,7 @@ export function useStockAudit() {
 
       // Group allocations by item id
       const allocationsByItem = new Map<string, number[]>();
-      (allocations || []).forEach((alloc) => {
+      allocations.forEach((alloc) => {
         if (!allocationsByItem.has(alloc.warehouse_item_id)) {
           allocationsByItem.set(alloc.warehouse_item_id, []);
         }
@@ -148,7 +148,7 @@ export function useStockAudit() {
     mutationFn: async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user || !selectedCompany?.id) return;
-      if (auditItems.length === 0) return; // don't log empty snapshots
+      if (auditItems.length === 0) return;
 
       const desynced = auditItems.filter((i) => i.status === 'desync');
       const noBins = auditItems.filter((i) => i.status === 'no_bins');
@@ -161,18 +161,11 @@ export function useStockAudit() {
         desync_count: summary.desynced,
         no_bins_count: summary.noBins,
         desynced_items: desynced.map((i) => ({
-          id: i.id,
-          item_code: i.item_code,
-          name: i.name,
-          current_stock: i.current_stock,
-          bin_total: i.bin_total,
-          variance: i.variance,
+          id: i.id, item_code: i.item_code, name: i.name,
+          current_stock: i.current_stock, bin_total: i.bin_total, variance: i.variance,
         })),
         no_bins_items: noBins.map((i) => ({
-          id: i.id,
-          item_code: i.item_code,
-          name: i.name,
-          current_stock: i.current_stock,
+          id: i.id, item_code: i.item_code, name: i.name, current_stock: i.current_stock,
         })),
       });
       if (error) throw error;
@@ -180,163 +173,53 @@ export function useStockAudit() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['stock-audit-history', selectedCompany?.id] });
     },
-    // Silently fail — logging is best-effort and shouldn't interrupt the user
     onError: () => {},
   });
 
-  // Helper: create a bin allocation for an item with no bins
-  const createAllocationForNoBinsItem = async (item: StockAuditItem) => {
-    // Look up the item's location_id
-    const { data: itemData, error: itemError } = await supabase
-      .from('warehouse_items')
-      .select('location_id, company_id')
-      .eq('id', item.id)
-      .single();
-
-    if (itemError || !itemData?.location_id) {
-      throw new Error('Could not determine item location.');
-    }
-
-    // Find the first active bin at this location (alphabetical by bin_code)
-    const { data: bins, error: binError } = await supabase
-      .from('warehouse_bins')
-      .select('id')
-      .eq('location_id', itemData.location_id)
-      .eq('status', 'active')
-      .order('bin_code')
-      .limit(1);
-
-    if (binError || !bins || bins.length === 0) {
-      throw new Error('No active bins found at item location. Create a bin first.');
-    }
-
-    const { data: { user } } = await supabase.auth.getUser();
-
-    const { error: insertError } = await supabase
-      .from('warehouse_bin_allocations')
-      .insert({
-        warehouse_item_id: item.id,
-        bin_id: bins[0].id,
-        allocated_quantity: item.current_stock,
-        reserved_quantity: 0,
-        company_id: itemData.company_id,
-        created_by: user?.id || null,
-      });
-
-    if (insertError) throw insertError;
+  const invalidateAll = () => {
+    queryClient.invalidateQueries({ queryKey: ['stock-audit'] });
+    queryClient.invalidateQueries({ queryKey: ['warehouse-bin-allocations'] });
+    queryClient.invalidateQueries({ queryKey: ['warehouse-items'] });
+    queryClient.invalidateQueries({ queryKey: ['all-items-location-stock'] });
   };
 
-  // Fix a single desynced or no_bins item
+  // Fix a single item using the shared engine
   const fixDesyncMutation = useMutation({
-    mutationFn: async (item: StockAuditItem) => {
-      // Handle no_bins: create a new allocation
-      if (item.bin_count === 0) {
-        await createAllocationForNoBinsItem(item);
-        return;
-      }
-
-      // Handle desync: adjust the largest bin allocation so SUM = current_stock
-      const { data: allocations, error: fetchError } = await supabase
-        .from('warehouse_bin_allocations')
-        .select('id, allocated_quantity, reserved_quantity')
-        .eq('warehouse_item_id', item.id)
-        .order('allocated_quantity', { ascending: false });
-
-      if (fetchError) throw fetchError;
-      if (!allocations || allocations.length === 0) {
-        throw new Error('No bin allocations found.');
-      }
-
-      const otherTotal = allocations
-        .slice(1)
-        .reduce((sum, a) => sum + (a.allocated_quantity || 0), 0);
-
-      const newPrimaryQty = Math.max(0, item.current_stock - otherTotal);
-      const primaryAlloc = allocations[0];
-      const newReserved = Math.min(primaryAlloc.reserved_quantity || 0, newPrimaryQty);
-
-      const { error: updateError } = await supabase
-        .from('warehouse_bin_allocations')
-        .update({
-          allocated_quantity: newPrimaryQty,
-          reserved_quantity: newReserved,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', primaryAlloc.id);
-
-      if (updateError) throw updateError;
+    mutationFn: async ({ item, override }: { item: StockAuditItem; override?: ReconcileOverride }) => {
+      if (!selectedCompany?.id) throw new Error('No company selected');
+      return reconcileItem(item, selectedCompany.id, override);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['stock-audit'] });
-      queryClient.invalidateQueries({ queryKey: ['warehouse-bin-allocations'] });
-      queryClient.invalidateQueries({ queryKey: ['warehouse-items'] });
-      toast.success('Stock reconciled — bin allocation updated to match item master');
+    onSuccess: (result: ReconcileResult) => {
+      invalidateAll();
+      if (result.action === 'fixed' || result.action === 'created') {
+        toast.success(`${result.itemCode}: ${result.message}`);
+      } else if (result.action === 'blocked') {
+        toast.warning(`${result.itemCode}: ${result.message}`);
+      } else {
+        toast.error(`${result.itemCode}: ${result.message}`);
+      }
     },
     onError: (error: Error) => {
       toast.error(`Fix failed: ${error.message}`);
     },
   });
 
-  // Fix all desynced and no_bins items at once
+  // Fix all items using the shared engine
   const fixAllDesyncsMutation = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (overrides?: Map<string, ReconcileOverride>) => {
+      if (!selectedCompany?.id) throw new Error('No company selected');
       const itemsToFix = auditItems.filter((i) => i.status === 'desync' || i.status === 'no_bins');
       if (itemsToFix.length === 0) throw new Error('No items to fix.');
-
-      let fixed = 0;
-      let failed = 0;
-
-      for (const item of itemsToFix) {
-        try {
-          if (item.bin_count === 0) {
-            // no_bins: create allocation
-            await createAllocationForNoBinsItem(item);
-            fixed++;
-          } else {
-            // desync: adjust largest allocation
-            const { data: allocations, error: fetchError } = await supabase
-              .from('warehouse_bin_allocations')
-              .select('id, allocated_quantity, reserved_quantity')
-              .eq('warehouse_item_id', item.id)
-              .order('allocated_quantity', { ascending: false });
-
-            if (fetchError || !allocations || allocations.length === 0) {
-              failed++;
-              continue;
-            }
-
-            const otherTotal = allocations
-              .slice(1)
-              .reduce((sum, a) => sum + (a.allocated_quantity || 0), 0);
-            const newPrimaryQty = Math.max(0, item.current_stock - otherTotal);
-            const primaryAlloc = allocations[0];
-            const newReserved = Math.min(primaryAlloc.reserved_quantity || 0, newPrimaryQty);
-
-            const { error: updateError } = await supabase
-              .from('warehouse_bin_allocations')
-              .update({
-                allocated_quantity: newPrimaryQty,
-                reserved_quantity: newReserved,
-                updated_at: new Date().toISOString(),
-              })
-              .eq('id', primaryAlloc.id);
-
-            if (updateError) failed++;
-            else fixed++;
-          }
-        } catch {
-          failed++;
-        }
-      }
-
-      return { fixed, failed };
+      return reconcileItems(itemsToFix, selectedCompany.id, overrides);
     },
     onSuccess: (result) => {
-      queryClient.invalidateQueries({ queryKey: ['stock-audit'] });
-      queryClient.invalidateQueries({ queryKey: ['warehouse-bin-allocations'] });
-      queryClient.invalidateQueries({ queryKey: ['warehouse-items'] });
-      if (result.fixed > 0) toast.success(`Fixed ${result.fixed} item(s)`);
-      if (result.failed > 0) toast.warning(`${result.failed} item(s) could not be fixed`);
+      invalidateAll();
+      const msgs: string[] = [];
+      if (result.fixed > 0) msgs.push(`${result.fixed} adjusted`);
+      if (result.created > 0) msgs.push(`${result.created} allocations created`);
+      if (msgs.length > 0) toast.success(msgs.join(', '));
+      if (result.blocked > 0) toast.warning(`${result.blocked} item(s) blocked — missing location or bins`);
+      if (result.failed > 0) toast.error(`${result.failed} item(s) failed`);
     },
     onError: (error: Error) => {
       toast.error(`Fix all failed: ${error.message}`);
@@ -358,9 +241,9 @@ export function useStockAudit() {
     summary,
     auditHistory,
     logSnapshot: logSnapshotMutation.mutate,
-    fixDesync: fixDesyncMutation.mutate,
+    fixDesync: (item: StockAuditItem, override?: ReconcileOverride) => fixDesyncMutation.mutate({ item, override }),
     isFixingDesync: fixDesyncMutation.isPending,
-    fixAllDesyncs: fixAllDesyncsMutation.mutate,
+    fixAllDesyncs: (overrides?: Map<string, ReconcileOverride>) => fixAllDesyncsMutation.mutate(overrides),
     isFixingAll: fixAllDesyncsMutation.isPending,
   };
 }
