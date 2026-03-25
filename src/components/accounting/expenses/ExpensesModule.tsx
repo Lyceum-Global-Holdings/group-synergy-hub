@@ -25,28 +25,16 @@ export default function ExpensesModule({ activeSubTab, onSubTabChange }: Expense
     <ModuleSubTabs tabs={subTabs} activeTab={effectiveTab} onTabChange={onSubTabChange}>
       <TabsContent value="dashboard"><ExpensesDashboard /></TabsContent>
       <TabsContent value="all">
-        <PlaceholderContent
-          title="All Expenses"
-          description="Consolidated view of all company expenses across categories. Requires expense tracking tables. Coming soon."
-        />
+        <PlaceholderContent title="All Expenses" description="Consolidated view of all company expenses across categories. Requires expense tracking tables. Coming soon." />
       </TabsContent>
       <TabsContent value="bills">
-        <PlaceholderContent
-          title="Company Bills"
-          description="Manage recurring company bills and utility payments. Can be linked to Accounts Payable invoices. Coming soon."
-        />
+        <PlaceholderContent title="Company Bills" description="Manage recurring company bills and utility payments. Can be linked to Accounts Payable invoices. Coming soon." />
       </TabsContent>
       <TabsContent value="petty">
-        <PlaceholderContent
-          title="Petty Cash"
-          description="Manage petty cash funds, vouchers, and replenishments. Requires petty_cash_funds and petty_cash_vouchers tables. Coming soon."
-        />
+        <PlaceholderContent title="Petty Cash" description="Manage petty cash funds, vouchers, and replenishments. Requires petty_cash_funds and petty_cash_vouchers tables. Coming soon." />
       </TabsContent>
       <TabsContent value="advances">
-        <PlaceholderContent
-          title="Staff Advances"
-          description="Track employee advance requests, approvals, and settlements. Requires staff_advances table. Coming soon."
-        />
+        <PlaceholderContent title="Staff Advances" description="Track employee advance requests, approvals, and settlements. Requires staff_advances table. Coming soon." />
       </TabsContent>
     </ModuleSubTabs>
   );
@@ -56,10 +44,10 @@ function ExpensesDashboard() {
   return (
     <div className="space-y-6 mt-4">
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <KPICard title="Total Expenses (MTD)" value="—" icon={DollarSign} />
-        <KPICard title="Pending Approvals" value="—" icon={Receipt} variant="warning" />
-        <KPICard title="Petty Cash Balance" value="—" icon={Wallet} variant="info" />
-        <KPICard title="Outstanding Advances" value="—" icon={CreditCard} variant="danger" />
+        <KPICard label="Total Expenses (MTD)" value="—" icon={DollarSign} />
+        <KPICard label="Pending Approvals" value="—" icon={Receipt} variant="warning" />
+        <KPICard label="Petty Cash Balance" value="—" icon={Wallet} variant="primary" />
+        <KPICard label="Outstanding Advances" value="—" icon={CreditCard} variant="destructive" />
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -77,7 +65,6 @@ function ExpensesDashboard() {
             </div>
           </CardContent>
         </Card>
-
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Top Cost Centers</CardTitle>

@@ -11,11 +11,9 @@ import { useGoodsReceiptNotes, useGrnSummary } from "@/hooks/useGoodsReceiptNote
 import { useCompany } from "@/contexts/CompanyContext";
 import { CreatePrDialog } from "@/components/procurement/CreatePrDialog";
 import { CreatePoDialog } from "@/components/procurement/CreatePoDialog";
-import { PrDetailsDialog } from "@/components/procurement/PrDetailsDialog";
-import { PoDetailsDialog } from "@/components/procurement/PoDetailsDialog";
 import { DataTable } from "@/components/ui/data-table";
 import { Button } from "@/components/ui/button";
-import { Plus, FileText, ShoppingCart, Package, CheckSquare } from "lucide-react";
+import { Plus, FileText, ShoppingCart, Package } from "lucide-react";
 import type { ColumnDef } from "@tanstack/react-table";
 
 interface ProcurementModuleProps {
@@ -51,33 +49,16 @@ export default function ProcurementModule({ activeSubTab, onSubTabChange }: Proc
 function PRTab() {
   const { data: prs = [], isLoading } = usePurchaseRequisitions();
   const [showCreate, setShowCreate] = useState(false);
-  const [selectedPrId, setSelectedPrId] = useState<string | null>(null);
   const formatDate = useFormatDate();
   const formatCurr = useFormatCurrency();
 
   const columns: ColumnDef<any>[] = [
     { accessorKey: "pr_number", header: "PR #" },
     { accessorKey: "title", header: "Title" },
-    {
-      accessorKey: "status",
-      header: "Status",
-      cell: ({ row }) => <StatusBadge status={row.getValue("status")} />,
-    },
-    {
-      accessorKey: "total_estimated_cost",
-      header: "Est. Cost",
-      cell: ({ row }) => formatCurr(row.getValue("total_estimated_cost")),
-    },
-    {
-      accessorKey: "required_date",
-      header: "Required Date",
-      cell: ({ row }) => formatDate(row.getValue("required_date")),
-    },
-    {
-      accessorKey: "created_at",
-      header: "Created",
-      cell: ({ row }) => formatDate(row.getValue("created_at")),
-    },
+    { accessorKey: "status", header: "Status", cell: ({ row }) => <StatusBadge status={row.getValue("status")} /> },
+    { accessorKey: "total_estimated_cost", header: "Est. Cost", cell: ({ row }) => formatCurr(row.getValue("total_estimated_cost")) },
+    { accessorKey: "required_date", header: "Required Date", cell: ({ row }) => formatDate(row.getValue("required_date")) },
+    { accessorKey: "created_at", header: "Created", cell: ({ row }) => formatDate(row.getValue("created_at")) },
   ];
 
   const total = prs.length;
@@ -87,26 +68,17 @@ function PRTab() {
   return (
     <div className="space-y-6 mt-4">
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <KPICard title="Total PRs" value={total} icon={FileText} />
-        <KPICard title="Pending" value={pending} icon={FileText} variant="warning" />
-        <KPICard title="Approved" value={approved} icon={FileText} variant="success" />
+        <KPICard label="Total PRs" value={total} icon={FileText} />
+        <KPICard label="Pending" value={pending} icon={FileText} variant="warning" />
+        <KPICard label="Approved" value={approved} icon={FileText} variant="success" />
         <div className="flex items-end">
           <Button onClick={() => setShowCreate(true)} className="w-full">
             <Plus className="h-4 w-4 mr-2" /> New Requisition
           </Button>
         </div>
       </div>
-
       <DataTable columns={columns} data={prs} isLoading={isLoading} />
-
       <CreatePrDialog open={showCreate} onOpenChange={setShowCreate} />
-      {selectedPrId && (
-        <PrDetailsDialog
-          open={!!selectedPrId}
-          onOpenChange={() => setSelectedPrId(null)}
-          prId={selectedPrId}
-        />
-      )}
     </div>
   );
 }
@@ -115,53 +87,31 @@ function POTab() {
   const { data: pos = [], isLoading } = usePurchaseOrders();
   const { data: stats } = usePoSummaryStats();
   const [showCreate, setShowCreate] = useState(false);
-  const [selectedPoId, setSelectedPoId] = useState<string | null>(null);
   const formatDate = useFormatDate();
   const formatCurr = useFormatCurrency();
 
   const columns: ColumnDef<any>[] = [
     { accessorKey: "po_number", header: "PO #" },
     { accessorKey: "supplier_name", header: "Supplier" },
-    {
-      accessorKey: "status",
-      header: "Status",
-      cell: ({ row }) => <StatusBadge status={row.getValue("status")} />,
-    },
-    {
-      accessorKey: "total_amount",
-      header: "Total",
-      cell: ({ row }) => formatCurr(row.getValue("total_amount")),
-    },
-    {
-      accessorKey: "order_date",
-      header: "Order Date",
-      cell: ({ row }) => formatDate(row.getValue("order_date")),
-    },
+    { accessorKey: "status", header: "Status", cell: ({ row }) => <StatusBadge status={row.getValue("status")} /> },
+    { accessorKey: "total_amount", header: "Total", cell: ({ row }) => formatCurr(row.getValue("total_amount")) },
+    { accessorKey: "order_date", header: "Order Date", cell: ({ row }) => formatDate(row.getValue("order_date")) },
   ];
 
   return (
     <div className="space-y-6 mt-4">
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <KPICard title="Total POs" value={stats?.total || pos.length} icon={ShoppingCart} />
-        <KPICard title="Pending" value={stats?.pending || 0} icon={ShoppingCart} variant="warning" />
-        <KPICard title="Approved" value={stats?.approved || 0} icon={ShoppingCart} variant="success" />
+        <KPICard label="Total POs" value={stats?.total_pos || pos.length} icon={ShoppingCart} />
+        <KPICard label="Pending" value={stats?.pending_approval_pos || 0} icon={ShoppingCart} variant="warning" />
+        <KPICard label="Approved" value={stats?.approved_pos || 0} icon={ShoppingCart} variant="success" />
         <div className="flex items-end">
           <Button onClick={() => setShowCreate(true)} className="w-full">
             <Plus className="h-4 w-4 mr-2" /> New Order
           </Button>
         </div>
       </div>
-
       <DataTable columns={columns} data={pos} isLoading={isLoading} />
-
       <CreatePoDialog open={showCreate} onOpenChange={setShowCreate} />
-      {selectedPoId && (
-        <PoDetailsDialog
-          open={!!selectedPoId}
-          onOpenChange={() => setSelectedPoId(null)}
-          poId={selectedPoId}
-        />
-      )}
     </div>
   );
 }
@@ -176,27 +126,18 @@ function GRNTab() {
     { accessorKey: "grn_number", header: "GRN #" },
     { accessorKey: "po_number", header: "PO #" },
     { accessorKey: "supplier_name", header: "Supplier" },
-    {
-      accessorKey: "status",
-      header: "Status",
-      cell: ({ row }) => <StatusBadge status={row.getValue("status")} />,
-    },
-    {
-      accessorKey: "received_date",
-      header: "Received",
-      cell: ({ row }) => formatDate(row.getValue("received_date")),
-    },
+    { accessorKey: "status", header: "Status", cell: ({ row }) => <StatusBadge status={row.getValue("status")} /> },
+    { accessorKey: "received_date", header: "Received", cell: ({ row }) => formatDate(row.getValue("received_date")) },
   ];
 
   return (
     <div className="space-y-6 mt-4">
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <KPICard title="Total GRNs" value={summary?.total || grns.length} icon={Package} />
-        <KPICard title="Pending QC" value={summary?.pending_qc || 0} icon={Package} variant="warning" />
-        <KPICard title="Completed" value={summary?.completed || 0} icon={Package} variant="success" />
-        <KPICard title="Issues" value={summary?.with_issues || 0} icon={Package} variant="danger" />
+        <KPICard label="Total GRNs" value={summary?.total_grns || grns.length} icon={Package} />
+        <KPICard label="Pending Approval" value={summary?.pending_approval || 0} icon={Package} variant="warning" />
+        <KPICard label="Approved This Month" value={summary?.approved_this_month || 0} icon={Package} variant="success" />
+        <KPICard label="Total Value" value={summary?.total_value?.toLocaleString() || "0"} icon={Package} variant="primary" />
       </div>
-
       <DataTable columns={columns} data={grns} isLoading={isLoading} />
     </div>
   );

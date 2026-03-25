@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { TabsContent } from "@/components/ui/tabs";
 import { ModuleSubTabs } from "../ModuleSubTabs";
 import { KPICard } from "../KPICard";
@@ -44,25 +43,16 @@ function InspectionsTab() {
     { accessorKey: "inspection_number", header: "Inspection #" },
     { accessorKey: "inspection_type", header: "Type" },
     { accessorKey: "item_description", header: "Item / Area" },
-    {
-      accessorKey: "status",
-      header: "Status",
-      cell: ({ row }) => <StatusBadge status={row.getValue("status")} />,
-    },
+    { accessorKey: "status", header: "Status", cell: ({ row }) => <StatusBadge status={row.getValue("status")} /> },
     {
       accessorKey: "result",
       header: "Result",
       cell: ({ row }) => {
         const result = row.getValue("result") as string;
-        if (!result) return "—";
-        return <StatusBadge status={result} />;
+        return result ? <StatusBadge status={result} /> : <span className="text-muted-foreground">—</span>;
       },
     },
-    {
-      accessorKey: "inspection_date",
-      header: "Date",
-      cell: ({ row }) => formatDate(row.getValue("inspection_date")),
-    },
+    { accessorKey: "inspection_date", header: "Date", cell: ({ row }) => formatDate(row.getValue("inspection_date")) },
   ];
 
   const total = inspections.length;
@@ -73,10 +63,10 @@ function InspectionsTab() {
   return (
     <div className="space-y-6 mt-4">
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <KPICard title="Total Inspections" value={total} icon={ClipboardCheck} />
-        <KPICard title="Pending" value={pending} icon={AlertTriangle} variant="warning" />
-        <KPICard title="Accepted" value={accepted} icon={CheckCircle} variant="success" />
-        <KPICard title="Rejected" value={rejected} icon={XCircle} variant="danger" />
+        <KPICard label="Total Inspections" value={total} icon={ClipboardCheck} />
+        <KPICard label="Pending" value={pending} icon={AlertTriangle} variant="warning" />
+        <KPICard label="Accepted" value={accepted} icon={CheckCircle} variant="success" />
+        <KPICard label="Rejected" value={rejected} icon={XCircle} variant="destructive" />
       </div>
       <DataTable columns={columns} data={inspections} isLoading={isLoading} />
     </div>

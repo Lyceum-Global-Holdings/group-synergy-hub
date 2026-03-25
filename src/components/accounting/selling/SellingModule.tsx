@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { TabsContent } from "@/components/ui/tabs";
 import { ModuleSubTabs } from "../ModuleSubTabs";
 import { KPICard } from "../KPICard";
@@ -43,21 +42,9 @@ function SalesOrdersTab() {
   const columns: ColumnDef<any>[] = [
     { accessorKey: "order_number", header: "SO #" },
     { accessorKey: "customer_name", header: "Customer" },
-    {
-      accessorKey: "status",
-      header: "Status",
-      cell: ({ row }) => <StatusBadge status={row.getValue("status")} />,
-    },
-    {
-      accessorKey: "total_amount",
-      header: "Total",
-      cell: ({ row }) => formatCurr(row.getValue("total_amount")),
-    },
-    {
-      accessorKey: "order_date",
-      header: "Order Date",
-      cell: ({ row }) => formatDate(row.getValue("order_date")),
-    },
+    { accessorKey: "status", header: "Status", cell: ({ row }) => <StatusBadge status={row.getValue("status")} /> },
+    { accessorKey: "total_amount", header: "Total", cell: ({ row }) => formatCurr(row.getValue("total_amount")) },
+    { accessorKey: "order_date", header: "Order Date", cell: ({ row }) => formatDate(row.getValue("order_date")) },
   ];
 
   const total = salesOrders.length;
@@ -67,9 +54,9 @@ function SalesOrdersTab() {
   return (
     <div className="space-y-6 mt-4">
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <KPICard title="Total Orders" value={total} icon={ShoppingBag} />
-        <KPICard title="Pending" value={pending} icon={ShoppingBag} variant="warning" />
-        <KPICard title="Completed" value={completed} icon={ShoppingBag} variant="success" />
+        <KPICard label="Total Orders" value={total} icon={ShoppingBag} />
+        <KPICard label="Pending" value={pending} icon={ShoppingBag} variant="warning" />
+        <KPICard label="Completed" value={completed} icon={ShoppingBag} variant="success" />
       </div>
       <DataTable columns={columns} data={salesOrders} isLoading={isLoading} />
     </div>
@@ -85,16 +72,8 @@ function DeliveryNotesTab() {
   const columns: ColumnDef<any>[] = [
     { accessorKey: "delivery_number", header: "DN #" },
     { accessorKey: "sales_order_number", header: "SO #" },
-    {
-      accessorKey: "status",
-      header: "Status",
-      cell: ({ row }) => <StatusBadge status={row.getValue("status")} />,
-    },
-    {
-      accessorKey: "delivery_date",
-      header: "Delivery Date",
-      cell: ({ row }) => formatDate(row.getValue("delivery_date")),
-    },
+    { accessorKey: "status", header: "Status", cell: ({ row }) => <StatusBadge status={row.getValue("status")} /> },
+    { accessorKey: "delivery_date", header: "Delivery Date", cell: ({ row }) => formatDate(row.getValue("delivery_date")) },
   ];
 
   const total = deliveryOrders.length;
@@ -103,9 +82,9 @@ function DeliveryNotesTab() {
   return (
     <div className="space-y-6 mt-4">
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <KPICard title="Total Deliveries" value={total} icon={Truck} />
-        <KPICard title="Dispatched" value={dispatched} icon={Truck} variant="success" />
-        <KPICard title="Pending" value={total - dispatched} icon={Truck} variant="warning" />
+        <KPICard label="Total Deliveries" value={total} icon={Truck} />
+        <KPICard label="Dispatched" value={dispatched} icon={Truck} variant="success" />
+        <KPICard label="Pending" value={total - dispatched} icon={Truck} variant="warning" />
       </div>
       <DataTable columns={columns} data={deliveryOrders} isLoading={isLoading} />
     </div>
@@ -120,16 +99,8 @@ function PickListsTab() {
   const columns: ColumnDef<any>[] = [
     { accessorKey: "pick_list_number", header: "Pick List #" },
     { accessorKey: "sales_order_number", header: "SO #" },
-    {
-      accessorKey: "status",
-      header: "Status",
-      cell: ({ row }) => <StatusBadge status={row.getValue("status")} />,
-    },
-    {
-      accessorKey: "created_at",
-      header: "Created",
-      cell: ({ row }) => formatDate(row.getValue("created_at")),
-    },
+    { accessorKey: "status", header: "Status", cell: ({ row }) => <StatusBadge status={row.getValue("status")} /> },
+    { accessorKey: "created_at", header: "Created", cell: ({ row }) => formatDate(row.getValue("created_at")) },
   ];
 
   const total = pickLists.length;
@@ -138,9 +109,9 @@ function PickListsTab() {
   return (
     <div className="space-y-6 mt-4">
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <KPICard title="Total Pick Lists" value={total} icon={ClipboardList} />
-        <KPICard title="In Progress" value={inProgress} icon={ClipboardList} variant="warning" />
-        <KPICard title="Completed" value={total - inProgress} icon={ClipboardList} variant="success" />
+        <KPICard label="Total Pick Lists" value={total} icon={ClipboardList} />
+        <KPICard label="In Progress" value={inProgress} icon={ClipboardList} variant="warning" />
+        <KPICard label="Completed" value={total - inProgress} icon={ClipboardList} variant="success" />
       </div>
       <DataTable columns={columns} data={pickLists} isLoading={isLoading} />
     </div>
