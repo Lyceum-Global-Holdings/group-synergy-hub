@@ -1,41 +1,66 @@
 
 
-## Add Error Boundaries and User-Friendly Error Messages to Finance Reports
+## Build 3-Way Matching Function
 
-### Problem
-Currently, report components show raw error messages (`error.message`) directly to the user, and there are no React Error Boundaries to catch rendering crashes. A database or network error displays unfriendly text like "column coa.parent_id does not exist".
+### Overview
+Build a fully functional 3-way matching system that compares **Purchase Orders**, **Goods Receipt Notes (GRNs)**, and **Supplier Invoices** at line-item level, detecting quantity and price discrepancies and enabling approval or exception workflows.
 
-### Plan
+### Existing Schema (no migrations needed)
+The database already supports this:
+- `supplier_invoices` has `po_id`, `grn_id`, and `three_way_match_status` columns
+- `po_items` has `quantity_ordered`, `unit_price`, `item_name`, `item_code`
+- `grn_items` has `quantity_received`, `unit_price`, linked via `po_item_id`
+- `supplier_invoice_lines` has `quantity`, `unit_price`, linked via `invoice_id`
 
-**1. Create a reusable `ReportErrorBoundary` component**
-- File: `src/components/finance/reports/ReportErrorBoundary.tsx`
-- React class component implementing `componentDidCatch`
-- Renders a styled Card with an alert icon, friendly title ("Something went wrong"), a human-readable description, a "Try Again" button that resets the boundary, and a collapsible "Technical Details" section showing the raw error
-- Accepts optional `onReset` callback prop
+### Implementation Plan
 
-**2. Create a reusable `ReportErrorMessage` inline component**
-- File: `src/components/finance/reports/ReportErrorMessage.tsx`
-- Functional component for query-level errors (the current inline `error` states)
-- Maps common error patterns to friendly messages (e.g., "column ... does not exist" → "Report configuration issue — please contact support", network errors → "Unable to connect", permission errors → "You don't have access")
-- Shows a retry button using react-query's `refetch`
-- Renders as a styled Alert with icon, not raw red text
+**1. Create `useThreeWayMatch` hook** (`src/hooks/useThreeWayMatch.ts`)
+- Fetch supplier invoices that have a `po_id` set, joining PO details, GRN details, and their respective line items
+- Compute match status per invoice by comparing:
+  - PO item qty/price vs GRN item qty/price (quantity received matches ordered)
+  - PO item qty/price vs Invoice line qty/price (billed matches ordered)
+  - Allow configurable tolerance (e.g., 2% price variance, 0 qty variance)
+- Return match results with discrepancy details per line item
+- Provide mutations: `approveMatch` (sets `three_way_match_status` to 'matched'), `flagException`, `rejectMatch`
+- Dashboard stats query: count by `three_way_match_status`
 
-**3. Update 4 report components to use both**
-- `ProfitLossReport.tsx`, `BalanceSheetReport.tsx`, `CashFlowReport.tsx`, `AgingReport.tsx`
-- Wrap each report's return in `<ReportErrorBoundary>` for crash protection
-- Replace the inline `error.message` divs with `<ReportErrorMessage error={error} onRetry={refetch} />`
+**2. Rebuild `ThreeWayMatch.tsx` page** (`src/pages/procurement/ThreeWayMatch.tsx`)
+- **KPI Cards**: Live counts from DB (Pending, Matched, Exception, Failed)
+- **Tabs**: Pending / Matched / Exceptions / Failed -- each showing a DataTable of invoices
+- **Table columns**: Invoice #, PO #, GRN #, Supplier, PO Amount, GRN Amount, Invoice Amount, Variance %, Status, Actions
+- **Match Detail Dialog**: Clicking a row opens a side-by-side comparison showing:
+  - Left column: PO line items (item, qty ordered, unit price)
+  - Middle column: GRN line items (qty received, unit price)
+  - Right column: Invoice lines (qty billed, unit price)
+  - Color-coded cells: green (match), amber (within tolerance), red (mismatch)
+  - Action buttons: Approve Match, Flag Exception, Reject
+- **Auto-Match button**: Runs matching logic on all pending invoices with linked PO+GRN, auto-approves perfect matches
 
-**4. Wrap the `ReportsModule` tabs content**
-- Add a top-level `<ReportErrorBoundary>` around each `<TabsContent>` that renders a live report, so any unhandled crash in a single tab doesn't break the entire module
+**3. Create `ThreeWayMatchDetail` component** (`src/components/procurement/ThreeWayMatchDetail.tsx`)
+- Three-column comparison table with variance calculations
+- Visual indicators (icons + colors) for match/mismatch per line
+- Summary row showing totals and overall match percentage
+- Notes field for exception reasoning
 
-### Files to Create
-- `src/components/finance/reports/ReportErrorBoundary.tsx`
-- `src/components/finance/reports/ReportErrorMessage.tsx`
+### Technical Details
 
-### Files to Edit
-- `src/components/finance/reports/ProfitLossReport.tsx` — wrap + replace error div
-- `src/components/finance/reports/BalanceSheetReport.tsx` — wrap + replace error div
-- `src/components/finance/reports/CashFlowReport.tsx` — wrap + replace error div
-- `src/components/finance/reports/AgingReport.tsx` — wrap + replace error div
-- `src/components/accounting/reports/ReportsModule.tsx` — wrap tab contents
+**Match Logic** (in hook):
+```
+For each supplier_invoice with po_id:
+  1. Fetch po_items for that PO
+  2. Fetch grn_items where grn_id = invoice.grn_id (or grn.po_id = invoice.po_id)
+  3. Match lines by item_code or po_item_id
+  4. Compare: qty_ordered vs qty_received vs qty_billed
+  5. Compare: po_unit_price vs grn_unit_price vs invoice_unit_price
+  6. If all lines match within tolerance → "matched"
+  7. If any line has variance → "exception"  
+  8. If no GRN or PO found → "unmatched"
+```
+
+**Files to create:**
+- `src/hooks/useThreeWayMatch.ts`
+- `src/components/procurement/ThreeWayMatchDetail.tsx`
+
+**Files to edit:**
+- `src/pages/procurement/ThreeWayMatch.tsx` (full rebuild)
 
