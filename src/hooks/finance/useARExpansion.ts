@@ -171,11 +171,11 @@ export function useARStats() {
       const [invoices, receipts, customers] = await Promise.all([
         supabase
           .from("customer_invoices")
-          .select("status, total_amount, amount_paid")
+          .select("status, gross_amount, amount_received")
           .eq("company_id", selectedCompany!.id),
         supabase
           .from("customer_receipts")
-          .select("status, amount")
+          .select("status, total_amount")
           .eq("company_id", selectedCompany!.id),
         supabase
           .from("customers")
@@ -187,10 +187,10 @@ export function useARStats() {
       const totalInvoices = invoices.data.length;
       const unpaid = invoices.data.filter((i) => i.status !== "paid" && i.status !== "cancelled");
       const outstandingAmount = unpaid.reduce(
-        (s, i) => s + (Number(i.total_amount || 0) - Number(i.amount_paid || 0)), 0
+        (s, i) => s + (Number(i.gross_amount || 0) - Number(i.amount_received || 0)), 0
       );
       const totalReceipts = receipts.data?.length || 0;
-      const totalReceived = receipts.data?.reduce((s, r) => s + Number(r.amount || 0), 0) || 0;
+      const totalReceived = receipts.data?.reduce((s, r) => s + Number(r.total_amount || 0), 0) || 0;
       const totalCustomers = customers.data?.length || 0;
       const activeCustomers = customers.data?.filter((c: any) => c.status === "active").length || 0;
 
