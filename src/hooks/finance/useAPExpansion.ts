@@ -9,13 +9,13 @@ export function useDebitNotes() {
   return useQuery({
     queryKey: ["debit-notes", selectedCompany?.id],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from("debit_notes")
         .select("*, supplier:suppliers(supplier_name)")
         .eq("company_id", selectedCompany!.id)
         .order("debit_date", { ascending: false });
       if (error) throw error;
-      return data;
+      return data as any[];
     },
     enabled: !!selectedCompany?.id,
   });
@@ -26,15 +26,16 @@ export function useDebitNoteStats() {
   return useQuery({
     queryKey: ["debit-note-stats", selectedCompany?.id],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from("debit_notes")
         .select("status, amount")
         .eq("company_id", selectedCompany!.id);
       if (error) throw error;
-      const total = data.length;
-      const draft = data.filter((d) => d.status === "draft").length;
-      const applied = data.filter((d) => d.status === "applied").length;
-      const totalAmount = data.reduce((s, d) => s + Number(d.amount || 0), 0);
+      const items = (data || []) as any[];
+      const total = items.length;
+      const draft = items.filter((d) => d.status === "draft").length;
+      const applied = items.filter((d) => d.status === "applied").length;
+      const totalAmount = items.reduce((s, d) => s + Number(d.amount || 0), 0);
       return { total, draft, applied, totalAmount };
     },
     enabled: !!selectedCompany?.id,
@@ -46,7 +47,7 @@ export function useCreateDebitNote() {
   const { selectedCompany } = useCompany();
   return useMutation({
     mutationFn: async (values: Record<string, any>) => {
-      const { error } = await supabase.from("debit_notes").insert({
+      const { error } = await (supabase as any).from("debit_notes").insert({
         ...values,
         company_id: selectedCompany!.id,
       });
@@ -67,13 +68,13 @@ export function useVendorAdvances() {
   return useQuery({
     queryKey: ["vendor-advances", selectedCompany?.id],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from("vendor_advances")
         .select("*, supplier:suppliers(supplier_name)")
         .eq("company_id", selectedCompany!.id)
         .order("advance_date", { ascending: false });
       if (error) throw error;
-      return data;
+      return data as any[];
     },
     enabled: !!selectedCompany?.id,
   });
@@ -84,15 +85,16 @@ export function useVendorAdvanceStats() {
   return useQuery({
     queryKey: ["vendor-advance-stats", selectedCompany?.id],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from("vendor_advances")
         .select("status, amount, remaining_amount")
         .eq("company_id", selectedCompany!.id);
       if (error) throw error;
-      const total = data.length;
-      const outstanding = data.reduce((s, d) => s + Number(d.remaining_amount || 0), 0);
-      const totalAdvanced = data.reduce((s, d) => s + Number(d.amount || 0), 0);
-      const pending = data.filter((d) => d.status === "pending").length;
+      const items = (data || []) as any[];
+      const total = items.length;
+      const outstanding = items.reduce((s, d) => s + Number(d.remaining_amount || 0), 0);
+      const totalAdvanced = items.reduce((s, d) => s + Number(d.amount || 0), 0);
+      const pending = items.filter((d) => d.status === "pending").length;
       return { total, outstanding, totalAdvanced, pending };
     },
     enabled: !!selectedCompany?.id,
@@ -104,7 +106,7 @@ export function useCreateVendorAdvance() {
   const { selectedCompany } = useCompany();
   return useMutation({
     mutationFn: async (values: Record<string, any>) => {
-      const { error } = await supabase.from("vendor_advances").insert({
+      const { error } = await (supabase as any).from("vendor_advances").insert({
         ...values,
         company_id: selectedCompany!.id,
         remaining_amount: values.amount,
@@ -126,13 +128,13 @@ export function useWHTCertificates() {
   return useQuery({
     queryKey: ["wht-certificates", selectedCompany?.id],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from("wht_certificates")
         .select("*, supplier:suppliers(supplier_name)")
         .eq("company_id", selectedCompany!.id)
         .order("certificate_date", { ascending: false });
       if (error) throw error;
-      return data;
+      return data as any[];
     },
     enabled: !!selectedCompany?.id,
   });
@@ -143,14 +145,15 @@ export function useWHTStats() {
   return useQuery({
     queryKey: ["wht-stats", selectedCompany?.id],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from("wht_certificates")
         .select("status, wht_amount")
         .eq("company_id", selectedCompany!.id);
       if (error) throw error;
-      const total = data.length;
-      const totalWHT = data.reduce((s, d) => s + Number(d.wht_amount || 0), 0);
-      const draft = data.filter((d) => d.status === "draft").length;
+      const items = (data || []) as any[];
+      const total = items.length;
+      const totalWHT = items.reduce((s, d) => s + Number(d.wht_amount || 0), 0);
+      const draft = items.filter((d) => d.status === "draft").length;
       return { total, totalWHT, draft };
     },
     enabled: !!selectedCompany?.id,
@@ -162,7 +165,7 @@ export function useCreateWHTCertificate() {
   const { selectedCompany } = useCompany();
   return useMutation({
     mutationFn: async (values: Record<string, any>) => {
-      const { error } = await supabase.from("wht_certificates").insert({
+      const { error } = await (supabase as any).from("wht_certificates").insert({
         ...values,
         company_id: selectedCompany!.id,
       });
@@ -209,7 +212,7 @@ export function useAPStats() {
       const totalPayments = payments.data.length;
       const totalPaid = payments.data.reduce((s, p) => s + Number(p.total_amount || 0), 0);
       const totalSuppliers = suppliers.data?.length || 0;
-      const activeSuppliers = suppliers.data?.filter((s) => s.status === "active").length || 0;
+      const activeSuppliers = suppliers.data?.filter((s: any) => s.status === "active").length || 0;
 
       return { totalInvoices, outstandingAmount, totalPayments, totalPaid, totalSuppliers, activeSuppliers };
     },
