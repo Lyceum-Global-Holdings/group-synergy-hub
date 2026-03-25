@@ -51,7 +51,10 @@ export default function BankingModule({ activeSubTab, onSubTabChange }: BankingM
         </TabsContent>
 
         <TabsContent value="reconciliation" className="mt-4">
-          <BankStatementImport />
+          <PlaceholderContent
+            title="Bank Reconciliation"
+            description="Select a bank account from the Bank Accounts tab to start reconciliation. Import bank statements and match transactions."
+          />
         </TabsContent>
       </ModuleSubTabs>
 
