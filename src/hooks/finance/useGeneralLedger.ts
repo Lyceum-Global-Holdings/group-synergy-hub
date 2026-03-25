@@ -13,7 +13,7 @@ export function useGeneralLedger(accountId?: string, dateRange?: { start: string
         .select(`
           *,
           journal_entry:journal_entries!inner(
-            entry_number, entry_date, description, status, source_type
+            journal_number, journal_date, description, status, journal_type
           ),
           account:chart_of_accounts!inner(
             account_code, account_name, account_type
@@ -28,10 +28,10 @@ export function useGeneralLedger(accountId?: string, dateRange?: { start: string
         query = query.eq("account_id", accountId);
       }
       if (dateRange?.start) {
-        query = query.gte("journal_entries.entry_date", dateRange.start);
+        query = query.gte("journal_entries.journal_date", dateRange.start);
       }
       if (dateRange?.end) {
-        query = query.lte("journal_entries.entry_date", dateRange.end);
+        query = query.lte("journal_entries.journal_date", dateRange.end);
       }
 
       const { data, error } = await query.order("created_at", { ascending: false }).limit(500);
