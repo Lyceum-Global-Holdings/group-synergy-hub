@@ -1,84 +1,104 @@
 
 
-## Plan: Rebuild Finance Module to Match StoresONE Structure
+## Phase 2: Flesh Out Placeholder Modules
 
-### What Changes
+### Overview
+Replace the 6 placeholder modules (Selling, Expenses, Inventory, Procurement, Quality, Automation) with full sub-tabbed implementations matching StoresONE's structure. This requires creating missing shared utilities and adapting each module to use existing hooks/components where available.
 
-Replace the current multi-page Finance module (11 separate pages at `/finance/*`) with a single unified **Finance & Accounting** page at `/finance` (or `/accounting`) using a tabbed interface, matching the StoresONE architecture.
+### Prerequisites: Missing Shared Utilities
 
-### Current vs Target Structure
+**Create these first** (StoresONE has them, this project doesn't):
 
-```text
-CURRENT (11 separate pages)          TARGET (1 page, 13 tabs with sub-tabs)
-/finance/general-ledger              /finance?tab=gl     (Dashboard, COA, Journal Entries, Recurring, Periods, Currencies, Period Closing, Approvals)
-/finance/accounts-payable            /finance?tab=ap     (Dashboard, Invoices, Payments, Debit Notes, Advances, WHT, Aging, Vendor Payment Center)
-/finance/accounts-receivable         /finance?tab=ar     (Dashboard, Invoices, Receipts, Credit Notes, Advances, Bad Debt, Aging, Reconciliation)
-/finance/cash-bank                   /finance?tab=banking (Dashboard, Accounts, Transactions, Cheques, Transfers, Batches, Reconciliation, Rules)
-/finance/fixed-assets                /finance?tab=assets (Asset Register, Depreciation)
-/finance/budgeting                   (merged into settings/costing)
-/finance/cost-centers                (merged into GL or settings)
-/finance/reporting                   /finance?tab=reports (Trial Balance, Financial Statements, Cash Flow, Variance, Tax, Audit, etc.)
-/finance/bank-reconciliation         (merged into banking tab)
-/finance/payments                    (merged into AP tab)
-/finance/settings                    /finance?tab=settings (Companies, Account Mapping, Payment Terms, Tax, Templates, etc.)
-NEW TABS:                            /finance?tab=selling, expenses, inventory, procurement, quality, automation
-```
+1. **`src/components/shared/DataTable.tsx`** -- Generic table component with row click support (used by Selling, Quality, Automation modules)
+2. **`src/components/shared/StatusBadge.tsx`** -- Reusable status badge with color mapping
+3. **`src/lib/exportUtils.ts`** -- `exportToExcel()` function for CSV/Excel exports
+4. **`src/lib/formatters.ts`** -- `useFormatCurrency()` and `useFormatDate()` hooks wrapping existing `formatCurrency` from `utils.ts`
 
-### Scope -- This is Very Large (~100+ files)
+### Module Implementations
 
-Given the massive scale (StoresONE has ~120 component files in `src/components/accounting/`), I recommend a **phased approach**:
+#### 1. Procurement Module (most hooks exist)
+**Sub-tabs:** Purchase Requisitions, Purchase Orders, Goods Receipt Notes, Invoice Matching
 
-**Phase 1 (this implementation):** Create the structural foundation
-- Unified `Accounting` page with all 13 primary tabs
-- Shared components: `KPICard`, `ModuleSubTabs`, `PlaceholderContent`, `QuickActions`
-- Shared utility components: `CreatedByCell`, `AccountCombobox`, `CostCenterCombobox`
-- **GL Module** -- fully functional (reuses existing `useChartOfAccounts`, `useJournalEntries`, `ChartOfAccountsTab`)
-- **AP Module** -- fully functional (reuses existing AP components from `src/components/finance/ap/`)
-- **AR Module** -- fully functional (reuses existing AR components from `src/components/finance/ar/`)
-- **Banking Module** -- fully functional (reuses existing bank components from `src/components/finance/bank/`)
-- **Fixed Assets Module** -- fully functional (reuses existing `src/components/finance/assets/`)
-- **Reports Module** -- fully functional (reuses existing `src/components/finance/reports/`)
-- **Settings Module** -- fully functional (reuses existing `src/components/finance/settings/`)
-- **Selling, Expenses, Inventory, Procurement, Quality, Automation** -- placeholder modules
-- Update routing: single `/finance` route, redirect old routes
-- Update `moduleConfig.ts` sidebar to single "Finance & Accounting" entry
+- Reuse existing: `usePurchaseRequisitions`, `usePurchaseOrders`, `useGoodsReceiptNotes`
+- Reuse existing dialogs: `CreatePrDialog`, `CreatePoDialog`, `PrDetailsDialog`, `PoDetailsDialog`
+- Create: `GRNDetailsPanel` (simple sheet showing GRN details)
+- Invoice Matching tab: KPI cards + placeholder for 3-way match interface
 
-**Phase 2 (follow-up):** Flesh out placeholder modules and add missing hooks (`useGeneralLedger`, `useLedgerTotals`, `useCostCenters`, GL posting service, etc.)
+#### 2. Selling Module (partially available via usePickPack)
+**Sub-tabs:** Sales Orders, Delivery Notes, Pick Lists
 
-### Files to Create
+- Adapt `usePickPack().useSalesOrders()` for the orders tab
+- Delivery Notes: reuse existing delivery order data from `useDeliveryOrders`
+- Pick Lists: filter confirmed/picking orders from sales orders
+- Create: `SalesOrderFormDialog` (simple dialog) or link to existing pick-pack workflow
+- Details: reuse existing `SalesOrderDetailsDialog`
 
-1. `src/pages/Accounting.tsx` -- Main unified page with 13 tabs
-2. `src/components/accounting/KPICard.tsx`
-3. `src/components/accounting/ModuleSubTabs.tsx`
-4. `src/components/accounting/PlaceholderContent.tsx`
-5. `src/components/accounting/QuickActions.tsx`
-6. `src/components/accounting/gl/GLModule.tsx`
-7. `src/components/accounting/ap/APModule.tsx`
-8. `src/components/accounting/ar/ARModule.tsx`
-9. `src/components/accounting/banking/BankingModule.tsx`
-10. `src/components/accounting/assets/FixedAssetsModule.tsx`
-11. `src/components/accounting/reports/ReportsModule.tsx`
-12. `src/components/accounting/settings/SettingsModule.tsx`
-13. `src/components/accounting/selling/SellingModule.tsx`
-14. `src/components/accounting/expenses/ExpensesModule.tsx`
-15. `src/components/accounting/inventory/InventoryModule.tsx`
-16. `src/components/accounting/procurement/ProcurementModule.tsx`
-17. `src/components/accounting/quality/QualityModule.tsx`
-18. `src/components/accounting/automation/AutomationModule.tsx`
+#### 3. Inventory Module (warehouse hooks available)
+**Sub-tabs:** Items, Stock Levels, Batch/Serial Tracking, Inventory Ageing, Stock Reconciliation
 
-### Files to Modify
+- Items tab: use `useWarehouseItems` or `useWarehouseItemsPaged` for item listing
+- Stock Levels: use `useWarehouseBinAllocations` for stock data
+- Batch Tracking tab: create `BatchTrackingTab` using `useBatches`
+- Ageing tab: create `InventoryAgeingTab` using `useInventoryValuation`
+- Reconciliation tab: create `StockReconciliationTab` using `useStockAudit`
 
-1. `src/App.tsx` -- Replace 11 finance routes with single `/finance` route + redirects
-2. `src/constants/moduleConfig.ts` -- Replace finance sub-modules with single entry pointing to `/finance`
+#### 4. Quality Module (construction quality hooks exist)
+**Sub-tabs:** Quality Inspections, Inspection Templates
 
-### Files to Remove (old finance pages)
+- Adapt `useQualityInspections` from `src/hooks/construction/useQualityInspections.ts`
+- Inspections table with KPI cards (total, pending, accepted, rejected)
+- Templates tab with template listing
+- Create `InspectionDetailsPanel` (sheet with inspection details)
 
-All 11 files in `src/pages/finance/` will no longer be used as standalone pages. Existing components in `src/components/finance/` will be **kept and reused** by the new module wrappers.
+#### 5. Expenses Module (needs new hooks + tables)
+**Sub-tabs:** Dashboard, All Expenses, Company Bills, Petty Cash, Staff Advances
 
-### Key Technical Notes
+- **Company Bills** tab can reuse existing AP invoice data from `useSupplierInvoices` (finance/ap)
+- **Dashboard, Petty Cash, Staff Advances** require new database tables and hooks that don't exist yet
+- Approach: Build the full UI structure with sub-tabs, KPI cards, and tables. Wire Company Bills to existing AP data. Other tabs show "Coming soon" empty states with proper UI structure (not just a placeholder card)
 
-- The GL, AP, AR, Banking, Assets, Reports, and Settings modules will wrap existing components from `src/components/finance/` rather than rewriting them
-- Missing hooks from StoresONE (`useGeneralLedger`, `useLedgerTotals`, `useCostCenters`, etc.) will need to be created or adapted from existing hooks
-- The `useFormatCurrency` pattern differs: current project uses `formatCurrency` from `src/lib/utils.ts` (not a hook), so module files will adapt accordingly
-- Placeholder modules (Selling, Expenses, Inventory, Procurement, Quality, Automation) will use the `PlaceholderContent` component
+#### 6. Automation Module (partially available)
+**Sub-tabs:** Job Dashboard, Recurring Invoices, Payment Reminders, Workflow Rules, Scheduled Tasks
+
+- **Workflow Rules** tab: use existing `useApprovalWorkflow` hook with DataTable
+- **Recurring Invoices, Payment Reminders, Job Dashboard, Scheduled Tasks**: Build UI structure. Job Dashboard shows card grid for future automation jobs. Other tabs show structured empty states.
+
+### Files to Create (~25 files)
+
+**Shared utilities (4):**
+- `src/components/shared/DataTable.tsx`
+- `src/components/shared/StatusBadge.tsx`
+- `src/lib/exportUtils.ts`
+- `src/lib/formatters.ts`
+
+**Module rewrites (6):**
+- `src/components/accounting/procurement/ProcurementModule.tsx`
+- `src/components/accounting/selling/SellingModule.tsx`
+- `src/components/accounting/inventory/InventoryModule.tsx`
+- `src/components/accounting/quality/QualityModule.tsx`
+- `src/components/accounting/expenses/ExpensesModule.tsx`
+- `src/components/accounting/automation/AutomationModule.tsx`
+
+**Supporting sub-tab components (~12):**
+- `src/components/accounting/inventory/BatchTrackingTab.tsx`
+- `src/components/accounting/inventory/InventoryAgeingTab.tsx`
+- `src/components/accounting/inventory/StockReconciliationTab.tsx`
+- `src/components/accounting/quality/InspectionDetailsPanel.tsx`
+- `src/components/accounting/expenses/ExpensesByTypeChart.tsx`
+- `src/components/accounting/expenses/TopCostCentersChart.tsx`
+- `src/components/accounting/procurement/GRNDetailsPanel.tsx`
+
+### What Won't Be Fully Functional Yet
+- **Expenses**: Petty Cash and Staff Advances need new DB tables (petty_cash_funds, petty_cash_vouchers, staff_advances) -- will show structured empty states
+- **Automation**: Job runner infrastructure needs edge functions -- will show UI structure with manual trigger placeholders
+- **Selling**: Full sales order creation needs a dedicated sales workflow -- will link to existing pick-pack system
+
+### Implementation Order
+1. Shared utilities (DataTable, StatusBadge, exportUtils, formatters)
+2. Procurement (most complete, good validation of shared components)
+3. Selling (uses existing pick-pack data)
+4. Inventory (uses existing warehouse data)
+5. Quality (adapts construction hooks)
+6. Expenses (mostly UI structure)
+7. Automation (mostly UI structure)
 
