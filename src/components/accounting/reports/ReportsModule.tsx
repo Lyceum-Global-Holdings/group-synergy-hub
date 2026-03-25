@@ -1,6 +1,7 @@
 import { TabsContent } from "@/components/ui/tabs";
 import { ModuleSubTabs } from "../ModuleSubTabs";
 import { QuickActions } from "../QuickActions";
+import { ReportErrorBoundary } from "@/components/finance/reports/ReportErrorBoundary";
 import { ProfitLossReport } from "@/components/finance/reports/ProfitLossReport";
 import { BalanceSheetReport } from "@/components/finance/reports/BalanceSheetReport";
 import { CashFlowReport } from "@/components/finance/reports/CashFlowReport";
@@ -46,27 +47,39 @@ export default function ReportsModule({ activeSubTab, onSubTabChange }: ReportsM
     <ModuleSubTabs tabs={subTabs} activeTab={activeSubTab || "profit-loss"} onTabChange={onSubTabChange}>
       <TabsContent value="profit-loss" className="mt-4 space-y-6">
         <QuickActions actions={quickActions} />
-        <ProfitLossReport />
+        <ReportErrorBoundary>
+          <ProfitLossReport />
+        </ReportErrorBoundary>
       </TabsContent>
 
       <TabsContent value="balance-sheet" className="mt-4">
-        <BalanceSheetReport />
+        <ReportErrorBoundary>
+          <BalanceSheetReport />
+        </ReportErrorBoundary>
       </TabsContent>
 
       <TabsContent value="trial-balance" className="mt-4">
-        <TrialBalanceReport />
+        <ReportErrorBoundary>
+          <TrialBalanceReport />
+        </ReportErrorBoundary>
       </TabsContent>
 
       <TabsContent value="cash-flow" className="mt-4">
-        <CashFlowReport />
+        <ReportErrorBoundary>
+          <CashFlowReport />
+        </ReportErrorBoundary>
       </TabsContent>
 
       <TabsContent value="general-ledger" className="mt-4">
-        <GeneralLedgerReport />
+        <ReportErrorBoundary>
+          <GeneralLedgerReport />
+        </ReportErrorBoundary>
       </TabsContent>
 
       <TabsContent value="tax" className="mt-4">
-        <TaxSummaryReport />
+        <ReportErrorBoundary>
+          <TaxSummaryReport />
+        </ReportErrorBoundary>
       </TabsContent>
 
       <TabsContent value="variance" className="mt-4">

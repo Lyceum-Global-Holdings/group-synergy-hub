@@ -9,6 +9,7 @@ import { format, startOfYear } from "date-fns";
 import { cn, formatCurrency } from "@/lib/utils";
 import { useFinancialReports, CashFlowRow } from "@/hooks/useFinancialReports";
 import { useCompany } from "@/contexts/CompanyContext";
+import { ReportErrorMessage } from "./ReportErrorMessage";
 
 export function CashFlowReport() {
   const { selectedCompany } = useCompany();
@@ -17,7 +18,7 @@ export function CashFlowReport() {
   const [startDate, setStartDate] = useState<Date>(startOfYear(new Date()));
   const [endDate, setEndDate] = useState<Date>(new Date());
   
-  const { data: reportData, isLoading, error } = getCashFlowStatement(
+  const { data: reportData, isLoading, error, refetch } = getCashFlowStatement(
     format(startDate, "yyyy-MM-dd"),
     format(endDate, "yyyy-MM-dd")
   );
@@ -118,9 +119,7 @@ export function CashFlowReport() {
               <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
             </div>
           ) : error ? (
-            <div className="text-center py-8 text-destructive">
-              Error loading report: {error.message}
-            </div>
+            <ReportErrorMessage error={error} onRetry={() => refetch()} />
           ) : !reportData || reportData.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground space-y-4">
               <p>No cash flow data found for this period.</p>
