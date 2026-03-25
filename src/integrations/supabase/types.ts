@@ -6547,6 +6547,79 @@ export type Database = {
           },
         ]
       }
+      debit_notes: {
+        Row: {
+          amount: number
+          amount_applied: number
+          company_id: string | null
+          created_at: string | null
+          created_by: string | null
+          debit_date: string
+          debit_note_number: string
+          description: string | null
+          id: string
+          reason: string | null
+          reference_invoice_id: string | null
+          status: string
+          supplier_id: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          amount?: number
+          amount_applied?: number
+          company_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          debit_date?: string
+          debit_note_number: string
+          description?: string | null
+          id?: string
+          reason?: string | null
+          reference_invoice_id?: string | null
+          status?: string
+          supplier_id?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          amount?: number
+          amount_applied?: number
+          company_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          debit_date?: string
+          debit_note_number?: string
+          description?: string | null
+          id?: string
+          reason?: string | null
+          reference_invoice_id?: string | null
+          status?: string
+          supplier_id?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "debit_notes_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "debit_notes_reference_invoice_id_fkey"
+            columns: ["reference_invoice_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "debit_notes_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       delivery_order_items: {
         Row: {
           batch_number: string | null
@@ -16515,6 +16588,82 @@ export type Database = {
           },
         ]
       }
+      vendor_advances: {
+        Row: {
+          advance_date: string
+          advance_number: string
+          amount: number
+          company_id: string | null
+          created_at: string | null
+          created_by: string | null
+          description: string | null
+          id: string
+          journal_entry_id: string | null
+          payment_method: string | null
+          reference_number: string | null
+          remaining_amount: number
+          status: string
+          supplier_id: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          advance_date?: string
+          advance_number: string
+          amount?: number
+          company_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          journal_entry_id?: string | null
+          payment_method?: string | null
+          reference_number?: string | null
+          remaining_amount?: number
+          status?: string
+          supplier_id?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          advance_date?: string
+          advance_number?: string
+          amount?: number
+          company_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          journal_entry_id?: string | null
+          payment_method?: string | null
+          reference_number?: string | null
+          remaining_amount?: number
+          status?: string
+          supplier_id?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vendor_advances_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vendor_advances_journal_entry_id_fkey"
+            columns: ["journal_entry_id"]
+            isOneToOne: false
+            referencedRelation: "journal_entries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vendor_advances_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       warehouse_assets: {
         Row: {
           accumulated_depreciation: number | null
@@ -17530,6 +17679,85 @@ export type Database = {
             columns: ["unit_id"]
             isOneToOne: false
             referencedRelation: "item_units"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      wht_certificates: {
+        Row: {
+          certificate_date: string
+          certificate_number: string
+          company_id: string | null
+          created_at: string | null
+          created_by: string | null
+          gross_amount: number
+          id: string
+          net_amount: number
+          notes: string | null
+          payment_id: string | null
+          status: string
+          supplier_id: string | null
+          tax_period: string | null
+          updated_at: string | null
+          wht_amount: number
+          wht_rate: number
+        }
+        Insert: {
+          certificate_date?: string
+          certificate_number: string
+          company_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          gross_amount?: number
+          id?: string
+          net_amount?: number
+          notes?: string | null
+          payment_id?: string | null
+          status?: string
+          supplier_id?: string | null
+          tax_period?: string | null
+          updated_at?: string | null
+          wht_amount?: number
+          wht_rate?: number
+        }
+        Update: {
+          certificate_date?: string
+          certificate_number?: string
+          company_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          gross_amount?: number
+          id?: string
+          net_amount?: number
+          notes?: string | null
+          payment_id?: string | null
+          status?: string
+          supplier_id?: string | null
+          tax_period?: string | null
+          updated_at?: string | null
+          wht_amount?: number
+          wht_rate?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wht_certificates_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "wht_certificates_payment_id_fkey"
+            columns: ["payment_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_payments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "wht_certificates_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
             referencedColumns: ["id"]
           },
         ]
