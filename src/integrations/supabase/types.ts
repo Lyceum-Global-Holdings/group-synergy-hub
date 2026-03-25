@@ -1170,6 +1170,96 @@ export type Database = {
           },
         ]
       }
+      bad_debt_provisions: {
+        Row: {
+          amount: number
+          company_id: string | null
+          created_at: string | null
+          created_by: string | null
+          customer_id: string | null
+          id: string
+          invoice_id: string | null
+          journal_entry_id: string | null
+          notes: string | null
+          provision_date: string
+          reason: string | null
+          recovery_amount: number
+          status: string
+          updated_at: string | null
+          write_off_date: string | null
+        }
+        Insert: {
+          amount?: number
+          company_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          customer_id?: string | null
+          id?: string
+          invoice_id?: string | null
+          journal_entry_id?: string | null
+          notes?: string | null
+          provision_date?: string
+          reason?: string | null
+          recovery_amount?: number
+          status?: string
+          updated_at?: string | null
+          write_off_date?: string | null
+        }
+        Update: {
+          amount?: number
+          company_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          customer_id?: string | null
+          id?: string
+          invoice_id?: string | null
+          journal_entry_id?: string | null
+          notes?: string | null
+          provision_date?: string
+          reason?: string | null
+          recovery_amount?: number
+          status?: string
+          updated_at?: string | null
+          write_off_date?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bad_debt_provisions_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bad_debt_provisions_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bad_debt_provisions_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bad_debt_provisions_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "customer_invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bad_debt_provisions_journal_entry_id_fkey"
+            columns: ["journal_entry_id"]
+            isOneToOne: false
+            referencedRelation: "journal_entries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       bank_accounts: {
         Row: {
           account_name: string
@@ -5323,6 +5413,86 @@ export type Database = {
           },
         ]
       }
+      credit_notes: {
+        Row: {
+          amount: number
+          amount_applied: number
+          company_id: string | null
+          created_at: string | null
+          created_by: string | null
+          credit_date: string
+          credit_note_number: string
+          customer_id: string | null
+          description: string | null
+          id: string
+          reason: string | null
+          reference_invoice_id: string | null
+          status: string
+          updated_at: string | null
+        }
+        Insert: {
+          amount?: number
+          amount_applied?: number
+          company_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          credit_date?: string
+          credit_note_number: string
+          customer_id?: string | null
+          description?: string | null
+          id?: string
+          reason?: string | null
+          reference_invoice_id?: string | null
+          status?: string
+          updated_at?: string | null
+        }
+        Update: {
+          amount?: number
+          amount_applied?: number
+          company_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          credit_date?: string
+          credit_note_number?: string
+          customer_id?: string | null
+          description?: string | null
+          id?: string
+          reason?: string | null
+          reference_invoice_id?: string | null
+          status?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "credit_notes_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "credit_notes_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "credit_notes_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "credit_notes_reference_invoice_id_fkey"
+            columns: ["reference_invoice_id"]
+            isOneToOne: false
+            referencedRelation: "customer_invoices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       currencies: {
         Row: {
           code: string
@@ -5358,6 +5528,89 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: []
+      }
+      customer_advances: {
+        Row: {
+          advance_date: string
+          advance_number: string
+          company_id: string | null
+          created_at: string | null
+          created_by: string | null
+          customer_id: string | null
+          description: string | null
+          id: string
+          journal_entry_id: string | null
+          original_amount: number
+          payment_method: string | null
+          reference_number: string | null
+          remaining_amount: number
+          status: string
+          updated_at: string | null
+        }
+        Insert: {
+          advance_date?: string
+          advance_number: string
+          company_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          customer_id?: string | null
+          description?: string | null
+          id?: string
+          journal_entry_id?: string | null
+          original_amount?: number
+          payment_method?: string | null
+          reference_number?: string | null
+          remaining_amount?: number
+          status?: string
+          updated_at?: string | null
+        }
+        Update: {
+          advance_date?: string
+          advance_number?: string
+          company_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          customer_id?: string | null
+          description?: string | null
+          id?: string
+          journal_entry_id?: string | null
+          original_amount?: number
+          payment_method?: string | null
+          reference_number?: string | null
+          remaining_amount?: number
+          status?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_advances_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_advances_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_advances_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_advances_journal_entry_id_fkey"
+            columns: ["journal_entry_id"]
+            isOneToOne: false
+            referencedRelation: "journal_entries"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       customer_invoice_lines: {
         Row: {
