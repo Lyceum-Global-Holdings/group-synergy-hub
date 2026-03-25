@@ -37,20 +37,11 @@ export interface ModuleConfig {
 export const moduleConfig: Record<string, ModuleConfig> = {
   finance: {
     key: 'finance',
-    name: 'Finance',
-    description: 'Financial management and reporting',
+    name: 'Finance & Accounting',
+    description: 'Enterprise accounting module',
     icon: Calculator,
     subModules: [
-      { key: 'general-ledger', name: 'General Ledger', description: 'Chart of accounts and journal entries', url: '/finance/general-ledger' },
-      { key: 'accounts-payable', name: 'Accounts Payable', description: 'Supplier invoices and payments', url: '/finance/accounts-payable' },
-      { key: 'accounts-receivable', name: 'Accounts Receivable', description: 'Customer invoices and receipts', url: '/finance/accounts-receivable' },
-      { key: 'cash-bank', name: 'Cash & Bank', description: 'Bank accounts and cash management', url: '/finance/cash-bank' },
-      { key: 'fixed-assets', name: 'Fixed Assets', description: 'Asset register and depreciation', url: '/finance/fixed-assets' },
-      { key: 'budgeting', name: 'Budgeting', description: 'Budget planning and analysis', url: '/finance/budgeting' },
-      { key: 'cost-centers', name: 'Cost Centers', description: 'Cost allocation and tracking', url: '/finance/cost-centers' },
-      { key: 'payments', name: 'Payments', description: 'Payment processing and tracking', url: '/finance/payments' },
-      { key: 'bank-reconciliation', name: 'Bank Reconciliation', description: 'Reconcile bank statements', url: '/finance/bank-reconciliation' },
-      { key: 'financial-reporting', name: 'Financial Reporting', description: 'P&L, balance sheet, and reports', url: '/finance/reporting' }
+      { key: 'finance', name: 'Finance & Accounting', description: 'Unified finance and accounting module', url: '/finance' },
     ]
   },
   warehouse: {
