@@ -3351,6 +3351,112 @@ export type Database = {
           },
         ]
       }
+      cheques: {
+        Row: {
+          amount: number
+          bank_account_id: string | null
+          cheque_date: string
+          cheque_number: string
+          cheque_type: string
+          clearing_date: string | null
+          company_id: string | null
+          created_at: string | null
+          created_by: string | null
+          customer_id: string | null
+          description: string | null
+          id: string
+          is_post_dated: boolean
+          journal_entry_id: string | null
+          payee_payer: string
+          status: string
+          supplier_id: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          amount?: number
+          bank_account_id?: string | null
+          cheque_date?: string
+          cheque_number: string
+          cheque_type?: string
+          clearing_date?: string | null
+          company_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          customer_id?: string | null
+          description?: string | null
+          id?: string
+          is_post_dated?: boolean
+          journal_entry_id?: string | null
+          payee_payer: string
+          status?: string
+          supplier_id?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          amount?: number
+          bank_account_id?: string | null
+          cheque_date?: string
+          cheque_number?: string
+          cheque_type?: string
+          clearing_date?: string | null
+          company_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          customer_id?: string | null
+          description?: string | null
+          id?: string
+          is_post_dated?: boolean
+          journal_entry_id?: string | null
+          payee_payer?: string
+          status?: string
+          supplier_id?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cheques_bank_account_id_fkey"
+            columns: ["bank_account_id"]
+            isOneToOne: false
+            referencedRelation: "bank_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cheques_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cheques_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cheques_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cheques_journal_entry_id_fkey"
+            columns: ["journal_entry_id"]
+            isOneToOne: false
+            referencedRelation: "journal_entries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cheques_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       companies: {
         Row: {
           address: string | null
@@ -8432,6 +8538,92 @@ export type Database = {
           },
         ]
       }
+      fund_transfers: {
+        Row: {
+          amount: number
+          company_id: string | null
+          created_at: string | null
+          created_by: string | null
+          description: string | null
+          exchange_rate: number | null
+          from_account_id: string | null
+          from_currency: string | null
+          id: string
+          journal_entry_id: string | null
+          reference_number: string | null
+          status: string
+          to_account_id: string | null
+          to_currency: string | null
+          transfer_date: string
+          updated_at: string | null
+        }
+        Insert: {
+          amount?: number
+          company_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          exchange_rate?: number | null
+          from_account_id?: string | null
+          from_currency?: string | null
+          id?: string
+          journal_entry_id?: string | null
+          reference_number?: string | null
+          status?: string
+          to_account_id?: string | null
+          to_currency?: string | null
+          transfer_date?: string
+          updated_at?: string | null
+        }
+        Update: {
+          amount?: number
+          company_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          exchange_rate?: number | null
+          from_account_id?: string | null
+          from_currency?: string | null
+          id?: string
+          journal_entry_id?: string | null
+          reference_number?: string | null
+          status?: string
+          to_account_id?: string | null
+          to_currency?: string | null
+          transfer_date?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fund_transfers_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fund_transfers_from_account_id_fkey"
+            columns: ["from_account_id"]
+            isOneToOne: false
+            referencedRelation: "bank_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fund_transfers_journal_entry_id_fkey"
+            columns: ["journal_entry_id"]
+            isOneToOne: false
+            referencedRelation: "journal_entries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fund_transfers_to_account_id_fkey"
+            columns: ["to_account_id"]
+            isOneToOne: false
+            referencedRelation: "bank_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       gl_settings: {
         Row: {
           allow_posting_to_closed_periods: boolean | null
@@ -10309,6 +10501,75 @@ export type Database = {
             columns: ["payment_id"]
             isOneToOne: false
             referencedRelation: "supplier_payments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payment_batches: {
+        Row: {
+          approved_by: string | null
+          approved_date: string | null
+          bank_account_id: string | null
+          batch_date: string
+          batch_number: string
+          batch_type: string
+          company_id: string | null
+          created_at: string | null
+          created_by: string | null
+          description: string | null
+          id: string
+          payment_count: number
+          status: string
+          total_amount: number
+          updated_at: string | null
+        }
+        Insert: {
+          approved_by?: string | null
+          approved_date?: string | null
+          bank_account_id?: string | null
+          batch_date?: string
+          batch_number: string
+          batch_type?: string
+          company_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          payment_count?: number
+          status?: string
+          total_amount?: number
+          updated_at?: string | null
+        }
+        Update: {
+          approved_by?: string | null
+          approved_date?: string | null
+          bank_account_id?: string | null
+          batch_date?: string
+          batch_number?: string
+          batch_type?: string
+          company_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          payment_count?: number
+          status?: string
+          total_amount?: number
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_batches_bank_account_id_fkey"
+            columns: ["bank_account_id"]
+            isOneToOne: false
+            referencedRelation: "bank_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_batches_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
             referencedColumns: ["id"]
           },
         ]
@@ -16601,6 +16862,73 @@ export type Database = {
           version?: string | null
         }
         Relationships: []
+      }
+      transaction_rules: {
+        Row: {
+          company_id: string | null
+          created_at: string | null
+          created_by: string | null
+          description_template: string | null
+          gl_account_id: string | null
+          id: string
+          is_active: boolean
+          match_field: string
+          match_pattern: string
+          priority: number
+          rule_name: string
+          updated_at: string | null
+        }
+        Insert: {
+          company_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          description_template?: string | null
+          gl_account_id?: string | null
+          id?: string
+          is_active?: boolean
+          match_field?: string
+          match_pattern: string
+          priority?: number
+          rule_name: string
+          updated_at?: string | null
+        }
+        Update: {
+          company_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          description_template?: string | null
+          gl_account_id?: string | null
+          id?: string
+          is_active?: boolean
+          match_field?: string
+          match_pattern?: string
+          priority?: number
+          rule_name?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transaction_rules_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transaction_rules_gl_account_id_fkey"
+            columns: ["gl_account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transaction_rules_gl_account_id_fkey"
+            columns: ["gl_account_id"]
+            isOneToOne: false
+            referencedRelation: "v_active_accounts_with_balances"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       transaction_to_gl_mapping: {
         Row: {
