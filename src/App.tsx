@@ -54,17 +54,7 @@ const BatchManagement = lazy(() => import("./pages/warehouse/BatchManagement"));
 const PublicAssetView = lazy(() => import("./pages/PublicAssetView"));
 const ToolManagement = lazy(() => import("./pages/warehouse/ToolManagement"));
 const PoEmailApproval = lazy(() => import("./pages/procurement/PoEmailApproval"));
-const GeneralLedger = lazy(() => import("./pages/finance/GeneralLedger"));
-const AccountsPayable = lazy(() => import("./pages/finance/AccountsPayable"));
-const AccountsReceivable = lazy(() => import("./pages/finance/AccountsReceivable"));
-const CashBank = lazy(() => import("./pages/finance/CashBank"));
-const FixedAssets = lazy(() => import("./pages/finance/FixedAssets"));
-const Budgeting = lazy(() => import("./pages/finance/Budgeting"));
-const CostCenters = lazy(() => import("./pages/finance/CostCenters"));
-const FinancialReporting = lazy(() => import("./pages/finance/FinancialReporting"));
-const BankReconciliation = lazy(() => import("./pages/finance/BankReconciliation"));
-const Payments = lazy(() => import("./pages/finance/Payments"));
-const FinanceSettings = lazy(() => import("./pages/finance/FinanceSettings"));
+const Accounting = lazy(() => import("./pages/Accounting"));
 const Auth = lazy(() => import("./pages/Auth"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const Training = lazy(() => import("./pages/admin/Training"));
@@ -201,17 +191,8 @@ function App() {
                 <Route path="/warehouse/delivery-order" element={<DeliveryOrder />} />
                 <Route path="/warehouse/inventory-valuation" element={<InventoryValuation />} />
                 <Route path="/warehouse/batch-management" element={<BatchManagement />} />
-                <Route path="/finance/general-ledger" element={<GeneralLedger />} />
-                <Route path="/finance/accounts-payable" element={<AccountsPayable />} />
-                <Route path="/finance/accounts-receivable" element={<AccountsReceivable />} />
-                <Route path="/finance/cash-bank" element={<CashBank />} />
-                <Route path="/finance/fixed-assets" element={<FixedAssets />} />
-                <Route path="/finance/budgeting" element={<Budgeting />} />
-                <Route path="/finance/cost-centers" element={<CostCenters />} />
-                <Route path="/finance/reporting" element={<FinancialReporting />} />
-                <Route path="/finance/bank-reconciliation" element={<BankReconciliation />} />
-                <Route path="/finance/payments" element={<Payments />} />
-                <Route path="/finance/settings" element={<FinanceSettings />} />
+                <Route path="/finance" element={<Accounting />} />
+                <Route path="/finance/*" element={<Accounting />} />
                 <Route path="/management/dashboards" element={<DashboardsKPIs />} />
                 <Route path="/management/dashboards/:id/edit" element={<DashboardEdit />} />
                 <Route path="/management/dashboards/:id" element={<DashboardView />} />
