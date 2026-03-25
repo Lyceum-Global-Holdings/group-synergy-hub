@@ -71,7 +71,7 @@ export function useLedgerSummary() {
         totalEntries: entries?.length || 0,
         postedEntries: entries?.filter((e) => e.status === "posted").length || 0,
         draftEntries: entries?.filter((e) => e.status === "draft").length || 0,
-        pendingApproval: entries?.filter((e) => e.status === "pending_approval").length || 0,
+        pendingApproval: entries?.filter((e) => e.status === "draft").length || 0,
         openPeriods: periods?.filter((p) => p.status === "open").length || 0,
       };
     },
