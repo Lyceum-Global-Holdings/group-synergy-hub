@@ -238,6 +238,82 @@ export type Database = {
           },
         ]
       }
+      asset_disposals: {
+        Row: {
+          asset_id: string
+          buyer_name: string | null
+          company_id: string | null
+          created_at: string | null
+          disposal_date: string
+          disposal_method: string
+          disposed_by: string | null
+          gain_loss: number | null
+          id: string
+          journal_entry_id: string | null
+          net_book_value_at_disposal: number
+          notes: string | null
+          proceeds: number
+          status: string
+          updated_at: string | null
+        }
+        Insert: {
+          asset_id: string
+          buyer_name?: string | null
+          company_id?: string | null
+          created_at?: string | null
+          disposal_date?: string
+          disposal_method?: string
+          disposed_by?: string | null
+          gain_loss?: number | null
+          id?: string
+          journal_entry_id?: string | null
+          net_book_value_at_disposal?: number
+          notes?: string | null
+          proceeds?: number
+          status?: string
+          updated_at?: string | null
+        }
+        Update: {
+          asset_id?: string
+          buyer_name?: string | null
+          company_id?: string | null
+          created_at?: string | null
+          disposal_date?: string
+          disposal_method?: string
+          disposed_by?: string | null
+          gain_loss?: number | null
+          id?: string
+          journal_entry_id?: string | null
+          net_book_value_at_disposal?: number
+          notes?: string | null
+          proceeds?: number
+          status?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "asset_disposals_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "warehouse_assets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "asset_disposals_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "asset_disposals_journal_entry_id_fkey"
+            columns: ["journal_entry_id"]
+            isOneToOne: false
+            referencedRelation: "journal_entries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       asset_master: {
         Row: {
           accumulated_depreciation: number | null
@@ -848,6 +924,73 @@ export type Database = {
             columns: ["department_id"]
             isOneToOne: false
             referencedRelation: "warehouse_locations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      asset_revaluations: {
+        Row: {
+          adjustment_amount: number | null
+          asset_id: string
+          company_id: string | null
+          created_at: string | null
+          id: string
+          journal_entry_id: string | null
+          new_value: number
+          old_value: number
+          reason: string | null
+          revaluation_date: string
+          revalued_by: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          adjustment_amount?: number | null
+          asset_id: string
+          company_id?: string | null
+          created_at?: string | null
+          id?: string
+          journal_entry_id?: string | null
+          new_value?: number
+          old_value?: number
+          reason?: string | null
+          revaluation_date?: string
+          revalued_by?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          adjustment_amount?: number | null
+          asset_id?: string
+          company_id?: string | null
+          created_at?: string | null
+          id?: string
+          journal_entry_id?: string | null
+          new_value?: number
+          old_value?: number
+          reason?: string | null
+          revaluation_date?: string
+          revalued_by?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "asset_revaluations_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "warehouse_assets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "asset_revaluations_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "asset_revaluations_journal_entry_id_fkey"
+            columns: ["journal_entry_id"]
+            isOneToOne: false
+            referencedRelation: "journal_entries"
             referencedColumns: ["id"]
           },
         ]
