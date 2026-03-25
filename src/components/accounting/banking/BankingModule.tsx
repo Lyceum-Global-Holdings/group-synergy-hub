@@ -51,7 +51,7 @@ export default function BankingModule({ activeSubTab, onSubTabChange }: BankingM
         </TabsContent>
 
         <TabsContent value="reconciliation" className="mt-4">
-          <ReconciliationWorkspace />
+          <BankStatementImport />
         </TabsContent>
       </ModuleSubTabs>
 
