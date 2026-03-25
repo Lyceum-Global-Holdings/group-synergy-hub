@@ -5,7 +5,7 @@ import { QuickActions } from "../QuickActions";
 import { BankAccountList } from "@/components/finance/bank/BankAccountList";
 import { BankTransactionList } from "@/components/finance/bank/BankTransactionList";
 import { CashPositionDashboard } from "@/components/finance/bank/CashPositionDashboard";
-import { BankStatementImport } from "@/components/finance/bank/BankStatementImport";
+import { PlaceholderContent } from "../PlaceholderContent";
 import { CreateBankAccountDialog } from "@/components/finance/bank/CreateBankAccountDialog";
 import { CreateBankTransactionDialog } from "@/components/finance/bank/CreateBankTransactionDialog";
 import { Plus, RefreshCw, Download } from "lucide-react";
