@@ -11,7 +11,7 @@ export function useDebitNotes() {
     queryFn: async () => {
       const { data, error } = await (supabase as any)
         .from("debit_notes")
-        .select("*, supplier:suppliers(supplier_name)")
+        .select("*, supplier:suppliers(name)")
         .eq("company_id", selectedCompany!.id)
         .order("debit_date", { ascending: false });
       if (error) throw error;
@@ -70,7 +70,7 @@ export function useVendorAdvances() {
     queryFn: async () => {
       const { data, error } = await (supabase as any)
         .from("vendor_advances")
-        .select("*, supplier:suppliers(supplier_name)")
+        .select("*, supplier:suppliers(name)")
         .eq("company_id", selectedCompany!.id)
         .order("advance_date", { ascending: false });
       if (error) throw error;
@@ -130,7 +130,7 @@ export function useWHTCertificates() {
     queryFn: async () => {
       const { data, error } = await (supabase as any)
         .from("wht_certificates")
-        .select("*, supplier:suppliers(supplier_name)")
+        .select("*, supplier:suppliers(name)")
         .eq("company_id", selectedCompany!.id)
         .order("certificate_date", { ascending: false });
       if (error) throw error;
