@@ -7635,6 +7635,71 @@ export type Database = {
           },
         ]
       }
+      expense_categories: {
+        Row: {
+          category_code: string | null
+          category_name: string
+          company_id: string | null
+          created_at: string | null
+          gl_account_id: string | null
+          id: string
+          is_active: boolean
+          parent_id: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          category_code?: string | null
+          category_name: string
+          company_id?: string | null
+          created_at?: string | null
+          gl_account_id?: string | null
+          id?: string
+          is_active?: boolean
+          parent_id?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          category_code?: string | null
+          category_name?: string
+          company_id?: string | null
+          created_at?: string | null
+          gl_account_id?: string | null
+          id?: string
+          is_active?: boolean
+          parent_id?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "expense_categories_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "expense_categories_gl_account_id_fkey"
+            columns: ["gl_account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "expense_categories_gl_account_id_fkey"
+            columns: ["gl_account_id"]
+            isOneToOne: false
+            referencedRelation: "v_active_accounts_with_balances"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "expense_categories_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "expense_categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       finished_goods: {
         Row: {
           available_sizes: Json | null
@@ -10857,6 +10922,171 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: []
+      }
+      petty_cash_funds: {
+        Row: {
+          company_id: string | null
+          created_at: string | null
+          created_by: string | null
+          current_balance: number
+          custodian_id: string | null
+          custodian_name: string | null
+          float_amount: number
+          fund_code: string | null
+          fund_name: string
+          gl_account_id: string | null
+          id: string
+          last_replenished_at: string | null
+          location: string | null
+          status: string
+          updated_at: string | null
+        }
+        Insert: {
+          company_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          current_balance?: number
+          custodian_id?: string | null
+          custodian_name?: string | null
+          float_amount?: number
+          fund_code?: string | null
+          fund_name: string
+          gl_account_id?: string | null
+          id?: string
+          last_replenished_at?: string | null
+          location?: string | null
+          status?: string
+          updated_at?: string | null
+        }
+        Update: {
+          company_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          current_balance?: number
+          custodian_id?: string | null
+          custodian_name?: string | null
+          float_amount?: number
+          fund_code?: string | null
+          fund_name?: string
+          gl_account_id?: string | null
+          id?: string
+          last_replenished_at?: string | null
+          location?: string | null
+          status?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "petty_cash_funds_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "petty_cash_funds_gl_account_id_fkey"
+            columns: ["gl_account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "petty_cash_funds_gl_account_id_fkey"
+            columns: ["gl_account_id"]
+            isOneToOne: false
+            referencedRelation: "v_active_accounts_with_balances"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      petty_cash_vouchers: {
+        Row: {
+          amount: number
+          approved_by: string | null
+          approved_date: string | null
+          company_id: string | null
+          created_at: string | null
+          created_by: string | null
+          description: string | null
+          expense_category_id: string | null
+          fund_id: string | null
+          id: string
+          journal_entry_id: string | null
+          payee_name: string
+          receipt_attached: boolean
+          status: string
+          updated_at: string | null
+          voucher_date: string
+          voucher_number: string
+        }
+        Insert: {
+          amount?: number
+          approved_by?: string | null
+          approved_date?: string | null
+          company_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          expense_category_id?: string | null
+          fund_id?: string | null
+          id?: string
+          journal_entry_id?: string | null
+          payee_name: string
+          receipt_attached?: boolean
+          status?: string
+          updated_at?: string | null
+          voucher_date?: string
+          voucher_number: string
+        }
+        Update: {
+          amount?: number
+          approved_by?: string | null
+          approved_date?: string | null
+          company_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          expense_category_id?: string | null
+          fund_id?: string | null
+          id?: string
+          journal_entry_id?: string | null
+          payee_name?: string
+          receipt_attached?: boolean
+          status?: string
+          updated_at?: string | null
+          voucher_date?: string
+          voucher_number?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "petty_cash_vouchers_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "petty_cash_vouchers_expense_category_id_fkey"
+            columns: ["expense_category_id"]
+            isOneToOne: false
+            referencedRelation: "expense_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "petty_cash_vouchers_fund_id_fkey"
+            columns: ["fund_id"]
+            isOneToOne: false
+            referencedRelation: "petty_cash_funds"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "petty_cash_vouchers_journal_entry_id_fkey"
+            columns: ["journal_entry_id"]
+            isOneToOne: false
+            referencedRelation: "journal_entries"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       pick_list_items: {
         Row: {
@@ -14406,6 +14636,99 @@ export type Database = {
             columns: ["site_report_id"]
             isOneToOne: false
             referencedRelation: "daily_site_reports"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      staff_advances: {
+        Row: {
+          advance_date: string
+          advance_number: string
+          approved_amount: number | null
+          approved_by: string | null
+          approved_date: string | null
+          company_id: string | null
+          created_at: string | null
+          created_by: string | null
+          disbursed_amount: number
+          disbursed_date: string | null
+          employee_id: string | null
+          employee_name: string
+          id: string
+          journal_entry_id: string | null
+          notes: string | null
+          outstanding_amount: number
+          payment_method: string | null
+          purpose: string | null
+          requested_amount: number
+          settled_amount: number
+          settlement_due_date: string | null
+          status: string
+          updated_at: string | null
+        }
+        Insert: {
+          advance_date?: string
+          advance_number: string
+          approved_amount?: number | null
+          approved_by?: string | null
+          approved_date?: string | null
+          company_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          disbursed_amount?: number
+          disbursed_date?: string | null
+          employee_id?: string | null
+          employee_name: string
+          id?: string
+          journal_entry_id?: string | null
+          notes?: string | null
+          outstanding_amount?: number
+          payment_method?: string | null
+          purpose?: string | null
+          requested_amount?: number
+          settled_amount?: number
+          settlement_due_date?: string | null
+          status?: string
+          updated_at?: string | null
+        }
+        Update: {
+          advance_date?: string
+          advance_number?: string
+          approved_amount?: number | null
+          approved_by?: string | null
+          approved_date?: string | null
+          company_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          disbursed_amount?: number
+          disbursed_date?: string | null
+          employee_id?: string | null
+          employee_name?: string
+          id?: string
+          journal_entry_id?: string | null
+          notes?: string | null
+          outstanding_amount?: number
+          payment_method?: string | null
+          purpose?: string | null
+          requested_amount?: number
+          settled_amount?: number
+          settlement_due_date?: string | null
+          status?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "staff_advances_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "staff_advances_journal_entry_id_fkey"
+            columns: ["journal_entry_id"]
+            isOneToOne: false
+            referencedRelation: "journal_entries"
             referencedColumns: ["id"]
           },
         ]
