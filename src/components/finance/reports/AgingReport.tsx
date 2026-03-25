@@ -10,6 +10,7 @@ import { format } from "date-fns";
 import { cn, formatCurrency } from "@/lib/utils";
 import { useFinancialReports, AgingBucketRow } from "@/hooks/useFinancialReports";
 import { useCompany } from "@/contexts/CompanyContext";
+import { ReportErrorMessage } from "./ReportErrorMessage";
 
 export function AgingReport() {
   const { selectedCompany } = useCompany();
@@ -18,7 +19,7 @@ export function AgingReport() {
   const [asOfDate, setAsOfDate] = useState<Date>(new Date());
   const [reportType, setReportType] = useState<"customer" | "supplier">("customer");
   
-  const { data: reportData, isLoading, error } = getAgingReport(
+  const { data: reportData, isLoading, error, refetch } = getAgingReport(
     format(asOfDate, "yyyy-MM-dd"),
     reportType
   );
@@ -135,9 +136,7 @@ export function AgingReport() {
               <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
             </div>
           ) : error ? (
-            <div className="text-center py-8 text-destructive">
-              Error loading report: {error.message}
-            </div>
+            <ReportErrorMessage error={error} onRetry={() => refetch()} />
           ) : !reportData || reportData.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
               No outstanding {reportType === "customer" ? "receivables" : "payables"} found.

@@ -4,6 +4,7 @@ import { ProfitLossReport } from "./reports/ProfitLossReport";
 import { BalanceSheetReport } from "./reports/BalanceSheetReport";
 import { CashFlowReport } from "./reports/CashFlowReport";
 import { AgingReport } from "./reports/AgingReport";
+import { ReportErrorBoundary } from "./reports/ReportErrorBoundary";
 import { FileText, BarChart3, Scale, TrendingUp, Clock } from "lucide-react";
 
 export function FinancialReportsTab() {
@@ -34,23 +35,33 @@ export function FinancialReportsTab() {
         </TabsList>
 
         <TabsContent value="trial-balance">
-          <TrialBalanceReport />
+          <ReportErrorBoundary>
+            <TrialBalanceReport />
+          </ReportErrorBoundary>
         </TabsContent>
 
         <TabsContent value="pl">
-          <ProfitLossReport />
+          <ReportErrorBoundary>
+            <ProfitLossReport />
+          </ReportErrorBoundary>
         </TabsContent>
 
         <TabsContent value="balance-sheet">
-          <BalanceSheetReport />
+          <ReportErrorBoundary>
+            <BalanceSheetReport />
+          </ReportErrorBoundary>
         </TabsContent>
 
         <TabsContent value="cash-flow">
-          <CashFlowReport />
+          <ReportErrorBoundary>
+            <CashFlowReport />
+          </ReportErrorBoundary>
         </TabsContent>
 
         <TabsContent value="aging">
-          <AgingReport />
+          <ReportErrorBoundary>
+            <AgingReport />
+          </ReportErrorBoundary>
         </TabsContent>
       </Tabs>
     </div>

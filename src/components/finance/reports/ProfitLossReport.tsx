@@ -11,6 +11,7 @@ import { format, startOfYear, endOfYear, subYears } from "date-fns";
 import { cn, formatCurrency } from "@/lib/utils";
 import { useFinancialReports, ProfitLossRow } from "@/hooks/useFinancialReports";
 import { useCompany } from "@/contexts/CompanyContext";
+import { ReportErrorMessage } from "./ReportErrorMessage";
 
 export function ProfitLossReport() {
   const { selectedCompany } = useCompany();
@@ -24,7 +25,7 @@ export function ProfitLossReport() {
   const comparisonStart = subYears(startDate, 1);
   const comparisonEnd = subYears(endDate, 1);
   
-  const { data: reportData, isLoading, error } = getProfitLossReport(
+  const { data: reportData, isLoading, error, refetch } = getProfitLossReport(
     format(startDate, "yyyy-MM-dd"),
     format(endDate, "yyyy-MM-dd"),
     showComparison ? format(comparisonStart, "yyyy-MM-dd") : null,
@@ -149,9 +150,7 @@ export function ProfitLossReport() {
               <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
             </div>
           ) : error ? (
-            <div className="text-center py-8 text-destructive">
-              Error loading report: {error.message}
-            </div>
+            <ReportErrorMessage error={error} onRetry={() => refetch()} />
           ) : !reportData || reportData.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
               No transactions found for this period. Post journal entries to generate the P&L report.

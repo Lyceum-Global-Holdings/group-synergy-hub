@@ -9,6 +9,7 @@ import { format } from "date-fns";
 import { cn, formatCurrency } from "@/lib/utils";
 import { useFinancialReports, BalanceSheetRow } from "@/hooks/useFinancialReports";
 import { useCompany } from "@/contexts/CompanyContext";
+import { ReportErrorMessage } from "./ReportErrorMessage";
 
 export function BalanceSheetReport() {
   const { selectedCompany } = useCompany();
@@ -16,7 +17,7 @@ export function BalanceSheetReport() {
   
   const [asOfDate, setAsOfDate] = useState<Date>(new Date());
   
-  const { data: reportData, isLoading, error } = getBalanceSheet(format(asOfDate, "yyyy-MM-dd"));
+  const { data: reportData, isLoading, error, refetch } = getBalanceSheet(format(asOfDate, "yyyy-MM-dd"));
 
   // Group data by category
   const assetAccounts = reportData?.filter(r => r.category === 'Assets') || [];
@@ -107,9 +108,7 @@ export function BalanceSheetReport() {
               <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
             </div>
           ) : error ? (
-            <div className="text-center py-8 text-destructive">
-              Error loading report: {error.message}
-            </div>
+            <ReportErrorMessage error={error} onRetry={() => refetch()} />
           ) : !reportData || reportData.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
               No account balances found. Create accounts and post journal entries to generate the Balance Sheet.
