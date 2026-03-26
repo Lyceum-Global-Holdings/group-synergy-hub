@@ -184,6 +184,13 @@ export function GrnDetailsDialog({ grnId, open, onOpenChange }: GrnDetailsDialog
                   <TableHead className="text-right">Unit Price</TableHead>
                   <TableHead className="text-right">Total Cost</TableHead>
                   <TableHead>Quality</TableHead>
+                  {grn.grn_items?.some((i: any) => i.batch_number) && (
+                    <>
+                      <TableHead>Batch #</TableHead>
+                      <TableHead>Mfg Date</TableHead>
+                      <TableHead>Expiry</TableHead>
+                    </>
+                  )}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -209,6 +216,13 @@ export function GrnDetailsDialog({ grnId, open, onOpenChange }: GrnDetailsDialog
                         {item.quality_status}
                       </Badge>
                     </TableCell>
+                    {grn.grn_items?.some((i: any) => i.batch_number) && (
+                      <>
+                        <TableCell>{item.batch_number || '-'}</TableCell>
+                        <TableCell>{item.manufacturing_date ? format(new Date(item.manufacturing_date), 'PP') : '-'}</TableCell>
+                        <TableCell>{item.expiry_date ? format(new Date(item.expiry_date), 'PP') : '-'}</TableCell>
+                      </>
+                    )}
                   </TableRow>
                 ))}
               </TableBody>
