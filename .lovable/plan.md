@@ -1,55 +1,40 @@
 
 
-## Add Bin Allocation on GRN Approval
+## Fix: Add Stock Transaction Records on GRN Approval
 
-### Overview
-When approving a GRN, show a dialog where the user selects a bin for each GRN item before confirming approval. The approval process then allocates stock to the selected bins via `warehouse_bin_allocations`.
+### Problem
+When a GRN is approved, the DB trigger updates `warehouse_items.current_stock` and the frontend handles bin allocations, but **no `stock_transactions` record is created**. This means GRN receipts don't appear in the stock movement history.
 
-### Current Flow
-- User clicks "Approve GRN" → directly updates status to `approved`
-- DB trigger `update_stock_on_grn_approval` updates `warehouse_items.current_stock`
-- **No bin allocation happens** — stock goes to item master but not to any bin
+### Solution
+After the GRN status is updated to `approved`, insert a `stock_transactions` record for each GRN item with `transaction_type: 'goods_receipt'` and `reference_type: 'grn'`.
 
-### New Flow
-1. User clicks "Approve GRN" → opens a **Bin Allocation Dialog**
-2. Dialog lists each GRN item with a bin selector (dropdown of active bins filtered by location)
-3. User selects a bin for each item (or uses a default bin)
-4. On confirm, the approval:
-   - Updates GRN status to `approved`
-   - The existing trigger updates `warehouse_items.current_stock`
-   - Frontend then upserts `warehouse_bin_allocations` for each item+bin combo
-   - Updates `warehouse_bins.current_quantity`
+### Changes
 
-### Implementation
+**Edit `src/hooks/useGoodsReceiptNotes.ts`**
 
-**1. New component: `GrnBinAllocationDialog.tsx`**
-- Props: GRN items, open/onConfirm/onCancel
-- For each item: shows item name, qty received, and a bin selector (Select dropdown)
-- Fetches active bins from `warehouse_bins` where `status = 'active'`
-- Validates all items have a bin selected before allowing confirm
-- Returns array of `{ grn_item_id, warehouse_item_id, bin_id, quantity }` on confirm
+In `useApproveGoodsReceiptNote`, after the GRN status update succeeds (line 333) and before processing bin allocations:
 
-**2. Update `useApproveGoodsReceiptNote` hook**
-- Accept bin allocations as parameter: `Array<{ warehouse_item_id, bin_id, quantity, company_id }>`
-- After GRN status update succeeds, upsert into `warehouse_bin_allocations`:
-  - If allocation exists for same `warehouse_item_id + bin_id`, increment `allocated_quantity`
-  - Otherwise insert new row
-- Also increment `warehouse_bins.current_quantity`
+1. Expand the GRN fetch (line 316) to also select `grn_items(id, warehouse_item_id, quantity_received, unit_price, total_cost, item_name)` and `grn_number`
+2. For each GRN item that has a `warehouse_item_id`, fetch the item's `current_stock` from `warehouse_items`
+3. Insert a `stock_transactions` record:
+   - `item_id`: the `warehouse_item_id`
+   - `transaction_type`: `'goods_receipt'`
+   - `reference_type`: `'grn'`
+   - `reference_id`: the GRN id
+   - `quantity_change`: `quantity_received` (positive, since it's incoming stock)
+   - `quantity_before`: current stock before the trigger fires (fetched before status update)
+   - `quantity_after`: `quantity_before + quantity_received`
+   - `unit_cost`: `unit_price`
+   - `total_value`: `total_cost`
+   - `notes`: `"GRN {grn_number} - {item_name}"`
+   - `company_id`: from GRN
+   - `created_by`: current user
 
-**3. Update `GrnDetailsDialog.tsx`**
-- Replace direct `handleApprove` call with opening the bin allocation dialog
-- On dialog confirm, call the updated approve mutation with allocations
-
-### Files to Create
-- `src/components/warehouse/GrnBinAllocationDialog.tsx`
-
-### Files to Edit
-- `src/hooks/useGoodsReceiptNotes.ts` — update `useApproveGoodsReceiptNote` to accept and process bin allocations
-- `src/components/warehouse/GrnDetailsDialog.tsx` — add dialog state and wire up
-
-### Technical Notes
-- `warehouse_bin_allocations` has: `warehouse_item_id`, `bin_id`, `allocated_quantity`, `reserved_quantity`, `company_id`, `created_by`
-- `available_quantity` is a generated column (cannot insert/update directly)
-- Bins are shared across companies (scoped by `location_id`), but allocations are scoped by `company_id`
-- Per architecture memory: stock updates should go through bin allocations as source of truth
+### Technical Detail
+The stock quantities (before/after) need to be captured **before** the status update triggers the DB function that increments `current_stock`. So the flow becomes:
+1. Fetch GRN with items and `grn_number`
+2. For each item, fetch current `warehouse_items.current_stock`
+3. Update GRN status → trigger fires, incrementing stock
+4. Insert `stock_transactions` records with the pre-captured quantities
+5. Process bin allocations (existing code)
 
