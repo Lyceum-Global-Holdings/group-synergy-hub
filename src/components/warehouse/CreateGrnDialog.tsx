@@ -267,6 +267,13 @@ export function CreateGrnDialog({ open, onOpenChange, poId }: CreateGrnDialogPro
     return { label: 'Pending', variant: 'secondary' };
   };
 
+  const generateBatchNumber = (item: CreateGrnItemData, index: number) => {
+    const dateStr = format(new Date(), 'yyyyMMdd');
+    const code = item.item_code || item.item_name?.substring(0, 6).toUpperCase().replace(/\s/g, '') || 'ITEM';
+    const seq = String(index + 1).padStart(2, '0');
+    return `${code}-${dateStr}-${seq}`;
+  };
+
   const handleSubmit = async (status: 'draft' | 'submitted') => {
     const values = form.getValues();
 
@@ -276,6 +283,28 @@ export function CreateGrnDialog({ open, onOpenChange, poId }: CreateGrnDialogPro
     if (validItems.length === 0) {
       alert('Please add at least one item with quantity received > 0');
       return;
+    }
+
+    // Validate batch-tracked items have batch numbers
+    const missingBatch = validItems.filter(
+      (item) => item.is_batch_tracked && !item.batch_number?.trim()
+    );
+    if (missingBatch.length > 0) {
+      const names = missingBatch.map((i) => i.item_name).join(', ');
+      alert(`Batch number is required for batch-tracked items: ${names}`);
+      return;
+    }
+
+    // Warn about missing dates (don't block)
+    const missingDates = validItems.filter(
+      (item) => item.is_batch_tracked && (!item.manufacturing_date || !item.expiry_date)
+    );
+    if (missingDates.length > 0) {
+      const names = missingDates.map((i) => i.item_name).join(', ');
+      const proceed = window.confirm(
+        `Manufacturing/Expiry dates are missing for: ${names}.\n\nPer GMP standards, these dates should be recorded. Continue anyway?`
+      );
+      if (!proceed) return;
     }
 
     await createGrn.mutateAsync({
@@ -302,7 +331,7 @@ export function CreateGrnDialog({ open, onOpenChange, poId }: CreateGrnDialogPro
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
+      <DialogContent className="max-w-6xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Create Goods Receipt Note</DialogTitle>
         </DialogHeader>
@@ -393,7 +422,7 @@ export function CreateGrnDialog({ open, onOpenChange, poId }: CreateGrnDialogPro
                   <TableHead>Unit Price</TableHead>
                   <TableHead>Total</TableHead>
                   <TableHead>Quality</TableHead>
-                  <TableHead>Batch/Serial</TableHead>
+                   <TableHead>Batch/Serial</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead></TableHead>
                 </TableRow>
@@ -576,89 +605,66 @@ export function CreateGrnDialog({ open, onOpenChange, poId }: CreateGrnDialogPro
                       </Select>
                     </TableCell>
                     <TableCell>
-                      {(item.is_batch_tracked || item.is_serialized) ? (
+                      {item.is_batch_tracked ? (
+                        <div className="flex items-center gap-1">
+                          <div className="flex items-center gap-1 flex-1">
+                            <Input
+                              value={item.batch_number || ''}
+                              onChange={(e) => handleItemChange(index, 'batch_number', e.target.value)}
+                              placeholder="Batch #*"
+                              className={cn("w-28 h-8 text-xs", item.is_batch_tracked && !item.batch_number?.trim() && "border-destructive")}
+                            />
+                            <Input
+                              type="date"
+                              value={item.manufacturing_date || ''}
+                              onChange={(e) => handleItemChange(index, 'manufacturing_date', e.target.value)}
+                              className="w-32 h-8 text-xs"
+                              title="Mfg Date"
+                            />
+                            <Input
+                              type="date"
+                              value={item.expiry_date || ''}
+                              onChange={(e) => handleItemChange(index, 'expiry_date', e.target.value)}
+                              className="w-32 h-8 text-xs"
+                              title="Expiry Date"
+                            />
+                          </div>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 px-2 text-xs"
+                            title="Auto-generate batch number"
+                            onClick={() => handleItemChange(index, 'batch_number', generateBatchNumber(item, index))}
+                          >
+                            Gen
+                          </Button>
+                        </div>
+                      ) : item.is_serialized ? (
                         <Popover>
                           <PopoverTrigger asChild>
-                            <Button variant="outline" size="sm" className="w-full">
-                              {item.batch_number || item.serial_numbers?.length ? (
-                                <span className="text-xs truncate max-w-[80px]">
-                                  {item.batch_number || `${item.serial_numbers?.length} SN`}
-                                </span>
-                              ) : (
-                                <span className="text-muted-foreground text-xs">Enter</span>
-                              )}
+                            <Button variant="outline" size="sm" className="w-full h-8">
+                              <span className="text-xs">{item.serial_numbers?.length ? `${item.serial_numbers.length} SN` : 'Enter SNs'}</span>
                             </Button>
                           </PopoverTrigger>
                           <PopoverContent className="w-80" align="start">
-                            <div className="space-y-4">
-                              <h4 className="font-medium text-sm">
-                                Batch & Serial Information
-                              </h4>
-                              
-                              {item.is_batch_tracked && (
-                                <>
-                                  <div className="space-y-2">
-                                    <Label className="text-xs">Batch Number</Label>
-                                    <Input
-                                      value={item.batch_number || ''}
-                                      onChange={(e) =>
-                                        handleItemChange(index, 'batch_number', e.target.value)
-                                      }
-                                      placeholder="Enter batch number"
-                                    />
-                                  </div>
-                                  
-                                  <div className="space-y-2">
-                                    <Label className="text-xs">Manufacturing Date</Label>
-                                    <Input
-                                      type="date"
-                                      value={item.manufacturing_date || ''}
-                                      onChange={(e) =>
-                                        handleItemChange(index, 'manufacturing_date', e.target.value)
-                                      }
-                                    />
-                                  </div>
-                                  
-                                  <div className="space-y-2">
-                                    <Label className="text-xs">Expiry Date</Label>
-                                    <Input
-                                      type="date"
-                                      value={item.expiry_date || ''}
-                                      onChange={(e) =>
-                                        handleItemChange(index, 'expiry_date', e.target.value)
-                                      }
-                                    />
-                                  </div>
-                                </>
-                              )}
-                              
-                              {item.is_serialized && (
-                                <div className="space-y-2">
-                                  <Label className="text-xs">
-                                    Serial Numbers (one per line)
-                                  </Label>
-                                  <Textarea
-                                    value={item.serial_numbers?.join('\n') || ''}
-                                    onChange={(e) => {
-                                      const serials = e.target.value
-                                        .split('\n')
-                                        .map(s => s.trim())
-                                        .filter(s => s.length > 0);
-                                      handleItemChange(index, 'serial_numbers', serials);
-                                    }}
-                                    placeholder="Enter serial numbers, one per line"
-                                    rows={4}
-                                  />
-                                  <p className="text-xs text-muted-foreground">
-                                    {item.serial_numbers?.length || 0} serial(s) entered
-                                    {item.quantity_received > 0 && item.serial_numbers?.length !== item.quantity_received && (
-                                      <span className="text-amber-600 ml-2">
-                                        (should match qty: {item.quantity_received})
-                                      </span>
-                                    )}
-                                  </p>
-                                </div>
-                              )}
+                            <div className="space-y-2">
+                              <Label className="text-xs">Serial Numbers (one per line)</Label>
+                              <Textarea
+                                value={item.serial_numbers?.join('\n') || ''}
+                                onChange={(e) => {
+                                  const serials = e.target.value.split('\n').map(s => s.trim()).filter(s => s.length > 0);
+                                  handleItemChange(index, 'serial_numbers', serials);
+                                }}
+                                placeholder="Enter serial numbers, one per line"
+                                rows={4}
+                              />
+                              <p className="text-xs text-muted-foreground">
+                                {item.serial_numbers?.length || 0} serial(s) entered
+                                {item.quantity_received > 0 && item.serial_numbers?.length !== item.quantity_received && (
+                                  <span className="text-amber-600 ml-2">(should match qty: {item.quantity_received})</span>
+                                )}
+                              </p>
                             </div>
                           </PopoverContent>
                         </Popover>
