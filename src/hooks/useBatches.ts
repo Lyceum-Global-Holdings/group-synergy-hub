@@ -197,9 +197,9 @@ export const useIsItemBatchTracked = (warehouseItemId: string) => {
 };
 
 // Get all batches with filters for Batch Management page
-export const useAllBatches = (filters?: BatchFilters) => {
+export const useAllBatches = (filters?: BatchFilters, companyId?: string) => {
   return useQuery({
-    queryKey: ['all-batches', filters],
+    queryKey: ['all-batches', filters, companyId],
     queryFn: async () => {
       let query = supabase
         .from('item_batches')
@@ -217,6 +217,11 @@ export const useAllBatches = (filters?: BatchFilters) => {
       // Apply warehouse item filter
       if (filters?.warehouseItemId) {
         query = query.eq('warehouse_item_id', filters.warehouseItemId);
+      }
+
+      // Apply company filter at application level
+      if (companyId) {
+        query = query.eq('company_id', companyId);
       }
 
       const { data, error } = await query;
