@@ -243,6 +243,14 @@ export function GrnDetailsDialog({ grnId, open, onOpenChange }: GrnDetailsDialog
           </>
         )}
       </DialogContent>
+
+      <GrnBinAllocationDialog
+        open={showBinAllocation}
+        onOpenChange={setShowBinAllocation}
+        items={grn.grn_items || []}
+        onConfirm={handleBinAllocationConfirm}
+        isLoading={approveGrn.isPending}
+      />
     </Dialog>
   );
 }
