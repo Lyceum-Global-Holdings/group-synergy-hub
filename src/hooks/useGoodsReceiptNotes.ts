@@ -310,14 +310,43 @@ export const useApproveGoodsReceiptNote = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
-      // Get the GRN's company_id
+      // Get the GRN with items and grn_number
       const { data: grn, error: grnFetchError } = await supabase
         .from('goods_receipt_notes')
-        .select('company_id')
+        .select('company_id, grn_number, grn_items(id, warehouse_item_id, quantity_received, unit_price, total_cost, item_name)')
         .eq('id', id)
         .single();
 
       if (grnFetchError) throw grnFetchError;
+
+      // Fetch current stock levels BEFORE the approval trigger fires
+      const itemsWithStock: Array<{
+        warehouse_item_id: string;
+        quantity_received: number;
+        unit_price: number;
+        total_cost: number;
+        item_name: string;
+        quantity_before: number;
+      }> = [];
+
+      const grnItems = (grn as any).grn_items || [];
+      for (const item of grnItems) {
+        if (!item.warehouse_item_id) continue;
+        const { data: whItem } = await supabase
+          .from('warehouse_items')
+          .select('current_stock')
+          .eq('id', item.warehouse_item_id)
+          .single();
+
+        itemsWithStock.push({
+          warehouse_item_id: item.warehouse_item_id,
+          quantity_received: item.quantity_received || 0,
+          unit_price: item.unit_price || 0,
+          total_cost: item.total_cost || 0,
+          item_name: item.item_name || '',
+          quantity_before: whItem?.current_stock || 0,
+        });
+      }
 
       // Update GRN status to approved
       // The database trigger 'update_stock_on_grn_approval' handles updating warehouse_items.current_stock
@@ -331,6 +360,30 @@ export const useApproveGoodsReceiptNote = () => {
         .eq('id', id);
 
       if (approveError) throw approveError;
+
+      // Insert stock transaction records for movement history
+      if (itemsWithStock.length > 0) {
+        const stockTransactions = itemsWithStock.map((item) => ({
+          item_id: item.warehouse_item_id,
+          transaction_type: 'goods_receipt' as const,
+          reference_type: 'grn' as const,
+          reference_id: id,
+          quantity_change: item.quantity_received,
+          quantity_before: item.quantity_before,
+          quantity_after: item.quantity_before + item.quantity_received,
+          unit_cost: item.unit_price,
+          total_value: item.total_cost,
+          notes: `GRN ${(grn as any).grn_number} - ${item.item_name}`,
+          company_id: grn.company_id,
+          created_by: user.id,
+        }));
+
+        const { error: txError } = await supabase
+          .from('stock_transactions')
+          .insert(stockTransactions);
+
+        if (txError) throw txError;
+      }
 
       // Process bin allocations
       for (const alloc of binAllocations) {
