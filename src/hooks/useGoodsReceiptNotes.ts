@@ -295,19 +295,32 @@ export const useSubmitGoodsReceiptNote = () => {
   });
 };
 
+export interface GrnBinAllocationInput {
+  warehouse_item_id: string;
+  bin_id: string;
+  quantity: number;
+}
+
 export const useApproveGoodsReceiptNote = () => {
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
   return useMutation({
-    mutationFn: async (id: string) => {
+    mutationFn: async ({ id, binAllocations }: { id: string; binAllocations: GrnBinAllocationInput[] }) => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
+      // Get the GRN's company_id
+      const { data: grn, error: grnFetchError } = await supabase
+        .from('goods_receipt_notes')
+        .select('company_id')
+        .eq('id', id)
+        .single();
+
+      if (grnFetchError) throw grnFetchError;
+
       // Update GRN status to approved
-      // The database trigger 'update_stock_on_grn_approval' handles:
-      // - Creating stock transactions
-      // - Updating warehouse_items current_stock
+      // The database trigger 'update_stock_on_grn_approval' handles updating warehouse_items.current_stock
       const { error: approveError } = await supabase
         .from('goods_receipt_notes')
         .update({
@@ -318,6 +331,62 @@ export const useApproveGoodsReceiptNote = () => {
         .eq('id', id);
 
       if (approveError) throw approveError;
+
+      // Process bin allocations
+      for (const alloc of binAllocations) {
+        // Check if allocation already exists for this item+bin+company
+        const { data: existing } = await supabase
+          .from('warehouse_bin_allocations')
+          .select('id, allocated_quantity')
+          .eq('warehouse_item_id', alloc.warehouse_item_id)
+          .eq('bin_id', alloc.bin_id)
+          .eq('company_id', grn.company_id)
+          .maybeSingle();
+
+        if (existing) {
+          // Increment existing allocation
+          const { error: updateError } = await supabase
+            .from('warehouse_bin_allocations')
+            .update({
+              allocated_quantity: (existing.allocated_quantity || 0) + alloc.quantity,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', existing.id);
+
+          if (updateError) throw updateError;
+        } else {
+          // Insert new allocation
+          const { error: insertError } = await supabase
+            .from('warehouse_bin_allocations')
+            .insert({
+              warehouse_item_id: alloc.warehouse_item_id,
+              bin_id: alloc.bin_id,
+              allocated_quantity: alloc.quantity,
+              company_id: grn.company_id,
+              created_by: user.id,
+            });
+
+          if (insertError) throw insertError;
+        }
+
+        // Increment bin's current_quantity
+        const { data: binData } = await supabase
+          .from('warehouse_bins')
+          .select('current_quantity')
+          .eq('id', alloc.bin_id)
+          .single();
+
+        if (binData) {
+          const { error: binUpdateError } = await supabase
+            .from('warehouse_bins')
+            .update({
+              current_quantity: (binData.current_quantity || 0) + alloc.quantity,
+            })
+            .eq('id', alloc.bin_id);
+
+          if (binUpdateError) throw binUpdateError;
+        }
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['goods-receipt-notes'] });
@@ -325,9 +394,11 @@ export const useApproveGoodsReceiptNote = () => {
       queryClient.invalidateQueries({ queryKey: ['grn-summary'] });
       queryClient.invalidateQueries({ queryKey: ['warehouse-items'] });
       queryClient.invalidateQueries({ queryKey: ['stock-transactions'] });
+      queryClient.invalidateQueries({ queryKey: ['warehouse-bins'] });
+      queryClient.invalidateQueries({ queryKey: ['warehouse-bin-allocations'] });
       toast({
         title: 'Success',
-        description: 'GRN approved successfully. Stock has been updated.',
+        description: 'GRN approved and stock allocated to bins successfully.',
       });
     },
     onError: (error: Error) => {

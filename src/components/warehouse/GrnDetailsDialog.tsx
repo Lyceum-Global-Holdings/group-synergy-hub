@@ -27,6 +27,7 @@ import { format } from 'date-fns';
 import { useState } from 'react';
 import { FileText } from 'lucide-react';
 import { GrnDocument } from './GrnDocument';
+import { GrnBinAllocationDialog, BinAllocation } from './GrnBinAllocationDialog';
 
 const statusColors: Record<GrnStatus, string> = {
   draft: 'bg-gray-500',
@@ -58,11 +59,24 @@ export function GrnDetailsDialog({ grnId, open, onOpenChange }: GrnDetailsDialog
   const submitGrn = useSubmitGoodsReceiptNote();
   const deleteGrn = useDeleteGoodsReceiptNote();
   const [showDocument, setShowDocument] = useState(false);
+  const [showBinAllocation, setShowBinAllocation] = useState(false);
 
   if (!grn) return null;
 
-  const handleApprove = async () => {
-    await approveGrn.mutateAsync(grn.id);
+  const handleApprove = () => {
+    setShowBinAllocation(true);
+  };
+
+  const handleBinAllocationConfirm = async (allocations: BinAllocation[]) => {
+    await approveGrn.mutateAsync({
+      id: grn.id,
+      binAllocations: allocations.map((a) => ({
+        warehouse_item_id: a.warehouse_item_id,
+        bin_id: a.bin_id,
+        quantity: a.quantity,
+      })),
+    });
+    setShowBinAllocation(false);
   };
 
   const handleSubmit = async () => {
@@ -229,6 +243,14 @@ export function GrnDetailsDialog({ grnId, open, onOpenChange }: GrnDetailsDialog
           </>
         )}
       </DialogContent>
+
+      <GrnBinAllocationDialog
+        open={showBinAllocation}
+        onOpenChange={setShowBinAllocation}
+        items={grn.grn_items || []}
+        onConfirm={handleBinAllocationConfirm}
+        isLoading={approveGrn.isPending}
+      />
     </Dialog>
   );
 }
