@@ -1,34 +1,38 @@
 
 
-## Fix Batch Detail Tracking in Batch Management
+## Fix: Batch Records Not Properly Created on GRN
 
-### Problem
-Batch records exist in `item_batches` but tracking details are incomplete across the system:
-1. GRN item queries omit `batch_number`, `manufacturing_date`, `expiry_date` — so GRN details don't show batch info
-2. GRN details dialog has no batch columns in the items table
-3. Batch details dialog shows no issue/consumption history (no `batch_issue_details` query)
-4. Batch records don't link back to their source GRN
+### Root Cause
 
-### Plan
+The trigger `create_batches_on_grn_approval` **is working** — batch records are being created. However, the problem is:
 
-**1. Add batch fields to GRN item queries** — `src/hooks/useGoodsReceiptNotes.ts`
-- In `useGoodsReceiptNotes` and `useGrnById`, add `batch_number, manufacturing_date, expiry_date` to the `grn_items(...)` select
+1. **Batch details are empty**: The GRN form's batch fields (batch number, manufacturing date, expiry date) are hidden inside a small popover button that says "Enter" — users don't notice it or skip it
+2. **No validation**: Batch-tracked items can be submitted without any batch details, resulting in auto-generated meaningless batch numbers like `BATCH-20260326-115055-00bfda61` with no dates
+3. **Poor UX**: Per international standards (ISO 22000, GMP/GDP, IAS 2), batch-tracked items must have proper batch identification at goods receipt
 
-**2. Show batch info in GRN details** — `src/components/warehouse/GrnDetailsDialog.tsx`
-- Add `Batch #`, `Mfg Date`, `Expiry` columns to the items table in the "Items" tab
-- Only show these columns when at least one item has batch data
+### Solution (International Best Practice)
 
-**3. Add issue history to batch details** — `src/components/warehouse/BatchDetailsDialog.tsx`
-- Query `batch_issue_details` for the selected batch, joining `material_issue_items(material_issues(issue_number, issue_date, issued_to))`
-- Display a "Consumption History" section showing: issue number, date, quantity consumed, issued to
-- This gives full traceability from batch → which issues consumed it
+**Make batch details mandatory and visible for batch-tracked items**, following ISO/GMP receiving standards:
 
-**4. Add GRN source link to batch details** — `src/components/warehouse/BatchDetailsDialog.tsx`
-- Use the existing `grn_item_id` on the batch to fetch the parent GRN number
-- Display "Source GRN" in the batch info section
+**1. Make batch fields inline and visible** — `CreateGrnDialog.tsx`
+- For batch-tracked items, show batch number, manufacturing date, and expiry date as **dedicated table rows or inline fields** instead of hiding them in a popover
+- Add a visual indicator (badge) showing the item requires batch tracking
+- Add validation: prevent form submission if any batch-tracked item is missing a batch number
+
+**2. Add validation on submit** — `CreateGrnDialog.tsx`
+- Before submitting, check all batch-tracked items have a `batch_number`
+- Show a clear error toast listing which items are missing batch details
+- Optionally warn (not block) if manufacturing/expiry dates are missing
+
+**3. Auto-suggest batch number format** — `CreateGrnDialog.tsx`
+- Provide a "Generate" button that creates a standardized batch number: `{ITEM_CODE}-{YYYYMMDD}-{SEQ}` (following GMP batch numbering conventions)
+- User can override with supplier's batch number
 
 ### Files to Edit
-- `src/hooks/useGoodsReceiptNotes.ts` — add 3 fields to grn_items select (2 queries)
-- `src/components/warehouse/GrnDetailsDialog.tsx` — add batch columns to items table
-- `src/components/warehouse/BatchDetailsDialog.tsx` — add consumption history section + GRN source
+- `src/components/warehouse/CreateGrnDialog.tsx` — make batch fields inline, add validation, add auto-generate button
+
+### Technical Notes
+- No database changes needed — trigger and schema are correct
+- The trigger's COALESCE fallback for auto-generating batch numbers is kept as a safety net
+- Expiry date validation: warn if expiry is in the past or within 30 days
 
