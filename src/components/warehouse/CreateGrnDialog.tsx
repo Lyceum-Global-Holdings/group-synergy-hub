@@ -267,6 +267,13 @@ export function CreateGrnDialog({ open, onOpenChange, poId }: CreateGrnDialogPro
     return { label: 'Pending', variant: 'secondary' };
   };
 
+  const generateBatchNumber = (item: CreateGrnItemData, index: number) => {
+    const dateStr = format(new Date(), 'yyyyMMdd');
+    const code = item.item_code || item.item_name?.substring(0, 6).toUpperCase().replace(/\s/g, '') || 'ITEM';
+    const seq = String(index + 1).padStart(2, '0');
+    return `${code}-${dateStr}-${seq}`;
+  };
+
   const handleSubmit = async (status: 'draft' | 'submitted') => {
     const values = form.getValues();
 
@@ -276,6 +283,28 @@ export function CreateGrnDialog({ open, onOpenChange, poId }: CreateGrnDialogPro
     if (validItems.length === 0) {
       alert('Please add at least one item with quantity received > 0');
       return;
+    }
+
+    // Validate batch-tracked items have batch numbers
+    const missingBatch = validItems.filter(
+      (item) => item.is_batch_tracked && !item.batch_number?.trim()
+    );
+    if (missingBatch.length > 0) {
+      const names = missingBatch.map((i) => i.item_name).join(', ');
+      alert(`Batch number is required for batch-tracked items: ${names}`);
+      return;
+    }
+
+    // Warn about missing dates (don't block)
+    const missingDates = validItems.filter(
+      (item) => item.is_batch_tracked && (!item.manufacturing_date || !item.expiry_date)
+    );
+    if (missingDates.length > 0) {
+      const names = missingDates.map((i) => i.item_name).join(', ');
+      const proceed = window.confirm(
+        `Manufacturing/Expiry dates are missing for: ${names}.\n\nPer GMP standards, these dates should be recorded. Continue anyway?`
+      );
+      if (!proceed) return;
     }
 
     await createGrn.mutateAsync({
