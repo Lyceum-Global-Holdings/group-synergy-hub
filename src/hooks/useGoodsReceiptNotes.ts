@@ -30,6 +30,9 @@ export const useGoodsReceiptNotes = (companyId?: string) => {
             total_cost,
             quality_status,
             remarks,
+            batch_number,
+            manufacturing_date,
+            expiry_date,
             created_at,
             updated_at
           )
@@ -76,6 +79,9 @@ export const useGrnById = (id: string) => {
             total_cost,
             quality_status,
             remarks,
+            batch_number,
+            manufacturing_date,
+            expiry_date,
             created_at,
             updated_at
           )

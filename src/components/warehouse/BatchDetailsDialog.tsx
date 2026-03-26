@@ -13,9 +13,13 @@ import {
   CheckCircle,
   XCircle,
   Clock,
-  Shield
+  Shield,
+  History,
+  FileText
 } from "lucide-react";
 import { useUpdateBatchStatus } from "@/hooks/useBatches";
+import { supabase } from "@/integrations/supabase/client";
+import { useQuery } from "@tanstack/react-query";
 import {
   Select,
   SelectContent,
@@ -23,6 +27,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { useState } from "react";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -61,6 +73,52 @@ export function BatchDetailsDialog({ batch, open, onOpenChange }: BatchDetailsDi
   const [notes, setNotes] = useState('');
   const updateStatus = useUpdateBatchStatus();
 
+  // Fetch consumption history
+  const { data: consumptionHistory = [] } = useQuery({
+    queryKey: ['batch-consumption', batch?.id],
+    queryFn: async () => {
+      if (!batch?.id) return [];
+      const { data, error } = await supabase
+        .from('batch_issue_details')
+        .select(`
+          id,
+          quantity_from_batch,
+          created_at,
+          issue_item:material_issue_items(
+            id,
+            issue:material_issues(
+              issue_number,
+              issue_date,
+              issued_to
+            )
+          )
+        `)
+        .eq('batch_id', batch.id)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!batch?.id && open,
+  });
+
+  // Fetch source GRN info
+  const { data: sourceGrn } = useQuery({
+    queryKey: ['batch-source-grn', batch?.grn_item_id],
+    queryFn: async () => {
+      if (!batch?.grn_item_id) return null;
+      const { data, error } = await supabase
+        .from('grn_items')
+        .select('grn_id, grn:goods_receipt_notes(grn_number, grn_date)')
+        .eq('id', batch.grn_item_id)
+        .single();
+
+      if (error) return null;
+      return data;
+    },
+    enabled: !!batch?.grn_item_id && open,
+  });
+
   if (!batch) return null;
 
   const today = new Date();
@@ -91,7 +149,7 @@ export function BatchDetailsDialog({ batch, open, onOpenChange }: BatchDetailsDi
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Package className="h-5 w-5" />
@@ -136,6 +194,30 @@ export function BatchDetailsDialog({ batch, open, onOpenChange }: BatchDetailsDi
               </div>
             </div>
           </div>
+
+          {/* Source GRN */}
+          {sourceGrn && (
+            <div className="bg-blue-500/5 border border-blue-500/20 rounded-lg p-4">
+              <h4 className="font-medium flex items-center gap-2 mb-2">
+                <FileText className="h-4 w-4 text-blue-600" />
+                Source GRN
+              </h4>
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <span className="text-muted-foreground">GRN Number:</span>
+                  <p className="font-medium">{(sourceGrn as any).grn?.grn_number || 'N/A'}</p>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">GRN Date:</span>
+                  <p className="font-medium">
+                    {(sourceGrn as any).grn?.grn_date 
+                      ? format(parseISO((sourceGrn as any).grn.grn_date), 'PP') 
+                      : 'N/A'}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
 
           <Separator />
 
@@ -227,6 +309,52 @@ export function BatchDetailsDialog({ batch, open, onOpenChange }: BatchDetailsDi
               </div>
             </div>
           </div>
+
+          {/* Consumption History */}
+          {consumptionHistory.length > 0 && (
+            <>
+              <Separator />
+              <div className="space-y-3">
+                <h4 className="font-medium flex items-center gap-2">
+                  <History className="h-4 w-4" />
+                  Consumption History
+                </h4>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Issue #</TableHead>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Issued To</TableHead>
+                      <TableHead className="text-right">Qty Consumed</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {consumptionHistory.map((record: any) => {
+                      const issue = record.issue_item?.issue;
+                      return (
+                        <TableRow key={record.id}>
+                          <TableCell className="font-medium">
+                            {issue?.issue_number || 'N/A'}
+                          </TableCell>
+                          <TableCell>
+                            {issue?.issue_date 
+                              ? format(parseISO(issue.issue_date), 'PP') 
+                              : record.created_at 
+                                ? format(parseISO(record.created_at), 'PP')
+                                : '-'}
+                          </TableCell>
+                          <TableCell>{issue?.issued_to || '-'}</TableCell>
+                          <TableCell className="text-right font-medium">
+                            {record.quantity_from_batch}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+            </>
+          )}
 
           {/* Notes */}
           {batch.notes && (
