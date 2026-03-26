@@ -1,38 +1,47 @@
 
 
-## Fix: Batch Records Not Properly Created on GRN
+## Fix: Batches Not Showing in Batch Management
 
 ### Root Cause
 
-The trigger `create_batches_on_grn_approval` **is working** — batch records are being created. However, the problem is:
+The RLS SELECT policy on `item_batches` restricts access to batches where `company_id` matches the user's `profiles.company_id`. However, the user operates across multiple companies — GRNs are created under `NCG Warehouse Solutions` (via selectedCompany context), but the user's profile is linked to `Lyceum Nugegoda Quarters`. The batch trigger copies the GRN's company_id, so the resulting batches are invisible to the user.
 
-1. **Batch details are empty**: The GRN form's batch fields (batch number, manufacturing date, expiry date) are hidden inside a small popover button that says "Enter" — users don't notice it or skip it
-2. **No validation**: Batch-tracked items can be submitted without any batch details, resulting in auto-generated meaningless batch numbers like `BATCH-20260326-115055-00bfda61` with no dates
-3. **Poor UX**: Per international standards (ISO 22000, GMP/GDP, IAS 2), batch-tracked items must have proper batch identification at goods receipt
+Other tables like `goods_receipt_notes` and `warehouse_items` use role-based access (any authenticated user / warehouse access), not company-scoped RLS.
 
-### Solution (International Best Practice)
+### Fix
 
-**Make batch details mandatory and visible for batch-tracked items**, following ISO/GMP receiving standards:
+**1. Migration: Update `item_batches` RLS SELECT policy** to match the pattern used by `warehouse_items` and `goods_receipt_notes`:
 
-**1. Make batch fields inline and visible** — `CreateGrnDialog.tsx`
-- For batch-tracked items, show batch number, manufacturing date, and expiry date as **dedicated table rows or inline fields** instead of hiding them in a popover
-- Add a visual indicator (badge) showing the item requires batch tracking
-- Add validation: prevent form submission if any batch-tracked item is missing a batch number
+```sql
+DROP POLICY "Users can view batches in their company" ON item_batches;
 
-**2. Add validation on submit** — `CreateGrnDialog.tsx`
-- Before submitting, check all batch-tracked items have a `batch_number`
-- Show a clear error toast listing which items are missing batch details
-- Optionally warn (not block) if manufacturing/expiry dates are missing
+CREATE POLICY "Users can view batches"
+  ON item_batches FOR SELECT
+  TO authenticated
+  USING (true);
+```
 
-**3. Auto-suggest batch number format** — `CreateGrnDialog.tsx`
-- Provide a "Generate" button that creates a standardized batch number: `{ITEM_CODE}-{YYYYMMDD}-{SEQ}` (following GMP batch numbering conventions)
-- User can override with supplier's batch number
+This matches the GRN policy pattern (authenticated users can view). Company filtering is handled at the application level via the selectedCompany context.
 
-### Files to Edit
-- `src/components/warehouse/CreateGrnDialog.tsx` — make batch fields inline, add validation, add auto-generate button
+Also update UPDATE/DELETE/INSERT policies similarly to allow cross-company operations for warehouse users:
 
-### Technical Notes
-- No database changes needed — trigger and schema are correct
-- The trigger's COALESCE fallback for auto-generating batch numbers is kept as a safety net
-- Expiry date validation: warn if expiry is in the past or within 30 days
+```sql
+DROP POLICY "Users can update batches in their company" ON item_batches;
+CREATE POLICY "Users can update batches"
+  ON item_batches FOR UPDATE TO authenticated USING (true);
+
+DROP POLICY "Users can delete batches in their company" ON item_batches;
+CREATE POLICY "Users can delete batches"
+  ON item_batches FOR DELETE TO authenticated USING (true);
+
+DROP POLICY "Users can insert batches in their company" ON item_batches;
+CREATE POLICY "Users can insert batches"
+  ON item_batches FOR INSERT TO authenticated WITH CHECK (true);
+```
+
+**2. Edit `src/hooks/useBatches.ts`**: Update `useAllBatches` to accept an optional `companyId` parameter and filter by it at the query level (application-level company filtering).
+
+### Files
+- **New migration**: Replace 4 RLS policies on `item_batches`
+- **Edit**: `src/hooks/useBatches.ts` — add optional companyId filter to `useAllBatches`
 
