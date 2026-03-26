@@ -1,40 +1,50 @@
 
 
-## Fix: Add Stock Transaction Records on GRN Approval
+## FIFO Batch-Based Stock Issuance
 
 ### Problem
-When a GRN is approved, the DB trigger updates `warehouse_items.current_stock` and the frontend handles bin allocations, but **no `stock_transactions` record is created**. This means GRN receipts don't appear in the stock movement history.
+Items are batch-tracked (`item_batches` table with `quantity_remaining`), but the current issue flow (`IssueItemsDialog.tsx`) ignores batches entirely — it deducts stock from `warehouse_items` and bin allocations without consuming from batches or recording `batch_issue_details`.
 
 ### Solution
-After the GRN status is updated to `approved`, insert a `stock_transactions` record for each GRN item with `transaction_type: 'goods_receipt'` and `reference_type: 'grn'`.
+Implement automatic FIFO batch consumption during material issuance. When items are issued, the system will:
+1. Query available batches ordered by `created_at ASC` (oldest first = FIFO)
+2. Consume from each batch sequentially until the issued quantity is fulfilled
+3. Record each batch deduction in `batch_issue_details`
+4. Decrement `item_batches.quantity_remaining`
+5. Set `batch_allocation_mode = 'fifo'` on the issue item
 
-### Changes
+### Implementation
 
-**Edit `src/hooks/useGoodsReceiptNotes.ts`**
+**1. New DB function: `process_fifo_batch_issue` (migration)**
 
-In `useApproveGoodsReceiptNote`, after the GRN status update succeeds (line 333) and before processing bin allocations:
+A SECURITY DEFINER function that:
+- Takes `p_issue_item_id`, `p_item_id`, `p_quantity_issued`, `p_company_id`
+- Selects from `item_batches` WHERE `warehouse_item_id = p_item_id` AND `company_id = p_company_id` AND `status = 'active'` AND `quantity_remaining > 0` ORDER BY `created_at ASC` (FIFO)
+- Loops through batches, consuming `MIN(quantity_remaining, remaining_to_issue)` from each
+- Inserts `batch_issue_details` for each consumed batch
+- Updates `item_batches.quantity_remaining` (triggers existing `update_batch_status` to auto-set `depleted`)
+- Updates `material_issue_items.batch_allocation_mode = 'fifo'`
+- Raises exception if total available across batches is insufficient
 
-1. Expand the GRN fetch (line 316) to also select `grn_items(id, warehouse_item_id, quantity_received, unit_price, total_cost, item_name)` and `grn_number`
-2. For each GRN item that has a `warehouse_item_id`, fetch the item's `current_stock` from `warehouse_items`
-3. Insert a `stock_transactions` record:
-   - `item_id`: the `warehouse_item_id`
-   - `transaction_type`: `'goods_receipt'`
-   - `reference_type`: `'grn'`
-   - `reference_id`: the GRN id
-   - `quantity_change`: `quantity_received` (positive, since it's incoming stock)
-   - `quantity_before`: current stock before the trigger fires (fetched before status update)
-   - `quantity_after`: `quantity_before + quantity_received`
-   - `unit_cost`: `unit_price`
-   - `total_value`: `total_cost`
-   - `notes`: `"GRN {grn_number} - {item_name}"`
-   - `company_id`: from GRN
-   - `created_by`: current user
+**2. Update `IssueItemsDialog.tsx`**
 
-### Technical Detail
-The stock quantities (before/after) need to be captured **before** the status update triggers the DB function that increments `current_stock`. So the flow becomes:
-1. Fetch GRN with items and `grn_number`
-2. For each item, fetch current `warehouse_items.current_stock`
-3. Update GRN status → trigger fires, incrementing stock
-4. Insert `stock_transactions` records with the pre-captured quantities
-5. Process bin allocations (existing code)
+In `handleIssue`, after creating stock transactions and before updating warehouse stock:
+- For each item, call the new RPC `process_fifo_batch_issue`
+- This handles all batch deductions and audit trail automatically
+- The existing bin/stock deduction logic remains unchanged (it handles the physical stock side)
+
+**3. Update `IssueItemsDialog.tsx` UI**
+
+Add a "Batch Allocation Preview" section showing which batches will be consumed per item (read-only, computed from available batches in FIFO order). This gives visibility before confirming.
+
+### Files
+
+**New migration** — `process_fifo_batch_issue` function  
+**Edit** — `src/components/warehouse/IssueItemsDialog.tsx` — call RPC + add batch preview UI
+
+### Technical Notes
+- Existing `update_batch_status` trigger auto-marks batches as `depleted` when `quantity_remaining = 0`
+- Expired batches (`status = 'expired'`) are excluded from FIFO selection
+- The function uses `FOR UPDATE` row locking on batches to prevent race conditions
+- No changes needed to the existing `process_material_issue_stock_update` function — it continues handling bin/stock deductions independently
 
