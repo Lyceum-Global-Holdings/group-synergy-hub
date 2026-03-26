@@ -27,6 +27,7 @@ import { format } from 'date-fns';
 import { useState } from 'react';
 import { FileText } from 'lucide-react';
 import { GrnDocument } from './GrnDocument';
+import { GrnBinAllocationDialog, BinAllocation } from './GrnBinAllocationDialog';
 
 const statusColors: Record<GrnStatus, string> = {
   draft: 'bg-gray-500',
