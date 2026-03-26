@@ -1,50 +1,34 @@
 
 
-## FIFO Batch-Based Stock Issuance
+## Fix Batch Detail Tracking in Batch Management
 
 ### Problem
-Items are batch-tracked (`item_batches` table with `quantity_remaining`), but the current issue flow (`IssueItemsDialog.tsx`) ignores batches entirely — it deducts stock from `warehouse_items` and bin allocations without consuming from batches or recording `batch_issue_details`.
+Batch records exist in `item_batches` but tracking details are incomplete across the system:
+1. GRN item queries omit `batch_number`, `manufacturing_date`, `expiry_date` — so GRN details don't show batch info
+2. GRN details dialog has no batch columns in the items table
+3. Batch details dialog shows no issue/consumption history (no `batch_issue_details` query)
+4. Batch records don't link back to their source GRN
 
-### Solution
-Implement automatic FIFO batch consumption during material issuance. When items are issued, the system will:
-1. Query available batches ordered by `created_at ASC` (oldest first = FIFO)
-2. Consume from each batch sequentially until the issued quantity is fulfilled
-3. Record each batch deduction in `batch_issue_details`
-4. Decrement `item_batches.quantity_remaining`
-5. Set `batch_allocation_mode = 'fifo'` on the issue item
+### Plan
 
-### Implementation
+**1. Add batch fields to GRN item queries** — `src/hooks/useGoodsReceiptNotes.ts`
+- In `useGoodsReceiptNotes` and `useGrnById`, add `batch_number, manufacturing_date, expiry_date` to the `grn_items(...)` select
 
-**1. New DB function: `process_fifo_batch_issue` (migration)**
+**2. Show batch info in GRN details** — `src/components/warehouse/GrnDetailsDialog.tsx`
+- Add `Batch #`, `Mfg Date`, `Expiry` columns to the items table in the "Items" tab
+- Only show these columns when at least one item has batch data
 
-A SECURITY DEFINER function that:
-- Takes `p_issue_item_id`, `p_item_id`, `p_quantity_issued`, `p_company_id`
-- Selects from `item_batches` WHERE `warehouse_item_id = p_item_id` AND `company_id = p_company_id` AND `status = 'active'` AND `quantity_remaining > 0` ORDER BY `created_at ASC` (FIFO)
-- Loops through batches, consuming `MIN(quantity_remaining, remaining_to_issue)` from each
-- Inserts `batch_issue_details` for each consumed batch
-- Updates `item_batches.quantity_remaining` (triggers existing `update_batch_status` to auto-set `depleted`)
-- Updates `material_issue_items.batch_allocation_mode = 'fifo'`
-- Raises exception if total available across batches is insufficient
+**3. Add issue history to batch details** — `src/components/warehouse/BatchDetailsDialog.tsx`
+- Query `batch_issue_details` for the selected batch, joining `material_issue_items(material_issues(issue_number, issue_date, issued_to))`
+- Display a "Consumption History" section showing: issue number, date, quantity consumed, issued to
+- This gives full traceability from batch → which issues consumed it
 
-**2. Update `IssueItemsDialog.tsx`**
+**4. Add GRN source link to batch details** — `src/components/warehouse/BatchDetailsDialog.tsx`
+- Use the existing `grn_item_id` on the batch to fetch the parent GRN number
+- Display "Source GRN" in the batch info section
 
-In `handleIssue`, after creating stock transactions and before updating warehouse stock:
-- For each item, call the new RPC `process_fifo_batch_issue`
-- This handles all batch deductions and audit trail automatically
-- The existing bin/stock deduction logic remains unchanged (it handles the physical stock side)
-
-**3. Update `IssueItemsDialog.tsx` UI**
-
-Add a "Batch Allocation Preview" section showing which batches will be consumed per item (read-only, computed from available batches in FIFO order). This gives visibility before confirming.
-
-### Files
-
-**New migration** — `process_fifo_batch_issue` function  
-**Edit** — `src/components/warehouse/IssueItemsDialog.tsx` — call RPC + add batch preview UI
-
-### Technical Notes
-- Existing `update_batch_status` trigger auto-marks batches as `depleted` when `quantity_remaining = 0`
-- Expired batches (`status = 'expired'`) are excluded from FIFO selection
-- The function uses `FOR UPDATE` row locking on batches to prevent race conditions
-- No changes needed to the existing `process_material_issue_stock_update` function — it continues handling bin/stock deductions independently
+### Files to Edit
+- `src/hooks/useGoodsReceiptNotes.ts` — add 3 fields to grn_items select (2 queries)
+- `src/components/warehouse/GrnDetailsDialog.tsx` — add batch columns to items table
+- `src/components/warehouse/BatchDetailsDialog.tsx` — add consumption history section + GRN source
 
