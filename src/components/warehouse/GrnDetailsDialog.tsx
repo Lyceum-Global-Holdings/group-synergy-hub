@@ -59,11 +59,24 @@ export function GrnDetailsDialog({ grnId, open, onOpenChange }: GrnDetailsDialog
   const submitGrn = useSubmitGoodsReceiptNote();
   const deleteGrn = useDeleteGoodsReceiptNote();
   const [showDocument, setShowDocument] = useState(false);
+  const [showBinAllocation, setShowBinAllocation] = useState(false);
 
   if (!grn) return null;
 
-  const handleApprove = async () => {
-    await approveGrn.mutateAsync(grn.id);
+  const handleApprove = () => {
+    setShowBinAllocation(true);
+  };
+
+  const handleBinAllocationConfirm = async (allocations: BinAllocation[]) => {
+    await approveGrn.mutateAsync({
+      id: grn.id,
+      binAllocations: allocations.map((a) => ({
+        warehouse_item_id: a.warehouse_item_id,
+        bin_id: a.bin_id,
+        quantity: a.quantity,
+      })),
+    });
+    setShowBinAllocation(false);
   };
 
   const handleSubmit = async () => {
