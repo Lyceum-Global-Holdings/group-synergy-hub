@@ -19365,6 +19365,15 @@ export type Database = {
           statement_line_id: string
         }[]
       }
+      process_fifo_batch_issue: {
+        Args: {
+          p_company_id: string
+          p_issue_item_id: string
+          p_item_id: string
+          p_quantity_issued: number
+        }
+        Returns: undefined
+      }
       process_material_issue_stock_update: {
         Args: {
           p_bin_allocation_id?: string
