@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useCompany } from "@/contexts/CompanyContext";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -62,6 +63,7 @@ const statusConfig: Record<BatchStatus, { label: string; color: string; icon: Re
 
 export default function BatchManagement() {
   const queryClient = useQueryClient();
+  const { selectedCompany } = useCompany();
   const [filters, setFilters] = useState<BatchFilters>({
     status: 'all',
     expiryFilter: 'all',
@@ -71,7 +73,7 @@ export default function BatchManagement() {
   const [selectedBatch, setSelectedBatch] = useState<ItemBatch | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
 
-  const { data: batches = [], isLoading: batchesLoading, refetch } = useAllBatches(filters);
+  const { data: batches = [], isLoading: batchesLoading, refetch } = useAllBatches(filters, selectedCompany?.id);
   const { data: summary, isLoading: summaryLoading } = useBatchSummary();
   const { data: batchTrackedItems = [] } = useBatchTrackedItems();
 
