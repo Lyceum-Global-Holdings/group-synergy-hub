@@ -422,7 +422,7 @@ export function CreateGrnDialog({ open, onOpenChange, poId }: CreateGrnDialogPro
                   <TableHead>Unit Price</TableHead>
                   <TableHead>Total</TableHead>
                   <TableHead>Quality</TableHead>
-                  <TableHead>Batch/Serial</TableHead>
+                   <TableHead>Batch/Serial</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead></TableHead>
                 </TableRow>
