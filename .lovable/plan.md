@@ -1,47 +1,75 @@
 
 
-## Fix: Batches Not Showing in Batch Management
+## Fix: Consolidate Duplicate Bin Allocations and Enforce FIFO for Transfers/Issues
 
-### Root Cause
+### Problem
 
-The RLS SELECT policy on `item_batches` restricts access to batches where `company_id` matches the user's `profiles.company_id`. However, the user operates across multiple companies — GRNs are created under `NCG Warehouse Solutions` (via selectedCompany context), but the user's profile is linked to `Lyceum Nugegoda Quarters`. The batch trigger copies the GRN's company_id, so the resulting batches are invisible to the user.
+1. **Duplicate bin allocations**: 57 item+bin+company combinations have multiple rows in `warehouse_bin_allocations` instead of one consolidated row. This is because there is no unique constraint on `(warehouse_item_id, bin_id, company_id)`. The screenshot shows the same bin (LNPE) appearing 5 times with different quantities (10, 10, 2, 19, 10) in the transfer dropdown.
 
-Other tables like `goods_receipt_notes` and `warehouse_items` use role-based access (any authenticated user / warehouse access), not company-scoped RLS.
+2. **No FIFO enforcement on transfers**: The transfer dialog picks from individual bin allocation rows but doesn't consider batch age. Per IAS 2 / ISO 22000 / GMP standards, stock should be issued and transferred on a FIFO basis using batch expiry/manufacturing dates.
 
-### Fix
+### Solution
 
-**1. Migration: Update `item_batches` RLS SELECT policy** to match the pattern used by `warehouse_items` and `goods_receipt_notes`:
-
-```sql
-DROP POLICY "Users can view batches in their company" ON item_batches;
-
-CREATE POLICY "Users can view batches"
-  ON item_batches FOR SELECT
-  TO authenticated
-  USING (true);
-```
-
-This matches the GRN policy pattern (authenticated users can view). Company filtering is handled at the application level via the selectedCompany context.
-
-Also update UPDATE/DELETE/INSERT policies similarly to allow cross-company operations for warehouse users:
+**1. Migration: Consolidate duplicates and add unique constraint**
 
 ```sql
-DROP POLICY "Users can update batches in their company" ON item_batches;
-CREATE POLICY "Users can update batches"
-  ON item_batches FOR UPDATE TO authenticated USING (true);
+-- Merge duplicate rows: keep oldest, sum quantities into it, delete rest
+WITH dupes AS (
+  SELECT warehouse_item_id, bin_id, company_id,
+    MIN(id) as keep_id,
+    SUM(allocated_quantity) as total_alloc,
+    SUM(reserved_quantity) as total_reserved
+  FROM warehouse_bin_allocations
+  GROUP BY warehouse_item_id, bin_id, company_id
+  HAVING COUNT(*) > 1
+)
+UPDATE warehouse_bin_allocations wba
+SET allocated_quantity = d.total_alloc,
+    reserved_quantity = d.total_reserved
+FROM dupes d
+WHERE wba.id = d.keep_id;
 
-DROP POLICY "Users can delete batches in their company" ON item_batches;
-CREATE POLICY "Users can delete batches"
-  ON item_batches FOR DELETE TO authenticated USING (true);
+-- Delete the non-kept duplicates
+DELETE FROM warehouse_bin_allocations
+WHERE id NOT IN (
+  SELECT MIN(id) FROM warehouse_bin_allocations
+  GROUP BY warehouse_item_id, bin_id, company_id
+);
 
-DROP POLICY "Users can insert batches in their company" ON item_batches;
-CREATE POLICY "Users can insert batches"
-  ON item_batches FOR INSERT TO authenticated WITH CHECK (true);
+-- Add unique constraint to prevent future duplicates
+ALTER TABLE warehouse_bin_allocations
+  ADD CONSTRAINT unique_item_bin_company
+  UNIQUE (warehouse_item_id, bin_id, company_id);
 ```
 
-**2. Edit `src/hooks/useBatches.ts`**: Update `useAllBatches` to accept an optional `companyId` parameter and filter by it at the query level (application-level company filtering).
+**2. Migration: Create `transfer_stock_fifo` RPC** — A database function that:
+- Deducts from source bin allocation
+- Adds to destination bin allocation (upsert via the new unique constraint)
+- Automatically selects batches FIFO (oldest expiry/manufacturing date first)
+- Creates `batch_stock_allocations` records for the destination bin
+- Inserts `stock_transactions` for audit trail
+
+**3. Edit `ItemTransferDialog.tsx`** — Fix the bin dropdown to show consolidated allocations (one entry per bin) and call the new FIFO RPC instead of manual allocation updates.
+
+**4. Edit `useGoodsReceiptNotes.ts`** — Replace the manual check-then-insert bin allocation logic with an `ON CONFLICT` upsert that leverages the new unique constraint.
+
+### Technical Details
+
+The FIFO RPC will:
+```text
+1. Accept: item_id, from_bin_id, to_bin_id, quantity, company_id, user_id
+2. Validate: source bin has sufficient available_quantity
+3. Select batches from item_batches WHERE warehouse_item_id = item_id
+   AND status = 'active' ORDER BY expiry_date ASC NULLS LAST, manufacturing_date ASC, created_at ASC
+4. For each batch (FIFO order): deduct min(remaining_transfer_qty, batch.quantity_remaining)
+5. Deduct from source warehouse_bin_allocations
+6. Upsert into destination warehouse_bin_allocations
+7. Log stock_transaction (type: 'transfer')
+```
 
 ### Files
-- **New migration**: Replace 4 RLS policies on `item_batches`
-- **Edit**: `src/hooks/useBatches.ts` — add optional companyId filter to `useAllBatches`
+
+- **New migration**: Consolidate duplicates, add unique constraint, create `transfer_stock_fifo` RPC
+- **Edit**: `src/components/warehouse/ItemTransferDialog.tsx` — use consolidated bins, call FIFO RPC
+- **Edit**: `src/hooks/useGoodsReceiptNotes.ts` — simplify bin allocation to use upsert
 
