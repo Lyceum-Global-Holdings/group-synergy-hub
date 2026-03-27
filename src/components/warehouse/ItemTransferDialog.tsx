@@ -39,7 +39,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useCreateStockTransfer, useCreateStockTransferItem, useCompleteStockTransfer } from "@/hooks/useStockTransfer";
+import { useCreateStockTransfer, useCreateStockTransferItem } from "@/hooks/useStockTransfer";
 import { useWarehouseBins } from "@/hooks/useWarehouseBins";
 import { useWarehouseLocations } from "@/hooks/useWarehouseLocations";
 import { WarehouseItem } from "@/types/itemBin";
@@ -87,7 +87,6 @@ export function ItemTransferDialog({
 
   const createTransfer = useCreateStockTransfer();
   const createItem = useCreateStockTransferItem();
-  const completeTransfer = useCompleteStockTransfer();
   const { bins = [] } = useWarehouseBins();
   const { locations = [] } = useWarehouseLocations();
   const { units } = useItemUnits();
