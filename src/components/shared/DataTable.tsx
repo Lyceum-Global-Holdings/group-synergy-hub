@@ -28,16 +28,18 @@ export function DataTable<T extends Record<string, unknown>>({
 }: DataTableProps<T>) {
   if (isLoading) {
     return (
-      <div className="space-y-2">
-        {Array.from({ length: 5 }).map((_, i) => (
-          <Skeleton key={i} className="h-12 w-full" />
-        ))}
+      <div className="rounded-lg bg-card shadow-[var(--shadow-sm)] border border-border/50 overflow-hidden">
+        <div className="p-4 space-y-3">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <Skeleton key={i} className="h-10 w-full rounded-md" />
+          ))}
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="rounded-md border">
+    <div className="rounded-lg bg-card shadow-[var(--shadow-sm)] border border-border/50 overflow-hidden">
       <Table>
         <TableHeader>
           <TableRow>
@@ -60,7 +62,7 @@ export function DataTable<T extends Record<string, unknown>>({
               <TableRow
                 key={(row.id as string) || idx}
                 className={cn(
-                  onRowClick && "cursor-pointer hover:bg-muted/50",
+                  onRowClick && "cursor-pointer",
                   typeof rowClassName === "function" ? rowClassName(row) : rowClassName
                 )}
                 onClick={() => onRowClick?.(row)}

@@ -68,7 +68,6 @@ export function CompanySidebar() {
   const isGroupActive = (items: { url: string }[]) =>
     items.some((item) => currentPath.startsWith(item.url));
 
-  // Get all unique modules when viewing all companies
   const getAllUniqueModules = () => {
     const allModules = new Set<string>();
     companies.forEach(company => {
@@ -82,7 +81,6 @@ export function CompanySidebar() {
     return Array.from(allModules);
   };
 
-  // Get companies that use a specific module
   const getCompaniesUsingModule = (moduleKey: string) => {
     return companies.filter(company => {
       try {
@@ -95,24 +93,18 @@ export function CompanySidebar() {
     });
   };
 
-  // Filter modules based on selected company or show all when viewing all companies
-  // Super admins see all modules only when viewing "All Companies"
-  // When a specific company is selected, show only that company's modules
   const companyModules = isViewingAllCompanies
     ? (isSuperAdmin ? Object.keys(moduleConfig) : getAllUniqueModules())
     : selectedCompany
       ? Object.keys(normalizeCompanyModules(selectedCompany.modules))
       : [];
 
-  // Filter by user permissions (unless super admin)
-  // Super admins always get "administration" even when viewing a specific company
   const availableModules = isSuperAdmin 
     ? (companyModules.includes("administration") ? companyModules : [...companyModules, "administration"])
     : companyModules.filter(moduleKey => 
         userEffectiveModules?.availableModules?.includes(moduleKey)
       );
     
-  // Ensure availableModules is always an array
   const safeAvailableModules = Array.isArray(availableModules) ? availableModules : [];
     
   const departments: ModuleWithCompanies[] = safeAvailableModules
@@ -120,7 +112,6 @@ export function CompanySidebar() {
       const config = moduleConfig[moduleKey];
       if (!config) return null;
       
-      // Start from configured sub-modules
       let enabledItems: SidebarItem[] = config.subModules.map(sub => ({
         title: sub.name,
         url: sub.url,
@@ -128,7 +119,6 @@ export function CompanySidebar() {
         children: sub.children
       }));
 
-      // Add super-admin-only Backend Monitor under Administration
       if (moduleKey === "administration" && isSuperAdmin) {
         enabledItems.push({
           title: "Backend Monitor",
@@ -137,8 +127,6 @@ export function CompanySidebar() {
         });
       }
 
-      // When viewing a specific company, filter sub-modules based on company settings
-      // Keep backend-monitor visible for super admins even if not part of company module config
       if (!isViewingAllCompanies && selectedCompany) {
         const companyModules = normalizeCompanyModules(selectedCompany.modules);
         const enabledSubModules = companyModules[moduleKey] || [];
@@ -147,7 +135,6 @@ export function CompanySidebar() {
         );
       }
 
-      // Further filter by user permissions (unless super admin)
       if (!isSuperAdmin && userEffectiveModules?.moduleSubModules) {
         const userSubModules = userEffectiveModules.moduleSubModules[moduleKey] || [];
         enabledItems = enabledItems.filter(item =>
@@ -155,10 +142,8 @@ export function CompanySidebar() {
         );
       }
 
-      // Skip modules with no enabled items for the user
       if (enabledItems.length === 0) return null;
       
-      // Add companies using this module when viewing all companies
       if (isViewingAllCompanies) {
         return {
           key: moduleKey,
@@ -179,25 +164,27 @@ export function CompanySidebar() {
     .filter(Boolean) as ModuleWithCompanies[];
 
   return (
-    <Sidebar className="border-r">
-      <SidebarContent>
+    <Sidebar className="border-r-0 shadow-[var(--shadow-md)]">
+      <SidebarContent className="bg-sidebar">
         {/* Company Header */}
         <SidebarGroup className="pb-2">
-          <div className="px-3 py-2 bg-muted/50 rounded-lg mx-2 mb-2">
-            <div className="flex items-center gap-2">
-              <Building2 className="h-4 w-4 text-primary" />
+          <div className="px-3 py-3 mx-2 mb-1">
+            <div className="flex items-center gap-2.5">
+              <div className="h-8 w-8 rounded-lg bg-sidebar-primary/20 flex items-center justify-center shrink-0">
+                <Building2 className="h-4 w-4 text-sidebar-primary" />
+              </div>
               <div className="flex-1 min-w-0">
-                <div className="text-sm font-medium truncate">
+                <div className="text-sm font-semibold text-sidebar-accent-foreground truncate">
                   {isViewingAllCompanies ? "All Companies" : selectedCompany?.name}
                 </div>
-                <div className="text-xs text-muted-foreground">
+                <div className="text-xs text-sidebar-muted">
                   {isViewingAllCompanies 
                     ? `${companies.length} companies` 
                     : selectedCompany?.code
                   }
                 </div>
               </div>
-              <Badge variant="secondary" className="text-xs">
+              <Badge variant="secondary" className="text-xs bg-sidebar-accent text-sidebar-accent-foreground border-0">
                 {safeAvailableModules.length}
               </Badge>
             </div>
@@ -206,13 +193,19 @@ export function CompanySidebar() {
 
         {/* Main Navigation */}
         <SidebarGroup>
-          <SidebarGroupLabel>Navigation</SidebarGroupLabel>
+          <SidebarGroupLabel className="text-[10px] uppercase tracking-[0.1em] font-semibold text-sidebar-muted px-4">
+            Navigation
+          </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               <SidebarMenuItem>
-                <SidebarMenuButton asChild isActive={currentPath === "/"}>
+                <SidebarMenuButton
+                  asChild
+                  isActive={currentPath === "/"}
+                  className={currentPath === "/" ? "border-l-[3px] border-l-sidebar-primary bg-sidebar-accent/60 text-sidebar-accent-foreground font-medium" : "border-l-[3px] border-l-transparent"}
+                >
                   <NavLink to="/" className="flex items-center gap-2">
-                    <BarChart3 className="h-4 w-4" />
+                    <BarChart3 className="h-[18px] w-[18px]" />
                     <span>Dashboard</span>
                   </NavLink>
                 </SidebarMenuButton>
@@ -221,16 +214,22 @@ export function CompanySidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
 
-        {/* Super Admin Tools (always visible for super admins) */}
+        {/* Super Admin Tools */}
         {isSuperAdmin && (
           <SidebarGroup>
-            <SidebarGroupLabel>Super Admin Tools</SidebarGroupLabel>
+            <SidebarGroupLabel className="text-[10px] uppercase tracking-[0.1em] font-semibold text-sidebar-muted px-4">
+              Super Admin Tools
+            </SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
                 <SidebarMenuItem>
-                  <SidebarMenuButton asChild isActive={currentPath.startsWith("/admin/backend")}>
+                  <SidebarMenuButton
+                    asChild
+                    isActive={currentPath.startsWith("/admin/backend")}
+                    className={currentPath.startsWith("/admin/backend") ? "border-l-[3px] border-l-sidebar-primary bg-sidebar-accent/60 text-sidebar-accent-foreground font-medium" : "border-l-[3px] border-l-transparent"}
+                  >
                     <NavLink to="/admin/backend" className="flex items-center gap-2">
-                      <Database className="h-4 w-4" />
+                      <Database className="h-[18px] w-[18px]" />
                       <span>Backend Monitor</span>
                     </NavLink>
                   </SidebarMenuButton>
@@ -243,8 +242,8 @@ export function CompanySidebar() {
         {/* Company Modules */}
         {departments.length > 0 && (
           <SidebarGroup>
-            <SidebarGroupLabel>
-              {isViewingAllCompanies ? "All Available Modules" : `${selectedCompany?.name} Modules`}
+            <SidebarGroupLabel className="text-[10px] uppercase tracking-[0.1em] font-semibold text-sidebar-muted px-4">
+              {isViewingAllCompanies ? "All Modules" : "Modules"}
             </SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
@@ -258,18 +257,18 @@ export function CompanySidebar() {
                       <CollapsibleTrigger asChild>
                         <SidebarMenuButton
                           isActive={isGroupActive(dept.items)}
-                          className="w-full"
+                          className={`w-full ${isGroupActive(dept.items) ? "border-l-[3px] border-l-sidebar-primary bg-sidebar-accent/40 text-sidebar-accent-foreground" : "border-l-[3px] border-l-transparent"}`}
                         >
-                          <dept.icon className="h-4 w-4" />
+                          <dept.icon className="h-[18px] w-[18px]" />
                           <div className="flex-1 flex items-center justify-between">
-                            <span>{dept.title}</span>
+                            <span className="text-sm">{dept.title}</span>
                             {isViewingAllCompanies && dept.companiesUsing && (
-                              <Badge variant="outline" className="text-xs ml-2">
+                              <Badge variant="outline" className="text-[10px] ml-2 border-sidebar-border text-sidebar-muted">
                                 {dept.companiesUsing.length}
                               </Badge>
                             )}
                           </div>
-                          <ChevronDown className="ml-auto h-4 w-4 transition-transform group-data-[state=open]/collapsible:rotate-180" />
+                          <ChevronDown className="ml-auto h-3.5 w-3.5 text-sidebar-muted transition-transform duration-200 group-data-[state=open]/collapsible:rotate-180" />
                         </SidebarMenuButton>
                       </CollapsibleTrigger>
                       <CollapsibleContent>
@@ -288,19 +287,19 @@ export function CompanySidebar() {
                                       isActive={isActive(item.url) || item.children.some(child => currentPath.startsWith(child.url))}
                                     >
                                       <span>{item.title}</span>
-                                      <ChevronDown className="h-3 w-3 transition-transform group-data-[state=open]/nested:rotate-180" />
+                                      <ChevronDown className="h-3 w-3 transition-transform duration-200 group-data-[state=open]/nested:rotate-180" />
                                     </SidebarMenuSubButton>
                                   </CollapsibleTrigger>
                                   <CollapsibleContent>
-                                    <div className="ml-4 mt-1 space-y-1 border-l border-border pl-2">
+                                    <div className="ml-4 mt-1 space-y-0.5 border-l border-sidebar-border pl-2">
                                       {item.children.map((child) => (
                                         <NavLink
                                           key={child.url}
                                           to={child.url}
-                                          className={`block text-xs py-1 px-2 rounded-sm transition-colors ${
+                                          className={`block text-xs py-1.5 px-2 rounded-sm transition-colors ${
                                             isActive(child.url)
-                                              ? 'bg-primary/10 text-primary font-medium'
-                                              : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                                              ? 'bg-sidebar-primary/15 text-sidebar-primary font-medium'
+                                              : 'text-sidebar-muted hover:text-sidebar-accent-foreground hover:bg-sidebar-accent/40'
                                           }`}
                                         >
                                           {child.name}
@@ -323,11 +322,11 @@ export function CompanySidebar() {
                           ))}
                           {isViewingAllCompanies && dept.companiesUsing && dept.companiesUsing.length > 0 && (
                             <SidebarMenuSubItem>
-                              <div className="px-3 py-1">
-                                <div className="text-xs text-muted-foreground mb-1">Used by:</div>
+                              <div className="px-3 py-1.5">
+                                <div className="text-[10px] text-sidebar-muted mb-1 uppercase tracking-wider">Used by:</div>
                                 <div className="flex flex-wrap gap-1">
                                   {dept.companiesUsing.map((company) => (
-                                    <Badge key={company.id} variant="secondary" className="text-xs">
+                                    <Badge key={company.id} variant="secondary" className="text-[10px] bg-sidebar-accent text-sidebar-accent-foreground border-0">
                                       {company.code}
                                     </Badge>
                                   ))}
