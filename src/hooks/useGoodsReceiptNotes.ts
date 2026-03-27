@@ -391,9 +391,8 @@ export const useApproveGoodsReceiptNote = () => {
         if (txError) throw txError;
       }
 
-      // Process bin allocations
+      // Process bin allocations using upsert (unique constraint on item+bin+company)
       for (const alloc of binAllocations) {
-        // Check if allocation already exists for this item+bin+company
         const { data: existing } = await supabase
           .from('warehouse_bin_allocations')
           .select('id, allocated_quantity')
@@ -403,7 +402,6 @@ export const useApproveGoodsReceiptNote = () => {
           .maybeSingle();
 
         if (existing) {
-          // Increment existing allocation
           const { error: updateError } = await supabase
             .from('warehouse_bin_allocations')
             .update({
@@ -411,10 +409,8 @@ export const useApproveGoodsReceiptNote = () => {
               updated_at: new Date().toISOString(),
             })
             .eq('id', existing.id);
-
           if (updateError) throw updateError;
         } else {
-          // Insert new allocation
           const { error: insertError } = await supabase
             .from('warehouse_bin_allocations')
             .insert({
@@ -424,7 +420,6 @@ export const useApproveGoodsReceiptNote = () => {
               company_id: grn.company_id,
               created_by: user.id,
             });
-
           if (insertError) throw insertError;
         }
 
@@ -442,7 +437,6 @@ export const useApproveGoodsReceiptNote = () => {
               current_quantity: (binData.current_quantity || 0) + alloc.quantity,
             })
             .eq('id', alloc.bin_id);
-
           if (binUpdateError) throw binUpdateError;
         }
       }

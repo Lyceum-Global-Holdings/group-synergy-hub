@@ -19468,6 +19468,19 @@ export type Database = {
         Args: { p_request_id: string }
         Returns: Json
       }
+      transfer_stock_fifo: {
+        Args: {
+          p_company_id: string
+          p_from_bin_id: string
+          p_item_id: string
+          p_quantity: number
+          p_to_bin_id: string
+          p_transfer_id?: string
+          p_transfer_number?: string
+          p_user_id: string
+        }
+        Returns: Json
+      }
       update_reservation_on_issue: {
         Args: { p_quantity_issued: number; p_reservation_id: string }
         Returns: undefined

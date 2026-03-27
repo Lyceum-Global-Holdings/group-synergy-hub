@@ -39,7 +39,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useCreateStockTransfer, useCreateStockTransferItem, useCompleteStockTransfer } from "@/hooks/useStockTransfer";
+import { useCreateStockTransfer, useCreateStockTransferItem } from "@/hooks/useStockTransfer";
 import { useWarehouseBins } from "@/hooks/useWarehouseBins";
 import { useWarehouseLocations } from "@/hooks/useWarehouseLocations";
 import { WarehouseItem } from "@/types/itemBin";
@@ -87,7 +87,6 @@ export function ItemTransferDialog({
 
   const createTransfer = useCreateStockTransfer();
   const createItem = useCreateStockTransferItem();
-  const completeTransfer = useCompleteStockTransfer();
   const { bins = [] } = useWarehouseBins();
   const { locations = [] } = useWarehouseLocations();
   const { units } = useItemUnits();
@@ -105,7 +104,7 @@ export function ItemTransferDialog({
     ? units.find(u => u.id === item.unit_id)?.abbreviation || "units"
     : "units";
 
-  // Fetch bin allocations for this item
+  // Fetch bin allocations for this item (already consolidated by unique constraint)
   const { data: itemBinAllocations = [] } = useQuery({
     queryKey: ['item-bin-allocations-for-transfer', item?.id],
     queryFn: async () => {
@@ -136,10 +135,9 @@ export function ItemTransferDialog({
 
   // Get bins with stock for this item, filtered by edit permissions
   const binsWithStock = useMemo(() => {
-    // Build set of edit-permitted location IDs
     const editLocationIds = permissions && !permissions.viewAllLocations
       ? new Set([...permissions.editLocationIds])
-      : null; // null means all locations permitted
+      : null;
 
     return itemBinAllocations.map((allocation: any) => {
       const bin = allocation.warehouse_bins;
@@ -154,7 +152,6 @@ export function ItemTransferDialog({
       };
     }).filter(b => {
       if (!b.binId) return false;
-      // Filter by edit permissions for source bins
       if (editLocationIds && !editLocationIds.has(b.locationId)) return false;
       return true;
     });
@@ -237,13 +234,46 @@ export function ItemTransferDialog({
   };
 
   const handleConfirmTransfer = async () => {
-    if (!pendingTransferData) return;
+    if (!pendingTransferData || !item) return;
     
     setIsCompleting(true);
     try {
-      // Complete the transfer immediately
-      await completeTransfer.mutateAsync(pendingTransferData.transfer.id);
-      
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+
+      // Call the FIFO transfer RPC
+      const { data: result, error: rpcError } = await supabase.rpc('transfer_stock_fifo', {
+        p_item_id: item.id,
+        p_from_bin_id: pendingTransferData.values.from_bin_id,
+        p_to_bin_id: pendingTransferData.values.to_bin_id,
+        p_quantity: pendingTransferData.values.quantity,
+        p_company_id: item.company_id,
+        p_user_id: user.id,
+        p_transfer_number: pendingTransferData.transfer.transfer_number,
+        p_transfer_id: pendingTransferData.transfer.id,
+      });
+
+      if (rpcError) throw rpcError;
+
+      // Mark transfer as completed
+      await supabase
+        .from('stock_transfer_requests')
+        .update({
+          status: 'completed',
+          completed_by: user.id,
+          completed_date: new Date().toISOString(),
+        })
+        .eq('id', pendingTransferData.transfer.id);
+
+      // Mark transfer items as completed
+      await supabase
+        .from('stock_transfer_items')
+        .update({
+          status: 'completed',
+          quantity_transferred: pendingTransferData.values.quantity,
+        })
+        .eq('transfer_id', pendingTransferData.transfer.id);
+
       // Reset and close
       setShowVerificationDialog(false);
       setPendingTransferData(null);
