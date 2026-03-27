@@ -1,75 +1,117 @@
 
 
-## Fix: Consolidate Duplicate Bin Allocations and Enforce FIFO for Transfers/Issues
+## Modern Enterprise UI Redesign - Design System First (SAP Fiori / Oracle-inspired)
 
-### Problem
+### Approach
+Update the design tokens (CSS variables), core UI components, and layout shell so the entire system inherits a modern enterprise look automatically. No page-by-page changes needed -- all 50+ pages inherit the refreshed design through shared components.
 
-1. **Duplicate bin allocations**: 57 item+bin+company combinations have multiple rows in `warehouse_bin_allocations` instead of one consolidated row. This is because there is no unique constraint on `(warehouse_item_id, bin_id, company_id)`. The screenshot shows the same bin (LNPE) appearing 5 times with different quantities (10, 10, 2, 19, 10) in the transfer dropdown.
+### Design Direction
+Inspired by SAP Fiori 3.0 and Oracle Redwood: clean typography, generous whitespace, subtle depth through layered surfaces, refined color palette with semantic meaning, and professional data density.
 
-2. **No FIFO enforcement on transfers**: The transfer dialog picks from individual bin allocation rows but doesn't consider batch age. Per IAS 2 / ISO 22000 / GMP standards, stock should be issued and transferred on a FIFO basis using batch expiry/manufacturing dates.
+### 1. Update Design Tokens (`src/index.css`)
+- **Background**: Shift from flat gray to a warmer, layered surface system (shell > page > card > elevated)
+- **Primary**: Refined enterprise blue with better contrast ratios (WCAG AAA)
+- **Border**: Softer, less visible borders -- surfaces separated by elevation not lines
+- **Shadows**: Replace current shadows with a 3-tier elevation system (subtle, medium, raised)
+- **Typography**: Add `--font-display` and `--font-body` CSS vars; use Inter/system font stack
+- **Radius**: Increase from `0.5rem` to `0.625rem` for a softer, modern feel
+- **Spacing**: Tighter header (py-2 to h-14 fixed), more breathing room in content areas
+- **New tokens**: `--surface-1`, `--surface-2`, `--surface-3` for layered depth; `--border-subtle` for lighter separators
 
-### Solution
+### 2. Update Core UI Components
 
-**1. Migration: Consolidate duplicates and add unique constraint**
+**Card** (`src/components/ui/card.tsx`)
+- Remove visible border, use subtle shadow for elevation
+- Slightly larger border-radius
+- Add hover state with elevated shadow for interactive cards
 
-```sql
--- Merge duplicate rows: keep oldest, sum quantities into it, delete rest
-WITH dupes AS (
-  SELECT warehouse_item_id, bin_id, company_id,
-    MIN(id) as keep_id,
-    SUM(allocated_quantity) as total_alloc,
-    SUM(reserved_quantity) as total_reserved
-  FROM warehouse_bin_allocations
-  GROUP BY warehouse_item_id, bin_id, company_id
-  HAVING COUNT(*) > 1
-)
-UPDATE warehouse_bin_allocations wba
-SET allocated_quantity = d.total_alloc,
-    reserved_quantity = d.total_reserved
-FROM dupes d
-WHERE wba.id = d.keep_id;
+**Button** (`src/components/ui/button.tsx`)
+- Fiori-style: slightly taller (h-9 default), more horizontal padding
+- Primary: solid fill with subtle gradient
+- Ghost/outline: refined hover states with smooth transitions
+- Add `emphasized` variant for primary CTAs
 
--- Delete the non-kept duplicates
-DELETE FROM warehouse_bin_allocations
-WHERE id NOT IN (
-  SELECT MIN(id) FROM warehouse_bin_allocations
-  GROUP BY warehouse_item_id, bin_id, company_id
-);
+**Table** (`src/components/ui/table.tsx`)
+- Zebra striping with very subtle alternating backgrounds
+- Sticky header with surface elevation
+- Refined header: uppercase text-xs tracking-wider, lighter weight
+- Tighter row height for data density
 
--- Add unique constraint to prevent future duplicates
-ALTER TABLE warehouse_bin_allocations
-  ADD CONSTRAINT unique_item_bin_company
-  UNIQUE (warehouse_item_id, bin_id, company_id);
-```
+**Input/Select** (`src/components/ui/input.tsx`, `src/components/ui/select.tsx`)
+- Bottom-border style (Fiori-like) or refined bordered with lighter border color
+- Focused state: primary color bottom border highlight
+- Slightly reduced height (h-9) for density
 
-**2. Migration: Create `transfer_stock_fifo` RPC** — A database function that:
-- Deducts from source bin allocation
-- Adds to destination bin allocation (upsert via the new unique constraint)
-- Automatically selects batches FIFO (oldest expiry/manufacturing date first)
-- Creates `batch_stock_allocations` records for the destination bin
-- Inserts `stock_transactions` for audit trail
+**Badge** (`src/components/ui/badge.tsx`)
+- Add `success`, `warning`, `info` variants using semantic tokens
+- Softer pill shape, lighter backgrounds
 
-**3. Edit `ItemTransferDialog.tsx`** — Fix the bin dropdown to show consolidated allocations (one entry per bin) and call the new FIFO RPC instead of manual allocation updates.
+**Tabs** (`src/components/ui/tabs.tsx`)
+- Fiori-style: underline active indicator instead of background pill
+- Cleaner, more spacious tab items
 
-**4. Edit `useGoodsReceiptNotes.ts`** — Replace the manual check-then-insert bin allocation logic with an `ON CONFLICT` upsert that leverages the new unique constraint.
+**Dialog** (`src/components/ui/dialog.tsx`)
+- Softer overlay (black/50 instead of black/80)
+- Refined shadow and radius
+- Header with subtle bottom border separator
 
-### Technical Details
+### 3. Redesign Layout Shell
 
-The FIFO RPC will:
-```text
-1. Accept: item_id, from_bin_id, to_bin_id, quantity, company_id, user_id
-2. Validate: source bin has sufficient available_quantity
-3. Select batches from item_batches WHERE warehouse_item_id = item_id
-   AND status = 'active' ORDER BY expiry_date ASC NULLS LAST, manufacturing_date ASC, created_at ASC
-4. For each batch (FIFO order): deduct min(remaining_transfer_qty, batch.quantity_remaining)
-5. Deduct from source warehouse_bin_allocations
-6. Upsert into destination warehouse_bin_allocations
-7. Log stock_transaction (type: 'transfer')
-```
+**Header** (`src/components/layout/AppLayout.tsx`)
+- Fixed height `h-14`, cleaner horizontal layout
+- Remove gradient logo box -- use text-based branding or simple icon
+- Subtle bottom shadow instead of heavy border
+- Right-side controls: refined spacing, smaller selectors
 
-### Files
+**Sidebar** (`src/components/layout/CompanySidebar.tsx`)
+- Fiori shell bar style: darker surface (`--sidebar-background` adjusted to a refined dark blue-gray)
+- Active item: left accent bar (3px primary-colored left border) instead of background fill
+- Group headers: smaller, uppercase, tracked-wider
+- Icons: consistent 18px, muted until active
+- Smooth expand/collapse transitions
 
-- **New migration**: Consolidate duplicates, add unique constraint, create `transfer_stock_fifo` RPC
-- **Edit**: `src/components/warehouse/ItemTransferDialog.tsx` — use consolidated bins, call FIFO RPC
-- **Edit**: `src/hooks/useGoodsReceiptNotes.ts` — simplify bin allocation to use upsert
+### 4. Shared Components Polish
+
+**DataTable** (`src/components/shared/DataTable.tsx`)
+- Wrap in card with no visible border (shadow only)
+- Add optional toolbar area for search/filters
+- Loading skeleton: refined shimmer animation
+
+**StatusBadge** (`src/components/shared/StatusBadge.tsx`)
+- Use new semantic color tokens
+- Add subtle dot indicator before text (Fiori pattern)
+
+**ModuleSubTabs** (`src/components/accounting/ModuleSubTabs.tsx`)
+- Switch to underline-style tabs matching the new Tabs component
+
+### 5. Global Styles (`src/index.css`, `src/App.css`)
+- Clean up `src/App.css` (remove Vite boilerplate styles)
+- Add smooth scrollbar styling
+- Add subtle page transition feel
+- Font smoothing: antialiased rendering
+- Selection color matching primary
+
+### Files to Edit
+- `src/index.css` -- design tokens overhaul
+- `src/App.css` -- clean up legacy styles
+- `src/components/ui/card.tsx` -- elevation-based design
+- `src/components/ui/button.tsx` -- refined variants
+- `src/components/ui/table.tsx` -- enterprise data table styling
+- `src/components/ui/input.tsx` -- refined input styling
+- `src/components/ui/badge.tsx` -- semantic variants
+- `src/components/ui/tabs.tsx` -- underline active indicator
+- `src/components/ui/dialog.tsx` -- softer overlay and polish
+- `src/components/layout/AppLayout.tsx` -- modern header
+- `src/components/layout/CompanySidebar.tsx` -- Fiori-style sidebar
+- `src/components/shared/DataTable.tsx` -- card wrapper and polish
+- `src/components/shared/StatusBadge.tsx` -- dot indicator
+- `src/components/accounting/ModuleSubTabs.tsx` -- underline tabs
+- `tailwind.config.ts` -- add new color tokens
+
+### Technical Notes
+- All changes are to shared/base components -- no individual page edits needed
+- The ~50+ page components will automatically inherit the new look
+- Fully backward compatible: no prop changes, no API changes
+- Dark mode tokens updated in parallel
+- WCAG AA contrast ratios maintained throughout
 
