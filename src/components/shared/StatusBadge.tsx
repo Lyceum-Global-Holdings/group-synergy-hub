@@ -1,37 +1,42 @@
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
-const statusColorMap: Record<string, string> = {
-  // General
-  active: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
-  approved: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
-  completed: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
-  paid: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
-  received: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
-  accepted: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
-  delivered: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
-  matched: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
+const statusConfig: Record<string, { dot: string; bg: string; text: string }> = {
+  // Success states
+  active: { dot: "bg-success", bg: "bg-success/10", text: "text-success" },
+  approved: { dot: "bg-success", bg: "bg-success/10", text: "text-success" },
+  completed: { dot: "bg-success", bg: "bg-success/10", text: "text-success" },
+  paid: { dot: "bg-success", bg: "bg-success/10", text: "text-success" },
+  received: { dot: "bg-success", bg: "bg-success/10", text: "text-success" },
+  accepted: { dot: "bg-success", bg: "bg-success/10", text: "text-success" },
+  delivered: { dot: "bg-success", bg: "bg-success/10", text: "text-success" },
+  matched: { dot: "bg-success", bg: "bg-success/10", text: "text-success" },
 
-  pending: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200",
-  draft: "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200",
-  submitted: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
-  in_progress: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
-  processing: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
-  picking: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
-  confirmed: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
-  partial: "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200",
-  partially_paid: "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200",
-  partially_received: "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200",
+  // Warning / in-progress
+  pending: { dot: "bg-warning", bg: "bg-warning/10", text: "text-warning" },
+  draft: { dot: "bg-muted-foreground", bg: "bg-muted", text: "text-muted-foreground" },
+  submitted: { dot: "bg-info", bg: "bg-info/10", text: "text-info" },
+  in_progress: { dot: "bg-info", bg: "bg-info/10", text: "text-info" },
+  processing: { dot: "bg-info", bg: "bg-info/10", text: "text-info" },
+  picking: { dot: "bg-info", bg: "bg-info/10", text: "text-info" },
+  confirmed: { dot: "bg-info", bg: "bg-info/10", text: "text-info" },
+  partial: { dot: "bg-warning", bg: "bg-warning/10", text: "text-warning" },
+  partially_paid: { dot: "bg-warning", bg: "bg-warning/10", text: "text-warning" },
+  partially_received: { dot: "bg-warning", bg: "bg-warning/10", text: "text-warning" },
 
-  rejected: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200",
-  cancelled: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200",
-  failed: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200",
-  overdue: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200",
+  // Error states
+  rejected: { dot: "bg-destructive", bg: "bg-destructive/10", text: "text-destructive" },
+  cancelled: { dot: "bg-destructive", bg: "bg-destructive/10", text: "text-destructive" },
+  failed: { dot: "bg-destructive", bg: "bg-destructive/10", text: "text-destructive" },
+  overdue: { dot: "bg-destructive", bg: "bg-destructive/10", text: "text-destructive" },
 
-  inactive: "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400",
-  closed: "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400",
-  expired: "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400",
+  // Neutral
+  inactive: { dot: "bg-muted-foreground/50", bg: "bg-muted", text: "text-muted-foreground" },
+  closed: { dot: "bg-muted-foreground/50", bg: "bg-muted", text: "text-muted-foreground" },
+  expired: { dot: "bg-muted-foreground/50", bg: "bg-muted", text: "text-muted-foreground" },
 };
+
+const defaultConfig = { dot: "bg-muted-foreground", bg: "bg-muted", text: "text-muted-foreground" };
 
 interface StatusBadgeProps {
   status: string;
@@ -40,10 +45,19 @@ interface StatusBadgeProps {
 
 export function StatusBadge({ status, className }: StatusBadgeProps) {
   const normalizedStatus = status?.toLowerCase().replace(/[\s-]/g, "_") || "unknown";
-  const colorClass = statusColorMap[normalizedStatus] || "bg-muted text-muted-foreground";
+  const config = statusConfig[normalizedStatus] || defaultConfig;
 
   return (
-    <Badge variant="outline" className={cn("border-0 font-medium capitalize", colorClass, className)}>
+    <Badge
+      variant="outline"
+      className={cn(
+        "border-0 font-medium capitalize gap-1.5",
+        config.bg,
+        config.text,
+        className
+      )}
+    >
+      <span className={cn("h-1.5 w-1.5 rounded-full shrink-0", config.dot)} />
       {status?.replace(/_/g, " ") || "Unknown"}
     </Badge>
   );

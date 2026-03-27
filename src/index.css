@@ -2,136 +2,163 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
-All colors MUST be HSL.
-*/
+/* SAP Fiori / Oracle Redwood-inspired Enterprise Design System
+   All colors are HSL. Layered surface system with 3-tier elevation. */
 
 @layer base {
   :root {
-    --background: 240 10% 98%;
-    --foreground: 240 10% 9%;
+    /* Surfaces — layered depth system */
+    --background: 220 20% 97%;
+    --foreground: 220 25% 10%;
 
     --card: 0 0% 100%;
-    --card-foreground: 240 10% 9%;
+    --card-foreground: 220 25% 10%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 240 10% 9%;
+    --popover-foreground: 220 25% 10%;
 
-    --primary: 217 91% 60%;
+    /* Surface layers for depth */
+    --surface-1: 0 0% 100%;
+    --surface-2: 220 20% 98%;
+    --surface-3: 220 16% 96%;
+
+    /* Enterprise Blue — refined, WCAG AAA */
+    --primary: 213 94% 42%;
     --primary-foreground: 0 0% 100%;
-    --primary-hover: 217 91% 55%;
+    --primary-hover: 213 94% 36%;
 
-    --secondary: 240 5% 96%;
-    --secondary-foreground: 240 6% 10%;
+    --secondary: 220 14% 96%;
+    --secondary-foreground: 220 15% 20%;
 
-    --muted: 240 5% 96%;
-    --muted-foreground: 240 4% 46%;
+    --muted: 220 14% 96%;
+    --muted-foreground: 220 10% 46%;
 
-    --accent: 240 5% 96%;
-    --accent-foreground: 240 6% 10%;
+    --accent: 220 14% 96%;
+    --accent-foreground: 220 15% 20%;
 
-    --destructive: 0 84% 60%;
-    --destructive-foreground: 0 0% 98%;
+    --destructive: 4 80% 56%;
+    --destructive-foreground: 0 0% 100%;
 
-    --border: 240 6% 90%;
-    --input: 240 6% 90%;
-    --ring: 217 91% 60%;
+    /* Borders — softer, subtle */
+    --border: 220 13% 91%;
+    --border-subtle: 220 13% 94%;
+    --input: 220 13% 89%;
+    --ring: 213 94% 42%;
 
-    --success: 142 76% 36%;
+    /* Semantic colors */
+    --success: 152 60% 36%;
     --success-foreground: 0 0% 100%;
 
-    --warning: 38 92% 50%;
-    --warning-foreground: 0 0% 100%;
+    --warning: 36 95% 48%;
+    --warning-foreground: 36 95% 12%;
 
-    --info: 199 89% 48%;
+    --info: 205 85% 45%;
     --info-foreground: 0 0% 100%;
 
+    /* 3-tier elevation shadows */
+    --shadow-xs: 0 1px 2px 0 hsl(220 25% 10% / 0.04);
+    --shadow-sm: 0 1px 3px 0 hsl(220 25% 10% / 0.06), 0 1px 2px -1px hsl(220 25% 10% / 0.06);
+    --shadow-md: 0 4px 6px -1px hsl(220 25% 10% / 0.07), 0 2px 4px -2px hsl(220 25% 10% / 0.05);
+    --shadow-lg: 0 10px 15px -3px hsl(220 25% 10% / 0.08), 0 4px 6px -4px hsl(220 25% 10% / 0.04);
+    --shadow-xl: 0 20px 25px -5px hsl(220 25% 10% / 0.08), 0 8px 10px -6px hsl(220 25% 10% / 0.04);
+
     /* Enterprise gradients */
-    --gradient-primary: linear-gradient(135deg, hsl(217 91% 60%), hsl(199 89% 48%));
-    --gradient-secondary: linear-gradient(135deg, hsl(240 5% 96%), hsl(240 10% 98%));
-    --gradient-card: linear-gradient(135deg, hsl(0 0% 100%), hsl(240 10% 98%));
-    
-    /* Shadows */
-    --shadow-sm: 0 2px 4px -1px hsl(240 5% 15% / 0.05);
-    --shadow-md: 0 4px 6px -1px hsl(240 5% 15% / 0.1), 0 2px 4px -1px hsl(240 5% 15% / 0.06);
-    --shadow-lg: 0 10px 15px -3px hsl(240 5% 15% / 0.1), 0 4px 6px -2px hsl(240 5% 15% / 0.05);
-    --shadow-enterprise: 0 20px 25px -5px hsl(217 91% 60% / 0.1), 0 10px 10px -5px hsl(217 91% 60% / 0.04);
+    --gradient-primary: linear-gradient(135deg, hsl(213 94% 42%), hsl(205 85% 45%));
+    --gradient-secondary: linear-gradient(135deg, hsl(220 14% 96%), hsl(220 20% 98%));
+    --gradient-card: linear-gradient(180deg, hsl(0 0% 100%), hsl(220 20% 99%));
 
-    --radius: 0.5rem;
+    --radius: 0.625rem;
 
-    --sidebar-background: 0 0% 98%;
+    /* Sidebar — refined dark blue-gray shell */
+    --sidebar-background: 220 25% 14%;
+    --sidebar-foreground: 220 15% 80%;
+    --sidebar-primary: 213 94% 55%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 220 20% 20%;
+    --sidebar-accent-foreground: 220 15% 90%;
+    --sidebar-border: 220 20% 20%;
+    --sidebar-ring: 213 94% 55%;
+    --sidebar-muted: 220 15% 55%;
 
-    --sidebar-foreground: 240 5.3% 26.1%;
-
-    --sidebar-primary: 240 5.9% 10%;
-
-    --sidebar-primary-foreground: 0 0% 98%;
-
-    --sidebar-accent: 240 4.8% 95.9%;
-
-    --sidebar-accent-foreground: 240 5.9% 10%;
-
-    --sidebar-border: 220 13% 91%;
-
-    --sidebar-ring: 217.2 91.2% 59.8%;
-
-    /* Chart Colors - Professional Data Visualization Palette */
-    --chart-1: 217 91% 60%;     /* Primary Blue */
-    --chart-2: 142 76% 36%;     /* Success Green */
-    --chart-3: 38 92% 50%;      /* Warning Orange */
-    --chart-4: 199 89% 48%;     /* Info Cyan */
-    --chart-5: 271 76% 53%;     /* Purple */
-    --chart-6: 346 77% 50%;     /* Rose */
-    --chart-7: 173 58% 39%;     /* Teal */
-    --chart-8: 239 84% 67%;     /* Indigo */
+    /* Chart Colors — professional data visualization */
+    --chart-1: 213 94% 42%;
+    --chart-2: 152 60% 36%;
+    --chart-3: 36 95% 48%;
+    --chart-4: 205 85% 45%;
+    --chart-5: 271 65% 50%;
+    --chart-6: 346 72% 50%;
+    --chart-7: 173 55% 38%;
+    --chart-8: 239 75% 60%;
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
+    --background: 222 30% 7%;
+    --foreground: 210 40% 96%;
 
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
+    --card: 222 25% 10%;
+    --card-foreground: 210 40% 96%;
 
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
+    --popover: 222 25% 10%;
+    --popover-foreground: 210 40% 96%;
 
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
+    --surface-1: 222 25% 10%;
+    --surface-2: 222 25% 8%;
+    --surface-3: 222 25% 12%;
 
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
+    --primary: 213 90% 58%;
+    --primary-foreground: 222 30% 7%;
+    --primary-hover: 213 90% 52%;
 
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
+    --secondary: 220 20% 16%;
+    --secondary-foreground: 210 40% 96%;
 
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
+    --muted: 220 20% 16%;
+    --muted-foreground: 215 18% 60%;
 
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
+    --accent: 220 20% 16%;
+    --accent-foreground: 210 40% 96%;
 
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
+    --destructive: 4 72% 45%;
+    --destructive-foreground: 210 40% 96%;
+
+    --border: 220 20% 18%;
+    --border-subtle: 220 20% 15%;
+    --input: 220 20% 18%;
+    --ring: 213 90% 58%;
+
+    --success: 152 55% 40%;
+    --success-foreground: 0 0% 100%;
+
+    --warning: 36 90% 50%;
+    --warning-foreground: 36 95% 12%;
+
+    --info: 205 80% 50%;
+    --info-foreground: 0 0% 100%;
+
+    --shadow-xs: 0 1px 2px 0 hsl(0 0% 0% / 0.2);
+    --shadow-sm: 0 1px 3px 0 hsl(0 0% 0% / 0.25), 0 1px 2px -1px hsl(0 0% 0% / 0.2);
+    --shadow-md: 0 4px 6px -1px hsl(0 0% 0% / 0.3), 0 2px 4px -2px hsl(0 0% 0% / 0.2);
+    --shadow-lg: 0 10px 15px -3px hsl(0 0% 0% / 0.3), 0 4px 6px -4px hsl(0 0% 0% / 0.2);
+    --shadow-xl: 0 20px 25px -5px hsl(0 0% 0% / 0.35), 0 8px 10px -6px hsl(0 0% 0% / 0.2);
+
+    --sidebar-background: 222 30% 7%;
+    --sidebar-foreground: 220 15% 75%;
+    --sidebar-primary: 213 90% 58%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --sidebar-accent: 220 20% 14%;
+    --sidebar-accent-foreground: 220 15% 90%;
+    --sidebar-border: 220 20% 14%;
+    --sidebar-ring: 213 90% 58%;
+    --sidebar-muted: 220 15% 45%;
 
-    /* Chart Colors - Dark Mode Adjusted */
-    --chart-1: 217 91% 65%;     /* Brighter Blue */
-    --chart-2: 142 76% 42%;     /* Brighter Green */
-    --chart-3: 38 92% 55%;      /* Brighter Orange */
-    --chart-4: 199 89% 55%;     /* Brighter Cyan */
-    --chart-5: 271 76% 60%;     /* Brighter Purple */
-    --chart-6: 346 77% 58%;     /* Brighter Rose */
-    --chart-7: 173 58% 45%;     /* Brighter Teal */
-    --chart-8: 239 84% 72%;     /* Brighter Indigo */
+    --chart-1: 213 90% 58%;
+    --chart-2: 152 55% 42%;
+    --chart-3: 36 90% 55%;
+    --chart-4: 205 80% 55%;
+    --chart-5: 271 65% 58%;
+    --chart-6: 346 72% 58%;
+    --chart-7: 173 55% 44%;
+    --chart-8: 239 75% 68%;
   }
 }
 
@@ -141,6 +168,48 @@ All colors MUST be HSL.
   }
 
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+
+  /* Smooth scrollbar styling */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: hsl(var(--muted-foreground) / 0.2);
+    border-radius: 3px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--muted-foreground) / 0.35);
+  }
+
+  /* Selection */
+  ::selection {
+    background: hsl(var(--primary) / 0.15);
+    color: hsl(var(--primary));
+  }
+}
+
+@layer utilities {
+  /* Enterprise elevation utilities */
+  .elevation-0 {
+    box-shadow: none;
+  }
+  .elevation-1 {
+    box-shadow: var(--shadow-sm);
+  }
+  .elevation-2 {
+    box-shadow: var(--shadow-md);
+  }
+  .elevation-3 {
+    box-shadow: var(--shadow-lg);
   }
 }

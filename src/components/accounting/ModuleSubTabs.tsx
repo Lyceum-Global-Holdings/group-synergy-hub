@@ -17,12 +17,12 @@ export function ModuleSubTabs({ tabs, activeTab, onTabChange, children }: Module
 
   return (
     <Tabs value={effectiveTab} onValueChange={onTabChange} className="w-full">
-      <TabsList className="h-auto p-1 bg-muted/30 border border-border rounded-lg flex flex-wrap gap-1 justify-start w-full">
+      <TabsList className="w-full justify-start flex-wrap gap-0 border-b border-border bg-transparent px-0 h-auto">
         {tabs.map((tab) => (
           <TabsTrigger
             key={tab.id}
             value={tab.id}
-            className="px-4 py-2 text-sm data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+            className="px-4 py-2.5 text-sm rounded-none"
           >
             {tab.label}
           </TabsTrigger>
