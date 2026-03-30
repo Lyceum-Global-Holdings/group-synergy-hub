@@ -446,8 +446,10 @@ export function BulkStockUploadDialog({ open, onOpenChange }: BulkStockUploadDia
           if (result.status === 'fulfilled') {
             successCount++;
           } else {
-            console.error(`Failed to process row ${batch[idx].rowNumber}:`, result.reason);
+            const reason = result.reason?.message || result.reason || 'Unknown error';
+            console.error(`Row ${batch[idx].rowNumber} (${batch[idx].item_code}): ${reason}`);
             failCount++;
+            failMessages.push(`Row ${batch[idx].rowNumber} (${batch[idx].item_code}): ${reason}`);
           }
         });
       }
