@@ -302,145 +302,155 @@ export function BulkStockUploadDialog({ open, onOpenChange }: BulkStockUploadDia
     try {
       const { data: { user } } = await supabase.auth.getUser();
 
-      for (const row of importableRows) {
-        try {
-          let itemId = row.item_id;
+      // Process rows in parallel batches of 10 for speed
+      const BATCH_SIZE = 10;
+      for (let i = 0; i < importableRows.length; i += BATCH_SIZE) {
+        const batch = importableRows.slice(i, i + BATCH_SIZE);
+        const results = await Promise.allSettled(
+          batch.map(async (row) => {
+            let itemId = row.item_id;
 
-          // Auto-import from catalog if needed
-          if (row.needs_import && row.catalog_item) {
-            const cat = row.catalog_item;
+            // Auto-import from catalog if needed
+            if (row.needs_import && row.catalog_item) {
+              const cat = row.catalog_item;
 
-            // Check if existing row exists (may have been zeroed out)
-            const { data: existingRow } = await supabase
-              .from('warehouse_items')
-              .select('id')
-              .eq('company_id', selectedCompany!.id)
-              .or(`catalog_item_id.eq.${cat.id},item_code.eq.${cat.item_code}`)
-              .maybeSingle();
-
-            if (existingRow) {
-              // Reactivate existing row
-              await supabase
+              const { data: existingRow } = await supabase
                 .from('warehouse_items')
-                .update({
-                  current_stock: 0,
-                  reserved_quantity: 0,
-                  status: 'active',
-                  location_id: effectiveLocationId || null,
-                  name: cat.name,
-                  description: cat.description,
-                  category_id: cat.category_id,
-                  unit_id: cat.unit_id,
-                  brand: cat.brand,
-                  manufacturer: cat.manufacturer,
-                  barcode: cat.barcode,
-                  sku: cat.sku,
-                  unit_cost: cat.unit_cost,
-                  selling_price: cat.selling_price,
-                  reorder_level: cat.reorder_level,
-                  min_stock_level: cat.min_stock_level,
-                  max_stock_level: cat.max_stock_level,
-                  image_url: cat.image_url,
-                  is_batch_tracked: cat.is_batch_tracked,
-                  is_serialized: cat.is_serialized,
-                })
-                .eq('id', existingRow.id);
-              itemId = existingRow.id;
-            } else {
-              // Fresh insert from catalog
-              const { data: newItem, error: insertError } = await supabase
-                .from('warehouse_items')
-                .insert({
-                  catalog_item_id: cat.id,
-                  item_code: cat.item_code,
-                  name: cat.name,
-                  description: cat.description,
-                  category_id: cat.category_id,
-                  unit_id: cat.unit_id,
-                  brand: cat.brand,
-                  manufacturer: cat.manufacturer,
-                  barcode: cat.barcode,
-                  sku: cat.sku,
-                  unit_cost: cat.unit_cost,
-                  selling_price: cat.selling_price,
-                  reorder_level: cat.reorder_level,
-                  min_stock_level: cat.min_stock_level,
-                  max_stock_level: cat.max_stock_level,
-                  image_url: cat.image_url,
-                  is_batch_tracked: cat.is_batch_tracked,
-                  is_serialized: cat.is_serialized,
-                  status: 'active',
-                  company_id: selectedCompany!.id,
-                  location_id: effectiveLocationId || null,
-                  current_stock: 0,
-                  reserved_quantity: 0,
-                  created_by: user?.id,
-                })
                 .select('id')
-                .single();
-              if (insertError) throw insertError;
-              itemId = newItem.id;
+                .eq('company_id', selectedCompany!.id)
+                .or(`catalog_item_id.eq.${cat.id},item_code.eq.${cat.item_code}`)
+                .maybeSingle();
+
+              if (existingRow) {
+                await supabase
+                  .from('warehouse_items')
+                  .update({
+                    current_stock: 0,
+                    reserved_quantity: 0,
+                    status: 'active',
+                    location_id: effectiveLocationId || null,
+                    name: cat.name,
+                    description: cat.description,
+                    category_id: cat.category_id,
+                    unit_id: cat.unit_id,
+                    brand: cat.brand,
+                    manufacturer: cat.manufacturer,
+                    barcode: cat.barcode,
+                    sku: cat.sku,
+                    unit_cost: cat.unit_cost,
+                    selling_price: cat.selling_price,
+                    reorder_level: cat.reorder_level,
+                    min_stock_level: cat.min_stock_level,
+                    max_stock_level: cat.max_stock_level,
+                    image_url: cat.image_url,
+                    is_batch_tracked: cat.is_batch_tracked,
+                    is_serialized: cat.is_serialized,
+                  })
+                  .eq('id', existingRow.id);
+                itemId = existingRow.id;
+              } else {
+                const { data: newItem, error: insertError } = await supabase
+                  .from('warehouse_items')
+                  .insert({
+                    catalog_item_id: cat.id,
+                    item_code: cat.item_code,
+                    name: cat.name,
+                    description: cat.description,
+                    category_id: cat.category_id,
+                    unit_id: cat.unit_id,
+                    brand: cat.brand,
+                    manufacturer: cat.manufacturer,
+                    barcode: cat.barcode,
+                    sku: cat.sku,
+                    unit_cost: cat.unit_cost,
+                    selling_price: cat.selling_price,
+                    reorder_level: cat.reorder_level,
+                    min_stock_level: cat.min_stock_level,
+                    max_stock_level: cat.max_stock_level,
+                    image_url: cat.image_url,
+                    is_batch_tracked: cat.is_batch_tracked,
+                    is_serialized: cat.is_serialized,
+                    status: 'active',
+                    company_id: selectedCompany!.id,
+                    location_id: effectiveLocationId || null,
+                    current_stock: 0,
+                    reserved_quantity: 0,
+                    created_by: user?.id,
+                  })
+                  .select('id')
+                  .single();
+                if (insertError) throw insertError;
+                itemId = newItem.id;
+              }
             }
-          }
 
-          if (!itemId) throw new Error('Could not resolve item ID');
+            if (!itemId) throw new Error('Could not resolve item ID');
 
-          // Read current_stock BEFORE updating allocation (trigger will change it)
-          const { data: itemData } = await supabase
-            .from('warehouse_items')
-            .select('current_stock')
-            .eq('id', itemId)
-            .single();
-          const qtyBefore = Number(itemData?.current_stock || 0);
+            // Read current_stock BEFORE updating allocation
+            const { data: itemData } = await supabase
+              .from('warehouse_items')
+              .select('current_stock')
+              .eq('id', itemId)
+              .single();
+            const qtyBefore = Number(itemData?.current_stock || 0);
 
-          // Check existing allocation
-          const { data: existing } = await supabase
-            .from('warehouse_bin_allocations')
-            .select('id, allocated_quantity')
-            .eq('warehouse_item_id', itemId)
-            .eq('bin_id', row.bin_id!)
-            .maybeSingle();
-
-          if (existing) {
-            const newQty = (existing.allocated_quantity || 0) + row.quantity;
+            // Upsert bin allocation (no available_quantity — it's a generated column)
             const { error: allocErr } = await supabase
               .from('warehouse_bin_allocations')
-              .update({ allocated_quantity: newQty, available_quantity: newQty })
-              .eq('id', existing.id);
-            if (allocErr) throw allocErr;
-          } else {
-            const { error: allocErr } = await supabase
-              .from('warehouse_bin_allocations')
+              .upsert(
+                {
+                  warehouse_item_id: itemId,
+                  bin_id: row.bin_id!,
+                  allocated_quantity: row.quantity,
+                  company_id: selectedCompany?.id,
+                },
+                { onConflict: 'warehouse_item_id,bin_id,company_id' }
+              );
+            if (allocErr) {
+              // Fallback: if upsert fails due to existing row, do additive update
+              const { data: existing } = await supabase
+                .from('warehouse_bin_allocations')
+                .select('id, allocated_quantity')
+                .eq('warehouse_item_id', itemId)
+                .eq('bin_id', row.bin_id!)
+                .eq('company_id', selectedCompany?.id || '')
+                .maybeSingle();
+              if (existing) {
+                const newQty = (existing.allocated_quantity || 0) + row.quantity;
+                await supabase
+                  .from('warehouse_bin_allocations')
+                  .update({ allocated_quantity: newQty })
+                  .eq('id', existing.id);
+              } else {
+                throw allocErr;
+              }
+            }
+
+            // Create stock transaction
+            await supabase
+              .from('stock_transactions')
               .insert({
-                warehouse_item_id: itemId,
-                bin_id: row.bin_id!,
-                allocated_quantity: row.quantity,
-                available_quantity: row.quantity,
+                item_id: itemId,
+                transaction_type: 'opening_stock',
+                reference_type: 'manual',
+                quantity_change: row.quantity,
+                quantity_before: qtyBefore,
+                quantity_after: qtyBefore + row.quantity,
+                notes: `Bulk stock upload - Bin: ${row.bin_code}`,
                 company_id: selectedCompany?.id,
+                created_by: user?.id,
               });
-            if (allocErr) throw allocErr;
+          })
+        );
+
+        results.forEach((result, idx) => {
+          if (result.status === 'fulfilled') {
+            successCount++;
+          } else {
+            console.error(`Failed to process row ${batch[idx].rowNumber}:`, result.reason);
+            failCount++;
           }
-
-          // Create stock transaction with correct before/after values
-          await supabase
-            .from('stock_transactions')
-            .insert({
-              item_id: itemId,
-              transaction_type: 'opening_stock',
-              reference_type: 'manual',
-              quantity_change: row.quantity,
-              quantity_before: qtyBefore,
-              quantity_after: qtyBefore + row.quantity,
-              notes: `Bulk stock upload - Bin: ${row.bin_code}`,
-              company_id: selectedCompany?.id,
-              created_by: user?.id,
-            });
-
-          successCount++;
-        } catch (err) {
-          console.error(`Failed to process row ${row.rowNumber}:`, err);
-          failCount++;
-        }
+        });
       }
 
       // Invalidate relevant queries
