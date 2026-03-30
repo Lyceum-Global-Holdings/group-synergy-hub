@@ -465,7 +465,8 @@ export function BulkStockUploadDialog({ open, onOpenChange }: BulkStockUploadDia
       if (failCount === 0) {
         toast.success(`Successfully uploaded stock for ${successCount} items`);
       } else {
-        toast.warning(`Uploaded ${successCount} items, ${failCount} failed`);
+        const detail = failMessages.slice(0, 3).join('\n');
+        toast.warning(`Uploaded ${successCount} items, ${failCount} failed.\n${detail}`);
       }
 
       handleReset();
