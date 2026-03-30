@@ -298,6 +298,7 @@ export function BulkStockUploadDialog({ open, onOpenChange }: BulkStockUploadDia
 
     let successCount = 0;
     let failCount = 0;
+    const failMessages: string[] = [];
 
     try {
       const { data: { user } } = await supabase.auth.getUser();
