@@ -298,6 +298,7 @@ export function BulkStockUploadDialog({ open, onOpenChange }: BulkStockUploadDia
 
     let successCount = 0;
     let failCount = 0;
+    const failMessages: string[] = [];
 
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -394,36 +395,35 @@ export function BulkStockUploadDialog({ open, onOpenChange }: BulkStockUploadDia
               .single();
             const qtyBefore = Number(itemData?.current_stock || 0);
 
-            // Upsert bin allocation (no available_quantity — it's a generated column)
-            const { error: allocErr } = await supabase
+            // Additive bin allocation: check existing, then update or insert
+            const { data: existingAlloc } = await supabase
               .from('warehouse_bin_allocations')
-              .upsert(
-                {
+              .select('id, allocated_quantity')
+              .eq('warehouse_item_id', itemId)
+              .eq('bin_id', row.bin_id!)
+              .eq('company_id', selectedCompany!.id)
+              .maybeSingle();
+
+            if (existingAlloc) {
+              // Add to existing allocation
+              const newQty = (existingAlloc.allocated_quantity || 0) + row.quantity;
+              const { error: updateErr } = await supabase
+                .from('warehouse_bin_allocations')
+                .update({ allocated_quantity: newQty })
+                .eq('id', existingAlloc.id);
+              if (updateErr) throw new Error(`Bin allocation update failed: ${updateErr.message}`);
+            } else {
+              // Insert new allocation with created_by for RLS
+              const { error: insertErr } = await supabase
+                .from('warehouse_bin_allocations')
+                .insert({
                   warehouse_item_id: itemId,
                   bin_id: row.bin_id!,
                   allocated_quantity: row.quantity,
-                  company_id: selectedCompany?.id,
-                },
-                { onConflict: 'warehouse_item_id,bin_id,company_id' }
-              );
-            if (allocErr) {
-              // Fallback: if upsert fails due to existing row, do additive update
-              const { data: existing } = await supabase
-                .from('warehouse_bin_allocations')
-                .select('id, allocated_quantity')
-                .eq('warehouse_item_id', itemId)
-                .eq('bin_id', row.bin_id!)
-                .eq('company_id', selectedCompany?.id || '')
-                .maybeSingle();
-              if (existing) {
-                const newQty = (existing.allocated_quantity || 0) + row.quantity;
-                await supabase
-                  .from('warehouse_bin_allocations')
-                  .update({ allocated_quantity: newQty })
-                  .eq('id', existing.id);
-              } else {
-                throw allocErr;
-              }
+                  company_id: selectedCompany!.id,
+                  created_by: user!.id,
+                });
+              if (insertErr) throw new Error(`Bin allocation insert failed: ${insertErr.message}`);
             }
 
             // Create stock transaction
@@ -447,8 +447,10 @@ export function BulkStockUploadDialog({ open, onOpenChange }: BulkStockUploadDia
           if (result.status === 'fulfilled') {
             successCount++;
           } else {
-            console.error(`Failed to process row ${batch[idx].rowNumber}:`, result.reason);
+            const reason = result.reason?.message || result.reason || 'Unknown error';
+            console.error(`Row ${batch[idx].rowNumber} (${batch[idx].item_code}): ${reason}`);
             failCount++;
+            failMessages.push(`Row ${batch[idx].rowNumber} (${batch[idx].item_code}): ${reason}`);
           }
         });
       }
@@ -463,7 +465,8 @@ export function BulkStockUploadDialog({ open, onOpenChange }: BulkStockUploadDia
       if (failCount === 0) {
         toast.success(`Successfully uploaded stock for ${successCount} items`);
       } else {
-        toast.warning(`Uploaded ${successCount} items, ${failCount} failed`);
+        const detail = failMessages.slice(0, 3).join('\n');
+        toast.warning(`Uploaded ${successCount} items, ${failCount} failed.\n${detail}`);
       }
 
       handleReset();
