@@ -118,7 +118,7 @@ export default function NDACompliance() {
         action: "nda_signed",
         performed_by: user?.id,
         details: { user_id: selectedAccess.user_id, access_id: selectedAccess.id },
-      });
+      } as any);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["social-media-ndas"] });
