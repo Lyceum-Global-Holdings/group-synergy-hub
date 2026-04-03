@@ -89,6 +89,10 @@ const PriceLists = lazy(() => import("./pages/procurement/PriceLists"));
 const AuditLogs = lazy(() => import("./pages/management/AuditLogs"));
 const BudgetVsActual = lazy(() => import("./pages/management/BudgetVsActual"));
 const Exceptions = lazy(() => import("./pages/management/Exceptions"));
+const SocialMediaAccounts = lazy(() => import("./pages/social-media/AccountRegistry"));
+const SocialMediaAccess = lazy(() => import("./pages/social-media/AccessManagement"));
+const SocialMediaNDA = lazy(() => import("./pages/social-media/NDACompliance"));
+const SocialMediaActivityLog = lazy(() => import("./pages/social-media/ActivityLog"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
