@@ -80,6 +80,7 @@ export default function AccountRegistry() {
     mutationFn: async (formData: AccountForm) => {
       const payload = {
         ...formData,
+        platform: formData.platform as "facebook" | "instagram" | "linkedin" | "twitter" | "youtube" | "tiktok" | "whatsapp" | "pinterest" | "snapchat" | "other",
         company_id: selectedCompany!.id,
       };
       if (editingId) {
@@ -90,9 +91,10 @@ export default function AccountRegistry() {
         if (error) throw error;
       } else {
         const { data: { user } } = await supabase.auth.getUser();
+        const insertPayload = { ...payload, added_by: user?.id, account_name: payload.account_name };
         const { error } = await supabase
           .from("social_media_accounts")
-          .insert({ ...payload, added_by: user?.id });
+          .insert(insertPayload);
         if (error) throw error;
       }
     },
