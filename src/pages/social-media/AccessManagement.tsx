@@ -17,7 +17,7 @@ import { Plus, Search, ShieldCheck, ShieldAlert, UserPlus } from "lucide-react";
 const ACCESS_LEVELS = ["admin", "editor", "viewer", "analyst"] as const;
 
 export default function AccessManagement() {
-  const { selectedCompany } = useCompanyContext();
+  const { selectedCompany } = useCompany();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [levelFilter, setLevelFilter] = useState("all");

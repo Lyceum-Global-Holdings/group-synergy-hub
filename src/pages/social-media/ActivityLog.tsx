@@ -19,7 +19,7 @@ const ACTION_LABELS: Record<string, { label: string; color: string }> = {
 };
 
 export default function ActivityLog() {
-  const { selectedCompany } = useCompanyContext();
+  const { selectedCompany } = useCompany();
   const [search, setSearch] = useState("");
   const [actionFilter, setActionFilter] = useState("all");
 

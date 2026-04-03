@@ -52,7 +52,7 @@ const emptyForm: AccountForm = {
 };
 
 export default function AccountRegistry() {
-  const { selectedCompany } = useCompanyContext();
+  const { selectedCompany } = useCompany();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [platformFilter, setPlatformFilter] = useState<string>("all");

@@ -15,7 +15,7 @@ import { Search, ShieldCheck, ShieldAlert, Clock, FileText, Upload } from "lucid
 import { format, differenceInDays } from "date-fns";
 
 export default function NDACompliance() {
-  const { selectedCompany } = useCompanyContext();
+  const { selectedCompany } = useCompany();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [signDialogOpen, setSignDialogOpen] = useState(false);
