@@ -100,7 +100,7 @@ export default function AccessManagement() {
         action: "access_granted",
         performed_by: user?.id,
         details: { user_id: form.user_id, access_level: form.access_level },
-      });
+      } as any);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["social-media-access"] });
