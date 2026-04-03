@@ -14640,6 +14640,233 @@ export type Database = {
           },
         ]
       }
+      social_media_access: {
+        Row: {
+          access_granted_at: string
+          access_granted_by: string | null
+          access_level: string
+          access_revoked_at: string | null
+          account_id: string
+          company_id: string
+          created_at: string
+          id: string
+          is_active: boolean
+          notes: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          access_granted_at?: string
+          access_granted_by?: string | null
+          access_level?: string
+          access_revoked_at?: string | null
+          account_id: string
+          company_id: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          notes?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          access_granted_at?: string
+          access_granted_by?: string | null
+          access_level?: string
+          access_revoked_at?: string | null
+          account_id?: string
+          company_id?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          notes?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "social_media_access_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "social_media_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "social_media_access_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      social_media_accounts: {
+        Row: {
+          account_handle: string | null
+          account_name: string
+          account_type: string
+          account_url: string | null
+          added_by: string | null
+          company_id: string
+          created_at: string
+          description: string | null
+          follower_count: number | null
+          id: string
+          platform: Database["public"]["Enums"]["social_media_platform"]
+          profile_image_url: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          account_handle?: string | null
+          account_name: string
+          account_type?: string
+          account_url?: string | null
+          added_by?: string | null
+          company_id: string
+          created_at?: string
+          description?: string | null
+          follower_count?: number | null
+          id?: string
+          platform?: Database["public"]["Enums"]["social_media_platform"]
+          profile_image_url?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          account_handle?: string | null
+          account_name?: string
+          account_type?: string
+          account_url?: string | null
+          added_by?: string | null
+          company_id?: string
+          created_at?: string
+          description?: string | null
+          follower_count?: number | null
+          id?: string
+          platform?: Database["public"]["Enums"]["social_media_platform"]
+          profile_image_url?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "social_media_accounts_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      social_media_activity_log: {
+        Row: {
+          account_id: string | null
+          action: string
+          company_id: string
+          created_at: string
+          details: Json | null
+          id: string
+          performed_by: string | null
+        }
+        Insert: {
+          account_id?: string | null
+          action: string
+          company_id: string
+          created_at?: string
+          details?: Json | null
+          id?: string
+          performed_by?: string | null
+        }
+        Update: {
+          account_id?: string | null
+          action?: string
+          company_id?: string
+          created_at?: string
+          details?: Json | null
+          id?: string
+          performed_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "social_media_activity_log_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "social_media_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "social_media_activity_log_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      social_media_ndas: {
+        Row: {
+          access_id: string
+          company_id: string
+          created_at: string
+          id: string
+          nda_document_url: string | null
+          nda_expiry_date: string | null
+          nda_signed: boolean
+          nda_signed_at: string | null
+          nda_version: string | null
+          notes: string | null
+          updated_at: string
+          user_id: string
+          witnessed_by: string | null
+        }
+        Insert: {
+          access_id: string
+          company_id: string
+          created_at?: string
+          id?: string
+          nda_document_url?: string | null
+          nda_expiry_date?: string | null
+          nda_signed?: boolean
+          nda_signed_at?: string | null
+          nda_version?: string | null
+          notes?: string | null
+          updated_at?: string
+          user_id: string
+          witnessed_by?: string | null
+        }
+        Update: {
+          access_id?: string
+          company_id?: string
+          created_at?: string
+          id?: string
+          nda_document_url?: string | null
+          nda_expiry_date?: string | null
+          nda_signed?: boolean
+          nda_signed_at?: string | null
+          nda_version?: string | null
+          notes?: string | null
+          updated_at?: string
+          user_id?: string
+          witnessed_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "social_media_ndas_access_id_fkey"
+            columns: ["access_id"]
+            isOneToOne: false
+            referencedRelation: "social_media_access"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "social_media_ndas_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       staff_advances: {
         Row: {
           advance_date: string
@@ -19789,6 +20016,17 @@ export type Database = {
         | "pending"
         | "partially_signed"
         | "fully_signed"
+      social_media_platform:
+        | "facebook"
+        | "instagram"
+        | "linkedin"
+        | "twitter"
+        | "youtube"
+        | "tiktok"
+        | "whatsapp"
+        | "pinterest"
+        | "snapchat"
+        | "other"
       stock_reference_type:
         | "manual"
         | "grn"
@@ -20256,6 +20494,18 @@ export const Constants = {
         "pending",
         "partially_signed",
         "fully_signed",
+      ],
+      social_media_platform: [
+        "facebook",
+        "instagram",
+        "linkedin",
+        "twitter",
+        "youtube",
+        "tiktok",
+        "whatsapp",
+        "pinterest",
+        "snapchat",
+        "other",
       ],
       stock_reference_type: [
         "manual",
