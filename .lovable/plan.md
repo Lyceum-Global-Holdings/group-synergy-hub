@@ -1,29 +1,41 @@
 
 
-## Add: Inline Access Level Editing per Social Media Channel
+## Add Company Selector + Auto Follower Count to Social Media Accounts
 
-### What's needed
-Currently the access level is set once when granting access and cannot be changed afterward. The user wants to be able to change a user's access level (admin/editor/viewer/analyst) directly from the access management table, per social media account.
+### Changes
 
-### Approach
-Add an inline editable `Select` dropdown in the "Access Level" column of the access table. When changed, it updates the `social_media_access` record and logs the change to the activity log.
+**1. Add Company Selector to the Add/Edit Dialog**
 
-### Changes — single file
+Currently, accounts are silently tied to whichever company is selected in the global header. The dialog will gain a "Company" dropdown at the top, pre-filled with the current company but changeable. This uses the same `companies` list from `useCompany()`.
 
-**`src/pages/social-media/AccessManagement.tsx`**
+**2. Auto-capture Follower Count from URL**
 
-1. Add an `updateAccessMutation` that:
-   - Calls `supabase.from("social_media_access").update({ access_level })` for the given record ID
-   - Logs an `access_level_changed` entry to `social_media_activity_log` with old and new levels
-   - Invalidates the query cache on success
+When a user pastes a social media page URL into the "Account URL" field, the system will attempt to extract the follower count automatically.
 
-2. Replace the static `Badge` in the "Access Level" column with a `Select` dropdown (only for active records):
-   - Shows current level as the selected value
-   - On change, fires the update mutation
-   - Inactive/revoked rows keep the static badge (read-only)
+**Approach**: Create a Supabase Edge Function (`fetch-social-stats`) that receives a URL + platform, fetches the public page HTML, and scrapes the follower count from meta tags or structured data (most platforms expose this in `og:` tags or JSON-LD). The dialog will show a small "Fetching followers..." indicator when a valid URL is pasted, and auto-populate the follower count field.
 
-3. No database changes needed — the `access_level` column already exists and is updatable via existing RLS policies.
+- Facebook: `og:description` or page HTML contains follower/like counts
+- Instagram: `og:description` meta tag contains follower count
+- LinkedIn: Limited; will attempt meta scraping
+- Twitter/X: `og:description` or page content
+- YouTube: subscriber count from page metadata
+- Fallback: If scraping fails, the field stays manual with a toast notification
 
-### Files to Edit
-- `src/pages/social-media/AccessManagement.tsx` — add update mutation + inline select in the access level column
+**3. UI Updates to the Dialog**
+
+- Add Company selector as the first field (full width, above Platform/Account Type row)
+- Add a loading spinner next to the follower count field when auto-fetching
+- URL field gets an `onBlur`/debounced handler that triggers the fetch
+
+### Files to Create/Edit
+
+1. **`supabase/functions/fetch-social-stats/index.ts`** — Edge Function that accepts `{ url, platform }`, fetches the page, extracts follower count from meta tags, returns `{ follower_count: number | null }`
+2. **`src/pages/social-media/AccountRegistry.tsx`** — Add company selector to dialog, add URL-change handler that calls the edge function, show loading state on follower count field
+
+### Technical Notes
+
+- The edge function uses standard `fetch()` with a browser-like User-Agent to get public page HTML
+- Follower count extraction uses regex on `og:description` and common meta patterns — no API keys needed
+- If the fetch fails or count can't be parsed, the field remains editable manually (graceful degradation)
+- The company selector only shows companies the user has access to (same list as the header selector)
 
