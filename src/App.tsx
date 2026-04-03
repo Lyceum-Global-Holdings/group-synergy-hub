@@ -230,6 +230,12 @@ function App() {
                 
                 {/* Production routes */}
                 <Route path="/production" element={<ProductionModule />} />
+                
+                {/* Social Media routes */}
+                <Route path="/social-media/accounts" element={<SocialMediaAccounts />} />
+                <Route path="/social-media/access" element={<SocialMediaAccess />} />
+                <Route path="/social-media/nda-compliance" element={<SocialMediaNDA />} />
+                <Route path="/social-media/activity-log" element={<SocialMediaActivityLog />} />
               </Route>
               
               {/* Catch-all 404 route */}
