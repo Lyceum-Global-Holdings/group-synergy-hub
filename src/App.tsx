@@ -89,6 +89,10 @@ const PriceLists = lazy(() => import("./pages/procurement/PriceLists"));
 const AuditLogs = lazy(() => import("./pages/management/AuditLogs"));
 const BudgetVsActual = lazy(() => import("./pages/management/BudgetVsActual"));
 const Exceptions = lazy(() => import("./pages/management/Exceptions"));
+const SocialMediaAccounts = lazy(() => import("./pages/social-media/AccountRegistry"));
+const SocialMediaAccess = lazy(() => import("./pages/social-media/AccessManagement"));
+const SocialMediaNDA = lazy(() => import("./pages/social-media/NDACompliance"));
+const SocialMediaActivityLog = lazy(() => import("./pages/social-media/ActivityLog"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -226,6 +230,12 @@ function App() {
                 
                 {/* Production routes */}
                 <Route path="/production" element={<ProductionModule />} />
+                
+                {/* Social Media routes */}
+                <Route path="/social-media/accounts" element={<SocialMediaAccounts />} />
+                <Route path="/social-media/access" element={<SocialMediaAccess />} />
+                <Route path="/social-media/nda-compliance" element={<SocialMediaNDA />} />
+                <Route path="/social-media/activity-log" element={<SocialMediaActivityLog />} />
               </Route>
               
               {/* Catch-all 404 route */}

@@ -9,7 +9,8 @@ import {
   GraduationCap,
   Settings,
   HardHat,
-  Factory
+  Factory,
+  Share2
 } from "lucide-react";
 
 export interface SubModuleChild {
@@ -181,6 +182,18 @@ export const moduleConfig: Record<string, ModuleConfig> = {
       { key: 'safety-management', name: 'Safety Management', description: 'Safety incidents and compliance', url: '/construction/safety-management' },
       { key: 'project-documents', name: 'Project Documents', description: 'Project document management', url: '/construction/project-documents' },
       { key: 'project-budgeting', name: 'Project Budgeting', description: 'Project budget planning and tracking', url: '/construction/project-budgeting' }
+    ]
+  },
+  'social-media': {
+    key: 'social-media',
+    name: 'Social Media',
+    description: 'Social media account management and NDA compliance',
+    icon: Share2,
+    subModules: [
+      { key: 'accounts', name: 'Account Registry', description: 'Manage company social media pages', url: '/social-media/accounts' },
+      { key: 'access', name: 'Access Management', description: 'Control account access and permissions', url: '/social-media/access' },
+      { key: 'nda-compliance', name: 'NDA Compliance', description: 'Track NDA signing and expiry', url: '/social-media/nda-compliance' },
+      { key: 'activity-log', name: 'Activity Log', description: 'Audit trail for account changes', url: '/social-media/activity-log' }
     ]
   }
 };
