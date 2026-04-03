@@ -111,6 +111,29 @@ export default function AccessManagement() {
     onError: (err: Error) => toast.error(err.message),
   });
 
+  const updateAccessMutation = useMutation({
+    mutationFn: async ({ accessId, oldLevel, newLevel }: { accessId: string; oldLevel: string; newLevel: string }) => {
+      const { data: { user } } = await supabase.auth.getUser();
+      const { error } = await supabase.from("social_media_access").update({
+        access_level: newLevel,
+      }).eq("id", accessId);
+      if (error) throw error;
+      const record = accessRecords.find((r: Record<string, unknown>) => r.id === accessId);
+      await supabase.from("social_media_activity_log").insert({
+        company_id: selectedCompany!.id,
+        account_id: (record as Record<string, unknown>)?.account_id as string,
+        action: "access_level_changed",
+        performed_by: user?.id,
+        details: { access_id: accessId, old_level: oldLevel, new_level: newLevel },
+      } as any);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["social-media-access"] });
+      toast.success("Access level updated");
+    },
+    onError: (err: Error) => toast.error(err.message),
+  });
+
   const revokeMutation = useMutation({
     mutationFn: async (accessId: string) => {
       const { data: { user } } = await supabase.auth.getUser();
