@@ -197,7 +197,25 @@ export default function AccessManagement() {
     {
       key: "access_level",
       header: "Access Level",
-      render: (row) => <Badge variant="outline" className="capitalize">{row.access_level as string}</Badge>,
+      render: (row) => row.is_active ? (
+        <Select
+          value={row.access_level as string}
+          onValueChange={(newLevel) => {
+            if (newLevel !== row.access_level) {
+              updateAccessMutation.mutate({ accessId: row.id as string, oldLevel: row.access_level as string, newLevel });
+            }
+          }}
+        >
+          <SelectTrigger className="w-[120px] h-8 capitalize">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {ACCESS_LEVELS.map((l) => <SelectItem key={l} value={l} className="capitalize">{l}</SelectItem>)}
+          </SelectContent>
+        </Select>
+      ) : (
+        <Badge variant="outline" className="capitalize">{row.access_level as string}</Badge>
+      ),
     },
     {
       key: "nda_status",
