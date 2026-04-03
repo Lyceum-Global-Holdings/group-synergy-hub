@@ -1,90 +1,43 @@
 
 
-## Generate: Group Synergy Hub System Manual (PDF)
+## Update: Add Process Maps to System Manual (v2)
 
-A professional ~100-page system documentation PDF modeled on the GarageOne manual's structure and quality — adapted for your actual system (Group Synergy Hub / NCG Holdings ERP platform).
+### What's Missing
+The current 53-page manual describes each module in prose but contains no visual process flow diagrams. The GarageOne reference manual includes process maps for every major workflow. We need to add these.
 
-### Document Structure
+### Process Maps to Add (11 diagrams)
 
-The reference manual uses a 5-part structure. The generated PDF will mirror this architecture, mapped to all modules present in your codebase:
+Each process map will be a visual flowchart rendered directly in the PDF using ReportLab's drawing primitives (boxes, arrows, diamonds for decisions, color-coded by stage).
 
-```text
-COVER PAGE
-  Title: Group Synergy Hub — System Manual
-  Edition: Version 3.1 · April 2026
-  Classification: Senior Management — Confidential
+1. **Procurement Lifecycle** -- PR (Draft → Submitted → Approved) → PO (Draft → Pending Approval → Dept Head Approval → Approved → Sent → Acknowledged → Partially Received → Completed) → GRN → 3-Way Match → Payment
+2. **Warehouse Operations** -- Item Master → Bin Allocation → GRN Receipt → Quality Check → Put-Away → FIFO Stock Transfer → Stock Issue → Cycle Count
+3. **Supplier Management** -- Registration → Evaluation → Onboarding → Scorecard → Performance Review → Blacklist/Suspend decision
+4. **Production** -- BOM Creation → Production Order → Material Issue → Manufacturing → Quality Inspection → Production Receipt → Finished Goods
+5. **Construction Project** -- Project Setup → Site Activation → Work Orders → Daily Reports (Draft → Submitted → Approved) → Phase Completion → Project Closeout
+6. **Sales / Customer PO** -- Customer PO → Pick → Pack → Dispatch → Delivery Order → Invoice
+7. **Accounts Payable** -- Vendor Invoice → 3-Way Match (PO + GRN + Invoice) → Approval → Payment → Bank Reconciliation
+8. **Accounts Receivable** -- Sales Invoice → Customer Payment → Receipt Matching → Aging → Write-off/Collection
+9. **Fixed Asset Lifecycle** -- Asset Request → Approval → Acquisition → Depreciation → Revaluation → Disposal
+10. **Approval Workflow** -- Request Created → Pending → Stage 1 Approval → Stage N Approval → Approved/Rejected → Escalation path
+11. **RFQ/RFP Process** -- Draft → Published → Supplier Invitations → Quote Submission → Evaluation → Award
 
-TABLE OF CONTENTS
+### Design Approach
+- Each process map is a full-page landscape-oriented diagram with color-coded boxes (blue for start/end, green for actions, amber for decisions, red for rejection paths)
+- Arrow connectors between stages with labels
+- Rendered using ReportLab `Drawing` / `shapes` primitives (no external image dependencies)
+- Process maps inserted into the Module Architecture Reference section (pages 10-20), one per module, immediately after each module's summary page
 
-MODULE ARCHITECTURE REFERENCE (visual summary pages)
-  - Module Overview Grid (all modules at a glance)
-  - Master Ecosystem Connectivity Map
-  - Individual Module Process Flow pages:
-    1. Administration & Access Control
-    2. Warehouse & Inventory
-    3. Procurement
-    4. Sourcing & Supplier Management
-    5. Finance & Accounting
-    6. Production
-    7. Construction & Project Management
-    8. Sales (TUH Modules — Customer PO, Finished Goods)
-    9. Management & Approvals
-   10. Notifications & Escalations
-   11. Reporting & Analytics
-  - Cross-Module Dependency Matrix
-
-PART ONE — SYSTEM PHILOSOPHY
-  1.1 The Invisible Backbone (real-time monitoring)
-  1.2 The Immutable Ledger (append-only audit trail)
-  1.3 Unified Connectivity (automatic notifications)
-
-PART TWO — INFRASTRUCTURE & DATABASE MODEL
-  2.1 The Secure Database (Supabase/PostgreSQL, RLS, entity isolation)
-  2.2 Role-Based Access Architecture (13 roles, 5 tiers, company-scoped)
-  2.3 Notification & Communication Infrastructure (Telegram, SMS, dashboard)
-
-PART THREE — OPERATIONAL MODULES
-  3.1 Warehouse Operations (items, bins, GRN, batch tracking, FIFO, stock transfer)
-  3.2 Procurement Lifecycle (PR → PO → GRN → 3-Way Match)
-  3.3 Sourcing & Supplier Management (registration, evaluation, scorecard, blacklist)
-  3.4 Production Module (BOM, production orders, receipts)
-  3.5 Construction & Project Management (site management, work orders, daily reports, budgeting)
-  3.6 Sales & Customer Operations (Customer PO, pick/pack/dispatch, delivery orders)
-
-PART FOUR — FINANCIAL CONTROL & INTEGRITY
-  4.1 The 3-Way Match (PO vs GRN vs Invoice)
-  4.2 General Ledger & Period Locking
-  4.3 Accounts Receivable Lifecycle
-  4.4 Accounts Payable & Vendor Payments
-  4.5 Banking, Cash Management & Reconciliation
-  4.6 Fixed Assets, Budgeting & Cost Centers
-
-PART FIVE — SECURITY & GOVERNANCE
-  5.1 Multi-Company Architecture & Data Sovereignty
-  5.2 Row-Level Security & Zero-Trust Model
-  5.3 Approval Workflows & Escalation Matrix
-  5.4 Audit Trail & Universal Movement Log
-
-GLOSSARY OF OPERATIONAL TERMS
-```
-
-### Design & Branding
-
-- Uses the enterprise color palette from the existing design system (slate/blue tones)
-- Professional typography: Arial/Helvetica, clean table formatting
-- Each section starts on a new page with a branded header band
-- Tables use the same style as the reference (bordered, shaded headers)
-- Footer with page numbers and document classification
-- Cover page with NCG Holdings Group branding
+### Output
+- New file: `GroupSynergyHub_SystemManual_v2.pdf` (~65-70 pages)
+- Same content + 11 new process map pages interleaved in the module reference section
 
 ### Technical Approach
+1. Regenerate the full PDF script with the existing content preserved
+2. Add a `draw_process_map(canvas, title, steps, decisions)` helper function
+3. Each process map page uses landscape orientation with the branded header/footer
+4. Visual QA on every process map page after generation
 
-1. Generate the PDF using Python (ReportLab) with a single script
-2. Content derived from the codebase structure + adapted from the GarageOne reference manual's narrative style
-3. Process flow descriptions based on actual system pages and hooks
-4. Output to `/mnt/documents/GroupSynergyHub_SystemManual.pdf`
-
-### Estimated Output
-
-~80-100 pages, matching the professional quality and depth of the GarageOne reference document.
+### Files
+- Script: `/tmp/gen_manual_v2.py` (regenerated)
+- Output: `/mnt/documents/GroupSynergyHub_SystemManual_v2.pdf`
 
