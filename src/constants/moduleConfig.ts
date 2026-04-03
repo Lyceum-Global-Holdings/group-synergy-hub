@@ -9,7 +9,8 @@ import {
   GraduationCap,
   Settings,
   HardHat,
-  Factory
+  Factory,
+  Share2
 } from "lucide-react";
 
 export interface SubModuleChild {
