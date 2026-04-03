@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useCompany } from "@/contexts/CompanyContext";
@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { Plus, Search, Facebook, Instagram, Linkedin, Twitter, Youtube } from "lucide-react";
+import { Plus, Search, Facebook, Instagram, Linkedin, Twitter, Youtube, Loader2, Building2 } from "lucide-react";
 
 const PLATFORMS = [
   "facebook", "instagram", "linkedin", "twitter", "youtube",
@@ -30,6 +30,7 @@ const platformIcons: Record<string, React.ReactNode> = {
 };
 
 interface AccountForm {
+  company_id: string;
   platform: string;
   account_name: string;
   account_handle: string;
@@ -40,25 +41,28 @@ interface AccountForm {
   follower_count: number;
 }
 
-const emptyForm: AccountForm = {
-  platform: "facebook",
-  account_name: "",
-  account_handle: "",
-  account_url: "",
-  account_type: "business",
-  status: "active",
-  description: "",
-  follower_count: 0,
-};
-
 export default function AccountRegistry() {
-  const { selectedCompany } = useCompany();
+  const { selectedCompany, companies } = useCompany();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [platformFilter, setPlatformFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [fetchingFollowers, setFetchingFollowers] = useState(false);
+
+  const emptyForm: AccountForm = {
+    company_id: selectedCompany?.id || "",
+    platform: "facebook",
+    account_name: "",
+    account_handle: "",
+    account_url: "",
+    account_type: "business",
+    status: "active",
+    description: "",
+    follower_count: 0,
+  };
+
   const [form, setForm] = useState<AccountForm>(emptyForm);
 
   const { data: accounts = [], isLoading } = useQuery({
@@ -76,12 +80,39 @@ export default function AccountRegistry() {
     enabled: !!selectedCompany?.id,
   });
 
+  const fetchFollowerCount = useCallback(async (url: string, platform: string) => {
+    if (!url || !url.startsWith("http")) return;
+    setFetchingFollowers(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("fetch-social-stats", {
+        body: { url, platform },
+      });
+      if (error) throw error;
+      if (data?.follower_count != null) {
+        setForm((prev) => ({ ...prev, follower_count: data.follower_count }));
+        toast.success(`Follower count auto-detected: ${data.follower_count.toLocaleString()}`);
+      } else {
+        toast.info("Could not auto-detect follower count. You can enter it manually.");
+      }
+    } catch {
+      toast.info("Could not fetch follower count. You can enter it manually.");
+    } finally {
+      setFetchingFollowers(false);
+    }
+  }, []);
+
   const saveMutation = useMutation({
     mutationFn: async (formData: AccountForm) => {
       const payload = {
-        ...formData,
         platform: formData.platform as "facebook" | "instagram" | "linkedin" | "twitter" | "youtube" | "tiktok" | "whatsapp" | "pinterest" | "snapchat" | "other",
-        company_id: selectedCompany!.id,
+        account_name: formData.account_name,
+        account_handle: formData.account_handle,
+        account_url: formData.account_url,
+        account_type: formData.account_type,
+        status: formData.status,
+        description: formData.description,
+        follower_count: formData.follower_count,
+        company_id: formData.company_id,
       };
       if (editingId) {
         const { error } = await supabase
@@ -91,10 +122,9 @@ export default function AccountRegistry() {
         if (error) throw error;
       } else {
         const { data: { user } } = await supabase.auth.getUser();
-        const insertPayload = { ...payload, added_by: user?.id, account_name: payload.account_name };
         const { error } = await supabase
           .from("social_media_accounts")
-          .insert(insertPayload);
+          .insert({ ...payload, added_by: user?.id });
         if (error) throw error;
       }
     },
@@ -111,6 +141,7 @@ export default function AccountRegistry() {
   const openEdit = (row: Record<string, unknown>) => {
     setEditingId(row.id as string);
     setForm({
+      company_id: (row.company_id as string) || selectedCompany?.id || "",
       platform: row.platform as string,
       account_name: row.account_name as string,
       account_handle: (row.account_handle as string) || "",
@@ -120,6 +151,12 @@ export default function AccountRegistry() {
       description: (row.description as string) || "",
       follower_count: (row.follower_count as number) || 0,
     });
+    setDialogOpen(true);
+  };
+
+  const openNew = () => {
+    setEditingId(null);
+    setForm({ ...emptyForm, company_id: selectedCompany?.id || "" });
     setDialogOpen(true);
   };
 
@@ -169,7 +206,7 @@ export default function AccountRegistry() {
           <h1 className="text-2xl font-semibold text-foreground">Social Media Accounts</h1>
           <p className="text-sm text-muted-foreground">Manage company social media pages and profiles</p>
         </div>
-        <Button onClick={() => { setEditingId(null); setForm(emptyForm); setDialogOpen(true); }}>
+        <Button onClick={openNew}>
           <Plus className="h-4 w-4 mr-2" /> Add Account
         </Button>
       </div>
@@ -203,6 +240,23 @@ export default function AccountRegistry() {
             <DialogTitle>{editingId ? "Edit Account" : "Add Social Media Account"}</DialogTitle>
           </DialogHeader>
           <div className="grid gap-4 py-4">
+            {/* Company Selector */}
+            <div className="space-y-2">
+              <Label className="flex items-center gap-1.5">
+                <Building2 className="h-3.5 w-3.5" /> Company *
+              </Label>
+              <Select value={form.company_id} onValueChange={(v) => setForm({ ...form, company_id: v })}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select company" />
+                </SelectTrigger>
+                <SelectContent>
+                  {companies.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Platform</Label>
@@ -227,19 +281,37 @@ export default function AccountRegistry() {
               <Label>Account Name *</Label>
               <Input value={form.account_name} onChange={(e) => setForm({ ...form, account_name: e.target.value })} placeholder="e.g. NCG Holdings Official" />
             </div>
+            <div className="space-y-2">
+              <Label>Account URL</Label>
+              <Input
+                value={form.account_url}
+                onChange={(e) => setForm({ ...form, account_url: e.target.value })}
+                onBlur={(e) => {
+                  const url = e.target.value.trim();
+                  if (url && url.startsWith("http")) {
+                    fetchFollowerCount(url, form.platform);
+                  }
+                }}
+                placeholder="https://facebook.com/yourpage — paste to auto-fetch followers"
+              />
+            </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Handle</Label>
                 <Input value={form.account_handle} onChange={(e) => setForm({ ...form, account_handle: e.target.value })} placeholder="@handle" />
               </div>
               <div className="space-y-2">
-                <Label>Follower Count</Label>
-                <Input type="number" value={form.follower_count} onChange={(e) => setForm({ ...form, follower_count: parseInt(e.target.value) || 0 })} />
+                <Label className="flex items-center gap-1.5">
+                  Follower Count
+                  {fetchingFollowers && <Loader2 className="h-3 w-3 animate-spin text-primary" />}
+                </Label>
+                <Input
+                  type="number"
+                  value={form.follower_count}
+                  onChange={(e) => setForm({ ...form, follower_count: parseInt(e.target.value) || 0 })}
+                  disabled={fetchingFollowers}
+                />
               </div>
-            </div>
-            <div className="space-y-2">
-              <Label>Account URL</Label>
-              <Input value={form.account_url} onChange={(e) => setForm({ ...form, account_url: e.target.value })} placeholder="https://..." />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
@@ -259,7 +331,7 @@ export default function AccountRegistry() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
-            <Button onClick={() => saveMutation.mutate(form)} disabled={!form.account_name || saveMutation.isPending}>
+            <Button onClick={() => saveMutation.mutate(form)} disabled={!form.account_name || !form.company_id || saveMutation.isPending}>
               {saveMutation.isPending ? "Saving..." : editingId ? "Update" : "Add Account"}
             </Button>
           </DialogFooter>
