@@ -126,7 +126,7 @@ export default function AccessManagement() {
         action: "access_revoked",
         performed_by: user?.id,
         details: { access_id: accessId },
-      });
+      } as any);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["social-media-access"] });
