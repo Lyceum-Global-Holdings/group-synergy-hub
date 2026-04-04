@@ -90,9 +90,11 @@ export default function AccountRegistry() {
       if (error) throw error;
       if (data?.follower_count != null) {
         setForm((prev) => ({ ...prev, follower_count: data.follower_count }));
-        toast.success(`Follower count auto-detected: ${data.follower_count.toLocaleString()}`);
+        const source = data.source === 'api' ? 'via official API' : 'from page data';
+        toast.success(`Follower count auto-detected ${source}: ${data.follower_count.toLocaleString()}`);
       } else {
-        toast.info("Could not auto-detect follower count. You can enter it manually.");
+        const msg = data?.message || "Could not auto-detect follower count.";
+        toast.info(`${msg} You can enter it manually.`);
       }
     } catch {
       toast.info("Could not fetch follower count. You can enter it manually.");
