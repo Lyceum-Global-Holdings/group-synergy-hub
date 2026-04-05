@@ -19,7 +19,7 @@ export const useWarehouseBins = (options: UseWarehouseBinsOptions = {}) => {
     isLoading,
     error
   } = useQuery({
-    queryKey: ['warehouse-bins', permissions?.viewAllLocations, permissions?.viewLocationIds, permissions?.editLocationIds],
+    queryKey: ['warehouse-bins', skipLocationFilter, permissions?.viewAllLocations, permissions?.viewLocationIds, permissions?.editLocationIds],
     queryFn: async () => {
       let query = supabase
         .from('warehouse_bins')

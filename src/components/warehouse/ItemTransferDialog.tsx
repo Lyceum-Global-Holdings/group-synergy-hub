@@ -133,12 +133,8 @@ export function ItemTransferDialog({
     enabled: !!item?.id && open,
   });
 
-  // Get bins with stock for this item, filtered by edit permissions
+  // Get bins with stock for this item — show all locations (visibility ≠ authorization)
   const binsWithStock = useMemo(() => {
-    const editLocationIds = permissions && !permissions.viewAllLocations
-      ? new Set([...permissions.editLocationIds])
-      : null;
-
     return itemBinAllocations.map((allocation: any) => {
       const bin = allocation.warehouse_bins;
       const location = locations.find(l => l.id === bin?.location_id);
@@ -150,12 +146,8 @@ export function ItemTransferDialog({
         locationName: location?.name || "Unassigned",
         availableQty: Number(allocation.available_quantity) || 0,
       };
-    }).filter(b => {
-      if (!b.binId) return false;
-      if (editLocationIds && !editLocationIds.has(b.locationId)) return false;
-      return true;
-    });
-  }, [itemBinAllocations, locations, permissions]);
+    }).filter(b => !!b.binId);
+  }, [itemBinAllocations, locations]);
 
   const getBinDisplayName = (bin: typeof bins[0]) => {
     const location = locations.find(l => l.id === bin.location_id);
