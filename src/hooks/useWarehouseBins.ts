@@ -27,7 +27,8 @@ export const useWarehouseBins = (options: UseWarehouseBinsOptions = {}) => {
         .order('bin_code');
 
       // Filter by permitted locations if user doesn't have view_all_locations
-      if (permissions && !permissions.viewAllLocations) {
+      // Skip filtering when skipLocationFilter is true (e.g., during transfers)
+      if (!skipLocationFilter && permissions && !permissions.viewAllLocations) {
         const permittedLocationIds = [...new Set([...permissions.viewLocationIds, ...permissions.editLocationIds])];
         if (permittedLocationIds.length > 0) {
           query = query.in('location_id', permittedLocationIds);
