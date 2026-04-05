@@ -32,6 +32,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Upload, X, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import { QuickCreateSupplierDialog } from './QuickCreateSupplierDialog';
+import { useNextWarehouseItemCode } from '@/hooks/warehouse/useNextWarehouseItemCode';
 
 interface CreateItemDialogProps {
   open: boolean;
