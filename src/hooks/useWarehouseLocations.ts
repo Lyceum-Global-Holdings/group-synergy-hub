@@ -229,7 +229,20 @@ export const useDashboardLocations = (selectedCompanyId?: string | null) => {
         if (loc?.id) merged.set(loc.id, loc);
       });
 
-      return Array.from(merged.values()).sort((a, b) => a.name.localeCompare(b.name));
+      const result = Array.from(merged.values()).sort((a, b) => a.name.localeCompare(b.name));
+
+      // Fallback: if no locations mapped to this company, show all locations
+      if (result.length === 0) {
+        const { data: allLocations, error: allError } = await supabase
+          .from('warehouse_locations')
+          .select('id, name, type')
+          .eq('type', 'location')
+          .order('name');
+        if (allError) throw allError;
+        return allLocations ?? [];
+      }
+
+      return result;
     },
   });
 };
