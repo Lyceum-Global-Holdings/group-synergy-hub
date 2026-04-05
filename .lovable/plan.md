@@ -1,32 +1,29 @@
 
 
-## Add Comprehensive Standard Categories to Import Dialog
+## Filter Item Category Selector to Level 1 (Top-Level) Categories Only
 
-### Current State
-The `standardCategories.ts` file has 3 industry templates: **Apparel**, **Construction**, **Stationery**. The user wants all standard warehouse categories covered based on international standards (UNSPSC / ISO 22742).
+### Why
+Per SAP MM and UNSPSC standards, items are classified at the **material group level** (top-level category), not at sub-category levels. Sub-categories exist for organizational hierarchy but item codes are generated from the top-level category code (e.g., `NCG-ELC-000001`). Allowing sub-category selection would break the item code pattern and violate the material classification standard.
 
-### Categories to Add (9 new industry templates)
+### Changes
 
-1. **Manufacturing** — Raw materials, chemicals, packaging materials, MRO supplies
-2. **IT & Electronics** — Hardware, networking, peripherals, cables, components
-3. **Automotive** — Parts, fluids, tires, accessories, body parts
-4. **Food & Beverage** — Dry goods, refrigerated, frozen, beverages, packaging
-5. **Healthcare & Pharma** — Medicines, medical devices, lab supplies, PPE, consumables
-6. **Hospitality** — Linen, amenities, kitchen supplies, cleaning, furniture
-7. **Agriculture** — Seeds, fertilizers, pesticides, tools, irrigation, animal feed
-8. **Logistics & Packaging** — Boxes, pallets, tape, stretch wrap, labels, containers
-9. **General Warehouse** — Cleaning supplies, maintenance, safety, office consumables, fuel
+**1. `src/components/warehouse/SingleItemForm.tsx`**
+- Filter the `categories` array to only show top-level categories (`parent_id === null`) in the category `<Select>` dropdown
+- Add a `useMemo` filter: `const topLevelCategories = categories.filter(c => !c.parent_id)`
+- Replace `categories.map(...)` with `topLevelCategories.map(...)` in the selector
+- Add a helper label/tooltip: "Material Group (Level 1)" to clarify the SAP standard
 
-Each template follows the same 3-level hierarchy (category → subcategory → sub-subcategory) with ISO 7372-aligned 3-letter codes.
+**2. `src/components/warehouse/CreateItemDialog.tsx`**
+- Same change: filter to `parent_id === null` categories only
+- Same label update
 
-### UI Changes
-
-**`ImportCategoriesDialog.tsx`**:
-- Change `TabsList` from `grid-cols-3` to a scrollable horizontal layout to accommodate 12 tabs
-- Add icons for each new industry (using existing Lucide icons)
-- No other dialog changes needed — the existing rendering logic handles any number of templates
+### What stays the same
+- The full category hierarchy remains visible in the Category Management page
+- Sub-categories are still useful for reporting, filtering, and organizational purposes
+- Item code auto-generation logic unchanged — it already reads from the selected category's code
+- Bulk import uses the same filtering
 
 ### Files to Edit
-1. `src/constants/standardCategories.ts` — Add 9 new industry templates (~400 new categories total)
-2. `src/components/warehouse/ImportCategoriesDialog.tsx` — Update tab layout to scroll horizontally, add icons for new industries
+1. `src/components/warehouse/SingleItemForm.tsx`
+2. `src/components/warehouse/CreateItemDialog.tsx`
 
