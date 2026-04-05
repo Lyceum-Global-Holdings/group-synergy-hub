@@ -87,6 +87,21 @@ export function CreateItemDialog({ open, onOpenChange, editingItem }: CreateItem
   const warehouseLocations = locations.filter(loc => loc.type === 'location');
   const topLevelCategories = useMemo(() => categories.filter(c => !c.parent_id), [categories]);
 
+  const selectedCategory = useMemo(() => 
+    topLevelCategories.find(c => c.id === formData.category_id), 
+    [topLevelCategories, formData.category_id]
+  );
+  const { data: nextItemCode, isLoading: isLoadingCode } = useNextWarehouseItemCode(
+    selectedCategory?.code || null,
+    selectedCompany?.id || null
+  );
+
+  useEffect(() => {
+    if (!editingItem && nextItemCode) {
+      setFormData(prev => ({ ...prev, item_code: nextItemCode }));
+    }
+  }, [nextItemCode, editingItem]);
+
   // Filter bins by selected warehouse location
   const filteredBins = formData.location_id 
     ? bins.filter(bin => bin.location_id === formData.location_id)
@@ -309,7 +324,15 @@ export function CreateItemDialog({ open, onOpenChange, editingItem }: CreateItem
                 value={formData.item_code}
                 onChange={(e) => setFormData({ ...formData, item_code: e.target.value })}
                 required
+                readOnly={!editingItem}
+                placeholder={!editingItem ? 'Select category to auto-generate' : ''}
+                className={!editingItem ? 'bg-muted cursor-not-allowed' : ''}
               />
+              {!editingItem && (
+                <p className="text-xs text-muted-foreground">
+                  {isLoadingCode ? 'Generating...' : 'Auto-generated: INV-{Category}-Sequence'}
+                </p>
+              )}
             </div>
             <div className="space-y-2">
               <Label htmlFor="name">Item Name *</Label>
