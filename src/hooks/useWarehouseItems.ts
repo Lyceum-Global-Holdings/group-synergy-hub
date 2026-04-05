@@ -78,10 +78,8 @@ export const useWarehouseItems = (options?: { skipCompanyFilter?: boolean; disab
           const permittedLocationIds = [...new Set([...permissions.viewLocationIds, ...permissions.editLocationIds])];
           if (permittedLocationIds.length > 0) {
             binsQuery = binsQuery.in('location_id', permittedLocationIds);
-          } else {
-            // No location permissions — return items with no bin data
-            return (data || []).map((item: any) => ({ ...item, bins: null })) as WarehouseItem[];
           }
+          // No explicit permissions = fail-open: show all bins (no filter applied)
         }
 
         const { data: bins } = await binsQuery;
