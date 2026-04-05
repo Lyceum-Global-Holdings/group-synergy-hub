@@ -87,7 +87,7 @@ export function ItemTransferDialog({
 
   const createTransfer = useCreateStockTransfer();
   const createItem = useCreateStockTransferItem();
-  const { bins = [] } = useWarehouseBins();
+  const { bins = [] } = useWarehouseBins({ skipLocationFilter: true });
   const { locations = [] } = useWarehouseLocations();
   const { units } = useItemUnits();
   const { data: permissions } = useCurrentUserLocationPermissions();
