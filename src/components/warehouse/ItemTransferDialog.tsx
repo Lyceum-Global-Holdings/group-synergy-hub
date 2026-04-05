@@ -90,7 +90,7 @@ export function ItemTransferDialog({
   const { bins = [] } = useWarehouseBins({ skipLocationFilter: true });
   const { locations = [] } = useWarehouseLocations();
   const { units } = useItemUnits();
-  const { data: permissions } = useCurrentUserLocationPermissions();
+  
 
   // State for verification dialog
   const [showVerificationDialog, setShowVerificationDialog] = useState(false);
