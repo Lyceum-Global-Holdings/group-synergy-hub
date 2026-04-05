@@ -13,7 +13,10 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { Package, FileText, Hammer, Download } from 'lucide-react';
+import { 
+  Package, FileText, Hammer, Download, Factory, Monitor, Car, 
+  UtensilsCrossed, HeartPulse, Hotel, Sprout, Truck, Warehouse 
+} from 'lucide-react';
 import { STANDARD_INDUSTRY_TEMPLATES, StandardCategory } from '@/constants/standardCategories';
 import { useItemCategories } from '@/hooks/useItemCategories';
 import { CreateItemCategoryData } from '@/types/itemBin';
@@ -30,12 +33,10 @@ export function ImportCategoriesDialog({ open, onOpenChange, companyId }: Import
   
   const { categories: existingCategories, bulkImportCategories, isImporting } = useItemCategories(companyId);
 
-  // Get existing category names to prevent duplicates
   const existingCategoryNames = useMemo(() => {
     return new Set(existingCategories.map(cat => cat.name.toLowerCase()));
   }, [existingCategories]);
 
-  // Flatten categories for easier processing
   const flattenCategories = (categories: StandardCategory[], parentId?: string): Array<StandardCategory & { parentName?: string; level: number; uniqueKey: string }> => {
     const result: Array<StandardCategory & { parentName?: string; level: number; uniqueKey: string }> = [];
     
@@ -62,7 +63,6 @@ export function ImportCategoriesDialog({ open, onOpenChange, companyId }: Import
   const currentIndustryTemplate = STANDARD_INDUSTRY_TEMPLATES.find(t => t.name === selectedIndustry);
   const flatCategories = currentIndustryTemplate ? flattenCategories(currentIndustryTemplate.categories) : [];
 
-  // Filter out categories that already exist
   const availableCategories = flatCategories.filter(cat => 
     !existingCategoryNames.has(cat.name.toLowerCase())
   );
@@ -88,7 +88,6 @@ export function ImportCategoriesDialog({ open, onOpenChange, companyId }: Import
   const handleImport = () => {
     if (selectedCategories.size === 0) return;
 
-    // Process selected categories with their metadata
     const categoriesToImport = availableCategories
       .filter(cat => selectedCategories.has(cat.uniqueKey))
       .sort((a, b) => a.level - b.level)
@@ -106,13 +105,19 @@ export function ImportCategoriesDialog({ open, onOpenChange, companyId }: Import
     setSelectedCategories(new Set());
   };
 
-  const getIndustryIcon = (industry: string) => {
-    switch (industry) {
-      case 'Apparel': return <Package className="h-4 w-4" />;
-      case 'Construction': return <Hammer className="h-4 w-4" />;
-      case 'Stationery': return <FileText className="h-4 w-4" />;
-      default: return <Package className="h-4 w-4" />;
-    }
+  const INDUSTRY_ICONS: Record<string, React.ReactNode> = {
+    'Apparel': <Package className="h-4 w-4 shrink-0" />,
+    'Construction': <Hammer className="h-4 w-4 shrink-0" />,
+    'Stationery': <FileText className="h-4 w-4 shrink-0" />,
+    'Manufacturing': <Factory className="h-4 w-4 shrink-0" />,
+    'IT & Electronics': <Monitor className="h-4 w-4 shrink-0" />,
+    'Automotive': <Car className="h-4 w-4 shrink-0" />,
+    'Food & Beverage': <UtensilsCrossed className="h-4 w-4 shrink-0" />,
+    'Healthcare': <HeartPulse className="h-4 w-4 shrink-0" />,
+    'Hospitality': <Hotel className="h-4 w-4 shrink-0" />,
+    'Agriculture': <Sprout className="h-4 w-4 shrink-0" />,
+    'Logistics': <Truck className="h-4 w-4 shrink-0" />,
+    'General': <Warehouse className="h-4 w-4 shrink-0" />,
   };
 
   return (
@@ -129,18 +134,20 @@ export function ImportCategoriesDialog({ open, onOpenChange, companyId }: Import
         </DialogHeader>
 
         <Tabs value={selectedIndustry} onValueChange={setSelectedIndustry} className="flex-1">
-          <TabsList className="grid w-full grid-cols-3">
-            {STANDARD_INDUSTRY_TEMPLATES.map((template) => (
-              <TabsTrigger 
-                key={template.name} 
-                value={template.name}
-                className="flex items-center gap-2"
-              >
-                {getIndustryIcon(template.name)}
-                {template.name}
-              </TabsTrigger>
-            ))}
-          </TabsList>
+          <ScrollArea className="w-full">
+            <TabsList className="inline-flex w-max gap-1 p-1">
+              {STANDARD_INDUSTRY_TEMPLATES.map((template) => (
+                <TabsTrigger 
+                  key={template.name} 
+                  value={template.name}
+                  className="flex items-center gap-1.5 whitespace-nowrap text-xs px-3"
+                >
+                  {INDUSTRY_ICONS[template.name] || <Package className="h-4 w-4 shrink-0" />}
+                  {template.name}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+          </ScrollArea>
 
           {STANDARD_INDUSTRY_TEMPLATES.map((template) => (
             <TabsContent key={template.name} value={template.name} className="space-y-4">
@@ -169,9 +176,7 @@ export function ImportCategoriesDialog({ open, onOpenChange, companyId }: Import
                     return (
                       <div 
                         key={categoryKey}
-                        className={`flex items-start gap-3 p-2 rounded-lg hover:bg-muted/50 ${
-                          category.level > 0 ? 'ml-' + (category.level * 4) : ''
-                        }`}
+                        className={`flex items-start gap-3 p-2 rounded-lg hover:bg-muted/50`}
                         style={{ marginLeft: category.level * 16 }}
                       >
                         <Checkbox
