@@ -14,7 +14,6 @@ import { useCurrentUserLocationPermissions } from "@/hooks/useCurrentUserLocatio
 import { useEffect, useMemo } from "react";
 
 export function LocationSelector() {
-  const NO_LOCATION_ACCESS = "__no_location_access__";
   const { globalLocationId, setGlobalLocationId } = useLocationFilter();
   const { selectedCompany } = useCompany();
   const { data: permissions, isLoading: permissionsLoading } = useCurrentUserLocationPermissions();
@@ -72,7 +71,7 @@ export function LocationSelector() {
 
   const canViewAll = permissions?.viewAllLocations === true;
 
-  // Strict filtering: show only explicitly permitted locations unless View All is granted.
+  // Fail-open visibility: if user has no explicit location permissions, show all company locations
   const locations = useMemo(() => {
     if (permissionsLoading) return [];
     if (!permissions) return [];
@@ -83,29 +82,37 @@ export function LocationSelector() {
       ...permissions.editLocationIds,
     ]);
 
-    if (permittedIds.size === 0) return [];
+    // Fail-open: no explicit permissions means unrestricted visibility
+    if (permittedIds.size === 0) return companyLocations;
     return companyLocations.filter((loc) => permittedIds.has(loc.id));
   }, [companyLocations, permissions, permissionsLoading, canViewAll]);
 
+  // Determine if user should see "All Locations" option
+  const showAllOption = canViewAll || (permissions && permissions.viewLocationIds.length === 0 && permissions.editLocationIds.length === 0);
+
   useEffect(() => {
-    if (canViewAll) {
+    if (permissionsLoading) return;
+
+    if (showAllOption) {
+      // Reset to null (All Locations) if current selection is invalid
       if (globalLocationId && !locations.some((loc) => loc.id === globalLocationId)) {
         setGlobalLocationId(null);
       }
       return;
     }
 
+    // User has explicit permissions — auto-select first permitted location
     if (locations.length === 0) {
-      if (globalLocationId !== NO_LOCATION_ACCESS) setGlobalLocationId(NO_LOCATION_ACCESS);
+      if (globalLocationId !== null) setGlobalLocationId(null);
       return;
     }
 
     if (!globalLocationId || !locations.some((loc) => loc.id === globalLocationId)) {
       setGlobalLocationId(locations[0].id);
     }
-  }, [canViewAll, globalLocationId, locations, setGlobalLocationId]);
+  }, [showAllOption, permissionsLoading, globalLocationId, locations, setGlobalLocationId]);
 
-  const selectValue = canViewAll
+  const selectValue = showAllOption
     ? (globalLocationId ?? "all")
     : (globalLocationId ?? locations[0]?.id);
 
@@ -114,23 +121,18 @@ export function LocationSelector() {
       <MapPin className="h-4 w-4 text-muted-foreground" />
       <Select
         value={selectValue}
-        onValueChange={(value) => setGlobalLocationId(canViewAll ? (value === "all" ? null : value) : value)}
+        onValueChange={(value) => setGlobalLocationId(showAllOption ? (value === "all" ? null : value) : value)}
       >
-        <SelectTrigger className="w-[160px] shrink-0" disabled={!canViewAll && locations.length === 0}>
-          <SelectValue placeholder={canViewAll ? "All Locations" : "No Location Access"} />
+        <SelectTrigger className="w-[160px] shrink-0" disabled={locations.length === 0}>
+          <SelectValue placeholder={showAllOption ? "All Locations" : "Select Location"} />
         </SelectTrigger>
         <SelectContent>
-          {canViewAll && <SelectItem value="all">All Locations</SelectItem>}
+          {showAllOption && <SelectItem value="all">All Locations</SelectItem>}
           {locations.map((loc) => (
             <SelectItem key={loc.id} value={loc.id}>
               {loc.name}
             </SelectItem>
           ))}
-          {!canViewAll && locations.length === 0 && (
-            <SelectItem value={NO_LOCATION_ACCESS} disabled>
-              No permitted locations
-            </SelectItem>
-          )}
         </SelectContent>
       </Select>
     </div>
