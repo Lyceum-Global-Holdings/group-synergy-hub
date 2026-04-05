@@ -4,7 +4,12 @@ import { WarehouseBin, CreateWarehouseBinData } from '@/types/itemBin';
 import { useToast } from '@/hooks/use-toast';
 import { useCurrentUserLocationPermissions } from '@/hooks/useCurrentUserLocationPermissions';
 
-export const useWarehouseBins = () => {
+interface UseWarehouseBinsOptions {
+  skipLocationFilter?: boolean;
+}
+
+export const useWarehouseBins = (options: UseWarehouseBinsOptions = {}) => {
+  const { skipLocationFilter = false } = options;
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { data: permissions } = useCurrentUserLocationPermissions();
