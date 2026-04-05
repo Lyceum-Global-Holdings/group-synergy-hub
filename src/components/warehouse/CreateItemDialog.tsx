@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -84,6 +84,7 @@ export function CreateItemDialog({ open, onOpenChange, editingItem }: CreateItem
 
   // Filter locations to only show warehouses (type='location')
   const warehouseLocations = locations.filter(loc => loc.type === 'location');
+  const topLevelCategories = useMemo(() => categories.filter(c => !c.parent_id), [categories]);
 
   // Filter bins by selected warehouse location
   const filteredBins = formData.location_id 
@@ -374,15 +375,15 @@ export function CreateItemDialog({ open, onOpenChange, editingItem }: CreateItem
 
           <div className="grid grid-cols-3 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="category_id">Category</Label>
+              <Label htmlFor="category_id" title="SAP MM Material Group — only top-level categories are used for item classification">Material Group (Level 1)</Label>
               <Select value={formData.category_id} onValueChange={(value) => setFormData({ ...formData, category_id: value })}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Select category" />
+                  <SelectValue placeholder="Select material group" />
                 </SelectTrigger>
                 <SelectContent className="bg-background border z-50">
-                  {categories.map((category) => (
+                  {topLevelCategories.map((category) => (
                     <SelectItem key={category.id} value={category.id}>
-                      {category.name}
+                      {category.code ? `[${category.code}] ${category.name}` : category.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
