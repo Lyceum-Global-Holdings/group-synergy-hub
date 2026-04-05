@@ -1,32 +1,44 @@
 
 
-## Fix: Show All Bin Locations During Inventory Transfers
+## Fix: Fall Back to All Locations When Company Has No Mapped Locations
 
 ### Problem
-When transferring items, both source and destination bin dropdowns are filtered by the user's location permissions. Users cannot see or select bins at locations they don't have explicit edit access to — making cross-location transfers impossible for non-admin users.
+When a company has no entries in `warehouse_location_companies` and no legacy `company_id` mappings, the location selector shows "No permitted locations" and the user is locked out of all location-dependent features (inventory, transfers, bins, dashboard). This is a common scenario for newly created companies or companies that operate across shared sites.
 
 ### International Standard Alignment
-Per ISO 22745 (open technical data) and warehouse management best practices, **visibility of storage locations should not be restricted during transfer operations**. The transfer approval workflow (already in place) is the proper control point — not the bin selector. Restricting visibility breaks operational efficiency and forces admin involvement for routine moves.
+Per ISO 55001 (Asset Management) and supply chain best practices, operational visibility should never be blocked by incomplete administrative configuration. The principle of **fail-open for visibility, fail-closed for writes** applies: users should see all available locations until explicit restrictions are configured.
 
 ### Solution
-
-**Principle**: Separate *visibility* from *write authorization*. All users see all bins for transfers; the approval workflow and RLS enforce authorization.
-
-**1. `src/hooks/useWarehouseBins.ts`** — Add an option to bypass location filtering
-
-Add an optional `skipLocationFilter` parameter. When `true`, the hook returns all bins regardless of location permissions. The default remains filtered for other contexts (Bin Master management).
-
-**2. `src/components/warehouse/ItemTransferDialog.tsx`** — Two changes:
-
-- Call `useWarehouseBins({ skipLocationFilter: true })` so the destination bin dropdown shows all bins across all locations
-- Remove the `editLocationIds` filter from the `binsWithStock` memo (source bins) — source bins should show wherever the item has stock, regardless of the user's edit permissions. The transfer approval workflow handles authorization.
+Add a fallback in three key locations: if a company has zero mapped locations, return **all** locations instead of an empty list.
 
 ### Files to Edit
-1. `src/hooks/useWarehouseBins.ts` — add `skipLocationFilter` option to the hook
-2. `src/components/warehouse/ItemTransferDialog.tsx` — use unfiltered bins for both source and destination selectors
 
-### What stays the same
-- RLS on `warehouse_bins` already allows all authenticated users to SELECT (no change needed)
-- Transfer approval workflow remains the authorization gate
-- Bin Master management page keeps its existing location-filtered view
+**1. `src/components/common/LocationSelector.tsx`** (header location dropdown)
+- After fetching `companyLocations`, if the result is empty, fetch all locations (type = 'location') as a fallback
+- This ensures users always have a location to select
+
+**2. `src/hooks/useWarehouseLocations.ts`** — `useDashboardLocations` function
+- Same logic: if the company-filtered query returns zero results, fall back to returning all locations
+- Dashboard widgets will still show data
+
+**3. `src/hooks/useWarehouseBins.ts`** — no changes needed
+- Already handles this correctly: when no location permissions are configured, it shows all bins (line 36 comment)
+
+### Implementation Detail
+
+In both the LocationSelector query and `useDashboardLocations`, after merging mapped + legacy rows:
+
+```
+if (merged.size === 0) {
+  // No locations mapped to this company — fall back to all locations
+  const { data: allLocations } = await supabase
+    .from('warehouse_locations')
+    .select('id, name, type')
+    .eq('type', 'location')
+    .order('name');
+  return allLocations ?? [];
+}
+```
+
+This is a safe, non-destructive change — once locations are properly mapped to a company, the fallback is never triggered.
 
