@@ -1,31 +1,32 @@
 
 
-## Auto-Generate 3-Letter Category Codes (ISO 7372 / UNSPSC Aligned)
+## Add Comprehensive Standard Categories to Import Dialog
 
-### Standard
-ISO 7372 Trade Data Element Directory and UNSPSC use **3-letter mnemonic abbreviations** for material group codes (e.g., `ELC` for Electronics, `PLB` for Plumbing, `RAW` for Raw Materials). SAP MM also uses 3-character material group keys.
+### Current State
+The `standardCategories.ts` file has 3 industry templates: **Apparel**, **Construction**, **Stationery**. The user wants all standard warehouse categories covered based on international standards (UNSPSC / ISO 22742).
 
-### How Code Generation Works
+### Categories to Add (9 new industry templates)
 
-When the user types a category name, the system auto-generates a 3-letter code:
+1. **Manufacturing** — Raw materials, chemicals, packaging materials, MRO supplies
+2. **IT & Electronics** — Hardware, networking, peripherals, cables, components
+3. **Automotive** — Parts, fluids, tires, accessories, body parts
+4. **Food & Beverage** — Dry goods, refrigerated, frozen, beverages, packaging
+5. **Healthcare & Pharma** — Medicines, medical devices, lab supplies, PPE, consumables
+6. **Hospitality** — Linen, amenities, kitchen supplies, cleaning, furniture
+7. **Agriculture** — Seeds, fertilizers, pesticides, tools, irrigation, animal feed
+8. **Logistics & Packaging** — Boxes, pallets, tape, stretch wrap, labels, containers
+9. **General Warehouse** — Cleaning supplies, maintenance, safety, office consumables, fuel
 
-1. **Primary rule**: First 3 consonants of the name, uppercased (e.g., "Electronics" → `ELC`, "Plumbing" → `PLM`, "Safety Equipment" → `SFT`)
-2. **Fallback**: If fewer than 3 consonants, use first 3 letters (e.g., "Oil" → `OIL`)
-3. **Collision handling**: If the generated code already exists among sibling categories, append/increment the last character (e.g., `ELC` taken → `ELD`)
-4. **Editable override**: The field auto-fills but remains editable so users can manually set a preferred code
-5. **Validation**: Enforces exactly 3 uppercase letters, shows error if not met
+Each template follows the same 3-level hierarchy (category → subcategory → sub-subcategory) with ISO 7372-aligned 3-letter codes.
 
-### Sub-category codes
-Sub-categories inherit the parent code as a prefix: `ELC-CMP` (Electronics → Components). The sub-category gets its own 3-letter code appended with a hyphen.
+### UI Changes
+
+**`ImportCategoriesDialog.tsx`**:
+- Change `TabsList` from `grid-cols-3` to a scrollable horizontal layout to accommodate 12 tabs
+- Add icons for each new industry (using existing Lucide icons)
+- No other dialog changes needed — the existing rendering logic handles any number of templates
 
 ### Files to Edit
-
-**1. `src/components/warehouse/CreateCategoryDialog.tsx`**
-- Add `generateCategoryCode(name, existingCodes)` helper function
-- Add `useEffect` on `formData.name` changes to auto-generate code
-- Add validation (3 uppercase letters, uniqueness check)
-- Add tooltip explaining "Auto-generated ISO 7372 category code"
-- For sub-categories, prepend parent code with hyphen separator
-
-### No new files needed — all logic fits within the existing dialog component.
+1. `src/constants/standardCategories.ts` — Add 9 new industry templates (~400 new categories total)
+2. `src/components/warehouse/ImportCategoriesDialog.tsx` — Update tab layout to scroll horizontally, add icons for new industries
 
