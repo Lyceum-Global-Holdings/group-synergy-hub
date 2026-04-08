@@ -1,74 +1,127 @@
 
 
-## Expand Manual to 150+ Pages with CI/CD & Edge Functions
+## Generate: Group Synergy Hub Complete Documentation with Mermaid Diagrams (150+ Pages)
 
-### Current State
-- Manual is **72 pages** across 12 chapters
-- Chapters 4–11 are thin (abbreviated content, ~2-3 pages each)
-- No CI/CD or Edge Function documentation exists
+### Output
+PDF: `/mnt/documents/GroupSynergyHub_Complete_Documentation.pdf`
+Mermaid diagrams: `/mnt/documents/*.mmd` files (one per major process, embedded as rendered images in the PDF)
 
-### Expansion Strategy (Target: 160+ pages)
+### Approach
+Generate 150+ page PDF using Python ReportLab with the same navy/gold branding as the previous manual. For each major process, create a Mermaid `.mmd` file, render it to PNG using the `mmdc` (Mermaid CLI) tool, and embed the image in the corresponding PDF section.
 
-#### A. New Chapter 13 — CI/CD Pipeline & DevOps (~12 pages)
-- 13.1 CI/CD Overview (Lovable → Supabase deployment architecture)
-- 13.2 Frontend Build Pipeline (Vite build, Docker containerization, the existing Dockerfile)
-- 13.3 Backend Deployment (Edge Functions auto-deploy, database migrations)
-- 13.4 Environment Management (development, staging, production)
-- 13.5 Version Control & Branching Strategy
-- 13.6 Automated Testing Strategy
-- 13.7 Rollback Procedures
-- 13.8 Monitoring & Alerting
-- Process flow: Code Commit → Build → Test → Deploy → Monitor
+### Document Structure (14 Chapters + Appendices, ~170 pages)
 
-#### B. New Chapter 14 — Edge Functions & Serverless Architecture (~14 pages)
-Documents all 10 existing edge functions with purpose, inputs, outputs, and security:
-- 14.1 Edge Function Architecture (Deno runtime, Supabase hosting, JWT validation)
-- 14.2 `admin-create-user` — Programmatic user provisioning
-- 14.3 `admin-reset-password` — Secure password reset
-- 14.4 `analyze-floor-plan` — AI-powered floor plan analysis
-- 14.5 `fetch-social-stats` — Social media follower tracking with API fallback
-- 14.6 `po-email-approval` — Purchase order email approval workflow
-- 14.7 `public-supplier-registration` — Public supplier onboarding with Zod validation
-- 14.8 `scheduled-telegram-reports` — Automated Telegram report delivery (pg_cron)
-- 14.9 `send-approval-notification` — Multi-channel approval notifications (Resend)
-- 14.10 `send-telegram-report` / `test-telegram-connection` — Telegram integration
-- 14.11 CORS & Security Hardening Standards
-- 14.12 Edge Function Monitoring & Logs
-- Process flow: Edge Function Request Lifecycle
+**Chapter 1 — System Overview (~16 pages)**
+- Platform architecture, 11 modules, 13 roles, 5-tier permission model
+- Multi-company/multi-location access control
+- Mermaid: System Architecture (module relationships), User Onboarding Flow
 
-#### C. Expand Existing Thin Chapters (~60 additional pages total)
-Each of chapters 4–11 currently has minimal content. Expand each with:
-- **"What You Will See"** subsections describing the actual UI screens
-- **"Step-by-Step"** operational procedures (numbered steps)
-- **Field reference tables** (field name, type, required, description)
-- **Status lifecycle tables** (e.g., PO statuses: Draft → Submitted → Approved → Issued)
-- **Callout boxes** for key concepts and warnings
-- **"The Bottom Line"** summary boxes
-- Additional process flow diagrams where missing
+**Chapter 2 — Procurement (~18 pages)**
+- Purchase Requisitions, Purchase Orders, PO Amendments, Blanket POs
+- RFQ/RFP Management, Material Demand Planning, Three-Way Matching
+- Catalogs, Price Lists, Procurement Approvals
+- Mermaid: Requisition-to-Payment, Three-Way Match, PO Amendment Lifecycle
 
-Specific expansions:
-- **Ch5 Finance**: Add detailed GL posting rules table, bank reconciliation step-by-step, budget variance analysis
-- **Ch6 Production**: Expand BOM structure, add costing methodology, production receipt workflow
-- **Ch7 Construction**: Add Gantt-style progress tracking explanation, safety incident reporting, daily report templates
-- **Ch8 Sales**: Add CPO fulfillment lifecycle, delivery note fields, dispatch checklist
-- **Ch9 Social Media**: Add platform-specific integration details, NDA workflow
-- **Ch10 Management**: Add dashboard widget catalog, KPI formula reference table
-- **Ch11 Admin**: Add role creation step-by-step, module allocation matrix, location mapping guide
+**Chapter 3 — Warehouse & Inventory (~24 pages)**
+- Item Master (INV-{CAT}-XXX codes), Category Management (ISO 7372)
+- Bin Master, Units of Measure, GRN, Putaway
+- Stock Transfers, Material Issue/Return, Pick Pack Dispatch, Delivery Orders
+- Cycle Count, Inventory Valuation (FIFO/WAC/LIFO), Stock Adjustment
+- Batch Management, Asset Management, Tool Management
+- Mermaid: Goods Receipt to Dispatch, Cycle Count, Stock Transfer, Material Issue/Return
 
-#### D. Expand Appendices (~6 additional pages)
-- 12.9 Edge Function Reference Table (all 10 functions with endpoint, auth, purpose)
-- 12.10 CI/CD Pipeline Configuration Reference
-- 12.11 Docker & Self-Hosting Guide
-- 12.12 Environment Variables Reference
+**Chapter 4 — Sourcing & Supplier Management (~14 pages)**
+- Supplier Master, Public Registration Portal, Evaluation/Scorecard
+- Supplier Allocation, Quotation Comparison, RFQ Management
+- Contracts, Blacklist, Risk Management
+- Mermaid: Supplier Onboarding to Evaluation, Blacklist Review, Contract Lifecycle
 
-### Technical Approach
-1. Modify the existing `/tmp/manual_gen.py` script
-2. Add `ch13_cicd()` and `ch14_edge_functions()` builder functions
-3. Expand each existing thin chapter function with additional content
-4. Update TOC to include new chapters
-5. Regenerate PDF and QA visually
+**Chapter 5 — Finance & Accounting (~20 pages)**
+- GL & Chart of Accounts, Accounting Periods, Journal Entries
+- AR, AP, Cash & Bank, Bank Reconciliation, Payments
+- Budgeting, Cost Centers, Fixed Assets
+- Financial Reporting (Trial Balance, P&L, Balance Sheet)
+- GL Configuration, Auto-Posting from Modules
+- Mermaid: Procure-to-Pay GL Integration, Bank Reconciliation, Month-End Close
 
-### Files
-- `/tmp/manual_gen.py` — edit (expand)
-- `/mnt/documents/GroupSynergyHub_Executive_Manual_v2.pdf` — new versioned output
+**Chapter 6 — Production (~12 pages)**
+- BOM, BOM Size Multipliers, Production Planning
+- Production Receipts, Finished Goods, Valuation
+- Mermaid: BOM to Finished Goods, Production Receipt Workflow
+
+**Chapter 7 — Construction Project Management (~16 pages)**
+- Project Master, Site Management, Work Orders
+- Resource Allocation, Project Budgeting, Progress Tracking
+- Quality Control, Safety Management, Daily Site Reports
+- Floor Plans & Room Management, Material Allocation, Labour
+- Mermaid: Project Lifecycle, Work Order Flow, Safety Incident Flow
+
+**Chapter 8 — Sales & Distribution (~12 pages)**
+- Customer Master, Customer POs, Sales Order Fulfillment
+- Pick Pack Dispatch, Delivery Orders, Material Reservation
+- Mermaid: Order-to-Delivery, CPO Fulfillment
+
+**Chapter 9 — Social Media Management (~8 pages)**
+- Account Registry, Follower Tracking, Access Management
+- NDA Compliance, Activity Logging
+- Mermaid: Account Registration & Compliance
+
+**Chapter 10 — Management & Executive Tools (~10 pages)**
+- Unified Approval Console (10 approval types), Custom Dashboards
+- Dashboard Builder, KPIs, Budget vs Actual, Exception Management, Audit Logs
+- Mermaid: Approval Workflow (multi-stage), Dashboard Creation
+
+**Chapter 11 — System Administration (~10 pages)**
+- Company Management, User & Role Management
+- Module Allocation, Warehouse Settings, Location-Company Mapping
+- Backend Dashboard, Training Portal
+- Mermaid: User Provisioning, Company Setup
+
+**Chapter 12 — CI/CD Pipeline & DevOps (~14 pages)**
+- Architecture: Lovable → Supabase deployment
+- Frontend: Vite build, Docker containerization (Dockerfile reference)
+- Backend: Edge Function auto-deploy, database migrations
+- Environment Management (dev/staging/prod)
+- Version Control, Testing Strategy, Rollback, Monitoring
+- Mermaid: CI/CD Pipeline, Deployment Architecture, Rollback Flow
+
+**Chapter 13 — Edge Functions & Serverless Architecture (~16 pages)**
+- Deno runtime architecture, JWT validation, CORS hardening
+- All 10 edge functions documented with purpose, inputs, outputs, security:
+  - admin-create-user, admin-reset-password
+  - analyze-floor-plan (OpenAI Vision API)
+  - fetch-social-stats
+  - po-email-approval (Resend email + token-based approval)
+  - public-supplier-registration (Zod validation, rate limiting)
+  - scheduled-telegram-reports (pg_cron, PDF generation, yesterday fallback)
+  - send-approval-notification, send-telegram-report, test-telegram-connection
+- Mermaid: Edge Function Request Lifecycle, Email Approval Flow, Telegram Report Pipeline
+
+**Chapter 14 — Appendices (~10 pages)**
+- Glossary, ISO 7372 Category Codes, Role Permission Matrix
+- Approval Type Reference, Item Code Format, API Integration Points
+- Edge Function Reference Table, Environment Variables, Docker Self-Hosting Guide
+
+### Mermaid Diagrams (~25 total)
+Each rendered as PNG via `mmdc` CLI and embedded in the PDF. Diagrams use consistent styling:
+- Blue nodes for start/end
+- Green for actions
+- Amber/orange for decisions
+- Navy for data/system steps
+
+### Technical Execution
+1. Install `@mermaid-js/mermaid-cli` via npm
+2. Generate all `.mmd` files to `/tmp/diagrams/`
+3. Render each to PNG with `mmdc`
+4. Build PDF with ReportLab Platypus, embedding diagram PNGs at relevant sections
+5. Apply navy/gold branding matching the FleetONE reference
+6. QA: convert pages to images, inspect every 10th page minimum
+
+### Writing Style
+- Plain-language executive prose (department heads audience)
+- "What You Will See" UI descriptions
+- "Step-by-Step" numbered operational procedures
+- Field reference tables, status lifecycle tables
+- Gray callout boxes for key concepts
+- "The Bottom Line" summary boxes
 
