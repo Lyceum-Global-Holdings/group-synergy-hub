@@ -1,67 +1,100 @@
 
 
-## Generate: VEB Complete Construction Documentation (75+ Pages, DOCX)
+## In-App Test Environment — Module Testing Dashboard
 
-### Output
-`/mnt/documents/VEB_Construction_Complete_Documentation.docx` — 75+ page professionally formatted Word document with embedded Mermaid process diagrams, aligned with international standards.
+### Overview
+Build a dedicated **Test Environment** page (`/admin/test-environment`) accessible to Super Admins. It provides an interactive dashboard to run automated smoke tests against every module's core operations (CRUD, API connectivity, RLS policies, edge functions) with real-time pass/fail results — aligned with **ISO 29119** (Software Testing) and **ISTQB** test execution standards.
 
-### Document Structure (20 Chapters + Appendices)
+### Architecture
 
-| # | Chapter | Pages | Diagrams |
-|---|---------|-------|----------|
-| 1 | Executive Summary & VEB Overview | 3 | 1 (end-to-end construction flow) |
-| 2 | International Standards Alignment | 4 | 1 (standards mapping) |
-| 3 | Project Master Management | 5 | 1 (project lifecycle) |
-| 4 | Multi-Company Project Scoping | 4 | 1 (company-project junction flow) |
-| 5 | Site Management | 4 | 1 (site setup & status flow) |
-| 6 | Floor Plan System (2D/3D) | 5 | 2 (floor plan upload flow, AI room detection) |
-| 7 | Room Operations & Stage Tracking | 5 | 1 (room stage pipeline) |
-| 8 | Room Material Allocation | 4 | 1 (material issue/return lifecycle) |
-| 9 | Construction Inventory — Item Master | 5 | 1 (item code generation & categories) |
-| 10 | Serial Number Tracking (Machines) | 4 | 1 (serial lifecycle) |
-| 11 | Bulk Stock Management | 4 | 1 (stock-in/out flow) |
-| 12 | Inter-Site Transfers | 4 | 1 (transfer workflow) |
-| 13 | Repair Lifecycle Management | 4 | 1 (repair state machine) |
-| 14 | Work Orders | 5 | 1 (work order lifecycle) |
-| 15 | Daily Site Reports & Labour Attendance | 5 | 2 (DSR flow, attendance tracking) |
-| 16 | Labour Master & Allocation | 4 | 1 (labour allocation flow) |
-| 17 | Quality Control & Inspections | 4 | 1 (inspection workflow) |
-| 18 | Safety Management (Incidents & Inspections) | 5 | 2 (incident reporting, safety inspection) |
-| 19 | Project Budgeting & Cost Control | 4 | 1 (budget lifecycle) |
-| 20 | Document Management | 3 | 1 (document approval flow) |
-| A | Appendix A: Field Reference Tables | 4 | — |
-| B | Appendix B: Status Lifecycle Tables | 3 | — |
-| C | Appendix C: Phased Implementation Roadmap | 4 | 1 (5-phase Gantt) |
-| D | Appendix D: Subcontractor Management | 2 | — |
-| E | Appendix E: Glossary & Acronyms | 2 | — |
+```text
+/admin/test-environment
+├── TestEnvironmentPage.tsx        ← Main dashboard
+├── components/
+│   ├── TestSuiteRunner.tsx        ← Orchestrates test execution
+│   ├── TestCategoryCard.tsx       ← Module-level card with expand/collapse
+│   ├── TestCaseResult.tsx         ← Individual test row (pass/fail/skip/running)
+│   ├── TestSummaryHeader.tsx      ← Overall stats (total, passed, failed, duration)
+│   └── TestReportExport.tsx       ← Export results as CSV/JSON
+├── hooks/
+│   └── useTestSuite.ts            ← State management for test execution
+└── tests/
+    ├── authTests.ts               ← Authentication & session tests
+    ├── warehouseTests.ts          ← Warehouse module tests (13 sub-modules)
+    ├── procurementTests.ts        ← Procurement module tests (9 sub-modules)
+    ├── sourcingTests.ts           ← Sourcing module tests (6 sub-modules)
+    ├── financeTests.ts            ← Finance module tests (11 sub-modules)
+    ├── constructionTests.ts       ← Construction module tests (11 sub-modules)
+    ├── productionTests.ts         ← Production module tests
+    ├── salesTests.ts              ← TUH/Sales module tests (4 sub-modules)
+    ├── managementTests.ts         ← Management module tests (5 sub-modules)
+    ├── socialMediaTests.ts        ← Social media module tests
+    ├── adminTests.ts              ← Administration module tests
+    ├── edgeFunctionTests.ts       ← Edge function connectivity tests (10 functions)
+    └── rlsTests.ts                ← RLS policy validation tests
+```
 
-**Total: ~94 pages, 24 Mermaid diagrams**
+### Test Categories (12 Suites, ~120 Test Cases)
 
-### International Standards
+| Suite | Tests | What It Validates |
+|-------|-------|-------------------|
+| **Authentication** | 6 | Login, session, token refresh, role resolution, super admin check |
+| **Warehouse** | 15 | Item master CRUD, GRN create/list, stock transfer, asset tracking, batch FIFO |
+| **Procurement** | 12 | PR create, PO lifecycle, RFQ, 3-way match, MDP calculation, BOM explosion |
+| **Sourcing** | 8 | Supplier CRUD, evaluation scoring, contract management, blacklist |
+| **Finance** | 14 | GL entries, AP/AR, bank reconciliation, budget CRUD, fixed assets, cost centers |
+| **Construction** | 15 | Project CRUD, site management, floor plans, work orders, DSR, safety incidents |
+| **Production** | 8 | Sector/stage setup, production orders, daily entries, WIP cost calculation |
+| **Sales (TUH)** | 6 | Customer master, CPO lifecycle, finished goods, demand overview |
+| **Management** | 6 | Dashboard access, approval console, audit log retrieval, budget vs actual |
+| **Social Media** | 4 | Account registry, access management, NDA compliance, activity log |
+| **Edge Functions** | 10 | Connectivity test for all 10 deployed edge functions |
+| **RLS & Security** | 8 | Company-scoped isolation, role-based access, cross-company visibility |
 
-| Standard | Application |
-|----------|------------|
-| ISO 19650 | BIM & construction information management |
-| ISO 45001 | Occupational health & safety (incidents, inspections) |
-| ISO 9001 | Quality management (inspection checklists, corrective actions) |
-| ISO 55001 | Asset management (serial tracking, condition monitoring) |
-| PMBOK 7th Ed | Project lifecycle, WBS, earned value |
-| FIDIC | Contract administration, work orders |
-| IAS 16 | Property, plant & equipment valuation |
+### Each Test Case Structure
+Every test follows a standardized format:
+- **ID**: Unique identifier (e.g., `WH-001`)
+- **Name**: Descriptive test name
+- **Category**: Module grouping
+- **Priority**: Critical / High / Medium
+- **Test Function**: Async function that runs a Supabase query or API call and returns pass/fail with details
+- **Expected Result**: What constitutes a pass
+- **Actual Result**: Runtime output
+- **Duration**: Execution time in ms
 
-### Phased Implementation (Appendix C)
+### How Tests Work
+Each test is a lightweight async function that:
+1. Calls `supabase.from('table').select()` or `supabase.rpc()` to verify table accessibility
+2. Attempts a test insert → verify → delete cycle (using a `test_` prefix for cleanup)
+3. Calls edge functions via `supabase.functions.invoke()` to verify deployment
+4. Checks RLS by verifying company-scoped results match expectations
+5. Reports pass/fail with error details and timing
 
-- **Phase 1 — Foundation**: Project master, sites, multi-company scoping, user permissions
-- **Phase 2 — Site Operations**: Floor plans, room stages, DSR, labour attendance, work orders
-- **Phase 3 — Inventory**: Item master (6 categories), serial tracking, bulk stock, transfers, repairs
-- **Phase 4 — Quality & Safety**: Quality inspections, safety incidents, safety inspections, corrective actions
-- **Phase 5 — Financial & Optimization**: Budgeting, cost control, document management, analytics, reporting
+### UI Design
+- **Summary Header**: Total tests, passed (green), failed (red), skipped (gray), total duration
+- **Module Cards**: Collapsible cards per module with progress bar and individual test rows
+- **Run Controls**: "Run All", "Run Suite", "Run Single Test" buttons
+- **Export**: Download results as timestamped CSV or JSON
+- **Color Coding**: Green checkmark (pass), red X (fail), yellow spinner (running), gray dash (skipped)
+- Navy/Gold branding consistent with the rest of the platform
 
-### Technical Execution
-1. Generate 24 Mermaid `.mmd` files in `/tmp/veb_diagrams/`
-2. Render all to PNG via `mmdc` at 2000px width
-3. Build DOCX with `docx-js` using chapter registry pattern with static TOC
-4. Embed diagrams with aspect-ratio-preserving scaling (read IHDR for actual dimensions)
-5. Navy (#1E2761) and Gold (#C9A84C) branding consistent with existing documentation suite
-6. QA: Convert to PDF via LibreOffice, render to images, inspect sample pages
+### Standards Alignment
+- **ISO 29119-3**: Test case documentation structure (ID, preconditions, steps, expected results)
+- **ISO 29119-4**: Test execution procedures (suite → case → result → report)
+- **ISTQB Foundation**: Test levels (unit → integration → system), traceability matrix
+- **ISO 27001**: Security testing (RLS validation, authentication checks)
+
+### Implementation Steps
+1. Create test definition files for all 12 suites in `src/pages/admin/test-environment/tests/`
+2. Build `useTestSuite` hook for async test orchestration with progress tracking
+3. Build UI components (summary header, category cards, result rows, export)
+4. Create main `TestEnvironmentPage.tsx` with routing
+5. Add route to `App.tsx` and register in `moduleConfig.ts` under Administration
+6. Protect with `SuperAdminRoute` wrapper
+
+### Safety
+- All write tests use a `test_` prefix and clean up after themselves (insert → assert → delete)
+- Tests run against the **live database** but only touch test-prefixed records
+- No destructive operations on real data
+- Edge function tests only verify reachability (HTTP 200/401), not side effects
 
