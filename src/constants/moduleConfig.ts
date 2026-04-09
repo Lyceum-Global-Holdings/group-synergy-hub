@@ -143,7 +143,8 @@ export const moduleConfig: Record<string, ModuleConfig> = {
       { key: 'company-management', name: 'Company Management', description: 'Manage companies and settings', url: '/admin/companies' },
       { key: 'user-role-management', name: 'User & Role Management', description: 'Manage users, roles, and permissions', url: '/admin/users-roles' },
       { key: 'module-allocation', name: 'Module Allocation', description: 'Assign modules to companies', url: '/admin/modules' },
-      { key: 'warehouse-management', name: 'Warehouse Management', description: 'Configure warehouse settings', url: '/admin/warehouse-management' }
+      { key: 'warehouse-management', name: 'Warehouse Management', description: 'Configure warehouse settings', url: '/admin/warehouse-management' },
+      { key: 'test-environment', name: 'Test Environment', description: 'Module testing dashboard (Super Admin)', url: '/admin/test-environment' }
     ]
   },
   production: {
