@@ -1,72 +1,67 @@
 
 
-## Generate: TUH Complete Documentation — Production, BOM, Material Demand Planning & Finished Goods
+## Generate: VEB Complete Construction Documentation (75+ Pages, DOCX)
 
 ### Output
-`/mnt/documents/TUH_Complete_Module_Documentation.docx` — 80+ page professionally formatted Word document with embedded Mermaid process diagrams, aligned with international standards (ISO 22400, ISO 55001, APICS/ASCM MRP-II, IAS 2).
+`/mnt/documents/VEB_Construction_Complete_Documentation.docx` — 75+ page professionally formatted Word document with embedded Mermaid process diagrams, aligned with international standards.
 
-### Document Structure (15 Chapters + Appendices)
+### Document Structure (20 Chapters + Appendices)
 
-| # | Chapter | Est. Pages | Diagrams |
-|---|---------|-----------|----------|
-| 1 | Executive Summary & System Overview | 3 | 1 (end-to-end flow) |
+| # | Chapter | Pages | Diagrams |
+|---|---------|-------|----------|
+| 1 | Executive Summary & VEB Overview | 3 | 1 (end-to-end construction flow) |
 | 2 | International Standards Alignment | 4 | 1 (standards mapping) |
-| 3 | Product Master Management | 5 | 1 (product lifecycle) |
-| 4 | Bill of Materials (BOM) — Core | 8 | 2 (BOM creation flow, BOM explosion) |
-| 5 | BOM Versioning & Templates | 5 | 1 (version control flow) |
-| 6 | BOM Size Multipliers & Substitutions | 4 | 1 (size scaling flow) |
-| 7 | BOM Approval Workflow | 4 | 1 (approval state machine) |
-| 8 | Production Module — Sectors & Stages | 6 | 2 (sector setup, stage pipeline) |
-| 9 | Production Orders & WIP Tracking | 8 | 2 (order lifecycle, daily entry flow) |
-| 10 | Stage-wise Cost Management | 5 | 1 (cost accumulation) |
-| 11 | Material Demand Planning (MDP/MRP) | 8 | 2 (MRP netting logic, demand-to-PO flow) |
-| 12 | CPO-Driven Demand Calculation | 6 | 2 (CPO-to-demand flow, BOM explosion for CPO) |
-| 13 | Finished Goods Management | 7 | 2 (FG lifecycle, production receipt flow) |
-| 14 | Demand Overview & Sales Fulfillment | 5 | 1 (production-to-fulfillment pipeline) |
-| 15 | Finished Goods Valuation & Batch Management | 4 | 1 (batch traceability) |
+| 3 | Project Master Management | 5 | 1 (project lifecycle) |
+| 4 | Multi-Company Project Scoping | 4 | 1 (company-project junction flow) |
+| 5 | Site Management | 4 | 1 (site setup & status flow) |
+| 6 | Floor Plan System (2D/3D) | 5 | 2 (floor plan upload flow, AI room detection) |
+| 7 | Room Operations & Stage Tracking | 5 | 1 (room stage pipeline) |
+| 8 | Room Material Allocation | 4 | 1 (material issue/return lifecycle) |
+| 9 | Construction Inventory — Item Master | 5 | 1 (item code generation & categories) |
+| 10 | Serial Number Tracking (Machines) | 4 | 1 (serial lifecycle) |
+| 11 | Bulk Stock Management | 4 | 1 (stock-in/out flow) |
+| 12 | Inter-Site Transfers | 4 | 1 (transfer workflow) |
+| 13 | Repair Lifecycle Management | 4 | 1 (repair state machine) |
+| 14 | Work Orders | 5 | 1 (work order lifecycle) |
+| 15 | Daily Site Reports & Labour Attendance | 5 | 2 (DSR flow, attendance tracking) |
+| 16 | Labour Master & Allocation | 4 | 1 (labour allocation flow) |
+| 17 | Quality Control & Inspections | 4 | 1 (inspection workflow) |
+| 18 | Safety Management (Incidents & Inspections) | 5 | 2 (incident reporting, safety inspection) |
+| 19 | Project Budgeting & Cost Control | 4 | 1 (budget lifecycle) |
+| 20 | Document Management | 3 | 1 (document approval flow) |
 | A | Appendix A: Field Reference Tables | 4 | — |
 | B | Appendix B: Status Lifecycle Tables | 3 | — |
-| C | Appendix C: Phased Implementation Roadmap | 4 | 1 (Gantt-style phases) |
-| D | Appendix D: Glossary & Acronyms | 2 | — |
+| C | Appendix C: Phased Implementation Roadmap | 4 | 1 (5-phase Gantt) |
+| D | Appendix D: Subcontractor Management | 2 | — |
+| E | Appendix E: Glossary & Acronyms | 2 | — |
 
-**Total: ~87 pages, 22 Mermaid diagrams**
+**Total: ~94 pages, 24 Mermaid diagrams**
 
-### Phased Implementation (included in Appendix C)
-
-- **Phase 1 — Foundation**: Product Master setup, BOM creation, sector/stage initialization
-- **Phase 2 — Production**: Production order creation, WIP tracking, daily entries, stage costs
-- **Phase 3 — MRP**: Material demand calculation from BOMs, POs, and CPOs; shortage analysis; auto-PR generation
-- **Phase 4 — Finished Goods**: Production receipts, batch management, valuation, demand overview
-- **Phase 5 — Optimization**: BOM templates, substitutions, size multipliers, approval workflows, advanced MRP netting
-
-### International Standards Coverage
+### International Standards
 
 | Standard | Application |
 |----------|------------|
-| APICS/ASCM MRP-II | MRP netting logic (gross → net requirements), safety stock, lead time offsetting |
-| ISO 22400 | Production KPIs: OEE, throughput, WIP value, stage efficiency |
-| IAS 2 / IFRS | Finished goods valuation (weighted average cost, standard cost) |
-| ISO 9001 | Quality control at production stages, batch traceability |
-| GS1 Standards | Product coding, batch/lot identification |
+| ISO 19650 | BIM & construction information management |
+| ISO 45001 | Occupational health & safety (incidents, inspections) |
+| ISO 9001 | Quality management (inspection checklists, corrective actions) |
+| ISO 55001 | Asset management (serial tracking, condition monitoring) |
+| PMBOK 7th Ed | Project lifecycle, WBS, earned value |
+| FIDIC | Contract administration, work orders |
+| IAS 16 | Property, plant & equipment valuation |
 
-### Diagram Rendering Approach
-- Generate simplified, clear Mermaid `.mmd` files (max 15 nodes per diagram)
-- Render at 2000px width using `mmdc` with white background
-- Embed in DOCX with aspect-ratio-preserving scaling (max 560px wide, max 680px tall)
-- Read actual PNG dimensions from IHDR chunk to prevent stretching
+### Phased Implementation (Appendix C)
 
-### Visual Design
-- Navy (#1E2761) and Gold (#C9A84C) branding consistent with existing documentation
-- Static TOC with internal bookmarks and dot leaders
-- Gray callout boxes for key concepts
-- Field reference tables with navy header rows
-- Step-by-step numbered procedures
+- **Phase 1 — Foundation**: Project master, sites, multi-company scoping, user permissions
+- **Phase 2 — Site Operations**: Floor plans, room stages, DSR, labour attendance, work orders
+- **Phase 3 — Inventory**: Item master (6 categories), serial tracking, bulk stock, transfers, repairs
+- **Phase 4 — Quality & Safety**: Quality inspections, safety incidents, safety inspections, corrective actions
+- **Phase 5 — Financial & Optimization**: Budgeting, cost control, document management, analytics, reporting
 
 ### Technical Execution
-1. Generate 22 Mermaid `.mmd` files in `/tmp/tuh_diagrams/`
-2. Render all to PNG via `mmdc`
-3. Build DOCX with `docx-js` using chapter registry pattern
-4. Embed diagrams with dynamic aspect-ratio scaling
-5. Generate static TOC with bookmarks
+1. Generate 24 Mermaid `.mmd` files in `/tmp/veb_diagrams/`
+2. Render all to PNG via `mmdc` at 2000px width
+3. Build DOCX with `docx-js` using chapter registry pattern with static TOC
+4. Embed diagrams with aspect-ratio-preserving scaling (read IHDR for actual dimensions)
+5. Navy (#1E2761) and Gold (#C9A84C) branding consistent with existing documentation suite
 6. QA: Convert to PDF via LibreOffice, render to images, inspect sample pages
 
