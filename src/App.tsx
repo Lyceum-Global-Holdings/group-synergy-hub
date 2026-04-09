@@ -93,6 +93,7 @@ const SocialMediaAccounts = lazy(() => import("./pages/social-media/AccountRegis
 const SocialMediaAccess = lazy(() => import("./pages/social-media/AccessManagement"));
 const SocialMediaNDA = lazy(() => import("./pages/social-media/NDACompliance"));
 const SocialMediaActivityLog = lazy(() => import("./pages/social-media/ActivityLog"));
+const TestEnvironmentPage = lazy(() => import("./pages/admin/test-environment/TestEnvironmentPage"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -159,6 +160,7 @@ function App() {
                 <Route path="/admin/modules" element={<AdminRoute><ModuleAllocation /></AdminRoute>} />
                 <Route path="/admin/warehouse-management" element={<AdminRoute><WarehouseManagement /></AdminRoute>} />
                 <Route path="/admin/backend" element={<SuperAdminRoute><BackendDashboard /></SuperAdminRoute>} />
+                <Route path="/admin/test-environment" element={<SuperAdminRoute><TestEnvironmentPage /></SuperAdminRoute>} />
                 <Route path="/admin/training" element={<Training />} />
                 <Route path="/admin/training/module-trainings" element={<ModuleTrainings />} />
                 <Route path="/admin/training/video-library" element={<VideoLibrary />} />
