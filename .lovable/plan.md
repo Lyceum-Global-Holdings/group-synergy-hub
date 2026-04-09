@@ -1,60 +1,55 @@
 
 
-## Expand NCG Warehouse Asset Management Documentation to 60 Pages (DOCX)
+## Fix Mermaid Diagram Stretching in Asset Management DOCX
+
+### Root Cause
+The `diagram()` function in `/tmp/gen_asset_docx.js` hardcodes `transformation: { width: 600, height: 400 }` for every image. But the actual diagrams have wildly different aspect ratios:
+
+| Diagram | Actual Size | Aspect | Current Display | Result |
+|---------|------------|--------|-----------------|--------|
+| d1.png | 3050×346 | 8.82 | 600×400 | Squished vertically |
+| d10.png | 726×2106 | 0.34 | 600×400 | Stretched horizontally |
+| d14.png | 820×2528 | 0.32 | 600×400 | Stretched horizontally |
+| d8.png | 1632×922 | 1.77 | 600×400 | Slightly distorted |
+
+### Fix
+Replace the fixed-size `diagram()` function with one that:
+1. Reads each PNG's actual dimensions using `sizeOf` (from `image-size` npm package) or raw buffer parsing
+2. Calculates display size preserving aspect ratio
+3. Constrains to max width 580px and max height 700px (fits within US Letter margins)
+4. For very tall diagrams (aspect < 0.5), caps height and scales width proportionally
+5. For very wide diagrams (aspect > 3), caps width and scales height proportionally
+
+### Updated `diagram()` function logic
+```javascript
+function diagram(num, caption) {
+  const fp = path.join(DIAG_DIR, `d${num}.png`);
+  if (!fs.existsSync(fp)) return [p(`[Diagram ${num} not available]`)];
+  const buf = fs.readFileSync(fp);
+  // Read PNG dimensions from header (bytes 16-23)
+  const pngW = buf.readUInt32BE(16);
+  const pngH = buf.readUInt32BE(20);
+  const aspect = pngW / pngH;
+  const MAX_W = 580, MAX_H = 700;
+  let w, h;
+  if (aspect >= 1) {
+    w = Math.min(MAX_W, pngW);
+    h = Math.round(w / aspect);
+    if (h > MAX_H) { h = MAX_H; w = Math.round(h * aspect); }
+  } else {
+    h = Math.min(MAX_H, pngH);
+    w = Math.round(h * aspect);
+    if (w > MAX_W) { w = MAX_W; h = Math.round(w / aspect); }
+  }
+  // ... embed with transformation: { width: w, height: h }
+}
+```
+
+### Steps
+1. Update the `diagram()` function in `/tmp/gen_asset_docx.js` to read actual PNG dimensions and preserve aspect ratio
+2. Regenerate the DOCX
+3. QA: Convert to PDF, then to images, inspect diagram pages
 
 ### Output
-`/mnt/documents/NCG_Warehouse_Asset_Management_Documentation.docx` — 60-page professionally formatted Word document with Navy/Gold branding and embedded Mermaid diagram images.
-
-### Current State
-- 28-page PDF with 15 chapters + 3 appendices, 14 Mermaid diagrams (PNGs already rendered at HD in `/tmp/asset_diagrams_v2/`)
-- Content is abbreviated — most chapters are 1-2 pages
-
-### Expansion Strategy (28 → 60 pages)
-
-**A. Deepen Existing Chapters (~20 additional pages)**
-
-Each existing chapter gets expanded with:
-- "What You Will See" UI walkthrough subsections describing screen layout, buttons, and fields
-- "Best Practices" subsections with ISO 55001 / IAS 16 recommendations
-- Detailed worked examples (e.g., depreciation calculations with actual numbers)
-- Error handling and troubleshooting guides
-- Role-permission matrices per chapter
-- Additional field reference tables where missing
-
-**B. Add New Chapters (~12 additional pages)**
-
-| New Chapter | Pages | Content |
-|---|---|---|
-| 16. Maintenance Management | 3 | Preventive/corrective maintenance workflows, condition-based triggers, maintenance scheduling |
-| 17. Insurance & Risk Management | 2 | Asset insurance tracking, risk assessment matrices, claim workflows |
-| 18. Audit & Compliance | 3 | Physical audit procedures, reconciliation workflows, compliance reporting |
-| 19. Integration Architecture | 2 | API endpoints, webhook events, third-party system integration patterns |
-| 20. CI/CD & Deployment | 2 | Asset module deployment pipeline, database migration strategy, edge function architecture |
-
-**C. Expand Appendices (~5 additional pages)**
-- Appendix D: Complete Database Schema Reference (all asset-related tables with column types)
-- Appendix E: Standard Operating Procedures (SOPs) with forms
-- Appendix F: Troubleshooting Guide
-
-### Document Format (DOCX)
-- Built with `docx-js` (npm `docx` package)
-- Navy (#1E2761) heading text, Gold (#C9A84C) accent borders
-- Header: "NCG Warehouse Solutions | Asset Management Documentation"
-- Footer: "CONFIDENTIAL | Page X"
-- US Letter page size (8.5" × 11")
-- Arial font family throughout
-- Proper `HeadingLevel` styles for TOC generation
-- All 14 existing Mermaid diagram PNGs embedded as `ImageRun` elements
-- Tables with navy header rows and alternating row shading
-
-### Technical Execution
-1. Install `docx` npm package globally
-2. Write Node.js script to `/tmp/gen_asset_docx.js`
-3. Embed existing 14 diagram PNGs from `/tmp/asset_diagrams_v2/`
-4. Generate DOCX to `/mnt/documents/`
-5. QA: Convert to PDF via LibreOffice, then to images, inspect sample pages
-
-### Files
-- `/tmp/gen_asset_docx.js` — generation script
-- `/mnt/documents/NCG_Warehouse_Asset_Management_Documentation.docx` — output
+Overwrite `/mnt/documents/NCG_Warehouse_Asset_Management_Documentation.docx`
 
