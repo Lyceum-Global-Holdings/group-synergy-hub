@@ -1,127 +1,60 @@
 
-I’ll fix this by changing the diagram-generation approach rather than just re-exporting the same diagrams at a higher resolution.
 
-## Best solution
+## Expand NCG Warehouse Asset Management Documentation to 60 Pages (DOCX)
 
-The Mermaid diagrams are most likely unclear because of a combination of:
-1. too much content per diagram,
-2. raster PNG export being scaled down in the PDF,
-3. labels/edges being too dense for the page width,
-4. inconsistent layout direction for process maps.
+### Output
+`/mnt/documents/NCG_Warehouse_Asset_Management_Documentation.docx` — 60-page professionally formatted Word document with Navy/Gold branding and embedded Mermaid diagram images.
 
-The best standards-based solution is to rebuild the asset document diagrams as executive process maps with one process per page/section, simplified node counts, consistent notation, and print-safe export settings.
+### Current State
+- 28-page PDF with 15 chapters + 3 appendices, 14 Mermaid diagrams (PNGs already rendered at HD in `/tmp/asset_diagrams_v2/`)
+- Content is abbreviated — most chapters are 1-2 pages
 
-## What I will change
+### Expansion Strategy (28 → 60 pages)
 
-### 1. Redesign all Mermaid diagrams for readability
-I’ll replace dense technical diagrams with cleaner BPMN-style Mermaid flowcharts:
-- 1 process = 1 focused diagram
-- 6–10 nodes per diagram where possible
-- top-to-bottom flow for approvals/lifecycles
-- left-to-right flow for integrations/data movement
-- explicit start/end nodes
-- short labels only
+**A. Deepen Existing Chapters (~20 additional pages)**
 
-Examples:
-- Asset lifecycle
-- Asset master to physical asset sync
-- Asset registration
-- Asset transfer
-- Asset request approval
-- Depreciation calculation
-- Finance integration
-- QR/public scan flow
-- Reporting pipeline
-- Security/RLS access model
+Each existing chapter gets expanded with:
+- "What You Will See" UI walkthrough subsections describing screen layout, buttons, and fields
+- "Best Practices" subsections with ISO 55001 / IAS 16 recommendations
+- Detailed worked examples (e.g., depreciation calculations with actual numbers)
+- Error handling and troubleshooting guides
+- Role-permission matrices per chapter
+- Additional field reference tables where missing
 
-### 2. Split complex diagrams into sub-diagrams
-Instead of one crowded diagram, I’ll separate them into:
-- business workflow diagram
-- system/data flow diagram
-- state/lifecycle diagram
+**B. Add New Chapters (~12 additional pages)**
 
-Example:
-- “Asset Requests” becomes:
-  - Request approval workflow
-  - Purchase-to-fulfillment workflow
-- “Depreciation” becomes:
-  - Calculation logic
-  - Posting/integration to finance
+| New Chapter | Pages | Content |
+|---|---|---|
+| 16. Maintenance Management | 3 | Preventive/corrective maintenance workflows, condition-based triggers, maintenance scheduling |
+| 17. Insurance & Risk Management | 2 | Asset insurance tracking, risk assessment matrices, claim workflows |
+| 18. Audit & Compliance | 3 | Physical audit procedures, reconciliation workflows, compliance reporting |
+| 19. Integration Architecture | 2 | API endpoints, webhook events, third-party system integration patterns |
+| 20. CI/CD & Deployment | 2 | Asset module deployment pipeline, database migration strategy, edge function architecture |
 
-### 3. Use print-safe Mermaid conventions
-I’ll regenerate diagrams using:
-- larger base font sizes
-- larger node spacing
-- wrapped labels avoided
-- plain rectangular nodes for process steps
-- decision diamonds only where necessary
-- no oversized relationship webs
+**C. Expand Appendices (~5 additional pages)**
+- Appendix D: Complete Database Schema Reference (all asset-related tables with column types)
+- Appendix E: Standard Operating Procedures (SOPs) with forms
+- Appendix F: Troubleshooting Guide
 
-### 4. Change PDF embedding strategy
-I’ll update the document generator so diagrams are inserted with:
-- larger on-page width
-- preserved aspect ratio
-- dedicated spacing before/after figure
-- optional full-width figure pages for the most important maps
+### Document Format (DOCX)
+- Built with `docx-js` (npm `docx` package)
+- Navy (#1E2761) heading text, Gold (#C9A84C) accent borders
+- Header: "NCG Warehouse Solutions | Asset Management Documentation"
+- Footer: "CONFIDENTIAL | Page X"
+- US Letter page size (8.5" × 11")
+- Arial font family throughout
+- Proper `HeadingLevel` styles for TOC generation
+- All 14 existing Mermaid diagram PNGs embedded as `ImageRun` elements
+- Tables with navy header rows and alternating row shading
 
-For the densest diagrams, I’ll use a full-page diagram layout instead of squeezing them inside text-heavy pages.
+### Technical Execution
+1. Install `docx` npm package globally
+2. Write Node.js script to `/tmp/gen_asset_docx.js`
+3. Embed existing 14 diagram PNGs from `/tmp/asset_diagrams_v2/`
+4. Generate DOCX to `/mnt/documents/`
+5. QA: Convert to PDF via LibreOffice, then to images, inspect sample pages
 
-### 5. Add diagram captions and process context
-Each diagram section will include:
-- purpose
-- trigger
-- inputs
-- outputs
-- related screens/tables
+### Files
+- `/tmp/gen_asset_docx.js` — generation script
+- `/mnt/documents/NCG_Warehouse_Asset_Management_Documentation.docx` — output
 
-This reduces the need to overload the diagram itself with explanatory text.
-
-## Files/artifacts to update
-
-### Generated artifacts
-- `/mnt/documents/NCG_Warehouse_Asset_Management_Documentation_v2.pdf`
-- `/mnt/documents/asset-management-diagrams/*.mmd`
-
-### Generation logic
-- regenerate the asset documentation script used for the current PDF
-- replace the existing Mermaid definitions with simplified, standards-aligned versions
-- update image sizing/layout rules in the PDF builder
-
-## Technical details
-
-### Diagram design standard
-I’ll follow a hybrid of:
-- ISO 55001 asset lifecycle structure
-- BPMN-style process clarity
-- SAP-style operational flow sequencing
-
-### Rendering improvements
-I’ll use:
-- higher-resolution export
-- larger canvas dimensions
-- more whitespace around nodes
-- fewer cross-links
-- per-diagram layout direction chosen for readability
-
-### Why this is better than just “higher resolution”
-If the diagram structure is too dense, HD export only makes a crowded diagram sharper, not clearer. The real fix is:
-```text
-simplify structure
--> separate concerns
--> enlarge placement in PDF
--> export cleanly
-```
-
-## Expected result
-The revised PDF will have diagrams that are:
-- readable at normal zoom
-- understandable by operations and management users
-- aligned with international documentation practice
-- visually consistent across the whole asset management document
-
-## QA I will perform after implementation
-- inspect every diagram page visually after PDF generation
-- verify no clipped labels or overlapping nodes
-- confirm text remains readable at standard page view
-- check ordering and captions for every process map
-- keep the old PDF intact and deliver a versioned replacement
