@@ -55,10 +55,10 @@ export const authTests: TestCase[] = [
     run: async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return { passed: false, error: "Not authenticated" };
-      const { data, error } = await supabase.from("profiles").select("id, first_name, email").eq("id", user.id).maybeSingle();
+const { data, error } = await supabase.from("profiles").select("id").eq("id", user.id).maybeSingle();
       if (error) return { passed: false, error: error.message };
       if (!data) return { passed: false, error: "No profile found" };
-      return { passed: true, details: `Profile: ${data.first_name || data.email}` };
+      return { passed: true, details: `Profile found: ${data.id}` };
     },
   },
   {
