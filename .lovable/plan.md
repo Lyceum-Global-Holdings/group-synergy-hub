@@ -1,100 +1,53 @@
 
 
-## In-App Test Environment — Module Testing Dashboard
+## Fix: All Users See All Locations When Decreasing Stock (Location → Sub-Location Hierarchy)
 
-### Overview
-Build a dedicated **Test Environment** page (`/admin/test-environment`) accessible to Super Admins. It provides an interactive dashboard to run automated smoke tests against every module's core operations (CRUD, API connectivity, RLS policies, edge functions) with real-time pass/fail results — aligned with **ISO 29119** (Software Testing) and **ISTQB** test execution standards.
+### Problem
+The `StockAdjustmentDialog` calls `useWarehouseBins()` **without** `skipLocationFilter`, so non-admin users only see bins within their permitted locations when decreasing stock. The sub-location dropdown is also limited to project-allocated sub-locations only.
 
-### Architecture
+Per **ISO 55001** (Asset Management) and **APICS/ASCM** best practices, stock consumption/issue operations should provide visibility into all storage locations to ensure accurate demand fulfillment and prevent artificial shortages caused by access restrictions. Write authorization remains enforced at the backend level (RLS + approval workflows).
 
-```text
-/admin/test-environment
-├── TestEnvironmentPage.tsx        ← Main dashboard
-├── components/
-│   ├── TestSuiteRunner.tsx        ← Orchestrates test execution
-│   ├── TestCategoryCard.tsx       ← Module-level card with expand/collapse
-│   ├── TestCaseResult.tsx         ← Individual test row (pass/fail/skip/running)
-│   ├── TestSummaryHeader.tsx      ← Overall stats (total, passed, failed, duration)
-│   └── TestReportExport.tsx       ← Export results as CSV/JSON
-├── hooks/
-│   └── useTestSuite.ts            ← State management for test execution
-└── tests/
-    ├── authTests.ts               ← Authentication & session tests
-    ├── warehouseTests.ts          ← Warehouse module tests (13 sub-modules)
-    ├── procurementTests.ts        ← Procurement module tests (9 sub-modules)
-    ├── sourcingTests.ts           ← Sourcing module tests (6 sub-modules)
-    ├── financeTests.ts            ← Finance module tests (11 sub-modules)
-    ├── constructionTests.ts       ← Construction module tests (11 sub-modules)
-    ├── productionTests.ts         ← Production module tests
-    ├── salesTests.ts              ← TUH/Sales module tests (4 sub-modules)
-    ├── managementTests.ts         ← Management module tests (5 sub-modules)
-    ├── socialMediaTests.ts        ← Social media module tests
-    ├── adminTests.ts              ← Administration module tests
-    ├── edgeFunctionTests.ts       ← Edge function connectivity tests (10 functions)
-    └── rlsTests.ts                ← RLS policy validation tests
-```
+### Solution
 
-### Test Categories (12 Suites, ~120 Test Cases)
+**Principle**: Separate **visibility** (read) from **authorization** (write) — the same pattern already used for transfers (`skipLocationFilter: true`).
 
-| Suite | Tests | What It Validates |
-|-------|-------|-------------------|
-| **Authentication** | 6 | Login, session, token refresh, role resolution, super admin check |
-| **Warehouse** | 15 | Item master CRUD, GRN create/list, stock transfer, asset tracking, batch FIFO |
-| **Procurement** | 12 | PR create, PO lifecycle, RFQ, 3-way match, MDP calculation, BOM explosion |
-| **Sourcing** | 8 | Supplier CRUD, evaluation scoring, contract management, blacklist |
-| **Finance** | 14 | GL entries, AP/AR, bank reconciliation, budget CRUD, fixed assets, cost centers |
-| **Construction** | 15 | Project CRUD, site management, floor plans, work orders, DSR, safety incidents |
-| **Production** | 8 | Sector/stage setup, production orders, daily entries, WIP cost calculation |
-| **Sales (TUH)** | 6 | Customer master, CPO lifecycle, finished goods, demand overview |
-| **Management** | 6 | Dashboard access, approval console, audit log retrieval, budget vs actual |
-| **Social Media** | 4 | Account registry, access management, NDA compliance, activity log |
-| **Edge Functions** | 10 | Connectivity test for all 10 deployed edge functions |
-| **RLS & Security** | 8 | Company-scoped isolation, role-based access, cross-company visibility |
+### Changes
 
-### Each Test Case Structure
-Every test follows a standardized format:
-- **ID**: Unique identifier (e.g., `WH-001`)
-- **Name**: Descriptive test name
-- **Category**: Module grouping
-- **Priority**: Critical / High / Medium
-- **Test Function**: Async function that runs a Supabase query or API call and returns pass/fail with details
-- **Expected Result**: What constitutes a pass
-- **Actual Result**: Runtime output
-- **Duration**: Execution time in ms
+**1. `StockAdjustmentDialog.tsx` — Pass `skipLocationFilter` for decrease operations**
 
-### How Tests Work
-Each test is a lightweight async function that:
-1. Calls `supabase.from('table').select()` or `supabase.rpc()` to verify table accessibility
-2. Attempts a test insert → verify → delete cycle (using a `test_` prefix for cleanup)
-3. Calls edge functions via `supabase.functions.invoke()` to verify deployment
-4. Checks RLS by verifying company-scoped results match expectations
-5. Reports pass/fail with error details and timing
+- Change `useWarehouseBins()` call to `useWarehouseBins({ skipLocationFilter: true })` so all bins across all locations are visible during stock adjustments.
+- This mirrors the existing transfer pattern and is consistent with the project's established "visibility-agnostic" architecture for operational efficiency.
 
-### UI Design
-- **Summary Header**: Total tests, passed (green), failed (red), skipped (gray), total duration
-- **Module Cards**: Collapsible cards per module with progress bar and individual test rows
-- **Run Controls**: "Run All", "Run Suite", "Run Single Test" buttons
-- **Export**: Download results as timestamped CSV or JSON
-- **Color Coding**: Green checkmark (pass), red X (fail), yellow spinner (running), gray dash (skipped)
-- Navy/Gold branding consistent with the rest of the platform
+**2. `StockAdjustmentDialog.tsx` — Add Location → Sub-Location hierarchical selector**
+
+Replace the flat sub-location dropdown with a two-step hierarchy:
+- **Step 1**: Select a **Location** (parent) from all `warehouse_locations` where `type = 'location'`
+- **Step 2**: Select a **Sub-Location** (child) filtered by the selected parent's `id`
+
+This gives users a clear Location → Sub-Location navigation path instead of a flat list.
+
+**3. `StockAdjustmentDialog.tsx` — Show all warehouse sub-locations (not just project-allocated ones)**
+
+Currently the sub-location list comes from `useProjectStorageLocations`, which only returns sub-locations linked to construction projects. Replace this with a direct query to `warehouse_locations` filtered by `type = 'sublocation'` and the selected parent location, so **all** sub-locations are visible regardless of project allocation.
+
+**4. Bin selector — Group bins by location**
+
+Update the bin dropdown to display bins grouped by their parent location name, making it easier for users to identify where stock is being decreased from across all locations.
+
+### Files Modified
+| File | Change |
+|------|--------|
+| `src/components/warehouse/StockAdjustmentDialog.tsx` | Add `skipLocationFilter: true`, replace flat sub-location list with Location → Sub-Location hierarchy, group bins by location |
 
 ### Standards Alignment
-- **ISO 29119-3**: Test case documentation structure (ID, preconditions, steps, expected results)
-- **ISO 29119-4**: Test execution procedures (suite → case → result → report)
-- **ISTQB Foundation**: Test levels (unit → integration → system), traceability matrix
-- **ISO 27001**: Security testing (RLS validation, authentication checks)
-
-### Implementation Steps
-1. Create test definition files for all 12 suites in `src/pages/admin/test-environment/tests/`
-2. Build `useTestSuite` hook for async test orchestration with progress tracking
-3. Build UI components (summary header, category cards, result rows, export)
-4. Create main `TestEnvironmentPage.tsx` with routing
-5. Add route to `App.tsx` and register in `moduleConfig.ts` under Administration
-6. Protect with `SuperAdminRoute` wrapper
+| Standard | Application |
+|----------|------------|
+| ISO 55001 | Full asset visibility for consumption operations |
+| APICS/ASCM | Unrestricted location visibility for stock issue/adjustment |
+| ISO 29119 | Existing test environment can validate this change |
 
 ### Safety
-- All write tests use a `test_` prefix and clean up after themselves (insert → assert → delete)
-- Tests run against the **live database** but only touch test-prefixed records
-- No destructive operations on real data
-- Edge function tests only verify reachability (HTTP 200/401), not side effects
+- **Read visibility only** — all users can see all locations in the decrease dialog
+- **Write authorization unchanged** — RLS policies and backend guards still enforce company-scoped write permissions
+- Matches the existing `skipLocationFilter` pattern already approved for transfers
 
