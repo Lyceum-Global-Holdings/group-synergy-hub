@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -13,7 +13,9 @@ import { Textarea } from '@/components/ui/textarea';
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
@@ -22,8 +24,8 @@ import { useStockTransactions } from '@/hooks/useStockTransactions';
 import { StockTransactionType } from '@/types/stockTransaction';
 import { useWarehouseBins } from '@/hooks/useWarehouseBins';
 import { useWarehouseBinAllocations } from '@/hooks/useWarehouseBinAllocations';
-import { useProjectStorageLocations } from '@/hooks/useProjectStorageLocations';
-import { Building2 } from 'lucide-react';
+import { useWarehouseLocations } from '@/hooks/useWarehouseLocations';
+import { Building2, MapPin } from 'lucide-react';
 
 interface StockAdjustmentDialogProps {
   open: boolean;
@@ -46,13 +48,47 @@ export function StockAdjustmentDialog({
   const [unitCost, setUnitCost] = useState('');
   const [notes, setNotes] = useState('');
   const [issueToSubLocation, setIssueToSubLocation] = useState(false);
+  const [selectedLocationId, setSelectedLocationId] = useState('');
   const [selectedSubLocationId, setSelectedSubLocationId] = useState('');
 
   const { createTransaction, isCreating } = useStockTransactions();
-  const { bins } = useWarehouseBins();
+  // skipLocationFilter: all users see all bins/locations for stock adjustments (ISO 55001)
+  const { bins } = useWarehouseBins({ skipLocationFilter: true });
   const { createAllocation, adjustAllocation, getAllocationsForItem } = useWarehouseBinAllocations();
-  const { projectSubLocations, isLoadingSubLocations } = useProjectStorageLocations();
+  const { locations } = useWarehouseLocations();
   const [itemAllocations, setItemAllocations] = useState<any[]>([]);
+
+  // Derive parent locations and sub-locations from warehouse_locations
+  const parentLocations = useMemo(
+    () => (locations || []).filter(l => l.type === 'location' && l.status === 'active'),
+    [locations]
+  );
+
+  const subLocations = useMemo(
+    () => (locations || []).filter(
+      l => l.type === 'sublocation' && l.status === 'active' && l.parent_id === selectedLocationId
+    ),
+    [locations, selectedLocationId]
+  );
+
+  // Group active bins by their parent location for the bin selector
+  const binsGroupedByLocation = useMemo(() => {
+    const activeBins = bins.filter(bin => bin.status === 'active');
+    const groups = new Map<string, { locationName: string; bins: typeof activeBins }>();
+
+    for (const bin of activeBins) {
+      const loc = (locations || []).find(l => l.id === bin.location_id);
+      const locName = loc?.name || 'Unknown Location';
+      const locId = bin.location_id || 'unknown';
+      if (!groups.has(locId)) {
+        groups.set(locId, { locationName: locName, bins: [] });
+      }
+      groups.get(locId)!.bins.push(bin);
+    }
+
+    return Array.from(groups.entries())
+      .sort((a, b) => a[1].locationName.localeCompare(b[1].locationName));
+  }, [bins, locations]);
 
   // Load allocations for this item when dialog opens
   useEffect(() => {
@@ -69,9 +105,15 @@ export function StockAdjustmentDialog({
   useEffect(() => {
     if (adjustmentType === 'increase') {
       setIssueToSubLocation(false);
+      setSelectedLocationId('');
       setSelectedSubLocationId('');
     }
   }, [adjustmentType]);
+
+  // Reset sub-location when parent location changes
+  useEffect(() => {
+    setSelectedSubLocationId('');
+  }, [selectedLocationId]);
 
   // Reset form when dialog closes
   useEffect(() => {
@@ -81,6 +123,7 @@ export function StockAdjustmentDialog({
       setUnitCost('');
       setNotes('');
       setIssueToSubLocation(false);
+      setSelectedLocationId('');
       setSelectedSubLocationId('');
       setAdjustmentType('increase');
     }
@@ -109,13 +152,11 @@ export function StockAdjustmentDialog({
     const existingAllocation = itemAllocations.find(a => a.bin_id === binId);
 
     if (existingAllocation) {
-      // Adjust existing bin allocation - this will automatically update item stock via trigger
       adjustAllocation({
         id: existingAllocation.id,
         quantityChange: quantityChange,
       });
     } else if (adjustmentType === 'increase') {
-      // Create new bin allocation for increase - this will automatically update item stock via trigger
       createAllocation({
         warehouse_item_id: itemId,
         bin_id: binId,
@@ -128,7 +169,8 @@ export function StockAdjustmentDialog({
     }
 
     // Determine transaction type and notes based on issue destination
-    const selectedSubLocation = projectSubLocations.find(l => l.sublocation_id === selectedSubLocationId);
+    const selectedSubLocation = (locations || []).find(l => l.id === selectedSubLocationId);
+    const selectedParentLocation = (locations || []).find(l => l.id === selectedLocationId);
     const isSubLocationIssue = issueToSubLocation && selectedSubLocation && adjustmentType === 'decrease';
     
     let transactionType: StockTransactionType = 'adjustment';
@@ -142,13 +184,12 @@ export function StockAdjustmentDialog({
     }
     
     let transactionNotes = notes;
-    if (isSubLocationIssue) {
-      transactionNotes = `Issued to ${selectedSubLocation.sublocation_name} (${selectedSubLocation.project_name})${notes ? ' - ' + notes : ''}`;
+    if (isSubLocationIssue && selectedSubLocation && selectedParentLocation) {
+      transactionNotes = `Issued to ${selectedParentLocation.name} → ${selectedSubLocation.name}${notes ? ' - ' + notes : ''}`;
     } else if (!transactionNotes) {
       transactionNotes = `Manual stock ${adjustmentType} - Bin: ${bins.find(b => b.id === binId)?.bin_code}`;
     }
 
-    // Create transaction for audit trail
     createTransaction({
       item_id: itemId,
       transaction_type: transactionType,
@@ -196,15 +237,23 @@ export function StockAdjustmentDialog({
                 <SelectValue placeholder="Select bin location" />
               </SelectTrigger>
               <SelectContent>
-                {bins.filter(bin => bin.status === 'active').map(bin => {
-                  const allocation = itemAllocations.find(a => a.bin_id === bin.id);
-                  const allocatedQty = allocation?.allocated_quantity || 0;
-                  return (
-                    <SelectItem key={bin.id} value={bin.id}>
-                      {bin.bin_code} - {bin.name} {allocatedQty > 0 && `(Current: ${allocatedQty})`}
-                    </SelectItem>
-                  );
-                })}
+                {binsGroupedByLocation.map(([locId, group]) => (
+                  <SelectGroup key={locId}>
+                    <SelectLabel className="flex items-center gap-1.5">
+                      <MapPin className="h-3 w-3" />
+                      {group.locationName}
+                    </SelectLabel>
+                    {group.bins.map(bin => {
+                      const allocation = itemAllocations.find(a => a.bin_id === bin.id);
+                      const allocatedQty = allocation?.allocated_quantity || 0;
+                      return (
+                        <SelectItem key={bin.id} value={bin.id}>
+                          {bin.bin_code} - {bin.name} {allocatedQty > 0 && `(Current: ${allocatedQty})`}
+                        </SelectItem>
+                      );
+                    })}
+                  </SelectGroup>
+                ))}
               </SelectContent>
             </Select>
           </div>
@@ -223,7 +272,7 @@ export function StockAdjustmentDialog({
             />
           </div>
 
-          {/* Issue to Sub-Location - Only shown for decrease */}
+          {/* Issue to Sub-Location — Location → Sub-Location hierarchy */}
           {adjustmentType === 'decrease' && (
             <div className="space-y-3 p-3 border rounded-lg bg-muted/30">
               <div className="flex items-center space-x-2">
@@ -232,7 +281,10 @@ export function StockAdjustmentDialog({
                   checked={issueToSubLocation}
                   onCheckedChange={(checked) => {
                     setIssueToSubLocation(checked === true);
-                    if (!checked) setSelectedSubLocationId('');
+                    if (!checked) {
+                      setSelectedLocationId('');
+                      setSelectedSubLocationId('');
+                    }
                   }}
                 />
                 <Label 
@@ -245,29 +297,59 @@ export function StockAdjustmentDialog({
               </div>
 
               {issueToSubLocation && (
-                <div className="space-y-2 pl-6">
-                  <Label htmlFor="subLocation">Sub-Location *</Label>
-                  <Select 
-                    value={selectedSubLocationId} 
-                    onValueChange={setSelectedSubLocationId}
-                    disabled={isLoadingSubLocations}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder={isLoadingSubLocations ? "Loading..." : "Select sub-location"} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {projectSubLocations.map(location => (
-                        <SelectItem key={location.sublocation_id} value={location.sublocation_id}>
-                          {location.sublocation_name} ({location.project_name})
-                        </SelectItem>
-                      ))}
-                      {projectSubLocations.length === 0 && !isLoadingSubLocations && (
-                        <SelectItem value="none" disabled>
-                          No project sub-locations available
-                        </SelectItem>
-                      )}
-                    </SelectContent>
-                  </Select>
+                <div className="space-y-3 pl-6">
+                  {/* Step 1: Select Location (parent) */}
+                  <div className="space-y-2">
+                    <Label htmlFor="parentLocation">Location *</Label>
+                    <Select
+                      value={selectedLocationId}
+                      onValueChange={setSelectedLocationId}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select location" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {parentLocations.map(loc => (
+                          <SelectItem key={loc.id} value={loc.id}>
+                            {loc.name} {loc.location_code ? `(${loc.location_code})` : ''}
+                          </SelectItem>
+                        ))}
+                        {parentLocations.length === 0 && (
+                          <SelectItem value="none" disabled>
+                            No locations available
+                          </SelectItem>
+                        )}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Step 2: Select Sub-Location (child) */}
+                  {selectedLocationId && (
+                    <div className="space-y-2">
+                      <Label htmlFor="subLocation">Sub-Location *</Label>
+                      <Select
+                        value={selectedSubLocationId}
+                        onValueChange={setSelectedSubLocationId}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select sub-location" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {subLocations.map(sub => (
+                            <SelectItem key={sub.id} value={sub.id}>
+                              {sub.name} {sub.location_code ? `(${sub.location_code})` : ''}
+                            </SelectItem>
+                          ))}
+                          {subLocations.length === 0 && (
+                            <SelectItem value="none" disabled>
+                              No sub-locations under this location
+                            </SelectItem>
+                          )}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+
                   <p className="text-xs text-muted-foreground">
                     Stock will be marked as issued to this sub-location
                   </p>
