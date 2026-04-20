@@ -583,6 +583,15 @@ export function BulkItemImportDialog() {
         </DialogHeader>
 
         <div className="space-y-4">
+          <Alert>
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>
+              Leave <code className="font-mono text-xs">item_code</code> blank to auto-generate codes
+              following the standard <code className="font-mono text-xs">INV-{'{CATEGORY}'}-{'{SEQUENCE}'}</code>
+              {' '}(GS1 / ISO 8000-110). A valid <code className="font-mono text-xs">category</code> is required for auto-generation.
+            </AlertDescription>
+          </Alert>
+
           <div className="flex items-center gap-4">
             <Button variant="outline" onClick={downloadTemplate} className="flex-shrink-0">
               <Download className="mr-2 h-4 w-4" />
