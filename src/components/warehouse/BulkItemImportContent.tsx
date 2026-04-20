@@ -173,7 +173,8 @@ export function BulkItemImportContent({ onSuccess, onCancel }: BulkItemImportCon
           switch (header) {
             case 'item_code':
               if (!value) {
-                item.errors.push('Item code is required');
+                // Blank → mark for auto-generation; validated later when category is known
+                item.autoGenerateCode = true;
               } else {
                 item.item_code = value;
               }
