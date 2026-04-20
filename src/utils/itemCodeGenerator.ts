@@ -52,8 +52,8 @@ export async function allocateItemCodes(
   const prefix = `INV-${categoryCode}-`;
   const table = scope === 'catalog' ? 'warehouse_item_catalog' : 'warehouse_items';
 
-  let query = supabase
-    .from(table)
+  let query: any = supabase
+    .from(table as any)
     .select('item_code')
     .ilike('item_code', `${prefix}%`);
 
