@@ -598,6 +598,13 @@ export function BulkItemImportContent({ onSuccess, onCancel }: BulkItemImportCon
 
   return (
     <div className="space-y-4">
+      <Alert>
+        <Sparkles className="h-4 w-4" />
+        <AlertDescription>
+          Leave <span className="font-mono font-medium">item_code</span> blank to auto-generate codes following the standard{' '}
+          <span className="font-mono font-medium">INV-{'{CATEGORY}'}-{'{SEQUENCE}'}</span> (GS1 / ISO 8000-110). A valid category with a 3-letter mnemonic is required.
+        </AlertDescription>
+      </Alert>
       <div className="flex items-center gap-4">
         <Button variant="outline" onClick={downloadTemplate} className="flex-shrink-0">
           <Download className="mr-2 h-4 w-4" />
