@@ -29,6 +29,7 @@ interface ParsedItem extends Partial<CreateCatalogItemData> {
   existingId?: string;
   existingItemCode?: string;
   updateCodeEnabled?: boolean;
+  autoGenerateCode?: boolean;
 }
 
 interface BulkItemImportContentProps {
