@@ -360,7 +360,16 @@ export function ItemMasterDefinitionTab({ onNavigateToInventory, onNavigateToBin
                     </TableCell>
                   )}
                   {col('item_code') && <TableCell className="font-mono text-xs">{item.item_code}</TableCell>}
-                  <TableCell className="font-medium">{item.name}</TableCell>
+                  <TableCell>
+                    <div className="space-y-0.5">
+                      <div className="font-medium">{item.name}</div>
+                      {item.description && (
+                        <div className="text-xs text-muted-foreground line-clamp-1">
+                          {item.description}
+                        </div>
+                      )}
+                    </div>
+                  </TableCell>
                   {col('category') && <TableCell>{category?.name || '-'}</TableCell>}
                   {col('unit') && <TableCell>{unit?.abbreviation || '-'}</TableCell>}
                   {col('brand') && <TableCell>{item.brand || '-'}</TableCell>}
