@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Download, FileText, AlertCircle, CheckCircle2, ArrowRight, RefreshCw } from 'lucide-react';
+import { Download, FileText, AlertCircle, CheckCircle2, ArrowRight, RefreshCw, Sparkles } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useWarehouseItemCatalog } from '@/hooks/useWarehouseItemCatalog';
 import { useItemCategories } from '@/hooks/useItemCategories';
@@ -18,6 +18,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
 import { useWarehouseLocations } from '@/hooks/useWarehouseLocations';
+import { allocateItemCodes } from '@/utils/itemCodeGenerator';
 type ImportStatus = 'new' | 'duplicate' | 'update_code' | 'error';
 
 interface ParsedItem extends Partial<CreateCatalogItemData> {
@@ -28,6 +29,7 @@ interface ParsedItem extends Partial<CreateCatalogItemData> {
   existingId?: string;
   existingItemCode?: string;
   updateCodeEnabled?: boolean;
+  autoGenerateCode?: boolean;
 }
 
 interface BulkItemImportContentProps {
@@ -61,8 +63,9 @@ export function BulkItemImportContent({ onSuccess, onCancel }: BulkItemImportCon
       'supplier', 'status', 'is_serialized', 'is_batch_tracked', 'notes', 'company'
     ];
 
+    // Sample row leaves item_code BLANK so it auto-generates as INV-{CAT}-{NNN}
     const sampleRow = [
-      'ITEM001', 'Sample Item', 'This is a sample item', 'Electronics', 'PCS',
+      '', 'Sample Item', 'This is a sample item', 'Electronics', 'PCS',
       'Main Warehouse', '10', '5', '100', '50.00', '75.00',
       '123456789', 'SKU001', 'Sample Brand', 'Sample Manufacturer', 'Sample Supplier',
       'active', 'false', 'false', 'Sample notes', 'Sample Company'
@@ -170,7 +173,8 @@ export function BulkItemImportContent({ onSuccess, onCancel }: BulkItemImportCon
           switch (header) {
             case 'item_code':
               if (!value) {
-                item.errors.push('Item code is required');
+                // Blank → mark for auto-generation; validated later when category is known
+                item.autoGenerateCode = true;
               } else {
                 item.item_code = value;
               }
@@ -268,6 +272,21 @@ export function BulkItemImportContent({ onSuccess, onCancel }: BulkItemImportCon
 
         parsed.push(item);
       }
+
+      // --- Validate auto-generation requirements ---
+      // Rows with blank item_code need a resolvable category that has a 3-letter mnemonic code.
+      parsed.forEach(item => {
+        if (item.autoGenerateCode) {
+          if (!item.category_id) {
+            item.errors.push('Item code is required when category is missing — provide an item_code or set a valid category for auto-generation');
+            return;
+          }
+          const cat = categories.find(c => c.id === item.category_id);
+          if (!cat?.code || !cat.code.trim()) {
+            item.errors.push(`Category "${cat?.name || 'unknown'}" has no 3-letter code — cannot auto-generate item code`);
+          }
+        }
+      });
 
       // --- Duplicate detection within CSV (names, SKUs, and item_codes) ---
       const csvNameCounts = new Map<string, number>();
@@ -431,6 +450,50 @@ export function BulkItemImportContent({ onSuccess, onCancel }: BulkItemImportCon
         return;
       }
 
+      // --- Auto-generate item codes for rows that need them (batch-aware) ---
+      // Group blank-code rows by category and allocate sequential INV-{CAT}-{NNN} codes.
+      const rowsNeedingCodes = newItems.filter(i => i.autoGenerateCode && !i.item_code && i.category_id);
+      if (rowsNeedingCodes.length > 0) {
+        const groups = new Map<string, ParsedItem[]>();
+        for (const row of rowsNeedingCodes) {
+          const key = row.category_id as string;
+          if (!groups.has(key)) groups.set(key, []);
+          groups.get(key)!.push(row);
+        }
+
+        try {
+          for (const [categoryId, rows] of groups) {
+            const cat = categories.find(c => c.id === categoryId);
+            const catCode = cat?.code?.trim();
+            if (!catCode) {
+              rows.forEach(r => r.errors.push(`Category "${cat?.name || 'unknown'}" has no 3-letter code`));
+              continue;
+            }
+            const codes = await allocateItemCodes({
+              categoryCode: catCode,
+              count: rows.length,
+              scope: 'catalog',
+            });
+            rows.forEach((row, idx) => {
+              row.item_code = codes[idx];
+            });
+          }
+        } catch (allocErr: any) {
+          console.error('[bulk-import] Code allocation failed:', allocErr);
+          toast({
+            title: "Code allocation failed",
+            description: allocErr?.message || 'Unable to auto-generate item codes',
+            variant: "destructive",
+          });
+          setIsImporting(false);
+          setShowConfirmation(false);
+          return;
+        }
+
+        // Force re-render so preview reflects newly assigned codes
+        setParsedData(prev => [...prev]);
+      }
+
       // --- Pre-import safety gate: re-check item_code uniqueness in catalog ---
       if (newItems.length > 0) {
         const existingCodesSet = new Set(
@@ -467,7 +530,7 @@ export function BulkItemImportContent({ onSuccess, onCancel }: BulkItemImportCon
 
       // --- Insert new items ---
       if (newItems.length > 0) {
-        const validData = newItems.map(({ rowNumber, errors, warnings, importStatus, existingId, existingItemCode, updateCodeEnabled, ...item }) => {
+        const validData = newItems.map(({ rowNumber, errors, warnings, importStatus, existingId, existingItemCode, updateCodeEnabled, autoGenerateCode, ...item }) => {
           const sanitized = { ...item } as any;
           const nullableFields = ['sku', 'barcode', 'description', 'brand', 'manufacturer', 'notes', 'image_url'];
           for (const field of nullableFields) {
@@ -535,6 +598,13 @@ export function BulkItemImportContent({ onSuccess, onCancel }: BulkItemImportCon
 
   return (
     <div className="space-y-4">
+      <Alert>
+        <Sparkles className="h-4 w-4" />
+        <AlertDescription>
+          Leave <span className="font-mono font-medium">item_code</span> blank to auto-generate codes following the standard{' '}
+          <span className="font-mono font-medium">INV-{'{CATEGORY}'}-{'{SEQUENCE}'}</span> (GS1 / ISO 8000-110). A valid category with a 3-letter mnemonic is required.
+        </AlertDescription>
+      </Alert>
       <div className="flex items-center gap-4">
         <Button variant="outline" onClick={downloadTemplate} className="flex-shrink-0">
           <Download className="mr-2 h-4 w-4" />
@@ -642,7 +712,15 @@ export function BulkItemImportContent({ onSuccess, onCancel }: BulkItemImportCon
                           <span className="font-medium text-amber-800">{item.item_code}</span>
                         </div>
                       ) : (
-                        <span className="font-medium">{item.item_code || '-'}</span>
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium">{item.item_code || (item.autoGenerateCode ? <span className="text-muted-foreground italic">auto on import</span> : '-')}</span>
+                          {item.autoGenerateCode && (
+                            <Badge variant="outline" className="gap-1 text-[10px] py-0 px-1.5">
+                              <Sparkles className="h-2.5 w-2.5" />
+                              Auto
+                            </Badge>
+                          )}
+                        </div>
                       )}
                     </TableCell>
                     <TableCell>{item.name || '-'}</TableCell>

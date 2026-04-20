@@ -9,30 +9,56 @@ import { supabase } from '@/integrations/supabase/client';
  * - ISO 8000-110 Master Data Quality (documented, repeatable pattern)
  * - ISO 7372 / SAP MM 3-letter category mnemonic
  *
+ * Scopes:
+ * - 'catalog'   → global uniqueness (queries warehouse_item_catalog)
+ * - 'inventory' → per-company uniqueness (queries warehouse_items, scoped by company_id)
+ *
  * Performs a single DB query per category per batch to discover the current
  * max sequence, then returns `count` sequential codes starting from max + 1.
- *
- * Scoped per (categoryCode, companyId) — matches the composite uniqueness
- * constraint on warehouse_items(item_code, company_id).
  */
+export type ItemCodeScope = 'catalog' | 'inventory';
+
+export interface AllocateItemCodesOptions {
+  categoryCode: string;
+  count: number;
+  scope: ItemCodeScope;
+  companyId?: string | null;
+}
+
 export async function allocateItemCodes(
-  categoryCode: string,
-  companyId: string | null,
-  count: number
+  optionsOrCategoryCode: AllocateItemCodesOptions | string,
+  legacyCompanyId?: string | null,
+  legacyCount?: number
 ): Promise<string[]> {
+  // Backward-compat: support old positional signature (categoryCode, companyId, count)
+  // which targeted the inventory table.
+  const opts: AllocateItemCodesOptions =
+    typeof optionsOrCategoryCode === 'string'
+      ? {
+          categoryCode: optionsOrCategoryCode,
+          companyId: legacyCompanyId ?? null,
+          count: legacyCount ?? 0,
+          scope: 'inventory',
+        }
+      : optionsOrCategoryCode;
+
+  const { categoryCode, count, scope, companyId = null } = opts;
+
   if (!categoryCode) {
     throw new Error('Category code is required to auto-generate item codes');
   }
   if (count <= 0) return [];
 
   const prefix = `INV-${categoryCode}-`;
+  const table = scope === 'catalog' ? 'warehouse_item_catalog' : 'warehouse_items';
 
-  let query = supabase
-    .from('warehouse_items')
+  let query: any = supabase
+    .from(table as any)
     .select('item_code')
     .ilike('item_code', `${prefix}%`);
 
-  if (companyId) {
+  // Company scoping only applies to inventory (catalog is global)
+  if (scope === 'inventory' && companyId) {
     query = query.eq('company_id', companyId);
   }
 
@@ -45,7 +71,7 @@ export async function allocateItemCodes(
 
   let maxSeq = 0;
   if (data && data.length > 0) {
-    for (const row of data) {
+    for (const row of data as Array<{ item_code: string | null }>) {
       const seqStr = (row.item_code || '').replace(prefix, '');
       const seq = parseInt(seqStr, 10);
       if (!isNaN(seq) && seq > maxSeq) {
