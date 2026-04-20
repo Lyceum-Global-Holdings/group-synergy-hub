@@ -1,72 +1,111 @@
 
+## Fix bulk item code generation by correcting the actual import flow
 
-## Auto-Generate Item Codes During Bulk Upload (Aligned with Single-Item Standard)
+### What I found
+The current user-facing bulk upload flow is not using the code path that was fixed earlier.
 
-### Problem
-The bulk CSV importer (`BulkItemImportDialog.tsx`) **requires** `item_code` in every row (line 206-211: "Item code is required"). Single-item creation (`SingleItemForm` / `CreateItemDialog`) auto-generates codes via `useNextWarehouseItemCode` using the format `INV-{CAT3}-{NNN}` (per `mem://architecture/item-code-generation-standards` and the 3-letter ISO 7372 / SAP MM mnemonic standard).
+1. `AddItemsDialog` renders `BulkItemImportContent` in the Bulk Import tab.
+2. `BulkItemImportContent` still hard-requires `item_code` and never calls `allocateItemCodes`.
+3. The previously updated `BulkItemImportDialog` is effectively a separate flow and is not the one the user is using here.
+4. The current allocator reads from `warehouse_items`, but the active bulk importer writes to `warehouse_item_catalog`, so even if reused as-is it would validate against the wrong table.
+5. There are now two parallel bulk import implementations, which is why single-item creation works but bulk upload still fails.
 
-This inconsistency means bulk uploads fail when the column is blank.
+### Best solution
+Implement one shared, standards-compliant item-code generation pipeline and apply it to the active bulk import flow.
 
-### International Standards Alignment
-- **GS1 SKU Identification** — every item must have a unique, deterministic identifier
-- **ISO 8000-110** (Master Data Quality) — codes must follow a documented, repeatable pattern
-- **ISO 7372 / SAP MM** — already used for the 3-letter category mnemonic
-- **Existing project standard** — `INV-{CAT}-{NNN}` zero-padded 3-digit sequence, scoped per `(category, company_id)`
+This keeps item codes aligned with:
+- GS1 deterministic SKU identification
+- ISO 8000-110 master data quality
+- ISO 7372 / SAP MM 3-letter material group mnemonic
+- existing project standard: `INV-{CAT}-{NNN}`
 
-### Solution
+### Implementation plan
 
-Make `item_code` **optional** in the CSV. When blank, auto-generate using the same standard as the single-item form, with **batch-aware sequencing** to prevent collisions within a single upload.
+#### 1) Refactor item code generation into a shared allocator
+Update `src/utils/itemCodeGenerator.ts` so it supports both scopes:
 
-### Files Modified
+- `catalog` scope: query `warehouse_item_catalog` for existing `INV-{CAT}-*` codes
+- `inventory` scope: query `warehouse_items` scoped by `(company_id, item_code)`
 
-**1. `src/utils/itemCodeGenerator.ts`** *(new)* — extract reusable generator
+Proposed shape:
 ```ts
-// Given category code, company_id, and the count already taken in this batch,
-// query the DB once for the current max sequence, then return codes
-// INV-{CAT}-{NNN} starting from max+1.
-export async function allocateItemCodes(
-  categoryCode: string,
-  companyId: string,
-  count: number
-): Promise<string[]>
+allocateItemCodes({
+  categoryCode,
+  count,
+  scope: 'catalog' | 'inventory',
+  companyId?: string | null,
+})
 ```
-- Single DB query per category per batch (efficient for large CSVs)
-- Returns `count` sequential codes
-- Reuses the exact prefix logic from `useNextWarehouseItemCode`
 
-**2. `src/components/warehouse/BulkItemImportDialog.tsx`**
-- **CSV template**: mark `item_code` column as *optional* in the description; sample row leaves it blank
-- **Parser (line 204-211)**: if `item_code` blank, set a flag `needsCode: true` instead of pushing an error
-- **Pre-import allocation step** (new, before line 433 `bulkCreateItemsAsync`):
-  1. Group rows needing codes by `(category_id, company_id)`
-  2. For each group, resolve category → 3-letter `code`, call `allocateItemCodes(catCode, companyId, groupCount)`
-  3. Assign returned codes back to the corresponding rows
-  4. Re-run duplicate check (CSV-internal + DB) on the now-fully-populated set
-- **Validation guard**: if a row has no `category_id` AND no `item_code`, raise a clear error: *"Item code is required when category is missing — provide one or set a valid category for auto-generation"*
-- **Preview table**: show generated codes with a small "Auto" badge so users can verify before clicking Import
+This ensures:
+- global uniqueness for catalog imports
+- company-scoped uniqueness for inventory imports
+- one source of truth for all automated item-code generation
 
-**3. UX touches in the dialog header**
-- Add an info Alert: *"Leave `item_code` blank to auto-generate codes following the standard `INV-{CATEGORY}-{SEQUENCE}` (GS1 / ISO 8000-110)."*
+#### 2) Fix the active bulk importer
+Update `src/components/warehouse/BulkItemImportContent.tsx` to make `item_code` optional.
 
-### Why this approach
-- **Zero schema change** — purely client-side; no DB trigger needed (and avoids the recursive-auth pitfall of `SECURITY DEFINER` triggers on a multi-tenant table)
-- **Deterministic & predictable** — codes match exactly what the single-item form would produce
-- **Batch-safe** — sequence is allocated once per category per upload, no race conditions within the batch
-- **Backward compatible** — users who *do* provide `item_code` in the CSV retain full control
-- **Standards-compliant** — follows the documented `INV-{CAT}-{NNN}` pattern already in `mem://architecture/item-code-generation-standards`
+Changes:
+- blank `item_code` should mark the row for auto-generation
+- require a valid top-level category/material group when auto-generating
+- resolve the category’s 3-letter mnemonic
+- allocate sequential codes per category group before duplicate checks
+- show generated codes in preview with an “Auto” badge
+- update the CSV template to leave `item_code` blank by default and explain the standard
 
-### Edge Cases Handled
-| Scenario | Behavior |
-|---|---|
-| Row has `item_code` and `category` | Use provided code (current behavior) |
-| Row has `category` only | Auto-generate `INV-{CAT}-{NNN}` |
-| Row has neither | Hard error with clear message |
-| Two rows same category, both blank | Get sequential codes (e.g. `-005`, `-006`) |
-| Race vs. another user uploading | Final DB unique constraint catches it; user sees existing duplicate error message |
+#### 3) Make bulk import mode-aware so it matches single-item behavior
+Pass `mode` from `AddItemsDialog` into `BulkItemImportContent`.
 
-### Files
-| File | Change |
-|---|---|
-| `src/utils/itemCodeGenerator.ts` | NEW — batch-aware code allocator |
-| `src/components/warehouse/BulkItemImportDialog.tsx` | Make `item_code` optional, allocate codes pre-import, add info alert + Auto badge |
+- In `catalog` mode:
+  - create/update `warehouse_item_catalog`
+  - use global code uniqueness
+- In `inventory` mode:
+  - follow the same architecture as `SingleItemForm`
+  - create/reuse the catalog entry first
+  - then create the company-scoped `warehouse_items` row
+  - preserve selected company scoping
 
+This is the safest fix because the user is on the inventory route, and bulk upload should behave consistently with single-item creation.
+
+#### 4) Enforce standards-based category rules
+For auto-generated codes:
+- only allow Level 1 / top-level material groups
+- reject rows where category is missing, unresolved, or lacks a valid 3-letter code
+- keep manual `item_code` entry supported for exceptional imports
+
+This keeps bulk import aligned with the existing single-item form and project memory.
+
+#### 5) Remove drift between duplicate bulk flows
+To prevent this from happening again:
+- either consolidate the two bulk import components into one shared implementation
+- or extract shared parsing/allocation/validation helpers used by both
+
+Minimum safe outcome:
+- the bulk flow rendered by `AddItemsDialog` must use the shared allocator and shared validation logic
+
+### Files to update
+- `src/components/warehouse/AddItemsDialog.tsx`
+- `src/components/warehouse/BulkItemImportContent.tsx`
+- `src/utils/itemCodeGenerator.ts`
+- optionally `src/hooks/warehouse/useNextWarehouseItemCode.ts` to reuse the same shared logic
+
+### Technical notes
+- No database schema change is required
+- No RLS change is required
+- The fix is primarily a UI/import-pipeline consistency issue
+- Existing manual item codes remain supported
+- Duplicate checks must happen after auto-generated codes are assigned
+
+### Verification
+I would verify these cases after implementation:
+
+1. Inventory bulk import with blank `item_code` generates `INV-{CAT}-{NNN}` successfully
+2. Catalog bulk import with blank `item_code` also generates codes successfully
+3. Multiple rows in the same category get sequential codes
+4. Mixed categories generate separate sequences
+5. Missing category + blank code gives a clear validation error
+6. Existing manual code duplicates are blocked correctly
+7. Imported bulk items appear in the same places and with the same code logic as single-item creation
+
+### Expected outcome
+Bulk upload will finally behave like single-item creation: item codes auto-generate reliably, follow international standards, and stay consistent across catalog and inventory workflows.
