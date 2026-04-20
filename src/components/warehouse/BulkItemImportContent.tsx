@@ -273,6 +273,21 @@ export function BulkItemImportContent({ onSuccess, onCancel }: BulkItemImportCon
         parsed.push(item);
       }
 
+      // --- Validate auto-generation requirements ---
+      // Rows with blank item_code need a resolvable category that has a 3-letter mnemonic code.
+      parsed.forEach(item => {
+        if (item.autoGenerateCode) {
+          if (!item.category_id) {
+            item.errors.push('Item code is required when category is missing — provide an item_code or set a valid category for auto-generation');
+            return;
+          }
+          const cat = categories.find(c => c.id === item.category_id);
+          if (!cat?.code || !cat.code.trim()) {
+            item.errors.push(`Category "${cat?.name || 'unknown'}" has no 3-letter code — cannot auto-generate item code`);
+          }
+        }
+      });
+
       // --- Duplicate detection within CSV (names, SKUs, and item_codes) ---
       const csvNameCounts = new Map<string, number>();
       const csvSkuCounts = new Map<string, number>();
