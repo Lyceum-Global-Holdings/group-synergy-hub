@@ -530,7 +530,7 @@ export function BulkItemImportContent({ onSuccess, onCancel }: BulkItemImportCon
 
       // --- Insert new items ---
       if (newItems.length > 0) {
-        const validData = newItems.map(({ rowNumber, errors, warnings, importStatus, existingId, existingItemCode, updateCodeEnabled, ...item }) => {
+        const validData = newItems.map(({ rowNumber, errors, warnings, importStatus, existingId, existingItemCode, updateCodeEnabled, autoGenerateCode, ...item }) => {
           const sanitized = { ...item } as any;
           const nullableFields = ['sku', 'barcode', 'description', 'brand', 'manufacturer', 'notes', 'image_url'];
           for (const field of nullableFields) {
