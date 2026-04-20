@@ -712,7 +712,15 @@ export function BulkItemImportContent({ onSuccess, onCancel }: BulkItemImportCon
                           <span className="font-medium text-amber-800">{item.item_code}</span>
                         </div>
                       ) : (
-                        <span className="font-medium">{item.item_code || '-'}</span>
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium">{item.item_code || (item.autoGenerateCode ? <span className="text-muted-foreground italic">auto on import</span> : '-')}</span>
+                          {item.autoGenerateCode && (
+                            <Badge variant="outline" className="gap-1 text-[10px] py-0 px-1.5">
+                              <Sparkles className="h-2.5 w-2.5" />
+                              Auto
+                            </Badge>
+                          )}
+                        </div>
                       )}
                     </TableCell>
                     <TableCell>{item.name || '-'}</TableCell>
