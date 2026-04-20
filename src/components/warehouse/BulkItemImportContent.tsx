@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Download, FileText, AlertCircle, CheckCircle2, ArrowRight, RefreshCw } from 'lucide-react';
+import { Download, FileText, AlertCircle, CheckCircle2, ArrowRight, RefreshCw, Sparkles } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useWarehouseItemCatalog } from '@/hooks/useWarehouseItemCatalog';
 import { useItemCategories } from '@/hooks/useItemCategories';
@@ -18,6 +18,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
 import { useWarehouseLocations } from '@/hooks/useWarehouseLocations';
+import { allocateItemCodes } from '@/utils/itemCodeGenerator';
 type ImportStatus = 'new' | 'duplicate' | 'update_code' | 'error';
 
 interface ParsedItem extends Partial<CreateCatalogItemData> {
