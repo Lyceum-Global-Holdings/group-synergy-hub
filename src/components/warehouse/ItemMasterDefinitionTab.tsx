@@ -112,10 +112,22 @@ export function ItemMasterDefinitionTab({ onNavigateToInventory, onNavigateToBin
     return suppliers.find(s => s.name === supplierFilter)?.id || 'all';
   }, [supplierFilter, suppliers]);
 
-  const selectedCategoryId = useMemo(() => {
-    if (categoryFilter === 'all') return 'all';
-    return categories.find(c => c.name === categoryFilter)?.id || 'all';
-  }, [categoryFilter, categories]);
+  const categoryOptions = useMemo(() => {
+    const level0 = categories.filter(c => !c.parent_id);
+    const result: Array<{ category: typeof categories[number]; depth: 0 | 1 }> = [];
+    level0
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .forEach(parent => {
+        result.push({ category: parent, depth: 0 });
+        categories
+          .filter(c => c.parent_id === parent.id)
+          .sort((a, b) => a.name.localeCompare(b.name))
+          .forEach(child => result.push({ category: child, depth: 1 }));
+      });
+    return result;
+  }, [categories]);
+
+  const selectedCategoryId = categoryFilter;
 
   const filterParams = { search: debouncedSearch, categoryId: selectedCategoryId, status: statusFilter, supplierId: selectedSupplierId };
 
