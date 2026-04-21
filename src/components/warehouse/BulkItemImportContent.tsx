@@ -18,7 +18,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
 import { useWarehouseLocations } from '@/hooks/useWarehouseLocations';
-import { allocateItemCodes } from '@/utils/itemCodeGenerator';
+import { parseCSV, downloadCSV, allocateAutoCodes } from '@/lib/bulkImport';
 type ImportStatus = 'new' | 'duplicate' | 'update_code' | 'error';
 
 interface ParsedItem extends Partial<CreateCatalogItemData> {
