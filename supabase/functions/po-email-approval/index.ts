@@ -37,6 +37,57 @@ serve(async (req) => {
     const body = await req.json();
 
     if (body.action === 'send_email') {
+      // SECURITY: Require authenticated caller. Without this, any actor could
+      // trigger PO approval emails to arbitrary addresses and leak PO details.
+      const authHeader = req.headers.get('Authorization');
+      if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      const token = authHeader.replace('Bearer ', '');
+      const { data: userData, error: userError } = await supabase.auth.getUser(token);
+      if (userError || !userData?.user) {
+        return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      // SECURITY: Verify caller belongs to the same company as the PO before
+      // sending the email (prevents cross-tenant PO data leakage via email).
+      const callerId = userData.user.id;
+      const { data: poRow, error: poLookupError } = await supabase
+        .from('purchase_orders')
+        .select('company_id')
+        .eq('id', body.po_id)
+        .single();
+
+      if (poLookupError || !poRow) {
+        return new Response(JSON.stringify({ error: 'Purchase order not found' }), {
+          status: 404,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      const { data: isAdmin } = await supabase.rpc('is_admin', { _user_id: callerId });
+      if (!isAdmin) {
+        const { data: callerCompanies } = await supabase
+          .from('user_companies')
+          .select('company_id')
+          .eq('user_id', callerId);
+        const callerCompanyIds = (callerCompanies ?? []).map((c: any) => c.company_id);
+        if (!callerCompanyIds.includes(poRow.company_id)) {
+          console.error(`Security: User ${callerId} attempted to send PO approval email for PO from another company`);
+          return new Response(JSON.stringify({ error: 'Forbidden' }), {
+            status: 403,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+      }
+
       return await handleSendEmail(body, supabase);
     } else if (body.action === 'process_approval') {
       return await handleProcessApproval(body, supabase);
