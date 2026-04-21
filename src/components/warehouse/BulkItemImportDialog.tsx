@@ -19,7 +19,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
-import { allocateItemCodes } from '@/utils/itemCodeGenerator';
+import { parseCSV, downloadCSV, allocateAutoCodes } from '@/lib/bulkImport';
 
 interface ParsedItem extends Partial<CreateWarehouseItemData> {
   rowNumber: number;
