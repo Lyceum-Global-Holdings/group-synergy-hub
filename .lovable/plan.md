@@ -1,111 +1,170 @@
 
-## Fix bulk item code generation by correcting the actual import flow
 
-### What I found
-The current user-facing bulk upload flow is not using the code path that was fixed earlier.
+## Codebase Refactoring Plan — Phased, Standards-Based
 
-1. `AddItemsDialog` renders `BulkItemImportContent` in the Bulk Import tab.
-2. `BulkItemImportContent` still hard-requires `item_code` and never calls `allocateItemCodes`.
-3. The previously updated `BulkItemImportDialog` is effectively a separate flow and is not the one the user is using here.
-4. The current allocator reads from `warehouse_items`, but the active bulk importer writes to `warehouse_item_catalog`, so even if reused as-is it would validate against the wrong table.
-5. There are now two parallel bulk import implementations, which is why single-item creation works but bulk upload still fails.
+A pragmatic, low-risk refactor of the Lyceum Global Holdings ERP codebase (~826 TS/TSX files, multiple 1000+ LOC components, 100+ hooks, duplicated import flows). Aligned with **Clean Code**, **SOLID**, **ISO/IEC 25010** (maintainability), **OWASP ASVS** (security), and **React/TypeScript community standards**.
 
-### Best solution
-Implement one shared, standards-compliant item-code generation pipeline and apply it to the active bulk import flow.
+### Guiding principles
+- Zero behavior change per phase — refactor, don't rewrite
+- Each phase is independently shippable and revertible
+- No DB schema changes unless explicitly called out
+- Tests / smoke-checks after each phase before moving on
 
-This keeps item codes aligned with:
-- GS1 deterministic SKU identification
-- ISO 8000-110 master data quality
-- ISO 7372 / SAP MM 3-letter material group mnemonic
-- existing project standard: `INV-{CAT}-{NNN}`
+---
 
-### Implementation plan
+### Phase 0 — Baseline & Guardrails *(prerequisite, ~quick)*
+Establish safety nets before touching code.
 
-#### 1) Refactor item code generation into a shared allocator
-Update `src/utils/itemCodeGenerator.ts` so it supports both scopes:
+- Add **ESLint + Prettier** strict config (`eslint-plugin-react-hooks`, `@typescript-eslint`, `import/order`)
+- Enable `tsconfig` `strict: true`, `noUncheckedIndexedAccess`, `noImplicitOverride`
+- Add **Husky + lint-staged** pre-commit hooks
+- Add a `CONTRIBUTING.md` with folder conventions and naming rules
+- Generate a baseline complexity/duplication report (e.g. `jscpd`) to track progress
 
-- `catalog` scope: query `warehouse_item_catalog` for existing `INV-{CAT}-*` codes
-- `inventory` scope: query `warehouse_items` scoped by `(company_id, item_code)`
+**Deliverable:** lint passes, baseline metrics committed.
 
-Proposed shape:
-```ts
-allocateItemCodes({
-  categoryCode,
-  count,
-  scope: 'catalog' | 'inventory',
-  companyId?: string | null,
-})
+---
+
+### Phase 1 — Folder & Module Boundaries *(structural)*
+Adopt a **feature-sliced architecture** (industry standard for large React apps).
+
+```text
+src/
+├── app/                  ← App shell, providers, router
+├── features/             ← Domain features (warehouse, finance, construction, …)
+│   └── warehouse/
+│       ├── api/          ← supabase queries + react-query hooks
+│       ├── components/   ← feature-only UI
+│       ├── hooks/
+│       ├── types/
+│       ├── utils/
+│       └── index.ts      ← public surface
+├── shared/               ← Cross-feature reusable code
+│   ├── ui/               ← shadcn primitives (current src/components/ui)
+│   ├── lib/              ← framework-agnostic helpers
+│   ├── api/              ← supabase client, base hooks
+│   └── types/
+└── pages/                ← Thin route components only
 ```
 
-This ensures:
-- global uniqueness for catalog imports
-- company-scoped uniqueness for inventory imports
-- one source of truth for all automated item-code generation
+- Move existing `src/components/{warehouse,finance,construction,…}` → `src/features/<domain>/components`
+- Move matching hooks from flat `src/hooks/` into their feature folder
+- Enforce boundaries with `eslint-plugin-boundaries` (no cross-feature imports except via `index.ts`)
 
-#### 2) Fix the active bulk importer
-Update `src/components/warehouse/BulkItemImportContent.tsx` to make `item_code` optional.
+**Why:** ISO/IEC 25010 "modularity" + scales for 100+ hooks today.
 
-Changes:
-- blank `item_code` should mark the row for auto-generation
-- require a valid top-level category/material group when auto-generating
-- resolve the category’s 3-letter mnemonic
-- allocate sequential codes per category group before duplicate checks
-- show generated codes in preview with an “Auto” badge
-- update the CSV template to leave `item_code` blank by default and explain the standard
+---
 
-#### 3) Make bulk import mode-aware so it matches single-item behavior
-Pass `mode` from `AddItemsDialog` into `BulkItemImportContent`.
+### Phase 2 — Eliminate Duplication & Dead Code
+Targeted dedup based on confirmed drift.
 
-- In `catalog` mode:
-  - create/update `warehouse_item_catalog`
-  - use global code uniqueness
-- In `inventory` mode:
-  - follow the same architecture as `SingleItemForm`
-  - create/reuse the catalog entry first
-  - then create the company-scoped `warehouse_items` row
-  - preserve selected company scoping
+- Consolidate `BulkItemImportContent.tsx` (861 LOC) and `BulkItemImportDialog.tsx` (733 LOC) → one shared importer with `mode: 'catalog' | 'inventory'`
+- Extract shared CSV parse/validate/preview pipeline to `features/warehouse/lib/bulkImport/`
+- Audit for similar parallel flows: GRN dialogs, asset import dialogs, dashboard widgets
+- Run `jscpd` / `ts-prune` to remove dead exports
+- Centralize repeated patterns (toasts, confirm dialogs, loader fallbacks) into `shared/ui/feedback/`
 
-This is the safest fix because the user is on the inventory route, and bulk upload should behave consistently with single-item creation.
+**Outcome:** single source of truth per workflow; the bulk-import drift bug class disappears permanently.
 
-#### 4) Enforce standards-based category rules
-For auto-generated codes:
-- only allow Level 1 / top-level material groups
-- reject rows where category is missing, unresolved, or lacks a valid 3-letter code
-- keep manual `item_code` entry supported for exceptional imports
+---
 
-This keeps bulk import aligned with the existing single-item form and project memory.
+### Phase 3 — Decompose God Components *(SOLID / SRP)*
+Break down files >500 LOC. Targets identified:
 
-#### 5) Remove drift between duplicate bulk flows
-To prevent this from happening again:
-- either consolidate the two bulk import components into one shared implementation
-- or extract shared parsing/allocation/validation helpers used by both
+| File | LOC | Strategy |
+|---|---|---|
+| `LocationReportAnalytics.tsx` | 1,919 | Split into header / filters / charts / table / export |
+| `useMaterialDemand.ts` | 1,493 | Split per concern: queries, calculations, mutations |
+| `AssetManagement.tsx` page | 1,347 | Move logic to hooks; page becomes layout + tabs |
+| `useConstructionInventory.ts` | 1,283 | Split per entity (serials, bulk, transfers) |
+| `MaterialDemandPlanning.tsx` | 1,052 | Container/presentational split |
+| `ItemMasterTab.tsx` | 1,045 | Extract toolbar, table, dialogs |
+| `CreateSupplierDialog.tsx` | 1,003 | Step components + zod schema per step |
 
-Minimum safe outcome:
-- the bulk flow rendered by `AddItemsDialog` must use the shared allocator and shared validation logic
+**Rule of thumb:** components ≤ 250 LOC, hooks ≤ 200 LOC, single responsibility.
 
-### Files to update
-- `src/components/warehouse/AddItemsDialog.tsx`
-- `src/components/warehouse/BulkItemImportContent.tsx`
-- `src/utils/itemCodeGenerator.ts`
-- optionally `src/hooks/warehouse/useNextWarehouseItemCode.ts` to reuse the same shared logic
+---
 
-### Technical notes
-- No database schema change is required
-- No RLS change is required
-- The fix is primarily a UI/import-pipeline consistency issue
-- Existing manual item codes remain supported
-- Duplicate checks must happen after auto-generated codes are assigned
+### Phase 4 — Data Layer Standardization
+React Query is already used; tighten the contract.
 
-### Verification
-I would verify these cases after implementation:
+- Standard hook shape: `useXxxQuery`, `useXxxMutation`, colocated `xxxKeys` factory
+- Centralize **query key factory** per feature (`features/warehouse/api/queryKeys.ts`) — eliminates the brittle string keys scattered today
+- Wrap all Supabase calls in feature-level `api/` modules (no `supabase.from(...)` in components)
+- Standard error handler → unified toast + `system_error_logs` capture
+- Keep current `staleTime: 0` policy (project memory rule)
 
-1. Inventory bulk import with blank `item_code` generates `INV-{CAT}-{NNN}` successfully
-2. Catalog bulk import with blank `item_code` also generates codes successfully
-3. Multiple rows in the same category get sequential codes
-4. Mixed categories generate separate sequences
-5. Missing category + blank code gives a clear validation error
-6. Existing manual code duplicates are blocked correctly
-7. Imported bulk items appear in the same places and with the same code logic as single-item creation
+**Why:** matches TanStack Query best practices and contains the Supabase coupling.
 
-### Expected outcome
-Bulk upload will finally behave like single-item creation: item codes auto-generate reliably, follow international standards, and stay consistent across catalog and inventory workflows.
+---
+
+### Phase 5 — Type Safety & Validation Hardening
+- Replace all remaining `any` / `as any` with generated types from `src/integrations/supabase/types.ts`
+- Adopt **Zod schemas** as the single source for all forms + CSV imports + edge function payloads (OWASP ASVS V5)
+- Derive TS types from Zod via `z.infer` — no duplicate definitions
+- Form pattern: `react-hook-form` + `zodResolver` everywhere (already a dependency)
+
+---
+
+### Phase 6 — Security & Multi-Tenancy Audit *(OWASP ASVS / project memory rules)*
+Codify the patterns already in memory so they can't regress.
+
+- Lint rule / code-mod: every `supabase.from(<tenant_table>).insert(...)` must include `company_id` (matches Core memory rule)
+- Audit all RLS-bypassing edge functions for: JWT verification, `can_access_company` check, input zod validation (per `mem://security/edge-function-hardening-standards`)
+- Enforce server-side admin checks (per `mem://security/admin-authorization-server-side`)
+- Run `security--run_security_scan` after each phase
+
+---
+
+### Phase 7 — Performance & Bundle
+- Verify route-level lazy loading (already done in `App.tsx`) — extend to heavy dialogs (PDF/QR utilities, mermaid, three.js)
+- Replace `html2canvas` + `jspdf` ad-hoc usage with one shared `shared/lib/pdf/` module
+- Audit `react-query` `staleTime: 0` — keep where required, allow opt-in caching for static lookups (categories, units, companies)
+- Add **virtualization** (`@tanstack/react-virtual`) to long tables (Item Master, Asset Master, Bins) — aligns with `mem://performance/warehouse-inventory-tab-optimization`
+- Bundle analyze with `rollup-plugin-visualizer`
+
+---
+
+### Phase 8 — Design System Consolidation
+- Audit `src/components/ui/` (shadcn primitives) — keep as `shared/ui/primitives/`
+- Promote repeating composite patterns (DataTable, FilterBar, PageHeader, EmptyState, ConfirmDialog) into `shared/ui/patterns/`
+- Tokens-only styling — no hardcoded colors / hex values (per `mem://style/modern-enterprise-design-system`)
+- Add a Storybook (optional but recommended) for the design system
+
+---
+
+### Phase 9 — Testing & Documentation
+- **Vitest + React Testing Library** for unit tests on hooks and pure utils (start with `itemCodeGenerator`, `stockReconciliation`, FIFO logic)
+- **Playwright** smoke tests for critical flows: login, create item (single + bulk), GRN approval, stock transfer
+- Generate API docs from Zod schemas
+- Update `mem://` rules to reflect new structure
+
+---
+
+### Suggested execution order & effort
+
+| Phase | Risk | Value | Order |
+|---|---|---|---|
+| 0 Guardrails | Low | High | 1st |
+| 6 Security audit | Low | Critical | 2nd (parallel with 0) |
+| 2 Dedup | Low | High | 3rd |
+| 4 Data layer | Med | High | 4th |
+| 1 Folder restructure | Med | High | 5th (after 2 & 4) |
+| 3 Decomposition | Med | High | 6th |
+| 5 Types/Zod | Low | Med | 7th |
+| 7 Performance | Low | Med | 8th |
+| 8 Design system | Low | Med | 9th |
+| 9 Testing | Low | High | continuous |
+
+---
+
+### What I will NOT change
+- Database schema, RLS policies, edge function business logic (unless a security finding requires it)
+- Brand identity, design tokens, or current visual UX
+- Behavior of any existing workflow
+
+### Approval model
+Refactoring 800+ files in one go is reckless. I'll execute **one phase per approval**, with a smoke-test summary after each, and you greenlight the next.
+
+**Recommended starting point:** approve Phase 0 + Phase 2 together — guardrails first, then the bulk-import dedup that's already biting you.
+
