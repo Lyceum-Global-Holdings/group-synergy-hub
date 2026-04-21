@@ -112,10 +112,22 @@ export function ItemMasterDefinitionTab({ onNavigateToInventory, onNavigateToBin
     return suppliers.find(s => s.name === supplierFilter)?.id || 'all';
   }, [supplierFilter, suppliers]);
 
-  const selectedCategoryId = useMemo(() => {
-    if (categoryFilter === 'all') return 'all';
-    return categories.find(c => c.name === categoryFilter)?.id || 'all';
-  }, [categoryFilter, categories]);
+  const categoryOptions = useMemo(() => {
+    const level0 = categories.filter(c => !c.parent_id);
+    const result: Array<{ category: typeof categories[number]; depth: 0 | 1 }> = [];
+    level0
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .forEach(parent => {
+        result.push({ category: parent, depth: 0 });
+        categories
+          .filter(c => c.parent_id === parent.id)
+          .sort((a, b) => a.name.localeCompare(b.name))
+          .forEach(child => result.push({ category: child, depth: 1 }));
+      });
+    return result;
+  }, [categories]);
+
+  const selectedCategoryId = categoryFilter;
 
   const filterParams = { search: debouncedSearch, categoryId: selectedCategoryId, status: statusFilter, supplierId: selectedSupplierId };
 
@@ -254,10 +266,17 @@ export function ItemMasterDefinitionTab({ onNavigateToInventory, onNavigateToBin
               />
             </div>
             <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-              <SelectTrigger className="w-[140px]"><SelectValue placeholder="Category" /></SelectTrigger>
+              <SelectTrigger className="w-[160px]"><SelectValue placeholder="Category" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Categories</SelectItem>
-                {categories.map(c => <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>)}
+                {categoryOptions.map(({ category, depth }) => (
+                  <SelectItem key={category.id} value={category.id}>
+                    <span className={depth === 1 ? 'pl-4 text-muted-foreground' : 'font-medium'}>
+                      {depth === 1 ? '└ ' : ''}
+                      {category.code ? `[${category.code}] ${category.name}` : category.name}
+                    </span>
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
             <Select value={statusFilter} onValueChange={setStatusFilter}>
