@@ -80,11 +80,25 @@ export function SingleItemForm({ editingItem, onSuccess, onCancel, mode = 'inven
   const { createAllocation } = useWarehouseBinAllocations();
 
   const warehouseLocations = locations.filter(loc => loc.type === 'location');
-  const topLevelCategories = useMemo(() => categories.filter(c => !c.parent_id), [categories]);
+  const categoryOptions = useMemo(() => {
+    const level0 = categories.filter(c => !c.parent_id);
+    const result: Array<{ category: typeof categories[number]; depth: 0 | 1 }> = [];
+    level0
+      .slice()
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .forEach(parent => {
+        result.push({ category: parent, depth: 0 });
+        categories
+          .filter(c => c.parent_id === parent.id)
+          .sort((a, b) => a.name.localeCompare(b.name))
+          .forEach(child => result.push({ category: child, depth: 1 }));
+      });
+    return result;
+  }, [categories]);
 
-  const selectedCategory = useMemo(() => 
-    topLevelCategories.find(c => c.id === formData.category_id), 
-    [topLevelCategories, formData.category_id]
+  const selectedCategory = useMemo(
+    () => categories.find(c => c.id === formData.category_id),
+    [categories, formData.category_id]
   );
   const { data: nextItemCode, isLoading: isLoadingCode } = useNextWarehouseItemCode(
     selectedCategory?.code || null,
@@ -406,15 +420,18 @@ export function SingleItemForm({ editingItem, onSuccess, onCancel, mode = 'inven
 
       <div className="grid grid-cols-3 gap-4">
         <div className="space-y-2">
-          <Label htmlFor="category_id" title="SAP MM Material Group — only top-level categories are used for item classification">Material Group (Level 1)</Label>
+          <Label htmlFor="category_id">Category</Label>
           <Select value={formData.category_id} onValueChange={(value) => setFormData({ ...formData, category_id: value })}>
             <SelectTrigger>
-              <SelectValue placeholder="Select material group" />
+              <SelectValue placeholder="Select category" />
             </SelectTrigger>
             <SelectContent className="bg-background border z-50">
-              {topLevelCategories.map((category) => (
+              {categoryOptions.map(({ category, depth }) => (
                 <SelectItem key={category.id} value={category.id}>
-                  {category.code ? `[${category.code}] ${category.name}` : category.name}
+                  <span className={depth === 1 ? 'pl-4 text-muted-foreground' : 'font-medium'}>
+                    {depth === 1 ? '└ ' : ''}
+                    {category.code ? `[${category.code}] ${category.name}` : category.name}
+                  </span>
                 </SelectItem>
               ))}
             </SelectContent>
