@@ -102,65 +102,7 @@ export function BulkItemImportDialog() {
       'Sample Company'
     ];
 
-    const csvContent = [
-      headers.join(','),
-      sampleRow.join(',')
-    ].join('\n');
-
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'item_import_template.csv';
-    a.click();
-    window.URL.revokeObjectURL(url);
-  };
-
-  const parseCSV = (text: string): string[][] => {
-    const lines: string[][] = [];
-    let currentRow: string[] = [];
-    let currentField = '';
-    let inQuotes = false;
-
-    for (let i = 0; i < text.length; i++) {
-      const char = text[i];
-      const nextChar = text[i + 1];
-
-      if (char === '"') {
-        if (inQuotes && nextChar === '"') {
-          currentField += '"';
-          i++;
-        } else {
-          inQuotes = !inQuotes;
-        }
-      } else if (char === ',' && !inQuotes) {
-        currentRow.push(currentField.trim());
-        currentField = '';
-      } else if ((char === '\n' || char === '\r') && !inQuotes) {
-        if (char === '\r' && nextChar === '\n') {
-          i++;
-        }
-        if (currentField || currentRow.length > 0) {
-          currentRow.push(currentField.trim());
-          if (currentRow.some(field => field !== '')) {
-            lines.push(currentRow);
-          }
-          currentRow = [];
-          currentField = '';
-        }
-      } else {
-        currentField += char;
-      }
-    }
-
-    if (currentField || currentRow.length > 0) {
-      currentRow.push(currentField.trim());
-      if (currentRow.some(field => field !== '')) {
-        lines.push(currentRow);
-      }
-    }
-
-    return lines;
+    downloadCSV('item_import_template.csv', headers, [sampleRow]);
   };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
