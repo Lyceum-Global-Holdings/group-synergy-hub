@@ -403,45 +403,22 @@ export function BulkItemImportContent({ onSuccess, onCancel }: BulkItemImportCon
       }
 
       // --- Auto-generate item codes for rows that need them (batch-aware) ---
-      // Group blank-code rows by category and allocate sequential INV-{CAT}-{NNN} codes.
+      // Delegates grouping + sequential allocation to the shared bulk-import pipeline.
       const rowsNeedingCodes = newItems.filter(i => i.autoGenerateCode && !i.item_code && i.category_id);
       if (rowsNeedingCodes.length > 0) {
-        const groups = new Map<string, ParsedItem[]>();
-        for (const row of rowsNeedingCodes) {
-          const key = row.category_id as string;
-          if (!groups.has(key)) groups.set(key, []);
-          groups.get(key)!.push(row);
-        }
-
-        try {
-          for (const [categoryId, rows] of groups) {
-            const cat = categories.find(c => c.id === categoryId);
-            const catCode = cat?.code?.trim();
-            if (!catCode) {
-              rows.forEach(r => r.errors.push(`Category "${cat?.name || 'unknown'}" has no 3-letter code`));
-              continue;
-            }
-            const codes = await allocateItemCodes({
-              categoryCode: catCode,
-              count: rows.length,
-              scope: 'catalog',
-            });
-            rows.forEach((row, idx) => {
-              row.item_code = codes[idx];
-            });
-          }
-        } catch (allocErr: any) {
-          console.error('[bulk-import] Code allocation failed:', allocErr);
+        const allocated = await allocateAutoCodes(rowsNeedingCodes as any, categories, { scope: 'catalog' });
+        const failedRows = rowsNeedingCodes.filter(r => !r.item_code);
+        if (!allocated || failedRows.length > 0) {
+          const firstError = failedRows[0]?.errors?.find(e => e.toLowerCase().includes('allocation') || e.toLowerCase().includes('code'));
           toast({
             title: "Code allocation failed",
-            description: allocErr?.message || 'Unable to auto-generate item codes',
+            description: firstError || 'Unable to auto-generate item codes',
             variant: "destructive",
           });
           setIsImporting(false);
           setShowConfirmation(false);
           return;
         }
-
         // Force re-render so preview reflects newly assigned codes
         setParsedData(prev => [...prev]);
       }
