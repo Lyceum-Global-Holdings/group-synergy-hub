@@ -266,10 +266,17 @@ export function ItemMasterDefinitionTab({ onNavigateToInventory, onNavigateToBin
               />
             </div>
             <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-              <SelectTrigger className="w-[140px]"><SelectValue placeholder="Category" /></SelectTrigger>
+              <SelectTrigger className="w-[160px]"><SelectValue placeholder="Category" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Categories</SelectItem>
-                {categories.map(c => <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>)}
+                {categoryOptions.map(({ category, depth }) => (
+                  <SelectItem key={category.id} value={category.id}>
+                    <span className={depth === 1 ? 'pl-4 text-muted-foreground' : 'font-medium'}>
+                      {depth === 1 ? '└ ' : ''}
+                      {category.code ? `[${category.code}] ${category.name}` : category.name}
+                    </span>
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
             <Select value={statusFilter} onValueChange={setStatusFilter}>
