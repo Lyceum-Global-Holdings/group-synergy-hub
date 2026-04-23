@@ -304,6 +304,25 @@ export function BulkToolImportDialog({ open, onOpenChange }: BulkToolImportDialo
             </Button>
           </div>
 
+          {/* Global location auto-fill banner */}
+          {globalLocationName ? (
+            <Alert>
+              <Info className="h-4 w-4" />
+              <AlertDescription>
+                Blank <strong>Location</strong> cells will use the current
+                location: <strong>{globalLocationName}</strong>.
+              </AlertDescription>
+            </Alert>
+          ) : (
+            <Alert>
+              <Info className="h-4 w-4" />
+              <AlertDescription>
+                Pick a global location in the header to auto-fill blank Location
+                cells; otherwise rows without a location will be flagged.
+              </AlertDescription>
+            </Alert>
+          )}
+
           {/* File Upload */}
           <div className="space-y-2">
             <label className="text-sm font-medium">Upload File</label>
