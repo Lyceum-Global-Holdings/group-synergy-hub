@@ -213,6 +213,70 @@ export const useItemCategories = (companyId?: string) => {
     },
   });
 
+  const moveCategoryMutation = useMutation({
+    mutationFn: async ({ id, newParentId }: { id: string; newParentId: string | null }) => {
+      // Client-side guards (DB trigger enforces these too as a safety net).
+      if (newParentId === id) {
+        throw new Error('A category cannot be its own parent.');
+      }
+      if (newParentId) {
+        // Cycle check
+        const descendants = new Set<string>();
+        const stack = [id];
+        while (stack.length) {
+          const cur = stack.pop()!;
+          allCategories
+            .filter((c) => c.parent_id === cur)
+            .forEach((c) => {
+              if (!descendants.has(c.id)) {
+                descendants.add(c.id);
+                stack.push(c.id);
+              }
+            });
+        }
+        if (descendants.has(newParentId)) {
+          throw new Error('Move would create a cycle in the category tree.');
+        }
+        // Depth check: a parent (has children) cannot be moved under another category
+        const sourceHasChildren = allCategories.some((c) => c.parent_id === id);
+        if (sourceHasChildren) {
+          throw new Error('This category has subcategories. Move it to Top Level instead.');
+        }
+        // The intended parent must itself be Level 0 (no parent)
+        const target = allCategories.find((c) => c.id === newParentId);
+        if (target?.parent_id) {
+          throw new Error('Destination must be a Level 0 category.');
+        }
+        // Global source can only sit under a global parent
+        const source = allCategories.find((c) => c.id === id);
+        if (source && !source.company_id && target && target.company_id) {
+          throw new Error('A global category can only be moved under another global category.');
+        }
+      }
+
+      const { error } = await supabase
+        .from('item_categories')
+        .update({ parent_id: newParentId })
+        .eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['item-categories', companyId] });
+      toast({
+        title: 'Category moved',
+        description: 'Hierarchy updated successfully.',
+      });
+    },
+    onError: (error: any) => {
+      console.error('Error moving category:', error);
+      toast({
+        title: 'Move failed',
+        description: error?.message ?? 'Could not move category.',
+        variant: 'destructive',
+      });
+    },
+  });
+
   const excludeCategoryMutation = useMutation({
     mutationFn: async (categoryId: string) => {
       if (!companyId) throw new Error('No company selected');
@@ -341,5 +405,7 @@ export const useItemCategories = (companyId?: string) => {
     isRestoring: restoreCategoryMutation.isPending,
     bulkUpdateVisibility: bulkUpdateVisibilityMutation.mutateAsync,
     isBulkUpdating: bulkUpdateVisibilityMutation.isPending,
+    moveCategory: moveCategoryMutation.mutate,
+    isMoving: moveCategoryMutation.isPending,
   };
 };

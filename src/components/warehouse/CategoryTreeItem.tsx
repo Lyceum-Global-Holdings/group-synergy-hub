@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { ChevronRight, ChevronDown, Edit, Trash2, Tag, EyeOff, Eye, Globe } from 'lucide-react';
+import { ChevronRight, ChevronDown, Edit, Trash2, Tag, EyeOff, Eye, Globe, FolderInput } from 'lucide-react';
 import {
   Collapsible,
   CollapsibleContent,
@@ -33,6 +33,7 @@ interface CategoryTreeItemProps {
   onEdit: (category: ItemCategory) => void;
   onDelete: (categoryId: string) => void;
   onRestore?: (categoryId: string) => void;
+  onMove?: (category: ItemCategory) => void;
   isDeleting?: boolean;
   canDelete?: boolean;
   isGlobal?: boolean;
@@ -46,6 +47,7 @@ export function CategoryTreeItem({
   onEdit, 
   onDelete,
   onRestore,
+  onMove,
   isDeleting = false,
   canDelete = true,
   isGlobal = false,
@@ -127,6 +129,26 @@ export function CategoryTreeItem({
             >
               <Edit className="h-4 w-4" />
             </Button>
+          )}
+
+          {!isHidden && onMove && (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => onMove(category)}
+                    className="h-8 w-8 p-0 hover:bg-primary/10 hover:text-primary"
+                  >
+                    <FolderInput className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Move to another group</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           )}
           
           {isHidden && onRestore ? (
@@ -229,6 +251,7 @@ export function CategoryTreeItem({
                   onEdit={onEdit}
                   onDelete={onDelete}
                   onRestore={onRestore}
+                  onMove={onMove}
                   isDeleting={isDeleting}
                   canDelete={canDelete}
                   isGlobal={!child.company_id}
