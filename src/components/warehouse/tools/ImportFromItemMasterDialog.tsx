@@ -73,6 +73,7 @@ export function ImportFromItemMasterDialog({
   onOpenChange,
 }: ImportFromItemMasterDialogProps) {
   const { selectedCompany, companies } = useCompany();
+  const { globalLocationId } = useLocationFilter();
   const { allCategories } = useItemCategories(selectedCompany?.id);
   const { tools, createBulkTools, isCreatingBulk } = useWarehouseTools();
   const { data: accessibleCompanyIds = [] } = useAccessibleCompanyIds();
@@ -82,6 +83,13 @@ export function ImportFromItemMasterDialog({
   const [categoryScope, setCategoryScope] = useState<CategoryScope>("tools");
   const [companyScope, setCompanyScope] = useState<CompanyScope>("current");
   const [locationId, setLocationId] = useState<string>("any");
+
+  // SAP EWM "default storage location": prefill the destination filter with
+  // the global header location so promoted tools land in the active site.
+  useEffect(() => {
+    if (!open) return;
+    if (globalLocationId) setLocationId(globalLocationId);
+  }, [open, globalLocationId]);
 
   const categoryOptions = useMemo(
     () => buildToolCategoryOptions(allCategories),
