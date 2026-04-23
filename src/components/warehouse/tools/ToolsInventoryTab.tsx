@@ -165,12 +165,14 @@ export function ToolsInventoryTab({ tools, isLoading, onAdjustQuantity, onEditTo
 
   const columns = createColumns(onAdjustQuantity, onEditTool);
 
-  // Extract unique categories and locations from the data
-  const categories = useMemo(() => {
-    const uniqueCategories = [...new Set(tools.map(t => t.category?.name).filter(Boolean))] as string[];
-    return uniqueCategories.sort();
-  }, [tools]);
+  const { selectedCompany } = useCompany();
+  const { allCategories } = useItemCategories(selectedCompany?.id);
+  const categoryOptions = useMemo(
+    () => buildToolCategoryOptions(allCategories),
+    [allCategories],
+  );
 
+  // Locations are still derived from in-memory tool data (no master list needed here)
   const locations = useMemo(() => {
     const uniqueLocations = [...new Set(tools.map(t => t.location?.name).filter(Boolean))] as string[];
     return uniqueLocations.sort();
@@ -187,9 +189,9 @@ export function ToolsInventoryTab({ tools, isLoading, onAdjustQuantity, onEditTo
         tool.category?.name?.toLowerCase().includes(query) ||
         tool.location?.name?.toLowerCase().includes(query);
 
-      // Category filter
-      const matchesCategory = categoryFilter === "all" || 
-        tool.category?.name === categoryFilter;
+      // Category filter (id-based)
+      const matchesCategory = categoryFilter === "all" ||
+        tool.category_id === categoryFilter;
 
       // Location filter
       const matchesLocation = locationFilter === "all" || 
