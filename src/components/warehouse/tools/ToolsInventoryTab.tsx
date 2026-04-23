@@ -19,6 +19,9 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { WarehouseTool } from "@/types/toolManagement";
 import { MoreHorizontal, Pencil, Search, SlidersHorizontal, X } from "lucide-react";
+import { useItemCategories } from "@/hooks/useItemCategories";
+import { useCompany } from "@/contexts/CompanyContext";
+import { buildToolCategoryOptions } from "@/features/tools/lib/toolCategories";
 
 interface ToolsInventoryTabProps {
   tools: WarehouseTool[];
