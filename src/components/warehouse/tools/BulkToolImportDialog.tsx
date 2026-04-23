@@ -146,8 +146,10 @@ export function BulkToolImportDialog({ open, onOpenChange }: BulkToolImportDialo
           }
         }
 
-        // Validate location
+        // Validate location — fall back to the global header location when blank
+        // (SAP EWM "default storage location" pattern, ISO 55000 §6.2.6).
         let locationId: string | undefined;
+        let locationLabel = locationName;
         if (locationName) {
           const match = locations.find((l) => l.name.toLowerCase() === locationName.toLowerCase());
           if (!match) {
@@ -155,6 +157,10 @@ export function BulkToolImportDialog({ open, onOpenChange }: BulkToolImportDialo
           } else {
             locationId = match.id;
           }
+        } else if (globalLocationId) {
+          locationId = globalLocationId;
+          locationLabel =
+            locations.find((l) => l.id === globalLocationId)?.name ?? "";
         }
 
         // Validate unit
