@@ -28,12 +28,15 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertCircle, Loader2, PackagePlus, Search } from "lucide-react";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { AlertCircle, Info, Loader2, PackagePlus, Search } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useItemCategories } from "@/hooks/useItemCategories";
 import { useWarehouseTools } from "@/hooks/useWarehouseTools";
+import { useAccessibleCompanyIds } from "@/hooks/construction/useAccessibleCompanyIds";
+import { useEffectiveLocationsForCompanies } from "@/hooks/useWarehouseLocations";
 import {
   buildToolCategoryOptions,
   getToolCategoryIds,
@@ -54,19 +57,30 @@ interface CandidateItem {
   unit_id: string | null;
   current_stock: number | null;
   unit_cost: number | null;
+  company_id: string | null;
+  location_id: string | null;
   category_name: string | null;
   category_code: string | null;
   unit_abbreviation: string | null;
 }
 
+type CategoryScope = "tools" | "all";
+type CompanyScope = "current" | "all";
+
 export function ImportFromItemMasterDialog({
   open,
   onOpenChange,
 }: ImportFromItemMasterDialogProps) {
-  const { selectedCompany } = useCompany();
+  const { selectedCompany, companies } = useCompany();
   const { allCategories } = useItemCategories(selectedCompany?.id);
   const { tools, createBulkTools, isCreatingBulk } = useWarehouseTools();
+  const { data: accessibleCompanyIds = [] } = useAccessibleCompanyIds();
   const queryClient = useQueryClient();
+
+  // Two-axis scope (SAP MM "promotion" defaults to current plant + tool categories).
+  const [categoryScope, setCategoryScope] = useState<CategoryScope>("tools");
+  const [companyScope, setCompanyScope] = useState<CompanyScope>("current");
+  const [locationId, setLocationId] = useState<string>("any");
 
   const categoryOptions = useMemo(
     () => buildToolCategoryOptions(allCategories),
@@ -77,78 +91,143 @@ export function ImportFromItemMasterDialog({
     [allCategories],
   );
 
+  const effectiveCompanyIds = useMemo(() => {
+    if (companyScope === "current") {
+      return selectedCompany?.id ? [selectedCompany.id] : [];
+    }
+    return accessibleCompanyIds;
+  }, [companyScope, selectedCompany?.id, accessibleCompanyIds]);
+
+  // Locations for the selected company-scope (union across companies for "all").
+  const { data: locationOptions = [] } = useEffectiveLocationsForCompanies(
+    effectiveCompanyIds,
+  );
+
+  const companyNameById = useMemo(() => {
+    const m = new Map<string, string>();
+    (companies ?? []).forEach((c) => c?.id && m.set(c.id, c.name));
+    return m;
+  }, [companies]);
+
+  const categoryNameById = useMemo(() => {
+    const m = new Map<string, { name: string; code: string | null }>();
+    (allCategories ?? []).forEach((c) =>
+      m.set(c.id, { name: c.name, code: c.code ?? null }),
+    );
+    return m;
+  }, [allCategories]);
+
   const [searchTerm, setSearchTerm] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [quantities, setQuantities] = useState<Record<string, number>>({});
 
-  const existingToolCodes = useMemo(
+  const existingToolKeys = useMemo(
     () =>
       new Set(
         tools
-          .filter((t) => !selectedCompany?.id || t.company_id === selectedCompany.id)
-          .map((t) => t.tool_code?.toLowerCase())
+          .map((t) =>
+            t.tool_code && t.company_id
+              ? `${t.company_id}::${t.tool_code.toLowerCase()}`
+              : null,
+          )
           .filter(Boolean) as string[],
       ),
-    [tools, selectedCompany?.id],
+    [tools],
   );
 
   const { data: items = [], isLoading, error } = useQuery({
     queryKey: [
       "warehouse-items-tool-candidates",
-      selectedCompany?.id,
+      companyScope,
+      categoryScope,
+      locationId,
+      effectiveCompanyIds.slice().sort().join(","),
       toolCategoryIds.join(","),
     ],
-    enabled: open && !!selectedCompany?.id && toolCategoryIds.length > 0,
+    enabled:
+      open &&
+      effectiveCompanyIds.length > 0 &&
+      (categoryScope === "all" || toolCategoryIds.length > 0),
     queryFn: async () => {
-      // NOTE: warehouse_items canonical name column is `name` (per SAP MM Material Master).
-      // The Tools subtree includes root + L1 children via getToolCategoryIds; L2 codes
-      // (e.g. TOO-HND-HAM) are children of L1 and therefore swept in via category_id IN (...).
-      const { data, error } = await supabase
-        .from("warehouse_items")
-        .select(
-          `
-          id,
-          item_code,
-          name,
-          description,
-          category_id,
-          unit_id,
-          current_stock,
-          unit_cost,
-          category:item_categories!category_id(name, code),
-          unit:item_units!unit_id(abbreviation)
-        `,
-        )
-        .eq("company_id", selectedCompany!.id)
-        .in("category_id", toolCategoryIds)
-        .order("name", { ascending: true })
-        .limit(2000);
+      // warehouse_items canonical column is `name` (SAP MM Material Master).
+      // Batched fetch in 1000-row pages to bypass PostgREST default limit
+      // (per project memory: warehouse-data-batching-limit).
+      const PAGE_SIZE = 1000;
+      const all: any[] = [];
+      let from = 0;
 
-      if (error) throw error;
+      // eslint-disable-next-line no-constant-condition
+      while (true) {
+        let query = supabase
+          .from("warehouse_items")
+          .select(
+            `
+            id,
+            item_code,
+            name,
+            description,
+            category_id,
+            unit_id,
+            current_stock,
+            unit_cost,
+            company_id,
+            location_id,
+            category:item_categories!category_id(name, code),
+            unit:item_units!unit_id(abbreviation)
+          `,
+          )
+          .in("company_id", effectiveCompanyIds)
+          .order("name", { ascending: true })
+          .range(from, from + PAGE_SIZE - 1);
 
-      return (data || []).map((row: any) => ({
-        id: row.id,
-        item_code: row.item_code,
-        name: row.name,
-        description: row.description,
-        category_id: row.category_id,
-        unit_id: row.unit_id,
-        current_stock: row.current_stock,
-        unit_cost: row.unit_cost,
-        category_name: row.category?.name ?? null,
-        category_code: row.category?.code ?? null,
-        unit_abbreviation: row.unit?.abbreviation ?? null,
-      })) as CandidateItem[];
+        if (categoryScope === "tools") {
+          query = query.in("category_id", toolCategoryIds);
+        }
+        if (locationId !== "any") {
+          query = query.eq("location_id", locationId);
+        }
+
+        const { data, error } = await query;
+        if (error) throw error;
+
+        const page = data ?? [];
+        all.push(...page);
+        if (page.length < PAGE_SIZE) break;
+        from += PAGE_SIZE;
+      }
+
+      return all.map((row: any) => {
+        const cat = categoryNameById.get(row.category_id);
+        return {
+          id: row.id,
+          item_code: row.item_code,
+          name: row.name,
+          description: row.description,
+          category_id: row.category_id,
+          unit_id: row.unit_id,
+          current_stock: row.current_stock,
+          unit_cost: row.unit_cost,
+          company_id: row.company_id,
+          location_id: row.location_id,
+          category_name: row.category?.name ?? cat?.name ?? null,
+          category_code: row.category?.code ?? cat?.code ?? null,
+          unit_abbreviation: row.unit?.abbreviation ?? null,
+        } as CandidateItem;
+      });
     },
   });
 
   const filteredItems = useMemo(() => {
     const q = searchTerm.trim().toLowerCase();
     return items.filter((item) => {
-      if (item.item_code && existingToolCodes.has(item.item_code.toLowerCase())) {
-        return false;
-      }
+      // Tenant-scoped duplicate check: same code in same company => already promoted.
+      const dupKey =
+        item.item_code && item.company_id
+          ? `${item.company_id}::${item.item_code.toLowerCase()}`
+          : null;
+      if (dupKey && existingToolKeys.has(dupKey)) return false;
+
       if (categoryFilter !== "all" && item.category_id !== categoryFilter) {
         return false;
       }
@@ -157,10 +236,11 @@ export function ImportFromItemMasterDialog({
         item.item_code?.toLowerCase().includes(q) ||
         item.name?.toLowerCase().includes(q) ||
         item.description?.toLowerCase().includes(q) ||
-        item.category_name?.toLowerCase().includes(q)
+        item.category_name?.toLowerCase().includes(q) ||
+        companyNameById.get(item.company_id ?? "")?.toLowerCase().includes(q)
       );
     });
-  }, [items, searchTerm, categoryFilter, existingToolCodes]);
+  }, [items, searchTerm, categoryFilter, existingToolKeys, companyNameById]);
 
   const allVisibleSelected =
     filteredItems.length > 0 && filteredItems.every((it) => selectedIds.has(it.id));
@@ -217,16 +297,19 @@ export function ImportFromItemMasterDialog({
     const selected = filteredItems.filter((it) => selectedIds.has(it.id));
     if (selected.length === 0) return;
 
+    // ISO 27001 A.9.4 / multi-tenant integrity: tools must land in the SOURCE
+    // item's company, not the header-selected company, when scope is widened.
     const payload: CreateWarehouseToolData[] = selected.map((item) => ({
       tool_code: item.item_code,
       name: item.name,
       description: item.description ?? undefined,
       category_id: item.category_id ?? undefined,
       unit_id: item.unit_id ?? undefined,
+      location_id: item.location_id ?? undefined,
       total_quantity: getQty(item),
       condition: "good",
       unit_cost: item.unit_cost ?? undefined,
-      company_id: selectedCompany?.id,
+      company_id: item.company_id ?? selectedCompany?.id,
     }));
 
     createBulkTools(payload, {
@@ -240,27 +323,130 @@ export function ImportFromItemMasterDialog({
   const selectedCount = filteredItems.filter((it) => selectedIds.has(it.id)).length;
   const hasActiveFilters = searchTerm.trim().length > 0 || categoryFilter !== "all";
 
+  // Categories visible in the inline category picker depend on scope.
+  const inlineCategoryOptions = useMemo(() => {
+    if (categoryScope === "tools") return categoryOptions;
+    // For "all" scope, list every category that actually appears in the result set.
+    const seen = new Set<string>();
+    items.forEach((it) => {
+      if (it.category_id) seen.add(it.category_id);
+    });
+    return Array.from(seen)
+      .map((id) => categoryNameById.get(id) && { id, ...categoryNameById.get(id)! })
+      .filter(Boolean)
+      .sort((a: any, b: any) => a.name.localeCompare(b.name))
+      .map((c: any) => ({
+        category: { id: c.id, name: c.name, code: c.code } as any,
+        depth: 0 as 0,
+      }));
+  }, [categoryScope, categoryOptions, items, categoryNameById]);
+
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-5xl max-h-[90vh] flex flex-col">
+      <DialogContent className="max-w-6xl max-h-[90vh] flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <PackagePlus className="h-5 w-5" />
             Import from Item Master
           </DialogTitle>
           <DialogDescription>
-            Promote existing Item Master items categorized as <strong>Hand Tools</strong> or{" "}
-            <strong>Power Tools</strong> (or their sub-categories) into Tool Master. Items
-            already promoted are hidden.
+            Promote existing Item Master items into Tool Master. Defaults to the
+            current company's tool categories; widen the scope below to see the
+            full catalog or items from other companies you can access.
           </DialogDescription>
         </DialogHeader>
 
         <div className="flex flex-col gap-3 flex-1 overflow-hidden">
+          {/* Scope controls */}
+          <div className="flex flex-wrap items-end gap-3 rounded-md border bg-muted/30 p-3">
+            <div className="flex flex-col gap-1">
+              <span className="text-xs font-medium text-muted-foreground">
+                Category scope
+              </span>
+              <Tabs
+                value={categoryScope}
+                onValueChange={(v) => setCategoryScope(v as CategoryScope)}
+              >
+                <TabsList>
+                  <TabsTrigger value="tools">Tool categories</TabsTrigger>
+                  <TabsTrigger value="all">All categories</TabsTrigger>
+                </TabsList>
+              </Tabs>
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <span className="text-xs font-medium text-muted-foreground">
+                Company scope
+              </span>
+              <Tabs
+                value={companyScope}
+                onValueChange={(v) => setCompanyScope(v as CompanyScope)}
+              >
+                <TabsList>
+                  <TabsTrigger value="current" disabled={!selectedCompany?.id}>
+                    Current company
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="all"
+                    disabled={accessibleCompanyIds.length === 0}
+                  >
+                    All my companies
+                    {accessibleCompanyIds.length > 0 && (
+                      <Badge variant="secondary" className="ml-2">
+                        {accessibleCompanyIds.length}
+                      </Badge>
+                    )}
+                  </TabsTrigger>
+                </TabsList>
+              </Tabs>
+            </div>
+
+            <div className="flex flex-col gap-1 min-w-[220px]">
+              <span className="text-xs font-medium text-muted-foreground">
+                Location / Sub-location
+              </span>
+              <Select value={locationId} onValueChange={setLocationId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Any location" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="any">Any location</SelectItem>
+                  {locationOptions.map((loc: any) => (
+                    <SelectItem key={loc.id} value={loc.id}>
+                      {loc.parent_id ? `↳ ${loc.name}` : loc.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {/* Safety-rail banners */}
+          {categoryScope === "all" && (
+            <Alert>
+              <Info className="h-4 w-4" />
+              <AlertDescription>
+                Showing items beyond Tool categories — verify each before promoting
+                to Tool Master.
+              </AlertDescription>
+            </Alert>
+          )}
+          {companyScope === "all" && (
+            <Alert>
+              <Info className="h-4 w-4" />
+              <AlertDescription>
+                Cross-company view active — tools will be created in each item's
+                source company, not the company in the header.
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {/* Search & inline category filter */}
           <div className="flex flex-wrap items-center gap-2">
             <div className="relative flex-1 min-w-[220px] max-w-md">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Search by code, name, description..."
+                placeholder="Search by code, name, description, company..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-9"
@@ -268,12 +454,14 @@ export function ImportFromItemMasterDialog({
             </div>
 
             <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-              <SelectTrigger className="w-[240px]">
+              <SelectTrigger className="w-[260px]">
                 <SelectValue placeholder="Category" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Tools Categories</SelectItem>
-                {categoryOptions.map(({ category, depth }) => (
+                <SelectItem value="all">
+                  {categoryScope === "tools" ? "All tool categories" : "All categories"}
+                </SelectItem>
+                {inlineCategoryOptions.map(({ category, depth }: any) => (
                   <SelectItem key={category.id} value={category.id}>
                     <span className={depth === 1 ? "pl-4 text-muted-foreground" : "font-medium"}>
                       {depth === 1 ? "└ " : ""}
@@ -302,40 +490,49 @@ export function ImportFromItemMasterDialog({
             </Alert>
           )}
 
-          {!selectedCompany?.id && (
-            <div className="flex-1 flex items-center justify-center text-sm text-muted-foreground">
-              Select a company to view candidate items.
+          {effectiveCompanyIds.length === 0 && (
+            <div className="flex-1 flex items-center justify-center text-sm text-muted-foreground text-center px-6">
+              {companyScope === "current"
+                ? "Select a company in the header, or switch the company scope to All my companies."
+                : "You don't have access to any companies yet."}
             </div>
           )}
 
-          {selectedCompany?.id && isLoading && (
+          {effectiveCompanyIds.length > 0 && isLoading && (
             <div className="flex-1 flex items-center justify-center">
               <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
               <span className="ml-2 text-sm text-muted-foreground">Loading items…</span>
             </div>
           )}
 
-          {selectedCompany?.id && !isLoading && !error && toolCategoryIds.length === 0 && (
-            <div className="flex-1 flex items-center justify-center text-sm text-muted-foreground text-center px-6">
-              Hand Tools / Power Tools categories are not set up. Ask an administrator
-              to add categories under codes <code className="font-mono">TOO-HND</code> or{" "}
-              <code className="font-mono">TOO-PWR</code>.
-            </div>
-          )}
-
-          {selectedCompany?.id &&
+          {effectiveCompanyIds.length > 0 &&
             !isLoading &&
             !error &&
-            toolCategoryIds.length > 0 &&
-            items.length === 0 && (
+            categoryScope === "tools" &&
+            toolCategoryIds.length === 0 && (
               <div className="flex-1 flex items-center justify-center text-sm text-muted-foreground text-center px-6">
-                No Item Master items in <strong>{selectedCompany.name}</strong> are
-                categorized under Hand Tools or Power Tools. Switch company in the
-                header, or add items under those categories first.
+                Hand Tools / Power Tools categories are not set up. Switch to{" "}
+                <strong className="mx-1">All categories</strong> above, or ask an
+                administrator to add categories under codes{" "}
+                <code className="font-mono">TOO-HND</code> /{" "}
+                <code className="font-mono">TOO-PWR</code>.
               </div>
             )}
 
-          {selectedCompany?.id &&
+          {effectiveCompanyIds.length > 0 &&
+            !isLoading &&
+            !error &&
+            !(categoryScope === "tools" && toolCategoryIds.length === 0) &&
+            items.length === 0 && (
+              <div className="flex-1 flex flex-col items-center justify-center gap-2 text-sm text-muted-foreground text-center px-6">
+                <span>No items match this scope.</span>
+                <span className="text-xs">
+                  Try widening category, company, or clearing the location filter.
+                </span>
+              </div>
+            )}
+
+          {effectiveCompanyIds.length > 0 &&
             !isLoading &&
             !error &&
             items.length > 0 &&
@@ -350,7 +547,7 @@ export function ImportFromItemMasterDialog({
               </div>
             )}
 
-          {selectedCompany?.id && !isLoading && filteredItems.length > 0 && (
+          {effectiveCompanyIds.length > 0 && !isLoading && filteredItems.length > 0 && (
             <ScrollArea className="flex-1 border rounded-md">
               <Table>
                 <TableHeader className="sticky top-0 bg-background z-10">
@@ -365,6 +562,7 @@ export function ImportFromItemMasterDialog({
                     <TableHead>Item Code</TableHead>
                     <TableHead>Name</TableHead>
                     <TableHead>Category</TableHead>
+                    <TableHead>Company (target)</TableHead>
                     <TableHead>Unit</TableHead>
                     <TableHead className="text-right">Current Stock</TableHead>
                     <TableHead className="w-32 text-right">Initial Qty</TableHead>
@@ -373,6 +571,9 @@ export function ImportFromItemMasterDialog({
                 <TableBody>
                   {filteredItems.map((item) => {
                     const isSelected = selectedIds.has(item.id);
+                    const companyName =
+                      (item.company_id && companyNameById.get(item.company_id)) ||
+                      "—";
                     return (
                       <TableRow key={item.id} data-state={isSelected ? "selected" : undefined}>
                         <TableCell>
@@ -400,6 +601,11 @@ export function ImportFromItemMasterDialog({
                           ) : (
                             <span className="text-muted-foreground">—</span>
                           )}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="secondary" className="font-normal">
+                            {companyName}
+                          </Badge>
                         </TableCell>
                         <TableCell>{item.unit_abbreviation ?? "—"}</TableCell>
                         <TableCell className="text-right">
