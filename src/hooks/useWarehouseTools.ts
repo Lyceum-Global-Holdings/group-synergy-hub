@@ -45,7 +45,7 @@ export function useWarehouseTools() {
   // Realtime: invalidate when any tool bin allocation changes
   useEffect(() => {
     const channel = supabase
-      .channel("warehouse-tools-bin-sync")
+      .channel(`warehouse-tools-bin-sync-${Math.random().toString(36).slice(2)}`)
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "tool_bin_allocations" },
