@@ -1,6 +1,4 @@
-import { useState, useMemo } from "react";
-import { ColumnDef } from "@tanstack/react-table";
-import { DataTable } from "@/components/ui/data-table";
+import { useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,13 +15,39 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { WarehouseTool } from "@/types/toolManagement";
-import { MoreHorizontal, Pencil, Search, SlidersHorizontal, Trash2, X } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronRight,
+  MapPin,
+  MoreHorizontal,
+  Pencil,
+  Search,
+  SlidersHorizontal,
+  Trash2,
+  X,
+} from "lucide-react";
 import { useItemCategories } from "@/hooks/useItemCategories";
 import { useCompany } from "@/contexts/CompanyContext";
 import { buildToolCategoryOptions } from "@/features/tools/lib/toolCategories";
 import { useIsAdminOrHigher } from "@/hooks/useIsAdminOrHigher";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { useLocationFilter } from "@/contexts/LocationFilterContext";
+import { useWarehouseLocations } from "@/hooks/useWarehouseLocations";
+import { ToolBinAllocationsPanel } from "./ToolBinAllocationsPanel";
 
 interface ToolsInventoryTabProps {
   tools: WarehouseTool[];
@@ -33,244 +57,103 @@ interface ToolsInventoryTabProps {
   onDeleteTool?: (tool: WarehouseTool) => void;
 }
 
-const createColumns = (
-  onAdjustQuantity?: (tool: WarehouseTool) => void,
-  onEditTool?: (tool: WarehouseTool) => void,
-  onDeleteTool?: (tool: WarehouseTool) => void,
-  canDelete: boolean = false,
-): ColumnDef<WarehouseTool>[] => [
-  {
-    accessorKey: "tool_code",
-    header: "Code",
-    cell: ({ row }) => (
-      <span className="font-mono text-sm">{row.getValue("tool_code")}</span>
-    ),
-  },
-  {
-    accessorKey: "name",
-    header: "Name",
-    cell: ({ row }) => (
-      <div>
-        <div className="font-medium">{row.getValue("name")}</div>
-        {row.original.description && (
-          <div className="text-sm text-muted-foreground truncate max-w-[200px]">
-            {row.original.description}
-          </div>
-        )}
-      </div>
-    ),
-  },
-  {
-    accessorKey: "category",
-    header: "Category",
-    cell: ({ row }) => row.original.category?.name || "-",
-  },
-  {
-    accessorKey: "location",
-    header: "Location",
-    cell: ({ row }) => row.original.location?.name || "-",
-  },
-  {
-    accessorKey: "unit",
-    header: "Unit",
-    cell: ({ row }) => row.original.unit?.abbreviation || "-",
-  },
-  {
-    accessorKey: "total_quantity",
-    header: "Total",
-    cell: ({ row }) => row.getValue("total_quantity"),
-  },
-  {
-    accessorKey: "available_quantity",
-    header: "Available",
-    cell: ({ row }) => {
-      const available = row.getValue("available_quantity") as number;
-      const total = row.original.total_quantity;
-      const percentage = total > 0 ? (available / total) * 100 : 0;
-      
-      return (
-        <Badge variant={percentage > 50 ? "default" : percentage > 0 ? "secondary" : "destructive"}>
-          {available}
-        </Badge>
-      );
-    },
-  },
-  {
-    accessorKey: "issued_quantity",
-    header: "Issued",
-    cell: ({ row }) => {
-      const issued = row.getValue("issued_quantity") as number;
-      return issued > 0 ? (
-        <Badge variant="outline">{issued}</Badge>
-      ) : (
-        <span className="text-muted-foreground">0</span>
-      );
-    },
-  },
-  {
-    accessorKey: "condition",
-    header: "Condition",
-    cell: ({ row }) => {
-      const condition = row.getValue("condition") as string;
-      const variants: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
-        good: "default",
-        fair: "secondary",
-        poor: "destructive",
-        needs_repair: "outline",
-      };
-      return (
-        <Badge variant={variants[condition] || "secondary"}>
-          {condition.replace("_", " ")}
-        </Badge>
-      );
-    },
-  },
-  {
-    accessorKey: "unit_cost",
-    header: "Unit Cost",
-    cell: ({ row }) => {
-      const cost = row.getValue("unit_cost") as number | null;
-      return cost ? `$${cost.toFixed(2)}` : "-";
-    },
-  },
-  {
-    id: "actions",
-    header: "",
-    cell: ({ row }) => {
-      const tool = row.original;
-      const hasIssued = (tool.issued_quantity ?? 0) > 0;
-      const showDelete = canDelete && !!onDeleteTool;
-      return (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="h-8 w-8">
-              <MoreHorizontal className="h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => onEditTool?.(tool)}>
-              <Pencil className="h-4 w-4 mr-2" />
-              Edit Tool
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => onAdjustQuantity?.(tool)}>
-              <SlidersHorizontal className="h-4 w-4 mr-2" />
-              Adjust Quantity
-            </DropdownMenuItem>
-            {showDelete && (
-              hasIssued ? (
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <div>
-                        <DropdownMenuItem
-                          disabled
-                          className="text-destructive focus:text-destructive"
-                          onSelect={(e) => e.preventDefault()}
-                        >
-                          <Trash2 className="h-4 w-4 mr-2" />
-                          Delete Tool
-                        </DropdownMenuItem>
-                      </div>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      Return all issued units before deleting.
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              ) : (
-                <DropdownMenuItem
-                  className="text-destructive focus:text-destructive"
-                  onClick={() => onDeleteTool?.(tool)}
-                >
-                  <Trash2 className="h-4 w-4 mr-2" />
-                  Delete Tool
-                </DropdownMenuItem>
-              )
-            )}
-          </DropdownMenuContent>
-        </DropdownMenu>
-      );
-    },
-  },
-];
-
-export function ToolsInventoryTab({ tools, isLoading, onAdjustQuantity, onEditTool, onDeleteTool }: ToolsInventoryTabProps) {
+export function ToolsInventoryTab({
+  tools,
+  isLoading,
+  onAdjustQuantity,
+  onEditTool,
+  onDeleteTool,
+}: ToolsInventoryTabProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
-  const [locationFilter, setLocationFilter] = useState<string>("all");
   const [conditionFilter, setConditionFilter] = useState<string>("all");
   const [availabilityFilter, setAvailabilityFilter] = useState<string>("all");
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const { canDelete } = useIsAdminOrHigher();
-  const columns = useMemo(
-    () => createColumns(onAdjustQuantity, onEditTool, onDeleteTool, canDelete),
-    [onAdjustQuantity, onEditTool, onDeleteTool, canDelete],
-  );
-
   const { selectedCompany } = useCompany();
   const { allCategories } = useItemCategories(selectedCompany?.id);
-  const categoryOptions = useMemo(
-    () => buildToolCategoryOptions(allCategories),
-    [allCategories],
+  const { globalLocationId, setGlobalLocationId } = useLocationFilter();
+  const { locations } = useWarehouseLocations();
+
+  const currentLocation = useMemo(
+    () => locations.find((l) => l.id === globalLocationId) || null,
+    [locations, globalLocationId]
   );
 
-  // Locations are still derived from in-memory tool data (no master list needed here)
-  const locations = useMemo(() => {
-    const uniqueLocations = [...new Set(tools.map(t => t.location?.name).filter(Boolean))] as string[];
-    return uniqueLocations.sort();
-  }, [tools]);
+  const categoryOptions = useMemo(
+    () => buildToolCategoryOptions(allCategories),
+    [allCategories]
+  );
 
   const filteredTools = useMemo(() => {
     return tools.filter((tool) => {
-      // Text search
       const query = searchQuery.toLowerCase();
-      const matchesSearch = !searchQuery.trim() ||
+      const matchesSearch =
+        !searchQuery.trim() ||
         tool.tool_code?.toLowerCase().includes(query) ||
         tool.name?.toLowerCase().includes(query) ||
         tool.description?.toLowerCase().includes(query) ||
         tool.category?.name?.toLowerCase().includes(query) ||
         tool.location?.name?.toLowerCase().includes(query);
 
-      // Category filter (id-based)
-      const matchesCategory = categoryFilter === "all" ||
-        tool.category_id === categoryFilter;
+      const matchesCategory =
+        categoryFilter === "all" || tool.category_id === categoryFilter;
 
-      // Location filter
-      const matchesLocation = locationFilter === "all" || 
-        tool.location?.name === locationFilter;
+      const matchesCondition =
+        conditionFilter === "all" || tool.condition === conditionFilter;
 
-      // Condition filter
-      const matchesCondition = conditionFilter === "all" || 
-        tool.condition === conditionFilter;
-
-      // Availability filter
-      const matchesAvailability = availabilityFilter === "all" ||
+      const matchesAvailability =
+        availabilityFilter === "all" ||
         (availabilityFilter === "in_stock" && tool.available_quantity > 0) ||
         (availabilityFilter === "out_of_stock" && tool.available_quantity === 0) ||
-        (availabilityFilter === "partially_available" && 
-          tool.available_quantity > 0 && tool.available_quantity < tool.total_quantity);
+        (availabilityFilter === "partially_available" &&
+          tool.available_quantity > 0 &&
+          tool.available_quantity < tool.total_quantity);
 
-      return matchesSearch && matchesCategory && matchesLocation && 
-             matchesCondition && matchesAvailability;
+      return (
+        matchesSearch && matchesCategory && matchesCondition && matchesAvailability
+      );
     });
-  }, [tools, searchQuery, categoryFilter, locationFilter, conditionFilter, availabilityFilter]);
+  }, [tools, searchQuery, categoryFilter, conditionFilter, availabilityFilter]);
 
   const clearAllFilters = () => {
     setSearchQuery("");
     setCategoryFilter("all");
-    setLocationFilter("all");
     setConditionFilter("all");
     setAvailabilityFilter("all");
   };
 
-  const isFiltered = searchQuery.trim() !== "" || 
-    categoryFilter !== "all" || 
-    locationFilter !== "all" || 
-    conditionFilter !== "all" || 
+  const isFiltered =
+    searchQuery.trim() !== "" ||
+    categoryFilter !== "all" ||
+    conditionFilter !== "all" ||
     availabilityFilter !== "all";
 
   return (
     <div className="space-y-4">
+      {/* Location scope banner */}
+      {globalLocationId ? (
+        <div className="flex items-center justify-between rounded-md border bg-card p-3">
+          <div className="flex items-center gap-2 text-sm">
+            <MapPin className="h-4 w-4 text-primary" />
+            <span className="text-muted-foreground">Showing tools at:</span>
+            <span className="font-medium">{currentLocation?.name ?? "Selected location"}</span>
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setGlobalLocationId(null)}
+          >
+            Show all locations
+          </Button>
+        </div>
+      ) : (
+        <div className="rounded-md border border-primary/30 bg-primary/5 p-3 text-sm text-muted-foreground">
+          Showing tools across all locations. Use the location selector in the header to focus on one site.
+        </div>
+      )}
+
       <div className="flex flex-wrap items-center gap-2">
         <div className="relative flex-1 min-w-[200px] max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -296,18 +179,6 @@ export function ToolsInventoryTab({ tools, isLoading, onAdjustQuantity, onEditTo
                   {category.name}
                 </span>
               </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-
-        <Select value={locationFilter} onValueChange={setLocationFilter}>
-          <SelectTrigger className="w-[160px]">
-            <SelectValue placeholder="Location" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Locations</SelectItem>
-            {locations.map(loc => (
-              <SelectItem key={loc} value={loc}>{loc}</SelectItem>
             ))}
           </SelectContent>
         </Select>
@@ -360,19 +231,175 @@ export function ToolsInventoryTab({ tools, isLoading, onAdjustQuantity, onEditTo
         </div>
         <div className="rounded-lg border bg-card p-4">
           <div className="text-sm text-muted-foreground">Available</div>
-          <div className="text-2xl font-bold text-green-600">
+          <div className="text-2xl font-bold">
             {filteredTools.reduce((sum, t) => sum + t.available_quantity, 0)}
           </div>
         </div>
         <div className="rounded-lg border bg-card p-4">
           <div className="text-sm text-muted-foreground">Currently Issued</div>
-          <div className="text-2xl font-bold text-orange-600">
+          <div className="text-2xl font-bold">
             {filteredTools.reduce((sum, t) => sum + t.issued_quantity, 0)}
           </div>
         </div>
       </div>
 
-      <DataTable columns={columns} data={filteredTools} isLoading={isLoading} />
+      <div className="rounded-md border bg-card">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="w-[40px]" />
+              <TableHead>Code</TableHead>
+              <TableHead>Name</TableHead>
+              <TableHead>Category</TableHead>
+              <TableHead>Location</TableHead>
+              <TableHead className="text-right">Total</TableHead>
+              <TableHead className="text-right">Available</TableHead>
+              <TableHead className="text-right">Issued</TableHead>
+              <TableHead>Condition</TableHead>
+              <TableHead className="w-[60px]" />
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {isLoading ? (
+              <TableRow>
+                <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
+                  Loading tools…
+                </TableCell>
+              </TableRow>
+            ) : filteredTools.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
+                  {globalLocationId
+                    ? `No tools at ${currentLocation?.name ?? "this location"}. Create one or transfer from another site.`
+                    : "No tools found."}
+                </TableCell>
+              </TableRow>
+            ) : (
+              filteredTools.map((tool) => {
+                const expanded = expandedId === tool.id;
+                const hasIssued = (tool.issued_quantity ?? 0) > 0;
+                const showDelete = canDelete && !!onDeleteTool;
+                return (
+                  <>
+                    <TableRow key={tool.id}>
+                      <TableCell>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7"
+                          onClick={() => setExpandedId(expanded ? null : tool.id)}
+                          aria-label={expanded ? "Collapse" : "Expand bin allocations"}
+                        >
+                          {expanded ? (
+                            <ChevronDown className="h-4 w-4" />
+                          ) : (
+                            <ChevronRight className="h-4 w-4" />
+                          )}
+                        </Button>
+                      </TableCell>
+                      <TableCell className="font-mono text-sm">{tool.tool_code}</TableCell>
+                      <TableCell>
+                        <div className="font-medium">{tool.name}</div>
+                        {tool.description && (
+                          <div className="text-xs text-muted-foreground truncate max-w-[240px]">
+                            {tool.description}
+                          </div>
+                        )}
+                      </TableCell>
+                      <TableCell>{tool.category?.name || "-"}</TableCell>
+                      <TableCell>
+                        {tool.location?.name || (
+                          <Badge variant="outline" className="text-xs">
+                            Unassigned
+                          </Badge>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right">{tool.total_quantity}</TableCell>
+                      <TableCell className="text-right">
+                        <Badge
+                          variant={
+                            tool.available_quantity > 0 ? "default" : "destructive"
+                          }
+                        >
+                          {tool.available_quantity}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {tool.issued_quantity > 0 ? (
+                          <Badge variant="outline">{tool.issued_quantity}</Badge>
+                        ) : (
+                          <span className="text-muted-foreground">0</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="secondary">
+                          {(tool.condition || "").replace("_", " ")}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-8 w-8">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => onEditTool?.(tool)}>
+                              <Pencil className="h-4 w-4 mr-2" />
+                              Edit Tool
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => onAdjustQuantity?.(tool)}>
+                              <SlidersHorizontal className="h-4 w-4 mr-2" />
+                              Adjust Quantity
+                            </DropdownMenuItem>
+                            {showDelete &&
+                              (hasIssued ? (
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <div>
+                                        <DropdownMenuItem
+                                          disabled
+                                          className="text-destructive focus:text-destructive"
+                                          onSelect={(e) => e.preventDefault()}
+                                        >
+                                          <Trash2 className="h-4 w-4 mr-2" />
+                                          Delete Tool
+                                        </DropdownMenuItem>
+                                      </div>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      Return all issued units before deleting.
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                              ) : (
+                                <DropdownMenuItem
+                                  className="text-destructive focus:text-destructive"
+                                  onClick={() => onDeleteTool?.(tool)}
+                                >
+                                  <Trash2 className="h-4 w-4 mr-2" />
+                                  Delete Tool
+                                </DropdownMenuItem>
+                              ))}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    </TableRow>
+                    {expanded && (
+                      <TableRow key={tool.id + "-exp"}>
+                        <TableCell colSpan={10} className="bg-muted/20 p-4">
+                          <ToolBinAllocationsPanel tool={tool} />
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </>
+                );
+              })
+            )}
+          </TableBody>
+        </Table>
+      </div>
     </div>
   );
 }
