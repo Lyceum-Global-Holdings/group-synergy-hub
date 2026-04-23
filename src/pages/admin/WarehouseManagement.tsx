@@ -267,6 +267,7 @@ export default function WarehouseManagement() {
       contact_person: location.contact_person || '',
       contact_phone: location.contact_phone || '',
       physical_address: location.physical_address || '',
+      is_standalone_warehouse: !!location.is_standalone_warehouse,
       company_ids: [] as string[], // Will be populated by useEffect
     });
   };
