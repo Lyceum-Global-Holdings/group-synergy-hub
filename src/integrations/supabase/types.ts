@@ -19528,6 +19528,15 @@ export type Database = {
           company_id: string
         }[]
       }
+      get_effective_locations_for_company: {
+        Args: { p_company_id: string }
+        Returns: {
+          id: string
+          name: string
+          parent_id: string
+          type: string
+        }[]
+      }
       get_location_company_assignments_admin: {
         Args: { p_location_id: string }
         Returns: {
