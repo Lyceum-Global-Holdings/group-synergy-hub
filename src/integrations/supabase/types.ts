@@ -17197,9 +17197,74 @@ export type Database = {
           },
         ]
       }
+      tool_bin_allocations: {
+        Row: {
+          allocated_quantity: number
+          available_quantity: number | null
+          bin_id: string
+          company_id: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          notes: string | null
+          reserved_quantity: number
+          tool_id: string
+          updated_at: string
+        }
+        Insert: {
+          allocated_quantity?: number
+          available_quantity?: number | null
+          bin_id: string
+          company_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          reserved_quantity?: number
+          tool_id: string
+          updated_at?: string
+        }
+        Update: {
+          allocated_quantity?: number
+          available_quantity?: number | null
+          bin_id?: string
+          company_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          reserved_quantity?: number
+          tool_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tool_bin_allocations_bin_id_fkey"
+            columns: ["bin_id"]
+            isOneToOne: false
+            referencedRelation: "warehouse_bins"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tool_bin_allocations_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tool_bin_allocations_tool_id_fkey"
+            columns: ["tool_id"]
+            isOneToOne: false
+            referencedRelation: "warehouse_tools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tool_issues: {
         Row: {
           approved_by: string | null
+          bin_id: string | null
           company_id: string | null
           created_at: string | null
           created_by: string | null
@@ -17223,6 +17288,7 @@ export type Database = {
         }
         Insert: {
           approved_by?: string | null
+          bin_id?: string | null
           company_id?: string | null
           created_at?: string | null
           created_by?: string | null
@@ -17246,6 +17312,7 @@ export type Database = {
         }
         Update: {
           approved_by?: string | null
+          bin_id?: string | null
           company_id?: string | null
           created_at?: string | null
           created_by?: string | null
@@ -17268,6 +17335,13 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "tool_issues_bin_id_fkey"
+            columns: ["bin_id"]
+            isOneToOne: false
+            referencedRelation: "warehouse_bins"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "tool_issues_company_id_fkey"
             columns: ["company_id"]
@@ -19349,6 +19423,10 @@ export type Database = {
           asset_id: string
         }[]
       }
+      create_tool_with_initial_bin: {
+        Args: { p_bin_id: string; p_quantity: number; p_tool_data: Json }
+        Returns: string
+      }
       create_user_with_roles: {
         Args: {
           _department?: string
@@ -19703,6 +19781,22 @@ export type Database = {
       }
       is_same_company: { Args: { _target_user_id: string }; Returns: boolean }
       is_super_admin: { Args: { _user_id: string }; Returns: boolean }
+      issue_tool_from_bin: {
+        Args: {
+          p_bin_id: string
+          p_company_id?: string
+          p_department?: string
+          p_expected_return_date?: string
+          p_expected_return_time?: string
+          p_issue_date: string
+          p_issued_to_name: string
+          p_notes?: string
+          p_purpose?: string
+          p_quantity: number
+          p_tool_id: string
+        }
+        Returns: string
+      }
       journal_entry_has_sensitive_accounts: {
         Args: { je_id: string }
         Returns: boolean
@@ -19783,6 +19877,20 @@ export type Database = {
       remove_item_from_inventory: {
         Args: { p_item_id: string }
         Returns: undefined
+      }
+      return_tool_to_bin: {
+        Args: {
+          p_bin_id: string
+          p_company_id?: string
+          p_condition: string
+          p_condition_notes?: string
+          p_issue_id: string
+          p_notes?: string
+          p_quantity: number
+          p_return_date: string
+          p_returned_by_name?: string
+        }
+        Returns: string
       }
       run_fx_revaluation: {
         Args: {

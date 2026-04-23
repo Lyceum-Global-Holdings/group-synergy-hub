@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -18,10 +18,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useToolReturns } from "@/hooks/useToolReturns";
 import { ToolIssue } from "@/types/toolManagement";
 import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
+import { useToast } from "@/hooks/use-toast";
+import { useQueryClient, useQuery } from "@tanstack/react-query";
+import { useCompany } from "@/contexts/CompanyContext";
+import { supabase } from "@/integrations/supabase/client";
+import { useToolReturns } from "@/hooks/useToolReturns";
 
 interface ReturnToolDialogProps {
   open: boolean;
@@ -30,9 +34,14 @@ interface ReturnToolDialogProps {
 }
 
 export function ReturnToolDialog({ open, onOpenChange, activeIssues }: ReturnToolDialogProps) {
-  const { createReturn, isCreating } = useToolReturns();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const { selectedCompany } = useCompany();
+  const { createReturn, isCreating: isLegacyCreating } = useToolReturns();
+  const [submitting, setSubmitting] = useState(false);
   const [formData, setFormData] = useState({
     issue_id: "",
+    bin_id: "",
     return_date: format(new Date(), "yyyy-MM-dd"),
     quantity_returned: 1,
     condition: "good",
@@ -42,40 +51,120 @@ export function ReturnToolDialog({ open, onOpenChange, activeIssues }: ReturnToo
   });
 
   const selectedIssue = activeIssues.find((i) => i.id === formData.issue_id);
-  const maxReturnQty = selectedIssue 
-    ? selectedIssue.quantity_issued - selectedIssue.quantity_returned 
+  const maxReturnQty = selectedIssue
+    ? selectedIssue.quantity_issued - selectedIssue.quantity_returned
     : 1;
+  const toolId = selectedIssue?.tool_id ?? null;
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    createReturn({
-      ...formData,
-      condition_notes: formData.condition_notes || undefined,
-      returned_by_name: formData.returned_by_name || undefined,
-    }, {
-      onSuccess: () => {
-        onOpenChange(false);
-        setFormData({
-          issue_id: "",
-          return_date: format(new Date(), "yyyy-MM-dd"),
-          quantity_returned: 1,
-          condition: "good",
-          condition_notes: "",
-          returned_by_name: "",
-          notes: "",
-        });
-      },
+  // Fetch bins available at the tool's location
+  const binsQuery = useQuery({
+    queryKey: ["bins-for-tool", toolId],
+    enabled: open && !!toolId,
+    queryFn: async () => {
+      const { data: tool } = await supabase
+        .from("warehouse_tools")
+        .select("location_id")
+        .eq("id", toolId!)
+        .maybeSingle();
+      if (!tool?.location_id) return [];
+      const { data, error } = await supabase
+        .from("warehouse_bins")
+        .select("id, bin_code, name, location_id, status")
+        .eq("location_id", tool.location_id)
+        .eq("status", "active")
+        .order("bin_code");
+      if (error) throw error;
+      return data || [];
+    },
+  });
+
+  const bins = binsQuery.data || [];
+  const bpresent = bins.length > 0;
+
+  // Default bin to issue's source bin when present
+  useEffect(() => {
+    if (selectedIssue?.bin_id && bins.find((b) => b.id === selectedIssue.bin_id)) {
+      setFormData((f) => ({ ...f, bin_id: selectedIssue.bin_id! }));
+    }
+  }, [selectedIssue?.bin_id, bins]);
+
+  const reset = () =>
+    setFormData({
+      issue_id: "",
+      bin_id: "",
+      return_date: format(new Date(), "yyyy-MM-dd"),
+      quantity_returned: 1,
+      condition: "good",
+      condition_notes: "",
+      returned_by_name: "",
+      notes: "",
     });
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedIssue) return;
+    setSubmitting(true);
+    try {
+      if (formData.bin_id && bpresent) {
+        const { error } = await supabase.rpc("return_tool_to_bin", {
+          p_issue_id: formData.issue_id,
+          p_bin_id: formData.bin_id,
+          p_quantity: formData.quantity_returned,
+          p_condition: formData.condition,
+          p_return_date: formData.return_date,
+          p_returned_by_name: formData.returned_by_name || null,
+          p_condition_notes: formData.condition_notes || null,
+          p_notes: formData.notes || null,
+          p_company_id: selectedCompany?.id ?? null,
+        });
+        if (error) throw error;
+        queryClient.invalidateQueries({ queryKey: ["tool-returns"] });
+        queryClient.invalidateQueries({ queryKey: ["tool-issues"] });
+        queryClient.invalidateQueries({ queryKey: ["tool-issues-active"] });
+        queryClient.invalidateQueries({ queryKey: ["warehouse-tools"] });
+        queryClient.invalidateQueries({ queryKey: ["tool-bin-allocations"] });
+        toast({ title: "Success", description: "Return processed" });
+        reset();
+        onOpenChange(false);
+      } else {
+        // Legacy fallback (no bins configured for this tool)
+        createReturn(
+          {
+            issue_id: formData.issue_id,
+            return_date: formData.return_date,
+            quantity_returned: formData.quantity_returned,
+            condition: formData.condition,
+            condition_notes: formData.condition_notes || undefined,
+            returned_by_name: formData.returned_by_name || undefined,
+            notes: formData.notes || undefined,
+          },
+          {
+            onSuccess: () => {
+              reset();
+              onOpenChange(false);
+            },
+          }
+        );
+      }
+    } catch (err: any) {
+      toast({
+        title: "Error",
+        description: err.message || "Failed to process return",
+        variant: "destructive",
+      });
+    } finally {
+      setSubmitting(false);
+    }
   };
+
+  const isBusy = submitting || isLegacyCreating;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>Return Tool</DialogTitle>
-          <DialogDescription>
-            Process a tool return against an active issue.
-          </DialogDescription>
+          <DialogDescription>Process a tool return against an active issue.</DialogDescription>
         </DialogHeader>
 
         {activeIssues.length === 0 ? (
@@ -85,13 +174,20 @@ export function ReturnToolDialog({ open, onOpenChange, activeIssues }: ReturnToo
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="issue_id">Select Issue *</Label>
+              <Label>Select Issue *</Label>
               <Select
                 value={formData.issue_id}
                 onValueChange={(value) => {
                   const issue = activeIssues.find((i) => i.id === value);
-                  const outstanding = issue ? issue.quantity_issued - issue.quantity_returned : 1;
-                  setFormData({ ...formData, issue_id: value, quantity_returned: outstanding });
+                  const outstanding = issue
+                    ? issue.quantity_issued - issue.quantity_returned
+                    : 1;
+                  setFormData({
+                    ...formData,
+                    issue_id: value,
+                    quantity_returned: outstanding,
+                    bin_id: issue?.bin_id ?? "",
+                  });
                 }}
               >
                 <SelectTrigger>
@@ -101,7 +197,7 @@ export function ReturnToolDialog({ open, onOpenChange, activeIssues }: ReturnToo
                   {activeIssues.map((issue) => (
                     <SelectItem key={issue.id} value={issue.id}>
                       <div className="flex items-center gap-2">
-                        <span>{issue.tool?.name || "Unknown Tool"}</span>
+                        <span>{issue.tool?.name || issue.tool_name_snapshot || "Unknown"}</span>
                         <span className="text-muted-foreground">→</span>
                         <span>{issue.issued_to_name}</span>
                         <Badge variant="secondary" className="text-xs">
@@ -112,19 +208,35 @@ export function ReturnToolDialog({ open, onOpenChange, activeIssues }: ReturnToo
                   ))}
                 </SelectContent>
               </Select>
-              {selectedIssue && (
-                <div className="text-sm text-muted-foreground space-y-1">
-                  <p>Issue #: {selectedIssue.issue_number}</p>
-                  <p>Issued: {selectedIssue.quantity_issued} | Returned: {selectedIssue.quantity_returned}</p>
-                </div>
-              )}
             </div>
+
+            {selectedIssue && bpresent && (
+              <div className="space-y-2">
+                <Label>Return to bin *</Label>
+                <Select
+                  value={formData.bin_id}
+                  onValueChange={(v) => setFormData({ ...formData, bin_id: v })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Pick a bin" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {bins.map((b) => (
+                      <SelectItem key={b.id} value={b.id}>
+                        <span className="font-mono text-xs mr-2">{b.bin_code}</span>
+                        {b.name}
+                        {selectedIssue.bin_id === b.id ? " (source)" : ""}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="return_date">Return Date *</Label>
+                <Label>Return Date *</Label>
                 <Input
-                  id="return_date"
                   type="date"
                   value={formData.return_date}
                   onChange={(e) => setFormData({ ...formData, return_date: e.target.value })}
@@ -132,34 +244,38 @@ export function ReturnToolDialog({ open, onOpenChange, activeIssues }: ReturnToo
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="quantity_returned">Quantity *</Label>
+                <Label>Quantity * (max {maxReturnQty})</Label>
                 <Input
-                  id="quantity_returned"
                   type="number"
-                  min="1"
+                  min={1}
                   max={maxReturnQty}
                   value={formData.quantity_returned}
-                  onChange={(e) => setFormData({ ...formData, quantity_returned: parseInt(e.target.value) || 1 })}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      quantity_returned: parseInt(e.target.value) || 1,
+                    })
+                  }
                   required
                 />
               </div>
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="returned_by_name">Returned By</Label>
+              <Label>Returned By</Label>
               <Input
-                id="returned_by_name"
                 value={formData.returned_by_name}
-                onChange={(e) => setFormData({ ...formData, returned_by_name: e.target.value })}
-                placeholder="Person returning the tool"
+                onChange={(e) =>
+                  setFormData({ ...formData, returned_by_name: e.target.value })
+                }
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="condition">Condition *</Label>
+              <Label>Condition *</Label>
               <Select
                 value={formData.condition}
-                onValueChange={(value) => setFormData({ ...formData, condition: value })}
+                onValueChange={(v) => setFormData({ ...formData, condition: v })}
               >
                 <SelectTrigger>
                   <SelectValue />
@@ -173,28 +289,28 @@ export function ReturnToolDialog({ open, onOpenChange, activeIssues }: ReturnToo
               </Select>
             </div>
 
-            {(formData.condition === "damaged" || formData.condition === "needs_repair" || formData.condition === "lost") && (
+            {(formData.condition === "damaged" ||
+              formData.condition === "needs_repair" ||
+              formData.condition === "lost") && (
               <div className="space-y-2">
-                <Label htmlFor="condition_notes">Condition Notes *</Label>
+                <Label>Condition Notes *</Label>
                 <Textarea
-                  id="condition_notes"
-                  value={formData.condition_notes}
-                  onChange={(e) => setFormData({ ...formData, condition_notes: e.target.value })}
-                  placeholder="Describe the damage or issue..."
                   rows={2}
+                  value={formData.condition_notes}
+                  onChange={(e) =>
+                    setFormData({ ...formData, condition_notes: e.target.value })
+                  }
                   required
                 />
               </div>
             )}
 
             <div className="space-y-2">
-              <Label htmlFor="notes">Additional Notes</Label>
+              <Label>Additional Notes</Label>
               <Textarea
-                id="notes"
+                rows={2}
                 value={formData.notes}
                 onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                placeholder="Any other notes..."
-                rows={2}
               />
             </div>
 
@@ -202,11 +318,16 @@ export function ReturnToolDialog({ open, onOpenChange, activeIssues }: ReturnToo
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
                 Cancel
               </Button>
-              <Button 
-                type="submit" 
-                disabled={isCreating || !formData.issue_id}
+              <Button
+                type="submit"
+                disabled={
+                  isBusy ||
+                  !formData.issue_id ||
+                  (bpresent && !formData.bin_id) ||
+                  formData.quantity_returned <= 0
+                }
               >
-                {isCreating ? "Processing..." : "Process Return"}
+                {isBusy ? "Processing..." : "Process Return"}
               </Button>
             </DialogFooter>
           </form>
