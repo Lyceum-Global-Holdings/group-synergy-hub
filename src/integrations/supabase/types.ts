@@ -18521,6 +18521,7 @@ export type Database = {
       warehouse_locations: {
         Row: {
           capacity: number | null
+          company_assignment_mode: string
           company_id: string | null
           contact_person: string | null
           contact_phone: string | null
@@ -18540,6 +18541,7 @@ export type Database = {
         }
         Insert: {
           capacity?: number | null
+          company_assignment_mode?: string
           company_id?: string | null
           contact_person?: string | null
           contact_phone?: string | null
@@ -18559,6 +18561,7 @@ export type Database = {
         }
         Update: {
           capacity?: number | null
+          company_assignment_mode?: string
           company_id?: string | null
           contact_person?: string | null
           contact_phone?: string | null
@@ -19403,6 +19406,15 @@ export type Database = {
           name: string
         }[]
       }
+      get_all_effective_location_companies: {
+        Args: never
+        Returns: {
+          company_id: string
+          is_inherited: boolean
+          location_id: string
+          source_location_id: string
+        }[]
+      }
       get_all_warehouse_location_companies: {
         Args: never
         Returns: {
@@ -19510,6 +19522,22 @@ export type Database = {
         }[]
       }
       get_current_tenant_id: { Args: never; Returns: string }
+      get_effective_location_company_ids: {
+        Args: { p_location_id: string }
+        Returns: {
+          company_id: string
+        }[]
+      }
+      get_location_company_assignments_admin: {
+        Args: { p_location_id: string }
+        Returns: {
+          assignment_mode: string
+          direct_company_ids: string[]
+          effective_company_ids: string[]
+          inheritance_source_id: string
+          inheritance_source_name: string
+        }[]
+      }
       get_pending_sap_sync_items: {
         Args: { _company_id: string; _limit?: number; _table_name: string }
         Returns: Json[]
@@ -19692,6 +19720,14 @@ export type Database = {
           revalued_balance: number
           unrealized_gain_loss: number
         }[]
+      }
+      set_location_company_assignments_admin: {
+        Args: {
+          p_assignment_mode: string
+          p_company_ids: string[]
+          p_location_id: string
+        }
+        Returns: undefined
       }
       stock_audit_summary: {
         Args: { p_company_id?: string }
