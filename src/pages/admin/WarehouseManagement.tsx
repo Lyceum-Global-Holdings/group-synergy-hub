@@ -30,6 +30,7 @@ import {
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Switch } from '@/components/ui/switch';
 import { useWarehouseLocations } from '@/hooks/useWarehouseLocations';
 import { LocationManagementDialog } from '@/components/warehouse/LocationManagementDialog';
 import { LocationAnalytics } from '@/components/warehouse/LocationAnalytics';
