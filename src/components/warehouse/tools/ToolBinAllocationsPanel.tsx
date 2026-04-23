@@ -68,7 +68,7 @@ export function ToolBinAllocationsPanel({ tool }: Props) {
       </div>
 
       {!tool.location_id && (
-        <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-700 dark:text-amber-400">
+        <div className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
           Tool has no location assigned. Edit the tool to set one before allocating bins.
         </div>
       )}
