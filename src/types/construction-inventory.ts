@@ -254,12 +254,14 @@ export const REPAIR_STATUSES: { value: RepairStatus; label: string }[] = [
   { value: 'discarded', label: 'Discarded' },
 ];
 
-// Helper to abbreviate item name for code generation
+// Helper to abbreviate item name for code generation.
+// Returns the first 3 alphanumeric characters of the cleaned item name (uppercase).
+// Aligned with GS1 GTIN-13 / ISO/IEC 15459 (13-char max item code budget).
 export function abbreviateItemName(name: string): string {
   if (!name) return "";
   // Remove common words
   const cleaned = name.replace(/\b(the|and|of|for|with|a|an)\b/gi, "").trim();
-  // Take first 5 chars of cleaned uppercase, remove spaces
-  const abbr = cleaned.replace(/[^a-zA-Z0-9]/g, "").toUpperCase().slice(0, 5);
-  return abbr || name.slice(0, 5).toUpperCase();
+  // Take first 3 alphanumeric chars, uppercase — keeps composite code within 13 chars
+  const abbr = cleaned.replace(/[^a-zA-Z0-9]/g, "").toUpperCase().slice(0, 3);
+  return abbr || name.replace(/[^a-zA-Z0-9]/g, "").toUpperCase().slice(0, 3);
 }
