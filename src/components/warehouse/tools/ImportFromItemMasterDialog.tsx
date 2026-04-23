@@ -314,7 +314,9 @@ export function ImportFromItemMasterDialog({
       description: item.description ?? undefined,
       category_id: item.category_id ?? undefined,
       unit_id: item.unit_id ?? undefined,
-      location_id: item.location_id ?? undefined,
+      // Auto-assign destination location from global filter when set; falls
+      // back to the source item's location_id otherwise.
+      location_id: globalLocationId ?? item.location_id ?? undefined,
       total_quantity: getQty(item),
       condition: "good",
       unit_cost: item.unit_cost ?? undefined,
