@@ -295,7 +295,7 @@ export function CreateToolDialog({ open, onOpenChange }: CreateToolDialogProps) 
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button type="submit" disabled={isCreating}>
+            <Button type="submit" disabled={isCreating || locationMissing}>
               {isCreating ? "Creating..." : "Create Tool"}
             </Button>
           </DialogFooter>
