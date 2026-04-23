@@ -23,6 +23,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useDashboardLocations } from "@/hooks/useWarehouseLocations";
 import { useDashboardLocationData } from "@/hooks/useDashboardLocationData";
 import { useLocationFilter } from "@/contexts/LocationFilterContext";
+import { useCompany } from "@/contexts/CompanyContext";
 
 const kpiData = [
   {
