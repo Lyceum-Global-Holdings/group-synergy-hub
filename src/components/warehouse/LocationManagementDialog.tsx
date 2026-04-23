@@ -13,6 +13,7 @@ import { useCompanies } from '@/hooks/useCompanies';
 import { useLocationCompanies } from '@/hooks/useLocationCompanies';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Switch } from '@/components/ui/switch';
 import { ChevronsUpDown } from 'lucide-react';
 type LocationType = 'location' | 'sublocation' | 'department';
 
