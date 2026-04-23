@@ -73,22 +73,42 @@ export default function WarehouseManagement() {
   const { companies } = useCompanies();
   const { companyIds: editLocationCompanyIds, saveCompanies } = useLocationCompanies(editLocationData?.id);
 
-  // Fetch all location-company mappings in bulk for the table
+  // Admin master-data view: fetch FULL location-company mappings via security-definer RPC,
+  // bypassing per-company RLS so admins see every allocation chip (ISO/IEC 27001 A.9.4.1 —
+  // separation of administrative metadata access from transactional data access).
   const { data: allLocationCompanyMap = {} } = useQuery({
-    queryKey: ['all-location-companies'],
+    queryKey: ['all-location-companies-admin'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('warehouse_location_companies')
-        .select('location_id, company_id');
+      const { data, error } = await supabase.rpc('get_all_warehouse_location_companies');
       if (error) throw error;
       const map: Record<string, string[]> = {};
-      for (const row of data || []) {
+      for (const row of (data || []) as Array<{ location_id: string; company_id: string }>) {
         if (!map[row.location_id]) map[row.location_id] = [];
         map[row.location_id].push(row.company_id);
       }
       return map;
     },
   });
+
+  // Admin-scoped minimal company directory (id, name, code) for chip labelling.
+  // Falls back to useCompanies() — kept RLS-scoped for transactional surfaces.
+  const { data: allCompaniesMinimal = [] } = useQuery({
+    queryKey: ['all-companies-minimal-admin'],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('get_all_companies_minimal');
+      if (error) throw error;
+      return (data || []) as Array<{ id: string; name: string; code: string | null }>;
+    },
+  });
+
+  const companyLookup = useMemo(() => {
+    const m = new Map<string, { name: string; code: string | null }>();
+    for (const c of allCompaniesMinimal) m.set(c.id, { name: c.name, code: c.code });
+    for (const c of companies) {
+      if (!m.has(c.id)) m.set(c.id, { name: c.name, code: (c as any).code ?? null });
+    }
+    return m;
+  }, [allCompaniesMinimal, companies]);
 
   // Calculate statistics
   const stats = {
@@ -513,15 +533,51 @@ export default function WarehouseManagement() {
                       </TableCell>
                       <TableCell>
                         <div className="flex flex-wrap gap-1">
-                          {(allLocationCompanyMap[location.id] || (location.company_id ? [location.company_id] : [])).map((cid: string) => {
-                            const comp = companies.find(c => c.id === cid);
-                            return comp ? (
-                              <Badge key={cid} variant="outline" className="text-xs">
-                                {comp.code || comp.name}
-                              </Badge>
-                            ) : null;
-                          })}
-                          {!(allLocationCompanyMap[location.id]?.length || location.company_id) && '-'}
+                          {(() => {
+                            const direct = allLocationCompanyMap[location.id]
+                              || (location.company_id ? [location.company_id] : []);
+                            if (direct.length > 0) {
+                              return direct.map((cid: string) => {
+                                const comp = companyLookup.get(cid);
+                                const label = comp?.code || comp?.name || `#${cid.slice(0, 8)}`;
+                                return (
+                                  <Badge
+                                    key={cid}
+                                    variant="outline"
+                                    className="text-xs"
+                                    title={comp?.name || `Unknown company (${cid})`}
+                                  >
+                                    {label}
+                                  </Badge>
+                                );
+                              });
+                            }
+                            // Parent-inheritance hint (SAP MM storage-bin → storage-location pattern):
+                            // sub-locations / departments with no direct allocation surface their parent's set.
+                            const parentId = (location as any).parent_id;
+                            const parent = parentId ? locations.find(l => l.id === parentId) : null;
+                            const inherited = parent
+                              ? (allLocationCompanyMap[parent.id]
+                                  || ((parent as any).company_id ? [(parent as any).company_id] : []))
+                              : [];
+                            if (inherited.length > 0 && parent) {
+                              return inherited.map((cid: string) => {
+                                const comp = companyLookup.get(cid);
+                                const label = comp?.code || comp?.name || `#${cid.slice(0, 8)}`;
+                                return (
+                                  <Badge
+                                    key={cid}
+                                    variant="secondary"
+                                    className="text-xs opacity-70"
+                                    title={`Inherited from parent location: ${parent.name}`}
+                                  >
+                                    {label} <span className="ml-1 text-[10px] italic">via {parent.name}</span>
+                                  </Badge>
+                                );
+                              });
+                            }
+                            return <span className="text-muted-foreground">-</span>;
+                          })()}
                         </div>
                       </TableCell>
                       <TableCell>{getTypeBadge(location.type)}</TableCell>
