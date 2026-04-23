@@ -1,163 +1,95 @@
 
-## Fix selected-company location dropdowns so they always show the effective location hierarchy
 
-### Exact issue
+## Standalone sub-location warehouses with independent multi-company inventory
 
-This is not a missing-data problem.
+### Outcome
 
-Verified facts:
-- The database already has effective locations for the affected companies:
-  - `NWS` has effective locations
-  - `LIS` has effective locations
-  - `LGH` has effective locations
-- The current user is `super_admin`, so company access should not block the picker.
-- The current implementation still has two competing sources of truth:
-  1. `get_effective_location_company_ids(location_id)` — already works
-  2. `get_effective_locations_for_company(...)` / `...for_companies(...)` — re-implements hierarchy resolution separately
+- Any node in the location hierarchy (`location`, `sublocation`, `department`) can act as a **standalone stocking warehouse**, independent of its parent.
+- The same physical sub-location can hold inventory for **multiple different companies** simultaneously, with each company seeing only its own stock.
+- Company assignment to a sub-location is **independent of its parent** when needed, while still supporting `inherit_parent` for convenience.
+- All location pickers, inventory queries, and stock movements use one canonical resolver and respect company scoping.
 
-That duplication is the main risk. When the “list RPC” drifts from the proven “effective company IDs” resolver, dropdowns can return zero rows even though the data is valid.
+Aligned with:
+- **SAP EWM** — every storage node can independently be a stock-bearing location for multiple plants
+- **GS1 GLN (ISO/IEC 6523)** — each physical location has a stable identity decoupled from hierarchy
+- **ISO 8000** — single authoritative master-data resolution
+- **ISO/IEC 27001 A.9** — company-scoped access enforced server-side
 
-A second issue is UX masking:
-- `LocationSelector` disables the select when `locations.length === 0`
-- there is no visible loading/error state
-- if the RPC path fails or returns empty, the UI looks like “no locations exist”
-
-### Best-practice solution
-
-Adopt one real canonical server-side read model:
+### Root model (already mostly in place — needs formalization)
 
 ```text
-warehouse_locations
-  -> get_effective_location_company_ids(location_id)   (single company-membership truth)
-  -> get_effective_locations_for_company(company_id)   (list builder using that truth)
-  -> get_effective_locations_for_companies(company_ids) (union builder using that truth)
-  -> shared React hooks
-  -> all company-scoped dropdowns
+warehouse_locations (id, type, parent_id, company_assignment_mode)
+   └── warehouse_location_companies (location_id, company_id)   ← multi-company membership
+warehouse_items (location_id, company_id, ...)                  ← per-company inventory at a location
 ```
 
-This follows:
-- ISO 8000: one authoritative master-data derivation path
-- SAP EWM/WM: hierarchy-aware location visibility from one resolver
-- ISO/IEC 27001 A.9: company access enforced server-side without relaxing raw table RLS
+The data model already supports the scenario. What is missing:
 
-## Changes to implement
+1. A first-class **`is_standalone_warehouse`** flag on `warehouse_locations` so a sub-location can be marked as its own stocking warehouse independent of its parent's role.
+2. An **independent company assignment mode** for standalone sub-locations (force `explicit`, never inherit).
+3. A **canonical inventory-visibility resolver** so item lists, stock counts, and movements at a standalone sub-location are cleanly company-scoped.
+4. A **sub-location-aware location picker** that lets users choose any stock-bearing node — not just top-level locations.
 
-### 1) Rewrite the canonical list RPCs to reuse the proven effective-company resolver
+### Changes
 
-Replace the current recursive logic inside:
-- `public.get_effective_locations_for_company(uuid)`
-- `public.get_effective_locations_for_companies(uuid[])`
+#### 1) Database
 
-with a simpler canonical filter based on:
+**Migration:**
 
-```sql
-exists (
-  select 1
-  from public.get_effective_location_company_ids(wl.id) ec
-  where ec.company_id = p_company_id
-)
-```
+- Add column `warehouse_locations.is_standalone_warehouse boolean NOT NULL DEFAULT false`.
+- Add CHECK / trigger: if `is_standalone_warehouse = true` then `company_assignment_mode = 'explicit'` (a standalone warehouse must declare its own companies, never inherit silently).
+- Backfill: any sub-location that already has explicit `warehouse_location_companies` rows AND its parent has a different company set → mark `is_standalone_warehouse = true`.
+- New RPC `get_stock_bearing_locations_for_company(p_company_id uuid)` built on top of the proven `get_effective_location_company_ids(location_id)` resolver. Returns all locations (any type) where this company has effective access — with hierarchy metadata.
+- New RPC `get_company_inventory_at_location(p_company_id uuid, p_location_id uuid)` to return only inventory rows where `warehouse_items.company_id = p_company_id` AND `location_id = p_location_id`. This guarantees per-company inventory isolation even when many companies share a physical sub-location.
+- Reuse existing `get_effective_locations_for_company` for picker lists; do not duplicate logic.
 
-and for multi-company:
+#### 2) Frontend — admin master data
 
-```sql
-exists (
-  select 1
-  from public.get_effective_location_company_ids(wl.id) ec
-  where ec.company_id = any(v_accessible)
-)
-```
+`src/components/warehouse/LocationManagementDialog.tsx` and `src/pages/admin/WarehouseManagement.tsx`:
 
-The RPC should:
-- return active rows only
-- return `location`, `sublocation`, and `department`
-- return `id`, `name`, `type`, `parent_id`, `depth`
-- compute `depth` only for display/sorting, not for company membership
-- order parent before child consistently
+- Add a **"Standalone Warehouse"** toggle in the location form.
+- When ON:
+  - Force `assignment_mode = 'explicit'` and disable the inherit option.
+  - Show explainer: "This sub-location operates as its own warehouse. Companies and inventory are managed independently from its parent."
+- When OFF and `parent_id` is set: keep current `inherit_parent` default.
+- Show a **"Companies served"** chip list (resolved from `warehouse_location_companies`) on each location row.
 
-This removes duplicated inheritance logic and makes the list RPC mathematically consistent with the already-working company-resolution function.
+#### 3) Frontend — pickers and inventory views
 
-### 2) Keep every dropdown on the shared hooks only
+All pickers continue to use the canonical hooks (`useEffectiveLocationsForCompany`, `useEffectiveLocationsForCompanies`). Add hierarchy-aware rendering already in place (`↳` indent).
 
-Preserve and standardize these hooks as the only read path:
-- `useEffectiveLocationsForCompany`
-- `useEffectiveLocationsForCompanies`
-- `useDashboardLocations`
+`InventoryItems.tsx`, `WarehouseItemsTab`, stock movement screens:
 
-No component should query `warehouse_location_companies` directly for picker contents.
+- When user selects a sub-location in the picker, query inventory using `get_company_inventory_at_location(selectedCompany, selectedLocation)` so only that company's stock at that physical sub-location is shown.
+- Stock-add / GRN / transfer dialogs always set `warehouse_items.company_id` from the active company context — never inferred from the location.
 
-### 3) Fix picker UX so failures are visible instead of looking like “no locations exist”
+#### 4) Permissions
 
-Update:
-- `src/components/common/LocationSelector.tsx`
-- `src/pages/Dashboard.tsx`
+`user_location_permissions` continues to grant per-location access. Hierarchy expansion already exists in `LocationSelector`. No relaxation needed — a standalone sub-location is just another node a user can be granted access to.
 
-So they show:
-- loading state while the RPC is in flight
-- explicit empty state when a company truly has no mapped locations
-- explicit error state if the RPC fails
+### Verification
 
-Do not silently disable the selector with a blank result.
+1. Mark `Lyceum Anuradhapura` (sub-location) as **Standalone Warehouse** with companies `LIS` and `LGH`.
+2. Selecting `LIS` shows `Lyceum Anuradhapura` in pickers; selecting `LGH` also shows it.
+3. Add stock for an item at `Lyceum Anuradhapura` while `LIS` is active — `LGH` user does not see those stock rows.
+4. Add a different stock row at the same `Lyceum Anuradhapura` while `LGH` is active — `LIS` user does not see it.
+5. Parent location's companies do not leak access to the standalone sub-location's inventory.
+6. Admin Warehouse Management shows the "Companies served" chips and the standalone flag correctly.
 
-### 4) Align cache invalidation with the real query keys
+### Files to modify
 
-Current invalidation still targets `header-locations`, but the active hook key is:
-- `effective-locations-for-company`
-- `effective-locations-for-companies`
-- `dashboard-locations`
+- `supabase/migrations/<new>.sql` — add column, CHECK trigger, two RPCs
+- `src/components/warehouse/LocationManagementDialog.tsx` — standalone toggle
+- `src/pages/admin/WarehouseManagement.tsx` — standalone toggle in edit dialog, chips
+- `src/hooks/useWarehouseLocations.ts` — expose `useStockBearingLocationsForCompany` and `useCompanyInventoryAtLocation` hooks
+- `src/pages/construction/resources/InventoryItems.tsx` — switch to `get_company_inventory_at_location`
+- `src/components/warehouse/ItemMasterTab.tsx` (and equivalent inventory tabs) — same per-company-at-location query path
+- `src/types/warehouse.ts` — add `is_standalone_warehouse` to `WarehouseLocation` and create payloads
 
-Update invalidation in location/company assignment flows so dropdowns refresh immediately after admin changes.
+### Constraints
 
-### 5) Verify the canonical resolver against real company cases
+- Do not relax RLS on `warehouse_location_companies` or `warehouse_items`.
+- Do not infer `warehouse_items.company_id` from the location — it must come from the active company context.
+- Standalone sub-locations must use `explicit` assignment mode (enforced by trigger).
+- All pickers continue to read through the canonical effective-location RPCs — no new direct junction-table queries.
 
-Test with the exact cases already discussed:
-- `NCG Warehouse Solutions (NWS)`
-- `Lyceum International Schools (LIS)`
-- `Lyceum Global Holdings (LGH)`
-
-Expected result:
-- selecting any of those companies returns non-zero rows
-- inherited sublocations are included
-- explicit multi-company sublocations are included
-- admin warehouse management and header/dashboard pickers agree
-
-## Files to modify
-
-- `supabase/migrations/...`  
-  Recreate `get_effective_locations_for_company(uuid)` and `get_effective_locations_for_companies(uuid[])` on top of `get_effective_location_company_ids(uuid)`
-
-- `src/hooks/useWarehouseLocations.ts`  
-  Keep hooks canonical; ensure query keys and return typing align with the rewritten RPCs
-
-- `src/components/common/LocationSelector.tsx`  
-  Add explicit loading/error/empty handling and keep hierarchical rendering
-
-- `src/pages/Dashboard.tsx`  
-  Same explicit handling for company-scoped location list
-
-- `src/hooks/useLocationCompanies.ts`
-- `src/hooks/useUserLocationPermissions.ts`  
-  Align invalidation to actual effective-location query keys
-
-## Verification after implementation
-
-1. Open `/admin/warehouse-management`
-2. Select `NWS` in the company selector
-   - header location dropdown shows locations
-3. Select `LIS`
-   - `Lyceum Anuradhapura` and other valid sublocations appear
-4. Select `LGH`
-   - all valid effective locations appear
-5. Confirm network shows `POST /rpc/get_effective_locations_for_company`
-6. Confirm no dropdown is blank unless the company truly has zero valid locations
-7. Confirm admin assignment changes refresh dropdowns without manual reload
-
-## Technical note
-
-The key correction is architectural:
-
-- keep `get_effective_location_company_ids(location_id)` as the single company-membership source of truth
-- make all list-style RPCs derive from it
-- never duplicate hierarchy/company resolution logic in multiple SQL functions
-
-That is the most reliable international-standard solution for multi-company master data with inherited location hierarchies.
