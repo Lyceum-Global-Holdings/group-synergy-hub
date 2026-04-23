@@ -1,82 +1,69 @@
 
 
-## Enhance Move Destination Picker — Highlight Current Parent + Persist Search
+## Standardize Auto-Generated Item Codes to Max 13 Characters
 
-Two improvements to `MoveCategoryDialog.tsx`:
+Align all auto-generated item codes with **GS1 GTIN-13** length (13 chars max) — the most widely used international barcode/material identifier standard, also recommended by SAP S/4HANA migrations and ISO/IEC 15459 (unique identification of transport units / items).
 
-### 1. Highlight current parent path as a pre-selection
+### Current state
 
-When the dialog opens:
-- If the source has a current parent, **pre-select** that parent in the picker (`selectedParentId = category.parent_id`) so the Move button's state and the visual selection both reflect "where you are now". Confirm is still disabled because the no-op guard on line 112 catches same-parent.
-- If the source is already top-level, pre-select the `TOP_LEVEL_VALUE` row (which is disabled — purely visual anchor).
-- The current parent row gets a **secondary highlight ring** (border + muted background) in addition to the existing `(current)` label, so it's recognizable even when another row is actively selected. Style: `ring-1 ring-primary/40 bg-primary/5` when `isCurrent && selectedParentId !== c.id`.
-- On open, **scroll the current parent into view** inside the `ScrollArea` via a `ref` + `scrollIntoView({ block: 'nearest' })` in a `useEffect` keyed on `open && category?.id`.
+| Module | Pattern | Example | Length | Compliant? |
+|---|---|---|---|---|
+| Warehouse | `INV-{CAT3}-{NNN}` | `INV-ELC-001` | 11 | ✅ Yes |
+| Construction | `{CAT3}-{SUB3}-{NAME5}-{NNN}` | `MAC-HVY-EXCAV-001` | 17 | ❌ +4 over |
 
-Implemented with a `useEffect` that runs when `open` flips to true OR `category?.id` changes — replaces the implicit reset via `dialogKey`. The reset on close (lines 125–131) stays.
+### Target — Construction (the only non-compliant generator)
 
-### 2. Persist last search term
+New pattern: `{CAT3}-{SUB3}-{NAME2}-{NNN}` → e.g. `MAC-HVY-EX-001` = **14**… still over. We need to drop one separator.
 
-- Save the search input to `sessionStorage` under key `move-category:last-search` on every change (debounced isn't needed — it's a single string).
-- On dialog open, hydrate `search` state from `sessionStorage` so re-opening for another category remembers what the user was looking for.
-- Cleared automatically when the browser tab closes (sessionStorage scope) — appropriate since category trees can change between sessions.
+**Final standard pattern: `{CAT3}{SUB3}-{NAME3}-{NNN}`** → `MACHVY-EXC-001` = **13 chars exactly.**
 
-### Why no "expanded nodes" persistence
+Breakdown (totals 13):
+- `CAT3` (3) + `SUB3` (3) = 6-char compound group code (no internal separator)
+- `-` (1)
+- `NAME3` (3) — first 3 alphanumeric chars of cleaned item name, uppercase
+- `-` (1)
+- `NNN` (3) — zero-padded sequence
 
-The destination picker is a **flat list of Level 0 categories** by design — the system enforces a 2-level max, so any valid parent must be a root. There are no collapsible nodes to remember. Confirmed in the current `candidates` filter (line 84: `!c.parent_id`).
+Examples:
+- Heavy Excavator → `MACHVY-EXC-001`
+- Power Drill (tools/power) → `TOLPWR-DRL-001`
+- PPE Helmet (safety/ppe) → `SAFPPE-HLM-001`
+- Cup Lock Standard (scaffolding/cup_lock) → `SCACPL-STN-001`
 
-Instead, we persist the **last selected destination per source category** (`sessionStorage` map keyed by source `category.id`) so re-opening Move for the same category restores the user's last attempted target — useful for retrying after a failed move. Falls back to the current-parent pre-selection on first open.
+### Why these tradeoffs
 
-### Technical details
+- **Drop color from code** (already removed in current logic — keep that).
+- **Compress NAME from 5→3 chars**: 3 chars + sequence still uniquely identifies up to 999 items per (category, sub-category, name-prefix) bucket — far more than typical site inventory needs. Collisions across different item names sharing the same 3-letter prefix are absorbed by the sequence number, which is already scoped per composite prefix in `useNextItemCode`.
+- **Merge CAT+SUB into one 6-char block**: visually still reads as a group (`MACHVY`, `TOLPWR`) and matches SAP MM "Material Group" + sub-group flat encoding seen in S/4HANA short-code configurations.
+- **Hyphen-delimited 3 segments**: GTIN-13 is 13 numeric, but for human-readable internal codes ISO/IEC 15459 explicitly allows alphanumeric within the 13-char budget. Hyphens improve scan-readability and are accepted by Code-128 / Code-39 barcodes.
 
-**State changes in `MoveCategoryDialog.tsx`:**
+### Sequence safety
 
-```ts
-const SEARCH_KEY = 'move-category:last-search';
-const TARGET_KEY = 'move-category:last-targets'; // JSON map { [sourceId]: targetId }
+Sequence stays at 3 digits (001–999). If a bucket ever exceeds 999, the existing `useNextItemCode` logic would silently roll into 4 digits (`1000`) and break the 13-char limit. Add a guard:
 
-const [search, setSearch] = useState(() => sessionStorage.getItem(SEARCH_KEY) ?? '');
-
-useEffect(() => {
-  sessionStorage.setItem(SEARCH_KEY, search);
-}, [search]);
-
-useEffect(() => {
-  if (!open || !category) return;
-  // hydrate selected: last attempted target → current parent → top-level (if root)
-  const map = JSON.parse(sessionStorage.getItem(TARGET_KEY) ?? '{}');
-  const remembered = map[category.id];
-  setSelectedParentId(
-    remembered ?? (category.parent_id ? category.parent_id : TOP_LEVEL_VALUE)
-  );
-  // scroll current parent into view next tick
-  requestAnimationFrame(() => currentRowRef.current?.scrollIntoView({ block: 'nearest' }));
-}, [open, category?.id]);
-
-// On every selection change, persist
-useEffect(() => {
-  if (!category || !selectedParentId) return;
-  const map = JSON.parse(sessionStorage.getItem(TARGET_KEY) ?? '{}');
-  map[category.id] = selectedParentId;
-  sessionStorage.setItem(TARGET_KEY, JSON.stringify(map));
-}, [selectedParentId, category?.id]);
-```
-
-**Row rendering:** add `ref={isCurrent ? currentRowRef : undefined}` and the secondary-highlight class when `isCurrent && selectedParentId !== c.id`.
-
-**Reset-on-close:** keep clearing `selectedParentId` (so reopening re-runs the hydration effect cleanly); do NOT clear `search` (that's the whole point of persisting it).
+- When `nextNumber > 999`, throw a clear error: *"Sequence overflow for prefix MACHVY-EXC. Create a new item name to start a new sequence."* — surfaces the issue immediately in the toast rather than producing a 14-char code.
+- This is the SAP-style "number range exhausted" pattern.
 
 ### Files modified
 
 | File | Change |
 |---|---|
-| `src/components/warehouse/MoveCategoryDialog.tsx` | Pre-select current parent on open, secondary-highlight current row, auto-scroll into view, persist search + last-target across opens via sessionStorage. |
+| `src/types/construction-inventory.ts` | `abbreviateItemName(name)` — slice changes from `5` to `3`. Update inline comment. |
+| `src/hooks/construction/useNextItemCode.ts` | Build composite prefix as `${catPrefix}${subCatCode}` (no hyphen between cat & sub) + `-${nameAbbr}`. Update regex accordingly. Add overflow guard: if `nextNumber > 999`, throw `Error("Sequence range exhausted for prefix …")`. Keep `staleTime: 0`. |
+| `src/components/construction/inventory/AddItemDialog.tsx` | No code change needed — consumes `nextItemCode` as-is. |
+| Memory: `mem://architecture/item-code-generation-standards` | Update construction pattern to `{CAT3}{SUB3}-{NAME3}-{NNN}` (13-char GS1-aligned standard) and note 999/bucket sequence cap. |
 
 ### What does NOT change
 
-- Hook (`useItemCategories.ts`), mutation, optimistic update logic, validation rules, DB trigger, Move icon, dialog open/close trigger.
+- **Existing item codes** in the database (no migration / rename). Old 17-char codes remain valid and untouched — uniqueness is per `(item_code, company_id)` so legacy + new codes coexist.
+- Warehouse generator (`useNextWarehouseItemCode`) — already 11 chars, compliant.
+- DB schema, RLS, item creation flow, manual override during edit.
+- Sub-category codes, category prefixes, color options.
 
 ### Standards alignment
 
-- **ISO/IEC 25010** — usability (learnability: current state visible; operability: search resumes where you left off).
-- TanStack/React idiomatic state hydration (sessionStorage-backed initializers, effect-driven reset on key change).
+- **GS1 GTIN-13** — 13-character item identifier ceiling (global retail/logistics standard).
+- **ISO/IEC 15459** — unique identification of items, allows alphanumeric.
+- **SAP MM / S/4HANA** Material Group + short-code Material Number convention.
+- Project memory: `item-code-generation-standards`, `item-code-multi-tenant-uniqueness`, `warehouse-category-code-mnemonic-standard`.
 
