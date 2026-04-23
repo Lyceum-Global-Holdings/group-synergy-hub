@@ -134,7 +134,7 @@ export default function Dashboard() {
   const { globalLocationId, setGlobalLocationId } = useLocationFilter();
   const { selectedCompany } = useCompany();
   const [locationFilter, setLocationFilter] = useState<string>(globalLocationId || "all");
-  const { data: locations } = useDashboardLocations(selectedCompany?.id);
+  const { data: locations, isLoading: locationsLoading, isError: locationsError } = useDashboardLocations(selectedCompany?.id);
   const activeLocationId = locationFilter === "all" ? null : locationFilter;
   const { inventory, labour, isLoading: locationDataLoading } = useDashboardLocationData(activeLocationId);
   const selectedLocationName = locationFilter === "all"
@@ -146,6 +146,11 @@ export default function Dashboard() {
     setLocationFilter(value);
     setGlobalLocationId(value === "all" ? null : value);
   };
+
+  let locationPlaceholder = "All Locations";
+  if (!selectedCompany?.id) locationPlaceholder = "Select a company";
+  else if (locationsLoading) locationPlaceholder = "Loading locations…";
+  else if (locationsError) locationPlaceholder = "Failed to load locations";
 
   return (
     <div className="space-y-6">
@@ -160,19 +165,31 @@ export default function Dashboard() {
       <div className="flex items-center gap-3 p-3 rounded-lg border bg-card">
         <MapPin className="h-5 w-5 text-primary" />
         <span className="text-sm font-medium text-muted-foreground">Location:</span>
-        <Select value={locationFilter} onValueChange={handleLocationChange}>
+        <Select
+          value={locationFilter}
+          onValueChange={handleLocationChange}
+          disabled={locationsLoading || !selectedCompany?.id}
+        >
           <SelectTrigger className="w-[260px]">
-            <SelectValue placeholder="All Locations" />
+            <SelectValue placeholder={locationPlaceholder} />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Locations</SelectItem>
-            {locations && locations.length > 0 ? (
-              locations.map(loc => (
-                <SelectItem key={loc.id} value={loc.id}>{loc.name}</SelectItem>
-              ))
-            ) : (
-              <SelectItem value="none" disabled>No locations configured</SelectItem>
+            {locationsError && (
+              <SelectItem value="__error" disabled>
+                Failed to load locations
+              </SelectItem>
             )}
+            {!locationsError && !locationsLoading && (locations?.length ?? 0) === 0 && selectedCompany?.id && (
+              <SelectItem value="__empty" disabled>
+                No locations mapped to this company
+              </SelectItem>
+            )}
+            {locations && locations.length > 0 && locations.map(loc => (
+              <SelectItem key={loc.id} value={loc.id}>
+                {loc.parent_id ? `↳ ${loc.name}` : loc.name}
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
       </div>
