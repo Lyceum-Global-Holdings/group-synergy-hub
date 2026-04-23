@@ -65,7 +65,11 @@ export const LocationManagementDialog = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formData.name.trim() || formData.company_ids.length === 0) return;
+    const isChild = formData.type !== 'location' && formData.parent_id !== 'none';
+    const effectiveMode = isChild ? formData.assignment_mode : 'explicit';
+
+    if (!formData.name.trim()) return;
+    if (effectiveMode === 'explicit' && formData.company_ids.length === 0) return;
 
     const locationData = {
       name: formData.name,
@@ -79,18 +83,20 @@ export const LocationManagementDialog = () => {
       physical_address: formData.physical_address || undefined,
       status: formData.status,
       warehouse_category: formData.warehouse_category as any,
-      company_id: formData.company_ids[0],
+      company_id: effectiveMode === 'explicit' ? formData.company_ids[0] : undefined,
     };
 
     try {
-      if (editingLocation) {
-        await updateLocationAsync({ id: editingLocation, ...locationData });
-        await saveCompanies({ locationId: editingLocation, companyIds: formData.company_ids });
-      } else {
-        const created = await createLocation(locationData);
-        if (created?.id) {
-          await saveCompanies({ locationId: created.id, companyIds: formData.company_ids });
-        }
+      const targetId = editingLocation
+        ? (await updateLocationAsync({ id: editingLocation, ...locationData }), editingLocation)
+        : (await createLocation(locationData))?.id;
+
+      if (targetId) {
+        await saveCompanies({
+          locationId: targetId,
+          companyIds: effectiveMode === 'explicit' ? formData.company_ids : [],
+          assignmentMode: effectiveMode,
+        });
       }
 
       resetForm();
@@ -112,7 +118,8 @@ export const LocationManagementDialog = () => {
       physical_address: '',
       status: 'active',
       warehouse_category: 'general',
-      company_ids: []
+      company_ids: [],
+      assignment_mode: 'explicit'
     });
     setEditingLocation(null);
   };
@@ -121,6 +128,21 @@ export const LocationManagementDialog = () => {
     if (!editingLocation || editCompanyIds.length === 0) return;
     setFormData(prev => ({ ...prev, company_ids: editCompanyIds }));
   }, [editCompanyIds, editingLocation]);
+
+  // SAP EWM hierarchy default: when a child type gets a parent, default to inherit_parent
+  // unless the user has explicitly changed mode. Only auto-apply when not editing.
+  useEffect(() => {
+    if (editingLocation) return;
+    if (formData.type === 'location') {
+      if (formData.assignment_mode !== 'explicit') {
+        setFormData(prev => ({ ...prev, assignment_mode: 'explicit' }));
+      }
+      return;
+    }
+    if (formData.parent_id !== 'none' && formData.assignment_mode === 'explicit' && formData.company_ids.length === 0) {
+      setFormData(prev => ({ ...prev, assignment_mode: 'inherit_parent' }));
+    }
+  }, [formData.type, formData.parent_id, editingLocation]);
 
   const handleEdit = (location: any) => {
     setEditingLocation(location.id);
@@ -136,7 +158,8 @@ export const LocationManagementDialog = () => {
       physical_address: location.physical_address || '',
       status: location.status || 'active',
       warehouse_category: location.warehouse_category || 'general',
-      company_ids: location.company_id ? [location.company_id] : []
+      company_ids: location.company_id ? [location.company_id] : [],
+      assignment_mode: location.company_assignment_mode || 'explicit'
     });
   };
 
