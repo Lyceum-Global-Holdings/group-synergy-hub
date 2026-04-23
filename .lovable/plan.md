@@ -1,91 +1,82 @@
 
 
-## Optimistic UI for Move Category with Auto-Rollback
+## Enhance Move Destination Picker — Highlight Current Parent + Persist Search
 
-Make the category tree update instantly when a user moves a category, then automatically revert if the server (or DB hierarchy trigger) rejects the change.
+Two improvements to `MoveCategoryDialog.tsx`:
 
-### Behavior
+### 1. Highlight current parent path as a pre-selection
 
-- User picks a new parent in `MoveCategoryDialog` and confirms.
-- The tree in `ItemCategoriesTab` immediately reflects the new position — no spinner, no flicker.
-- If the mutation fails (cycle, depth > 1, RLS, network error, etc.), the tree snaps back to its previous shape and the existing destructive toast appears.
-- On success, the cache is reconciled with the server (refetch) so any server-side adjustments are picked up.
+When the dialog opens:
+- If the source has a current parent, **pre-select** that parent in the picker (`selectedParentId = category.parent_id`) so the Move button's state and the visual selection both reflect "where you are now". Confirm is still disabled because the no-op guard on line 112 catches same-parent.
+- If the source is already top-level, pre-select the `TOP_LEVEL_VALUE` row (which is disabled — purely visual anchor).
+- The current parent row gets a **secondary highlight ring** (border + muted background) in addition to the existing `(current)` label, so it's recognizable even when another row is actively selected. Style: `ring-1 ring-primary/40 bg-primary/5` when `isCurrent && selectedParentId !== c.id`.
+- On open, **scroll the current parent into view** inside the `ScrollArea` via a `ref` + `scrollIntoView({ block: 'nearest' })` in a `useEffect` keyed on `open && category?.id`.
 
-### Implementation — `src/hooks/useItemCategories.ts`
+Implemented with a `useEffect` that runs when `open` flips to true OR `category?.id` changes — replaces the implicit reset via `dialogKey`. The reset on close (lines 125–131) stays.
 
-Convert `moveCategoryMutation` to use TanStack Query's optimistic update lifecycle (`onMutate` / `onError` / `onSettled`) against the `['item-categories', companyId]` cache.
+### 2. Persist last search term
+
+- Save the search input to `sessionStorage` under key `move-category:last-search` on every change (debounced isn't needed — it's a single string).
+- On dialog open, hydrate `search` state from `sessionStorage` so re-opening for another category remembers what the user was looking for.
+- Cleared automatically when the browser tab closes (sessionStorage scope) — appropriate since category trees can change between sessions.
+
+### Why no "expanded nodes" persistence
+
+The destination picker is a **flat list of Level 0 categories** by design — the system enforces a 2-level max, so any valid parent must be a root. There are no collapsible nodes to remember. Confirmed in the current `candidates` filter (line 84: `!c.parent_id`).
+
+Instead, we persist the **last selected destination per source category** (`sessionStorage` map keyed by source `category.id`) so re-opening Move for the same category restores the user's last attempted target — useful for retrying after a failed move. Falls back to the current-parent pre-selection on first open.
+
+### Technical details
+
+**State changes in `MoveCategoryDialog.tsx`:**
 
 ```ts
-const moveCategoryMutation = useMutation({
-  mutationFn: async ({ id, newParentId }) => {
-    // ...existing client-side guards (self, cycle, depth, scope) stay as-is...
-    const { error } = await supabase
-      .from('item_categories')
-      .update({ parent_id: newParentId })
-      .eq('id', id);
-    if (error) throw error;
-  },
-  onMutate: async ({ id, newParentId }) => {
-    const key = ['item-categories', companyId];
-    // Stop in-flight refetches so they don't overwrite our optimistic snapshot
-    await queryClient.cancelQueries({ queryKey: key });
+const SEARCH_KEY = 'move-category:last-search';
+const TARGET_KEY = 'move-category:last-targets'; // JSON map { [sourceId]: targetId }
 
-    const previous = queryClient.getQueryData<ItemCategory[]>(key);
-    if (previous) {
-      queryClient.setQueryData<ItemCategory[]>(
-        key,
-        previous.map((c) => (c.id === id ? { ...c, parent_id: newParentId } : c)),
-      );
-    }
-    return { previous };  // context for rollback
-  },
-  onError: (error, _vars, context) => {
-    // Roll back to the snapshot
-    if (context?.previous) {
-      queryClient.setQueryData(['item-categories', companyId], context.previous);
-    }
-    toast({
-      title: 'Move failed',
-      description: error?.message ?? 'Could not move category. Reverted.',
-      variant: 'destructive',
-    });
-  },
-  onSettled: () => {
-    // Reconcile with server on success or failure
-    queryClient.invalidateQueries({ queryKey: ['item-categories', companyId] });
-  },
-  onSuccess: () => {
-    toast({ title: 'Category moved', description: 'Hierarchy updated successfully.' });
-  },
-});
+const [search, setSearch] = useState(() => sessionStorage.getItem(SEARCH_KEY) ?? '');
+
+useEffect(() => {
+  sessionStorage.setItem(SEARCH_KEY, search);
+}, [search]);
+
+useEffect(() => {
+  if (!open || !category) return;
+  // hydrate selected: last attempted target → current parent → top-level (if root)
+  const map = JSON.parse(sessionStorage.getItem(TARGET_KEY) ?? '{}');
+  const remembered = map[category.id];
+  setSelectedParentId(
+    remembered ?? (category.parent_id ? category.parent_id : TOP_LEVEL_VALUE)
+  );
+  // scroll current parent into view next tick
+  requestAnimationFrame(() => currentRowRef.current?.scrollIntoView({ block: 'nearest' }));
+}, [open, category?.id]);
+
+// On every selection change, persist
+useEffect(() => {
+  if (!category || !selectedParentId) return;
+  const map = JSON.parse(sessionStorage.getItem(TARGET_KEY) ?? '{}');
+  map[category.id] = selectedParentId;
+  sessionStorage.setItem(TARGET_KEY, JSON.stringify(map));
+}, [selectedParentId, category?.id]);
 ```
 
-Notes:
-- All existing client-side validations remain inside `mutationFn` — they throw before any cache mutation, so `onMutate` only runs after the dialog's own pre-checks pass.
-- Snapshot is the entire cached `ItemCategory[]` (small array, cheap). Rollback is a single `setQueryData`.
-- `onSettled` invalidate is critical: ensures DB trigger errors that bypass client guards are reconciled, and that successful moves pull any server-touched fields (`updated_at`, etc.).
+**Row rendering:** add `ref={isCurrent ? currentRowRef : undefined}` and the secondary-highlight class when `isCurrent && selectedParentId !== c.id`.
 
-### Dialog behavior — `src/components/warehouse/MoveCategoryDialog.tsx`
-
-Minor adjustment: close the dialog immediately after firing `moveCategory(...)` (don't wait for `isMoving`). The optimistic update means the user sees the result instantly; if it fails, the rollback + toast communicates that, and they can reopen the dialog. If the dialog currently disables the confirm button on `isMoving`, switch it to close-on-click and rely on the toast for failure feedback.
-
-### What does NOT change
-
-- DB schema, RLS, hierarchy trigger.
-- Move icon, picker UI, validation rules, or `CategoryTreeItem` rendering.
-- Any other mutation (create / delete / exclude / restore / bulk visibility).
-- Other cache keys or React Query global config.
+**Reset-on-close:** keep clearing `selectedParentId` (so reopening re-runs the hydration effect cleanly); do NOT clear `search` (that's the whole point of persisting it).
 
 ### Files modified
 
 | File | Change |
 |---|---|
-| `src/hooks/useItemCategories.ts` | Add `onMutate` snapshot + optimistic patch and `onError` rollback to `moveCategoryMutation`; move invalidate to `onSettled`. |
-| `src/components/warehouse/MoveCategoryDialog.tsx` | Close dialog immediately on confirm so the optimistic update is visible; drop `isMoving` disable on the confirm button. |
+| `src/components/warehouse/MoveCategoryDialog.tsx` | Pre-select current parent on open, secondary-highlight current row, auto-scroll into view, persist search + last-target across opens via sessionStorage. |
+
+### What does NOT change
+
+- Hook (`useItemCategories.ts`), mutation, optimistic update logic, validation rules, DB trigger, Move icon, dialog open/close trigger.
 
 ### Standards alignment
 
-- TanStack Query canonical optimistic-update pattern (cancel → snapshot → patch → rollback → settle).
-- **ISO/IEC 25010** usability (responsiveness) + reliability (fault tolerance — automatic recovery on failure).
-- Project memory: `react-query-global-cache-freshness-permanent` (invalidate-on-settle preserves the staleTime: 0 contract).
+- **ISO/IEC 25010** — usability (learnability: current state visible; operability: search resumes where you left off).
+- TanStack/React idiomatic state hydration (sessionStorage-backed initializers, effect-driven reset on key change).
 
