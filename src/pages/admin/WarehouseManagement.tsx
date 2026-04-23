@@ -732,6 +732,26 @@ export default function WarehouseManagement() {
           <ScrollArea className="flex-1 pr-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-4">
               {editLocationData?.parent_id && (
+                <div className="space-y-2 md:col-span-2 flex items-start justify-between gap-3 p-3 rounded-lg border bg-muted/30">
+                  <div className="space-y-1">
+                    <Label htmlFor="edit-standalone-toggle" className="font-medium">Standalone Warehouse</Label>
+                    <p className="text-xs text-muted-foreground">
+                      This {editForm.type || 'sub-location'} operates as its own warehouse. Companies and inventory are managed independently from its parent.
+                    </p>
+                  </div>
+                  <Switch
+                    id="edit-standalone-toggle"
+                    checked={!!editForm.is_standalone_warehouse}
+                    onCheckedChange={(checked) => setEditForm(prev => ({
+                      ...prev,
+                      is_standalone_warehouse: checked,
+                      assignment_mode: checked ? 'explicit' : (prev.assignment_mode || 'explicit'),
+                    }))}
+                  />
+                </div>
+              )}
+
+              {editLocationData?.parent_id && !editForm.is_standalone_warehouse && (
                 <div className="space-y-2 md:col-span-2">
                   <Label>Company Assignment Mode</Label>
                   <Select
