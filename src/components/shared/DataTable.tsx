@@ -40,16 +40,17 @@ export function DataTable<T extends Record<string, unknown>>({
 
   return (
     <div className="rounded-lg bg-card shadow-[var(--shadow-sm)] border border-border/50 overflow-hidden">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            {columns.map((col) => (
-              <TableHead key={col.key} className={col.className}>
-                {col.header}
-              </TableHead>
-            ))}
-          </TableRow>
-        </TableHeader>
+      <div className="relative w-full overflow-x-auto">
+        <Table className="min-w-full">
+          <TableHeader className="sticky top-0 bg-card z-10">
+            <TableRow>
+              {columns.map((col) => (
+                <TableHead key={col.key} className={col.className}>
+                  {col.header}
+                </TableHead>
+              ))}
+            </TableRow>
+          </TableHeader>
         <TableBody>
           {data.length === 0 ? (
             <TableRow>
@@ -76,7 +77,8 @@ export function DataTable<T extends Record<string, unknown>>({
             ))
           )}
         </TableBody>
-      </Table>
+        </Table>
+      </div>
     </div>
   );
 }
