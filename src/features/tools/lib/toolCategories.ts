@@ -56,6 +56,12 @@ export function isToolCategoryId(
 /**
  * Returns just the category ids in the Tools subtree — useful for filtering
  * `warehouse_items` queries on `category_id`.
+ *
+ * Depth assumption: returns roots (Level 0) + direct children (Level 1).
+ * Level 2 codes (e.g. TOO-HND-HAM "Hammers") are children of L1 nodes and
+ * are therefore reachable through the L1 parent set during downstream
+ * `category_id IN (...)` queries — they do NOT need to be enumerated here.
+ * If/when Level 3+ categories are introduced, revisit this sweep.
  */
 export function getToolCategoryIds(categories: ItemCategory[]): string[] {
   return buildToolCategoryOptions(categories).map((o) => o.category.id);
