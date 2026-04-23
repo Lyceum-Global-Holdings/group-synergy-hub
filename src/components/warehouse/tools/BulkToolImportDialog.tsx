@@ -66,6 +66,7 @@ export function BulkToolImportDialog({ open, onOpenChange }: BulkToolImportDialo
   const { createBulkTools, isCreatingBulk } = useWarehouseTools();
   const { units = [] } = useItemUnits();
   const { selectedCompany } = useCompany();
+  const { globalLocationId } = useLocationFilter();
   const { allCategories } = useItemCategories(selectedCompany?.id);
 
   // Restrict CSV category lookup to the Tools subtree (Hand Tools / Power Tools + children)
