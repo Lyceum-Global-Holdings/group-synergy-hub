@@ -44,8 +44,9 @@ export function useToolBinAllocations(toolId?: string) {
   // Realtime: invalidate on any change to this tool's allocations
   useEffect(() => {
     if (!toolId) return;
+
     const channel = supabase
-      .channel(`tool-bin-allocations-${toolId}`)
+      .channel(`tool-bin-allocations-${toolId}-${crypto.randomUUID()}`)
       .on(
         "postgres_changes",
         {
@@ -60,6 +61,7 @@ export function useToolBinAllocations(toolId?: string) {
         }
       )
       .subscribe();
+
     return () => {
       supabase.removeChannel(channel);
     };
