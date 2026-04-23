@@ -194,14 +194,41 @@ export const LocationManagementDialog = () => {
             </h3>
             
             <form onSubmit={handleSubmit} className="space-y-4">
+              {formData.type !== 'location' && formData.parent_id !== 'none' && (
+                <div>
+                  <Label>Company Assignment Mode</Label>
+                  <Select
+                    value={formData.assignment_mode}
+                    onValueChange={(v: 'explicit' | 'inherit_parent') => setFormData({ ...formData, assignment_mode: v })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="inherit_parent">Inherit parent companies (recommended)</SelectItem>
+                      <SelectItem value="explicit">Use explicit companies</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {formData.assignment_mode === 'inherit_parent' && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      This {formData.type} will automatically inherit company access from its parent.
+                    </p>
+                  )}
+                </div>
+              )}
+
               <div>
-                <Label>Companies *</Label>
+                <Label>Companies {formData.assignment_mode !== 'inherit_parent' && '*'}</Label>
                 <Popover>
                   <PopoverTrigger asChild>
-                    <Button variant="outline" className="w-full justify-between font-normal">
+                    <Button
+                      variant="outline"
+                      className="w-full justify-between font-normal"
+                      disabled={formData.assignment_mode === 'inherit_parent'}
+                    >
                       {formData.company_ids.length > 0
-                        ? `${formData.company_ids.length} company(ies) selected`
-                        : 'Select companies'}
+                        ? `${formData.company_ids.length} company(ies) ${formData.assignment_mode === 'inherit_parent' ? 'inherited' : 'selected'}`
+                        : (formData.assignment_mode === 'inherit_parent' ? 'Inherited from parent' : 'Select companies')}
                       <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                     </Button>
                   </PopoverTrigger>
