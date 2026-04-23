@@ -163,7 +163,8 @@ export const LocationManagementDialog = () => {
       status: location.status || 'active',
       warehouse_category: location.warehouse_category || 'general',
       company_ids: location.company_id ? [location.company_id] : [],
-      assignment_mode: location.company_assignment_mode || 'explicit'
+      assignment_mode: location.company_assignment_mode || 'explicit',
+      is_standalone_warehouse: !!location.is_standalone_warehouse,
     });
   };
 
