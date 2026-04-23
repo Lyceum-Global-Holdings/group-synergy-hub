@@ -1,189 +1,163 @@
 
-## Fix company-selected location lists so all valid locations appear consistently
+## Fix selected-company location dropdowns so they always show the effective location hierarchy
 
-### Outcome
+### Exact issue
 
-When a company is selected, every location picker that is supposed to be company-scoped will show the full correct location set for that company:
+This is not a missing-data problem.
 
-- top-level locations
-- explicit multi-company sub-locations
-- inherited child locations
-- no silent fallback to unrelated top-level locations
-- consistent results across header, dashboard, construction inventory, and admin assignment screens
+Verified facts:
+- The database already has effective locations for the affected companies:
+  - `NWS` has effective locations
+  - `LIS` has effective locations
+  - `LGH` has effective locations
+- The current user is `super_admin`, so company access should not block the picker.
+- The current implementation still has two competing sources of truth:
+  1. `get_effective_location_company_ids(location_id)` — already works
+  2. `get_effective_locations_for_company(...)` / `...for_companies(...)` — re-implements hierarchy resolution separately
 
-### Root cause
+That duplication is the main risk. When the “list RPC” drifts from the proven “effective company IDs” resolver, dropdowns can return zero rows even though the data is valid.
 
-The app currently has **multiple competing location query paths** instead of one canonical resolver:
+A second issue is UX masking:
+- `LocationSelector` disables the select when `locations.length === 0`
+- there is no visible loading/error state
+- if the RPC path fails or returns empty, the UI looks like “no locations exist”
 
-1. **Some screens use the new effective-company resolver**, but others still query `warehouse_location_companies` directly.
-2. Several consumers still hard-filter to `type = 'location'`, which excludes child locations.
-3. **`Dashboard.tsx` is not passing the selected company into `useDashboardLocations()`**, so its dropdown is not actually synced to the active company context.
-4. `useLocationsForCompanies()` and other admin/location pickers still use the old direct-junction logic, so multi-company and inherited children are dropped.
-5. The current “fallback to all top-level locations” masks resolver failures and breaks company-scoped master-data integrity.
+### Best-practice solution
 
-This violates single-source-of-truth master-data practice and is why the user keeps seeing “some locations missing” after each partial fix.
+Adopt one real canonical server-side read model:
 
-## Best-practice solution
+```text
+warehouse_locations
+  -> get_effective_location_company_ids(location_id)   (single company-membership truth)
+  -> get_effective_locations_for_company(company_id)   (list builder using that truth)
+  -> get_effective_locations_for_companies(company_ids) (union builder using that truth)
+  -> shared React hooks
+  -> all company-scoped dropdowns
+```
 
-Adopt a **single canonical effective-location read model** for all company-scoped dropdowns, aligned with:
-
-- **ISO 8000** — master-data completeness and consistency
-- **SAP EWM / WM hierarchy practice** — operational pickers must resolve the location hierarchy from one authoritative source
-- **ISO/IEC 27001 A.9** — company visibility enforced server-side, without broadening raw table access
+This follows:
+- ISO 8000: one authoritative master-data derivation path
+- SAP EWM/WM: hierarchy-aware location visibility from one resolver
+- ISO/IEC 27001 A.9: company access enforced server-side without relaxing raw table RLS
 
 ## Changes to implement
 
-### 1) Database: standardize effective location resolution
+### 1) Rewrite the canonical list RPCs to reuse the proven effective-company resolver
 
-Create or revise database RPCs so every location picker consumes the same logic:
+Replace the current recursive logic inside:
+- `public.get_effective_locations_for_company(uuid)`
+- `public.get_effective_locations_for_companies(uuid[])`
 
-#### A. Replace/upgrade `get_effective_locations_for_company(...)`
-Return all active locations effectively mapped to one company, including:
+with a simpler canonical filter based on:
 
-- `location`
-- `sublocation`
-- `department`
+```sql
+exists (
+  select 1
+  from public.get_effective_location_company_ids(wl.id) ec
+  where ec.company_id = p_company_id
+)
+```
 
-Return:
-- `id`
-- `name`
-- `type`
-- `parent_id`
-- `depth` or hierarchy metadata for ordering/rendering
+and for multi-company:
 
-Rules:
-- respect `can_access_company(p_company_id)`
-- resolve `inherit_parent` chains server-side
-- include explicit multi-company children
-- exclude inactive rows
-- order parent before child
+```sql
+exists (
+  select 1
+  from public.get_effective_location_company_ids(wl.id) ec
+  where ec.company_id = any(v_accessible)
+)
+```
 
-#### B. Add `get_effective_locations_for_companies(...)`
-Needed for admin/user-assignment flows that union multiple accessible companies.
+The RPC should:
+- return active rows only
+- return `location`, `sublocation`, and `department`
+- return `id`, `name`, `type`, `parent_id`, `depth`
+- compute `depth` only for display/sorting, not for company membership
+- order parent before child consistently
 
-Use case:
-- `useLocationsForCompanies()` in user permission editor
-- any multi-company picker currently merging direct junction rows client-side
+This removes duplicated inheritance logic and makes the list RPC mathematically consistent with the already-working company-resolution function.
 
-This avoids re-implementing company-union logic in React.
+### 2) Keep every dropdown on the shared hooks only
 
-### 2) Frontend: create one shared company-location data path
+Preserve and standardize these hooks as the only read path:
+- `useEffectiveLocationsForCompany`
+- `useEffectiveLocationsForCompanies`
+- `useDashboardLocations`
 
-Refactor company-scoped location fetching into a single reusable hook/helper, for example in `src/hooks/useWarehouseLocations.ts`.
+No component should query `warehouse_location_companies` directly for picker contents.
 
-That shared hook should:
-- call the effective-location RPC
-- accept one company or many companies
-- optionally support `includeChildren`
-- return already-sorted results
-- never fallback to unrelated top-level locations
+### 3) Fix picker UX so failures are visible instead of looking like “no locations exist”
 
-This becomes the only read path for dropdowns tied to selected company context.
+Update:
+- `src/components/common/LocationSelector.tsx`
+- `src/pages/Dashboard.tsx`
 
-### 3) Fix the currently inconsistent consumers
+So they show:
+- loading state while the RPC is in flight
+- explicit empty state when a company truly has no mapped locations
+- explicit error state if the RPC fails
 
-Update these files to use the shared effective-location source:
+Do not silently disable the selector with a blank result.
 
-#### `src/components/common/LocationSelector.tsx`
-- keep company-scoped behavior
-- remove legacy fallback query to `.eq("type", "location")`
-- render hierarchy hints for children
-- if permissions are applied, filter against the resolved set only
+### 4) Align cache invalidation with the real query keys
 
-#### `src/hooks/useWarehouseLocations.ts`
-- make `useDashboardLocations(selectedCompanyId)` rely on the shared effective-location hook/RPC
-- remove the fallback to all top-level locations
+Current invalidation still targets `header-locations`, but the active hook key is:
+- `effective-locations-for-company`
+- `effective-locations-for-companies`
+- `dashboard-locations`
 
-#### `src/pages/Dashboard.tsx`
-- pass `selectedCompany?.id` into `useDashboardLocations(...)`
-- ensure the dashboard dropdown actually tracks the selected company
+Update invalidation in location/company assignment flows so dropdowns refresh immediately after admin changes.
 
-#### `src/pages/construction/resources/InventoryItems.tsx`
-- replace direct `warehouse_location_companies` + legacy `company_id` merge logic
-- use the same canonical effective location source
+### 5) Verify the canonical resolver against real company cases
 
-#### `src/components/warehouse/AssignLocationDialog.tsx`
-- stop querying only direct top-level company locations
-- use the effective resolver so multi-company/inherited valid targets appear
+Test with the exact cases already discussed:
+- `NCG Warehouse Solutions (NWS)`
+- `Lyceum International Schools (LIS)`
+- `Lyceum Global Holdings (LGH)`
 
-#### `src/hooks/useUserLocationPermissions.ts`
-- replace `useLocationsForCompanies()` direct junction-table logic
-- use the new bulk effective-location RPC
-- ensure admin user editors see the real location union for assigned companies
-
-### 4) Permission overlay: make hierarchical visibility deterministic
-
-For users with explicit location grants, avoid exact-ID-only filtering if the business rule is hierarchical visibility.
-
-Implement a small shared helper that expands permitted IDs through the loaded tree:
-
-- if user has access to a parent location and hierarchical visibility is intended,
-  include its descendants in the visible picker set
-- if no explicit permissions exist, preserve the current fail-open behavior
-- admin and super admin continue to see all effective locations
-
-This prevents effective child locations from being fetched and then immediately hidden by client-side exact-ID filtering.
-
-### 5) Remove unsafe masking behavior
-
-Delete the current “if RPC returns zero rows, show all top-level locations” behavior from company-scoped dropdown paths.
-
-Replace it with:
-- empty result state when genuinely no company locations exist
-- optional warning/logging for debugging
-
-This preserves strict company isolation and avoids showing locations from other company scopes.
+Expected result:
+- selecting any of those companies returns non-zero rows
+- inherited sublocations are included
+- explicit multi-company sublocations are included
+- admin warehouse management and header/dashboard pickers agree
 
 ## Files to modify
 
-- New SQL migration in `supabase/migrations/`
-- `src/components/common/LocationSelector.tsx`
-- `src/hooks/useWarehouseLocations.ts`
-- `src/pages/Dashboard.tsx`
-- `src/pages/construction/resources/InventoryItems.tsx`
-- `src/components/warehouse/AssignLocationDialog.tsx`
-- `src/hooks/useUserLocationPermissions.ts`
+- `supabase/migrations/...`  
+  Recreate `get_effective_locations_for_company(uuid)` and `get_effective_locations_for_companies(uuid[])` on top of `get_effective_location_company_ids(uuid)`
 
-Potential follow-up audit targets if they also behave inconsistently:
-- `src/hooks/useWarehouseAssets.ts`
-- any remaining dropdowns still querying `warehouse_location_companies` directly
+- `src/hooks/useWarehouseLocations.ts`  
+  Keep hooks canonical; ensure query keys and return typing align with the rewritten RPCs
 
-## Verification
+- `src/components/common/LocationSelector.tsx`  
+  Add explicit loading/error/empty handling and keep hierarchical rendering
 
-After implementation, verify all of the following:
+- `src/pages/Dashboard.tsx`  
+  Same explicit handling for company-scoped location list
 
-1. Select a company in the header:
-   - header location dropdown updates immediately
-   - dashboard location dropdown shows the same company-scoped set
-2. `Lyceum Anuradhapura` appears when selecting both relevant companies where it is valid.
-3. Inherited child locations (for example floors/departments under a mapped parent) appear without requiring direct junction rows.
-4. Construction Inventory location dropdown matches the same effective company-scoped set.
-5. Assign Location dialog shows the same valid company-scoped locations.
-6. Admin user permission editor lists the full effective location union for the user’s assigned companies.
-7. No unrelated top-level locations appear when a company has zero valid mappings.
+- `src/hooks/useLocationCompanies.ts`
+- `src/hooks/useUserLocationPermissions.ts`  
+  Align invalidation to actual effective-location query keys
 
-## Technical details
+## Verification after implementation
 
-```text
-Canonical model
-Selected Company
-   -> effective-location RPC
-      -> resolve explicit + inherit_parent
-      -> enforce can_access_company()
-      -> return active hierarchy
-   -> shared React hook
-      -> used by all company-scoped dropdowns
-```
+1. Open `/admin/warehouse-management`
+2. Select `NWS` in the company selector
+   - header location dropdown shows locations
+3. Select `LIS`
+   - `Lyceum Anuradhapura` and other valid sublocations appear
+4. Select `LGH`
+   - all valid effective locations appear
+5. Confirm network shows `POST /rpc/get_effective_locations_for_company`
+6. Confirm no dropdown is blank unless the company truly has zero valid locations
+7. Confirm admin assignment changes refresh dropdowns without manual reload
 
-### Standards applied
+## Technical note
 
-- **ISO 8000**: one authoritative master-data resolution path
-- **SAP EWM / WM**: hierarchy-aware location resolution for operational pickers
-- **ISO/IEC 27001 A.9**: access restricted server-side by company context, not widened by client fallbacks
+The key correction is architectural:
 
-### Important constraints
+- keep `get_effective_location_company_ids(location_id)` as the single company-membership source of truth
+- make all list-style RPCs derive from it
+- never duplicate hierarchy/company resolution logic in multiple SQL functions
 
-- Do not relax RLS on `warehouse_location_companies`
-- Do not reintroduce direct client-side merging of raw junction-table rows for dropdowns
-- Do not keep the top-level fallback in company-scoped selectors
-- Keep admin metadata visibility separated from transactional company access
+That is the most reliable international-standard solution for multi-company master data with inherited location hierarchies.
