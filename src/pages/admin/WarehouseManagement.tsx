@@ -71,11 +71,10 @@ export default function WarehouseManagement() {
   } = useWarehouseLocations();
   const { toast } = useToast();
   const { companies } = useCompanies();
-  const { companyIds: editLocationCompanyIds, saveCompanies } = useLocationCompanies(editLocationData?.id);
+  const { companyIds: editLocationCompanyIds, assignments: editAssignments, saveCompanies } = useLocationCompanies(editLocationData?.id);
 
   // Admin master-data view: fetch FULL location-company mappings via security-definer RPC,
-  // bypassing per-company RLS so admins see every allocation chip (ISO/IEC 27001 A.9.4.1 —
-  // separation of administrative metadata access from transactional data access).
+  // bypassing per-company RLS so admins see every allocation chip (ISO/IEC 27001 A.9.4.1).
   const { data: allLocationCompanyMap = {} } = useQuery({
     queryKey: ['all-location-companies-admin'],
     queryFn: async () => {
@@ -85,6 +84,26 @@ export default function WarehouseManagement() {
       for (const row of (data || []) as Array<{ location_id: string; company_id: string }>) {
         if (!map[row.location_id]) map[row.location_id] = [];
         map[row.location_id].push(row.company_id);
+      }
+      return map;
+    },
+  });
+
+  // Effective (resolved + inheritance-aware) company assignments per location — the
+  // canonical source for chip rendering. Aligns with SAP EWM hierarchy practice.
+  const { data: allEffectiveMap = {} } = useQuery({
+    queryKey: ['all-effective-location-companies-admin'],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('get_all_effective_location_companies' as any);
+      if (error) throw error;
+      const map: Record<string, Array<{ company_id: string; is_inherited: boolean; source_location_id: string }>> = {};
+      for (const row of (data || []) as any[]) {
+        if (!map[row.location_id]) map[row.location_id] = [];
+        map[row.location_id].push({
+          company_id: row.company_id,
+          is_inherited: row.is_inherited,
+          source_location_id: row.source_location_id,
+        });
       }
       return map;
     },
