@@ -21,8 +21,16 @@ interface UseWarehouseItemsLazyInventoryOptions {
 const MAX_ITEMS = 20000;
 
 /**
- * Infinite-scroll hook for Inventory tab: fetches warehouse items in 100-item batches
- * with bin allocation enrichment per batch. Caps at 20,000 items total.
+ * Infinite-scroll hook for Inventory tab.
+ *
+ * Two paths:
+ *  1. When BOTH a company and a specific location are selected, route through the
+ *     canonical RPC `get_company_inventory_at_location`. This guarantees per-company
+ *     isolation at a physical node (incl. standalone sub-locations) and includes
+ *     items whose presence at the location is expressed only via bin allocations.
+ *     Inventory at one node is bounded — single page, capped at MAX_ITEMS.
+ *  2. Otherwise (no location, or "All Companies" view), keep the existing cursor-
+ *     based paginated query against `warehouse_items`.
  */
 export function useWarehouseItemsLazyInventory({
   pageSize = 100,
@@ -34,6 +42,9 @@ export function useWarehouseItemsLazyInventory({
 }: UseWarehouseItemsLazyInventoryOptions) {
   const { selectedCompany, isViewingAllCompanies } = useCompany();
   const { data: permissions } = useCurrentUserLocationPermissions();
+
+  const useLocationScopedRpc =
+    !!locationId && !!selectedCompany?.id && !isViewingAllCompanies;
 
   return useInfiniteQuery({
     queryKey: [
@@ -49,56 +60,119 @@ export function useWarehouseItemsLazyInventory({
       supplierId,
     ],
     queryFn: async ({ pageParam }: { pageParam: Cursor | null }) => {
-      let query = supabase
-        .from('warehouse_items')
-        .select(`*, supplier:suppliers(id, name)`)
-        .gt('current_stock', 0);
+      let rawItems: any[] = [];
 
-      // Company filter
-      if (!isViewingAllCompanies && selectedCompany?.id) {
-        query = query.eq('company_id', selectedCompany.id);
+      if (useLocationScopedRpc) {
+        // Single-page canonical path. No cursor pagination — bounded set.
+        if (pageParam !== null) {
+          return { items: [] as WarehouseItem[], nextCursor: null as Cursor | null };
+        }
+
+        const { data, error } = await supabase.rpc(
+          'get_company_inventory_at_location',
+          {
+            p_company_id: selectedCompany!.id,
+            p_location_id: locationId!,
+          }
+        );
+        if (error) throw error;
+
+        let rows = (data || []) as any[];
+
+        // Defensive cap
+        if (rows.length > MAX_ITEMS) rows = rows.slice(0, MAX_ITEMS);
+
+        // Hydrate supplier name (RPC returns plain warehouse_items rows)
+        const supplierIds = [
+          ...new Set(rows.map((r) => r.supplier_id).filter(Boolean)),
+        ] as string[];
+        let supplierMap = new Map<string, { id: string; name: string }>();
+        if (supplierIds.length > 0) {
+          const { data: suppliers } = await supabase
+            .from('suppliers')
+            .select('id, name')
+            .in('id', supplierIds);
+          supplierMap = new Map((suppliers || []).map((s) => [s.id, s]));
+        }
+
+        rawItems = rows.map((r) => ({
+          ...r,
+          supplier: r.supplier_id ? supplierMap.get(r.supplier_id) || null : null,
+        }));
+
+        // Apply remaining filters client-side over the bounded set
+        if (search?.trim()) {
+          const q = search.trim().toLowerCase();
+          rawItems = rawItems.filter((it) => {
+            const fields = [
+              it.name,
+              it.item_code,
+              it.brand,
+              it.barcode,
+              it.sku,
+            ];
+            return fields.some(
+              (f) => typeof f === 'string' && f.toLowerCase().includes(q)
+            );
+          });
+        }
+        if (categoryId && categoryId !== 'all') {
+          rawItems = rawItems.filter((it) => it.category_id === categoryId);
+        }
+        if (status && status !== 'all') {
+          rawItems = rawItems.filter((it) => it.status === status);
+        }
+        if (supplierId && supplierId !== 'all') {
+          rawItems = rawItems.filter((it) => it.supplier_id === supplierId);
+        }
+      } else {
+        // Original paginated path — unchanged behavior
+        let query = supabase
+          .from('warehouse_items')
+          .select(`*, supplier:suppliers(id, name)`)
+          .gt('current_stock', 0);
+
+        if (!isViewingAllCompanies && selectedCompany?.id) {
+          query = query.eq('company_id', selectedCompany.id);
+        }
+
+        const searchOr = search?.trim()
+          ? (() => {
+              const escaped = search.trim().replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+              const term = `%${escaped}%`;
+              return `name.ilike."${term}",item_code.ilike."${term}",brand.ilike."${term}",barcode.ilike."${term}",sku.ilike."${term}"`;
+            })()
+          : null;
+
+        const cursorOr = pageParam
+          ? `created_at.lt.${pageParam.created_at},and(created_at.eq.${pageParam.created_at},id.lt.${pageParam.id})`
+          : null;
+
+        if (categoryId && categoryId !== 'all') {
+          query = query.eq('category_id', categoryId);
+        }
+        if (status && status !== 'all') {
+          query = query.eq('status', status);
+        }
+        if (supplierId && supplierId !== 'all') {
+          query = query.eq('supplier_id', supplierId);
+        }
+
+        query = query
+          .order('created_at', { ascending: false })
+          .order('id', { ascending: false });
+
+        if (searchOr) query = query.or(searchOr);
+        if (cursorOr) query = query.or(cursorOr);
+
+        query = query.limit(pageSize);
+
+        const { data, error } = await query;
+        if (error) throw error;
+        rawItems = (data || []) as any[];
       }
 
-      // Build search and cursor OR strings
-      const searchOr = search?.trim()
-        ? (() => {
-            const escaped = search.trim().replace(/\\/g, '\\\\').replace(/"/g, '\\"');
-            const term = `%${escaped}%`;
-            return `name.ilike."${term}",item_code.ilike."${term}",brand.ilike."${term}",barcode.ilike."${term}",sku.ilike."${term}"`;
-          })()
-        : null;
-
-      const cursorOr = pageParam
-        ? `created_at.lt.${pageParam.created_at},and(created_at.eq.${pageParam.created_at},id.lt.${pageParam.id})`
-        : null;
-
-      if (categoryId && categoryId !== 'all') {
-        query = query.eq('category_id', categoryId);
-      }
-      if (status && status !== 'all') {
-        query = query.eq('status', status);
-      }
-      if (supplierId && supplierId !== 'all') {
-        query = query.eq('supplier_id', supplierId);
-      }
-
-      // Cursor-based keyset pagination
-      query = query
-        .order('created_at', { ascending: false })
-        .order('id', { ascending: false });
-
-      // Apply search and cursor as independent .or() calls (PostgREST ANDs them)
-      if (searchOr) query = query.or(searchOr);
-      if (cursorOr) query = query.or(cursorOr);
-
-      query = query.limit(pageSize);
-
-      const { data, error } = await query;
-      if (error) throw error;
-
-      const rawItems = (data || []) as any[];
-
-      // Enrich with bin allocation data per batch
+      // Enrich with bin allocation data
       const itemIds = rawItems.map((item) => item.id);
       let enrichedItems: WarehouseItem[] = rawItems.map((item) => ({
         ...item,
@@ -106,12 +180,10 @@ export function useWarehouseItemsLazyInventory({
       }));
 
       if (itemIds.length > 0) {
-        // Fetch permitted bins
         let binsQuery = supabase
           .from('warehouse_bins')
           .select('id, bin_code, name, location_id');
 
-        // If a specific location is selected, scope bins to that location
         if (locationId) {
           binsQuery = binsQuery.eq('location_id', locationId);
         } else if (permissions && !permissions.viewAllLocations) {
@@ -124,13 +196,11 @@ export function useWarehouseItemsLazyInventory({
           if (permittedLocationIds.length > 0) {
             binsQuery = binsQuery.in('location_id', permittedLocationIds);
           }
-          // Fail-open: no explicit permissions = show all bins (no filter)
         }
 
         const { data: bins } = await binsQuery;
         const permittedBinIds = new Set(bins?.map((b) => b.id) || []);
 
-        // Fetch allocations for this batch of items
         const { data: allocations } = await supabase
           .from('warehouse_bin_allocations')
           .select('warehouse_item_id, bin_id, available_quantity')
@@ -174,7 +244,7 @@ export function useWarehouseItemsLazyInventory({
       }
 
       let nextCursor: Cursor | null = null;
-      if (enrichedItems.length === pageSize) {
+      if (!useLocationScopedRpc && enrichedItems.length === pageSize) {
         const last = enrichedItems[enrichedItems.length - 1];
         nextCursor = { created_at: last.created_at!, id: last.id };
       }
@@ -183,7 +253,6 @@ export function useWarehouseItemsLazyInventory({
     },
     initialPageParam: null as Cursor | null,
     getNextPageParam: (lastPage, allPages) => {
-      // Cap at MAX_ITEMS
       const totalLoaded = allPages.reduce((sum, p) => sum + p.items.length, 0);
       if (totalLoaded >= MAX_ITEMS) return undefined;
       return lastPage.nextCursor;
