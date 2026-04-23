@@ -437,7 +437,7 @@ export const LocationManagementDialog = () => {
               <div className="flex gap-2">
                 <Button 
                   type="submit" 
-                  disabled={isCreating || isUpdating || !formData.name.trim() || formData.company_ids.length === 0}
+                  disabled={isCreating || isUpdating || !formData.name.trim() || (formData.assignment_mode !== 'inherit_parent' && formData.company_ids.length === 0)}
                   className="flex-1"
                 >
                   <Plus className="h-4 w-4 mr-2" />
