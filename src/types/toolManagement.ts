@@ -36,7 +36,8 @@ export interface WarehouseTool {
 export interface ToolIssue {
   id: string;
   issue_number: string;
-  tool_id: string;
+  tool_id: string | null;
+  bin_id?: string | null;
   issued_to: string | null;
   issued_to_name: string;
   department: string | null;
@@ -53,8 +54,32 @@ export interface ToolIssue {
   created_by: string | null;
   created_at: string;
   updated_at: string;
+  tool_code_snapshot?: string | null;
+  tool_name_snapshot?: string | null;
   // Joined fields
   tool?: WarehouseTool;
+  bin?: { id: string; bin_code: string; name: string } | null;
+}
+
+export interface ToolBinAllocation {
+  id: string;
+  tool_id: string;
+  bin_id: string;
+  allocated_quantity: number;
+  reserved_quantity: number;
+  available_quantity: number;
+  notes: string | null;
+  company_id: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+  // Joined
+  bin?: {
+    id: string;
+    bin_code: string;
+    name: string;
+    location_id: string | null;
+  };
 }
 
 export interface ToolReturn {
