@@ -1,5 +1,33 @@
 // App version: 1.0.2 - Code splitting for performance
 import { Suspense, lazy } from "react";
+
+// Auto-recover from stale chunk references after a new deploy.
+// When index.html is cached but references chunks that no longer exist,
+// dynamic imports throw "Failed to fetch dynamically imported module".
+// We reload once to pick up the fresh index.html + chunk hashes.
+if (typeof window !== "undefined") {
+  const handleChunkError = (message: string | undefined) => {
+    if (!message) return;
+    const isChunkError =
+      message.includes("Failed to fetch dynamically imported module") ||
+      message.includes("Importing a module script failed") ||
+      message.includes("error loading dynamically imported module");
+    if (!isChunkError) return;
+    const key = "__chunk_reload_attempt__";
+    if (sessionStorage.getItem(key)) return;
+    sessionStorage.setItem(key, "1");
+    window.location.reload();
+  };
+  window.addEventListener("error", (e) => handleChunkError(e.message));
+  window.addEventListener("unhandledrejection", (e) =>
+    handleChunkError(e.reason?.message ?? String(e.reason ?? ""))
+  );
+  // Clear the reload guard after a successful load.
+  window.addEventListener("load", () => {
+    setTimeout(() => sessionStorage.removeItem("__chunk_reload_attempt__"), 2000);
+  });
+}
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
