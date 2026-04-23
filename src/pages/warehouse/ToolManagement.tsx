@@ -165,6 +165,10 @@ export default function ToolManagement() {
               setSelectedToolForEdit(tool);
               setShowEditTool(true);
             }}
+            onDeleteTool={(tool) => {
+              setSelectedToolForDelete(tool);
+              setShowDeleteTool(true);
+            }}
           />
         </TabsContent>
 
@@ -203,6 +207,27 @@ export default function ToolManagement() {
           tool={selectedToolForEdit}
         />
       )}
+      <DeleteConfirmationDialog
+        open={showDeleteTool}
+        onOpenChange={(open) => {
+          setShowDeleteTool(open);
+          if (!open) setSelectedToolForDelete(null);
+        }}
+        title="Delete tool"
+        description="This permanently removes the tool master record. Historical issues and returns are preserved for audit."
+        itemName={selectedToolForDelete ? `${selectedToolForDelete.tool_code} — ${selectedToolForDelete.name}` : undefined}
+        destructiveText="Delete tool"
+        isLoading={isDeleting}
+        onConfirm={() => {
+          if (!selectedToolForDelete) return;
+          deleteTool(selectedToolForDelete.id, {
+            onSuccess: () => {
+              setShowDeleteTool(false);
+              setSelectedToolForDelete(null);
+            },
+          });
+        }}
+      />
     </div>
   );
 }
