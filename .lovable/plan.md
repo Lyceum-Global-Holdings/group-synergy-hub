@@ -1,69 +1,90 @@
 
 
-## Standardize Auto-Generated Item Codes to Max 13 Characters
+## Fix: Multi-Company Sub-Location Allocations Not Fully Visible (e.g. Lyceum Anuradhapura)
 
-Align all auto-generated item codes with **GS1 GTIN-13** length (13 chars max) — the most widely used international barcode/material identifier standard, also recommended by SAP S/4HANA migrations and ISO/IEC 15459 (unique identification of transport units / items).
+### Root cause (verified against DB)
 
-### Current state
+`Lyceum Anuradhapura` is correctly mapped to **2 companies** in `warehouse_location_companies`:
+- `NCG Warehouse Solutions` (NWS)
+- `Lyceum International Schools` (LIS)
 
-| Module | Pattern | Example | Length | Compliant? |
-|---|---|---|---|---|
-| Warehouse | `INV-{CAT3}-{NNN}` | `INV-ELC-001` | 11 | ✅ Yes |
-| Construction | `{CAT3}-{SUB3}-{NAME5}-{NNN}` | `MAC-HVY-EXCAV-001` | 17 | ❌ +4 over |
+But the table on `/admin/warehouse-management` shows only a subset because of **two compounding issues**:
 
-### Target — Construction (the only non-compliant generator)
+1. **RLS hides mapping rows from admins who can't access every linked company.** Policy on `warehouse_location_companies`: `SELECT … USING (can_access_company(company_id))`. The bulk fetch in `WarehouseManagement.tsx` (lines 77–91) silently drops rows for companies the admin isn't a member of.
+2. **The "Company" cell silently skips chips for companies missing from `useCompanies()`.** Line 516–522: `companies.find(c => c.id === cid)` → if the company isn't in the user's filtered list, `return null` and the badge disappears with no indication.
 
-New pattern: `{CAT3}-{SUB3}-{NAME2}-{NNN}` → e.g. `MAC-HVY-EX-001` = **14**… still over. We need to drop one separator.
+Net effect: a sub-location with 2 company allocations renders 0–1 chips depending on the admin's company access, so it *looks* like the allocation is broken. The data is fine — the **admin master-data view is over-filtered**.
 
-**Final standard pattern: `{CAT3}{SUB3}-{NAME3}-{NNN}`** → `MACHVY-EXC-001` = **13 chars exactly.**
+### Standards alignment
 
-Breakdown (totals 13):
-- `CAT3` (3) + `SUB3` (3) = 6-char compound group code (no internal separator)
-- `-` (1)
-- `NAME3` (3) — first 3 alphanumeric chars of cleaned item name, uppercase
-- `-` (1)
-- `NNN` (3) — zero-padded sequence
+- **ISO/IEC 27001 A.9.4.1 (Information access restriction)** — distinguishes *administrative metadata access* from *transactional data access*. Admin/master-data screens must expose the full configuration without granting operational data rights.
+- **SAP Authorization Concept** — separation of *display-only configuration objects* (e.g. `S_TABU_DIS` for warehouse master data) from *data access objects*.
+- **GS1 GMN / Master Data Sharing** — location master records should expose all their allocations to authorized maintainers (Super Admin / Admin) regardless of transactional scope.
 
-Examples:
-- Heavy Excavator → `MACHVY-EXC-001`
-- Power Drill (tools/power) → `TOLPWR-DRL-001`
-- PPE Helmet (safety/ppe) → `SAFPPE-HLM-001`
-- Cup Lock Standard (scaffolding/cup_lock) → `SCACPL-STN-001`
+### Solution — two layers
 
-### Why these tradeoffs
+#### 1. DB: security-definer RPC for full master-data view
 
-- **Drop color from code** (already removed in current logic — keep that).
-- **Compress NAME from 5→3 chars**: 3 chars + sequence still uniquely identifies up to 999 items per (category, sub-category, name-prefix) bucket — far more than typical site inventory needs. Collisions across different item names sharing the same 3-letter prefix are absorbed by the sequence number, which is already scoped per composite prefix in `useNextItemCode`.
-- **Merge CAT+SUB into one 6-char block**: visually still reads as a group (`MACHVY`, `TOLPWR`) and matches SAP MM "Material Group" + sub-group flat encoding seen in S/4HANA short-code configurations.
-- **Hyphen-delimited 3 segments**: GTIN-13 is 13 numeric, but for human-readable internal codes ISO/IEC 15459 explicitly allows alphanumeric within the 13-char budget. Hyphens improve scan-readability and are accepted by Code-128 / Code-39 barcodes.
+Create `get_all_warehouse_location_companies()` as `SECURITY DEFINER`, callable only by **Super Admin or Admin** (`has_role(auth.uid(), 'admin') OR has_role(auth.uid(), 'super_admin') OR is_super_admin(auth.uid())`). Returns the complete `(location_id, company_id)` set, bypassing the per-company RLS — appropriate because this is *configuration metadata*, not transactional data, and is gated to admin roles.
 
-### Sequence safety
+```sql
+CREATE OR REPLACE FUNCTION public.get_all_warehouse_location_companies()
+RETURNS TABLE (location_id uuid, company_id uuid)
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
+  SELECT wlc.location_id, wlc.company_id
+  FROM warehouse_location_companies wlc
+  WHERE has_role(auth.uid(), 'admin')
+     OR has_role(auth.uid(), 'super_admin')
+     OR is_super_admin(auth.uid());
+$$;
+GRANT EXECUTE ON FUNCTION public.get_all_warehouse_location_companies() TO authenticated;
+```
 
-Sequence stays at 3 digits (001–999). If a bucket ever exceeds 999, the existing `useNextItemCode` logic would silently roll into 4 digits (`1000`) and break the 13-char limit. Add a guard:
+Add a parallel `get_all_companies_minimal()` returning `(id, name, code)` only — no PII / sensitive columns — gated to admins, so the admin UI can label every chip even for companies outside the admin's transactional scope. Keep `useCompanies()` untouched (still RLS-scoped for transactional flows).
 
-- When `nextNumber > 999`, throw a clear error: *"Sequence overflow for prefix MACHVY-EXC. Create a new item name to start a new sequence."* — surfaces the issue immediately in the toast rather than producing a 14-char code.
-- This is the SAP-style "number range exhausted" pattern.
+```sql
+CREATE OR REPLACE FUNCTION public.get_all_companies_minimal()
+RETURNS TABLE (id uuid, name text, code text)
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
+  SELECT c.id, c.name, c.code FROM companies c
+  WHERE has_role(auth.uid(), 'admin')
+     OR has_role(auth.uid(), 'super_admin')
+     OR is_super_admin(auth.uid())
+  ORDER BY c.name;
+$$;
+GRANT EXECUTE ON FUNCTION public.get_all_companies_minimal() TO authenticated;
+```
+
+#### 2. Frontend: use the admin RPCs in the master-data screen
+
+**`src/pages/admin/WarehouseManagement.tsx`**
+- Replace the bulk `from('warehouse_location_companies').select(...)` query with `supabase.rpc('get_all_warehouse_location_companies')`.
+- Add a sibling query to `supabase.rpc('get_all_companies_minimal')` for chip labelling. Build a `Map<id, {name, code}>` and use it (with `useCompanies()` as fallback) when rendering the Company cell.
+- On unknown company IDs, render a neutral chip with the short UUID instead of returning `null` — guarantees mismatches are visible, not silently swallowed.
+- Keep the **edit dialog's** company picker (`companies` from `useCompanies`) unchanged — admins can only assign companies they themselves can access (correct security boundary).
+
+#### 3. Sub-location parent-inheritance hint (UX only)
+
+For `sublocation` / `department` rows, if their direct allocation set is empty, show a muted secondary chip "via {ParentName}" listing the parent's allocations, with a tooltip "Inherited from parent location". This matches **SAP MM storage-bin → storage-location** inheritance display pattern. Pure presentation — no data change, no permission change.
 
 ### Files modified
 
 | File | Change |
 |---|---|
-| `src/types/construction-inventory.ts` | `abbreviateItemName(name)` — slice changes from `5` to `3`. Update inline comment. |
-| `src/hooks/construction/useNextItemCode.ts` | Build composite prefix as `${catPrefix}${subCatCode}` (no hyphen between cat & sub) + `-${nameAbbr}`. Update regex accordingly. Add overflow guard: if `nextNumber > 999`, throw `Error("Sequence range exhausted for prefix …")`. Keep `staleTime: 0`. |
-| `src/components/construction/inventory/AddItemDialog.tsx` | No code change needed — consumes `nextItemCode` as-is. |
-| Memory: `mem://architecture/item-code-generation-standards` | Update construction pattern to `{CAT3}{SUB3}-{NAME3}-{NNN}` (13-char GS1-aligned standard) and note 999/bucket sequence cap. |
+| New migration | Create `get_all_warehouse_location_companies()` and `get_all_companies_minimal()` security-definer RPCs gated to admin/super-admin roles. |
+| `src/pages/admin/WarehouseManagement.tsx` | Switch the two bulk queries to the new RPCs; render unknown companies with a fallback chip instead of `null`; add parent-inheritance "via {Parent}" chips for sub-locations with no direct allocations. |
 
 ### What does NOT change
 
-- **Existing item codes** in the database (no migration / rename). Old 17-char codes remain valid and untouched — uniqueness is per `(item_code, company_id)` so legacy + new codes coexist.
-- Warehouse generator (`useNextWarehouseItemCode`) — already 11 chars, compliant.
-- DB schema, RLS, item creation flow, manual override during edit.
-- Sub-category codes, category prefixes, color options.
+- RLS on `warehouse_location_companies` stays as-is (transactional scoping preserved).
+- `useCompanies()` and all other consumers (`LocationSelector`, `useWarehouseAssets`, `InventoryItems`, etc.) — untouched.
+- Edit dialog assignment surface — admins still cannot assign companies they lack access to.
+- DB schema for locations / mapping — no column changes.
+- Existing data — no migration of rows.
 
-### Standards alignment
+### Verification after deploy
 
-- **GS1 GTIN-13** — 13-character item identifier ceiling (global retail/logistics standard).
-- **ISO/IEC 15459** — unique identification of items, allows alphanumeric.
-- **SAP MM / S/4HANA** Material Group + short-code Material Number convention.
-- Project memory: `item-code-generation-standards`, `item-code-multi-tenant-uniqueness`, `warehouse-category-code-mnemonic-standard`.
+- Open `/admin/warehouse-management` as the same admin → `Lyceum Anuradhapura` row shows **both** `NWS` and `LIS` chips.
+- Other multi-company sub-locations (`Lyceum Nugegoda`, `Lyceum Kurunegala`, `Lyceum Nugegoda Quarters`) show their full chip sets.
+- Non-admin users hitting the page (already RBAC-blocked from `/admin/*`) get an empty result from the RPC — no privilege escalation.
 
