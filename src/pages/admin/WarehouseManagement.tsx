@@ -556,44 +556,48 @@ export default function WarehouseManagement() {
                       <TableCell>
                         <div className="flex flex-wrap gap-1">
                           {(() => {
-                            const direct = allLocationCompanyMap[location.id]
-                              || (location.company_id ? [location.company_id] : []);
-                            if (direct.length > 0) {
-                              return direct.map((cid: string) => {
-                                const comp = companyLookup.get(cid);
-                                const label = comp?.code || comp?.name || `#${cid.slice(0, 8)}`;
+                            // Use server-resolved effective companies (handles inheritance chain).
+                            const effective = allEffectiveMap[location.id] || [];
+                            if (effective.length > 0) {
+                              return effective.map((row) => {
+                                const comp = companyLookup.get(row.company_id);
+                                const label = comp?.code || comp?.name || `#${row.company_id.slice(0, 8)}`;
+                                if (row.is_inherited) {
+                                  const sourceName = locations.find(l => l.id === row.source_location_id)?.name || 'parent';
+                                  return (
+                                    <Badge
+                                      key={row.company_id}
+                                      variant="secondary"
+                                      className="text-xs opacity-80"
+                                      title={`Inherited from: ${sourceName}`}
+                                    >
+                                      {label} <span className="ml-1 text-[10px] italic">via {sourceName}</span>
+                                    </Badge>
+                                  );
+                                }
                                 return (
                                   <Badge
-                                    key={cid}
+                                    key={row.company_id}
                                     variant="outline"
                                     className="text-xs"
-                                    title={comp?.name || `Unknown company (${cid})`}
+                                    title={comp?.name || `Unknown company (${row.company_id})`}
                                   >
                                     {label}
                                   </Badge>
                                 );
                               });
                             }
-                            // Parent-inheritance hint (SAP MM storage-bin → storage-location pattern):
-                            // sub-locations / departments with no direct allocation surface their parent's set.
-                            const parentId = (location as any).parent_id;
-                            const parent = parentId ? locations.find(l => l.id === parentId) : null;
-                            const inherited = parent
-                              ? (allLocationCompanyMap[parent.id]
-                                  || ((parent as any).company_id ? [(parent as any).company_id] : []))
-                              : [];
-                            if (inherited.length > 0 && parent) {
-                              return inherited.map((cid: string) => {
+                            // Legacy fallback for any rows the RPC hasn't covered yet.
+                            const legacy = allLocationCompanyMap[location.id]
+                              || (location.company_id ? [location.company_id] : []);
+                            if (legacy.length > 0) {
+                              return legacy.map((cid: string) => {
                                 const comp = companyLookup.get(cid);
                                 const label = comp?.code || comp?.name || `#${cid.slice(0, 8)}`;
                                 return (
-                                  <Badge
-                                    key={cid}
-                                    variant="secondary"
-                                    className="text-xs opacity-70"
-                                    title={`Inherited from parent location: ${parent.name}`}
-                                  >
-                                    {label} <span className="ml-1 text-[10px] italic">via {parent.name}</span>
+                                  <Badge key={cid} variant="outline" className="text-xs"
+                                    title={comp?.name || `Unknown company (${cid})`}>
+                                    {label}
                                   </Badge>
                                 );
                               });
