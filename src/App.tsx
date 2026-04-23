@@ -138,6 +138,7 @@ function App() {
         <Toaster />
         <Sonner />
         <BrowserRouter>
+          <ScrollToTop />
           <Suspense fallback={<PageLoader />}>
             <Routes>
               {/* Public routes - no auth required */}
