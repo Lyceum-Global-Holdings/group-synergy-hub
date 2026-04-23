@@ -442,12 +442,25 @@ export function ImportFromItemMasterDialog({
               </AlertDescription>
             </Alert>
           )}
-          {companyScope === "all" && (
+          {globalLocationId ? (
             <Alert>
               <Info className="h-4 w-4" />
               <AlertDescription>
-                Cross-company view active — tools will be created in each item's
-                source company, not the company in the header.
+                Auto-filled from current location filter — promoted tools will
+                land in{" "}
+                <strong>
+                  {locationOptions.find((l: any) => l.id === globalLocationId)
+                    ?.name ?? "the selected location"}
+                </strong>
+                . Change the Location dropdown above to override.
+              </AlertDescription>
+            </Alert>
+          ) : (
+            <Alert>
+              <Info className="h-4 w-4" />
+              <AlertDescription>
+                Pick a global location in the header to auto-assign all imports
+                to a single site.
               </AlertDescription>
             </Alert>
           )}
