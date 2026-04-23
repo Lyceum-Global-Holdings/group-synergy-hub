@@ -17216,7 +17216,9 @@ export type Database = {
           quantity_issued: number
           quantity_returned: number
           status: string
-          tool_id: string
+          tool_code_snapshot: string | null
+          tool_id: string | null
+          tool_name_snapshot: string | null
           updated_at: string | null
         }
         Insert: {
@@ -17237,7 +17239,9 @@ export type Database = {
           quantity_issued?: number
           quantity_returned?: number
           status?: string
-          tool_id: string
+          tool_code_snapshot?: string | null
+          tool_id?: string | null
+          tool_name_snapshot?: string | null
           updated_at?: string | null
         }
         Update: {
@@ -17258,7 +17262,9 @@ export type Database = {
           quantity_issued?: number
           quantity_returned?: number
           status?: string
-          tool_id?: string
+          tool_code_snapshot?: string | null
+          tool_id?: string | null
+          tool_name_snapshot?: string | null
           updated_at?: string | null
         }
         Relationships: [
