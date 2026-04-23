@@ -73,6 +73,7 @@ export interface CreateWarehouseLocationData {
   physical_address?: string;
   status?: 'active' | 'inactive' | 'maintenance' | 'closed';
   warehouse_category?: WarehouseCategory;
+  is_standalone_warehouse?: boolean;
 }
 
 export interface CreateAssetCategoryData {
