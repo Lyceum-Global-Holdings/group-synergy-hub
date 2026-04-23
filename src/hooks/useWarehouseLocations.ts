@@ -39,6 +39,8 @@ export const useWarehouseLocations = () => {
       queryClient.invalidateQueries({ queryKey: ['dashboard-locations'] }),
       queryClient.invalidateQueries({ queryKey: ['locations-for-companies'] }),
       queryClient.invalidateQueries({ queryKey: ['location-companies'] }),
+      queryClient.invalidateQueries({ queryKey: ['stock-bearing-locations-for-company'] }),
+      queryClient.invalidateQueries({ queryKey: ['company-inventory-at-location'] }),
     ]);
   };
 
@@ -197,6 +199,7 @@ export interface EffectiveLocation {
   type: string;
   parent_id: string | null;
   depth?: number;
+  is_standalone_warehouse?: boolean;
 }
 
 /**
@@ -262,5 +265,51 @@ export const useDashboardLocations = (selectedCompanyId?: string | null) => {
       if (error) throw error;
       return ((data as any[]) || []) as EffectiveLocation[];
     },
+  });
+};
+
+/**
+ * Stock-bearing locations for a company. Returns ALL nodes (location, sublocation,
+ * department) where the company has effective access — including standalone
+ * sub-location warehouses. Use this for stock-add / GRN / transfer pickers.
+ * SAP EWM: any storage node can be a stocking warehouse.
+ */
+export const useStockBearingLocationsForCompany = (selectedCompanyId?: string | null) => {
+  return useQuery({
+    queryKey: ['stock-bearing-locations-for-company', selectedCompanyId],
+    queryFn: async (): Promise<EffectiveLocation[]> => {
+      if (!selectedCompanyId) return [];
+      const { data, error } = await supabase.rpc(
+        'get_stock_bearing_locations_for_company' as any,
+        { p_company_id: selectedCompanyId }
+      );
+      if (error) throw error;
+      return ((data as any[]) || []) as EffectiveLocation[];
+    },
+    enabled: !!selectedCompanyId,
+  });
+};
+
+/**
+ * Per-company inventory at a specific physical location. Guarantees per-company
+ * stock isolation when many companies share a sub-location (standalone warehouse).
+ * Server-side filters warehouse_items by both company_id and location_id.
+ */
+export const useCompanyInventoryAtLocation = (
+  companyId?: string | null,
+  locationId?: string | null
+) => {
+  return useQuery({
+    queryKey: ['company-inventory-at-location', companyId, locationId],
+    queryFn: async (): Promise<any[]> => {
+      if (!companyId || !locationId) return [];
+      const { data, error } = await supabase.rpc(
+        'get_company_inventory_at_location' as any,
+        { p_company_id: companyId, p_location_id: locationId }
+      );
+      if (error) throw error;
+      return (data as any[]) || [];
+    },
+    enabled: !!companyId && !!locationId,
   });
 };

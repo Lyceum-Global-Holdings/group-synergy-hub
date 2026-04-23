@@ -30,6 +30,7 @@ import {
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Switch } from '@/components/ui/switch';
 import { useWarehouseLocations } from '@/hooks/useWarehouseLocations';
 import { LocationManagementDialog } from '@/components/warehouse/LocationManagementDialog';
 import { LocationAnalytics } from '@/components/warehouse/LocationAnalytics';
@@ -266,6 +267,7 @@ export default function WarehouseManagement() {
       contact_person: location.contact_person || '',
       contact_phone: location.contact_phone || '',
       physical_address: location.physical_address || '',
+      is_standalone_warehouse: !!location.is_standalone_warehouse,
       company_ids: [] as string[], // Will be populated by useEffect
     });
   };
@@ -288,7 +290,11 @@ export default function WarehouseManagement() {
   const handleSaveEdit = async () => {
     if (!editLocationData) return;
     try {
-      const mode = (editForm.assignment_mode as 'explicit' | 'inherit_parent') || 'explicit';
+      const isStandalone = !!editForm.is_standalone_warehouse;
+      // Standalone warehouses MUST use explicit company assignment.
+      const mode = isStandalone
+        ? 'explicit'
+        : ((editForm.assignment_mode as 'explicit' | 'inherit_parent') || 'explicit');
       await updateLocationAsync({
         id: editLocationData.id,
         name: editForm.name,
@@ -303,6 +309,7 @@ export default function WarehouseManagement() {
         contact_phone: editForm.contact_phone || null,
         physical_address: editForm.physical_address || null,
         company_id: mode === 'explicit' ? (editForm.company_ids?.[0] || null) : null,
+        is_standalone_warehouse: isStandalone,
       });
       await saveCompanies({
         locationId: editLocationData.id,
@@ -545,7 +552,14 @@ export default function WarehouseManagement() {
                       </TableCell>
                       <TableCell>
                         <div>
-                          <div className="font-medium">{location.name}</div>
+                          <div className="font-medium flex items-center gap-2 flex-wrap">
+                            <span>{location.name}</span>
+                            {location.is_standalone_warehouse && (
+                              <Badge variant="secondary" className="text-[10px] uppercase tracking-wide">
+                                Standalone
+                              </Badge>
+                            )}
+                          </div>
                           {location.description && (
                             <div className="text-sm text-muted-foreground">
                               {location.description}
@@ -725,6 +739,26 @@ export default function WarehouseManagement() {
           <ScrollArea className="flex-1 pr-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-4">
               {editLocationData?.parent_id && (
+                <div className="space-y-2 md:col-span-2 flex items-start justify-between gap-3 p-3 rounded-lg border bg-muted/30">
+                  <div className="space-y-1">
+                    <Label htmlFor="edit-standalone-toggle" className="font-medium">Standalone Warehouse</Label>
+                    <p className="text-xs text-muted-foreground">
+                      This {editForm.type || 'sub-location'} operates as its own warehouse. Companies and inventory are managed independently from its parent.
+                    </p>
+                  </div>
+                  <Switch
+                    id="edit-standalone-toggle"
+                    checked={!!editForm.is_standalone_warehouse}
+                    onCheckedChange={(checked) => setEditForm(prev => ({
+                      ...prev,
+                      is_standalone_warehouse: checked,
+                      assignment_mode: checked ? 'explicit' : (prev.assignment_mode || 'explicit'),
+                    }))}
+                  />
+                </div>
+              )}
+
+              {editLocationData?.parent_id && !editForm.is_standalone_warehouse && (
                 <div className="space-y-2 md:col-span-2">
                   <Label>Company Assignment Mode</Label>
                   <Select

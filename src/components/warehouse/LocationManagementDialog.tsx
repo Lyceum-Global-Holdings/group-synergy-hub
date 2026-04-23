@@ -13,6 +13,7 @@ import { useCompanies } from '@/hooks/useCompanies';
 import { useLocationCompanies } from '@/hooks/useLocationCompanies';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Switch } from '@/components/ui/switch';
 import { ChevronsUpDown } from 'lucide-react';
 type LocationType = 'location' | 'sublocation' | 'department';
 
@@ -33,6 +34,7 @@ export const LocationManagementDialog = () => {
     warehouse_category: string;
     company_ids: string[];
     assignment_mode: 'explicit' | 'inherit_parent';
+    is_standalone_warehouse: boolean;
   }>({
     name: '',
     type: 'location',
@@ -46,7 +48,8 @@ export const LocationManagementDialog = () => {
     status: 'active',
     warehouse_category: 'general',
     company_ids: [],
-    assignment_mode: 'explicit'
+    assignment_mode: 'explicit',
+    is_standalone_warehouse: false,
   });
 
   const {
@@ -66,7 +69,10 @@ export const LocationManagementDialog = () => {
     e.preventDefault();
 
     const isChild = formData.type !== 'location' && formData.parent_id !== 'none';
-    const effectiveMode = isChild ? formData.assignment_mode : 'explicit';
+    // Standalone warehouses MUST use explicit company assignment.
+    const effectiveMode = formData.is_standalone_warehouse
+      ? 'explicit'
+      : (isChild ? formData.assignment_mode : 'explicit');
 
     if (!formData.name.trim()) return;
     if (effectiveMode === 'explicit' && formData.company_ids.length === 0) return;
@@ -84,6 +90,7 @@ export const LocationManagementDialog = () => {
       status: formData.status,
       warehouse_category: formData.warehouse_category as any,
       company_id: effectiveMode === 'explicit' ? formData.company_ids[0] : undefined,
+      is_standalone_warehouse: formData.is_standalone_warehouse,
     };
 
     try {
@@ -119,7 +126,8 @@ export const LocationManagementDialog = () => {
       status: 'active',
       warehouse_category: 'general',
       company_ids: [],
-      assignment_mode: 'explicit'
+      assignment_mode: 'explicit',
+      is_standalone_warehouse: false,
     });
     setEditingLocation(null);
   };
@@ -159,7 +167,8 @@ export const LocationManagementDialog = () => {
       status: location.status || 'active',
       warehouse_category: location.warehouse_category || 'general',
       company_ids: location.company_id ? [location.company_id] : [],
-      assignment_mode: location.company_assignment_mode || 'explicit'
+      assignment_mode: location.company_assignment_mode || 'explicit',
+      is_standalone_warehouse: !!location.is_standalone_warehouse,
     });
   };
 
@@ -195,6 +204,27 @@ export const LocationManagementDialog = () => {
             
             <form onSubmit={handleSubmit} className="space-y-4">
               {formData.type !== 'location' && formData.parent_id !== 'none' && (
+                <div className="flex items-start justify-between gap-3 p-3 rounded-lg border bg-muted/30">
+                  <div className="space-y-1">
+                    <Label htmlFor="standalone-toggle" className="font-medium">Standalone Warehouse</Label>
+                    <p className="text-xs text-muted-foreground">
+                      This {formData.type} operates as its own warehouse. Companies and inventory are managed independently from its parent.
+                    </p>
+                  </div>
+                  <Switch
+                    id="standalone-toggle"
+                    checked={formData.is_standalone_warehouse}
+                    onCheckedChange={(checked) => setFormData(prev => ({
+                      ...prev,
+                      is_standalone_warehouse: checked,
+                      // Standalone forces explicit assignment.
+                      assignment_mode: checked ? 'explicit' : prev.assignment_mode,
+                    }))}
+                  />
+                </div>
+              )}
+
+              {formData.type !== 'location' && formData.parent_id !== 'none' && !formData.is_standalone_warehouse && (
                 <div>
                   <Label>Company Assignment Mode</Label>
                   <Select
@@ -218,7 +248,7 @@ export const LocationManagementDialog = () => {
               )}
 
               <div>
-                <Label>Companies {formData.assignment_mode !== 'inherit_parent' && '*'}</Label>
+                <Label>Companies {(formData.assignment_mode !== 'inherit_parent' || formData.is_standalone_warehouse) && '*'}</Label>
                 <Popover>
                   <PopoverTrigger asChild>
                     <Button

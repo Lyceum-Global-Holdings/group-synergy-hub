@@ -18530,6 +18530,7 @@ export type Database = {
           current_usage: number | null
           description: string | null
           id: string
+          is_standalone_warehouse: boolean
           location_code: string | null
           name: string
           parent_id: string | null
@@ -18550,6 +18551,7 @@ export type Database = {
           current_usage?: number | null
           description?: string | null
           id?: string
+          is_standalone_warehouse?: boolean
           location_code?: string | null
           name: string
           parent_id?: string | null
@@ -18570,6 +18572,7 @@ export type Database = {
           current_usage?: number | null
           description?: string | null
           id?: string
+          is_standalone_warehouse?: boolean
           location_code?: string | null
           name?: string
           parent_id?: string | null
@@ -19495,6 +19498,47 @@ export type Database = {
         }[]
       }
       get_company_hod: { Args: { p_company_id: string }; Returns: string }
+      get_company_inventory_at_location: {
+        Args: { p_company_id: string; p_location_id: string }
+        Returns: {
+          available_quantity: number | null
+          barcode: string | null
+          brand: string | null
+          catalog_item_id: string | null
+          category_id: string | null
+          company_id: string | null
+          created_at: string
+          created_by: string | null
+          current_stock: number | null
+          description: string | null
+          id: string
+          image_url: string | null
+          is_batch_tracked: boolean | null
+          is_serialized: boolean | null
+          item_code: string
+          location_id: string | null
+          manufacturer: string | null
+          max_stock_level: number | null
+          min_stock_level: number | null
+          name: string
+          notes: string | null
+          reorder_level: number | null
+          reserved_quantity: number | null
+          selling_price: number | null
+          sku: string | null
+          status: string
+          supplier_id: string | null
+          unit_cost: number | null
+          unit_id: string | null
+          updated_at: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "warehouse_items"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       get_company_manager: { Args: { p_company_id: string }; Returns: string }
       get_construction_labour_directory: {
         Args: never
@@ -19584,6 +19628,17 @@ export type Database = {
         }[]
       }
       get_public_asset: { Args: { p_id: string }; Returns: Json }
+      get_stock_bearing_locations_for_company: {
+        Args: { p_company_id: string }
+        Returns: {
+          depth: number
+          id: string
+          is_standalone_warehouse: boolean
+          name: string
+          parent_id: string
+          type: string
+        }[]
+      }
       get_trial_balance: {
         Args: { p_as_of_date: string; p_company_id: string }
         Returns: {
