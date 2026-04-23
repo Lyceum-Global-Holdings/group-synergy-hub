@@ -19395,6 +19395,21 @@ export type Database = {
       generate_supplier_code: { Args: never; Returns: string }
       generate_transfer_number: { Args: never; Returns: string }
       generate_work_order_number: { Args: never; Returns: string }
+      get_all_companies_minimal: {
+        Args: never
+        Returns: {
+          code: string
+          id: string
+          name: string
+        }[]
+      }
+      get_all_warehouse_location_companies: {
+        Args: never
+        Returns: {
+          company_id: string
+          location_id: string
+        }[]
+      }
       get_approval_console: {
         Args: { user_id?: string }
         Returns: {
