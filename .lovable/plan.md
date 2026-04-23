@@ -1,82 +1,111 @@
 
 
-## Fix: Deleting Level 1 Category Wipes Out the Level 0 Parent
+## Move Category Between Groups (Re-parent / Reclassify)
 
-### Root cause (confirmed via DB + code inspection)
+Add a "Move" action on each category so a user can relocate it under a different parent (or promote it to a Level 0 root). This is the standard SAP MM "Reclassify Material Group" pattern and aligns with **ISO 55000** (asset hierarchy maintenance) and **ISO/IEC 25010** reliability principles — change hierarchy without delete/recreate.
 
-A **closure bug** in `src/components/warehouse/ItemCategoriesTab.tsx` (lines 201–212 and 226–239):
+### Behavior
 
-```tsx
-<CategoryTreeItem
-  category={category}            // root category
-  onDelete={() => handleDeleteCategory(category)}  // ← ignores any id passed in
-  ...
-/>
+- New **Move** icon (folder-arrow) next to Edit / Delete on every visible category row.
+- Opens a `MoveCategoryDialog` showing:
+  - Source: current category (name, code, current parent path breadcrumb).
+  - Destination: searchable parent picker showing the full Level 0 + Level 1 tree with indentation, plus a top option **"— Move to Top Level (Level 0) —"**.
+  - Read-only impact summary: *"X subcategories will move with this category"*.
+  - Confirm / Cancel.
+- On confirm: single `UPDATE item_categories SET parent_id = <new> WHERE id = <source>`. Items linked to the category are unaffected (they reference `category_id`, not the parent path).
+
+### Validation rules (enforced client + DB)
+
+1. **No self-parent**: cannot pick itself as new parent.
+2. **No cycles**: cannot pick any of its own descendants as new parent. Computed in the picker (descendants are filtered out + greyed with tooltip "Would create a cycle").
+3. **Max depth = 2 (Level 0 + Level 1 only)** to match the rest of the warehouse UI: a Level 0 with children cannot be moved *under* another Level 0 (would push children to Level 2). Show inline error.
+4. **Global vs company scope**: a global category (`company_id IS NULL`) can only be re-parented to another global category (or top level). Company-owned categories can be re-parented to any visible parent. Prevents leaking company data into the global tree.
+5. **Permissions**: same rule as Edit — admin / super_admin / moderator only.
+
+### Database — depth + cycle guard trigger
+
+Belt-and-braces server-side enforcement (frontend bug should never corrupt the tree again, per the recent closure-bug incident):
+
+```sql
+CREATE OR REPLACE FUNCTION public.enforce_item_category_hierarchy()
+RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE
+  v_depth int := 0;
+  v_cursor uuid := NEW.parent_id;
+BEGIN
+  IF NEW.parent_id = NEW.id THEN
+    RAISE EXCEPTION 'Category cannot be its own parent';
+  END IF;
+
+  -- Walk up; reject cycles and depth > 1 (root=0, child=1)
+  WHILE v_cursor IS NOT NULL LOOP
+    IF v_cursor = NEW.id THEN
+      RAISE EXCEPTION 'Move would create a cycle in category tree';
+    END IF;
+    v_depth := v_depth + 1;
+    IF v_depth > 1 THEN
+      RAISE EXCEPTION 'Category hierarchy is limited to 2 levels (Level 0 and Level 1)';
+    END IF;
+    SELECT parent_id INTO v_cursor FROM public.item_categories WHERE id = v_cursor;
+  END LOOP;
+
+  -- If this category itself has children, it must remain at Level 0
+  IF NEW.parent_id IS NOT NULL
+     AND EXISTS (SELECT 1 FROM public.item_categories WHERE parent_id = NEW.id) THEN
+    RAISE EXCEPTION 'Cannot move a parent category under another category (would exceed 2 levels)';
+  END IF;
+
+  RETURN NEW;
+END $$;
+
+CREATE TRIGGER trg_item_category_hierarchy
+BEFORE INSERT OR UPDATE OF parent_id ON public.item_categories
+FOR EACH ROW EXECUTE FUNCTION public.enforce_item_category_hierarchy();
 ```
 
-`CategoryTreeItem` recursively renders its own children and forwards the **same** `onDelete` reference. The child calls `onDelete(child.id)` (correct), but the parent's closure throws the argument away and deletes the **root** instead. Any click on a Level 1 trash icon deletes its Level 0 ancestor.
+### Hook — new mutation in `useItemCategories.ts`
 
-The database is innocent — `item_categories.parent_id` FK is `ON DELETE SET NULL`. When `TOO-PWR` (Power Tools) was wrongly deleted, its children (Drills, Saws, Grinders, etc.) were correctly orphaned with `parent_id = NULL`. They still exist in the DB, just detached.
-
-### The fix
-
-**1. `src/components/warehouse/ItemCategoriesTab.tsx`** — honor the `(categoryId) => void` contract.
-
-Replace the inline closures with a handler that resolves the id back to the actual category before deciding delete vs. hide:
-
-```tsx
-const handleDeleteById = (categoryId: string) => {
-  const target = allCategories.find(c => c.id === categoryId);
-  if (!target) return;
-  if (!target.company_id && selectedCompany?.id) {
-    excludeCategory(target.id);   // global → hide for this company
-  } else {
-    deleteCategory(target.id);    // company-owned → real delete
-  }
-};
+```ts
+const moveCategoryMutation = useMutation({
+  mutationFn: async ({ id, newParentId }: { id: string; newParentId: string | null }) => {
+    const { error } = await supabase
+      .from('item_categories')
+      .update({ parent_id: newParentId })
+      .eq('id', id);
+    if (error) throw error;
+  },
+  onSuccess: () => {
+    queryClient.invalidateQueries({ queryKey: ['item-categories', companyId] });
+    toast({ title: 'Category moved', description: 'Hierarchy updated successfully.' });
+  },
+  onError: (e: any) => {
+    toast({ title: 'Move failed', description: e.message ?? 'Could not move category.', variant: 'destructive' });
+  },
+});
 ```
 
-Then both tree renders pass it directly:
-```tsx
-onDelete={handleDeleteById}
-```
-Drop `onDelete={() => handleDeleteCategory(category)}` and `onDelete={() => {}}`.
+Exposes `moveCategory`, `isMoving`.
 
-**2. `src/components/warehouse/CategoryTreeItem.tsx`** — defensive guard (parent-only deletion warning is misleading because of cascading children warning text).
-
-No logic change required; the component already calls `onDelete(category.id)` correctly. Optionally tighten the prop type to `onDelete: (categoryId: string) => void` (already is) — no other callers found.
-
-**3. Restore the deleted "Power Tools" Level 0 category**
-
-Re-create `TOO-PWR / Power Tools` as a global Level 0 (`company_id = NULL`, `parent_id = NULL`), then re-parent the orphaned children (Drills, Saws, Grinders, plus any company-scoped power-tool entries that lost their parent) back under it. Affected rows identified:
-
-| code | name | company_id |
-|---|---|---|
-| TOO-PWR-DRL | Drills | NULL (global) |
-| TOO-PWR-SAW | Saws | NULL (global) |
-| TOO-PWR-GRN | Grinders | NULL (global) |
-| TOO-PWR-MXT | Mixture | company-scoped |
-| TOO-PWR-WKR | Waker Machine | company-scoped |
-| TOO-PWR-DRL | Drill | company-scoped |
-| TOO-PWR-GNR | General Tools | company-scoped |
-
-Done via a one-shot data update (insert parent, then `UPDATE item_categories SET parent_id = <new TOO-PWR id> WHERE code LIKE 'TOO-PWR-%'`).
-
-**4. (Optional, recommended) Frontend safety rail**
-
-In `deleteCategoryMutation` (`src/hooks/useItemCategories.ts`), refuse to delete a category that has children in the in-memory list, returning a clear toast: *"This category has X subcategories. Delete or reassign them first."* This is belt-and-braces — the real bug is fixed in step 1, but this prevents any future accidental parent deletion. Aligns with **ISO/IEC 25010** (reliability/fault tolerance) and the standard "no implicit cascading delete on hierarchical master data" rule (SAP MM, ISO 55000).
-
-### What does NOT change
-
-- Database schema or FK rules (`ON DELETE SET NULL` is already correct).
-- RLS, exclude/restore (hide) flow, bulk visibility dialog.
-- Any other category picker, item form, or tools logic.
-
-### Files modified
+### UI changes
 
 | File | Change |
 |---|---|
-| `src/components/warehouse/ItemCategoriesTab.tsx` | Replace closure-bound `onDelete` with id-respecting `handleDeleteById`; both visible and hidden trees |
-| `src/hooks/useItemCategories.ts` | Add pre-flight "has children" guard in `deleteCategoryMutation` with clear error toast |
-| Data fix (no migration) | Recreate `TOO-PWR / Power Tools` Level 0; re-parent 7 orphaned `TOO-PWR-*` rows |
+| `src/components/warehouse/MoveCategoryDialog.tsx` | **New.** Source breadcrumb + destination picker (hierarchical, indented), validation, confirm. |
+| `src/components/warehouse/CategoryTreeItem.tsx` | Add `onMove?: (category) => void` prop and a Move icon button (lucide `FolderInput`) between Edit and Delete; tooltip "Move to another group". Hidden in `isHidden` mode and for global categories when no company is selected. |
+| `src/components/warehouse/ItemCategoriesTab.tsx` | Track `movingCategory` state; render `MoveCategoryDialog`; pass `onMove={setMovingCategory}` to both visible and hidden tree renders (move disabled in hidden tree). |
+| `src/hooks/useItemCategories.ts` | Add `moveCategoryMutation` + return `moveCategory`, `isMoving`. |
+| `supabase/migrations/<ts>_item_categories_hierarchy_guard.sql` | **New.** Trigger above. |
+
+### What does NOT change
+
+- `parent_id` column, RLS, FK rules (`ON DELETE SET NULL` stays).
+- Items / SKUs assigned to the moved category — unaffected (they keep their `category_id`).
+- Hidden / exclude / restore / bulk visibility flows.
+- Other category pickers (Item form, Inventory filter, Tools dropdown) — they auto-reflect the new tree because they read from the same source.
+
+### Standards alignment
+
+- **SAP MM** Material Group reclassification (move, don't delete/recreate).
+- **ISO 55000** asset hierarchy maintenance — preserve identity through reorganization.
+- Project memory: `warehouse-category-code-mnemonic-standard`, `shared-foundational-components`, `form-data-normalization`.
 
