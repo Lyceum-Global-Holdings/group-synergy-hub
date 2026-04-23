@@ -39,6 +39,8 @@ export const useWarehouseLocations = () => {
       queryClient.invalidateQueries({ queryKey: ['dashboard-locations'] }),
       queryClient.invalidateQueries({ queryKey: ['locations-for-companies'] }),
       queryClient.invalidateQueries({ queryKey: ['location-companies'] }),
+      queryClient.invalidateQueries({ queryKey: ['stock-bearing-locations-for-company'] }),
+      queryClient.invalidateQueries({ queryKey: ['company-inventory-at-location'] }),
     ]);
   };
 
