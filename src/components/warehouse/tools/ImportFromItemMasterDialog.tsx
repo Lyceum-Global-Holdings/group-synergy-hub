@@ -442,6 +442,15 @@ export function ImportFromItemMasterDialog({
               </AlertDescription>
             </Alert>
           )}
+          {companyScope === "all" && (
+            <Alert>
+              <Info className="h-4 w-4" />
+              <AlertDescription>
+                Cross-company view active — tools will be created in each item's
+                source company, not the company in the header.
+              </AlertDescription>
+            </Alert>
+          )}
           {globalLocationId ? (
             <Alert>
               <Info className="h-4 w-4" />
