@@ -177,12 +177,25 @@ export function CreateToolDialog({ open, onOpenChange }: CreateToolDialogProps) 
               </Select>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="location_id">Location</Label>
+              <div className="flex items-center justify-between gap-2">
+                <Label htmlFor="location_id">
+                  Location <span className="text-destructive">*</span>
+                </Label>
+                {isAutoFilled && (
+                  <Badge variant="secondary" className="text-[10px] py-0 px-1.5">
+                    Auto-filled
+                  </Badge>
+                )}
+              </div>
               <Select
                 value={formData.location_id}
                 onValueChange={(value) => setFormData({ ...formData, location_id: value })}
               >
-                <SelectTrigger>
+                <SelectTrigger
+                  aria-required="true"
+                  aria-invalid={locationMissing}
+                  className={locationMissing ? "border-destructive" : undefined}
+                >
                   <SelectValue placeholder="Select location" />
                 </SelectTrigger>
                 <SelectContent>
@@ -193,6 +206,13 @@ export function CreateToolDialog({ open, onOpenChange }: CreateToolDialogProps) 
                   ))}
                 </SelectContent>
               </Select>
+              <p className="text-xs text-muted-foreground">
+                {isAutoFilled
+                  ? "Auto-filled from current location filter — change if needed."
+                  : globalLocationId
+                    ? "Tools must belong to a site (ISO 55000)."
+                    : "Select a location — tools must belong to a site (ISO 55000)."}
+              </p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="unit_id">Unit of Measure</Label>
