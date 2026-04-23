@@ -269,16 +269,17 @@ export default function WarehouseManagement() {
       company_ids: [] as string[], // Will be populated by useEffect
     });
   };
-  // Populate company_ids when junction table data loads (with legacy fallback)
+  // Populate company_ids + assignment mode when admin RPC data loads.
   useEffect(() => {
     if (!editLocationData) return;
-
-    const resolvedCompanyIds = editLocationCompanyIds.length > 0
-      ? editLocationCompanyIds
-      : (editLocationData.company_id ? [editLocationData.company_id] : []);
-
-    setEditForm(prev => ({ ...prev, company_ids: resolvedCompanyIds }));
-  }, [editLocationCompanyIds, editLocationData?.id]);
+    const mode = editAssignments.assignmentMode || 'explicit';
+    const ids = mode === 'inherit_parent'
+      ? editAssignments.effectiveCompanyIds
+      : (editLocationCompanyIds.length > 0
+          ? editLocationCompanyIds
+          : (editLocationData.company_id ? [editLocationData.company_id] : []));
+    setEditForm(prev => ({ ...prev, company_ids: ids, assignment_mode: mode }));
+  }, [editLocationCompanyIds, editAssignments.assignmentMode, editAssignments.effectiveCompanyIds, editLocationData?.id]);
 
   const handleEditFormChange = (field: string, value: string | number) => {
     setEditForm(prev => ({ ...prev, [field]: value }));
@@ -287,6 +288,7 @@ export default function WarehouseManagement() {
   const handleSaveEdit = async () => {
     if (!editLocationData) return;
     try {
+      const mode = (editForm.assignment_mode as 'explicit' | 'inherit_parent') || 'explicit';
       await updateLocationAsync({
         id: editLocationData.id,
         name: editForm.name,
@@ -300,21 +302,22 @@ export default function WarehouseManagement() {
         contact_person: editForm.contact_person || null,
         contact_phone: editForm.contact_phone || null,
         physical_address: editForm.physical_address || null,
-        company_id: editForm.company_ids?.[0] || null,
+        company_id: mode === 'explicit' ? (editForm.company_ids?.[0] || null) : null,
       });
-      // Save multi-company associations
-      if (editForm.company_ids?.length > 0) {
-        await saveCompanies({ locationId: editLocationData.id, companyIds: editForm.company_ids });
-      }
+      await saveCompanies({
+        locationId: editLocationData.id,
+        companyIds: mode === 'explicit' ? (editForm.company_ids || []) : [],
+        assignmentMode: mode,
+      });
       toast({
         title: 'Location updated',
         description: `${editForm.name} has been successfully updated.`,
       });
       setEditLocationData(null);
-    } catch (error) {
+    } catch (error: any) {
       toast({
         title: 'Error',
-        description: 'Failed to update location.',
+        description: error?.message || 'Failed to update location.',
         variant: 'destructive',
       });
     }
