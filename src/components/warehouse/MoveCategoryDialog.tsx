@@ -113,7 +113,10 @@ export function MoveCategoryDialog({
       onOpenChange(false);
       return;
     }
+    // Fire mutation (optimistic update happens immediately) and close right away
+    // so the user sees the tree update without waiting for the server round-trip.
     onConfirm(newParentId);
+    onOpenChange(false);
   };
 
   return (
@@ -265,19 +268,18 @@ export function MoveCategoryDialog({
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isMoving}>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
           <Button
             onClick={handleConfirm}
             disabled={
               !selectedParentId ||
-              isMoving ||
               wouldPushToLevel2 ||
               (selectedParentId === TOP_LEVEL_VALUE && isAlreadyAtTop)
             }
           >
-            {isMoving ? 'Moving...' : 'Move Category'}
+            Move Category
           </Button>
         </DialogFooter>
       </DialogContent>
