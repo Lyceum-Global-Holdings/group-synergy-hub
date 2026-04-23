@@ -132,8 +132,9 @@ const recentActivities = [
 
 export default function Dashboard() {
   const { globalLocationId, setGlobalLocationId } = useLocationFilter();
+  const { selectedCompany } = useCompany();
   const [locationFilter, setLocationFilter] = useState<string>(globalLocationId || "all");
-  const { data: locations } = useDashboardLocations();
+  const { data: locations } = useDashboardLocations(selectedCompany?.id);
   const activeLocationId = locationFilter === "all" ? null : locationFilter;
   const { inventory, labour, isLoading: locationDataLoading } = useDashboardLocationData(activeLocationId);
   const selectedLocationName = locationFilter === "all"
