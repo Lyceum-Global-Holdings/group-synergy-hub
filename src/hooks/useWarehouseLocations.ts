@@ -189,19 +189,68 @@ export const useWarehouseLocations = () => {
   };
 };
 
-/** Lightweight hook for dashboard location filter */
+export interface EffectiveLocation {
+  id: string;
+  name: string;
+  type: string;
+  parent_id: string | null;
+  depth?: number;
+}
+
+/**
+ * Canonical company-scoped effective-location resolver.
+ * Server-side resolves explicit + inherit_parent chains via SECURITY DEFINER RPC.
+ * No client-side fallback to unrelated top-level locations.
+ * ISO 8000 master-data integrity / SAP EWM hierarchy alignment.
+ */
+export const useEffectiveLocationsForCompany = (selectedCompanyId?: string | null) => {
+  return useQuery({
+    queryKey: ['effective-locations-for-company', selectedCompanyId],
+    queryFn: async (): Promise<EffectiveLocation[]> => {
+      if (!selectedCompanyId) return [];
+      const { data, error } = await supabase.rpc(
+        'get_effective_locations_for_company' as any,
+        { p_company_id: selectedCompanyId }
+      );
+      if (error) throw error;
+      return ((data as any[]) || []) as EffectiveLocation[];
+    },
+    enabled: !!selectedCompanyId,
+  });
+};
+
+/**
+ * Multi-company variant. Used by admin/user-permission editors and any
+ * dropdown that must union locations across several companies.
+ */
+export const useEffectiveLocationsForCompanies = (companyIds: string[]) => {
+  return useQuery({
+    queryKey: ['effective-locations-for-companies', [...companyIds].sort()],
+    queryFn: async (): Promise<EffectiveLocation[]> => {
+      if (!companyIds || companyIds.length === 0) return [];
+      const { data, error } = await supabase.rpc(
+        'get_effective_locations_for_companies' as any,
+        { p_company_ids: companyIds }
+      );
+      if (error) throw error;
+      return ((data as any[]) || []) as EffectiveLocation[];
+    },
+    enabled: companyIds.length > 0,
+  });
+};
+
+/** Dashboard location filter — strict company-scoped, no fallback. */
 export const useDashboardLocations = (selectedCompanyId?: string | null) => {
   return useQuery({
     queryKey: ['dashboard-locations', selectedCompanyId],
-    queryFn: async () => {
+    queryFn: async (): Promise<EffectiveLocation[]> => {
       if (!selectedCompanyId) {
         const { data, error } = await supabase
           .from('warehouse_locations')
           .select('id, name, type, parent_id')
           .order('name');
-
         if (error) throw error;
-        return data;
+        return (data as EffectiveLocation[]) ?? [];
       }
 
       const { data, error } = await supabase.rpc(
@@ -209,21 +258,7 @@ export const useDashboardLocations = (selectedCompanyId?: string | null) => {
         { p_company_id: selectedCompanyId }
       );
       if (error) throw error;
-
-      const rows = (data as any[]) || [];
-
-      // Fallback: if nothing resolved for this company, show all top-level locations
-      if (rows.length === 0) {
-        const { data: allLocations, error: allError } = await supabase
-          .from('warehouse_locations')
-          .select('id, name, type, parent_id')
-          .eq('type', 'location')
-          .order('name');
-        if (allError) throw allError;
-        return allLocations ?? [];
-      }
-
-      return rows;
+      return ((data as any[]) || []) as EffectiveLocation[];
     },
   });
 };
