@@ -18,6 +18,8 @@ export interface WarehouseLocation {
   location_code?: string | null;
   status?: 'active' | 'inactive' | 'maintenance' | 'closed';
   warehouse_category?: WarehouseCategory | null;
+  is_standalone_warehouse?: boolean;
+  company_assignment_mode?: 'explicit' | 'inherit_parent';
 }
 
 export interface AssetCategory {
