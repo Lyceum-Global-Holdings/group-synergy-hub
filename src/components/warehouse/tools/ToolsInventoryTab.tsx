@@ -19,6 +19,9 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { WarehouseTool } from "@/types/toolManagement";
 import { MoreHorizontal, Pencil, Search, SlidersHorizontal, X } from "lucide-react";
+import { useItemCategories } from "@/hooks/useItemCategories";
+import { useCompany } from "@/contexts/CompanyContext";
+import { buildToolCategoryOptions } from "@/features/tools/lib/toolCategories";
 
 interface ToolsInventoryTabProps {
   tools: WarehouseTool[];
@@ -162,12 +165,14 @@ export function ToolsInventoryTab({ tools, isLoading, onAdjustQuantity, onEditTo
 
   const columns = createColumns(onAdjustQuantity, onEditTool);
 
-  // Extract unique categories and locations from the data
-  const categories = useMemo(() => {
-    const uniqueCategories = [...new Set(tools.map(t => t.category?.name).filter(Boolean))] as string[];
-    return uniqueCategories.sort();
-  }, [tools]);
+  const { selectedCompany } = useCompany();
+  const { allCategories } = useItemCategories(selectedCompany?.id);
+  const categoryOptions = useMemo(
+    () => buildToolCategoryOptions(allCategories),
+    [allCategories],
+  );
 
+  // Locations are still derived from in-memory tool data (no master list needed here)
   const locations = useMemo(() => {
     const uniqueLocations = [...new Set(tools.map(t => t.location?.name).filter(Boolean))] as string[];
     return uniqueLocations.sort();
@@ -184,9 +189,9 @@ export function ToolsInventoryTab({ tools, isLoading, onAdjustQuantity, onEditTo
         tool.category?.name?.toLowerCase().includes(query) ||
         tool.location?.name?.toLowerCase().includes(query);
 
-      // Category filter
-      const matchesCategory = categoryFilter === "all" || 
-        tool.category?.name === categoryFilter;
+      // Category filter (id-based)
+      const matchesCategory = categoryFilter === "all" ||
+        tool.category_id === categoryFilter;
 
       // Location filter
       const matchesLocation = locationFilter === "all" || 
@@ -236,13 +241,19 @@ export function ToolsInventoryTab({ tools, isLoading, onAdjustQuantity, onEditTo
         </div>
 
         <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-          <SelectTrigger className="w-[160px]">
+          <SelectTrigger className="w-[200px]">
             <SelectValue placeholder="Category" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Categories</SelectItem>
-            {categories.map(cat => (
-              <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+            {categoryOptions.map(({ category, depth }) => (
+              <SelectItem key={category.id} value={category.id}>
+                <span className={depth === 1 ? "pl-4 text-muted-foreground" : "font-medium"}>
+                  {depth === 1 ? "└ " : ""}
+                  {category.code ? `[${category.code}] ` : ""}
+                  {category.name}
+                </span>
+              </SelectItem>
             ))}
           </SelectContent>
         </Select>

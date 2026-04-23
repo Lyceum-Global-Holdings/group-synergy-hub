@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   Dialog,
   DialogContent,
@@ -21,9 +21,12 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { useWarehouseTools } from "@/hooks/useWarehouseTools";
 import { useItemUnits } from "@/hooks/useItemUnits";
+import { useItemCategories } from "@/hooks/useItemCategories";
+import { useCompany } from "@/contexts/CompanyContext";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { WarehouseTool } from "@/types/toolManagement";
+import { buildToolCategoryOptions } from "@/features/tools/lib/toolCategories";
 
 interface EditToolDialogProps {
   open: boolean;
@@ -34,6 +37,13 @@ interface EditToolDialogProps {
 export function EditToolDialog({ open, onOpenChange, tool }: EditToolDialogProps) {
   const { updateTool, isUpdating } = useWarehouseTools();
   const { units } = useItemUnits();
+  const { selectedCompany } = useCompany();
+  const { allCategories } = useItemCategories(selectedCompany?.id);
+  const categoryOptions = useMemo(
+    () => buildToolCategoryOptions(allCategories),
+    [allCategories],
+  );
+
   const [formData, setFormData] = useState({
     name: "",
     description: "",
@@ -60,18 +70,6 @@ export function EditToolDialog({ open, onOpenChange, tool }: EditToolDialogProps
       });
     }
   }, [tool]);
-
-  const { data: categories } = useQuery({
-    queryKey: ["asset-categories"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("asset_categories")
-        .select("id, name")
-        .order("name");
-      if (error) throw error;
-      return data;
-    },
-  });
 
   const { data: locations } = useQuery({
     queryKey: ["warehouse-locations-select"],
@@ -164,9 +162,18 @@ export function EditToolDialog({ open, onOpenChange, tool }: EditToolDialogProps
                   <SelectValue placeholder="Select category" />
                 </SelectTrigger>
                 <SelectContent>
-                  {categories?.map((cat) => (
-                    <SelectItem key={cat.id} value={cat.id}>
-                      {cat.name}
+                  {categoryOptions.length === 0 && (
+                    <div className="px-2 py-1.5 text-sm text-muted-foreground">
+                      No Tools categories found
+                    </div>
+                  )}
+                  {categoryOptions.map(({ category, depth }) => (
+                    <SelectItem key={category.id} value={category.id}>
+                      <span className={depth === 1 ? "pl-4 text-muted-foreground" : "font-medium"}>
+                        {depth === 1 ? "└ " : ""}
+                        {category.code ? `[${category.code}] ` : ""}
+                        {category.name}
+                      </span>
                     </SelectItem>
                   ))}
                 </SelectContent>

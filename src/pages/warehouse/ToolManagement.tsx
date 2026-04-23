@@ -7,7 +7,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Plus, Wrench, ArrowRightLeft, RotateCcw, AlertTriangle, ChevronDown, Layers, FileSpreadsheet } from "lucide-react";
+import { Plus, Wrench, ArrowRightLeft, RotateCcw, AlertTriangle, ChevronDown, Layers, FileSpreadsheet, PackagePlus } from "lucide-react";
 import { useWarehouseTools } from "@/hooks/useWarehouseTools";
 import { useToolIssues } from "@/hooks/useToolIssues";
 import { useToolReturns } from "@/hooks/useToolReturns";
@@ -22,6 +22,7 @@ import { ReturnToolDialog } from "@/components/warehouse/tools/ReturnToolDialog"
 import { BulkIssueToolDialog } from "@/components/warehouse/tools/BulkIssueToolDialog";
 import { BulkReturnToolDialog } from "@/components/warehouse/tools/BulkReturnToolDialog";
 import { BulkToolImportDialog } from "@/components/warehouse/tools/BulkToolImportDialog";
+import { ImportFromItemMasterDialog } from "@/components/warehouse/tools/ImportFromItemMasterDialog";
 import { ToolAdjustmentDialog } from "@/components/warehouse/tools/ToolAdjustmentDialog";
 import { Badge } from "@/components/ui/badge";
 import { WarehouseTool } from "@/types/toolManagement";
@@ -34,6 +35,7 @@ export default function ToolManagement() {
   const [showBulkIssueTool, setShowBulkIssueTool] = useState(false);
   const [showBulkReturnTool, setShowBulkReturnTool] = useState(false);
   const [showBulkImport, setShowBulkImport] = useState(false);
+  const [showImportFromItemMaster, setShowImportFromItemMaster] = useState(false);
   const [showAdjustTool, setShowAdjustTool] = useState(false);
   const [showEditTool, setShowEditTool] = useState(false);
   const [selectedToolForAdjustment, setSelectedToolForAdjustment] = useState<WarehouseTool | null>(null);
@@ -109,6 +111,10 @@ export default function ToolManagement() {
                 <Plus className="h-4 w-4 mr-2" />
                 Add Single Tool
               </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setShowImportFromItemMaster(true)}>
+                <PackagePlus className="h-4 w-4 mr-2" />
+                Import from Item Master
+              </DropdownMenuItem>
               <DropdownMenuItem onClick={() => setShowBulkImport(true)}>
                 <FileSpreadsheet className="h-4 w-4 mr-2" />
                 Bulk Import from CSV
@@ -178,6 +184,10 @@ export default function ToolManagement() {
       <BulkIssueToolDialog open={showBulkIssueTool} onOpenChange={setShowBulkIssueTool} tools={tools} />
       <BulkReturnToolDialog open={showBulkReturnTool} onOpenChange={setShowBulkReturnTool} activeIssues={activeIssues} />
       <BulkToolImportDialog open={showBulkImport} onOpenChange={setShowBulkImport} />
+      <ImportFromItemMasterDialog
+        open={showImportFromItemMaster}
+        onOpenChange={setShowImportFromItemMaster}
+      />
       <ToolAdjustmentDialog 
         open={showAdjustTool} 
         onOpenChange={setShowAdjustTool} 

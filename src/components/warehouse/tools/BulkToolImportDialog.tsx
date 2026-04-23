@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useMemo } from "react";
 import {
   Dialog,
   DialogContent,
@@ -22,9 +22,12 @@ import {
 import { Download, Upload, FileSpreadsheet, CheckCircle2, XCircle, Loader2 } from "lucide-react";
 import { useWarehouseTools } from "@/hooks/useWarehouseTools";
 import { useItemUnits } from "@/hooks/useItemUnits";
+import { useItemCategories } from "@/hooks/useItemCategories";
+import { useCompany } from "@/contexts/CompanyContext";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { readExcelFile, writeExcelFromAOA } from "@/utils/excelUtils";
+import { buildToolCategoryOptions } from "@/features/tools/lib/toolCategories";
 
 interface BulkToolImportDialogProps {
   open: boolean;
@@ -60,16 +63,14 @@ export function BulkToolImportDialog({ open, onOpenChange }: BulkToolImportDialo
 
   const { createBulkTools, isCreatingBulk } = useWarehouseTools();
   const { units = [] } = useItemUnits();
+  const { selectedCompany } = useCompany();
+  const { allCategories } = useItemCategories(selectedCompany?.id);
 
-  // Fetch categories and locations for validation
-  const { data: categories = [] } = useQuery({
-    queryKey: ["asset-categories"],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("asset_categories").select("id, name");
-      if (error) throw error;
-      return data;
-    },
-  });
+  // Restrict CSV category lookup to the Tools subtree (Hand Tools / Power Tools + children)
+  const toolCategoryOptions = useMemo(
+    () => buildToolCategoryOptions(allCategories),
+    [allCategories],
+  );
 
   const { data: locations = [] } = useQuery({
     queryKey: ["warehouse-locations"],
@@ -86,8 +87,8 @@ export function BulkToolImportDialog({ open, onOpenChange }: BulkToolImportDialo
   const downloadTemplate = async () => {
     const template = [
       ["tool_code", "name", "description", "category", "location", "unit", "total_quantity", "condition", "unit_cost", "notes"],
-      ["TL-001", "Hammer", "16oz claw hammer", "Hand Tools", "Main Warehouse", "Pieces", "10", "good", "25.99", "Standard issue"],
-      ["", "Drill", "Cordless power drill", "Power Tools", "Workshop", "pcs", "5", "good", "149.99", ""],
+      ["TL-001", "Claw Hammer 16oz", "Standard claw hammer", "Hand Tools", "Main Warehouse", "Pieces", "10", "good", "25.99", "Standard issue"],
+      ["", "Cordless Drill", "18V cordless drill", "Power Tools", "Workshop", "pcs", "5", "good", "149.99", ""],
     ];
 
     await writeExcelFromAOA(template, "tools_import_template.xlsx", "Tools Template");
@@ -127,14 +128,18 @@ export function BulkToolImportDialog({ open, onOpenChange }: BulkToolImportDialo
           }
         }
 
-        // Validate category
+        // Validate category — must be a Tools-subtree category
         let categoryId: string | undefined;
         if (categoryName) {
-          const match = categories.find((c) => c.name.toLowerCase() === categoryName.toLowerCase());
+          const match = toolCategoryOptions.find(
+            (o) => o.category.name.toLowerCase() === categoryName.toLowerCase(),
+          );
           if (!match) {
-            errors.push(`Category "${categoryName}" not found`);
+            errors.push(
+              `Category "${categoryName}" is not a Tools category. Allowed: Hand Tools, Power Tools, or their sub-categories.`,
+            );
           } else {
-            categoryId = match.id;
+            categoryId = match.category.id;
           }
         }
 
@@ -263,7 +268,7 @@ export function BulkToolImportDialog({ open, onOpenChange }: BulkToolImportDialo
             Bulk Import Tools
           </DialogTitle>
           <DialogDescription>
-            Upload a CSV or Excel file to import multiple tools at once
+            Upload a CSV or Excel file to import multiple tools. Categories must be in the Tools subtree (Hand Tools / Power Tools or their sub-categories).
           </DialogDescription>
         </DialogHeader>
 
@@ -305,12 +310,12 @@ export function BulkToolImportDialog({ open, onOpenChange }: BulkToolImportDialo
           {parsedData.length > 0 && !isParsing && (
             <>
               <div className="flex gap-4">
-                <Badge variant="outline" className="text-green-600 border-green-600">
+                <Badge variant="success">
                   <CheckCircle2 className="h-4 w-4 mr-1" />
                   {validTools.length} Valid
                 </Badge>
                 {invalidTools.length > 0 && (
-                  <Badge variant="outline" className="text-destructive border-destructive">
+                  <Badge variant="destructive">
                     <XCircle className="h-4 w-4 mr-1" />
                     {invalidTools.length} Invalid
                   </Badge>
@@ -320,7 +325,7 @@ export function BulkToolImportDialog({ open, onOpenChange }: BulkToolImportDialo
               {/* Valid Tools Preview */}
               {validTools.length > 0 && (
                 <div className="space-y-2 flex-1 overflow-hidden flex flex-col">
-                  <h4 className="text-sm font-medium text-green-600">Valid Tools</h4>
+                  <h4 className="text-sm font-medium text-success">Valid Tools</h4>
                   <ScrollArea className="flex-1 border rounded-md">
                     <Table>
                       <TableHeader>
