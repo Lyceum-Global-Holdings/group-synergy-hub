@@ -12,16 +12,36 @@ const edgeFnTest = (id: string, fnName: string): TestCase => ({
     try {
       const { error } = await supabase.functions.invoke(fnName, {
         method: "POST",
-        body: JSON.stringify({ test: true }),
+        body: { test: true },
       });
-      // We accept any non-network error as "reachable"
-      // Edge functions may return 400/401 but that means they're deployed
-      if (error && error.message?.includes("Failed to fetch")) {
-        return { passed: false, error: "Function unreachable" };
+
+      if (!error) {
+        return { passed: true, details: "Reachable (200 OK)" };
       }
-      return { passed: true, details: error ? `Reachable (returned error: ${error.message})` : "Reachable (200 OK)" };
+
+      const msg = error.message || "";
+
+      // Network-level failure = truly unreachable
+      if (msg.includes("Failed to fetch") || msg.includes("NetworkError")) {
+        return { passed: false, error: "Function unreachable (network error)" };
+      }
+
+      // 400 (validation) / 401 (auth) / 403 (authorization) all prove the function is
+      // deployed and executing — it just rejected our synthetic { test: true } payload.
+      // That is the expected outcome of a reachability probe.
+      const status = (error as any).context?.status ?? (error as any).status;
+      if (status === 400 || status === 401 || status === 403) {
+        return { passed: true, details: `Reachable (deployed, rejected probe with ${status})` };
+      }
+
+      // 5xx or unknown = real problem
+      return { passed: false, error: `Unexpected response: ${msg}` };
     } catch (e: any) {
-      return { passed: false, error: e.message || "Unknown error" };
+      const msg = e?.message || "Unknown error";
+      if (msg.includes("Failed to fetch") || msg.includes("NetworkError")) {
+        return { passed: false, error: "Function unreachable (network error)" };
+      }
+      return { passed: false, error: msg };
     }
   },
 });
