@@ -201,7 +201,7 @@ export function BulkToolImportDialog({ open, onOpenChange }: BulkToolImportDialo
           name,
           description,
           category: categoryName,
-          location: locationName,
+          location: locationLabel,
           unit: unitName,
           total_quantity: quantity,
           condition,
