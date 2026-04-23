@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -26,6 +26,16 @@ interface MoveCategoryDialogProps {
 }
 
 const TOP_LEVEL_VALUE = '__TOP_LEVEL__';
+const SEARCH_KEY = 'move-category:last-search';
+const TARGET_KEY = 'move-category:last-targets';
+
+const readTargetMap = (): Record<string, string> => {
+  try {
+    return JSON.parse(sessionStorage.getItem(TARGET_KEY) ?? '{}');
+  } catch {
+    return {};
+  }
+};
 
 export function MoveCategoryDialog({
   open,
@@ -35,11 +45,17 @@ export function MoveCategoryDialog({
   onConfirm,
   isMoving = false,
 }: MoveCategoryDialogProps) {
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState<string>(() => {
+    if (typeof window === 'undefined') return '';
+    return sessionStorage.getItem(SEARCH_KEY) ?? '';
+  });
   const [selectedParentId, setSelectedParentId] = useState<string | null>(null);
+  const currentRowRef = useRef<HTMLButtonElement | null>(null);
 
-  // Reset selection when dialog opens for a new category
-  const dialogKey = category?.id ?? 'none';
+  // Persist search across opens
+  useEffect(() => {
+    sessionStorage.setItem(SEARCH_KEY, search);
+  }, [search]);
 
   // Compute descendants of source (cycle prevention)
   const descendantIds = useMemo(() => {
@@ -100,6 +116,32 @@ export function MoveCategoryDialog({
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [allCategories, category, descendantIds, search]);
 
+  // Hydrate selection on open: last-attempted target → current parent → top-level (if root)
+  useEffect(() => {
+    if (!open || !category) return;
+    const map = readTargetMap();
+    const remembered = map[category.id];
+    setSelectedParentId(
+      remembered ?? (category.parent_id ? category.parent_id : TOP_LEVEL_VALUE),
+    );
+    // Scroll the current parent row into view after render
+    requestAnimationFrame(() => {
+      currentRowRef.current?.scrollIntoView({ block: 'nearest' });
+    });
+  }, [open, category?.id]);
+
+  // Persist last-attempted target per source category
+  useEffect(() => {
+    if (!open || !category || !selectedParentId) return;
+    const map = readTargetMap();
+    map[category.id] = selectedParentId;
+    try {
+      sessionStorage.setItem(TARGET_KEY, JSON.stringify(map));
+    } catch {
+      // ignore quota errors
+    }
+  }, [selectedParentId, category?.id, open]);
+
   if (!category) return null;
 
   const isAlreadyAtTop = !category.parent_id;
@@ -124,13 +166,14 @@ export function MoveCategoryDialog({
       open={open}
       onOpenChange={(o) => {
         if (!o) {
-          setSearch('');
+          // Keep search persisted across opens; only reset selection so the
+          // hydration effect re-runs cleanly next time the dialog opens.
           setSelectedParentId(null);
         }
         onOpenChange(o);
       }}
     >
-      <DialogContent key={dialogKey} className="max-w-lg">
+      <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <FolderInput className="h-5 w-5" />
@@ -190,6 +233,7 @@ export function MoveCategoryDialog({
               <div className="p-1">
                 {/* Top level option */}
                 <button
+                  ref={isAlreadyAtTop ? currentRowRef : undefined}
                   type="button"
                   onClick={() => setSelectedParentId(TOP_LEVEL_VALUE)}
                   disabled={isAlreadyAtTop}
@@ -198,13 +242,16 @@ export function MoveCategoryDialog({
                     selectedParentId === TOP_LEVEL_VALUE
                       ? 'bg-primary text-primary-foreground'
                       : 'hover:bg-muted',
-                    isAlreadyAtTop && 'opacity-50 cursor-not-allowed',
+                    isAlreadyAtTop &&
+                      selectedParentId !== TOP_LEVEL_VALUE &&
+                      'ring-1 ring-primary/40 bg-primary/5',
+                    isAlreadyAtTop && 'opacity-70 cursor-not-allowed',
                   )}
                 >
                   <ChevronRight className="h-3 w-3" />
                   <span className="font-medium">— Move to Top Level (Level 0) —</span>
                   {isAlreadyAtTop && (
-                    <span className="ml-auto text-xs">(already top)</span>
+                    <span className="ml-auto text-xs">(current)</span>
                   )}
                 </button>
 
@@ -217,16 +264,19 @@ export function MoveCategoryDialog({
                 ) : (
                   candidates.map((c) => {
                     const isCurrent = c.id === category.parent_id;
+                    const isSelected = selectedParentId === c.id;
                     return (
                       <button
                         key={c.id}
+                        ref={isCurrent ? currentRowRef : undefined}
                         type="button"
                         onClick={() => setSelectedParentId(c.id)}
                         className={cn(
                           'w-full text-left px-3 py-2 rounded-sm text-sm flex items-center gap-2 transition-colors',
-                          selectedParentId === c.id
+                          isSelected
                             ? 'bg-primary text-primary-foreground'
                             : 'hover:bg-muted',
+                          isCurrent && !isSelected && 'ring-1 ring-primary/40 bg-primary/5',
                         )}
                       >
                         <span className="font-medium">{c.name}</span>
@@ -235,7 +285,7 @@ export function MoveCategoryDialog({
                             variant="outline"
                             className={cn(
                               'text-xs',
-                              selectedParentId === c.id && 'bg-primary-foreground/10 border-primary-foreground/20 text-primary-foreground',
+                              isSelected && 'bg-primary-foreground/10 border-primary-foreground/20 text-primary-foreground',
                             )}
                           >
                             {c.code}
@@ -276,7 +326,8 @@ export function MoveCategoryDialog({
             disabled={
               !selectedParentId ||
               wouldPushToLevel2 ||
-              (selectedParentId === TOP_LEVEL_VALUE && isAlreadyAtTop)
+              (selectedParentId === TOP_LEVEL_VALUE && isAlreadyAtTop) ||
+              selectedParentId === (category.parent_id ?? TOP_LEVEL_VALUE)
             }
           >
             Move Category
