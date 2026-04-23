@@ -27,8 +27,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Loader2, PackagePlus, Search } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { AlertCircle, Loader2, PackagePlus, Search } from "lucide-react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useItemCategories } from "@/hooks/useItemCategories";
@@ -47,7 +48,7 @@ interface ImportFromItemMasterDialogProps {
 interface CandidateItem {
   id: string;
   item_code: string;
-  item_name: string;
+  name: string;
   description: string | null;
   category_id: string | null;
   unit_id: string | null;
@@ -65,6 +66,7 @@ export function ImportFromItemMasterDialog({
   const { selectedCompany } = useCompany();
   const { allCategories } = useItemCategories(selectedCompany?.id);
   const { tools, createBulkTools, isCreatingBulk } = useWarehouseTools();
+  const queryClient = useQueryClient();
 
   const categoryOptions = useMemo(
     () => buildToolCategoryOptions(allCategories),
@@ -91,7 +93,7 @@ export function ImportFromItemMasterDialog({
     [tools, selectedCompany?.id],
   );
 
-  const { data: items = [], isLoading } = useQuery({
+  const { data: items = [], isLoading, error } = useQuery({
     queryKey: [
       "warehouse-items-tool-candidates",
       selectedCompany?.id,
@@ -99,13 +101,16 @@ export function ImportFromItemMasterDialog({
     ],
     enabled: open && !!selectedCompany?.id && toolCategoryIds.length > 0,
     queryFn: async () => {
+      // NOTE: warehouse_items canonical name column is `name` (per SAP MM Material Master).
+      // The Tools subtree includes root + L1 children via getToolCategoryIds; L2 codes
+      // (e.g. TOO-HND-HAM) are children of L1 and therefore swept in via category_id IN (...).
       const { data, error } = await supabase
         .from("warehouse_items")
         .select(
           `
           id,
           item_code,
-          item_name,
+          name,
           description,
           category_id,
           unit_id,
@@ -117,7 +122,7 @@ export function ImportFromItemMasterDialog({
         )
         .eq("company_id", selectedCompany!.id)
         .in("category_id", toolCategoryIds)
-        .order("item_name", { ascending: true })
+        .order("name", { ascending: true })
         .limit(2000);
 
       if (error) throw error;
@@ -125,7 +130,7 @@ export function ImportFromItemMasterDialog({
       return (data || []).map((row: any) => ({
         id: row.id,
         item_code: row.item_code,
-        item_name: row.item_name,
+        name: row.name,
         description: row.description,
         category_id: row.category_id,
         unit_id: row.unit_id,
@@ -150,7 +155,7 @@ export function ImportFromItemMasterDialog({
       if (!q) return true;
       return (
         item.item_code?.toLowerCase().includes(q) ||
-        item.item_name?.toLowerCase().includes(q) ||
+        item.name?.toLowerCase().includes(q) ||
         item.description?.toLowerCase().includes(q) ||
         item.category_name?.toLowerCase().includes(q)
       );
@@ -195,8 +200,16 @@ export function ImportFromItemMasterDialog({
     setQuantities({});
   };
 
+  const clearFilters = () => {
+    setSearchTerm("");
+    setCategoryFilter("all");
+  };
+
   const handleClose = (next: boolean) => {
-    if (!next) resetState();
+    if (!next) {
+      resetState();
+      queryClient.removeQueries({ queryKey: ["warehouse-items-tool-candidates"] });
+    }
     onOpenChange(next);
   };
 
@@ -206,7 +219,7 @@ export function ImportFromItemMasterDialog({
 
     const payload: CreateWarehouseToolData[] = selected.map((item) => ({
       tool_code: item.item_code,
-      name: item.item_name,
+      name: item.name,
       description: item.description ?? undefined,
       category_id: item.category_id ?? undefined,
       unit_id: item.unit_id ?? undefined,
@@ -225,6 +238,7 @@ export function ImportFromItemMasterDialog({
   };
 
   const selectedCount = filteredItems.filter((it) => selectedIds.has(it.id)).length;
+  const hasActiveFilters = searchTerm.trim().length > 0 || categoryFilter !== "all";
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
@@ -279,6 +293,15 @@ export function ImportFromItemMasterDialog({
             )}
           </div>
 
+          {error && (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>
+                Failed to load candidate items: {(error as Error).message}
+              </AlertDescription>
+            </Alert>
+          )}
+
           {!selectedCompany?.id && (
             <div className="flex-1 flex items-center justify-center text-sm text-muted-foreground">
               Select a company to view candidate items.
@@ -292,12 +315,40 @@ export function ImportFromItemMasterDialog({
             </div>
           )}
 
-          {selectedCompany?.id && !isLoading && filteredItems.length === 0 && (
+          {selectedCompany?.id && !isLoading && !error && toolCategoryIds.length === 0 && (
             <div className="flex-1 flex items-center justify-center text-sm text-muted-foreground text-center px-6">
-              No Item Master items found for the Tools subtree. Make sure items are
-              categorized under Hand Tools or Power Tools.
+              Hand Tools / Power Tools categories are not set up. Ask an administrator
+              to add categories under codes <code className="font-mono">TOO-HND</code> or{" "}
+              <code className="font-mono">TOO-PWR</code>.
             </div>
           )}
+
+          {selectedCompany?.id &&
+            !isLoading &&
+            !error &&
+            toolCategoryIds.length > 0 &&
+            items.length === 0 && (
+              <div className="flex-1 flex items-center justify-center text-sm text-muted-foreground text-center px-6">
+                No Item Master items in <strong>{selectedCompany.name}</strong> are
+                categorized under Hand Tools or Power Tools. Switch company in the
+                header, or add items under those categories first.
+              </div>
+            )}
+
+          {selectedCompany?.id &&
+            !isLoading &&
+            !error &&
+            items.length > 0 &&
+            filteredItems.length === 0 && (
+              <div className="flex-1 flex flex-col items-center justify-center gap-3 text-sm text-muted-foreground text-center px-6">
+                <span>No items match the current filters.</span>
+                {hasActiveFilters && (
+                  <Button variant="outline" size="sm" onClick={clearFilters}>
+                    Clear filters
+                  </Button>
+                )}
+              </div>
+            )}
 
           {selectedCompany?.id && !isLoading && filteredItems.length > 0 && (
             <ScrollArea className="flex-1 border rounded-md">
@@ -328,12 +379,12 @@ export function ImportFromItemMasterDialog({
                           <Checkbox
                             checked={isSelected}
                             onCheckedChange={() => toggleOne(item.id)}
-                            aria-label={`Select ${item.item_name}`}
+                            aria-label={`Select ${item.name}`}
                           />
                         </TableCell>
                         <TableCell className="font-mono text-sm">{item.item_code}</TableCell>
                         <TableCell>
-                          <div className="font-medium">{item.item_name}</div>
+                          <div className="font-medium">{item.name}</div>
                           {item.description && (
                             <div className="text-xs text-muted-foreground truncate max-w-[260px]">
                               {item.description}
