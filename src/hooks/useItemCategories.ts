@@ -260,20 +260,41 @@ export const useItemCategories = (companyId?: string) => {
         .eq('id', id);
       if (error) throw error;
     },
+    onMutate: async ({ id, newParentId }: { id: string; newParentId: string | null }) => {
+      const key = ['item-categories', companyId];
+      // Cancel in-flight refetches so they can't overwrite our optimistic snapshot
+      await queryClient.cancelQueries({ queryKey: key });
+
+      const previous = queryClient.getQueryData<ItemCategory[]>(key);
+      if (previous) {
+        queryClient.setQueryData<ItemCategory[]>(
+          key,
+          previous.map((c) => (c.id === id ? { ...c, parent_id: newParentId } : c)),
+        );
+      }
+      return { previous };
+    },
+    onError: (error: any, _vars, context: any) => {
+      console.error('Error moving category:', error);
+      // Roll back to the snapshot
+      if (context?.previous) {
+        queryClient.setQueryData(['item-categories', companyId], context.previous);
+      }
+      toast({
+        title: 'Move failed',
+        description: error?.message ?? 'Could not move category. Reverted.',
+        variant: 'destructive',
+      });
+    },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['item-categories', companyId] });
       toast({
         title: 'Category moved',
         description: 'Hierarchy updated successfully.',
       });
     },
-    onError: (error: any) => {
-      console.error('Error moving category:', error);
-      toast({
-        title: 'Move failed',
-        description: error?.message ?? 'Could not move category.',
-        variant: 'destructive',
-      });
+    onSettled: () => {
+      // Reconcile with server on success or failure
+      queryClient.invalidateQueries({ queryKey: ['item-categories', companyId] });
     },
   });
 
