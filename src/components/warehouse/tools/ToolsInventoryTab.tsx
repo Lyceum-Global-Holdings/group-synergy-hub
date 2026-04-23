@@ -138,6 +138,8 @@ const createColumns = (
     header: "",
     cell: ({ row }) => {
       const tool = row.original;
+      const hasIssued = (tool.issued_quantity ?? 0) > 0;
+      const showDelete = canDelete && !!onDeleteTool;
       return (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -154,6 +156,37 @@ const createColumns = (
               <SlidersHorizontal className="h-4 w-4 mr-2" />
               Adjust Quantity
             </DropdownMenuItem>
+            {showDelete && (
+              hasIssued ? (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div>
+                        <DropdownMenuItem
+                          disabled
+                          className="text-destructive focus:text-destructive"
+                          onSelect={(e) => e.preventDefault()}
+                        >
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          Delete Tool
+                        </DropdownMenuItem>
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      Return all issued units before deleting.
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              ) : (
+                <DropdownMenuItem
+                  className="text-destructive focus:text-destructive"
+                  onClick={() => onDeleteTool?.(tool)}
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Delete Tool
+                </DropdownMenuItem>
+              )
+            )}
           </DropdownMenuContent>
         </DropdownMenu>
       );
@@ -161,14 +194,18 @@ const createColumns = (
   },
 ];
 
-export function ToolsInventoryTab({ tools, isLoading, onAdjustQuantity, onEditTool }: ToolsInventoryTabProps) {
+export function ToolsInventoryTab({ tools, isLoading, onAdjustQuantity, onEditTool, onDeleteTool }: ToolsInventoryTabProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [locationFilter, setLocationFilter] = useState<string>("all");
   const [conditionFilter, setConditionFilter] = useState<string>("all");
   const [availabilityFilter, setAvailabilityFilter] = useState<string>("all");
 
-  const columns = createColumns(onAdjustQuantity, onEditTool);
+  const { canDelete } = useIsAdminOrHigher();
+  const columns = useMemo(
+    () => createColumns(onAdjustQuantity, onEditTool, onDeleteTool, canDelete),
+    [onAdjustQuantity, onEditTool, onDeleteTool, canDelete],
+  );
 
   const { selectedCompany } = useCompany();
   const { allCategories } = useItemCategories(selectedCompany?.id);
