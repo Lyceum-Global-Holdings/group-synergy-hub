@@ -97,6 +97,10 @@ export function LocationSelector() {
 
   const isLoading = permissionsLoading || (!!selectedCompany?.id && locationsLoading);
 
+  const selectValue = showAllOption
+    ? (globalLocationId ?? "all")
+    : (globalLocationId ?? locations[0]?.id ?? "");
+
   let placeholder = showAllOption ? "All Locations" : "Select Location";
   if (!selectedCompany?.id) placeholder = "Select a company";
   else if (isLoading) placeholder = "Loading locations…";
