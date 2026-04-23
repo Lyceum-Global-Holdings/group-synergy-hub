@@ -87,6 +87,14 @@ export function BulkToolImportDialog({ open, onOpenChange }: BulkToolImportDialo
   const validTools = parsedData.filter((t) => t.isValid);
   const invalidTools = parsedData.filter((t) => !t.isValid);
 
+  const globalLocationName = useMemo(
+    () =>
+      globalLocationId
+        ? locations.find((l) => l.id === globalLocationId)?.name ?? null
+        : null,
+    [globalLocationId, locations],
+  );
+
   const downloadTemplate = async () => {
     const template = [
       ["tool_code", "name", "description", "category", "location", "unit", "total_quantity", "condition", "unit_cost", "notes"],
