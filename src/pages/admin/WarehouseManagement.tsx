@@ -290,7 +290,11 @@ export default function WarehouseManagement() {
   const handleSaveEdit = async () => {
     if (!editLocationData) return;
     try {
-      const mode = (editForm.assignment_mode as 'explicit' | 'inherit_parent') || 'explicit';
+      const isStandalone = !!editForm.is_standalone_warehouse;
+      // Standalone warehouses MUST use explicit company assignment.
+      const mode = isStandalone
+        ? 'explicit'
+        : ((editForm.assignment_mode as 'explicit' | 'inherit_parent') || 'explicit');
       await updateLocationAsync({
         id: editLocationData.id,
         name: editForm.name,
@@ -305,6 +309,7 @@ export default function WarehouseManagement() {
         contact_phone: editForm.contact_phone || null,
         physical_address: editForm.physical_address || null,
         company_id: mode === 'explicit' ? (editForm.company_ids?.[0] || null) : null,
+        is_standalone_warehouse: isStandalone,
       });
       await saveCompanies({
         locationId: editLocationData.id,
