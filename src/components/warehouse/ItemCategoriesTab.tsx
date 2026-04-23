@@ -7,6 +7,7 @@ import { CreateCategoryDialog } from '@/components/warehouse/CreateCategoryDialo
 import { ImportCategoriesDialog } from '@/components/warehouse/ImportCategoriesDialog';
 import { CategoryVisibilityDialog } from '@/components/warehouse/CategoryVisibilityDialog';
 import { CategoryTreeItem } from '@/components/warehouse/CategoryTreeItem';
+import { MoveCategoryDialog } from '@/components/warehouse/MoveCategoryDialog';
 import { ItemCategory } from '@/types/itemBin';
 import { useCompany } from '@/contexts/CompanyContext';
 import { Badge } from '@/components/ui/badge';
@@ -19,6 +20,7 @@ export function ItemCategoriesTab() {
   const [editingCategory, setEditingCategory] = useState<ItemCategory | null>(null);
   const [expandedAll, setExpandedAll] = useState(false);
   const [showHiddenCategories, setShowHiddenCategories] = useState(false);
+  const [movingCategory, setMovingCategory] = useState<ItemCategory | null>(null);
   
   const { selectedCompany } = useCompany();
   const { 
@@ -34,7 +36,9 @@ export function ItemCategoriesTab() {
     restoreCategory,
     isRestoring,
     bulkUpdateVisibility,
-    isBulkUpdating
+    isBulkUpdating,
+    moveCategory,
+    isMoving
   } = useItemCategories(selectedCompany?.id);
 
   // Build category tree structure
@@ -210,6 +214,7 @@ export function ItemCategoriesTab() {
                 level={0}
                 onEdit={setEditingCategory}
                 onDelete={handleDeleteById}
+                onMove={setMovingCategory}
                 isDeleting={isDeleting || isExcluding}
                 isGlobal={!category.company_id}
               />
@@ -269,6 +274,21 @@ export function ItemCategoriesTab() {
         excludedCategoryIds={excludedCategoryIds}
         onSave={bulkUpdateVisibility}
         isSaving={isBulkUpdating}
+      />
+
+      <MoveCategoryDialog
+        open={movingCategory !== null}
+        onOpenChange={(open) => { if (!open) setMovingCategory(null); }}
+        category={movingCategory}
+        allCategories={allCategories}
+        isMoving={isMoving}
+        onConfirm={(newParentId) => {
+          if (!movingCategory) return;
+          moveCategory(
+            { id: movingCategory.id, newParentId },
+            { onSuccess: () => setMovingCategory(null) }
+          );
+        }}
       />
     </div>
   );
