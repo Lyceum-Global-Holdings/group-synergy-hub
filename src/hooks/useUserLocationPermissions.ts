@@ -99,49 +99,38 @@ export const useSaveUserLocationPermissions = () => {
 };
 
 /**
- * Fetch locations filtered by an array of company IDs using the junction table,
- * with legacy company_id fallback support.
+ * Fetch effective locations for an array of company IDs via the canonical
+ * server-side resolver. Returns the union of all locations (top-level,
+ * sub-locations, departments, including inherited children) effectively
+ * mapped to any of the supplied companies.
  */
 export const useLocationsForCompanies = (companyIds: string[]) => {
   return useQuery({
-    queryKey: ['locations-for-companies', companyIds],
+    queryKey: ['locations-for-companies', [...companyIds].sort()],
     queryFn: async () => {
       if (companyIds.length === 0) return [];
 
-      const [mappedRes, legacyRes] = await Promise.all([
-        supabase
-          .from('warehouse_location_companies')
-          .select('location_id, warehouse_locations!inner(id, name, type)')
-          .in('company_id', companyIds)
-          .eq('warehouse_locations.type', 'location'),
-        supabase
-          .from('warehouse_locations')
-          .select('id, name, type, company_id')
-          .in('company_id', companyIds)
-          .eq('type', 'location'),
-      ]);
+      const { data, error } = await supabase.rpc(
+        'get_effective_locations_for_companies' as any,
+        { p_company_ids: companyIds }
+      );
+      if (error) throw error;
 
-      if (mappedRes.error) throw mappedRes.error;
-      if (legacyRes.error) throw legacyRes.error;
+      const rows = ((data as any[]) || []) as Array<{
+        id: string;
+        name: string;
+        type: string;
+        parent_id: string | null;
+      }>;
 
-      // Deduplicate locations (a location may appear for multiple companies)
-      const locationMap = new Map<string, { id: string; name: string }>();
-
-      for (const row of mappedRes.data || []) {
-        const loc = row.warehouse_locations as any;
-        if (loc?.id && !locationMap.has(loc.id)) {
-          locationMap.set(loc.id, { id: loc.id, name: loc.name });
-        }
+      // Deduplicate (RPC already does, but defensive) and sort by name.
+      const seen = new Map<string, { id: string; name: string }>();
+      for (const r of rows) {
+        if (r?.id && !seen.has(r.id)) seen.set(r.id, { id: r.id, name: r.name });
       }
-
-      for (const loc of legacyRes.data || []) {
-        if (loc?.id && !locationMap.has(loc.id)) {
-          locationMap.set(loc.id, { id: loc.id, name: loc.name });
-        }
-      }
-
-      return Array.from(locationMap.values()).sort((a, b) => a.name.localeCompare(b.name));
+      return Array.from(seen.values()).sort((a, b) => a.name.localeCompare(b.name));
     },
     enabled: companyIds.length > 0,
   });
 };
+

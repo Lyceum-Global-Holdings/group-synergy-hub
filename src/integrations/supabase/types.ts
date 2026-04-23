@@ -19528,9 +19528,20 @@ export type Database = {
           company_id: string
         }[]
       }
+      get_effective_locations_for_companies: {
+        Args: { p_company_ids: string[] }
+        Returns: {
+          depth: number
+          id: string
+          name: string
+          parent_id: string
+          type: string
+        }[]
+      }
       get_effective_locations_for_company: {
         Args: { p_company_id: string }
         Returns: {
+          depth: number
           id: string
           name: string
           parent_id: string

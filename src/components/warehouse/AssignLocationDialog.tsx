@@ -46,41 +46,27 @@ export function AssignLocationDialog({ items, open, onOpenChange, onComplete, co
 
   useEffect(() => {
     if (!open || !companyId) return;
-    
+
     setIsLoadingLocations(true);
-    
-    // Fetch locations from both junction table AND legacy company_id
-    Promise.all([
-      supabase
-        .from('warehouse_location_companies')
-        .select('location_id, warehouse_locations!inner(id, name, type)')
-        .eq('company_id', companyId),
-      supabase
-        .from('warehouse_locations')
-        .select('id, name, type')
-        .eq('company_id', companyId)
-        .eq('type', 'location'),
-    ]).then(([junctionRes, legacyRes]) => {
-      const locMap = new Map<string, LocationOption>();
-      
-      // From junction table
-      (junctionRes.data || []).forEach((d: any) => {
-        const loc = d.warehouse_locations;
-        if (loc?.id && loc?.name && loc?.type === 'location') {
-          locMap.set(loc.id, { id: loc.id, name: loc.name });
+
+    // Use the canonical effective-location resolver — includes top-level,
+    // sub-locations, and inherited multi-company children.
+    supabase
+      .rpc('get_effective_locations_for_company' as any, { p_company_id: companyId })
+      .then(({ data, error }) => {
+        if (error) {
+          console.error('Failed to load effective locations:', error);
+          setLocations([]);
+        } else {
+          const rows = ((data as any[]) || []) as Array<{ id: string; name: string }>;
+          const map = new Map<string, LocationOption>();
+          for (const r of rows) {
+            if (r?.id && r?.name) map.set(r.id, { id: r.id, name: r.name });
+          }
+          setLocations(Array.from(map.values()));
         }
+        setIsLoadingLocations(false);
       });
-      
-      // From legacy company_id
-      (legacyRes.data || []).forEach((loc: any) => {
-        if (loc.id && loc.name) {
-          locMap.set(loc.id, { id: loc.id, name: loc.name });
-        }
-      });
-      
-      setLocations(Array.from(locMap.values()));
-      setIsLoadingLocations(false);
-    });
 
     // Initialize assignments
     setAssignments(items.map(item => ({
