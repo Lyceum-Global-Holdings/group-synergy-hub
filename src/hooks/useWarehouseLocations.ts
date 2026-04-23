@@ -34,8 +34,10 @@ export const useWarehouseLocations = () => {
   const invalidateLocationQueries = async () => {
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: ['warehouse-locations'] }),
-      queryClient.invalidateQueries({ queryKey: ['header-locations'] }),
+      queryClient.invalidateQueries({ queryKey: ['effective-locations-for-company'] }),
+      queryClient.invalidateQueries({ queryKey: ['effective-locations-for-companies'] }),
       queryClient.invalidateQueries({ queryKey: ['dashboard-locations'] }),
+      queryClient.invalidateQueries({ queryKey: ['locations-for-companies'] }),
       queryClient.invalidateQueries({ queryKey: ['location-companies'] }),
     ]);
   };

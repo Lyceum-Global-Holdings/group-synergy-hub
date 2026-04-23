@@ -18,7 +18,11 @@ export function LocationSelector() {
   const { data: permissions, isLoading: permissionsLoading } = useCurrentUserLocationPermissions();
 
   // Canonical company-scoped effective-location resolver (server-side hierarchy).
-  const { data: companyLocations = [] } = useEffectiveLocationsForCompany(selectedCompany?.id);
+  const {
+    data: companyLocations = [],
+    isLoading: locationsLoading,
+    isError: locationsError,
+  } = useEffectiveLocationsForCompany(selectedCompany?.id);
 
   const canViewAll = permissions?.viewAllLocations === true;
 
