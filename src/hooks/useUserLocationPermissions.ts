@@ -93,7 +93,10 @@ export const useSaveUserLocationPermissions = () => {
       queryClient.invalidateQueries({ queryKey: ['user-location-permissions', variables.userId] });
       queryClient.invalidateQueries({ queryKey: ['user-view-all-locations', variables.userId] });
       queryClient.invalidateQueries({ queryKey: ['current-user-location-permissions'] });
-      queryClient.invalidateQueries({ queryKey: ['header-locations'] });
+      queryClient.invalidateQueries({ queryKey: ['effective-locations-for-company'] });
+      queryClient.invalidateQueries({ queryKey: ['effective-locations-for-companies'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-locations'] });
+      queryClient.invalidateQueries({ queryKey: ['locations-for-companies'] });
     },
   });
 };

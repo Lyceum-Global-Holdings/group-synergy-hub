@@ -18,7 +18,11 @@ export function LocationSelector() {
   const { data: permissions, isLoading: permissionsLoading } = useCurrentUserLocationPermissions();
 
   // Canonical company-scoped effective-location resolver (server-side hierarchy).
-  const { data: companyLocations = [] } = useEffectiveLocationsForCompany(selectedCompany?.id);
+  const {
+    data: companyLocations = [],
+    isLoading: locationsLoading,
+    isError: locationsError,
+  } = useEffectiveLocationsForCompany(selectedCompany?.id);
 
   const canViewAll = permissions?.viewAllLocations === true;
 
@@ -91,9 +95,17 @@ export function LocationSelector() {
     }
   }, [showAllOption, permissionsLoading, globalLocationId, locations, setGlobalLocationId]);
 
+  const isLoading = permissionsLoading || (!!selectedCompany?.id && locationsLoading);
+
   const selectValue = showAllOption
     ? (globalLocationId ?? "all")
-    : (globalLocationId ?? locations[0]?.id);
+    : (globalLocationId ?? locations[0]?.id ?? "");
+
+  let placeholder = showAllOption ? "All Locations" : "Select Location";
+  if (!selectedCompany?.id) placeholder = "Select a company";
+  else if (isLoading) placeholder = "Loading locations…";
+  else if (locationsError) placeholder = "Failed to load locations";
+  else if (locations.length === 0) placeholder = "No locations for this company";
 
   return (
     <div className="flex items-center gap-2 shrink-0">
@@ -103,12 +115,25 @@ export function LocationSelector() {
         onValueChange={(value) =>
           setGlobalLocationId(showAllOption ? (value === "all" ? null : value) : value)
         }
+        disabled={isLoading || !selectedCompany?.id}
       >
-        <SelectTrigger className="w-[160px] shrink-0" disabled={locations.length === 0}>
-          <SelectValue placeholder={showAllOption ? "All Locations" : "Select Location"} />
+        <SelectTrigger className="w-[200px] shrink-0">
+          <SelectValue placeholder={placeholder} />
         </SelectTrigger>
         <SelectContent>
-          {showAllOption && <SelectItem value="all">All Locations</SelectItem>}
+          {locationsError && (
+            <SelectItem value="__error" disabled>
+              Failed to load locations
+            </SelectItem>
+          )}
+          {!locationsError && !isLoading && locations.length === 0 && selectedCompany?.id && (
+            <SelectItem value="__empty" disabled>
+              No locations mapped to this company
+            </SelectItem>
+          )}
+          {showAllOption && locations.length > 0 && (
+            <SelectItem value="all">All Locations</SelectItem>
+          )}
           {locations.map((loc) => (
             <SelectItem key={loc.id} value={loc.id}>
               {loc.parent_id ? `↳ ${loc.name}` : loc.name}

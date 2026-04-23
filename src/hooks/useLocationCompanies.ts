@@ -69,8 +69,10 @@ export function useLocationCompanies(locationId?: string | null) {
       queryClient.invalidateQueries({ queryKey: ['all-location-companies-admin'] });
       queryClient.invalidateQueries({ queryKey: ['all-effective-location-companies-admin'] });
       queryClient.invalidateQueries({ queryKey: ['warehouse-locations'] });
-      queryClient.invalidateQueries({ queryKey: ['header-locations'] });
+      queryClient.invalidateQueries({ queryKey: ['effective-locations-for-company'] });
+      queryClient.invalidateQueries({ queryKey: ['effective-locations-for-companies'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-locations'] });
+      queryClient.invalidateQueries({ queryKey: ['locations-for-companies'] });
     },
   });
 
