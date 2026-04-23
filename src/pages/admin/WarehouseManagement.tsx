@@ -73,22 +73,42 @@ export default function WarehouseManagement() {
   const { companies } = useCompanies();
   const { companyIds: editLocationCompanyIds, saveCompanies } = useLocationCompanies(editLocationData?.id);
 
-  // Fetch all location-company mappings in bulk for the table
+  // Admin master-data view: fetch FULL location-company mappings via security-definer RPC,
+  // bypassing per-company RLS so admins see every allocation chip (ISO/IEC 27001 A.9.4.1 —
+  // separation of administrative metadata access from transactional data access).
   const { data: allLocationCompanyMap = {} } = useQuery({
-    queryKey: ['all-location-companies'],
+    queryKey: ['all-location-companies-admin'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('warehouse_location_companies')
-        .select('location_id, company_id');
+      const { data, error } = await supabase.rpc('get_all_warehouse_location_companies');
       if (error) throw error;
       const map: Record<string, string[]> = {};
-      for (const row of data || []) {
+      for (const row of (data || []) as Array<{ location_id: string; company_id: string }>) {
         if (!map[row.location_id]) map[row.location_id] = [];
         map[row.location_id].push(row.company_id);
       }
       return map;
     },
   });
+
+  // Admin-scoped minimal company directory (id, name, code) for chip labelling.
+  // Falls back to useCompanies() — kept RLS-scoped for transactional surfaces.
+  const { data: allCompaniesMinimal = [] } = useQuery({
+    queryKey: ['all-companies-minimal-admin'],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('get_all_companies_minimal');
+      if (error) throw error;
+      return (data || []) as Array<{ id: string; name: string; code: string | null }>;
+    },
+  });
+
+  const companyLookup = useMemo(() => {
+    const m = new Map<string, { name: string; code: string | null }>();
+    for (const c of allCompaniesMinimal) m.set(c.id, { name: c.name, code: c.code });
+    for (const c of companies) {
+      if (!m.has(c.id)) m.set(c.id, { name: c.name, code: (c as any).code ?? null });
+    }
+    return m;
+  }, [allCompaniesMinimal, companies]);
 
   // Calculate statistics
   const stats = {
