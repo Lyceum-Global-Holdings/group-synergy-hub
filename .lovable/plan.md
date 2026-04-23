@@ -1,89 +1,80 @@
 
 
-## Allow tools to import from the general Item Master across any company / location
+## Admin-only "Delete Tool" in Tool Management
 
 ### Outcome
 
-The "Import from Item Master" dialog in Tool Management can pull from the **entire** Item Master — not just `TOO-*` categories — across **all companies the user can access** and any location/sub-location, while still defaulting to the safest scope (current company + tool categories) so existing workflows are unchanged.
+Admins (and higher) can delete tools from the Tools Inventory tab. Non-admins do not see the action. Deletion is blocked at the database level for non-admins and blocked in both UI and DB when the tool still has active (unreturned) issues, preserving audit history.
 
 ### Standards applied
 
-- **SAP MM → PM "Material to Equipment" promotion**: any inventory material may be promoted to equipment; categorization is a *recommendation*, not a hard gate.
-- **ISO 55000 §6.2.5 (single source of truth)**: the catalog is the master; tools are a *view/role* of the same master record.
-- **ISO 27001 A.9.4 (least privilege)**: cross-company reads must respect existing access (`useAccessibleCompanyIds` / `can_access_company`).
-- **WCAG 2.2 SC 3.2.3 (consistent navigation)** and **NN/g progressive disclosure**: scope widens via explicit user choice, never silently.
+- **ISO 27001 A.9.4.1 / A.9.4.4** — least privilege; destructive operations restricted to privileged roles, enforced server-side (RLS), not just client-side.
+- **SAP MM equipment retirement / ISO 55000** — physical assets are not deleted while in use; require all units returned before removal.
+- **GDPR Art. 5(1)(e) + ISO 27001 A.12.4** — preserve audit trail. Historical `tool_issues` / `tool_returns` rows are kept; only the master record is removed (or soft-deleted, see below).
+- **WCAG 2.2 SC 3.3.4** — destructive actions require a confirmation step naming the item.
+- **Project memory** `user-role-delete-restriction` and `admin-authorization-server-side` — admin gating must be server-side; client gating is UX only.
 
-### Solution
+### Database layer (server-side enforcement)
 
-#### 1) Two-axis scope selector at the top of the dialog
+Replace the over-permissive DELETE policy on `warehouse_tools` (currently `auth.uid() IS NOT NULL`).
 
-Replace the single hard filter with two independent controls:
+Migration:
 
-- **Category scope** (segmented control):
-  - `Tool categories` (default) — current behavior, `TOO-HND` / `TOO-PWR` subtree.
-  - `All categories` — no `category_id` filter.
-- **Company scope** (segmented control):
-  - `Current company` (default) — `selectedCompany.id` only.
-  - `All my companies` — every id from `useAccessibleCompanyIds()`.
+1. Drop existing DELETE policy `Users can delete warehouse tools`.
+2. Create a new DELETE policy: requires `has_role(auth.uid(), 'admin')` OR `has_role(auth.uid(), 'super_admin')` AND `can_access_company(company_id)` (or `company_id IS NULL`). Mirrors the existing SELECT scope so admins of other companies can't reach across tenants.
+3. Add a trigger `prevent_tool_delete_with_active_issues` (BEFORE DELETE on `warehouse_tools`) that raises an exception if any `tool_issues` row exists with `quantity_issued > quantity_returned` for the tool. Message: `Cannot delete tool: N units are still issued. Process returns first.`
 
-Both controls are part of the React Query `queryKey` so caches don't collide. Defaults preserve today's behavior; widening is one click.
+The historical `tool_issues` and `tool_returns` rows are retained (their `tool_id` becomes orphaned only if FK is `ON DELETE CASCADE` — verify and switch to `ON DELETE RESTRICT` or `SET NULL` so audit history survives). Plan: set `ON DELETE SET NULL` on `tool_issues.tool_id` and `tool_returns.tool_id`, with a denormalized `tool_code_snapshot` / `tool_name_snapshot` already on the issue rows where present (verify; if not, add nullable snapshot columns populated by an INSERT trigger).
 
-#### 2) Optional location / sub-location filter
+### Client layer
 
-Add a **Location** dropdown (single-select, includes "Any location") sourced from the existing global location context. When set, the query adds `.eq('location_id', locationId)`. When "Any" is selected the filter is omitted. This satisfies the request to support any location or sub-location without forcing a choice.
+#### `src/hooks/useWarehouseTools.ts`
 
-> Note: location filtering reads `warehouse_items.location_id` if present; for items without a location it remains visible under "Any location".
+- `deleteToolMutation` already exists. Add explicit verification per project memory `warehouse-asset-deletion-verification`:
+  - Run `.delete().eq('id', id).select('id')` and throw if no row returned (RLS blocked).
+- Surface the trigger error message verbatim in the toast.
 
-#### 3) Query rewrite
+#### `src/components/warehouse/tools/ToolsInventoryTab.tsx`
 
-In `ImportFromItemMasterDialog.tsx`:
+- Accept new prop `onDeleteTool?: (tool: WarehouseTool) => void`.
+- Import `useIsAdminOrHigher`.
+- In the row action `DropdownMenu`, conditionally render a **Delete Tool** item (red text, `Trash2` icon) only when `canDelete` is true AND `tool.issued_quantity === 0` (UI guard mirroring the trigger).
+- When `tool.issued_quantity > 0` and the user is admin, show the item disabled with tooltip "Return all issued units before deleting."
 
-- Pull `useAccessibleCompanyIds()` already used elsewhere in the construction module.
-- Build the Supabase query dynamically:
-  - Always select `id, item_code, name, description, category_id, company_id, unit_of_measurement, location_id`.
-  - `companyScope === 'current'` → `.eq('company_id', selectedCompany.id)`; else `.in('company_id', accessibleCompanyIds)`.
-  - `categoryScope === 'tools'` → `.in('category_id', toolCategoryIds)`; else no category filter.
-  - `locationId` set → `.eq('location_id', locationId)`.
-  - `.order('name', { ascending: true })` and apply the existing 1000-row batching helper to bypass PostgREST limits (per project memory `warehouse-data-batching-limit`).
+#### `src/pages/warehouse/ToolManagement.tsx`
 
-#### 4) New columns in the candidate table
+- Add state: `selectedToolForDelete`, `showDeleteTool`.
+- Pass `onDeleteTool` to `ToolsInventoryTab`.
+- Render the existing shared `DeleteConfirmationDialog` from `src/components/admin/DeleteConfirmationDialog.tsx` (already in the design system) with:
+  - `title`: "Delete tool"
+  - `itemName`: `${tool.tool_code} — ${tool.name}`
+  - `description`: "This permanently removes the tool master record. Historical issues and returns are preserved for audit."
+  - `destructiveText`: "Delete tool"
+  - `isLoading`: bound to `isDeleting`
+  - `onConfirm`: call `deleteTool(tool.id)`; close dialog on success.
 
-Add **Company** and **Category** columns so users can disambiguate identically named items across companies. Render company name from the existing `companies` lookup and category name from the existing categories cache. Make both columns sortable.
+#### Cache & realtime
 
-#### 5) Per-row target company on import
-
-When `companyScope === 'all my companies'`, the user may be importing items that belong to companies *other than* the currently selected one. The "promote to tool" payload must use **the source item's `company_id`**, not the header's selected company, so tool records land in the correct tenant. Add a small inline read-only "Target company" indicator per row to make this transparent.
-
-#### 6) UX safety rails
-
-- A subtle banner explains: "Showing items beyond Tool categories — verify each before promoting." appears only when `categoryScope === 'all'`.
-- A second banner appears when `companyScope === 'all my companies'`: "Tools will be created in each item's source company."
-- Empty states (already refined in the prior plan) gain a third variant: "No items match this scope — try widening category or company."
-- Error alert from previous plan stays.
-
-#### 7) Cache & memory
-
-- `queryKey: ['warehouse-items-tool-candidates', companyScope, categoryScope, locationId, selectedCompany?.id]`.
-- On dialog close, `removeQueries` for the whole key prefix.
-- No new project memory needed; behavior is governed by existing `construction-inventory-visibility-scoping` and `multi-company-visibility-logic` memories.
+- The existing `onSuccess` in `deleteToolMutation` invalidates `['warehouse-tools']` — sufficient (project uses `staleTime: 0`).
 
 ### Out of scope
 
-- No DB schema changes. No RLS changes — `warehouse_items` SELECT policies already enforce company access; this plan only widens client-side filters within what RLS allows.
-- No changes to `useWarehouseTools` create logic beyond passing the source item's `company_id`.
-- No changes to bulk CSV import.
-
-### Files to modify
-
-- `src/components/warehouse/tools/ImportFromItemMasterDialog.tsx` — scope controls, location filter, dynamic query, new columns, per-row target company, banners.
-- (read-only reuse) `src/hooks/construction/useAccessibleCompanyIds.ts`, `src/features/tools/lib/toolCategories.ts`, existing location context hook, batching helper.
+- No soft-delete column added (full delete is acceptable because audit history lives in `tool_issues`/`tool_returns`). Can be added later if regulators require restore.
+- No bulk delete (single-row only for safety in v1).
+- No changes to `tool_adjustments` (kept for audit; FK switched to `SET NULL` if currently CASCADE).
 
 ### Verification
 
-1. Default open → identical to today (current company + tool categories).
-2. Switch category scope to **All categories** → full Item Master for current company appears with banner.
-3. Switch company scope to **All my companies** → items from every accessible company appear; Company column populated; second banner visible.
-4. Pick a location → list narrows; "Any location" restores full set.
-5. Promote a row from another company → new tool record is created under that source company (verified by querying `warehouse_tools` filtered on the source company id).
-6. Close + reopen dialog → cache cleared, fresh fetch.
+1. As a `user` role: open Tool Management → row menu does NOT show Delete; direct API call `.delete()` returns 0 rows.
+2. As `admin`: row with `issued_quantity = 0` → Delete visible → confirm dialog shows code+name → row removed; toast "Tool deleted successfully".
+3. As `admin`: row with `issued_quantity > 0` → Delete disabled with tooltip; if forced via API, trigger raises clear error.
+4. After deletion, the `tool_issues` history for that tool is still queryable (audit preserved).
+5. Cross-company: admin of Company A cannot delete a tool belonging to Company B.
+
+### Files
+
+- New migration — RLS policy replacement + trigger + FK adjustment.
+- `src/hooks/useWarehouseTools.ts` — verification on delete.
+- `src/components/warehouse/tools/ToolsInventoryTab.tsx` — admin-gated Delete menu item.
+- `src/pages/warehouse/ToolManagement.tsx` — wire confirmation dialog.
 
