@@ -32,6 +32,7 @@ export const LocationManagementDialog = () => {
     status: 'active' | 'inactive' | 'maintenance' | 'closed';
     warehouse_category: string;
     company_ids: string[];
+    assignment_mode: 'explicit' | 'inherit_parent';
   }>({
     name: '',
     type: 'location',
@@ -44,7 +45,8 @@ export const LocationManagementDialog = () => {
     physical_address: '',
     status: 'active',
     warehouse_category: 'general',
-    company_ids: []
+    company_ids: [],
+    assignment_mode: 'explicit'
   });
 
   const {
