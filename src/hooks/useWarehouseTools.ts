@@ -17,7 +17,7 @@ export function useWarehouseTools() {
         .from("warehouse_tools")
         .select(`
           *,
-          category:asset_categories!category_id(id, name),
+          category:item_categories!category_id(id, name),
           location:warehouse_locations!location_id(id, name),
           unit:item_units!unit_id(id, name, abbreviation)
         `)
