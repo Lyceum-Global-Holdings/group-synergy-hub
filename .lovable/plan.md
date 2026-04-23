@@ -1,90 +1,179 @@
 
+## Fix sub-location company assignment with hierarchical inheritance and admin-safe writes
 
-## Fix: Multi-Company Sub-Location Allocations Not Fully Visible (e.g. Lyceum Anuradhapura)
+### Outcome
 
-### Root cause (verified against DB)
+Sub-locations and departments will be correctly assigned to the selected companies, remain visible in warehouse management, and follow a consistent hierarchy model:
 
-`Lyceum Anuradhapura` is correctly mapped to **2 companies** in `warehouse_location_companies`:
-- `NCG Warehouse Solutions` (NWS)
-- `Lyceum International Schools` (LIS)
+- Top-level `location` keeps an explicit company allocation.
+- Child `sublocation` / `department` defaults to **inherit parent companies**.
+- Admins can still make a child explicit when needed.
+- Existing orphaned child records with no mappings but mapped parents are backfilled safely.
 
-But the table on `/admin/warehouse-management` shows only a subset because of **two compounding issues**:
+### Root cause
 
-1. **RLS hides mapping rows from admins who can't access every linked company.** Policy on `warehouse_location_companies`: `SELECT … USING (can_access_company(company_id))`. The bulk fetch in `WarehouseManagement.tsx` (lines 77–91) silently drops rows for companies the admin isn't a member of.
-2. **The "Company" cell silently skips chips for companies missing from `useCompanies()`.** Line 516–522: `companies.find(c => c.id === cid)` → if the company isn't in the user's filtered list, `return null` and the badge disappears with no indication.
+The current implementation has three gaps:
 
-Net effect: a sub-location with 2 company allocations renders 0–1 chips depending on the admin's company access, so it *looks* like the allocation is broken. The data is fine — the **admin master-data view is over-filtered**.
+1. `useLocationCompanies.ts` writes directly to `warehouse_location_companies` under company-scoped RLS, which is not reliable for admin master-data maintenance across all mapped companies.
+2. Child locations have **no canonical inheritance model**. Many sub-locations/departments have zero direct mappings while their parent has valid company mappings.
+3. Create/edit flows treat company assignment as a flat picker, but warehouse locations are hierarchical master data.
 
-### Standards alignment
+Verified examples:
+- `Lyceum Anuradhapura` already has direct `LIS + NWS` mappings.
+- Many other children (e.g. `LNQ-1F` … `LNQ-5F`) have **no direct mapping** even though the parent has company assignments.
 
-- **ISO/IEC 27001 A.9.4.1 (Information access restriction)** — distinguishes *administrative metadata access* from *transactional data access*. Admin/master-data screens must expose the full configuration without granting operational data rights.
-- **SAP Authorization Concept** — separation of *display-only configuration objects* (e.g. `S_TABU_DIS` for warehouse master data) from *data access objects*.
-- **GS1 GMN / Master Data Sharing** — location master records should expose all their allocations to authorized maintainers (Super Admin / Admin) regardless of transactional scope.
+## Best-practice solution
 
-### Solution — two layers
+Adopt a **hierarchical master-data allocation model** aligned with SAP EWM / warehouse hierarchy governance and ISO 8000 master-data quality:
 
-#### 1. DB: security-definer RPC for full master-data view
+- Use **explicit vs inherited** allocation mode.
+- Resolve effective companies server-side.
+- Use admin-gated `SECURITY DEFINER` RPCs for master-data reads/writes.
+- Backfill only children with no direct mappings so existing explicit overrides are preserved.
 
-Create `get_all_warehouse_location_companies()` as `SECURITY DEFINER`, callable only by **Super Admin or Admin** (`has_role(auth.uid(), 'admin') OR has_role(auth.uid(), 'super_admin') OR is_super_admin(auth.uid())`). Returns the complete `(location_id, company_id)` set, bypassing the per-company RLS — appropriate because this is *configuration metadata*, not transactional data, and is gated to admin roles.
+## Changes to implement
 
-```sql
-CREATE OR REPLACE FUNCTION public.get_all_warehouse_location_companies()
-RETURNS TABLE (location_id uuid, company_id uuid)
-LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
-  SELECT wlc.location_id, wlc.company_id
-  FROM warehouse_location_companies wlc
-  WHERE has_role(auth.uid(), 'admin')
-     OR has_role(auth.uid(), 'super_admin')
-     OR is_super_admin(auth.uid());
-$$;
-GRANT EXECUTE ON FUNCTION public.get_all_warehouse_location_companies() TO authenticated;
-```
+### 1) Database: add allocation mode and effective-assignment RPCs
 
-Add a parallel `get_all_companies_minimal()` returning `(id, name, code)` only — no PII / sensitive columns — gated to admins, so the admin UI can label every chip even for companies outside the admin's transactional scope. Keep `useCompanies()` untouched (still RLS-scoped for transactional flows).
+Create a migration that:
 
-```sql
-CREATE OR REPLACE FUNCTION public.get_all_companies_minimal()
-RETURNS TABLE (id uuid, name text, code text)
-LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
-  SELECT c.id, c.name, c.code FROM companies c
-  WHERE has_role(auth.uid(), 'admin')
-     OR has_role(auth.uid(), 'super_admin')
-     OR is_super_admin(auth.uid())
-  ORDER BY c.name;
-$$;
-GRANT EXECUTE ON FUNCTION public.get_all_companies_minimal() TO authenticated;
-```
+- Adds `company_assignment_mode` to `warehouse_locations`
+  - `explicit`
+  - `inherit_parent`
+- Backfills:
+  - `location` rows → `explicit`
+  - child rows with direct mappings → `explicit`
+  - child rows with no direct mappings and mapped parent → `inherit_parent`
 
-#### 2. Frontend: use the admin RPCs in the master-data screen
+Add admin-safe RPCs:
 
-**`src/pages/admin/WarehouseManagement.tsx`**
-- Replace the bulk `from('warehouse_location_companies').select(...)` query with `supabase.rpc('get_all_warehouse_location_companies')`.
-- Add a sibling query to `supabase.rpc('get_all_companies_minimal')` for chip labelling. Build a `Map<id, {name, code}>` and use it (with `useCompanies()` as fallback) when rendering the Company cell.
-- On unknown company IDs, render a neutral chip with the short UUID instead of returning `null` — guarantees mismatches are visible, not silently swallowed.
-- Keep the **edit dialog's** company picker (`companies` from `useCompanies`) unchanged — admins can only assign companies they themselves can access (correct security boundary).
+- `get_location_company_assignments_admin()`
+  - returns direct + effective company assignments plus mode and inheritance source
+- `set_location_company_assignments_admin(location_id uuid, company_ids uuid[], assignment_mode text)`
+  - validates admin/super-admin role
+  - writes direct mappings atomically
+  - for `inherit_parent`, clears direct child rows and relies on parent resolution
+  - for `explicit`, replaces direct rows with the submitted set
 
-#### 3. Sub-location parent-inheritance hint (UX only)
+Add a reusable resolver function:
 
-For `sublocation` / `department` rows, if their direct allocation set is empty, show a muted secondary chip "via {ParentName}" listing the parent's allocations, with a tooltip "Inherited from parent location". This matches **SAP MM storage-bin → storage-location** inheritance display pattern. Pure presentation — no data change, no permission change.
+- `get_effective_location_company_ids(location_id uuid)`
+  - returns direct companies for `explicit`
+  - returns parent-resolved companies for `inherit_parent`
 
-### Files modified
+This keeps master-data writes consistent and avoids partial client-side delete/insert behavior.
 
-| File | Change |
-|---|---|
-| New migration | Create `get_all_warehouse_location_companies()` and `get_all_companies_minimal()` security-definer RPCs gated to admin/super-admin roles. |
-| `src/pages/admin/WarehouseManagement.tsx` | Switch the two bulk queries to the new RPCs; render unknown companies with a fallback chip instead of `null`; add parent-inheritance "via {Parent}" chips for sub-locations with no direct allocations. |
+### 2) Data repair migration for existing child locations
 
-### What does NOT change
+In the same migration, backfill existing records:
 
-- RLS on `warehouse_location_companies` stays as-is (transactional scoping preserved).
-- `useCompanies()` and all other consumers (`LocationSelector`, `useWarehouseAssets`, `InventoryItems`, etc.) — untouched.
-- Edit dialog assignment surface — admins still cannot assign companies they lack access to.
-- DB schema for locations / mapping — no column changes.
-- Existing data — no migration of rows.
+- Insert missing inherited mappings only for reporting if needed, or rely on the resolver function for effective reads.
+- Preserve children that already have explicit direct mappings.
+- Do not overwrite cases like `Lyceum Anuradhapura` that already carry a deliberate multi-company assignment.
 
-### Verification after deploy
+If the codebase continues to rely on raw junction-table queries in some places, add a compatibility backfill for children with zero mappings and mapped parents.
 
-- Open `/admin/warehouse-management` as the same admin → `Lyceum Anuradhapura` row shows **both** `NWS` and `LIS` chips.
-- Other multi-company sub-locations (`Lyceum Nugegoda`, `Lyceum Kurunegala`, `Lyceum Nugegoda Quarters`) show their full chip sets.
-- Non-admin users hitting the page (already RBAC-blocked from `/admin/*`) get an empty result from the RPC — no privilege escalation.
+### 3) Frontend: replace raw junction-table edits with admin RPCs
 
+Update `src/hooks/useLocationCompanies.ts`:
+
+- stop reading/writing `warehouse_location_companies` directly for admin maintenance
+- load:
+  - direct company IDs
+  - effective company IDs
+  - assignment mode
+  - inheritance source
+- save through `set_location_company_assignments_admin(...)`
+
+This makes admin edits deterministic and RLS-safe.
+
+### 4) Warehouse Management: make child assignment mode visible and controllable
+
+Update `src/pages/admin/WarehouseManagement.tsx`:
+
+- in the edit dialog, add:
+  - assignment mode selector:
+    - `Inherit parent companies`
+    - `Use explicit companies`
+- when a parent is selected for a sub-location/department:
+  - default mode to `inherit_parent`
+  - prefill the effective parent companies
+- show visual badges in the table:
+  - explicit company chips
+  - inherited chips with `via {parent}`
+- keep fallback chip logic for unknown companies
+
+This gives admins a clear, auditable hierarchy model.
+
+### 5) Location Management dialog: enforce hierarchical defaults
+
+Update `src/components/warehouse/LocationManagementDialog.tsx`:
+
+- when creating a `sublocation` or `department`:
+  - if a parent is chosen, default to `inherit_parent`
+  - show inherited companies immediately
+  - only expose manual company picking when switched to `explicit`
+- on submit, save mode + companies through the new hook/RPC
+
+This prevents child locations from being created without a valid company scope.
+
+### 6) Normalize all location-creation entry points
+
+Update any location creation flows that currently bypass company assignment logic:
+
+- `src/components/warehouse/ImportLocationsDialog.tsx`
+- `src/components/warehouse/LocationTemplateDialog.tsx`
+
+Behavior:
+- top-level locations must have explicit companies
+- child locations created under a parent default to `inherit_parent`
+- no more child rows with empty effective company assignment
+
+### 7) Read-side consistency for company-scoped location fetches
+
+Review and update location fetches that currently read raw `warehouse_location_companies`:
+
+- `src/components/common/LocationSelector.tsx`
+- `src/hooks/useWarehouseLocations.ts`
+- `src/pages/construction/resources/InventoryItems.tsx`
+- `src/components/warehouse/AssignLocationDialog.tsx`
+
+Use the effective-assignment source so company-scoped views honor inherited child mappings consistently.
+
+## Files to modify
+
+- New migration in `supabase/migrations/`
+- `src/hooks/useLocationCompanies.ts`
+- `src/pages/admin/WarehouseManagement.tsx`
+- `src/components/warehouse/LocationManagementDialog.tsx`
+- `src/components/warehouse/ImportLocationsDialog.tsx`
+- `src/components/warehouse/LocationTemplateDialog.tsx`
+- `src/components/common/LocationSelector.tsx`
+- `src/hooks/useWarehouseLocations.ts`
+- `src/pages/construction/resources/InventoryItems.tsx`
+- `src/components/warehouse/AssignLocationDialog.tsx`
+
+## Standards alignment
+
+- **ISO 8000**: master-data quality, completeness, and controlled inheritance
+- **ISO/IEC 27001 A.9**: admin metadata management separated from transactional RLS
+- **SAP EWM / WM hierarchy practice**: child storage entities inherit from parent by default, with explicit override only when justified
+
+## Verification
+
+After implementation:
+
+1. Edit `Lyceum Anuradhapura`:
+   - `LIS` and `NWS` remain visible and save correctly.
+2. Create a new sub-location under a mapped parent:
+   - it automatically inherits the parent company set.
+3. Existing children like `LNQ-1F` to `LNQ-5F` resolve to the parent’s companies without manual repair per row.
+4. Company-scoped location selectors and warehouse flows return the same effective company visibility as the admin master-data screen.
+5. No broad RLS relaxation is introduced; admin master-data writes go only through gated server-side RPCs.
+
+## Technical notes
+
+- Do not relax table RLS on `warehouse_location_companies`.
+- Do not overwrite explicit child mappings during backfill.
+- Prefer a resolver/RPC model over duplicated client-side inheritance logic.
+- Keep `company_id` on `warehouse_locations` as legacy compatibility only until all consumers are migrated to effective-assignment reads.
