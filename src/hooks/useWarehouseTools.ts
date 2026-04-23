@@ -140,8 +140,19 @@ export function useWarehouseTools() {
 
   const deleteToolMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from("warehouse_tools").delete().eq("id", id);
+      // Verify rows were actually removed (RLS may silently block non-admins)
+      const { data, error } = await supabase
+        .from("warehouse_tools")
+        .delete()
+        .eq("id", id)
+        .select("id");
       if (error) throw error;
+      if (!data || data.length === 0) {
+        throw new Error(
+          "Delete failed: you may not have permission to delete this tool, or it no longer exists."
+        );
+      }
+      return data[0];
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["warehouse-tools"] });

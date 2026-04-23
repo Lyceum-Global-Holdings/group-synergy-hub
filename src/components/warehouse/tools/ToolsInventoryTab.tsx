@@ -18,21 +18,26 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { WarehouseTool } from "@/types/toolManagement";
-import { MoreHorizontal, Pencil, Search, SlidersHorizontal, X } from "lucide-react";
+import { MoreHorizontal, Pencil, Search, SlidersHorizontal, Trash2, X } from "lucide-react";
 import { useItemCategories } from "@/hooks/useItemCategories";
 import { useCompany } from "@/contexts/CompanyContext";
 import { buildToolCategoryOptions } from "@/features/tools/lib/toolCategories";
+import { useIsAdminOrHigher } from "@/hooks/useIsAdminOrHigher";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface ToolsInventoryTabProps {
   tools: WarehouseTool[];
   isLoading: boolean;
   onAdjustQuantity?: (tool: WarehouseTool) => void;
   onEditTool?: (tool: WarehouseTool) => void;
+  onDeleteTool?: (tool: WarehouseTool) => void;
 }
 
 const createColumns = (
   onAdjustQuantity?: (tool: WarehouseTool) => void,
-  onEditTool?: (tool: WarehouseTool) => void
+  onEditTool?: (tool: WarehouseTool) => void,
+  onDeleteTool?: (tool: WarehouseTool) => void,
+  canDelete: boolean = false,
 ): ColumnDef<WarehouseTool>[] => [
   {
     accessorKey: "tool_code",
