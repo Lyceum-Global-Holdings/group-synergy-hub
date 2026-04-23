@@ -164,6 +164,17 @@ export const useItemCategories = (companyId?: string) => {
 
   const deleteCategoryMutation = useMutation({
     mutationFn: async (categoryId: string) => {
+      // Pre-flight guard: refuse to delete a category that has subcategories.
+      // Hierarchical master data must never be implicitly orphaned (SAP MM / ISO 55000).
+      const childCount = allCategories.filter((c) => c.parent_id === categoryId).length;
+      if (childCount > 0) {
+        const err = new Error(
+          `This category has ${childCount} subcategor${childCount === 1 ? 'y' : 'ies'}. Delete or reassign them first.`
+        );
+        (err as any).code = 'HAS_CHILDREN';
+        throw err;
+      }
+
       const { error } = await supabase
         .from('item_categories')
         .delete()
@@ -182,7 +193,9 @@ export const useItemCategories = (companyId?: string) => {
       console.error('Error deleting category:', error);
       
       let errorMessage = "Failed to delete category. Please try again.";
-      if (error?.code === '23503') {
+      if (error?.code === 'HAS_CHILDREN') {
+        errorMessage = error.message;
+      } else if (error?.code === '23503') {
         if (error?.details?.includes('warehouse_items')) {
           errorMessage = "Cannot delete this category because it has items assigned to it. Please reassign or delete those items first.";
         } else if (error?.details?.includes('product_master')) {

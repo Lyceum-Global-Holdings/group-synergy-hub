@@ -100,13 +100,17 @@ export function ItemCategoriesTab() {
     return categoryTree.rootCategories.filter(hasMatchingDescendant);
   }, [categoryTree, searchTerm]);
 
-  const handleDeleteCategory = (category: ItemCategory) => {
+  const handleDeleteById = (categoryId: string) => {
+    // Resolve the actual target category from the id passed by CategoryTreeItem.
+    // This avoids closure bugs where a parent's onDelete is invoked for a child.
+    const target = allCategories.find((c) => c.id === categoryId);
+    if (!target) return;
     // If it's a global category (company_id is null), hide it instead of deleting
-    if (!category.company_id && selectedCompany?.id) {
-      excludeCategory(category.id);
+    if (!target.company_id && selectedCompany?.id) {
+      excludeCategory(target.id);
     } else {
       // Company-specific category - actually delete it
-      deleteCategory(category.id);
+      deleteCategory(target.id);
     }
   };
 
@@ -205,7 +209,7 @@ export function ItemCategoriesTab() {
                 children={categoryTree.getChildren(category.id)}
                 level={0}
                 onEdit={setEditingCategory}
-                onDelete={() => handleDeleteCategory(category)}
+                onDelete={handleDeleteById}
                 isDeleting={isDeleting || isExcluding}
                 isGlobal={!category.company_id}
               />
@@ -230,7 +234,7 @@ export function ItemCategoriesTab() {
                   children={hiddenCategoryTree.getChildren(category.id)}
                   level={0}
                   onEdit={setEditingCategory}
-                  onDelete={() => {}}
+                  onDelete={handleDeleteById}
                   onRestore={handleRestoreCategory}
                   isDeleting={isRestoring}
                   isHidden={true}
