@@ -1,111 +1,91 @@
 
 
-## Move Category Between Groups (Re-parent / Reclassify)
+## Optimistic UI for Move Category with Auto-Rollback
 
-Add a "Move" action on each category so a user can relocate it under a different parent (or promote it to a Level 0 root). This is the standard SAP MM "Reclassify Material Group" pattern and aligns with **ISO 55000** (asset hierarchy maintenance) and **ISO/IEC 25010** reliability principles — change hierarchy without delete/recreate.
+Make the category tree update instantly when a user moves a category, then automatically revert if the server (or DB hierarchy trigger) rejects the change.
 
 ### Behavior
 
-- New **Move** icon (folder-arrow) next to Edit / Delete on every visible category row.
-- Opens a `MoveCategoryDialog` showing:
-  - Source: current category (name, code, current parent path breadcrumb).
-  - Destination: searchable parent picker showing the full Level 0 + Level 1 tree with indentation, plus a top option **"— Move to Top Level (Level 0) —"**.
-  - Read-only impact summary: *"X subcategories will move with this category"*.
-  - Confirm / Cancel.
-- On confirm: single `UPDATE item_categories SET parent_id = <new> WHERE id = <source>`. Items linked to the category are unaffected (they reference `category_id`, not the parent path).
+- User picks a new parent in `MoveCategoryDialog` and confirms.
+- The tree in `ItemCategoriesTab` immediately reflects the new position — no spinner, no flicker.
+- If the mutation fails (cycle, depth > 1, RLS, network error, etc.), the tree snaps back to its previous shape and the existing destructive toast appears.
+- On success, the cache is reconciled with the server (refetch) so any server-side adjustments are picked up.
 
-### Validation rules (enforced client + DB)
+### Implementation — `src/hooks/useItemCategories.ts`
 
-1. **No self-parent**: cannot pick itself as new parent.
-2. **No cycles**: cannot pick any of its own descendants as new parent. Computed in the picker (descendants are filtered out + greyed with tooltip "Would create a cycle").
-3. **Max depth = 2 (Level 0 + Level 1 only)** to match the rest of the warehouse UI: a Level 0 with children cannot be moved *under* another Level 0 (would push children to Level 2). Show inline error.
-4. **Global vs company scope**: a global category (`company_id IS NULL`) can only be re-parented to another global category (or top level). Company-owned categories can be re-parented to any visible parent. Prevents leaking company data into the global tree.
-5. **Permissions**: same rule as Edit — admin / super_admin / moderator only.
-
-### Database — depth + cycle guard trigger
-
-Belt-and-braces server-side enforcement (frontend bug should never corrupt the tree again, per the recent closure-bug incident):
-
-```sql
-CREATE OR REPLACE FUNCTION public.enforce_item_category_hierarchy()
-RETURNS trigger LANGUAGE plpgsql AS $$
-DECLARE
-  v_depth int := 0;
-  v_cursor uuid := NEW.parent_id;
-BEGIN
-  IF NEW.parent_id = NEW.id THEN
-    RAISE EXCEPTION 'Category cannot be its own parent';
-  END IF;
-
-  -- Walk up; reject cycles and depth > 1 (root=0, child=1)
-  WHILE v_cursor IS NOT NULL LOOP
-    IF v_cursor = NEW.id THEN
-      RAISE EXCEPTION 'Move would create a cycle in category tree';
-    END IF;
-    v_depth := v_depth + 1;
-    IF v_depth > 1 THEN
-      RAISE EXCEPTION 'Category hierarchy is limited to 2 levels (Level 0 and Level 1)';
-    END IF;
-    SELECT parent_id INTO v_cursor FROM public.item_categories WHERE id = v_cursor;
-  END LOOP;
-
-  -- If this category itself has children, it must remain at Level 0
-  IF NEW.parent_id IS NOT NULL
-     AND EXISTS (SELECT 1 FROM public.item_categories WHERE parent_id = NEW.id) THEN
-    RAISE EXCEPTION 'Cannot move a parent category under another category (would exceed 2 levels)';
-  END IF;
-
-  RETURN NEW;
-END $$;
-
-CREATE TRIGGER trg_item_category_hierarchy
-BEFORE INSERT OR UPDATE OF parent_id ON public.item_categories
-FOR EACH ROW EXECUTE FUNCTION public.enforce_item_category_hierarchy();
-```
-
-### Hook — new mutation in `useItemCategories.ts`
+Convert `moveCategoryMutation` to use TanStack Query's optimistic update lifecycle (`onMutate` / `onError` / `onSettled`) against the `['item-categories', companyId]` cache.
 
 ```ts
 const moveCategoryMutation = useMutation({
-  mutationFn: async ({ id, newParentId }: { id: string; newParentId: string | null }) => {
+  mutationFn: async ({ id, newParentId }) => {
+    // ...existing client-side guards (self, cycle, depth, scope) stay as-is...
     const { error } = await supabase
       .from('item_categories')
       .update({ parent_id: newParentId })
       .eq('id', id);
     if (error) throw error;
   },
-  onSuccess: () => {
-    queryClient.invalidateQueries({ queryKey: ['item-categories', companyId] });
-    toast({ title: 'Category moved', description: 'Hierarchy updated successfully.' });
+  onMutate: async ({ id, newParentId }) => {
+    const key = ['item-categories', companyId];
+    // Stop in-flight refetches so they don't overwrite our optimistic snapshot
+    await queryClient.cancelQueries({ queryKey: key });
+
+    const previous = queryClient.getQueryData<ItemCategory[]>(key);
+    if (previous) {
+      queryClient.setQueryData<ItemCategory[]>(
+        key,
+        previous.map((c) => (c.id === id ? { ...c, parent_id: newParentId } : c)),
+      );
+    }
+    return { previous };  // context for rollback
   },
-  onError: (e: any) => {
-    toast({ title: 'Move failed', description: e.message ?? 'Could not move category.', variant: 'destructive' });
+  onError: (error, _vars, context) => {
+    // Roll back to the snapshot
+    if (context?.previous) {
+      queryClient.setQueryData(['item-categories', companyId], context.previous);
+    }
+    toast({
+      title: 'Move failed',
+      description: error?.message ?? 'Could not move category. Reverted.',
+      variant: 'destructive',
+    });
+  },
+  onSettled: () => {
+    // Reconcile with server on success or failure
+    queryClient.invalidateQueries({ queryKey: ['item-categories', companyId] });
+  },
+  onSuccess: () => {
+    toast({ title: 'Category moved', description: 'Hierarchy updated successfully.' });
   },
 });
 ```
 
-Exposes `moveCategory`, `isMoving`.
+Notes:
+- All existing client-side validations remain inside `mutationFn` — they throw before any cache mutation, so `onMutate` only runs after the dialog's own pre-checks pass.
+- Snapshot is the entire cached `ItemCategory[]` (small array, cheap). Rollback is a single `setQueryData`.
+- `onSettled` invalidate is critical: ensures DB trigger errors that bypass client guards are reconciled, and that successful moves pull any server-touched fields (`updated_at`, etc.).
 
-### UI changes
+### Dialog behavior — `src/components/warehouse/MoveCategoryDialog.tsx`
 
-| File | Change |
-|---|---|
-| `src/components/warehouse/MoveCategoryDialog.tsx` | **New.** Source breadcrumb + destination picker (hierarchical, indented), validation, confirm. |
-| `src/components/warehouse/CategoryTreeItem.tsx` | Add `onMove?: (category) => void` prop and a Move icon button (lucide `FolderInput`) between Edit and Delete; tooltip "Move to another group". Hidden in `isHidden` mode and for global categories when no company is selected. |
-| `src/components/warehouse/ItemCategoriesTab.tsx` | Track `movingCategory` state; render `MoveCategoryDialog`; pass `onMove={setMovingCategory}` to both visible and hidden tree renders (move disabled in hidden tree). |
-| `src/hooks/useItemCategories.ts` | Add `moveCategoryMutation` + return `moveCategory`, `isMoving`. |
-| `supabase/migrations/<ts>_item_categories_hierarchy_guard.sql` | **New.** Trigger above. |
+Minor adjustment: close the dialog immediately after firing `moveCategory(...)` (don't wait for `isMoving`). The optimistic update means the user sees the result instantly; if it fails, the rollback + toast communicates that, and they can reopen the dialog. If the dialog currently disables the confirm button on `isMoving`, switch it to close-on-click and rely on the toast for failure feedback.
 
 ### What does NOT change
 
-- `parent_id` column, RLS, FK rules (`ON DELETE SET NULL` stays).
-- Items / SKUs assigned to the moved category — unaffected (they keep their `category_id`).
-- Hidden / exclude / restore / bulk visibility flows.
-- Other category pickers (Item form, Inventory filter, Tools dropdown) — they auto-reflect the new tree because they read from the same source.
+- DB schema, RLS, hierarchy trigger.
+- Move icon, picker UI, validation rules, or `CategoryTreeItem` rendering.
+- Any other mutation (create / delete / exclude / restore / bulk visibility).
+- Other cache keys or React Query global config.
+
+### Files modified
+
+| File | Change |
+|---|---|
+| `src/hooks/useItemCategories.ts` | Add `onMutate` snapshot + optimistic patch and `onError` rollback to `moveCategoryMutation`; move invalidate to `onSettled`. |
+| `src/components/warehouse/MoveCategoryDialog.tsx` | Close dialog immediately on confirm so the optimistic update is visible; drop `isMoving` disable on the confirm button. |
 
 ### Standards alignment
 
-- **SAP MM** Material Group reclassification (move, don't delete/recreate).
-- **ISO 55000** asset hierarchy maintenance — preserve identity through reorganization.
-- Project memory: `warehouse-category-code-mnemonic-standard`, `shared-foundational-components`, `form-data-normalization`.
+- TanStack Query canonical optimistic-update pattern (cancel → snapshot → patch → rollback → settle).
+- **ISO/IEC 25010** usability (responsiveness) + reliability (fault tolerance — automatic recovery on failure).
+- Project memory: `react-query-global-cache-freshness-permanent` (invalidate-on-settle preserves the staleTime: 0 contract).
 
