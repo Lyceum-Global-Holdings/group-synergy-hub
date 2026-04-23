@@ -7,7 +7,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Plus, Wrench, ArrowRightLeft, RotateCcw, AlertTriangle, ChevronDown, Layers, FileSpreadsheet } from "lucide-react";
+import { Plus, Wrench, ArrowRightLeft, RotateCcw, AlertTriangle, ChevronDown, Layers, FileSpreadsheet, PackagePlus } from "lucide-react";
 import { useWarehouseTools } from "@/hooks/useWarehouseTools";
 import { useToolIssues } from "@/hooks/useToolIssues";
 import { useToolReturns } from "@/hooks/useToolReturns";
@@ -22,6 +22,7 @@ import { ReturnToolDialog } from "@/components/warehouse/tools/ReturnToolDialog"
 import { BulkIssueToolDialog } from "@/components/warehouse/tools/BulkIssueToolDialog";
 import { BulkReturnToolDialog } from "@/components/warehouse/tools/BulkReturnToolDialog";
 import { BulkToolImportDialog } from "@/components/warehouse/tools/BulkToolImportDialog";
+import { ImportFromItemMasterDialog } from "@/components/warehouse/tools/ImportFromItemMasterDialog";
 import { ToolAdjustmentDialog } from "@/components/warehouse/tools/ToolAdjustmentDialog";
 import { Badge } from "@/components/ui/badge";
 import { WarehouseTool } from "@/types/toolManagement";

@@ -241,13 +241,19 @@ export function ToolsInventoryTab({ tools, isLoading, onAdjustQuantity, onEditTo
         </div>
 
         <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-          <SelectTrigger className="w-[160px]">
+          <SelectTrigger className="w-[200px]">
             <SelectValue placeholder="Category" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Categories</SelectItem>
-            {categories.map(cat => (
-              <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+            {categoryOptions.map(({ category, depth }) => (
+              <SelectItem key={category.id} value={category.id}>
+                <span className={depth === 1 ? "pl-4 text-muted-foreground" : "font-medium"}>
+                  {depth === 1 ? "└ " : ""}
+                  {category.code ? `[${category.code}] ` : ""}
+                  {category.name}
+                </span>
+              </SelectItem>
             ))}
           </SelectContent>
         </Select>
