@@ -32,6 +32,7 @@ export const LocationManagementDialog = () => {
     status: 'active' | 'inactive' | 'maintenance' | 'closed';
     warehouse_category: string;
     company_ids: string[];
+    assignment_mode: 'explicit' | 'inherit_parent';
   }>({
     name: '',
     type: 'location',
@@ -44,7 +45,8 @@ export const LocationManagementDialog = () => {
     physical_address: '',
     status: 'active',
     warehouse_category: 'general',
-    company_ids: []
+    company_ids: [],
+    assignment_mode: 'explicit'
   });
 
   const {
@@ -63,7 +65,11 @@ export const LocationManagementDialog = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formData.name.trim() || formData.company_ids.length === 0) return;
+    const isChild = formData.type !== 'location' && formData.parent_id !== 'none';
+    const effectiveMode = isChild ? formData.assignment_mode : 'explicit';
+
+    if (!formData.name.trim()) return;
+    if (effectiveMode === 'explicit' && formData.company_ids.length === 0) return;
 
     const locationData = {
       name: formData.name,
@@ -77,18 +83,20 @@ export const LocationManagementDialog = () => {
       physical_address: formData.physical_address || undefined,
       status: formData.status,
       warehouse_category: formData.warehouse_category as any,
-      company_id: formData.company_ids[0],
+      company_id: effectiveMode === 'explicit' ? formData.company_ids[0] : undefined,
     };
 
     try {
-      if (editingLocation) {
-        await updateLocationAsync({ id: editingLocation, ...locationData });
-        await saveCompanies({ locationId: editingLocation, companyIds: formData.company_ids });
-      } else {
-        const created = await createLocation(locationData);
-        if (created?.id) {
-          await saveCompanies({ locationId: created.id, companyIds: formData.company_ids });
-        }
+      const targetId = editingLocation
+        ? (await updateLocationAsync({ id: editingLocation, ...locationData }), editingLocation)
+        : (await createLocation(locationData))?.id;
+
+      if (targetId) {
+        await saveCompanies({
+          locationId: targetId,
+          companyIds: effectiveMode === 'explicit' ? formData.company_ids : [],
+          assignmentMode: effectiveMode,
+        });
       }
 
       resetForm();
@@ -110,7 +118,8 @@ export const LocationManagementDialog = () => {
       physical_address: '',
       status: 'active',
       warehouse_category: 'general',
-      company_ids: []
+      company_ids: [],
+      assignment_mode: 'explicit'
     });
     setEditingLocation(null);
   };
@@ -119,6 +128,21 @@ export const LocationManagementDialog = () => {
     if (!editingLocation || editCompanyIds.length === 0) return;
     setFormData(prev => ({ ...prev, company_ids: editCompanyIds }));
   }, [editCompanyIds, editingLocation]);
+
+  // SAP EWM hierarchy default: when a child type gets a parent, default to inherit_parent
+  // unless the user has explicitly changed mode. Only auto-apply when not editing.
+  useEffect(() => {
+    if (editingLocation) return;
+    if (formData.type === 'location') {
+      if (formData.assignment_mode !== 'explicit') {
+        setFormData(prev => ({ ...prev, assignment_mode: 'explicit' }));
+      }
+      return;
+    }
+    if (formData.parent_id !== 'none' && formData.assignment_mode === 'explicit' && formData.company_ids.length === 0) {
+      setFormData(prev => ({ ...prev, assignment_mode: 'inherit_parent' }));
+    }
+  }, [formData.type, formData.parent_id, editingLocation]);
 
   const handleEdit = (location: any) => {
     setEditingLocation(location.id);
@@ -134,7 +158,8 @@ export const LocationManagementDialog = () => {
       physical_address: location.physical_address || '',
       status: location.status || 'active',
       warehouse_category: location.warehouse_category || 'general',
-      company_ids: location.company_id ? [location.company_id] : []
+      company_ids: location.company_id ? [location.company_id] : [],
+      assignment_mode: location.company_assignment_mode || 'explicit'
     });
   };
 
@@ -169,14 +194,41 @@ export const LocationManagementDialog = () => {
             </h3>
             
             <form onSubmit={handleSubmit} className="space-y-4">
+              {formData.type !== 'location' && formData.parent_id !== 'none' && (
+                <div>
+                  <Label>Company Assignment Mode</Label>
+                  <Select
+                    value={formData.assignment_mode}
+                    onValueChange={(v: 'explicit' | 'inherit_parent') => setFormData({ ...formData, assignment_mode: v })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="inherit_parent">Inherit parent companies (recommended)</SelectItem>
+                      <SelectItem value="explicit">Use explicit companies</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {formData.assignment_mode === 'inherit_parent' && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      This {formData.type} will automatically inherit company access from its parent.
+                    </p>
+                  )}
+                </div>
+              )}
+
               <div>
-                <Label>Companies *</Label>
+                <Label>Companies {formData.assignment_mode !== 'inherit_parent' && '*'}</Label>
                 <Popover>
                   <PopoverTrigger asChild>
-                    <Button variant="outline" className="w-full justify-between font-normal">
+                    <Button
+                      variant="outline"
+                      className="w-full justify-between font-normal"
+                      disabled={formData.assignment_mode === 'inherit_parent'}
+                    >
                       {formData.company_ids.length > 0
-                        ? `${formData.company_ids.length} company(ies) selected`
-                        : 'Select companies'}
+                        ? `${formData.company_ids.length} company(ies) ${formData.assignment_mode === 'inherit_parent' ? 'inherited' : 'selected'}`
+                        : (formData.assignment_mode === 'inherit_parent' ? 'Inherited from parent' : 'Select companies')}
                       <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                     </Button>
                   </PopoverTrigger>
@@ -385,7 +437,7 @@ export const LocationManagementDialog = () => {
               <div className="flex gap-2">
                 <Button 
                   type="submit" 
-                  disabled={isCreating || isUpdating || !formData.name.trim() || formData.company_ids.length === 0}
+                  disabled={isCreating || isUpdating || !formData.name.trim() || (formData.assignment_mode !== 'inherit_parent' && formData.company_ids.length === 0)}
                   className="flex-1"
                 >
                   <Plus className="h-4 w-4 mr-2" />

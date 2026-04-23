@@ -1,47 +1,84 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
+export type LocationAssignmentMode = 'explicit' | 'inherit_parent';
+
+export interface LocationCompanyAssignments {
+  assignmentMode: LocationAssignmentMode;
+  directCompanyIds: string[];
+  effectiveCompanyIds: string[];
+  inheritanceSourceId: string | null;
+  inheritanceSourceName: string | null;
+}
+
+const EMPTY: LocationCompanyAssignments = {
+  assignmentMode: 'explicit',
+  directCompanyIds: [],
+  effectiveCompanyIds: [],
+  inheritanceSourceId: null,
+  inheritanceSourceName: null,
+};
+
 export function useLocationCompanies(locationId?: string | null) {
   const queryClient = useQueryClient();
 
-  const { data: companyIds = [], isLoading } = useQuery({
-    queryKey: ['location-companies', locationId],
-    queryFn: async () => {
-      if (!locationId) return [];
-      const { data, error } = await supabase
-        .from('warehouse_location_companies')
-        .select('company_id')
-        .eq('location_id', locationId);
+  const { data: assignments = EMPTY, isLoading } = useQuery({
+    queryKey: ['location-company-assignments', locationId],
+    queryFn: async (): Promise<LocationCompanyAssignments> => {
+      if (!locationId) return EMPTY;
+      const { data, error } = await supabase.rpc(
+        'get_location_company_assignments_admin' as any,
+        { p_location_id: locationId }
+      );
       if (error) throw error;
-      return data.map(d => d.company_id);
+      const row = (data as any[])?.[0];
+      if (!row) return EMPTY;
+      return {
+        assignmentMode: (row.assignment_mode as LocationAssignmentMode) || 'explicit',
+        directCompanyIds: (row.direct_company_ids as string[]) || [],
+        effectiveCompanyIds: (row.effective_company_ids as string[]) || [],
+        inheritanceSourceId: row.inheritance_source_id || null,
+        inheritanceSourceName: row.inheritance_source_name || null,
+      };
     },
     enabled: !!locationId,
   });
 
   const saveCompanies = useMutation({
-    mutationFn: async ({ locationId, companyIds }: { locationId: string; companyIds: string[] }) => {
-      const { error: deleteError } = await supabase
-        .from('warehouse_location_companies')
-        .delete()
-        .eq('location_id', locationId);
-
-      if (deleteError) throw deleteError;
-
-      if (companyIds.length > 0) {
-        const { error: insertError } = await supabase
-          .from('warehouse_location_companies')
-          .insert(companyIds.map(cid => ({ location_id: locationId, company_id: cid })));
-
-        if (insertError) throw insertError;
-      }
+    mutationFn: async ({
+      locationId,
+      companyIds,
+      assignmentMode = 'explicit',
+    }: {
+      locationId: string;
+      companyIds: string[];
+      assignmentMode?: LocationAssignmentMode;
+    }) => {
+      const { error } = await supabase.rpc(
+        'set_location_company_assignments_admin' as any,
+        {
+          p_location_id: locationId,
+          p_company_ids: companyIds,
+          p_assignment_mode: assignmentMode,
+        }
+      );
+      if (error) throw error;
     },
     onSuccess: (_, vars) => {
-      queryClient.invalidateQueries({ queryKey: ['location-companies', vars.locationId] });
+      queryClient.invalidateQueries({ queryKey: ['location-company-assignments', vars.locationId] });
+      queryClient.invalidateQueries({ queryKey: ['all-location-companies-admin'] });
+      queryClient.invalidateQueries({ queryKey: ['all-effective-location-companies-admin'] });
       queryClient.invalidateQueries({ queryKey: ['warehouse-locations'] });
       queryClient.invalidateQueries({ queryKey: ['header-locations'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-locations'] });
     },
   });
 
-  return { companyIds, isLoading, saveCompanies: saveCompanies.mutateAsync };
+  // Backwards-compatible aliases
+  return {
+    companyIds: assignments.directCompanyIds,
+    assignments,
+    isLoading,
+    saveCompanies: saveCompanies.mutateAsync,
+  };
 }

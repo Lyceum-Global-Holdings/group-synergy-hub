@@ -71,11 +71,10 @@ export default function WarehouseManagement() {
   } = useWarehouseLocations();
   const { toast } = useToast();
   const { companies } = useCompanies();
-  const { companyIds: editLocationCompanyIds, saveCompanies } = useLocationCompanies(editLocationData?.id);
+  const { companyIds: editLocationCompanyIds, assignments: editAssignments, saveCompanies } = useLocationCompanies(editLocationData?.id);
 
   // Admin master-data view: fetch FULL location-company mappings via security-definer RPC,
-  // bypassing per-company RLS so admins see every allocation chip (ISO/IEC 27001 A.9.4.1 —
-  // separation of administrative metadata access from transactional data access).
+  // bypassing per-company RLS so admins see every allocation chip (ISO/IEC 27001 A.9.4.1).
   const { data: allLocationCompanyMap = {} } = useQuery({
     queryKey: ['all-location-companies-admin'],
     queryFn: async () => {
@@ -85,6 +84,26 @@ export default function WarehouseManagement() {
       for (const row of (data || []) as Array<{ location_id: string; company_id: string }>) {
         if (!map[row.location_id]) map[row.location_id] = [];
         map[row.location_id].push(row.company_id);
+      }
+      return map;
+    },
+  });
+
+  // Effective (resolved + inheritance-aware) company assignments per location — the
+  // canonical source for chip rendering. Aligns with SAP EWM hierarchy practice.
+  const { data: allEffectiveMap = {} } = useQuery({
+    queryKey: ['all-effective-location-companies-admin'],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('get_all_effective_location_companies' as any);
+      if (error) throw error;
+      const map: Record<string, Array<{ company_id: string; is_inherited: boolean; source_location_id: string }>> = {};
+      for (const row of (data || []) as any[]) {
+        if (!map[row.location_id]) map[row.location_id] = [];
+        map[row.location_id].push({
+          company_id: row.company_id,
+          is_inherited: row.is_inherited,
+          source_location_id: row.source_location_id,
+        });
       }
       return map;
     },
@@ -250,16 +269,17 @@ export default function WarehouseManagement() {
       company_ids: [] as string[], // Will be populated by useEffect
     });
   };
-  // Populate company_ids when junction table data loads (with legacy fallback)
+  // Populate company_ids + assignment mode when admin RPC data loads.
   useEffect(() => {
     if (!editLocationData) return;
-
-    const resolvedCompanyIds = editLocationCompanyIds.length > 0
-      ? editLocationCompanyIds
-      : (editLocationData.company_id ? [editLocationData.company_id] : []);
-
-    setEditForm(prev => ({ ...prev, company_ids: resolvedCompanyIds }));
-  }, [editLocationCompanyIds, editLocationData?.id]);
+    const mode = editAssignments.assignmentMode || 'explicit';
+    const ids = mode === 'inherit_parent'
+      ? editAssignments.effectiveCompanyIds
+      : (editLocationCompanyIds.length > 0
+          ? editLocationCompanyIds
+          : (editLocationData.company_id ? [editLocationData.company_id] : []));
+    setEditForm(prev => ({ ...prev, company_ids: ids, assignment_mode: mode }));
+  }, [editLocationCompanyIds, editAssignments.assignmentMode, editAssignments.effectiveCompanyIds, editLocationData?.id]);
 
   const handleEditFormChange = (field: string, value: string | number) => {
     setEditForm(prev => ({ ...prev, [field]: value }));
@@ -268,6 +288,7 @@ export default function WarehouseManagement() {
   const handleSaveEdit = async () => {
     if (!editLocationData) return;
     try {
+      const mode = (editForm.assignment_mode as 'explicit' | 'inherit_parent') || 'explicit';
       await updateLocationAsync({
         id: editLocationData.id,
         name: editForm.name,
@@ -281,21 +302,22 @@ export default function WarehouseManagement() {
         contact_person: editForm.contact_person || null,
         contact_phone: editForm.contact_phone || null,
         physical_address: editForm.physical_address || null,
-        company_id: editForm.company_ids?.[0] || null,
+        company_id: mode === 'explicit' ? (editForm.company_ids?.[0] || null) : null,
       });
-      // Save multi-company associations
-      if (editForm.company_ids?.length > 0) {
-        await saveCompanies({ locationId: editLocationData.id, companyIds: editForm.company_ids });
-      }
+      await saveCompanies({
+        locationId: editLocationData.id,
+        companyIds: mode === 'explicit' ? (editForm.company_ids || []) : [],
+        assignmentMode: mode,
+      });
       toast({
         title: 'Location updated',
         description: `${editForm.name} has been successfully updated.`,
       });
       setEditLocationData(null);
-    } catch (error) {
+    } catch (error: any) {
       toast({
         title: 'Error',
-        description: 'Failed to update location.',
+        description: error?.message || 'Failed to update location.',
         variant: 'destructive',
       });
     }
@@ -534,44 +556,48 @@ export default function WarehouseManagement() {
                       <TableCell>
                         <div className="flex flex-wrap gap-1">
                           {(() => {
-                            const direct = allLocationCompanyMap[location.id]
-                              || (location.company_id ? [location.company_id] : []);
-                            if (direct.length > 0) {
-                              return direct.map((cid: string) => {
-                                const comp = companyLookup.get(cid);
-                                const label = comp?.code || comp?.name || `#${cid.slice(0, 8)}`;
+                            // Use server-resolved effective companies (handles inheritance chain).
+                            const effective = allEffectiveMap[location.id] || [];
+                            if (effective.length > 0) {
+                              return effective.map((row) => {
+                                const comp = companyLookup.get(row.company_id);
+                                const label = comp?.code || comp?.name || `#${row.company_id.slice(0, 8)}`;
+                                if (row.is_inherited) {
+                                  const sourceName = locations.find(l => l.id === row.source_location_id)?.name || 'parent';
+                                  return (
+                                    <Badge
+                                      key={row.company_id}
+                                      variant="secondary"
+                                      className="text-xs opacity-80"
+                                      title={`Inherited from: ${sourceName}`}
+                                    >
+                                      {label} <span className="ml-1 text-[10px] italic">via {sourceName}</span>
+                                    </Badge>
+                                  );
+                                }
                                 return (
                                   <Badge
-                                    key={cid}
+                                    key={row.company_id}
                                     variant="outline"
                                     className="text-xs"
-                                    title={comp?.name || `Unknown company (${cid})`}
+                                    title={comp?.name || `Unknown company (${row.company_id})`}
                                   >
                                     {label}
                                   </Badge>
                                 );
                               });
                             }
-                            // Parent-inheritance hint (SAP MM storage-bin → storage-location pattern):
-                            // sub-locations / departments with no direct allocation surface their parent's set.
-                            const parentId = (location as any).parent_id;
-                            const parent = parentId ? locations.find(l => l.id === parentId) : null;
-                            const inherited = parent
-                              ? (allLocationCompanyMap[parent.id]
-                                  || ((parent as any).company_id ? [(parent as any).company_id] : []))
-                              : [];
-                            if (inherited.length > 0 && parent) {
-                              return inherited.map((cid: string) => {
+                            // Legacy fallback for any rows the RPC hasn't covered yet.
+                            const legacy = allLocationCompanyMap[location.id]
+                              || (location.company_id ? [location.company_id] : []);
+                            if (legacy.length > 0) {
+                              return legacy.map((cid: string) => {
                                 const comp = companyLookup.get(cid);
                                 const label = comp?.code || comp?.name || `#${cid.slice(0, 8)}`;
                                 return (
-                                  <Badge
-                                    key={cid}
-                                    variant="secondary"
-                                    className="text-xs opacity-70"
-                                    title={`Inherited from parent location: ${parent.name}`}
-                                  >
-                                    {label} <span className="ml-1 text-[10px] italic">via {parent.name}</span>
+                                  <Badge key={cid} variant="outline" className="text-xs"
+                                    title={comp?.name || `Unknown company (${cid})`}>
+                                    {label}
                                   </Badge>
                                 );
                               });
@@ -698,13 +724,40 @@ export default function WarehouseManagement() {
           </DialogHeader>
           <ScrollArea className="flex-1 pr-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-4">
+              {editLocationData?.parent_id && (
+                <div className="space-y-2 md:col-span-2">
+                  <Label>Company Assignment Mode</Label>
+                  <Select
+                    value={editForm.assignment_mode || 'explicit'}
+                    onValueChange={(v) => setEditForm(prev => ({ ...prev, assignment_mode: v }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="inherit_parent">Inherit parent companies (recommended for sub-locations)</SelectItem>
+                      <SelectItem value="explicit">Use explicit companies</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {editForm.assignment_mode === 'inherit_parent' && editAssignments.inheritanceSourceName && (
+                    <p className="text-xs text-muted-foreground">
+                      Inheriting from <strong>{editAssignments.inheritanceSourceName}</strong>
+                    </p>
+                  )}
+                </div>
+              )}
+
               <div className="space-y-2">
-                <Label>Companies *</Label>
+                <Label>Companies {editForm.assignment_mode !== 'inherit_parent' && '*'}</Label>
                 <Popover>
                   <PopoverTrigger asChild>
-                    <Button variant="outline" className="w-full justify-between font-normal">
+                    <Button
+                      variant="outline"
+                      className="w-full justify-between font-normal"
+                      disabled={editForm.assignment_mode === 'inherit_parent'}
+                    >
                       {(editForm.company_ids?.length || 0) > 0
-                        ? `${editForm.company_ids.length} company(ies) selected`
+                        ? `${editForm.company_ids.length} company(ies) ${editForm.assignment_mode === 'inherit_parent' ? 'inherited' : 'selected'}`
                         : 'Select companies'}
                       <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                     </Button>
