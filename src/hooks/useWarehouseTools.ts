@@ -1,17 +1,20 @@
 // Warehouse Tools Hook - Handles CRUD operations for tool inventory
+import { useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import type { WarehouseTool, CreateWarehouseToolData } from "@/types/toolManagement";
 import { useToast } from "@/hooks/use-toast";
 import { useCompany } from "@/contexts/CompanyContext";
+import { useLocationFilter } from "@/contexts/LocationFilterContext";
 
 export function useWarehouseTools() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { selectedCompany } = useCompany();
+  const { globalLocationId } = useLocationFilter();
 
   const toolsQuery = useQuery({
-    queryKey: ["warehouse-tools", selectedCompany?.id],
+    queryKey: ["warehouse-tools", selectedCompany?.id, globalLocationId],
     queryFn: async () => {
       let query = supabase
         .from("warehouse_tools")
@@ -28,11 +31,33 @@ export function useWarehouseTools() {
         query = query.or(`company_id.eq.${selectedCompany.id},company_id.is.null`);
       }
 
+      // Filter by global location when set
+      if (globalLocationId) {
+        query = query.eq("location_id", globalLocationId);
+      }
+
       const { data, error } = await query;
       if (error) throw error;
       return data as WarehouseTool[];
     },
   });
+
+  // Realtime: invalidate when any tool bin allocation changes
+  useEffect(() => {
+    const channel = supabase
+      .channel("warehouse-tools-bin-sync")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "tool_bin_allocations" },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ["warehouse-tools"] });
+        }
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [queryClient]);
 
   const createToolMutation = useMutation({
     mutationFn: async (toolData: CreateWarehouseToolData) => {
