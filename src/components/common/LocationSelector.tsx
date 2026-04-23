@@ -18,53 +18,32 @@ export function LocationSelector() {
   const { selectedCompany } = useCompany();
   const { data: permissions, isLoading: permissionsLoading } = useCurrentUserLocationPermissions();
 
-  // Fetch locations for selected company (mapped + legacy fallback)
+  // Fetch effective locations for selected company (resolves inherited sub-locations)
   const { data: companyLocations = [] } = useQuery({
     queryKey: ["header-locations", selectedCompany?.id],
-    queryFn: async () => {
+    queryFn: async (): Promise<Array<{ id: string; name: string; type: string; parent_id: string | null }>> => {
       if (!selectedCompany?.id) return [];
 
-      const [{ data: mappedRows, error: mappedError }, { data: legacyRows, error: legacyError }] = await Promise.all([
-        supabase
-          .from("warehouse_location_companies")
-          .select("warehouse_locations!inner(id, name, type)")
-          .eq("company_id", selectedCompany.id)
-          .eq("warehouse_locations.type", "location"),
-        supabase
-          .from("warehouse_locations")
-          .select("id, name, type")
-          .eq("company_id", selectedCompany.id)
-          .eq("type", "location"),
-      ]);
+      const { data, error } = await supabase.rpc(
+        "get_effective_locations_for_company" as any,
+        { p_company_id: selectedCompany.id }
+      );
+      if (error) throw error;
 
-      if (mappedError) throw mappedError;
-      if (legacyError) throw legacyError;
+      const rows = (data as any[]) || [];
 
-      const merged = new Map<string, { id: string; name: string; type: string }>();
-
-      (mappedRows || []).forEach((row: any) => {
-        const location = row.warehouse_locations;
-        if (location?.id) merged.set(location.id, location);
-      });
-
-      (legacyRows || []).forEach((location: any) => {
-        if (location?.id) merged.set(location.id, location);
-      });
-
-      const result = Array.from(merged.values()).sort((a, b) => a.name.localeCompare(b.name));
-
-      // Fallback: if no locations mapped to this company, show all locations
-      if (result.length === 0) {
+      // Fallback: if nothing resolved for this company, show all top-level locations
+      if (rows.length === 0) {
         const { data: allLocations, error: allError } = await supabase
           .from("warehouse_locations")
-          .select("id, name, type")
+          .select("id, name, type, parent_id")
           .eq("type", "location")
           .order("name");
         if (allError) throw allError;
-        return allLocations ?? [];
+        return (allLocations ?? []) as any;
       }
 
-      return result;
+      return rows;
     },
     enabled: !!selectedCompany?.id,
   });
@@ -128,9 +107,9 @@ export function LocationSelector() {
         </SelectTrigger>
         <SelectContent>
           {showAllOption && <SelectItem value="all">All Locations</SelectItem>}
-          {locations.map((loc) => (
+          {locations.map((loc: any) => (
             <SelectItem key={loc.id} value={loc.id}>
-              {loc.name}
+              {loc.parent_id ? `↳ ${loc.name}` : loc.name}
             </SelectItem>
           ))}
         </SelectContent>

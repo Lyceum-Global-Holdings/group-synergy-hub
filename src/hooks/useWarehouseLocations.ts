@@ -197,52 +197,33 @@ export const useDashboardLocations = (selectedCompanyId?: string | null) => {
       if (!selectedCompanyId) {
         const { data, error } = await supabase
           .from('warehouse_locations')
-          .select('id, name, type')
+          .select('id, name, type, parent_id')
           .order('name');
 
         if (error) throw error;
         return data;
       }
 
-      const [{ data: mappedRows, error: mappedError }, { data: legacyRows, error: legacyError }] = await Promise.all([
-        supabase
-          .from('warehouse_location_companies')
-          .select('warehouse_locations!inner(id, name, type)')
-          .eq('company_id', selectedCompanyId),
-        supabase
-          .from('warehouse_locations')
-          .select('id, name, type')
-          .or(`company_id.eq.${selectedCompanyId},company_id.is.null`),
-      ]);
+      const { data, error } = await supabase.rpc(
+        'get_effective_locations_for_company' as any,
+        { p_company_id: selectedCompanyId }
+      );
+      if (error) throw error;
 
-      if (mappedError) throw mappedError;
-      if (legacyError) throw legacyError;
+      const rows = (data as any[]) || [];
 
-      const merged = new Map<string, { id: string; name: string; type: string }>();
-
-      (mappedRows || []).forEach((row: any) => {
-        const loc = row.warehouse_locations;
-        if (loc?.id) merged.set(loc.id, loc);
-      });
-
-      (legacyRows || []).forEach((loc: any) => {
-        if (loc?.id) merged.set(loc.id, loc);
-      });
-
-      const result = Array.from(merged.values()).sort((a, b) => a.name.localeCompare(b.name));
-
-      // Fallback: if no locations mapped to this company, show all locations
-      if (result.length === 0) {
+      // Fallback: if nothing resolved for this company, show all top-level locations
+      if (rows.length === 0) {
         const { data: allLocations, error: allError } = await supabase
           .from('warehouse_locations')
-          .select('id, name, type')
+          .select('id, name, type, parent_id')
           .eq('type', 'location')
           .order('name');
         if (allError) throw allError;
         return allLocations ?? [];
       }
 
-      return result;
+      return rows;
     },
   });
 };
