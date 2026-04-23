@@ -630,7 +630,11 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
             ) : filteredItems.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={visibleCount + 1} className="text-center py-8 text-muted-foreground">
-                  No items found. Create your first item to get started.
+                  {globalLocationId && selectedCompany?.name
+                    ? `No inventory for ${selectedCompany.name} at ${
+                        allLocations.find((l: any) => l.id === globalLocationId)?.name ?? 'this location'
+                      }.`
+                    : 'No items found. Create your first item to get started.'}
                 </TableCell>
               </TableRow>
             ) : (
