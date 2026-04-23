@@ -122,7 +122,8 @@ export const LocationManagementDialog = () => {
       status: 'active',
       warehouse_category: 'general',
       company_ids: [],
-      assignment_mode: 'explicit'
+      assignment_mode: 'explicit',
+      is_standalone_warehouse: false,
     });
     setEditingLocation(null);
   };
