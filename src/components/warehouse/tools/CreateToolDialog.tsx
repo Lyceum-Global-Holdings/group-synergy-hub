@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
 import {
   Select,
   SelectContent,
@@ -22,6 +23,7 @@ import { useWarehouseTools } from "@/hooks/useWarehouseTools";
 import { useItemUnits } from "@/hooks/useItemUnits";
 import { useItemCategories } from "@/hooks/useItemCategories";
 import { useCompany } from "@/contexts/CompanyContext";
+import { useLocationFilter } from "@/contexts/LocationFilterContext";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { buildToolCategoryOptions } from "@/features/tools/lib/toolCategories";
