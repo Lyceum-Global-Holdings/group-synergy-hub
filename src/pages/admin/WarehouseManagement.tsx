@@ -724,13 +724,40 @@ export default function WarehouseManagement() {
           </DialogHeader>
           <ScrollArea className="flex-1 pr-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-4">
+              {editLocationData?.parent_id && (
+                <div className="space-y-2 md:col-span-2">
+                  <Label>Company Assignment Mode</Label>
+                  <Select
+                    value={editForm.assignment_mode || 'explicit'}
+                    onValueChange={(v) => setEditForm(prev => ({ ...prev, assignment_mode: v }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="inherit_parent">Inherit parent companies (recommended for sub-locations)</SelectItem>
+                      <SelectItem value="explicit">Use explicit companies</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {editForm.assignment_mode === 'inherit_parent' && editAssignments.inheritanceSourceName && (
+                    <p className="text-xs text-muted-foreground">
+                      Inheriting from <strong>{editAssignments.inheritanceSourceName}</strong>
+                    </p>
+                  )}
+                </div>
+              )}
+
               <div className="space-y-2">
-                <Label>Companies *</Label>
+                <Label>Companies {editForm.assignment_mode !== 'inherit_parent' && '*'}</Label>
                 <Popover>
                   <PopoverTrigger asChild>
-                    <Button variant="outline" className="w-full justify-between font-normal">
+                    <Button
+                      variant="outline"
+                      className="w-full justify-between font-normal"
+                      disabled={editForm.assignment_mode === 'inherit_parent'}
+                    >
                       {(editForm.company_ids?.length || 0) > 0
-                        ? `${editForm.company_ids.length} company(ies) selected`
+                        ? `${editForm.company_ids.length} company(ies) ${editForm.assignment_mode === 'inherit_parent' ? 'inherited' : 'selected'}`
                         : 'Select companies'}
                       <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                     </Button>
