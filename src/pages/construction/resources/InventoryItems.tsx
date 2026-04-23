@@ -41,34 +41,24 @@ export default function InventoryItems() {
   const { globalLocationId, setGlobalLocationId } = useLocationFilter();
   const { selectedCompany } = useCompany();
 
-  // Fetch locations mapped to the selected company
+  // Canonical effective-location resolver — includes top-level, sub-locations,
+  // and inherited multi-company children for the selected company.
   const { data: locations } = useQuery({
     queryKey: ["inventory-page-locations", selectedCompany?.id],
     queryFn: async () => {
       if (!selectedCompany?.id) return [];
 
-      const [{ data: mappedRows }, { data: legacyRows }] = await Promise.all([
-        supabase
-          .from("warehouse_location_companies")
-          .select("warehouse_locations!inner(id, name, type)")
-          .eq("company_id", selectedCompany.id)
-          .eq("warehouse_locations.type", "location"),
-        supabase
-          .from("warehouse_locations")
-          .select("id, name, type")
-          .eq("company_id", selectedCompany.id)
-          .eq("type", "location"),
-      ]);
+      const { data, error } = await supabase.rpc(
+        "get_effective_locations_for_company" as any,
+        { p_company_id: selectedCompany.id }
+      );
+      if (error) throw error;
 
+      const rows = ((data as any[]) || []) as Array<{ id: string; name: string; parent_id: string | null }>;
       const merged = new Map<string, { id: string; name: string }>();
-      (mappedRows || []).forEach((row: any) => {
-        const loc = row.warehouse_locations;
-        if (loc?.id) merged.set(loc.id, { id: loc.id, name: loc.name });
-      });
-      (legacyRows || []).forEach((loc: any) => {
-        if (loc?.id) merged.set(loc.id, { id: loc.id, name: loc.name });
-      });
-
+      for (const r of rows) {
+        if (r?.id) merged.set(r.id, { id: r.id, name: r.name });
+      }
       return Array.from(merged.values()).sort((a, b) => a.name.localeCompare(b.name));
     },
     enabled: !!selectedCompany?.id,
