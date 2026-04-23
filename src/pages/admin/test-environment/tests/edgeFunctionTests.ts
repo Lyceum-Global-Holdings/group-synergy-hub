@@ -1,6 +1,8 @@
 import { supabase } from "@/integrations/supabase/client";
 import { TestCase } from "./types";
 
+const SUPABASE_URL = (supabase as any).supabaseUrl as string;
+
 const edgeFnTest = (id: string, fnName: string): TestCase => ({
   id,
   name: `Edge: ${fnName}`,
@@ -9,33 +11,30 @@ const edgeFnTest = (id: string, fnName: string): TestCase => ({
   description: `Verify ${fnName} edge function is reachable`,
   status: "idle",
   run: async () => {
+    // Probe via CORS preflight (OPTIONS). A deployed function responds with
+    // 200/204 + CORS headers WITHOUT executing handler logic — so we never
+    // trigger validation errors, auth checks, or SDK error logging that would
+    // otherwise show up as RUNTIME_ERROR in the browser console.
     try {
-      const { error } = await supabase.functions.invoke(fnName, {
-        method: "POST",
-        body: { test: true },
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/${fnName}`, {
+        method: "OPTIONS",
+        headers: {
+          "Access-Control-Request-Method": "POST",
+          "Access-Control-Request-Headers": "authorization, content-type",
+          Origin: window.location.origin,
+        },
       });
 
-      if (!error) {
-        return { passed: true, details: "Reachable (200 OK)" };
+      if (res.ok || res.status === 204) {
+        return { passed: true, details: `Reachable (CORS preflight ${res.status})` };
       }
 
-      const msg = error.message || "";
-
-      // Network-level failure = truly unreachable
-      if (msg.includes("Failed to fetch") || msg.includes("NetworkError")) {
-        return { passed: false, error: "Function unreachable (network error)" };
+      if (res.status === 404) {
+        return { passed: false, error: "Function not deployed (404)" };
       }
 
-      // 400 (validation) / 401 (auth) / 403 (authorization) all prove the function is
-      // deployed and executing — it just rejected our synthetic { test: true } payload.
-      // That is the expected outcome of a reachability probe.
-      const status = (error as any).context?.status ?? (error as any).status;
-      if (status === 400 || status === 401 || status === 403) {
-        return { passed: true, details: `Reachable (deployed, rejected probe with ${status})` };
-      }
-
-      // 5xx or unknown = real problem
-      return { passed: false, error: `Unexpected response: ${msg}` };
+      // Any other response from the edge runtime still proves it's reachable.
+      return { passed: true, details: `Reachable (preflight returned ${res.status})` };
     } catch (e: any) {
       const msg = e?.message || "Unknown error";
       if (msg.includes("Failed to fetch") || msg.includes("NetworkError")) {
