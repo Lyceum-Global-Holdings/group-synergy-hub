@@ -1,75 +1,89 @@
 
 
-## Fix "Import from Item Master" not showing tools — wrong column name + multi-tenant scoping
+## Allow tools to import from the general Item Master across any company / location
 
-### Root cause (verified against DB)
+### Outcome
 
-`src/components/warehouse/tools/ImportFromItemMasterDialog.tsx` queries `warehouse_items` selecting a column called **`item_name`**, but the actual column is **`name`** (verified via `information_schema.columns`). The Supabase request returns an error and the dialog falls through to the empty state ("No Item Master items found…") regardless of how many tool-categorized items exist.
+The "Import from Item Master" dialog in Tool Management can pull from the **entire** Item Master — not just `TOO-*` categories — across **all companies the user can access** and any location/sub-location, while still defaulting to the safest scope (current company + tool categories) so existing workflows are unchanged.
 
-Secondary issues exposed by the same investigation (against international standards):
+### Standards applied
 
-1. **Multi-tenant scope hides legitimate data**. Tools-categorized items currently exist only under `Lyceum Nugegoda Quarters` (9 items under `TOO-HND`). When the user is on a different selected company in the header (e.g. `NCG Warehouse Solutions`), the dialog correctly returns 0 — but the user is not told *why*. SAP MM "Material → Equipment" promotion is always **plant-scoped**, so the behavior is correct, but the UX must communicate it.
-2. **No error surfacing** — the query's `error` is thrown into React Query but never shown in-dialog. WCAG 3.3.1 (Error Identification) requires the user to see the error.
-3. **Sort/search uses the broken field name**, so even after the fix the sort column must be corrected.
-
-### International standards being applied
-
-- **SAP MM Material Master**: the canonical name field in inventory is `name` / `description`, not `item_name`. Promotion to Equipment Master must read this exact field.
-- **ISO 55000 §6.2.5** — single source of truth: don't introduce an alias for the same attribute.
-- **WCAG 2.2 SC 3.3.1 / 3.3.3** — Error Identification and Error Suggestion: surface the underlying query error and tell the user what to do.
-- **NN/g empty-state guideline** — distinguish "no data exists" from "no data for current filter/company"; offer the next action.
+- **SAP MM → PM "Material to Equipment" promotion**: any inventory material may be promoted to equipment; categorization is a *recommendation*, not a hard gate.
+- **ISO 55000 §6.2.5 (single source of truth)**: the catalog is the master; tools are a *view/role* of the same master record.
+- **ISO 27001 A.9.4 (least privilege)**: cross-company reads must respect existing access (`useAccessibleCompanyIds` / `can_access_company`).
+- **WCAG 2.2 SC 3.2.3 (consistent navigation)** and **NN/g progressive disclosure**: scope widens via explicit user choice, never silently.
 
 ### Solution
 
-#### 1) Fix the query (the actual bug)
+#### 1) Two-axis scope selector at the top of the dialog
 
-In `src/components/warehouse/tools/ImportFromItemMasterDialog.tsx`:
+Replace the single hard filter with two independent controls:
 
-- Replace the selected column `item_name` with `name`.
-- Update the `CandidateItem` interface: rename `item_name` → `name`.
-- Update the row mapper: `item_name: row.item_name` → `name: row.name`.
-- Update `.order("item_name", …)` → `.order("name", …)`.
-- Update all UI references to `item.item_name` (table cell, search-includes filter, `aria-label`, payload `name:`) to `item.name`.
+- **Category scope** (segmented control):
+  - `Tool categories` (default) — current behavior, `TOO-HND` / `TOO-PWR` subtree.
+  - `All categories` — no `category_id` filter.
+- **Company scope** (segmented control):
+  - `Current company` (default) — `selectedCompany.id` only.
+  - `All my companies` — every id from `useAccessibleCompanyIds()`.
 
-This single fix restores the candidate list.
+Both controls are part of the React Query `queryKey` so caches don't collide. Defaults preserve today's behavior; widening is one click.
 
-#### 2) Surface query errors (WCAG 3.3.1)
+#### 2) Optional location / sub-location filter
 
-- Destructure `error` from the `useQuery` call.
-- Render an inline destructive alert above the table when `error` is present, showing `error.message`. Use the existing `Alert`/`AlertDescription` components from `@/components/ui/alert`.
+Add a **Location** dropdown (single-select, includes "Any location") sourced from the existing global location context. When set, the query adds `.eq('location_id', locationId)`. When "Any" is selected the filter is omitted. This satisfies the request to support any location or sub-location without forcing a choice.
 
-#### 3) Improve empty-state messaging (NN/g)
+> Note: location filtering reads `warehouse_items.location_id` if present; for items without a location it remains visible under "Any location".
 
-Replace the single empty state with two distinct messages:
+#### 3) Query rewrite
 
-- **No tool categories configured** (when `toolCategoryIds.length === 0`): "Hand Tools / Power Tools categories are not set up. Ask an administrator to add categories under codes `TOO-HND` or `TOO-PWR`."
-- **No items in this company** (when categories exist but `items.length === 0`): "No Item Master items in **{company name}** are categorized under Hand Tools or Power Tools. Switch company in the header, or add items under those categories first."
-- **All filtered out** (when `items.length > 0` but `filteredItems.length === 0`): keep the existing message but add a "Clear filters" button.
+In `ImportFromItemMasterDialog.tsx`:
 
-#### 4) Defensive: also include sub-sub-categories (SAP MM hierarchy)
+- Pull `useAccessibleCompanyIds()` already used elsewhere in the construction module.
+- Build the Supabase query dynamically:
+  - Always select `id, item_code, name, description, category_id, company_id, unit_of_measurement, location_id`.
+  - `companyScope === 'current'` → `.eq('company_id', selectedCompany.id)`; else `.in('company_id', accessibleCompanyIds)`.
+  - `categoryScope === 'tools'` → `.in('category_id', toolCategoryIds)`; else no category filter.
+  - `locationId` set → `.eq('location_id', locationId)`.
+  - `.order('name', { ascending: true })` and apply the existing 1000-row batching helper to bypass PostgREST limits (per project memory `warehouse-data-batching-limit`).
 
-Today `getToolCategoryIds` returns root + level-1 children. The DB shows level-2 codes like `TOO-HND-HAM` (Hammers), which are children of `TOO-HND`. These ARE included via the level-1 sweep — verified — so no logic change needed. Add a code comment confirming the depth assumption so future categories at level 3+ are handled deliberately.
+#### 4) New columns in the candidate table
 
-#### 5) Reset query cache on close
+Add **Company** and **Category** columns so users can disambiguate identically named items across companies. Render company name from the existing `companies` lookup and category name from the existing categories cache. Make both columns sortable.
 
-After `resetState()`, also call React Query's `removeQueries({ queryKey: ['warehouse-items-tool-candidates'] })` so reopening the dialog after a category change shows fresh data (matches project Core rule "Caching: staleTime 0, refetchOnMount: 'always'").
+#### 5) Per-row target company on import
+
+When `companyScope === 'all my companies'`, the user may be importing items that belong to companies *other than* the currently selected one. The "promote to tool" payload must use **the source item's `company_id`**, not the header's selected company, so tool records land in the correct tenant. Add a small inline read-only "Target company" indicator per row to make this transparent.
+
+#### 6) UX safety rails
+
+- A subtle banner explains: "Showing items beyond Tool categories — verify each before promoting." appears only when `categoryScope === 'all'`.
+- A second banner appears when `companyScope === 'all my companies'`: "Tools will be created in each item's source company."
+- Empty states (already refined in the prior plan) gain a third variant: "No items match this scope — try widening category or company."
+- Error alert from previous plan stays.
+
+#### 7) Cache & memory
+
+- `queryKey: ['warehouse-items-tool-candidates', companyScope, categoryScope, locationId, selectedCompany?.id]`.
+- On dialog close, `removeQueries` for the whole key prefix.
+- No new project memory needed; behavior is governed by existing `construction-inventory-visibility-scoping` and `multi-company-visibility-logic` memories.
 
 ### Out of scope
 
-- No DB schema changes — `warehouse_items.name` is canonical and stays.
-- No changes to `toolCategories.ts`, `useWarehouseTools`, or RLS.
-- No changes to `BulkToolImportDialog` (CSV path uses different column resolution).
-
-### Verification
-
-1. With company `Lyceum Nugegoda Quarters` selected, open Tool Management → Add Tool → Import from Item Master → 9 candidate rows visible (TOO-HND items).
-2. With `NCG Warehouse Solutions` selected, open the same dialog → explicit empty-state message naming the company, not the generic "no items found".
-3. Force a query error (e.g. wrong category id) → red alert shown inline; dialog stays open.
-4. Filter by category → row count badge updates; "Clear filters" appears when count is 0.
-5. Select rows, set quantities, click Import → selected items become tools; dialog closes; cache invalidated.
+- No DB schema changes. No RLS changes — `warehouse_items` SELECT policies already enforce company access; this plan only widens client-side filters within what RLS allows.
+- No changes to `useWarehouseTools` create logic beyond passing the source item's `company_id`.
+- No changes to bulk CSV import.
 
 ### Files to modify
 
-- `src/components/warehouse/tools/ImportFromItemMasterDialog.tsx` — column rename, error alert, refined empty states, cache reset.
-- `src/features/tools/lib/toolCategories.ts` — add a clarifying comment (no logic change).
+- `src/components/warehouse/tools/ImportFromItemMasterDialog.tsx` — scope controls, location filter, dynamic query, new columns, per-row target company, banners.
+- (read-only reuse) `src/hooks/construction/useAccessibleCompanyIds.ts`, `src/features/tools/lib/toolCategories.ts`, existing location context hook, batching helper.
+
+### Verification
+
+1. Default open → identical to today (current company + tool categories).
+2. Switch category scope to **All categories** → full Item Master for current company appears with banner.
+3. Switch company scope to **All my companies** → items from every accessible company appear; Company column populated; second banner visible.
+4. Pick a location → list narrows; "Any location" restores full set.
+5. Promote a row from another company → new tool record is created under that source company (verified by querying `warehouse_tools` filtered on the source company id).
+6. Close + reopen dialog → cache cleared, fresh fetch.
 
