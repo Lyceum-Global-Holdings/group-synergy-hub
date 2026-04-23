@@ -24,6 +24,7 @@ import { BulkReturnToolDialog } from "@/components/warehouse/tools/BulkReturnToo
 import { BulkToolImportDialog } from "@/components/warehouse/tools/BulkToolImportDialog";
 import { ImportFromItemMasterDialog } from "@/components/warehouse/tools/ImportFromItemMasterDialog";
 import { ToolAdjustmentDialog } from "@/components/warehouse/tools/ToolAdjustmentDialog";
+import { DeleteConfirmationDialog } from "@/components/admin/DeleteConfirmationDialog";
 import { Badge } from "@/components/ui/badge";
 import { WarehouseTool } from "@/types/toolManagement";
 
@@ -40,8 +41,10 @@ export default function ToolManagement() {
   const [showEditTool, setShowEditTool] = useState(false);
   const [selectedToolForAdjustment, setSelectedToolForAdjustment] = useState<WarehouseTool | null>(null);
   const [selectedToolForEdit, setSelectedToolForEdit] = useState<WarehouseTool | null>(null);
+  const [selectedToolForDelete, setSelectedToolForDelete] = useState<WarehouseTool | null>(null);
+  const [showDeleteTool, setShowDeleteTool] = useState(false);
 
-  const { tools, isLoading: isLoadingTools } = useWarehouseTools();
+  const { tools, isLoading: isLoadingTools, deleteTool, isDeleting } = useWarehouseTools();
   const { issues, activeIssues, overdueIssues, isLoading: isLoadingIssues } = useToolIssues();
   const { returns, isLoading: isLoadingReturns } = useToolReturns();
 
