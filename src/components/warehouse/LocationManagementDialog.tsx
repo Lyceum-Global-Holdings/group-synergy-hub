@@ -69,7 +69,10 @@ export const LocationManagementDialog = () => {
     e.preventDefault();
 
     const isChild = formData.type !== 'location' && formData.parent_id !== 'none';
-    const effectiveMode = isChild ? formData.assignment_mode : 'explicit';
+    // Standalone warehouses MUST use explicit company assignment.
+    const effectiveMode = formData.is_standalone_warehouse
+      ? 'explicit'
+      : (isChild ? formData.assignment_mode : 'explicit');
 
     if (!formData.name.trim()) return;
     if (effectiveMode === 'explicit' && formData.company_ids.length === 0) return;
@@ -87,6 +90,7 @@ export const LocationManagementDialog = () => {
       status: formData.status,
       warehouse_category: formData.warehouse_category as any,
       company_id: effectiveMode === 'explicit' ? formData.company_ids[0] : undefined,
+      is_standalone_warehouse: formData.is_standalone_warehouse,
     };
 
     try {
