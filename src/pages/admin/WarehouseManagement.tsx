@@ -509,8 +509,8 @@ export default function WarehouseManagement() {
           <CardTitle>Warehouse Locations</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="rounded-md border">
-            <Table>
+          <div className="rounded-md border overflow-x-auto">
+            <Table className="min-w-full">
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-12">

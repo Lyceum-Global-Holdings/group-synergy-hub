@@ -167,6 +167,15 @@
     @apply border-border;
   }
 
+  /* Lock document to viewport — only the named app scroller scrolls.
+     Enterprise shell pattern (SAP Fiori / NN/g): header + sidebar always visible. */
+  html,
+  body,
+  #root {
+    height: 100%;
+    overflow: hidden;
+  }
+
   body {
     @apply bg-background text-foreground antialiased;
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";

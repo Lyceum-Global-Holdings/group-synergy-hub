@@ -595,8 +595,8 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
         </div>
       </div>
 
-      <div className="border rounded-lg">
-        <Table className="[&_td]:py-1.5 [&_th]:py-2">
+      <div className="border rounded-lg overflow-x-auto">
+        <Table className="min-w-full [&_td]:py-1.5 [&_th]:py-2">
           <TableHeader>
             <TableRow>
               <TableHead className="w-[40px]">

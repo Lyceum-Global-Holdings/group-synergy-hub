@@ -50,12 +50,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <SidebarProvider>
-      <div className="min-h-screen flex w-full bg-background">
+      <div className="h-svh flex w-full bg-background overflow-hidden">
         <CompanySidebar />
         
-        <div className="flex-1 flex flex-col min-w-0">
-          {/* Header — clean enterprise shell bar */}
-          <header className="h-14 flex items-center justify-between bg-card px-5 shadow-[var(--shadow-sm)] border-b border-border/40 shrink-0 z-20">
+        <div className="flex-1 flex flex-col min-w-0 h-svh">
+          {/* Header — clean enterprise shell bar (viewport-locked) */}
+          <header className="h-14 flex items-center justify-between bg-card px-5 shadow-[var(--shadow-sm)] border-b border-border/40 shrink-0 sticky top-0 z-20">
             <div className="flex items-center gap-3 min-w-0">
               <SidebarTrigger className="text-muted-foreground hover:text-foreground" />
               <div className="h-5 w-px bg-border/60" />
@@ -78,8 +78,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             </div>
           </header>
 
-          {/* Main Content */}
-          <main className="flex-1 p-5 overflow-auto">
+          {/* Main Content — the single canonical scroll region */}
+          <main
+            id="app-scroll-container"
+            className="flex-1 p-5 overflow-auto min-h-0 overscroll-contain"
+          >
             {children}
           </main>
         </div>
