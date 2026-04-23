@@ -37,24 +37,37 @@ export function CreateToolDialog({ open, onOpenChange }: CreateToolDialogProps) 
   const { createTool, isCreating } = useWarehouseTools();
   const { units } = useItemUnits();
   const { selectedCompany } = useCompany();
+  const { globalLocationId } = useLocationFilter();
   const { allCategories } = useItemCategories(selectedCompany?.id);
   const categoryOptions = useMemo(
     () => buildToolCategoryOptions(allCategories),
     [allCategories],
   );
 
-  const [formData, setFormData] = useState({
+  const buildInitialFormData = () => ({
     tool_code: "",
     name: "",
     description: "",
     category_id: "",
-    location_id: "",
+    location_id: globalLocationId ?? "",
     unit_id: "",
     total_quantity: 1,
     condition: "good",
     unit_cost: "",
     notes: "",
   });
+
+  const [formData, setFormData] = useState(buildInitialFormData);
+
+  // Re-sync the location field with the active global location whenever the
+  // dialog is reopened or the global filter changes (SAP EWM default storage
+  // location pattern). Only auto-fills if user hasn't picked something else.
+  useEffect(() => {
+    if (!open) return;
+    setFormData((prev) =>
+      prev.location_id ? prev : { ...prev, location_id: globalLocationId ?? "" },
+    );
+  }, [open, globalLocationId]);
 
   const { data: locations } = useQuery({
     queryKey: ["warehouse-locations-select"],
@@ -68,8 +81,13 @@ export function CreateToolDialog({ open, onOpenChange }: CreateToolDialogProps) 
     },
   });
 
+  const isAutoFilled =
+    !!globalLocationId && formData.location_id === globalLocationId;
+  const locationMissing = !formData.location_id;
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (locationMissing) return;
     createTool({
       ...formData,
       category_id: formData.category_id || undefined,
@@ -79,18 +97,7 @@ export function CreateToolDialog({ open, onOpenChange }: CreateToolDialogProps) 
     }, {
       onSuccess: () => {
         onOpenChange(false);
-        setFormData({
-          tool_code: "",
-          name: "",
-          description: "",
-          category_id: "",
-          location_id: "",
-          unit_id: "",
-          total_quantity: 1,
-          condition: "good",
-          unit_cost: "",
-          notes: "",
-        });
+        setFormData(buildInitialFormData());
       },
     });
   };
