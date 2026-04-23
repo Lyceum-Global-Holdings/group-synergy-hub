@@ -552,7 +552,14 @@ export default function WarehouseManagement() {
                       </TableCell>
                       <TableCell>
                         <div>
-                          <div className="font-medium">{location.name}</div>
+                          <div className="font-medium flex items-center gap-2 flex-wrap">
+                            <span>{location.name}</span>
+                            {location.is_standalone_warehouse && (
+                              <Badge variant="secondary" className="text-[10px] uppercase tracking-wide">
+                                Standalone
+                              </Badge>
+                            )}
+                          </div>
                           {location.description && (
                             <div className="text-sm text-muted-foreground">
                               {location.description}
