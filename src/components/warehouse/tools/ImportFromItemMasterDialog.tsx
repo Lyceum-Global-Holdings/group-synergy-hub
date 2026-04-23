@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -33,6 +33,7 @@ import { AlertCircle, Info, Loader2, PackagePlus, Search } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useCompany } from "@/contexts/CompanyContext";
+import { useLocationFilter } from "@/contexts/LocationFilterContext";
 import { useItemCategories } from "@/hooks/useItemCategories";
 import { useWarehouseTools } from "@/hooks/useWarehouseTools";
 import { useAccessibleCompanyIds } from "@/hooks/construction/useAccessibleCompanyIds";
@@ -72,6 +73,7 @@ export function ImportFromItemMasterDialog({
   onOpenChange,
 }: ImportFromItemMasterDialogProps) {
   const { selectedCompany, companies } = useCompany();
+  const { globalLocationId } = useLocationFilter();
   const { allCategories } = useItemCategories(selectedCompany?.id);
   const { tools, createBulkTools, isCreatingBulk } = useWarehouseTools();
   const { data: accessibleCompanyIds = [] } = useAccessibleCompanyIds();
@@ -81,6 +83,13 @@ export function ImportFromItemMasterDialog({
   const [categoryScope, setCategoryScope] = useState<CategoryScope>("tools");
   const [companyScope, setCompanyScope] = useState<CompanyScope>("current");
   const [locationId, setLocationId] = useState<string>("any");
+
+  // SAP EWM "default storage location": prefill the destination filter with
+  // the global header location so promoted tools land in the active site.
+  useEffect(() => {
+    if (!open) return;
+    if (globalLocationId) setLocationId(globalLocationId);
+  }, [open, globalLocationId]);
 
   const categoryOptions = useMemo(
     () => buildToolCategoryOptions(allCategories),
@@ -305,7 +314,9 @@ export function ImportFromItemMasterDialog({
       description: item.description ?? undefined,
       category_id: item.category_id ?? undefined,
       unit_id: item.unit_id ?? undefined,
-      location_id: item.location_id ?? undefined,
+      // Auto-assign destination location from global filter when set; falls
+      // back to the source item's location_id otherwise.
+      location_id: globalLocationId ?? item.location_id ?? undefined,
       total_quantity: getQty(item),
       condition: "good",
       unit_cost: item.unit_cost ?? undefined,
@@ -437,6 +448,28 @@ export function ImportFromItemMasterDialog({
               <AlertDescription>
                 Cross-company view active — tools will be created in each item's
                 source company, not the company in the header.
+              </AlertDescription>
+            </Alert>
+          )}
+          {globalLocationId ? (
+            <Alert>
+              <Info className="h-4 w-4" />
+              <AlertDescription>
+                Auto-filled from current location filter — promoted tools will
+                land in{" "}
+                <strong>
+                  {locationOptions.find((l: any) => l.id === globalLocationId)
+                    ?.name ?? "the selected location"}
+                </strong>
+                . Change the Location dropdown above to override.
+              </AlertDescription>
+            </Alert>
+          ) : (
+            <Alert>
+              <Info className="h-4 w-4" />
+              <AlertDescription>
+                Pick a global location in the header to auto-assign all imports
+                to a single site.
               </AlertDescription>
             </Alert>
           )}

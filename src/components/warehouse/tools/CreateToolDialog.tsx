@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
 import {
   Select,
   SelectContent,
@@ -22,6 +23,7 @@ import { useWarehouseTools } from "@/hooks/useWarehouseTools";
 import { useItemUnits } from "@/hooks/useItemUnits";
 import { useItemCategories } from "@/hooks/useItemCategories";
 import { useCompany } from "@/contexts/CompanyContext";
+import { useLocationFilter } from "@/contexts/LocationFilterContext";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { buildToolCategoryOptions } from "@/features/tools/lib/toolCategories";
@@ -35,24 +37,37 @@ export function CreateToolDialog({ open, onOpenChange }: CreateToolDialogProps) 
   const { createTool, isCreating } = useWarehouseTools();
   const { units } = useItemUnits();
   const { selectedCompany } = useCompany();
+  const { globalLocationId } = useLocationFilter();
   const { allCategories } = useItemCategories(selectedCompany?.id);
   const categoryOptions = useMemo(
     () => buildToolCategoryOptions(allCategories),
     [allCategories],
   );
 
-  const [formData, setFormData] = useState({
+  const buildInitialFormData = () => ({
     tool_code: "",
     name: "",
     description: "",
     category_id: "",
-    location_id: "",
+    location_id: globalLocationId ?? "",
     unit_id: "",
     total_quantity: 1,
     condition: "good",
     unit_cost: "",
     notes: "",
   });
+
+  const [formData, setFormData] = useState(buildInitialFormData);
+
+  // Re-sync the location field with the active global location whenever the
+  // dialog is reopened or the global filter changes (SAP EWM default storage
+  // location pattern). Only auto-fills if user hasn't picked something else.
+  useEffect(() => {
+    if (!open) return;
+    setFormData((prev) =>
+      prev.location_id ? prev : { ...prev, location_id: globalLocationId ?? "" },
+    );
+  }, [open, globalLocationId]);
 
   const { data: locations } = useQuery({
     queryKey: ["warehouse-locations-select"],
@@ -66,8 +81,13 @@ export function CreateToolDialog({ open, onOpenChange }: CreateToolDialogProps) 
     },
   });
 
+  const isAutoFilled =
+    !!globalLocationId && formData.location_id === globalLocationId;
+  const locationMissing = !formData.location_id;
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (locationMissing) return;
     createTool({
       ...formData,
       category_id: formData.category_id || undefined,
@@ -77,18 +97,7 @@ export function CreateToolDialog({ open, onOpenChange }: CreateToolDialogProps) 
     }, {
       onSuccess: () => {
         onOpenChange(false);
-        setFormData({
-          tool_code: "",
-          name: "",
-          description: "",
-          category_id: "",
-          location_id: "",
-          unit_id: "",
-          total_quantity: 1,
-          condition: "good",
-          unit_cost: "",
-          notes: "",
-        });
+        setFormData(buildInitialFormData());
       },
     });
   };
@@ -168,12 +177,25 @@ export function CreateToolDialog({ open, onOpenChange }: CreateToolDialogProps) 
               </Select>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="location_id">Location</Label>
+              <div className="flex items-center justify-between gap-2">
+                <Label htmlFor="location_id">
+                  Location <span className="text-destructive">*</span>
+                </Label>
+                {isAutoFilled && (
+                  <Badge variant="secondary" className="text-[10px] py-0 px-1.5">
+                    Auto-filled
+                  </Badge>
+                )}
+              </div>
               <Select
                 value={formData.location_id}
                 onValueChange={(value) => setFormData({ ...formData, location_id: value })}
               >
-                <SelectTrigger>
+                <SelectTrigger
+                  aria-required="true"
+                  aria-invalid={locationMissing}
+                  className={locationMissing ? "border-destructive" : undefined}
+                >
                   <SelectValue placeholder="Select location" />
                 </SelectTrigger>
                 <SelectContent>
@@ -184,6 +206,13 @@ export function CreateToolDialog({ open, onOpenChange }: CreateToolDialogProps) 
                   ))}
                 </SelectContent>
               </Select>
+              <p className="text-xs text-muted-foreground">
+                {isAutoFilled
+                  ? "Auto-filled from current location filter — change if needed."
+                  : globalLocationId
+                    ? "Tools must belong to a site (ISO 55000)."
+                    : "Select a location — tools must belong to a site (ISO 55000)."}
+              </p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="unit_id">Unit of Measure</Label>
@@ -266,7 +295,7 @@ export function CreateToolDialog({ open, onOpenChange }: CreateToolDialogProps) 
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button type="submit" disabled={isCreating}>
+            <Button type="submit" disabled={isCreating || locationMissing}>
               {isCreating ? "Creating..." : "Create Tool"}
             </Button>
           </DialogFooter>

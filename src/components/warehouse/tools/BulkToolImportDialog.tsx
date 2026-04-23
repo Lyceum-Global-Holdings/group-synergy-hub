@@ -19,11 +19,13 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Download, Upload, FileSpreadsheet, CheckCircle2, XCircle, Loader2 } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Download, Upload, FileSpreadsheet, CheckCircle2, XCircle, Loader2, Info } from "lucide-react";
 import { useWarehouseTools } from "@/hooks/useWarehouseTools";
 import { useItemUnits } from "@/hooks/useItemUnits";
 import { useItemCategories } from "@/hooks/useItemCategories";
 import { useCompany } from "@/contexts/CompanyContext";
+import { useLocationFilter } from "@/contexts/LocationFilterContext";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { readExcelFile, writeExcelFromAOA } from "@/utils/excelUtils";
@@ -64,6 +66,7 @@ export function BulkToolImportDialog({ open, onOpenChange }: BulkToolImportDialo
   const { createBulkTools, isCreatingBulk } = useWarehouseTools();
   const { units = [] } = useItemUnits();
   const { selectedCompany } = useCompany();
+  const { globalLocationId } = useLocationFilter();
   const { allCategories } = useItemCategories(selectedCompany?.id);
 
   // Restrict CSV category lookup to the Tools subtree (Hand Tools / Power Tools + children)
@@ -83,6 +86,14 @@ export function BulkToolImportDialog({ open, onOpenChange }: BulkToolImportDialo
 
   const validTools = parsedData.filter((t) => t.isValid);
   const invalidTools = parsedData.filter((t) => !t.isValid);
+
+  const globalLocationName = useMemo(
+    () =>
+      globalLocationId
+        ? locations.find((l) => l.id === globalLocationId)?.name ?? null
+        : null,
+    [globalLocationId, locations],
+  );
 
   const downloadTemplate = async () => {
     const template = [
@@ -143,8 +154,10 @@ export function BulkToolImportDialog({ open, onOpenChange }: BulkToolImportDialo
           }
         }
 
-        // Validate location
+        // Validate location — fall back to the global header location when blank
+        // (SAP EWM "default storage location" pattern, ISO 55000 §6.2.6).
         let locationId: string | undefined;
+        let locationLabel = locationName;
         if (locationName) {
           const match = locations.find((l) => l.name.toLowerCase() === locationName.toLowerCase());
           if (!match) {
@@ -152,6 +165,10 @@ export function BulkToolImportDialog({ open, onOpenChange }: BulkToolImportDialo
           } else {
             locationId = match.id;
           }
+        } else if (globalLocationId) {
+          locationId = globalLocationId;
+          locationLabel =
+            locations.find((l) => l.id === globalLocationId)?.name ?? "";
         }
 
         // Validate unit
@@ -192,7 +209,7 @@ export function BulkToolImportDialog({ open, onOpenChange }: BulkToolImportDialo
           name,
           description,
           category: categoryName,
-          location: locationName,
+          location: locationLabel,
           unit: unitName,
           total_quantity: quantity,
           condition,
@@ -286,6 +303,25 @@ export function BulkToolImportDialog({ open, onOpenChange }: BulkToolImportDialo
               Download Template
             </Button>
           </div>
+
+          {/* Global location auto-fill banner */}
+          {globalLocationName ? (
+            <Alert>
+              <Info className="h-4 w-4" />
+              <AlertDescription>
+                Blank <strong>Location</strong> cells will use the current
+                location: <strong>{globalLocationName}</strong>.
+              </AlertDescription>
+            </Alert>
+          ) : (
+            <Alert>
+              <Info className="h-4 w-4" />
+              <AlertDescription>
+                Pick a global location in the header to auto-fill blank Location
+                cells; otherwise rows without a location will be flagged.
+              </AlertDescription>
+            </Alert>
+          )}
 
           {/* File Upload */}
           <div className="space-y-2">
