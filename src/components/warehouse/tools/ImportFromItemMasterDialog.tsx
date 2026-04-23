@@ -33,6 +33,7 @@ import { AlertCircle, Info, Loader2, PackagePlus, Search } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useCompany } from "@/contexts/CompanyContext";
+import { useLocationFilter } from "@/contexts/LocationFilterContext";
 import { useItemCategories } from "@/hooks/useItemCategories";
 import { useWarehouseTools } from "@/hooks/useWarehouseTools";
 import { useAccessibleCompanyIds } from "@/hooks/construction/useAccessibleCompanyIds";
