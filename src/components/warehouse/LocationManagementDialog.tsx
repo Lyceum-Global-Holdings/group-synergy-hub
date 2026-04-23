@@ -204,6 +204,27 @@ export const LocationManagementDialog = () => {
             
             <form onSubmit={handleSubmit} className="space-y-4">
               {formData.type !== 'location' && formData.parent_id !== 'none' && (
+                <div className="flex items-start justify-between gap-3 p-3 rounded-lg border bg-muted/30">
+                  <div className="space-y-1">
+                    <Label htmlFor="standalone-toggle" className="font-medium">Standalone Warehouse</Label>
+                    <p className="text-xs text-muted-foreground">
+                      This {formData.type} operates as its own warehouse. Companies and inventory are managed independently from its parent.
+                    </p>
+                  </div>
+                  <Switch
+                    id="standalone-toggle"
+                    checked={formData.is_standalone_warehouse}
+                    onCheckedChange={(checked) => setFormData(prev => ({
+                      ...prev,
+                      is_standalone_warehouse: checked,
+                      // Standalone forces explicit assignment.
+                      assignment_mode: checked ? 'explicit' : prev.assignment_mode,
+                    }))}
+                  />
+                </div>
+              )}
+
+              {formData.type !== 'location' && formData.parent_id !== 'none' && !formData.is_standalone_warehouse && (
                 <div>
                   <Label>Company Assignment Mode</Label>
                   <Select
@@ -227,7 +248,7 @@ export const LocationManagementDialog = () => {
               )}
 
               <div>
-                <Label>Companies {formData.assignment_mode !== 'inherit_parent' && '*'}</Label>
+                <Label>Companies {(formData.assignment_mode !== 'inherit_parent' || formData.is_standalone_warehouse) && '*'}</Label>
                 <Popover>
                   <PopoverTrigger asChild>
                     <Button
