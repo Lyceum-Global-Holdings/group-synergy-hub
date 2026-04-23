@@ -18788,7 +18788,7 @@ export type Database = {
             foreignKeyName: "warehouse_tools_category_id_fkey"
             columns: ["category_id"]
             isOneToOne: false
-            referencedRelation: "asset_categories"
+            referencedRelation: "item_categories"
             referencedColumns: ["id"]
           },
           {
