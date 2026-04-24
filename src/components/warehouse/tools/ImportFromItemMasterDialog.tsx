@@ -169,6 +169,11 @@ export function ImportFromItemMasterDialog({
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [quantities, setQuantities] = useState<Record<string, number>>({});
 
+  // Phase 9.4 — "Find by exact code" finder state.
+  const [finderCode, setFinderCode] = useState("");
+  const [isFinding, setIsFinding] = useState(false);
+  const [highlightedId, setHighlightedId] = useState<string | null>(null);
+
   // ---------------------------------------------------------------------------
   // Duplicate detection — prefer catalog_item_id (Phase 9 provenance), fall back
   // to (company_id, tool_code) for legacy tools created before the migration.
