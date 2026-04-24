@@ -360,6 +360,19 @@ export function ImportFromItemMasterDialog({
   const selectedCount = filteredItems.filter((it) => selectedIds.has(it.id)).length;
   const hasActiveFilters = searchTerm.trim().length > 0 || categoryFilter !== "all";
 
+  // Row virtualization for large candidate sets (WAI-ARIA APG "Grid" pattern).
+  // Below threshold we render normally to keep DOM simple.
+  const VIRTUAL_THRESHOLD = 200;
+  const ROW_HEIGHT = 56;
+  const scrollParentRef = useRef<HTMLDivElement>(null);
+  const shouldVirtualize = filteredItems.length > VIRTUAL_THRESHOLD;
+  const rowVirtualizer = useVirtualizer({
+    count: filteredItems.length,
+    getScrollElement: () => scrollParentRef.current,
+    estimateSize: () => ROW_HEIGHT,
+    overscan: 8,
+  });
+
   // Categories visible in the inline category picker depend on scope.
   const inlineCategoryOptions = useMemo(() => {
     if (categoryScope === "tools") return categoryOptions;
