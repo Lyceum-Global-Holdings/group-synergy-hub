@@ -1046,6 +1046,11 @@ export function ImportFromItemMasterDialog({
                             key={item.id}
                             data-state={isSelected ? "selected" : undefined}
                             aria-rowindex={idx + 2}
+                            className={
+                              highlightedId === item.id
+                                ? "ring-2 ring-primary ring-offset-1 transition-shadow"
+                                : undefined
+                            }
                           >
                             <TableCell>
                               <Checkbox
