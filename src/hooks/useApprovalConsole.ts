@@ -14,9 +14,10 @@ export const useApprovalConsole = (filters?: ApprovalFilters) => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('No user found');
 
-      // Call the secure database function to get all approvals
+      // Call the secure database function to get all approvals.
+      // Phase 4: cap to 200 rows server-side; client filters/sorts the result.
       const { data: rawApprovals, error } = await supabase
-        .rpc('get_approval_console', { user_id: user.id });
+        .rpc('get_approval_console', { user_id: user.id, p_limit: 200 });
 
       if (error) {
         console.error('Error fetching approvals:', error);
