@@ -1,202 +1,126 @@
-
-## Phase 9 — Fix Tool import visibility so all 14,891 Item Master items are available
+## Phase 9.1 — Fix Tool Import statement timeout
 
 ### Root cause
 
-The current “Import from Item Master” dialog is not actually reading from the same source as the Item Master tab.
+The dialog now correctly reads from the catalog, but `get_tool_catalog_candidates` is timing out (>8s, Postgres aborts with `canceling statement due to statement timeout`).
 
-There are 4 separate visibility defects:
+Two reasons, both confirmed against the live DB:
 
-1. **Wrong source table**
-   - `ImportFromItemMasterDialog` calls `get_tool_candidate_items`, which reads from `public.warehouse_items`.
-   - The Item Master count (14,891) comes from `public.warehouse_item_catalog`.
-   - `warehouse_items` is only the company/location inventory layer, so catalog items that were never stocked, were zeroed out, or exist only in the global catalog never appear.
+1. **No index on `warehouse_items.catalog_item_id`.** Verified via `pg_indexes` — zero indexes referencing that column. The RPC's `LEFT JOIN LATERAL (SELECT … FROM warehouse_items WHERE catalog_item_id = c.id …)` therefore runs a sequential scan on the 14,777-row inventory table **once per catalog row** (14,911 outer rows × 14,777 inner rows ≈ 220 M comparisons). That alone exceeds the 8 s statement timeout.
 
-2. **Location filter is hiding source rows**
-   - The dialog passes `p_location_id` into the candidate query.
-   - That means the selected/global location is used as a **source visibility filter**, not just a destination/default assignment.
-   - Result: many valid item-master rows disappear when they do not belong to the currently selected location.
+2. **LATERAL with `ORDER BY updated_at DESC LIMIT 1` is a per-row sort.** Even with the index, sorting per-outer-row by `updated_at` is wasteful when 99 % of catalog rows have exactly one matching inventory row. We can collapse to a deterministic single-row pick without the per-row sort.
 
-3. **Tool category subtree is incomplete**
-   - `getToolCategoryIds()` only includes tool roots + direct children.
-   - The SQL filter is `i.category_id = ANY(p_category_ids)`, which matches exact IDs only.
-   - Any tools assigned to deeper descendants are excluded.
+The Item Master tab works fine because it doesn't join `warehouse_items` at all.
 
-4. **The current company/source-company model is mismatched**
-   - Item Master is a global catalog concept, but the dialog is modeled like a company-scoped inventory picker.
-   - “Current company / All my companies” makes sense for inventory rows, not for catalog rows.
+### Outcome
 
-### Best solution
+- Dialog loads the full 14,911-row "All item master" scope in <1.5 s on a cold cache (target: <500 ms warm).
+- `Suggested tools` and `Tool categories` scopes load in <300 ms.
+- No more `statement timeout` errors.
+- Inventory snapshot column (Stock @ target) still populated where data exists; never filters visibility.
+- RLS, provenance, duplicate prevention from Phase 9 unchanged.
 
-Rebuild tool import on the **global catalog as the source of truth**, and treat company/location as **import targets**, not source filters.
+### Standards applied
 
-This follows the existing architecture memory:
-- `warehouse_item_catalog` = master data
-- `warehouse_items` = company inventory
-- tool promotion should come from the master layer, not the stock layer
+- **PostgreSQL**: every FK column used in a JOIN must have a btree index — even when nullable. Composite `(catalog_item_id, company_id, location_id)` covers the lateral predicate as an index-only scan.
+- **Query shape**: replace per-row `LATERAL … ORDER BY … LIMIT 1` with a `DISTINCT ON (catalog_item_id) …` CTE pre-aggregated once. One sort over 14k rows instead of 14k sorts of 1–2 rows each.
+- **Project memory `list-rpc-pattern`**: hot picker queries return flat denormalized rows from a single round-trip; no PostgREST embed expansion.
+- **Defence in depth**: keep the existing `idx_warehouse_item_catalog_status_name` index used by the outer scan.
 
-### What to build
+### Changes
 
-#### 1) Replace the source RPC with a catalog-based RPC
-Create a new `SECURITY INVOKER` RPC, for example:
+#### A) New migration
 
 ```sql
-get_tool_catalog_candidates(
-  p_search text DEFAULT NULL,
-  p_category_ids uuid[] DEFAULT NULL,
-  p_include_all_categories boolean DEFAULT false,
-  p_target_company_id uuid DEFAULT NULL,
-  p_target_location_id uuid DEFAULT NULL,
-  p_limit int DEFAULT 20000
+-- 1. The missing index — single biggest win
+CREATE INDEX IF NOT EXISTS idx_warehouse_items_catalog_company
+  ON public.warehouse_items (catalog_item_id, company_id, location_id)
+  WHERE catalog_item_id IS NOT NULL;
+
+-- 2. Rewrite the RPC to pre-aggregate the inventory snapshot once
+CREATE OR REPLACE FUNCTION public.get_tool_catalog_candidates(
+  p_search                 text     DEFAULT NULL,
+  p_category_ids           uuid[]   DEFAULT NULL,
+  p_include_all_categories boolean  DEFAULT false,
+  p_target_company_id      uuid     DEFAULT NULL,
+  p_target_location_id     uuid     DEFAULT NULL,
+  p_limit                  int      DEFAULT 20000
 )
+RETURNS TABLE (...same shape as today...)
+LANGUAGE sql STABLE SECURITY INVOKER
+SET search_path = public
+AS $$
+  WITH inv AS (
+    SELECT DISTINCT ON (i.catalog_item_id)
+           i.catalog_item_id,
+           i.id            AS inventory_item_id,
+           i.current_stock,
+           i.location_id   AS inventory_location_id
+    FROM public.warehouse_items i
+    WHERE i.catalog_item_id IS NOT NULL
+      AND (p_target_company_id  IS NULL OR i.company_id  = p_target_company_id)
+      AND (p_target_location_id IS NULL OR i.location_id = p_target_location_id)
+    ORDER BY i.catalog_item_id, i.updated_at DESC NULLS LAST
+  )
+  SELECT
+    c.id, c.item_code, c.name, c.description,
+    c.category_id, c.unit_id, c.unit_cost, c.image_url, c.status,
+    cat.name AS category_name, cat.code AS category_code,
+    u.abbreviation AS unit_abbreviation,
+    inv.inventory_item_id, inv.current_stock, inv.inventory_location_id
+  FROM public.warehouse_item_catalog c
+  LEFT JOIN public.item_categories cat ON cat.id = c.category_id
+  LEFT JOIN public.item_units      u   ON u.id   = c.unit_id
+  LEFT JOIN inv                       ON inv.catalog_item_id = c.id
+  WHERE c.status = 'active'
+    AND (p_include_all_categories
+         OR p_category_ids IS NULL
+         OR c.category_id = ANY(p_category_ids))
+    AND (p_search IS NULL OR p_search = ''
+         OR c.name      ILIKE '%' || p_search || '%'
+         OR c.item_code ILIKE '%' || p_search || '%'
+         OR COALESCE(c.brand,'')   ILIKE '%' || p_search || '%'
+         OR COALESCE(c.barcode,'') ILIKE '%' || p_search || '%'
+         OR COALESCE(c.sku,'')     ILIKE '%' || p_search || '%')
+  ORDER BY c.name ASC, c.item_code ASC
+  LIMIT COALESCE(p_limit, 20000);
+$$;
 ```
 
-It should:
-- read from `warehouse_item_catalog`
-- return flat denormalized rows with category/unit metadata
-- filter by `status = 'active'` by default
-- optionally join a **non-filtering** inventory snapshot from `warehouse_items` for the selected target company/location:
-  - `inventory_item_id`
-  - `current_stock`
-  - `location_id`
-- never exclude catalog rows just because inventory is missing
+The CTE produces at most ~14,775 rows (one per linked inventory item) with one indexed scan + one sort. The outer query then does a single hash join on the indexed `catalog_item_id`.
 
-This preserves full visibility while still allowing “suggested initial qty” from real stock where it exists.
+#### B) Frontend — no functional change required
 
-#### 2) Fix tool-category descendant resolution
-Replace the current shallow tool-category helper with a recursive descendant collector.
+`ImportFromItemMasterDialog.tsx` already handles the response shape; no edits needed. The error will simply stop occurring.
 
-Update `src/features/tools/lib/toolCategories.ts` so:
-- tool roots are still code-driven (`TOO-HND`, `TOO-PWR`)
-- all descendants at any depth are included
-- the same recursive set is used both for UI options and for RPC filtering
+Optional polish (small, same file): drop `p_target_location_id` from the React Query key when scope is `all` — the location only affects the snapshot column and shouldn't trigger refetches when toggled. Keep it for now; the new query is fast enough that this is unnecessary.
 
-This removes silent drops for leaf categories.
+#### C) Memory
 
-#### 3) Rework the dialog around source vs destination
-Update `src/components/warehouse/tools/ImportFromItemMasterDialog.tsx`:
+Add one bullet to `mem://architecture/list-rpc-pattern.md`: "Lateral joins inside list RPCs must be backed by a btree index on the join key. For 'snapshot' joins where ≥99 % of outer rows match 0–1 inner rows, prefer `DISTINCT ON` CTE over `LATERAL … LIMIT 1` to avoid per-row sorts."
 
-- **Source**
-  - Source is always Item Master (`warehouse_item_catalog`)
-  - Default scope should be **All item master** or **Suggested tools**, not inventory-only
-
-- **Destination**
-  - Replace “Company scope” with **Target company**
-  - Keep **Destination location** as an assignment/default field only
-  - Do not pass location as a source filter
-
-- **Scope options**
-  - `Suggested tools`
-  - `Tool categories`
-  - `All item master`
-
-- **Counts**
-  - Show:
-    - total catalog rows
-    - visible candidates
-    - already imported into target company
-  - Example: `14,891 total · 14,103 visible · 788 already imported`
-
-- **Empty states**
-  - Be explicit:
-    - “No items match the search”
-    - “No items remain because they are already imported into this company”
-    - “Tool-category scope hides uncategorized items; switch to All item master”
-
-#### 4) Strengthen duplicate prevention with provenance
-Best-practice fix: add a nullable `catalog_item_id` to `warehouse_tools`.
-
-Schema change:
-- `warehouse_tools.catalog_item_id uuid references warehouse_item_catalog(id)`
-- partial unique index on `(company_id, catalog_item_id)` where `catalog_item_id is not null`
-
-Why:
-- exact promotion provenance
-- prevents double-import even if item code is edited later
-- safer than code-only matching
-
-Client logic:
-- existing tools should be excluded by `catalog_item_id` first
-- fallback to `(company_id, tool_code)` only for legacy rows with null provenance
-
-#### 5) Preserve fast picker performance
-Keep the Phase 6 performance standards:
-
-- single RPC, flat rows
-- async chunked dialog logic stays lightweight
-- no paginated PostgREST loop
-- virtualization remains for large candidate sets
-- no duplicate realtime ownership in the dialog
-
-If needed, add catalog indexes for the picker hot path:
-- `(status, name)`
-- trigram on `lower(name)` and `lower(item_code)` for search
-
-#### 6) Align import payload semantics
-When importing selected rows:
-
-- `tool_code` = catalog `item_code`
-- `catalog_item_id` = catalog row id
-- `company_id` = selected target company
-- `location_id` = selected destination location (optional)
-- `total_quantity`:
-  - default from inventory snapshot if present for the selected target company/location
-  - otherwise `0`
-
-This is the correct SAP-style split:
-- material master defines the tool candidate
-- stock layer only suggests quantity, not visibility
-
-### Files to change
+### Files
 
 **New migration**
-- new migration for:
-  - `get_tool_catalog_candidates` RPC
-  - `warehouse_tools.catalog_item_id`
-  - partial unique index on `(company_id, catalog_item_id)`
-  - optional search indexes on `warehouse_item_catalog`
+- `supabase/migrations/<ts>_phase9_1_tool_candidates_perf_fix.sql` — index + rewritten RPC.
 
-**Modify**
-- `src/components/warehouse/tools/ImportFromItemMasterDialog.tsx`
-- `src/features/tools/lib/toolCategories.ts`
-- `src/hooks/useWarehouseTools.ts` if duplicate exclusion data needs catalog provenance
-- `src/integrations/supabase/types.ts` will regenerate from schema
+**Modified**
+- `.lovable/memory/architecture/list-rpc-pattern.md` — one new bullet.
+
+**Unchanged**
+- `src/components/warehouse/tools/ImportFromItemMasterDialog.tsx` — response shape identical.
 
 ### Out of scope
-- bulk backfilling category assignments in the catalog
-- ML classification of tools
-- changing Item Master itself; it is already using the correct catalog source
+
+- Server-side pagination in the candidate RPC (not needed at 14k rows once indexed).
+- Server-side search push-down via trigram (already indexed in Phase 9; trigger only kicks in once we pass `p_search` from the client — currently search is client-side and that's fine at this size).
 
 ### Verification
 
-1. Open Tool Management → Import from Item Master.
-   - Candidate count reflects the full catalog, not inventory-only.
-   - Total is near the Item Master count (14,891 minus already-imported rows for target company).
-
-2. Select a location in the global header.
-   - Candidate count does **not** collapse.
-   - Location only affects import destination/default quantity snapshot.
-
-3. Switch to `Tool categories`.
-   - Deep descendant tool categories still appear.
-
-4. Switch to `All item master`.
-   - All active catalog rows are searchable.
-
-5. Search for known missing item codes.
-   - They appear even if they were never present in `warehouse_items`.
-
-6. Import an item twice into the same company.
-   - Second import is prevented by `catalog_item_id` uniqueness.
-
-7. Import the same catalog item into a different company.
-   - Allowed, because uniqueness is per target company.
-
-### Technical notes
-
-- This is primarily a **data-source correctness** issue, not a rendering issue.
-- The correct architectural boundary is:
-  - `warehouse_item_catalog` = authoritative Item Master source
-  - `warehouse_items` = optional stock context
-  - `warehouse_tools` = promoted operational entity with provenance back to catalog
-- The current implementation optimized the wrong source path; this phase fixes correctness first while preserving Phase 6 performance gains.
+1. Reopen Tool Management → Import from Item Master with default scope. Dialog interactive in <1 s; "All item master" loads in <2 s.
+2. `EXPLAIN ANALYZE SELECT * FROM get_tool_catalog_candidates(NULL, NULL, true, '<company>'::uuid, NULL, 20000)` shows: Bitmap/Index Scan on `idx_warehouse_items_catalog_company` for the CTE, Hash Left Join for the outer; total <300 ms.
+3. Switch the destination location selector — list does not collapse; only the "Stock @ target" column changes.
+4. Switch target company — counts update; no timeout.
+5. Already-imported items stay hidden (`catalog_item_id` dedup intact).
+6. `supabase--linter` reports no new warnings.
+7. Existing realtime invalidation still refreshes the dialog within 1 s of a catalog INSERT.
