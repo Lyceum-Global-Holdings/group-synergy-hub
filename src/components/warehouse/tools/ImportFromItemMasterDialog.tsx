@@ -647,10 +647,23 @@ export function ImportFromItemMasterDialog({
                 ref={scrollParentRef}
                 className="h-full w-full overflow-auto"
               >
-                <Table className="min-w-[1000px]">
+                <Table
+                  className="min-w-[1180px]"
+                  aria-rowcount={filteredItems.length + 1}
+                >
+                  <colgroup>
+                    <col style={{ width: 40 }} />
+                    <col style={{ width: 140 }} />
+                    <col style={{ width: 280 }} />
+                    <col style={{ width: 200 }} />
+                    <col style={{ width: 200 }} />
+                    <col style={{ width: 80 }} />
+                    <col style={{ width: 110 }} />
+                    <col style={{ width: 130 }} />
+                  </colgroup>
                   <TableHeader className="sticky top-0 bg-background z-10">
-                    <TableRow>
-                      <TableHead className="w-10">
+                    <TableRow aria-rowindex={1}>
+                      <TableHead>
                         <Checkbox
                           checked={allVisibleSelected}
                           onCheckedChange={toggleAllVisible}
@@ -663,20 +676,97 @@ export function ImportFromItemMasterDialog({
                       <TableHead>Company (target)</TableHead>
                       <TableHead>Unit</TableHead>
                       <TableHead className="text-right">Current Stock</TableHead>
-                      <TableHead className="w-32 text-right">Initial Qty</TableHead>
+                      <TableHead className="text-right">Initial Qty</TableHead>
                     </TableRow>
                   </TableHeader>
                   {shouldVirtualize ? (
-                    <TableBody
-                      style={{
-                        display: "block",
-                        position: "relative",
-                        height: `${rowVirtualizer.getTotalSize()}px`,
-                      }}
-                    >
-                      {rowVirtualizer.getVirtualItems().map((virtualRow) => {
-                        const item = filteredItems[virtualRow.index];
-                        if (!item) return null;
+                    (() => {
+                      const virtualItems = rowVirtualizer.getVirtualItems();
+                      const totalSize = rowVirtualizer.getTotalSize();
+                      const paddingTop = virtualItems.length > 0 ? virtualItems[0].start : 0;
+                      const paddingBottom =
+                        virtualItems.length > 0
+                          ? totalSize - virtualItems[virtualItems.length - 1].end
+                          : 0;
+                      return (
+                        <TableBody>
+                          {paddingTop > 0 && (
+                            <tr aria-hidden="true">
+                              <td colSpan={8} style={{ height: `${paddingTop}px`, padding: 0, border: 0 }} />
+                            </tr>
+                          )}
+                          {virtualItems.map((virtualRow) => {
+                            const item = filteredItems[virtualRow.index];
+                            if (!item) return null;
+                            const isSelected = selectedIds.has(item.id);
+                            const companyName =
+                              (item.company_id && companyNameById.get(item.company_id)) ||
+                              "—";
+                            return (
+                              <TableRow
+                                key={item.id}
+                                data-state={isSelected ? "selected" : undefined}
+                                aria-rowindex={virtualRow.index + 2}
+                              >
+                                <TableCell>
+                                  <Checkbox
+                                    checked={isSelected}
+                                    onCheckedChange={() => toggleOne(item.id)}
+                                    aria-label={`Select ${item.name}`}
+                                  />
+                                </TableCell>
+                                <TableCell className="font-mono text-sm truncate">{item.item_code}</TableCell>
+                                <TableCell>
+                                  <div className="font-medium truncate">{item.name}</div>
+                                  {item.description && (
+                                    <div className="text-xs text-muted-foreground truncate">
+                                      {item.description}
+                                    </div>
+                                  )}
+                                </TableCell>
+                                <TableCell>
+                                  {item.category_name ? (
+                                    <Badge variant="outline" className="font-normal max-w-[180px] truncate">
+                                      {item.category_code ? `[${item.category_code}] ` : ""}
+                                      {item.category_name}
+                                    </Badge>
+                                  ) : (
+                                    <span className="text-muted-foreground">—</span>
+                                  )}
+                                </TableCell>
+                                <TableCell>
+                                  <Badge variant="secondary" className="font-normal max-w-[180px] truncate">
+                                    {companyName}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell>{item.unit_abbreviation ?? "—"}</TableCell>
+                                <TableCell className="text-right">
+                                  {item.current_stock ?? 0}
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="number"
+                                    min={0}
+                                    value={getQty(item)}
+                                    onChange={(e) => setQty(item.id, parseInt(e.target.value, 10))}
+                                    disabled={!isSelected}
+                                    className="h-8 text-right"
+                                  />
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })}
+                          {paddingBottom > 0 && (
+                            <tr aria-hidden="true">
+                              <td colSpan={8} style={{ height: `${paddingBottom}px`, padding: 0, border: 0 }} />
+                            </tr>
+                          )}
+                        </TableBody>
+                      );
+                    })()
+                  ) : (
+                    <TableBody>
+                      {filteredItems.map((item, idx) => {
                         const isSelected = selectedIds.has(item.id);
                         const companyName =
                           (item.company_id && companyNameById.get(item.company_id)) ||
@@ -685,36 +775,27 @@ export function ImportFromItemMasterDialog({
                           <TableRow
                             key={item.id}
                             data-state={isSelected ? "selected" : undefined}
-                            style={{
-                              display: "table",
-                              tableLayout: "fixed",
-                              width: "100%",
-                              position: "absolute",
-                              top: 0,
-                              left: 0,
-                              transform: `translateY(${virtualRow.start}px)`,
-                              height: `${ROW_HEIGHT}px`,
-                            }}
+                            aria-rowindex={idx + 2}
                           >
-                            <TableCell className="w-10">
+                            <TableCell>
                               <Checkbox
                                 checked={isSelected}
                                 onCheckedChange={() => toggleOne(item.id)}
                                 aria-label={`Select ${item.name}`}
                               />
                             </TableCell>
-                            <TableCell className="font-mono text-sm">{item.item_code}</TableCell>
+                            <TableCell className="font-mono text-sm truncate">{item.item_code}</TableCell>
                             <TableCell>
-                              <div className="font-medium truncate max-w-[260px]">{item.name}</div>
+                              <div className="font-medium truncate">{item.name}</div>
                               {item.description && (
-                                <div className="text-xs text-muted-foreground truncate max-w-[260px]">
+                                <div className="text-xs text-muted-foreground truncate">
                                   {item.description}
                                 </div>
                               )}
                             </TableCell>
                             <TableCell>
                               {item.category_name ? (
-                                <Badge variant="outline" className="font-normal">
+                                <Badge variant="outline" className="font-normal max-w-[180px] truncate">
                                   {item.category_code ? `[${item.category_code}] ` : ""}
                                   {item.category_name}
                                 </Badge>
@@ -723,65 +804,7 @@ export function ImportFromItemMasterDialog({
                               )}
                             </TableCell>
                             <TableCell>
-                              <Badge variant="secondary" className="font-normal">
-                                {companyName}
-                              </Badge>
-                            </TableCell>
-                            <TableCell>{item.unit_abbreviation ?? "—"}</TableCell>
-                            <TableCell className="text-right">
-                              {item.current_stock ?? 0}
-                            </TableCell>
-                            <TableCell className="w-32">
-                              <Input
-                                type="number"
-                                min={0}
-                                value={getQty(item)}
-                                onChange={(e) => setQty(item.id, parseInt(e.target.value, 10))}
-                                disabled={!isSelected}
-                                className="h-8 text-right"
-                              />
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })}
-                    </TableBody>
-                  ) : (
-                    <TableBody>
-                      {filteredItems.map((item) => {
-                        const isSelected = selectedIds.has(item.id);
-                        const companyName =
-                          (item.company_id && companyNameById.get(item.company_id)) ||
-                          "—";
-                        return (
-                          <TableRow key={item.id} data-state={isSelected ? "selected" : undefined}>
-                            <TableCell>
-                              <Checkbox
-                                checked={isSelected}
-                                onCheckedChange={() => toggleOne(item.id)}
-                                aria-label={`Select ${item.name}`}
-                              />
-                            </TableCell>
-                            <TableCell className="font-mono text-sm">{item.item_code}</TableCell>
-                            <TableCell>
-                              <div className="font-medium">{item.name}</div>
-                              {item.description && (
-                                <div className="text-xs text-muted-foreground truncate max-w-[260px]">
-                                  {item.description}
-                                </div>
-                              )}
-                            </TableCell>
-                            <TableCell>
-                              {item.category_name ? (
-                                <Badge variant="outline" className="font-normal">
-                                  {item.category_code ? `[${item.category_code}] ` : ""}
-                                  {item.category_name}
-                                </Badge>
-                              ) : (
-                                <span className="text-muted-foreground">—</span>
-                              )}
-                            </TableCell>
-                            <TableCell>
-                              <Badge variant="secondary" className="font-normal">
+                              <Badge variant="secondary" className="font-normal max-w-[180px] truncate">
                                 {companyName}
                               </Badge>
                             </TableCell>
