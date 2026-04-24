@@ -18844,6 +18844,7 @@ export type Database = {
       warehouse_tools: {
         Row: {
           available_quantity: number
+          catalog_item_id: string | null
           category_id: string | null
           company_id: string | null
           condition: string
@@ -18864,6 +18865,7 @@ export type Database = {
         }
         Insert: {
           available_quantity?: number
+          catalog_item_id?: string | null
           category_id?: string | null
           company_id?: string | null
           condition?: string
@@ -18884,6 +18886,7 @@ export type Database = {
         }
         Update: {
           available_quantity?: number
+          catalog_item_id?: string | null
           category_id?: string | null
           company_id?: string | null
           condition?: string
@@ -18903,6 +18906,13 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "warehouse_tools_catalog_item_id_fkey"
+            columns: ["catalog_item_id"]
+            isOneToOne: false
+            referencedRelation: "warehouse_item_catalog"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "warehouse_tools_category_id_fkey"
             columns: ["category_id"]
@@ -19797,6 +19807,33 @@ export type Database = {
           item_code: string
           location_id: string
           name: string
+          unit_abbreviation: string
+          unit_cost: number
+          unit_id: string
+        }[]
+      }
+      get_tool_catalog_candidates: {
+        Args: {
+          p_category_ids?: string[]
+          p_include_all_categories?: boolean
+          p_limit?: number
+          p_search?: string
+          p_target_company_id?: string
+          p_target_location_id?: string
+        }
+        Returns: {
+          category_code: string
+          category_id: string
+          category_name: string
+          current_stock: number
+          description: string
+          id: string
+          image_url: string
+          inventory_item_id: string
+          inventory_location_id: string
+          item_code: string
+          name: string
+          status: string
           unit_abbreviation: string
           unit_cost: number
           unit_id: string

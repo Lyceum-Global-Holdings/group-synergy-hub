@@ -122,6 +122,8 @@ export function useWarehouseTools() {
         issued_quantity: 0,
         category_id: tool.category_id || null,
         location_id: tool.location_id || null,
+        // Phase 9 — provenance link to global catalog row (enforces per-company uniqueness).
+        catalog_item_id: tool.catalog_item_id ?? null,
         // Per-row company_id wins (supports cross-company "Import from Item Master").
         // Falls back to the header-selected company for single-company workflows.
         company_id: tool.company_id ?? selectedCompany?.id,

@@ -12,12 +12,17 @@ export const TOOL_ROOT_CODES = ['TOO-HND', 'TOO-PWR'] as const;
 
 export interface ToolCategoryOption {
   category: ItemCategory;
-  depth: 0 | 1;
+  /** Visual indentation depth — capped at 2 in the picker for readability. */
+  depth: 0 | 1 | 2;
 }
 
 /**
- * Returns the Tools subtree (Level 0 roots + their direct Level 1 children),
+ * Returns the Tools subtree (Level 0 roots + ALL descendants at any depth),
  * flattened in display order with a depth marker for indentation.
+ *
+ * Phase 9: previously only included direct children, which silently dropped
+ * deep tool categories (e.g. TOO-HND-HAM/specialty leaves). The picker now
+ * walks the parent_id graph recursively.
  */
 export function buildToolCategoryOptions(
   categories: ItemCategory[],
@@ -26,18 +31,30 @@ export function buildToolCategoryOptions(
     (c) => c.code != null && (TOOL_ROOT_CODES as readonly string[]).includes(c.code),
   );
 
+  // Index children by parent_id for O(N) traversal across the whole tree.
+  const childrenByParent = new Map<string, ItemCategory[]>();
+  categories.forEach((c) => {
+    if (!c.parent_id) return;
+    const arr = childrenByParent.get(c.parent_id);
+    if (arr) arr.push(c);
+    else childrenByParent.set(c.parent_id, [c]);
+  });
+
   const result: ToolCategoryOption[] = [];
+
+  const walk = (node: ItemCategory, depth: 0 | 1 | 2) => {
+    result.push({ category: node, depth });
+    const kids = (childrenByParent.get(node.id) ?? [])
+      .slice()
+      .sort((a, b) => a.name.localeCompare(b.name));
+    const nextDepth: 0 | 1 | 2 = depth >= 2 ? 2 : ((depth + 1) as 1 | 2);
+    kids.forEach((k) => walk(k, nextDepth));
+  };
 
   roots
     .slice()
     .sort((a, b) => a.name.localeCompare(b.name))
-    .forEach((root) => {
-      result.push({ category: root, depth: 0 });
-      categories
-        .filter((c) => c.parent_id === root.id)
-        .sort((a, b) => a.name.localeCompare(b.name))
-        .forEach((child) => result.push({ category: child, depth: 1 }));
-    });
+    .forEach((root) => walk(root, 0));
 
   return result;
 }
@@ -54,14 +71,9 @@ export function isToolCategoryId(
 }
 
 /**
- * Returns just the category ids in the Tools subtree — useful for filtering
- * `warehouse_items` queries on `category_id`.
- *
- * Depth assumption: returns roots (Level 0) + direct children (Level 1).
- * Level 2 codes (e.g. TOO-HND-HAM "Hammers") are children of L1 nodes and
- * are therefore reachable through the L1 parent set during downstream
- * `category_id IN (...)` queries — they do NOT need to be enumerated here.
- * If/when Level 3+ categories are introduced, revisit this sweep.
+ * Returns ids for the entire Tools subtree (roots + every descendant).
+ * Used by the candidate RPC to filter `warehouse_item_catalog.category_id`
+ * with an exact `= ANY(...)` predicate, so deep leaves must be enumerated.
  */
 export function getToolCategoryIds(categories: ItemCategory[]): string[] {
   return buildToolCategoryOptions(categories).map((o) => o.category.id);
