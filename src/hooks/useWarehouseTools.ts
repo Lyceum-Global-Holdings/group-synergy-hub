@@ -61,11 +61,13 @@ export function useWarehouseTools() {
   useRealtimeChannel("tool_bin_allocations", onBinAllocChange);
 
   // Realtime via shared bus — invalidate on warehouse_tools INSERT/UPDATE/DELETE.
+  // Phase 6: extended debounce to 1s to coalesce bulk-import bursts (a 100-row
+  // INSERT fires 100 realtime payloads — we want 1 refetch, not 4).
   const onToolsChange = useCallback(
     (payload: any) => {
       const cid = (payload?.new ?? payload?.old)?.company_id;
-      scheduleInvalidate(queryClient, ["warehouse-tools"]);
-      if (cid) scheduleInvalidate(queryClient, ["warehouse-tools", cid]);
+      scheduleInvalidate(queryClient, ["warehouse-tools"], 1000);
+      if (cid) scheduleInvalidate(queryClient, ["warehouse-tools", cid], 1000);
     },
     [queryClient],
   );
