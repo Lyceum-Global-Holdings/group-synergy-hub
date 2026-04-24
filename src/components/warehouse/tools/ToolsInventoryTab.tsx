@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { forwardRef, Fragment, useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -57,13 +57,10 @@ interface ToolsInventoryTabProps {
   onDeleteTool?: (tool: WarehouseTool) => void;
 }
 
-export function ToolsInventoryTab({
-  tools,
-  isLoading,
-  onAdjustQuantity,
-  onEditTool,
-  onDeleteTool,
-}: ToolsInventoryTabProps) {
+export const ToolsInventoryTab = forwardRef<HTMLDivElement, ToolsInventoryTabProps>(function ToolsInventoryTab(
+  { tools, isLoading, onAdjustQuantity, onEditTool, onDeleteTool },
+  ref,
+) {
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [conditionFilter, setConditionFilter] = useState<string>("all");
@@ -131,7 +128,7 @@ export function ToolsInventoryTab({
     availabilityFilter !== "all";
 
   return (
-    <div className="space-y-4">
+    <div ref={ref} className="space-y-4">
       {/* Location scope banner */}
       {globalLocationId ? (
         <div className="flex items-center justify-between rounded-md border bg-card p-3">
@@ -280,8 +277,8 @@ export function ToolsInventoryTab({
                 const hasIssued = (tool.issued_quantity ?? 0) > 0;
                 const showDelete = canDelete && !!onDeleteTool;
                 return (
-                  <>
-                    <TableRow key={tool.id}>
+                  <Fragment key={tool.id}>
+                    <TableRow>
                       <TableCell>
                         <Button
                           variant="ghost"
@@ -387,13 +384,13 @@ export function ToolsInventoryTab({
                       </TableCell>
                     </TableRow>
                     {expanded && (
-                      <TableRow key={tool.id + "-exp"}>
+                      <TableRow>
                         <TableCell colSpan={10} className="bg-muted/20 p-4">
                           <ToolBinAllocationsPanel tool={tool} />
                         </TableCell>
                       </TableRow>
                     )}
-                  </>
+                  </Fragment>
                 );
               })
             )}
@@ -402,4 +399,4 @@ export function ToolsInventoryTab({
       </div>
     </div>
   );
-}
+});

@@ -161,71 +161,37 @@ export function ImportFromItemMasterDialog({
       effectiveCompanyIds.length > 0 &&
       (categoryScope === "all" || toolCategoryIds.length > 0),
     queryFn: async () => {
-      // warehouse_items canonical column is `name` (SAP MM Material Master).
-      // Batched fetch in 1000-row pages to bypass PostgREST default limit
-      // (per project memory: warehouse-data-batching-limit).
-      const PAGE_SIZE = 1000;
-      const all: any[] = [];
-      let from = 0;
-
-      // eslint-disable-next-line no-constant-condition
-      while (true) {
-        let query = supabase
-          .from("warehouse_items")
-          .select(
-            `
-            id,
-            item_code,
-            name,
-            description,
-            category_id,
-            unit_id,
-            current_stock,
-            unit_cost,
-            company_id,
-            location_id,
-            category:item_categories!category_id(name, code),
-            unit:item_units!unit_id(abbreviation)
-          `,
-          )
-          .in("company_id", effectiveCompanyIds)
-          .order("name", { ascending: true })
-          .range(from, from + PAGE_SIZE - 1);
-
-        if (categoryScope === "tools") {
-          query = query.in("category_id", toolCategoryIds);
-        }
-        if (locationId !== "any") {
-          query = query.eq("location_id", locationId);
-        }
-
-        const { data, error } = await query;
-        if (error) throw error;
-
-        const page = data ?? [];
-        all.push(...page);
-        if (page.length < PAGE_SIZE) break;
-        from += PAGE_SIZE;
-      }
-
-      return all.map((row: any) => {
-        const cat = categoryNameById.get(row.category_id);
-        return {
-          id: row.id,
-          item_code: row.item_code,
-          name: row.name,
-          description: row.description,
-          category_id: row.category_id,
-          unit_id: row.unit_id,
-          current_stock: row.current_stock,
-          unit_cost: row.unit_cost,
-          company_id: row.company_id,
-          location_id: row.location_id,
-          category_name: row.category?.name ?? cat?.name ?? null,
-          category_code: row.category?.code ?? cat?.code ?? null,
-          unit_abbreviation: row.unit?.abbreviation ?? null,
-        } as CandidateItem;
+      // Phase 6: single SECURITY INVOKER RPC replaces N paginated PostgREST
+      // embed-joins. One round-trip + one server-side LEFT JOIN backed by
+      // composite (company_id, name) index. (project memory: list-rpc-pattern)
+      const { data, error } = await supabase.rpc("get_tool_candidate_items", {
+        p_company_ids: effectiveCompanyIds,
+        p_category_ids:
+          categoryScope === "tools" && toolCategoryIds.length > 0
+            ? toolCategoryIds
+            : null,
+        p_location_id: locationId !== "any" ? locationId : null,
+        p_limit: 20000,
       });
+      if (error) throw error;
+
+      return (data ?? []).map((row: any) => ({
+        id: row.id,
+        item_code: row.item_code,
+        name: row.name,
+        description: row.description,
+        category_id: row.category_id,
+        unit_id: row.unit_id,
+        current_stock: row.current_stock,
+        unit_cost: row.unit_cost,
+        company_id: row.company_id,
+        location_id: row.location_id,
+        category_name:
+          row.category_name ?? categoryNameById.get(row.category_id)?.name ?? null,
+        category_code:
+          row.category_code ?? categoryNameById.get(row.category_id)?.code ?? null,
+        unit_abbreviation: row.unit_abbreviation ?? null,
+      })) as CandidateItem[];
     },
   });
 
@@ -327,30 +293,28 @@ export function ImportFromItemMasterDialog({
 
     createBulkTools(payload, {
       onSuccess: () => {
-        // Refresh both candidate list (promoted rows disappear) and the
-        // tools list (new keys reflect in existingToolKeys de-dup).
-        queryClient.invalidateQueries({ queryKey: ["warehouse-items-tool-candidates"] });
-        queryClient.invalidateQueries({ queryKey: ["warehouse-tools"] });
+        // Close dialog FIRST so the heavy candidate query unmounts and won't
+        // refetch as part of the invalidation cascade. Then debounce-invalidate
+        // so the realtime INSERT burst (one event per inserted tool) coalesces
+        // with this trigger into a single refetch per affected list.
         onOpenChange(false);
         resetState();
+        scheduleInvalidate(queryClient, ["warehouse-items-tool-candidates"]);
+        scheduleInvalidate(queryClient, ["warehouse-tools"]);
       },
     });
   };
 
   // Realtime: keep the candidate list fresh when items are added/edited/deleted
   // in the source warehouse_items table, via the shared realtime bus.
-  // Debounced + scoped to avoid refetch storms during bulk imports.
+  // NOTE: warehouse_tools subscription is owned by useWarehouseTools — do NOT
+  // duplicate it here, or bulk imports trigger the invalidation twice per row.
+  // (project memory: list-rpc-pattern — realtime owned by exactly one hook.)
   const onItemsChange = useCallback(() => {
     if (!open || effectiveCompanyIds.length === 0) return;
     scheduleInvalidate(queryClient, ["warehouse-items-tool-candidates"]);
   }, [open, effectiveCompanyIds, queryClient]);
-  const onToolsChange = useCallback(() => {
-    if (!open) return;
-    // New tools elsewhere → existingToolKeys updates → candidate de-dup refreshes.
-    scheduleInvalidate(queryClient, ["warehouse-tools"]);
-  }, [open, queryClient]);
   useRealtimeChannel("warehouse_items", onItemsChange);
-  useRealtimeChannel("warehouse_tools", onToolsChange);
 
   const selectedCount = filteredItems.filter((it) => selectedIds.has(it.id)).length;
   const hasActiveFilters = searchTerm.trim().length > 0 || categoryFilter !== "all";
