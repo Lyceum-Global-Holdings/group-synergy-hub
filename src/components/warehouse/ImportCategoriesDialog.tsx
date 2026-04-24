@@ -154,9 +154,14 @@ export function ImportCategoriesDialog({ open, onOpenChange, companyId }: Import
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-muted-foreground">{template.description}</p>
-                  <Badge variant="secondary" className="mt-1">
-                    {availableCategories.length} categories available
-                  </Badge>
+                  <div className="mt-1 flex items-center gap-2">
+                    <Badge variant="secondary">
+                      {availableCategories.length} categories available
+                    </Badge>
+                    <span className="text-xs text-muted-foreground">
+                      Up to 3 levels supported
+                    </span>
+                  </div>
                 </div>
                 <Button
                   variant="outline"
