@@ -15,3 +15,4 @@ Hot list endpoints (any list with >1k rows or two+ joined tables) must use a `SE
 - Realtime invalidation hooks remain unchanged (still subscribe to base tables via the bus).
 - Search predicates inside list RPCs must be a single combined SQL expression — never two PostgREST `.or()` calls (they merge into one OR group, not AND, and silently leak rows past the cursor window).
 - Realtime invalidation must be owned by exactly one hook per table; consumer dialogs subscribe only to *related* tables.
+- **Lateral joins inside list RPCs must be backed by a btree index on the join key.** For "snapshot" joins where ≥99% of outer rows match 0–1 inner rows (e.g. catalog → inventory snapshot), prefer a `DISTINCT ON (join_key)` CTE over `LEFT JOIN LATERAL ... ORDER BY ... LIMIT 1` — the latter executes a per-row sort that explodes at scale (14k × 14k = statement timeout). Pre-aggregate once, hash-join to the outer query.
