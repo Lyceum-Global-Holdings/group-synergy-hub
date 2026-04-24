@@ -1,85 +1,84 @@
 
 
-## Fix Import-from-Item-Master: scrollable table + auto-refresh
+## Fix garbled table layout + truly-live Item Master sync
 
 ### Outcome
 
-The candidate table inside `ImportFromItemMasterDialog` scrolls smoothly through all 14,000+ rows, and the dataset stays fresh — automatically reflecting new Item Master entries and disappearing rows once they are promoted to Tool Master.
-
-### Standards applied
-
-- **WCAG 2.2 SC 1.4.10 (Reflow) & SC 2.5.7 (Dragging Movements)** — content must be scrollable without loss of information; touch and pointer scrolling must work in both axes.
-- **WAI-ARIA APG "Grid" pattern** — large tabular datasets should be virtualized to keep keyboard / screen-reader navigation responsive.
-- **SAP Fiori "Responsive Table" guideline** — tables in dialogs use a fixed-height scrollable viewport with sticky header.
-- **Project memory `realtime-stock-synchronization`** — list views backed by `warehouse_items` must subscribe to Postgres changes and invalidate React Query caches.
-- **Project memory `react-query-global-cache-freshness-permanent`** — `staleTime: 0` plus explicit invalidation on related mutations.
+1. The candidate table inside **Import from Item Master** renders cleanly — header columns line up with body cells, no overlapping text — at 14k+ rows with smooth scrolling.
+2. The list updates **automatically** when items are added/edited/deleted in Item Master *or* when tools are created elsewhere — without reopening the dialog.
 
 ### Root causes
 
-1. **Scroll fails / feels stuck**
-   - `ScrollArea className="flex-1"` works only when the parent flex chain actually constrains its height. The dialog uses `max-h-[90vh] flex flex-col`, but the *banners block* (3 alerts + scope controls + search) consumes most of the height, leaving the `ScrollArea` with `min-content` height — Radix then renders the table at full natural height and the page scrolls instead of the table.
-   - Rendering ~15,000 rows un-virtualized chokes the main thread; even when scroll works, it stutters and feels broken.
+**1. Garbled cells (the screenshot)**
+The virtualized branch sets `<TableBody style="display:block">` and `<TableRow style="display:table; table-layout:fixed; width:100%">` while the `<TableHeader>` is left as native `display:table-header-group`. Because the body is no longer part of the same `<table>` formatting context, header column widths and row column widths are computed independently, so:
+- All body cells fall back to natural widths, the first column absorbs the overflow,
+- Rows are absolutely positioned but their internal `<td>`s have no explicit widths, so text from every column collapses on top of the Item Code column.
 
-2. **Data not refreshing**
-   - No Supabase realtime subscription on `warehouse_items` for this query.
-   - After a successful import, only `warehouse-tools` is invalidated by `useWarehouseTools.createBulkTools` — the candidate query (`warehouse-items-tool-candidates`) is never invalidated, so promoted rows linger until the dialog is reopened (which `removeQueries` only does on close).
-   - No manual refresh affordance.
+This is a known anti-pattern when virtualizing inside a semantic `<table>`. The fix per WAI-ARIA APG "Grid" + the TanStack Virtual docs is to either (a) use a **CSS Grid layout** on rows with the same template applied to the header, or (b) keep the table but use **`position: sticky`** padding rows (top/bottom spacers) instead of absolute positioning on every row. Option (b) preserves the native `<table>` column algorithm — header and body widths align automatically — and is the simpler, more accessible fix.
+
+**2. Not auto-refreshing in practice**
+- `warehouse_tools` is **not in the `supabase_realtime` publication** (verified). So when a tool is created from another tab/device, neither `existingToolKeys` (de-dup) nor the tool list updates — promoted items appear to "linger".
+- The dialog's own realtime subscription on `warehouse_items` correctly invalidates the candidate query, but on `INSERT` the payload's `company_id` arrives only when `REPLICA IDENTITY FULL` is set, so the client-side `effectiveCompanyIds` filter inside the handler can drop legitimate inserts (the safer pattern is to invalidate on every change and let the query refetch with its scope filter — the network cost is negligible since results are paged).
+- The query has no `staleTime`/`refetchOnWindowFocus` override; by project default it's fresh, but combined with the missing publication for tools it still feels stale.
 
 ### Changes
 
-#### 1) Layout: guarantee a constrained scroll viewport
+#### A) Table layout — replace absolute-positioned virtual rows with sticky spacers
 
-- Wrap the alerts block in a single `div` with `shrink-0` so the flex column lets the `ScrollArea` fill remaining space.
-- Replace `ScrollArea className="flex-1 border rounded-md"` with an explicit, bounded container:
-  ```tsx
-  <div className="flex-1 min-h-[300px] border rounded-md overflow-hidden">
-    <div className="h-full w-full overflow-auto">
-      <Table>…</Table>
-    </div>
-  </div>
-  ```
-  Using a native scroll container avoids Radix `ScrollArea` height-collapse pitfalls and gives proper horizontal + vertical scrolling on touch and trackpad devices (WCAG 2.5.7).
-- Add `min-w-[1000px]` on `<Table>` so columns don't crush on narrow viewports — horizontal scroll kicks in instead.
-- Keep `sticky top-0` header inside the new scroll container.
+In `ImportFromItemMasterDialog.tsx`, virtualized branch:
 
-#### 2) Performance: virtualize rows over ~200
+- Remove `display:block` on `<TableBody>` and remove `display:table / position:absolute / transform` on each `<TableRow>`.
+- Render two **spacer `<tr>`s** with a single full-width `<td colSpan={8}>` to reserve the height above and below the visible window:
+  - `paddingTop = virtualItems[0].start`
+  - `paddingBottom = totalSize - virtualItems[last].end`
+- Render only the visible `virtualItems` as normal `<TableRow>`s in between.
+- Add `colgroup` with explicit widths for the 8 columns (checkbox 40, code 140, name 280, category 200, company 200, unit 80, current 110, qty 130) so header and body always line up regardless of viewport. Total ≥ 1180 → keep `min-w-[1180px]` on `<Table>` so horizontal scroll engages on narrow screens (WCAG 1.4.10).
+- Keep `<TableHeader className="sticky top-0 bg-background z-10">`.
 
-- Use `@tanstack/react-virtual` (already used elsewhere in the project — confirm and reuse) to virtualize `<TableBody>` when `filteredItems.length > 200`. Below that threshold, render normally to keep the simpler DOM.
-- Row height fixed at ~52 px with `overscan: 8`.
-- Maintains keyboard navigation per ARIA grid pattern.
+This restores native table column-width sharing → no more cell overlap.
 
-#### 3) Data freshness
+#### B) Realtime — make `warehouse_tools` actually broadcast and de-dup live
 
-- **Realtime subscription**: add a `useEffect` inside the dialog (active only when `open === true`) that subscribes to `postgres_changes` on `public.warehouse_items` filtered to `effectiveCompanyIds`. On INSERT/UPDATE/DELETE, call `queryClient.invalidateQueries({ queryKey: ['warehouse-items-tool-candidates'] })`. Channel name uses `crypto.randomUUID()` to avoid the StrictMode re-subscribe error already encountered in tools hooks.
-- **Post-import invalidation**: in `handleImport`'s `onSuccess`, also invalidate `['warehouse-items-tool-candidates']` and `['warehouse-tools']` so the next time the dialog reopens (or stays open for chained imports), the just-promoted items are removed and tool keys updated. Currently it just closes; chaining imports without closing leaves stale rows.
-- **Existing-tool keys realtime**: `useWarehouseTools` already subscribes to `warehouse_tools` changes — `existingToolKeys` recomputes automatically. Keep as-is.
-- **Manual refresh button**: add a small `RefreshCw` icon button next to the "candidates" badge that calls `queryClient.invalidateQueries({ queryKey: ['warehouse-items-tool-candidates'] })`. Spinner while `isFetching`.
-- Confirm `warehouse_items` is in the `supabase_realtime` publication; if not, add it via migration:
+- **Migration**: add `warehouse_tools` to the realtime publication and set `REPLICA IDENTITY FULL` on both tables so DELETE payloads carry company_id:
   ```sql
-  ALTER PUBLICATION supabase_realtime ADD TABLE public.warehouse_items;
+  ALTER PUBLICATION supabase_realtime ADD TABLE public.warehouse_tools;
+  ALTER TABLE public.warehouse_tools REPLICA IDENTITY FULL;
+  ALTER TABLE public.warehouse_items REPLICA IDENTITY FULL;
   ```
+- In `useWarehouseTools.ts`, **add a second realtime channel** for `postgres_changes` on `public.warehouse_tools` (UUID-suffixed channel name to dodge StrictMode re-subscribe). On any change, invalidate `['warehouse-tools']`. This automatically keeps `existingToolKeys` (and thus the candidate de-dup) in sync across tabs — fulfilling project memory `realtime-stock-synchronization`.
+- In `ImportFromItemMasterDialog.tsx`, **simplify the existing handler**: invalidate unconditionally on any `warehouse_items` change. The query's own `effectiveCompanyIds` filter handles scope correctly during refetch, and we avoid losing INSERTs whose payload lacks `company_id`.
+- Keep the existing manual **Refresh** button (WCAG 2.5.3 user-controllable affordance for assistive contexts).
+
+#### C) Minor accessibility & UX polish
+
+- Add `aria-rowcount={filteredItems.length + 1}` on the `<Table>` and `aria-rowindex` on each row (APG Grid pattern) so screen readers announce position correctly while virtualized.
+- Truncate long company names in the "Company (target)" column with `max-w-[180px] truncate` to prevent line-wrap that confuses row alignment at zoom levels.
 
 ### Files
 
 **Modified**
 - `src/components/warehouse/tools/ImportFromItemMasterDialog.tsx`
-  - Replace `ScrollArea` with bounded native scroll container; add `min-w-[1000px]` on Table.
-  - Add `shrink-0` wrapper around alerts/scope block.
-  - Add `useEffect` realtime subscription on `warehouse_items` with unique channel name.
-  - Invalidate candidate query in `handleImport` `onSuccess`.
-  - Add manual refresh button bound to `isFetching`.
-  - Virtualize rows when `filteredItems.length > 200` via `@tanstack/react-virtual`.
+  - Replace absolute-positioned virtual rows with sticky padding spacers + visible rows.
+  - Add `<colgroup>` with fixed column widths; bump table `min-w` to `1180px`.
+  - Simplify realtime handler (drop in-handler company filter).
+  - Add ARIA grid attributes.
+- `src/hooks/useWarehouseTools.ts`
+  - Add second realtime channel subscribing to `postgres_changes` on `warehouse_tools`.
 
-**New migration (only if publication check shows it's missing)**
-- `ALTER PUBLICATION supabase_realtime ADD TABLE public.warehouse_items;` plus `ALTER TABLE public.warehouse_items REPLICA IDENTITY FULL;` for accurate change payloads.
+**New migration**
+- `supabase/migrations/<timestamp>_realtime_warehouse_tools.sql`:
+  ```sql
+  ALTER PUBLICATION supabase_realtime ADD TABLE public.warehouse_tools;
+  ALTER TABLE public.warehouse_tools REPLICA IDENTITY FULL;
+  ALTER TABLE public.warehouse_items REPLICA IDENTITY FULL;
+  ```
 
 ### Verification
 
-1. Open the dialog → table scrolls vertically and horizontally on trackpad, mouse wheel, and touch; sticky header stays put.
-2. With 14,000+ candidates → scroll feels smooth (virtualized); CPU stays under control.
-3. Add a new item in Item Master in another tab → candidate list updates within ~1 s (realtime).
-4. Select a few rows → click Import → after success, reopen dialog: imported rows are gone without manual reload.
-5. Click the refresh button → spinner shows briefly; list re-fetches.
-6. Resize viewport down to 1024 px wide → horizontal scroll appears, no column crushing; banners remain visible above the table.
-7. Keyboard: Tab through rows, Space toggles select; row navigation remains responsive even at 14k rows.
+1. Open the dialog with 14k candidates → header and body columns align perfectly; no text overlap; smooth vertical and horizontal scroll on trackpad and touch.
+2. Resize the dialog narrower than 1180 px → horizontal scroll appears; columns still aligned; sticky header stays put.
+3. Add a new item in Item Master in another tab → candidate row appears within ~1 s without interaction.
+4. Create a tool elsewhere (or import a few here) → just-promoted rows disappear from the candidate list within ~1 s and tool count updates without reopening the dialog.
+5. Click manual Refresh → spinner shows briefly; list re-fetches.
+6. Screen reader (VoiceOver/NVDA): "row 7 of 14,771" announced correctly while scrolling.
 
