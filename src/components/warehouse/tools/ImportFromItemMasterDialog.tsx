@@ -437,7 +437,85 @@ export function ImportFromItemMasterDialog({
     overscan: 8,
   });
 
-  // Categories visible in the inline category picker depend on scope.
+  // ---------------------------------------------------------------------------
+  // Phase 9.4 — "Find by exact code" handler.
+  //
+  // Asks the database directly whether a code exists, whether it's active, and
+  // whether it has already been promoted into the target company. Removes the
+  // "is the item missing or am I just not finding it?" ambiguity for users
+  // staring at a 14k-row catalog.
+  // ---------------------------------------------------------------------------
+  const runFinder = useCallback(async () => {
+    const codeRaw = finderCode.trim();
+    if (!codeRaw) return;
+    setIsFinding(true);
+    try {
+      const { data, error } = await supabase.rpc("find_catalog_item_by_code", {
+        p_code: codeRaw,
+        p_target_company_id: targetCompanyId || null,
+      });
+      if (error) throw error;
+      const row = Array.isArray(data) ? data[0] : data;
+
+      if (!row || !row.found) {
+        toast({
+          variant: "destructive",
+          title: "Code not found",
+          description: `No active or inactive Item Master row matches “${codeRaw}”.`,
+        });
+        return;
+      }
+      if (row.status !== "active") {
+        toast({
+          variant: "destructive",
+          title: "Item is inactive",
+          description: `“${row.item_code}” exists in the Item Master but its status is “${row.status}”. Re-activate it first.`,
+        });
+        return;
+      }
+      if (row.already_imported) {
+        toast({
+          title: "Already in Tool Master",
+          description: `“${row.item_code}” has already been imported as “${row.tool_name ?? row.name}” for this company.`,
+        });
+        return;
+      }
+
+      // Force the item visible: clear filters that could hide it, then sync
+      // search to its exact code so it's the only row standing.
+      setCategoryFilter("all");
+      setSearchTerm(row.item_code);
+      setHighlightedId(row.catalog_id);
+
+      // Defer scrolling to the next tick so `filteredItems` reflects the new
+      // search term before the virtualizer is asked to scroll.
+      setTimeout(() => {
+        // After re-filter, the matched row should be at index 0.
+        try {
+          rowVirtualizer.scrollToIndex(0, { align: "center" });
+        } catch {
+          /* virtualizer not mounted yet — harmless */
+        }
+      }, 50);
+
+      // Auto-clear highlight after 2s.
+      setTimeout(() => setHighlightedId(null), 2000);
+
+      toast({
+        title: "Item found",
+        description: `“${row.item_code}” — ${row.name}. Tick it and click Import.`,
+      });
+    } catch (e: any) {
+      toast({
+        variant: "destructive",
+        title: "Lookup failed",
+        description: e?.message ?? "Unknown error",
+      });
+    } finally {
+      setIsFinding(false);
+    }
+  }, [finderCode, targetCompanyId, rowVirtualizer]);
+
   const inlineCategoryOptions = useMemo(() => {
     if (sourceScope !== "all") return categoryOptions;
     // For "all" scope, list every category that actually appears in the result set.
