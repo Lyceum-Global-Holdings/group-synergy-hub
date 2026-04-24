@@ -75,11 +75,14 @@ export async function allocateItemCodes(
   let maxSeq = 0;
   if (data && data.length > 0) {
     for (const row of data as Array<{ item_code: string | null }>) {
-      const seqStr = (row.item_code || '').replace(prefix, '');
-      const seq = parseInt(seqStr, 10);
-      if (!isNaN(seq) && seq > maxSeq) {
-        maxSeq = seq;
-      }
+      const code = row.item_code || '';
+      if (!code.startsWith(prefix)) continue;
+      // Phase 9.5: tolerate mixed historical padding (e.g. "001" alongside
+      // "0001") by parsing only the leading digits of the suffix.
+      const m = code.slice(prefix.length).match(/^(\d+)/);
+      if (!m) continue;
+      const seq = Number(m[1]);
+      if (Number.isFinite(seq) && seq > maxSeq) maxSeq = seq;
     }
   }
 
