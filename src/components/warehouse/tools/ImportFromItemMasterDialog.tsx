@@ -846,13 +846,50 @@ export function ImportFromItemMasterDialog({
                     ? "No items match the current filters."
                     : `All ${items.length.toLocaleString()} items in this scope are already imported into ${targetCompanyName}.`}
                 </span>
+                {/* Phase 9.4 — actionable diagnostic when search yields nothing.
+                    If the term looks like a code, push the user straight at the
+                    server-side finder rather than letting them wonder. */}
+                {hasActiveFilters &&
+                  searchTerm.trim().length > 0 &&
+                  /^[A-Za-z]{2,}-|^[A-Za-z0-9]+-\d/.test(searchTerm.trim()) && (
+                    <Button
+                      variant="default"
+                      size="sm"
+                      onClick={() => {
+                        setFinderCode(searchTerm.trim());
+                        void runFinder();
+                      }}
+                    >
+                      <Crosshair className="h-3.5 w-3.5 mr-2" />
+                      Look up “{searchTerm.trim()}” on the server
+                    </Button>
+                  )}
+                {hasActiveFilters && categoryFilter !== "all" && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCategoryFilter("all")}
+                  >
+                    Clear category filter
+                  </Button>
+                )}
+                {sourceScope !== "all" && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setSourceScope("all")}
+                  >
+                    Switch to All item master
+                  </Button>
+                )}
                 {hasActiveFilters && (
-                  <Button variant="outline" size="sm" onClick={clearFilters}>
-                    Clear filters
+                  <Button variant="ghost" size="sm" onClick={clearFilters}>
+                    Clear all filters
                   </Button>
                 )}
               </div>
             )}
+
 
           {targetCompanyId && !isLoading && filteredItems.length > 0 && (
             <div className="flex-1 min-h-[300px] border rounded-md overflow-hidden">
