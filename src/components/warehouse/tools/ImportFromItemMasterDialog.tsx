@@ -233,6 +233,35 @@ export function ImportFromItemMasterDialog({
     },
   });
 
+  // ---------------------------------------------------------------------------
+  // Phase 9.2 — Lightweight scope counts so users can see at a glance how many
+  // catalog rows each scope covers. Single SECURITY INVOKER RPC, ~1 round trip.
+  // ---------------------------------------------------------------------------
+  const { data: scopeCounts } = useQuery({
+    queryKey: [
+      "tool-catalog-candidate-counts",
+      targetCompanyId || "no-target",
+      toolCategoryIds.join(","),
+    ],
+    enabled: open,
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc(
+        "get_tool_catalog_candidate_counts",
+        {
+          p_target_company_id: targetCompanyId || null,
+          p_tool_category_ids: toolCategoryIds.length > 0 ? toolCategoryIds : null,
+        },
+      );
+      if (error) throw error;
+      const row = Array.isArray(data) ? data[0] : data;
+      return {
+        all: Number(row?.all_count ?? 0),
+        tools: Number(row?.tools_count ?? 0),
+        suggested: Number(row?.suggested_count ?? 0),
+      };
+    },
+  });
+
   // Counts — total catalog rows fetched, already-imported, visible after dedup
   const totalRows = items.length;
 
