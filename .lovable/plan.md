@@ -1,101 +1,137 @@
 
 
-## Phase 6 — Fix Tool Import freeze + close the perf gap
+## Phase 8 — Item Master: fix broken pagination so all 14,891 items are reachable
 
-The Tool Management page hangs after "Import from Item Master" because the dialog refetches the **entire 14k-row `warehouse_items` catalog** through paginated PostgREST embed-joins on every realtime tick — which fires once per row of the bulk insert. The root cause is a pattern that was identified in Phase 4 (memory `list-rpc-pattern`) but not yet applied to this path.
+### The actual bug
+
+The Item Master tab claims to use cursor pagination but it is silently dropping ~14k rows. Two compounding defects in `src/hooks/useWarehouseItemsPaged.ts`:
+
+1. **Tiebreaker collapse on bulk-imported rows.** 13,899 of 14,911 rows share *one* `created_at` (`2026-03-15 18:20:24.689807+00` — the original bulk import). The keyset cursor is `(created_at DESC, id DESC)`, but `id` is a random UUID v4. After page 1 loads 100 rows from inside that bucket, page 2 asks for `id < <random uuid>` which on random UUIDs only excludes roughly half the remaining bucket per fetch — so the iterator skips items unpredictably and terminates early when a page returns fewer than `pageSize` rows.
+2. **`.or()` chaining bug.** Lines 78–79 call `query.or(searchOr)` and then `query.or(cursorOr)` on the same builder. PostgREST does **not** AND two consecutive `.or()` calls; the second replaces/merges into one OR group. The cursor predicate ends up OR'd with the search predicate, so rows outside the cursor window leak in (and worse, the cursor stops gating progress).
+
+The same `fetchAllWarehouseItemsBatched` used by the Excel export has both defects, so the export is also incomplete.
+
+The user-visible symptom: count badge shows ~14,891 but the infinite-scroll list stops well short, and clicking "Download Excel" gets a partial file.
 
 ### Outcome
 
-- "Import from Item Master" dialog opens in <1 s on 14k items (was 8–15 s).
-- After clicking "Import N as Tools", the dialog closes and the inventory list refreshes in <500 ms (was 10–30 s freeze, sometimes never recovers).
-- No more refetch storm: a 100-tool bulk import triggers exactly **one** refetch of each affected list, not N.
-- Console warning `Function components cannot be given refs` on `ToolsInventoryTab` is gone.
+- All 14,911 catalog rows reachable via infinite scroll, in a single deterministic order.
+- Excel export contains every row matching the active filter (verified count = badge count).
+- Page-2+ requests use a stable, monotonic cursor that survives the 13,899-row bulk-import bucket.
+- Search + filter combinations still work; results stay correctly scoped (no leakage from broken `.or()` chaining).
+- Same RPC pattern used by Tools (Phase 6) and Approvals (Phase 4), per `mem://architecture/list-rpc-pattern`.
 
 ### Standards applied
 
-- **PostgreSQL/Supabase**: `SECURITY INVOKER` RPC returning denormalized rows; one round-trip + one server-side `LEFT JOIN` (project memory `list-rpc-pattern`).
-- **Composite index**: `(company_id, name)` on `warehouse_items` — covers the dialog's `WHERE company_id IN (...) ORDER BY name` plan in one index scan.
-- **Realtime invalidation hygiene**: subscribe to a table **once** per logical owner; use `scheduleInvalidate` (debounce 250 ms) so a 100-row INSERT burst becomes one refetch (project memory `realtime-bus-pattern`).
-- **React performance**: forward refs through wrapper components that participate in Radix `DropdownMenu` triggers (W3C WAI-ARIA APG menu pattern requires anchor refs).
+- **PostgreSQL keyset pagination (RFC-style):** the cursor must be a strictly monotonic tuple. We switch from `(created_at, id)` to `(created_at, item_code, id)` — `item_code` is unique per `(company_id, item_code)` and lexically stable, so pagination is deterministic even when 14k rows share `created_at`. `id` remains as a final tiebreaker for cross-company duplicates of `item_code`.
+- **`SECURITY INVOKER` RPC** returning denormalized rows — one round trip, server-side `LEFT JOIN suppliers`, RLS preserved (project memory `list-rpc-pattern`).
+- **Composite index** `(status, created_at DESC, item_code DESC, id DESC)` partial on `status='active'` — covers the default filter (the hot path) without bloating writes.
+- **PostgREST `.or()` correctness:** never chain two `.or()` calls; combine into one expression server-side via the RPC, eliminating the class of bug entirely.
 
 ### Changes
 
-#### A) New RPC `get_tool_candidate_items` (migration)
+#### A) New RPC `get_warehouse_catalog_page` (migration)
 
 `SECURITY INVOKER`, signature:
 
 ```sql
-get_tool_candidate_items(
-  p_company_ids   uuid[],
-  p_category_ids  uuid[] DEFAULT NULL,   -- NULL = all categories
-  p_location_id   uuid    DEFAULT NULL,  -- NULL = any
-  p_limit         int     DEFAULT 20000
+get_warehouse_catalog_page(
+  p_search          text     DEFAULT NULL,
+  p_category_id     uuid     DEFAULT NULL,
+  p_status          text     DEFAULT NULL,    -- NULL = all
+  p_supplier_id     uuid     DEFAULT NULL,
+  p_cursor_created  timestamptz DEFAULT NULL,
+  p_cursor_code     text     DEFAULT NULL,
+  p_cursor_id       uuid     DEFAULT NULL,
+  p_limit           int      DEFAULT 100
 ) RETURNS TABLE (
   id uuid, item_code text, name text, description text,
-  category_id uuid, category_name text, category_code text,
-  unit_id uuid, unit_abbreviation text,
-  current_stock numeric, unit_cost numeric,
-  company_id uuid, location_id uuid
+  category_id uuid, unit_id uuid,
+  brand text, barcode text, sku text,
+  unit_cost numeric, selling_price numeric, reorder_level numeric,
+  status text, image_url text,
+  supplier_id uuid, supplier_name text,
+  created_at timestamptz
 )
 ```
 
-One `SELECT … LEFT JOIN item_categories LEFT JOIN item_units WHERE company_id = ANY(p_company_ids) [AND category_id = ANY(p_category_ids)] [AND location_id = p_location_id] ORDER BY name LIMIT p_limit`. Replaces 14 PostgREST round-trips with one.
-
-#### B) Composite index (migration)
+Body uses one `SELECT … FROM warehouse_item_catalog c LEFT JOIN suppliers s ON s.id = c.supplier_id WHERE …` with the keyset predicate:
 
 ```sql
-CREATE INDEX IF NOT EXISTS idx_warehouse_items_company_name
-  ON public.warehouse_items (company_id, name);
+AND (
+  p_cursor_created IS NULL
+  OR c.created_at < p_cursor_created
+  OR (c.created_at = p_cursor_created AND c.item_code < p_cursor_code)
+  OR (c.created_at = p_cursor_created AND c.item_code = p_cursor_code AND c.id < p_cursor_id)
+)
+ORDER BY c.created_at DESC, c.item_code DESC, c.id DESC
+LIMIT p_limit;
 ```
 
-Covers the dialog query and the global Item Master sort.
+Search predicate is a single `(c.name ILIKE p OR c.item_code ILIKE p OR c.brand ILIKE p OR c.barcode ILIKE p OR c.sku ILIKE p)` — one expression, no `.or()` chaining bug possible.
 
-#### C) Rewire `ImportFromItemMasterDialog`
+Plus an exact-count companion RPC `get_warehouse_catalog_count(p_search, p_category_id, p_status, p_supplier_id)` returning `bigint` for the badge.
 
-- Replace the `while (true) { range(...) }` paginated embed-select with a single `supabase.rpc('get_tool_candidate_items', { ... })`.
-- Drop the now-unused 1000-row pagination loop.
-- Keep the `existingToolKeys` de-dup (client-side, cheap).
-- **Remove the `useRealtimeChannel("warehouse_tools", ...)` subscription from this dialog** — `useWarehouseTools` already owns it. Keep only `useRealtimeChannel("warehouse_items", ...)`. This kills the duplicate invalidation path.
+#### B) Composite indexes (same migration)
 
-#### D) Stop the post-import refetch storm
+```sql
+CREATE INDEX IF NOT EXISTS idx_warehouse_catalog_keyset
+  ON public.warehouse_item_catalog (created_at DESC, item_code DESC, id DESC);
 
-- In `handleImport.onSuccess`, replace the two `invalidateQueries(...)` calls with `scheduleInvalidate(queryClient, [...])` (debounced) — coalesces with the realtime payloads that follow.
-- Close the dialog **before** invalidating so the dialog's heavy `useQuery` is unmounted (and won't refetch) by the time invalidation runs.
+CREATE INDEX IF NOT EXISTS idx_warehouse_catalog_status_keyset
+  ON public.warehouse_item_catalog (status, created_at DESC, item_code DESC, id DESC);
 
-#### E) Fix the `forwardRef` warning
+-- Trigram for search; reuse Phase 7 extension
+CREATE INDEX IF NOT EXISTS idx_warehouse_catalog_name_trgm
+  ON public.warehouse_item_catalog USING gin (lower(name) gin_trgm_ops);
+CREATE INDEX IF NOT EXISTS idx_warehouse_catalog_code_trgm
+  ON public.warehouse_item_catalog USING gin (lower(item_code) gin_trgm_ops);
+```
 
-`ToolsInventoryTab` is rendered inside a Radix `DropdownMenuTrigger` chain in the parent. Wrap the component in `React.forwardRef` (or hoist the trigger) so Radix can attach its anchor ref. WAI-ARIA APG requires the menu to track its anchor element; the warning is currently silent but breaks keyboard focus return on dialog close.
+#### C) Rewrite `useWarehouseItemsPaged.ts`
 
-#### F) Defence: cap `useWarehouseTools` refetches
+- Replace the `.from('warehouse_item_catalog').select(...)` + chained `.or()` calls with a single `supabase.rpc('get_warehouse_catalog_page', { ... })`.
+- Cursor type becomes `{ created_at: string; item_code: string; id: string }`.
+- `useWarehouseItemsCount` → `supabase.rpc('get_warehouse_catalog_count', ...)`.
+- `fetchAllWarehouseItemsBatched` → loops the same RPC with the new cursor shape; guaranteed to terminate when `< pageSize` rows return *and* every iteration advances the keyset.
+- Map the flat RPC row back to `CatalogItem` (`{ ..., supplier: { id, name } }`) so consumer types stay stable (per `mem://architecture/list-rpc-pattern`).
 
-Bulk-tool INSERT fires N realtime payloads. Confirm `useWarehouseTools.onToolsChange` uses `scheduleInvalidate` (already does) — and add a 1-second debounce specifically for `warehouse_tools` bursts (override the default 250 ms) so a 100-row import is one refetch, not four.
+#### D) Defensive client-side de-dup stays
+
+The `seen` Set in `ItemMasterDefinitionTab.tsx` (lines 147–157) and in `fetchAllWarehouseItemsBatched` is kept as a belt-and-braces guard during rollout — it should never trigger after the fix, but if it does we'll see it in the row count.
+
+#### E) Memory
+
+- New: `mem://architecture/keyset-pagination-uniqueness` — "Keyset cursors must include a strictly unique tuple. For tables with bulk-imported rows sharing `created_at`, append `item_code` (or another business-unique column) before `id`. Random UUID `id` alone cannot tiebreak large equal-`created_at` buckets."
+- Update `mem://architecture/list-rpc-pattern.md` with one bullet: "Search predicates inside list RPCs must be a single combined expression — never two PostgREST `.or()` calls (they merge into one OR group, not AND)."
 
 ### Files
 
 **New migration**
-- `supabase/migrations/<ts>_phase6_tool_candidate_rpc.sql` — index + `get_tool_candidate_items` RPC.
+- `supabase/migrations/<ts>_phase8_catalog_keyset_rpc.sql` — RPCs + indexes.
 
 **Modified**
-- `src/components/warehouse/tools/ImportFromItemMasterDialog.tsx` — RPC swap, drop duplicate realtime subscription, debounced invalidation, close-before-invalidate.
-- `src/hooks/useWarehouseTools.ts` — bump `scheduleInvalidate` debounce to 1000 ms for `warehouse_tools` payloads.
-- `src/components/warehouse/tools/ToolsInventoryTab.tsx` — wrap in `React.forwardRef` to silence the Radix warning.
+- `src/hooks/useWarehouseItemsPaged.ts` — RPC swap, new cursor tuple, count RPC, batched export uses RPC.
+- `src/integrations/supabase/types.ts` — auto-regenerated.
 
-**Memory**
-- Update `mem://architecture/list-rpc-pattern` with one bullet: "Realtime invalidation must be owned by exactly one hook per table; consumer dialogs subscribe only to *related* tables."
+**Unchanged but verified**
+- `src/components/warehouse/ItemMasterDefinitionTab.tsx` — already de-dups by `id`; consumes the same `CatalogItem` shape; no edits needed.
+- `src/components/warehouse/ItemMasterTab.tsx` (Inventory tab) — uses different hooks (`warehouse_items` not `warehouse_item_catalog`); out of scope.
 
 ### Out of scope
 
-- Migrating `useWarehouseItems` / `useWarehouseAssets` to RPC (Phase 4 deferred this; current latency is acceptable post-index).
-- Cursor pagination (only needed beyond ~50k items).
-- Server-side search inside `get_tool_candidate_items` — the dialog filters client-side after the fetch and that's fine at 14k rows.
+- Backfilling distinct `created_at` values on the 13,899 bulk-imported rows (would silently fix pagination but mask the design defect; the new cursor tuple is the correct fix).
+- Migrating the Inventory tab (`useWarehouseItems`) — different table, no reported issue, addressed in Phase 4.
+- Server-side fuzzy ranking — current ILIKE + trigram index is sub-100 ms at 14k rows.
 
 ### Verification
 
-1. Open `/warehouse/tool-management` → "Import from Item Master". Network tab shows **one** `rpc/get_tool_candidate_items` request, ~200–600 ms, payload ~2–4 MB for 14k rows. Dialog interactive in <1 s.
-2. Select 50 items → click "Import 50 as Tools". Dialog closes immediately. Network tab shows **one** `warehouse_tools?` insert, then **one** `rpc/get_warehouse_tools_list` refetch within ~1 s. No subsequent re-fires of the candidate query.
-3. Page does not freeze; main-thread profile shows no >500 ms long task during the import.
-4. Console: zero `Function components cannot be given refs` warnings on `ToolsInventoryTab`.
-5. `EXPLAIN ANALYZE` on `get_tool_candidate_items('{...}'::uuid[])` shows index scan on `idx_warehouse_items_company_name`, execution <150 ms at 14k rows.
-6. `supabase--linter` reports no new warnings on the migration.
-7. Existing duplicate-detection still works: items already promoted (same `(company_id, item_code)`) remain hidden from the candidate list.
+1. Open Item Master with no filters → scroll to the bottom. Loaded count in the table === badge count (14,911). Network tab shows N requests of `rpc/get_warehouse_catalog_page`, last one returns `< 100` rows.
+2. `EXPLAIN ANALYZE` of `get_warehouse_catalog_page(NULL, NULL, NULL, NULL, NULL, NULL, NULL, 100)` shows index scan on `idx_warehouse_catalog_keyset`, execution <80 ms.
+3. Apply `status=active` filter → badge `14,904`; scroll to bottom loads exactly 14,904 rows.
+4. Search "drill" → results match a direct `SELECT COUNT(*) … WHERE name ILIKE '%drill%' OR …` against the table; cursor advances correctly across the 13,899-row bucket.
+5. Click "Download Excel" with no filters → file contains 14,911 rows (was previously truncating to ~5k–8k).
+6. RLS preserved: a non-admin user with access to only one company sees only that company's items in both list and export.
+7. `supabase--linter` reports no new warnings on the migration.
+8. No console errors; existing realtime invalidation (`useWarehouseItemCatalog`) still refreshes the list within 1 s of an INSERT.
 
