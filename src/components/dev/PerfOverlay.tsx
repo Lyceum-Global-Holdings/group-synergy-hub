@@ -50,11 +50,7 @@ export function PerfOverlay() {
     setEnabled(isEnabled());
   }, []);
 
-  const live = useSyncExternalStore(
-    subscribeLive,
-    getLiveValues,
-    () => ({}) as ReturnType<typeof getLiveValues>,
-  );
+  const live = useSyncExternalStore(subscribeLive, getLiveValues, getLiveValues);
 
   if (!enabled) return null;
 
