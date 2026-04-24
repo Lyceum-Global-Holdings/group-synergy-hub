@@ -481,29 +481,61 @@ export function ImportFromItemMasterDialog({
         return;
       }
 
-      // Force the item visible: clear filters that could hide it, then sync
-      // search to its exact code so it's the only row standing.
+      // Force the item visible.
+      //
+      // CRITICAL: a server-confirmed lookup must OUTRANK any active narrowing
+      // filter. The candidate query is keyed on `sourceScope` and
+      // `effectiveCategoryIds`, so if the matched row's category is outside
+      // the current scope (e.g. user is on "Tools" or "Suggested" and the
+      // item is uncategorized), the row will *never* enter `items` no matter
+      // what the search term is. Force scope back to "all" so the data
+      // window contains the row, then clear the category dropdown, then sync
+      // the search term so it's the only one standing.
+      const wasNarrowed =
+        sourceScope !== "all" || categoryFilter !== "all";
+      setSourceScope("all");
       setCategoryFilter("all");
       setSearchTerm(row.item_code);
       setHighlightedId(row.catalog_id);
 
-      // Defer scrolling to the next tick so `filteredItems` reflects the new
-      // search term before the virtualizer is asked to scroll.
-      setTimeout(() => {
-        // After re-filter, the matched row should be at index 0.
-        try {
-          rowVirtualizer.scrollToIndex(0, { align: "center" });
-        } catch {
-          /* virtualizer not mounted yet — harmless */
+      // Wait for the candidate query to settle with the broadened scope
+      // BEFORE asking the virtualizer to scroll, otherwise we're scrolling
+      // an empty list. Poll the cache for the matched row id (≤2s) so this
+      // works whether the data was already cached or had to refetch.
+      const targetCatalogId: string = row.catalog_id;
+      const scrollWhenReady = async () => {
+        const deadline = Date.now() + 2000;
+        while (Date.now() < deadline) {
+          const cached = queryClient.getQueriesData<CandidateItem[]>({
+            queryKey: ["tool-catalog-candidates"],
+          });
+          const present = cached.some(([, rows]) =>
+            (rows ?? []).some((r) => r?.id === targetCatalogId),
+          );
+          if (present) {
+            // Defer one frame so React has flushed `filteredItems` into the
+            // virtualizer before we ask it to scroll.
+            await new Promise((res) => requestAnimationFrame(() => res(null)));
+            try {
+              rowVirtualizer.scrollToIndex(0, { align: "center" });
+            } catch {
+              /* virtualizer not mounted yet — harmless */
+            }
+            return;
+          }
+          await new Promise((res) => setTimeout(res, 80));
         }
-      }, 50);
+      };
+      void scrollWhenReady();
 
-      // Auto-clear highlight after 2s.
-      setTimeout(() => setHighlightedId(null), 2000);
+      // Auto-clear highlight after 2.5s (slightly longer than the scroll wait).
+      setTimeout(() => setHighlightedId(null), 2500);
 
       toast({
         title: "Item found",
-        description: `“${row.item_code}” — ${row.name}. Tick it and click Import.`,
+        description: wasNarrowed
+          ? `“${row.item_code}” — ${row.name}. Switched scope to “All item master” so it’s visible. Tick it and click Import.`
+          : `“${row.item_code}” — ${row.name}. Tick it and click Import.`,
       });
     } catch (e: any) {
       toast({
@@ -514,7 +546,14 @@ export function ImportFromItemMasterDialog({
     } finally {
       setIsFinding(false);
     }
-  }, [finderCode, targetCompanyId, rowVirtualizer]);
+  }, [
+    finderCode,
+    targetCompanyId,
+    rowVirtualizer,
+    sourceScope,
+    categoryFilter,
+    queryClient,
+  ]);
 
   const inlineCategoryOptions = useMemo(() => {
     if (sourceScope !== "all") return categoryOptions;
