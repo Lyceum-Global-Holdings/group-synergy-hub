@@ -13,3 +13,5 @@ Hot list endpoints (any list with >1k rows or two+ joined tables) must use a `SE
 - Always include a `p_limit` parameter (default 5000) — never return unbounded result sets.
 - Client hook maps flat rows → embedded shape so consumer types stay stable. Example: `useWarehouseTools` → `get_warehouse_tools_list`.
 - Realtime invalidation hooks remain unchanged (still subscribe to base tables via the bus).
+- Search predicates inside list RPCs must be a single combined SQL expression — never two PostgREST `.or()` calls (they merge into one OR group, not AND, and silently leak rows past the cursor window).
+- Realtime invalidation must be owned by exactly one hook per table; consumer dialogs subscribe only to *related* tables.
