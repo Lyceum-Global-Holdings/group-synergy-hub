@@ -32,7 +32,8 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Outlet } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Outlet, useLocation } from "react-router-dom";
+import { useEffect } from "react";
 import ScrollToTop from "@/components/layout/ScrollToTop";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { CompanyProvider } from "@/contexts/CompanyContext";
@@ -42,6 +43,8 @@ import { AdminRoute } from "./components/auth/AdminRoute";
 import { SuperAdminRoute } from "./components/auth/SuperAdminRoute";
 import AppLayout from "./components/layout/AppLayout";
 import { Loader2 } from "lucide-react";
+import { PerfOverlay } from "@/components/dev/PerfOverlay";
+import { markRouteChange } from "@/lib/perfTelemetry";
 
 // Lazy load all page components for code splitting
 const Dashboard = lazy(() => import("./pages/Dashboard"));
@@ -123,6 +126,16 @@ const SocialMediaAccess = lazy(() => import("./pages/social-media/AccessManageme
 const SocialMediaNDA = lazy(() => import("./pages/social-media/NDACompliance"));
 const SocialMediaActivityLog = lazy(() => import("./pages/social-media/ActivityLog"));
 const TestEnvironmentPage = lazy(() => import("./pages/admin/test-environment/TestEnvironmentPage"));
+const PerformanceDashboard = lazy(() => import("./pages/admin/PerformanceDashboard"));
+
+// Phase 5 — fires markRouteChange on every SPA navigation so vitals tag the right route.
+function RouteChangeTracker() {
+  const location = useLocation();
+  useEffect(() => {
+    markRouteChange(location.pathname);
+  }, [location.pathname]);
+  return null;
+}
 
 // Tiered freshness policy: stale-while-revalidate by default for performance.
 // Live-critical hooks (stock, approvals, dashboards/KPIs) opt into staleTime:0
@@ -171,6 +184,8 @@ function App() {
         <Sonner />
         <BrowserRouter>
           <ScrollToTop />
+          <RouteChangeTracker />
+          <PerfOverlay />
           <Suspense fallback={<PageLoader />}>
             <Routes>
               {/* Public routes - no auth required */}
@@ -194,6 +209,7 @@ function App() {
                 <Route path="/admin/warehouse-management" element={<AdminRoute><WarehouseManagement /></AdminRoute>} />
                 <Route path="/admin/backend" element={<SuperAdminRoute><BackendDashboard /></SuperAdminRoute>} />
                 <Route path="/admin/test-environment" element={<SuperAdminRoute><TestEnvironmentPage /></SuperAdminRoute>} />
+                <Route path="/admin/performance" element={<AdminRoute><PerformanceDashboard /></AdminRoute>} />
                 <Route path="/admin/training" element={<Training />} />
                 <Route path="/admin/training/module-trainings" element={<ModuleTrainings />} />
                 <Route path="/admin/training/video-library" element={<VideoLibrary />} />

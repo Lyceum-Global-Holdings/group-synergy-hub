@@ -10830,6 +10830,39 @@ export type Database = {
           },
         ]
       }
+      performance_metrics: {
+        Row: {
+          company_id: string | null
+          context: Json | null
+          id: string
+          metric_kind: string
+          metric_value: number
+          recorded_at: string
+          route: string
+          user_id: string | null
+        }
+        Insert: {
+          company_id?: string | null
+          context?: Json | null
+          id?: string
+          metric_kind: string
+          metric_value: number
+          recorded_at?: string
+          route: string
+          user_id?: string | null
+        }
+        Update: {
+          company_id?: string | null
+          context?: Json | null
+          id?: string
+          metric_kind?: string
+          metric_value?: number
+          recorded_at?: string
+          route?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       period_close_tasks: {
         Row: {
           company_id: string | null
@@ -19712,6 +19745,7 @@ export type Database = {
         Args: { _company_id: string; _limit?: number; _table_name: string }
         Returns: Json[]
       }
+      get_performance_summary: { Args: { p_days?: number }; Returns: Json }
       get_profit_loss_report: {
         Args: {
           p_company_id: string
