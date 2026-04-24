@@ -19812,6 +19812,14 @@ export type Database = {
           unit_id: string
         }[]
       }
+      get_tool_catalog_candidate_counts: {
+        Args: { p_target_company_id?: string; p_tool_category_ids?: string[] }
+        Returns: {
+          all_count: number
+          suggested_count: number
+          tools_count: number
+        }[]
+      }
       get_tool_catalog_candidates: {
         Args: {
           p_category_ids?: string[]

@@ -95,7 +95,11 @@ export function ImportFromItemMasterDialog({
   // catalog rows are visible.
   // ---------------------------------------------------------------------------
 
-  const [sourceScope, setSourceScope] = useState<SourceScope>("suggested");
+  // Phase 9.2 — Default to "all" because ~97% of the catalog is uncategorized
+  // in production. A category-gated default silently hides the bulk of the
+  // Item Master from the picker. The narrower scopes remain available as
+  // opt-in filters for power users with a fully curated catalog.
+  const [sourceScope, setSourceScope] = useState<SourceScope>("all");
   const [targetCompanyId, setTargetCompanyId] = useState<string>("");
   const [destinationLocationId, setDestinationLocationId] = useState<string>("none");
 
@@ -226,6 +230,35 @@ export function ImportFromItemMasterDialog({
         current_stock: row.current_stock ?? null,
         inventory_location_id: row.inventory_location_id ?? null,
       })) as CandidateItem[];
+    },
+  });
+
+  // ---------------------------------------------------------------------------
+  // Phase 9.2 — Lightweight scope counts so users can see at a glance how many
+  // catalog rows each scope covers. Single SECURITY INVOKER RPC, ~1 round trip.
+  // ---------------------------------------------------------------------------
+  const { data: scopeCounts } = useQuery({
+    queryKey: [
+      "tool-catalog-candidate-counts",
+      targetCompanyId || "no-target",
+      toolCategoryIds.join(","),
+    ],
+    enabled: open,
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc(
+        "get_tool_catalog_candidate_counts",
+        {
+          p_target_company_id: targetCompanyId || null,
+          p_tool_category_ids: toolCategoryIds.length > 0 ? toolCategoryIds : null,
+        },
+      );
+      if (error) throw error;
+      const row = Array.isArray(data) ? data[0] : data;
+      return {
+        all: Number(row?.all_count ?? 0),
+        tools: Number(row?.tools_count ?? 0),
+        suggested: Number(row?.suggested_count ?? 0),
+      };
     },
   });
 
@@ -415,10 +448,10 @@ export function ImportFromItemMasterDialog({
             Import from Item Master
           </DialogTitle>
           <DialogDescription>
-            Promote items from the global Item Master catalog into the Tool
-            Master of the selected target company. Source is always the full
-            catalog — company and location below only control where tools are
-            created, not what is visible.
+            Showing every active Item Master entry by default so nothing is
+            hidden behind catalog curation gaps. Use the scope tabs to narrow
+            to curated tool categories. Company &amp; location below only
+            control where tools are created.
           </DialogDescription>
         </DialogHeader>
 
@@ -434,9 +467,30 @@ export function ImportFromItemMasterDialog({
                 onValueChange={(v) => setSourceScope(v as SourceScope)}
               >
                 <TabsList>
-                  <TabsTrigger value="suggested">Suggested tools</TabsTrigger>
-                  <TabsTrigger value="tools">Tool categories</TabsTrigger>
-                  <TabsTrigger value="all">All item master</TabsTrigger>
+                  <TabsTrigger value="all" className="gap-2">
+                    All item master
+                    {scopeCounts && (
+                      <span className="text-[10px] tabular-nums opacity-70">
+                        {scopeCounts.all.toLocaleString()}
+                      </span>
+                    )}
+                  </TabsTrigger>
+                  <TabsTrigger value="tools" className="gap-2">
+                    Tool categories
+                    {scopeCounts && (
+                      <span className="text-[10px] tabular-nums opacity-70">
+                        {scopeCounts.tools.toLocaleString()}
+                      </span>
+                    )}
+                  </TabsTrigger>
+                  <TabsTrigger value="suggested" className="gap-2">
+                    Suggested
+                    {scopeCounts && (
+                      <span className="text-[10px] tabular-nums opacity-70">
+                        {scopeCounts.suggested.toLocaleString()}
+                      </span>
+                    )}
+                  </TabsTrigger>
                 </TabsList>
               </Tabs>
             </div>
@@ -495,6 +549,27 @@ export function ImportFromItemMasterDialog({
               </AlertDescription>
             </Alert>
           )}
+          {sourceScope !== "all" &&
+            scopeCounts &&
+            scopeCounts.all > 0 &&
+            scopeCounts.tools < scopeCounts.all * 0.5 && (
+              <Alert>
+                <Info className="h-4 w-4" />
+                <AlertDescription>
+                  Only{" "}
+                  <strong>{scopeCounts.tools.toLocaleString()}</strong> of{" "}
+                  <strong>{scopeCounts.all.toLocaleString()}</strong> catalog
+                  items have a tool category assigned (
+                  {Math.round(
+                    ((scopeCounts.all - scopeCounts.tools) / scopeCounts.all) *
+                      100,
+                  )}
+                  % uncategorized). Items like trowels, hand rakes etc. may
+                  be missing from this scope — switch to{" "}
+                  <strong>All item master</strong> to see every item.
+                </AlertDescription>
+              </Alert>
+            )}
           {sourceScope !== "all" && toolCategoryIds.length === 0 && (
             <Alert variant="destructive">
               <AlertCircle className="h-4 w-4" />
