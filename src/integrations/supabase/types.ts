@@ -19481,6 +19481,21 @@ export type Database = {
         Returns: Json
       }
       escalate_pending_approvals: { Args: never; Returns: undefined }
+      find_catalog_item_by_code: {
+        Args: { p_code: string; p_target_company_id?: string }
+        Returns: {
+          already_imported: boolean
+          catalog_id: string
+          category_id: string
+          category_name: string
+          found: boolean
+          item_code: string
+          name: string
+          status: string
+          tool_id: string
+          tool_name: string
+        }[]
+      }
       generate_adjustment_batch_number: { Args: never; Returns: string }
       generate_asset_id: {
         Args: {
