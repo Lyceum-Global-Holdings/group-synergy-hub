@@ -5,20 +5,13 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { VirtualTable, type DataTableColumn } from '@/components/shared/VirtualTable';
 import { useCompany } from '@/contexts/CompanyContext';
 import { useGoodsReceiptNotes, useGrnSummary } from '@/hooks/useGoodsReceiptNotes';
 import { useCurrentUserRoles } from '@/hooks/useCurrentUserRoles';
