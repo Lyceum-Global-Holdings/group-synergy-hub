@@ -32,7 +32,8 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Outlet } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Outlet, useLocation } from "react-router-dom";
+import { useEffect } from "react";
 import ScrollToTop from "@/components/layout/ScrollToTop";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { CompanyProvider } from "@/contexts/CompanyContext";
@@ -42,6 +43,8 @@ import { AdminRoute } from "./components/auth/AdminRoute";
 import { SuperAdminRoute } from "./components/auth/SuperAdminRoute";
 import AppLayout from "./components/layout/AppLayout";
 import { Loader2 } from "lucide-react";
+import { PerfOverlay } from "@/components/dev/PerfOverlay";
+import { markRouteChange } from "@/lib/perfTelemetry";
 
 // Lazy load all page components for code splitting
 const Dashboard = lazy(() => import("./pages/Dashboard"));
