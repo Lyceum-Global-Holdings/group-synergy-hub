@@ -22,7 +22,7 @@ export default defineConfig(async ({ mode }) => ({
   },
   // Strip console.* and debugger statements from production builds (prod only).
   // Keeps dev logs intact for debugging.
-  esbuild: mode === "production" ? { drop: ["console", "debugger"] } : undefined,
+  esbuild: mode === "production" ? { drop: ["console", "debugger"] as ("console" | "debugger")[] } : undefined,
   build: {
     chunkSizeWarningLimit: 800,
     rollupOptions: {
