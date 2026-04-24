@@ -21,8 +21,8 @@ type VitalKey = keyof typeof THRESHOLDS;
 function gradeColor(key: VitalKey, v: number | undefined): string {
   if (v === undefined) return "text-muted-foreground";
   const t = THRESHOLDS[key];
-  if (v <= t.good) return "text-emerald-500";
-  if (v <= t.poor) return "text-amber-500";
+  if (v <= t.good) return "text-primary";
+  if (v <= t.poor) return "text-foreground";
   return "text-destructive";
 }
 
