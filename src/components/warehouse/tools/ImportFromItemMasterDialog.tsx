@@ -467,9 +467,30 @@ export function ImportFromItemMasterDialog({
                 onValueChange={(v) => setSourceScope(v as SourceScope)}
               >
                 <TabsList>
-                  <TabsTrigger value="suggested">Suggested tools</TabsTrigger>
-                  <TabsTrigger value="tools">Tool categories</TabsTrigger>
-                  <TabsTrigger value="all">All item master</TabsTrigger>
+                  <TabsTrigger value="all" className="gap-2">
+                    All item master
+                    {scopeCounts && (
+                      <span className="text-[10px] tabular-nums opacity-70">
+                        {scopeCounts.all.toLocaleString()}
+                      </span>
+                    )}
+                  </TabsTrigger>
+                  <TabsTrigger value="tools" className="gap-2">
+                    Tool categories
+                    {scopeCounts && (
+                      <span className="text-[10px] tabular-nums opacity-70">
+                        {scopeCounts.tools.toLocaleString()}
+                      </span>
+                    )}
+                  </TabsTrigger>
+                  <TabsTrigger value="suggested" className="gap-2">
+                    Suggested
+                    {scopeCounts && (
+                      <span className="text-[10px] tabular-nums opacity-70">
+                        {scopeCounts.suggested.toLocaleString()}
+                      </span>
+                    )}
+                  </TabsTrigger>
                 </TabsList>
               </Tabs>
             </div>
