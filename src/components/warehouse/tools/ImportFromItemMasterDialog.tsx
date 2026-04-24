@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import {
   Dialog,
   DialogContent,
@@ -11,7 +11,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Select,
   SelectContent,
@@ -29,8 +28,9 @@ import {
 } from "@/components/ui/table";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { AlertCircle, Info, Loader2, PackagePlus, Search } from "lucide-react";
+import { AlertCircle, Info, Loader2, PackagePlus, RefreshCw, Search } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import { supabase } from "@/integrations/supabase/client";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useLocationFilter } from "@/contexts/LocationFilterContext";
@@ -145,7 +145,7 @@ export function ImportFromItemMasterDialog({
     [tools],
   );
 
-  const { data: items = [], isLoading, error } = useQuery({
+  const { data: items = [], isLoading, isFetching, error, refetch } = useQuery({
     queryKey: [
       "warehouse-items-tool-candidates",
       companyScope,
@@ -325,14 +325,53 @@ export function ImportFromItemMasterDialog({
 
     createBulkTools(payload, {
       onSuccess: () => {
+        // Refresh both candidate list (promoted rows disappear) and the
+        // tools list (new keys reflect in existingToolKeys de-dup).
+        queryClient.invalidateQueries({ queryKey: ["warehouse-items-tool-candidates"] });
+        queryClient.invalidateQueries({ queryKey: ["warehouse-tools"] });
         onOpenChange(false);
         resetState();
       },
     });
   };
 
+  // Realtime: keep the candidate list fresh when items are added/edited/deleted
+  // in the source warehouse_items table (project memory: realtime-stock-synchronization).
+  useEffect(() => {
+    if (!open || effectiveCompanyIds.length === 0) return;
+    const channelName = `import-item-master-candidates-${crypto.randomUUID()}`;
+    const channel = supabase.channel(channelName);
+    channel
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "warehouse_items" },
+        (payload: any) => {
+          const row = (payload.new ?? payload.old) as { company_id?: string } | null;
+          if (row?.company_id && !effectiveCompanyIds.includes(row.company_id)) return;
+          queryClient.invalidateQueries({ queryKey: ["warehouse-items-tool-candidates"] });
+        },
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [open, effectiveCompanyIds, queryClient]);
+
   const selectedCount = filteredItems.filter((it) => selectedIds.has(it.id)).length;
   const hasActiveFilters = searchTerm.trim().length > 0 || categoryFilter !== "all";
+
+  // Row virtualization for large candidate sets (WAI-ARIA APG "Grid" pattern).
+  // Below threshold we render normally to keep DOM simple.
+  const VIRTUAL_THRESHOLD = 200;
+  const ROW_HEIGHT = 56;
+  const scrollParentRef = useRef<HTMLDivElement>(null);
+  const shouldVirtualize = filteredItems.length > VIRTUAL_THRESHOLD;
+  const rowVirtualizer = useVirtualizer({
+    count: filteredItems.length,
+    getScrollElement: () => scrollParentRef.current,
+    estimateSize: () => ROW_HEIGHT,
+    overscan: 8,
+  });
 
   // Categories visible in the inline category picker depend on scope.
   const inlineCategoryOptions = useMemo(() => {
@@ -512,6 +551,20 @@ export function ImportFromItemMasterDialog({
             {selectedCount > 0 && (
               <Badge variant="default">{selectedCount} selected</Badge>
             )}
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              onClick={() => refetch()}
+              disabled={isFetching}
+              aria-label="Refresh candidates"
+              title="Refresh candidates"
+            >
+              <RefreshCw
+                className={`h-4 w-4 ${isFetching ? "animate-spin" : ""}`}
+              />
+            </Button>
           </div>
 
           {error && (
@@ -581,85 +634,171 @@ export function ImportFromItemMasterDialog({
             )}
 
           {effectiveCompanyIds.length > 0 && !isLoading && filteredItems.length > 0 && (
-            <ScrollArea className="flex-1 border rounded-md">
-              <Table>
-                <TableHeader className="sticky top-0 bg-background z-10">
-                  <TableRow>
-                    <TableHead className="w-10">
-                      <Checkbox
-                        checked={allVisibleSelected}
-                        onCheckedChange={toggleAllVisible}
-                        aria-label="Select all"
-                      />
-                    </TableHead>
-                    <TableHead>Item Code</TableHead>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Category</TableHead>
-                    <TableHead>Company (target)</TableHead>
-                    <TableHead>Unit</TableHead>
-                    <TableHead className="text-right">Current Stock</TableHead>
-                    <TableHead className="w-32 text-right">Initial Qty</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredItems.map((item) => {
-                    const isSelected = selectedIds.has(item.id);
-                    const companyName =
-                      (item.company_id && companyNameById.get(item.company_id)) ||
-                      "—";
-                    return (
-                      <TableRow key={item.id} data-state={isSelected ? "selected" : undefined}>
-                        <TableCell>
-                          <Checkbox
-                            checked={isSelected}
-                            onCheckedChange={() => toggleOne(item.id)}
-                            aria-label={`Select ${item.name}`}
-                          />
-                        </TableCell>
-                        <TableCell className="font-mono text-sm">{item.item_code}</TableCell>
-                        <TableCell>
-                          <div className="font-medium">{item.name}</div>
-                          {item.description && (
-                            <div className="text-xs text-muted-foreground truncate max-w-[260px]">
-                              {item.description}
-                            </div>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          {item.category_name ? (
-                            <Badge variant="outline" className="font-normal">
-                              {item.category_code ? `[${item.category_code}] ` : ""}
-                              {item.category_name}
-                            </Badge>
-                          ) : (
-                            <span className="text-muted-foreground">—</span>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="secondary" className="font-normal">
-                            {companyName}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>{item.unit_abbreviation ?? "—"}</TableCell>
-                        <TableCell className="text-right">
-                          {item.current_stock ?? 0}
-                        </TableCell>
-                        <TableCell>
-                          <Input
-                            type="number"
-                            min={0}
-                            value={getQty(item)}
-                            onChange={(e) => setQty(item.id, parseInt(e.target.value, 10))}
-                            disabled={!isSelected}
-                            className="h-8 text-right"
-                          />
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </ScrollArea>
+            <div className="flex-1 min-h-[300px] border rounded-md overflow-hidden">
+              <div
+                ref={scrollParentRef}
+                className="h-full w-full overflow-auto"
+              >
+                <Table className="min-w-[1000px]">
+                  <TableHeader className="sticky top-0 bg-background z-10">
+                    <TableRow>
+                      <TableHead className="w-10">
+                        <Checkbox
+                          checked={allVisibleSelected}
+                          onCheckedChange={toggleAllVisible}
+                          aria-label="Select all"
+                        />
+                      </TableHead>
+                      <TableHead>Item Code</TableHead>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Category</TableHead>
+                      <TableHead>Company (target)</TableHead>
+                      <TableHead>Unit</TableHead>
+                      <TableHead className="text-right">Current Stock</TableHead>
+                      <TableHead className="w-32 text-right">Initial Qty</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  {shouldVirtualize ? (
+                    <TableBody
+                      style={{
+                        display: "block",
+                        position: "relative",
+                        height: `${rowVirtualizer.getTotalSize()}px`,
+                      }}
+                    >
+                      {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+                        const item = filteredItems[virtualRow.index];
+                        if (!item) return null;
+                        const isSelected = selectedIds.has(item.id);
+                        const companyName =
+                          (item.company_id && companyNameById.get(item.company_id)) ||
+                          "—";
+                        return (
+                          <TableRow
+                            key={item.id}
+                            data-state={isSelected ? "selected" : undefined}
+                            style={{
+                              display: "table",
+                              tableLayout: "fixed",
+                              width: "100%",
+                              position: "absolute",
+                              top: 0,
+                              left: 0,
+                              transform: `translateY(${virtualRow.start}px)`,
+                              height: `${ROW_HEIGHT}px`,
+                            }}
+                          >
+                            <TableCell className="w-10">
+                              <Checkbox
+                                checked={isSelected}
+                                onCheckedChange={() => toggleOne(item.id)}
+                                aria-label={`Select ${item.name}`}
+                              />
+                            </TableCell>
+                            <TableCell className="font-mono text-sm">{item.item_code}</TableCell>
+                            <TableCell>
+                              <div className="font-medium truncate max-w-[260px]">{item.name}</div>
+                              {item.description && (
+                                <div className="text-xs text-muted-foreground truncate max-w-[260px]">
+                                  {item.description}
+                                </div>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              {item.category_name ? (
+                                <Badge variant="outline" className="font-normal">
+                                  {item.category_code ? `[${item.category_code}] ` : ""}
+                                  {item.category_name}
+                                </Badge>
+                              ) : (
+                                <span className="text-muted-foreground">—</span>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant="secondary" className="font-normal">
+                                {companyName}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>{item.unit_abbreviation ?? "—"}</TableCell>
+                            <TableCell className="text-right">
+                              {item.current_stock ?? 0}
+                            </TableCell>
+                            <TableCell className="w-32">
+                              <Input
+                                type="number"
+                                min={0}
+                                value={getQty(item)}
+                                onChange={(e) => setQty(item.id, parseInt(e.target.value, 10))}
+                                disabled={!isSelected}
+                                className="h-8 text-right"
+                              />
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  ) : (
+                    <TableBody>
+                      {filteredItems.map((item) => {
+                        const isSelected = selectedIds.has(item.id);
+                        const companyName =
+                          (item.company_id && companyNameById.get(item.company_id)) ||
+                          "—";
+                        return (
+                          <TableRow key={item.id} data-state={isSelected ? "selected" : undefined}>
+                            <TableCell>
+                              <Checkbox
+                                checked={isSelected}
+                                onCheckedChange={() => toggleOne(item.id)}
+                                aria-label={`Select ${item.name}`}
+                              />
+                            </TableCell>
+                            <TableCell className="font-mono text-sm">{item.item_code}</TableCell>
+                            <TableCell>
+                              <div className="font-medium">{item.name}</div>
+                              {item.description && (
+                                <div className="text-xs text-muted-foreground truncate max-w-[260px]">
+                                  {item.description}
+                                </div>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              {item.category_name ? (
+                                <Badge variant="outline" className="font-normal">
+                                  {item.category_code ? `[${item.category_code}] ` : ""}
+                                  {item.category_name}
+                                </Badge>
+                              ) : (
+                                <span className="text-muted-foreground">—</span>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant="secondary" className="font-normal">
+                                {companyName}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>{item.unit_abbreviation ?? "—"}</TableCell>
+                            <TableCell className="text-right">
+                              {item.current_stock ?? 0}
+                            </TableCell>
+                            <TableCell>
+                              <Input
+                                type="number"
+                                min={0}
+                                value={getQty(item)}
+                                onChange={(e) => setQty(item.id, parseInt(e.target.value, 10))}
+                                disabled={!isSelected}
+                                className="h-8 text-right"
+                              />
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  )}
+                </Table>
+              </div>
+            </div>
           )}
         </div>
 
