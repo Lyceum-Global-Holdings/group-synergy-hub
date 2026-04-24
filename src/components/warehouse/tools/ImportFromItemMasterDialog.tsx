@@ -688,6 +688,45 @@ export function ImportFromItemMasterDialog({
             </Alert>
           )}
 
+          {/* Phase 9.4 — direct code finder. Asks the DB whether a specific
+              code exists, is active, and isn't already imported. Resolves the
+              "is the item missing or am I just not finding it?" ambiguity. */}
+          <div className="flex flex-wrap items-center gap-2 rounded-md border bg-muted/20 p-2">
+            <Crosshair className="h-4 w-4 text-muted-foreground ml-1" />
+            <span className="text-xs font-medium text-muted-foreground">
+              Find by exact code
+            </span>
+            <Input
+              placeholder="e.g. INV-CMP-CBL-0001"
+              value={finderCode}
+              onChange={(e) => setFinderCode(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  void runFinder();
+                }
+              }}
+              className="h-8 w-[260px] font-mono text-sm"
+              disabled={isFinding}
+            />
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={() => void runFinder()}
+              disabled={isFinding || !finderCode.trim()}
+            >
+              {isFinding ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                "Find & jump"
+              )}
+            </Button>
+            <span className="text-[11px] text-muted-foreground">
+              Confirms presence on the server in one click — no scrolling.
+            </span>
+          </div>
+
           {/* Search & inline category filter */}
           <div className="flex flex-wrap items-center gap-2">
             <div className="relative flex-1 min-w-[220px] max-w-md">
