@@ -39,21 +39,28 @@ let initialized = false;
 let currentConfig: TelemetryConfig | null = null;
 let currentRoute = typeof location !== "undefined" ? location.pathname : "/";
 
-// Live values for the dev overlay
+// Live values for the dev overlay.
+// IMPORTANT: getLiveValues must return a STABLE reference between updates,
+// otherwise useSyncExternalStore will loop infinitely (React error #185).
+// We mutate the same object and only swap the snapshot ref when a value changes.
 const liveValues: Partial<Record<MetricKind, number>> = {};
+let liveSnapshot: Partial<Record<MetricKind, number>> = { ...liveValues };
 const liveSubscribers = new Set<() => void>();
 
 function notifyLive() {
+  liveSnapshot = { ...liveValues };
   liveSubscribers.forEach((fn) => fn());
 }
 
 export function subscribeLive(cb: () => void): () => void {
   liveSubscribers.add(cb);
-  return () => liveSubscribers.delete(cb);
+  return () => {
+    liveSubscribers.delete(cb);
+  };
 }
 
 export function getLiveValues(): Partial<Record<MetricKind, number>> {
-  return { ...liveValues };
+  return liveSnapshot;
 }
 
 function shouldSample(): boolean {
