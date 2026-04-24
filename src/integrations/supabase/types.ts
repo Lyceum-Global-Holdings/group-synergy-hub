@@ -19779,6 +19779,29 @@ export type Database = {
           type: string
         }[]
       }
+      get_tool_candidate_items: {
+        Args: {
+          p_category_ids?: string[]
+          p_company_ids: string[]
+          p_limit?: number
+          p_location_id?: string
+        }
+        Returns: {
+          category_code: string
+          category_id: string
+          category_name: string
+          company_id: string
+          current_stock: number
+          description: string
+          id: string
+          item_code: string
+          location_id: string
+          name: string
+          unit_abbreviation: string
+          unit_cost: number
+          unit_id: string
+        }[]
+      }
       get_trial_balance: {
         Args: { p_as_of_date: string; p_company_id: string }
         Returns: {
