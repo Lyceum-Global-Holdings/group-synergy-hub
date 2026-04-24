@@ -1,89 +1,153 @@
-## Phase 9.4 — Stop "missing item" reports by making every catalog row directly findable in Tool Import
 
-### What I verified before planning
+## Phase 9.5 — Fix "An item with this code already exists in the catalog" on manual item creation
 
-I traced `INV-CMP-CBL-0001` end-to-end against the live database and the running preview's network log:
+### Symptom
+When a user opens **Item / Bin Master → Add Item**, picks a category (e.g. Electrical → ELC), and submits, the form fails with:
 
-| Check | Result |
-|---|---|
-| Catalog row exists, `status='active'` | ✅ id `b984cb63…ebd1`, name `"Wire cord"`, category `Components → Cables & Adapters` (`CMP-CBL`) |
-| Already imported as a tool for any company | ❌ no rows in `warehouse_tools` |
-| `get_tool_catalog_candidates(p_include_all_categories=true, p_target_company_id=Lyceum)` returns it | ✅ 1 of 14,909 rows |
-| Live network call from the preview at 10:40:04 | ✅ scope `all`, response contains all 14,909 rows incl. the target |
-| Client filter logic (line 282-302 of `ImportFromItemMasterDialog.tsx`) | ✅ would surface it for any substring of code/name |
+> **Error**: An item with this code already exists in the catalog
 
-**So the data is reaching the browser correctly. The bug is no longer a data-source bug — it's a *findability* bug.** The user opens a 14,861-row virtualized list sorted by `name ASC`, scrolls, doesn't see "Wire cord" because it sorts late, doesn't realise search is the answer, and reports the item as missing. The same shape of complaint produced "T jak", "Tile trowels", and now `INV-CMP-CBL-0001`. Fixing this once at the UI level retires the whole class of report.
+even though they typed nothing into the Item Code field — the dialog auto-generated `INV-ELE-ELC-0001` (or similar) and the catalog already contains that exact code.
 
-There is also one real correctness issue worth fixing in this pass: the in-memory search uses raw `includes()`, so a query like `Pvc pipe` (single space) will NOT match the catalog name `   Pvc  pipe-20MM` (leading + double internal spaces). This silently hides legitimately-matching rows.
+### Root cause (verified against the live database)
 
-### Goal
+`SingleItemForm.tsx` and `CreateItemDialog.tsx` both auto-fill the Item Code via `useNextWarehouseItemCode(categoryCode, companyId)`, which:
 
-After this phase, a user who knows ANY fragment of an item's code or name (e.g. `cmp-cbl`, `wire`, `wire cord`, even a partial `0001` paste) finds the row in <2 s without scrolling, and never reports a catalog item as "missing" unless it is genuinely absent from `warehouse_item_catalog`.
+```ts
+// src/hooks/warehouse/useNextWarehouseItemCode.ts
+const prefix = `INV-${categoryCode}-`;
+let query = supabase
+  .from('warehouse_items')                 // ❌ wrong source of truth
+  .select('item_code')
+  .ilike('item_code', `${prefix}%`);
+if (companyId) query = query.eq('company_id', companyId);   // ❌ scoped to one company
+```
 
-### Scope (3 surgical changes, all UI/RPC, no schema change)
+But on submit, `SingleItemForm` does a **dual insert** (per `warehouse-catalog-inventory-decoupling` memory):
+1. `INSERT INTO warehouse_item_catalog`  ← **GLOBAL**, has `UNIQUE(item_code)` (`warehouse_item_catalog_item_code_key`)
+2. `INSERT INTO warehouse_items`         ← per-company, has `UNIQUE(item_code, company_id)`
 
-#### 1. Whitespace-tolerant + diacritic-tolerant client search
+Live DB confirms the divergence for category `ELC`:
+- `warehouse_items` rows for current company with prefix `INV-ELE-ELC-` → **0** (so generator returns `001`)
+- `warehouse_item_catalog` rows with prefix `INV-ELE-ELC-` → **86** rows: `001..085` plus a stray `0001`
 
-`src/components/warehouse/tools/ImportFromItemMasterDialog.tsx`, `filteredItems` memo:
+→ The first insert (catalog) violates `warehouse_item_catalog_item_code_key`, surfaced as the toast in the screenshot.
 
-- Normalize both the query and the searched fields with a single helper:
-  ```ts
-  const norm = (s: string | null | undefined) =>
-    (s ?? "")
-      .toLowerCase()
-      .normalize("NFKD")
-      .replace(/[\u0300-\u036f]/g, "")  // strip accents
-      .replace(/\s+/g, " ")             // collapse all whitespace
-      .trim();
-  ```
-- Apply to `searchTerm` once, and to `item_code`, `name`, `description`, `category_name`, `category_code`, `brand`, `barcode`, `sku` per row.
-- This fixes `"Pvc pipe"` → `"   Pvc  pipe-20MM"` and equivalent cases the user has been hitting silently.
+This is a **systemic correctness bug**, not a one-off. Any company creating its first item in a category that *any other* company has already used will hit it. With 14k+ existing catalog rows across companies, this affects effectively every category.
 
-#### 2. "Jump to item" code-paste field with hard server confirmation
+A secondary inconsistency: catalog has both 3-digit (`085`) and 4-digit (`0001`) padded codes for the same prefix. The current generator does `parseInt`, so it correctly treats them as numeric, but it must scan the global catalog to see them at all.
 
-Add a small input next to the search box, labelled `Find by exact code` (placeholder: `e.g. INV-CMP-CBL-0001`).
+### Fix — generate codes against the global catalog and stay numeric-monotonic
 
-Behaviour:
-- On Enter or button click, call a new RPC `find_catalog_item_by_code(p_code text, p_target_company_id uuid)` (SECURITY INVOKER, single-row return) that:
-  - Looks up the exact code in `warehouse_item_catalog` (case-insensitive).
-  - Returns: `{ found: bool, status: 'active'|'inactive'|null, already_imported: bool, tool_id: uuid|null, catalog_id: uuid|null }`.
-- The dialog reacts based on the response:
-  - `found=false` → toast `"Code not found in Item Master."`
-  - `status='inactive'` → toast `"Item exists but is inactive — re-activate it in Item Master first."`
-  - `already_imported=true` → toast `"Already in Tool Master as <code>"` + a "Show tool" link.
-  - Otherwise → set `searchTerm` to the exact code AND scroll the virtualizer to the matching row using `rowVirtualizer.scrollToIndex(idx, { align: 'center' })`, then briefly highlight the row (1.5 s ring).
+Update `useNextWarehouseItemCode` so it answers a single question correctly: *"What is the smallest unused integer suffix for `INV-{category}-` across the entire global catalog?"*
 
-This means the user gets an authoritative server answer in one click, removing the "is the item missing or am I just not finding it?" ambiguity for good. It also doubles as a self-service diagnostic when this kind of report comes in.
+#### 1. Switch source table from `warehouse_items` → `warehouse_item_catalog`
 
-#### 3. Empty-search-result banner upgrade
+```ts
+// src/hooks/warehouse/useNextWarehouseItemCode.ts
+const prefix = `INV-${categoryCode}-`;
 
-Today, when `filteredItems.length === 0` the dialog shows a generic "no items match" message. Replace it with an actionable diagnostic that tells the user exactly what's happening:
+// Catalog is global and owns the UNIQUE(item_code) constraint, so
+// it must be the source of truth for the next-suffix calculation.
+const { data, error } = await supabase
+  .from('warehouse_item_catalog')
+  .select('item_code')
+  .ilike('item_code', `${prefix}%`);
+```
 
-- If `searchTerm` looks like an item code pattern (regex `/^[A-Z]{2,4}-/i` or contains digits and dashes), suggest the new "Find by exact code" lookup directly inline with a one-click button that runs it.
-- If `categoryFilter !== "all"`, show "Category filter is hiding rows — clear it" with a one-click clear.
-- If `sourceScope !== "all"`, show "Tool-categories scope hides uncategorized items — switch to All item master" with a one-click switch (re-using the existing alert wording for consistency).
+- Drop the `companyId` filter entirely — the catalog has no `company_id`.
+- Keep the React Query key dependent on `categoryCode` only (catalog is shared) so cache reuse works across users in the same browser session.
 
-### Out of scope (intentional)
+#### 2. Make suffix parsing format-tolerant
 
-- No schema change. Catalog is correct, RPC is correct, dedup is correct.
-- No change to scope-tab behaviour. `"all"` remains the default per Phase 9.2.
-- No change to bulk-import or tool creation. Provenance via `catalog_item_id` already works.
-- No changes to `warehouse_items` indexes — Phase 9.1 already covered that.
+The catalog already has mixed widths (`001` vs `0001`). Parse only the trailing digits and ignore non-numeric tails:
 
-### Files touched
+```ts
+let maxSeq = 0;
+for (const row of data ?? []) {
+  const tail = row.item_code.slice(prefix.length);     // e.g. "0001", "085-A"
+  const m = tail.match(/^(\d+)/);                      // grab leading digits only
+  if (!m) continue;
+  const seq = Number(m[1]);
+  if (Number.isFinite(seq) && seq > maxSeq) maxSeq = seq;
+}
+const nextSeq = String(maxSeq + 1).padStart(3, '0');   // keep 3-digit default
+return `${prefix}${nextSeq}`;
+```
 
-| File | Change |
-|---|---|
-| `supabase/migrations/<new>.sql` | Create `find_catalog_item_by_code(text, uuid)` RPC; SECURITY INVOKER; STABLE |
-| `src/integrations/supabase/types.ts` | Auto-regenerated from new RPC |
-| `src/components/warehouse/tools/ImportFromItemMasterDialog.tsx` | Add normalized search, "Find by code" input + handler + scroll-and-highlight, diagnostic empty state |
-| `.lovable/memory/architecture/tool-promotion-source-of-truth.md` | Append: "Tool Import dialog must expose a direct code-lookup path (`find_catalog_item_by_code`) so users can confirm presence without scrolling 14k rows" |
+This preserves the historical 3-digit padding (so `INV-ELE-ELC-` returns `086`, not `0086`), respecting the documented item-code-generation standard (≤13-char target where the prefix permits) and avoiding a flag-day where every category jumps width.
 
-### Acceptance criteria
+#### 3. Add a server-side authoritative path (defense in depth)
 
-1. Pasting `INV-CMP-CBL-0001` into the new field and pressing Enter scrolls to and highlights the "Wire cord" row in <1 s, with the row already passing the dedup filter.
-2. Typing `wire` in the existing search box also surfaces the row instantly (whitespace-tolerant matching).
-3. Pasting a genuinely non-existent code (`ZZZ-FAKE-9999`) shows the toast `"Code not found in Item Master."` — proving the dialog is now diagnostic, not silent.
-4. Pasting an already-imported code shows `"Already in Tool Master"` with a link, so future "missing" reports for already-promoted items are self-resolved.
-5. The 6.3 MB candidate payload is still fetched once per scope/company (no extra round trips for casual browsing — the new RPC only fires on explicit user action).
-6. No regression in the existing scope tabs, virtualization, or bulk-import flow.
+Even with the fix above, two users in different companies clicking "Add Item" simultaneously can both compute the same `086` and race the catalog UNIQUE. To make collisions self-healing instead of user-visible:
+
+- **New SECURITY INVOKER RPC** `next_catalog_item_code(p_category_code text)` that does the `MAX + 1` lookup inside the database (single round-trip, planner-stable).
+- **Client retry on collision**: in `useWarehouseItemCatalog.createMutation`, when the error matches `warehouse_item_catalog_item_code_key` AND the failing `item_code` was the auto-generated one (i.e. user did not edit it manually), call the RPC to fetch a fresh code and retry the insert **once**. If it still fails, surface the existing toast.
+  - Track "did the user edit the code?" with a `wasItemCodeEdited` flag set to `true` whenever the Input's `onChange` fires from a real user event (not the auto-fill `useEffect`).
+
+The RPC is the only call that has to be 100% correct; the React-Query hook becomes a UX hint.
+
+```sql
+-- Migration outline (no schema change, just an INVOKER helper)
+CREATE OR REPLACE FUNCTION public.next_catalog_item_code(p_category_code text)
+RETURNS text
+LANGUAGE plpgsql
+STABLE
+SECURITY INVOKER
+SET search_path = public
+AS $$
+DECLARE
+  v_prefix text := 'INV-' || upper(p_category_code) || '-';
+  v_max int;
+BEGIN
+  SELECT COALESCE(MAX(
+    CASE
+      WHEN substring(item_code FROM length(v_prefix) + 1) ~ '^\d+'
+      THEN (regexp_match(substring(item_code FROM length(v_prefix) + 1), '^(\d+)'))[1]::int
+      ELSE 0
+    END
+  ), 0)
+  INTO v_max
+  FROM public.warehouse_item_catalog
+  WHERE item_code ILIKE v_prefix || '%';
+
+  RETURN v_prefix || lpad((v_max + 1)::text, 3, '0');
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.next_catalog_item_code(text) TO authenticated;
+```
+
+#### 4. UX touch-ups in `SingleItemForm.tsx` and `CreateItemDialog.tsx`
+
+- Re-fetch the next code (`refetch()`) when the catalog mutation fires `onSuccess` so a second item created in the same dialog session doesn't reuse the just-allocated suffix.
+- Update the helper hint under the field from `"Auto-generated: INV-{Category}-Sequence"` to `"Auto-generated from global catalog (last used: INV-{Cat}-{maxSeq})"` so users understand the namespace is shared across companies (per `warehouse-catalog-inventory-decoupling` memory).
+- Keep the field read-only by default; allow override via a small "Edit code" toggle (already exists for `editingItem`; extend to manual override on create). Setting the toggle marks `wasItemCodeEdited = true` and disables the auto-retry path described in step 3.
+
+### Why this is the "best" fix (international standards alignment)
+
+- **GS1 GTIN-13 / ISO/IEC 15459** require *globally* unique item identifiers — not company-scoped. Generating codes from a per-company table directly contradicts the standard the project already cites (`item-code-generation-standards` memory). Fix #1 aligns the generator with the namespace its UNIQUE constraint actually enforces.
+- **SAP MM "Material Number"** convention is globally unique within a client (mandant). Catalog plays the role of the SAP client here; per-company `warehouse_items` is the plant/storage-location view. Generating from the plant view is the documented anti-pattern.
+- **3-digit zero-padding preserved**: most categories are far below 999 items; staying at 3 digits keeps codes within the 13-character GS1 budget for typical 3-letter category mnemonics (`INV-XXX-### = 11 chars`). When a category exceeds 999, the generator naturally rolls to 4 digits via `padStart(3)` (which `String(1000).padStart(3,'0')` returns as `1000`), so no width cap is hit.
+
+### Files to change
+
+1. `src/hooks/warehouse/useNextWarehouseItemCode.ts` — switch source to catalog, drop company filter, format-tolerant parsing, expose `refetch`.
+2. `src/components/warehouse/SingleItemForm.tsx` — track `wasItemCodeEdited`, refetch on success, updated helper text, retry-on-collision wrapper.
+3. `src/components/warehouse/CreateItemDialog.tsx` — same three changes for parity.
+4. `src/hooks/useWarehouseItemCatalog.ts` — `createMutation` accepts an optional `getFreshCode` callback and retries once on `warehouse_item_catalog_item_code_key` if the code was auto-generated.
+5. **New migration** — `next_catalog_item_code(text)` RPC.
+6. `src/integrations/supabase/types.ts` — auto-regenerated to expose the new RPC.
+7. **Memory** — append a note to `.lovable/memory/architecture/tool-promotion-source-of-truth.md` (or create `item-code-namespace-source-of-truth.md`) recording: *"Next-item-code generators MUST query `warehouse_item_catalog` (the table that owns the UNIQUE constraint), never `warehouse_items`."*
+
+### Out of scope / not changed
+
+- No schema migration, no data backfill — the stray `INV-ELE-ELC-0001` row stays as-is; the new generator will skip past it correctly (`maxSeq` = 85, next = 86).
+- Bulk import (`BulkItemImportContent.tsx`) already uses `useWarehouseItemCatalog` directly and surfaces "duplicate item codes" — no behavior change needed; users editing CSVs are responsible for their own codes.
+- No change to `warehouse_items.item_code` semantics or its `(item_code, company_id)` UNIQUE constraint.
+
+### Verification plan after the fix
+
+1. On the same `/warehouse/item-bin-master` page, pick category Electrical (ELC) → field auto-fills `INV-ELE-ELC-086`. Submit → success.
+2. Immediately add a second item in the same dialog session → field shows `INV-ELE-ELC-087` (not `086`).
+3. Manually overwrite the field to `INV-ELE-ELC-001` → submit → original error toast appears (correct behavior, manual override).
+4. Two browser tabs both opened on category ELC at suffix `088` → first submit succeeds; second submit silently retries via the new RPC and lands on `089`.

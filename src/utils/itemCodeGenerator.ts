@@ -50,17 +50,20 @@ export async function allocateItemCodes(
   if (count <= 0) return [];
 
   const prefix = `INV-${categoryCode}-`;
-  const table = scope === 'catalog' ? 'warehouse_item_catalog' : 'warehouse_items';
 
+  // Phase 9.5: ALWAYS query the global catalog. Both `catalog` and
+  // `inventory` writes ultimately have to satisfy
+  // `warehouse_item_catalog_item_code_key` (the catalog row is created
+  // first in the dual-insert flow), so the per-company inventory layer
+  // cannot be the source of truth for the next sequence number.
   let query: any = supabase
-    .from(table as any)
+    .from('warehouse_item_catalog' as any)
     .select('item_code')
     .ilike('item_code', `${prefix}%`);
 
-  // Company scoping only applies to inventory (catalog is global)
-  if (scope === 'inventory' && companyId) {
-    query = query.eq('company_id', companyId);
-  }
+  // companyId retained in the API for back-compat but no longer used —
+  // catalog has no company_id column.
+  void companyId;
 
   const { data, error } = await query;
 
@@ -72,11 +75,14 @@ export async function allocateItemCodes(
   let maxSeq = 0;
   if (data && data.length > 0) {
     for (const row of data as Array<{ item_code: string | null }>) {
-      const seqStr = (row.item_code || '').replace(prefix, '');
-      const seq = parseInt(seqStr, 10);
-      if (!isNaN(seq) && seq > maxSeq) {
-        maxSeq = seq;
-      }
+      const code = row.item_code || '';
+      if (!code.startsWith(prefix)) continue;
+      // Phase 9.5: tolerate mixed historical padding (e.g. "001" alongside
+      // "0001") by parsing only the leading digits of the suffix.
+      const m = code.slice(prefix.length).match(/^(\d+)/);
+      if (!m) continue;
+      const seq = Number(m[1]);
+      if (Number.isFinite(seq) && seq > maxSeq) maxSeq = seq;
     }
   }
 

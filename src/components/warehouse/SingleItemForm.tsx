@@ -275,6 +275,9 @@ export function SingleItemForm({ editingItem, onSuccess, onCancel, mode = 'inven
         await createCatalogItemAsync({
           ...catalogData,
           status: catalogData.status || 'active',
+          // Phase 9.5: enable transparent retry on UNIQUE collision when the
+          // code was auto-generated from the selected category.
+          _autoCodeCategory: selectedCategory?.code ?? null,
         } as any);
         onSuccess();
       } catch (error) {
@@ -288,11 +291,16 @@ export function SingleItemForm({ editingItem, onSuccess, onCancel, mode = 'inven
         const catalogResult = await createCatalogItemAsync({
           ...catalogFields,
           status: catalogFields.status || 'active',
+          _autoCodeCategory: selectedCategory?.code ?? null,
         } as any);
 
-        // Step 2: Create the inventory row linked to the catalog entry
+        // Step 2: Create the inventory row linked to the catalog entry.
+        // CRITICAL (Phase 9.5): use the catalog's returned item_code so a
+        // retry-on-collision allocation propagates to the inventory row;
+        // otherwise the two layers would store divergent codes.
         const createData = {
           ...baseData,
+          item_code: (catalogResult as any)?.item_code ?? baseData.item_code,
           current_stock: 0,
           catalog_item_id: catalogResult.id,
         };
@@ -301,6 +309,7 @@ export function SingleItemForm({ editingItem, onSuccess, onCancel, mode = 'inven
           initialStock: initialStock ? parseFloat(initialStock) : undefined,
           initialUnitCost: formData.unit_cost ? parseFloat(formData.unit_cost) : undefined,
         });
+
 
         if (initialStock && parseFloat(initialStock) > 0) {
           const stockQuantity = parseFloat(initialStock);

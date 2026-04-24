@@ -49,20 +49,60 @@ export function useWarehouseItemCatalog(options?: { disableFetch?: boolean }) {
   });
 
   const createMutation = useMutation({
-    mutationFn: async (itemData: CreateCatalogItemData) => {
+    mutationFn: async (
+      itemData: CreateCatalogItemData & {
+        /**
+         * Phase 9.5: when the caller auto-generated the item_code from a
+         * category prefix (e.g. `INV-ELE-ELC-086`), pass the category code
+         * here. On a UNIQUE collision (concurrent insert from another
+         * tab/company) we'll fetch a fresh next-code from the DB and
+         * transparently retry once.
+         */
+        _autoCodeCategory?: string | null;
+      },
+    ) => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User not authenticated');
 
-      const { data, error } = await supabase
-        .from('warehouse_item_catalog')
-        .insert({ ...itemData, created_by: user.id })
-        .select()
-        .single();
+      const { _autoCodeCategory, ...payload } = itemData;
+
+      const insertOnce = async (codeOverride?: string) => {
+        const body = codeOverride
+          ? { ...payload, item_code: codeOverride, created_by: user.id }
+          : { ...payload, created_by: user.id };
+        return supabase
+          .from('warehouse_item_catalog')
+          .insert(body)
+          .select()
+          .single();
+      };
+
+      let { data, error } = await insertOnce();
+
+      // Self-heal collisions when the code was auto-generated.
+      if (
+        error?.message?.includes('warehouse_item_catalog_item_code_key') &&
+        _autoCodeCategory
+      ) {
+        const { data: nextCode, error: rpcErr } = await supabase.rpc(
+          'next_catalog_item_code',
+          { p_category_code: _autoCodeCategory },
+        );
+        if (!rpcErr && typeof nextCode === 'string' && nextCode.length > 0) {
+          const retry = await insertOnce(nextCode);
+          data = retry.data;
+          error = retry.error;
+        }
+      }
+
       if (error) throw error;
       return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: CATALOG_QUERY_KEY });
+      // Bust the next-code cache so a second item created in the same
+      // session sees the freshly-allocated suffix.
+      queryClient.invalidateQueries({ queryKey: ['next-catalog-item-code'] });
       toast({ title: 'Success', description: 'Catalog item created successfully' });
     },
     onError: (error: any) => {
