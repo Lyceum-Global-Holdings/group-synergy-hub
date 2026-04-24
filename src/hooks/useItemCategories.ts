@@ -152,11 +152,11 @@ export const useItemCategories = (companyId?: string) => {
         description: `${data.length} categories imported successfully`,
       });
     },
-    onError: (error) => {
+    onError: (error: any) => {
       console.error('Error importing categories:', error);
       toast({
-        title: "Error",
-        description: "Failed to import categories",
+        title: "Failed to import categories",
+        description: error?.message ?? "Unknown error. Please try again.",
         variant: "destructive",
       });
     }
@@ -220,33 +220,60 @@ export const useItemCategories = (companyId?: string) => {
         throw new Error('A category cannot be its own parent.');
       }
       if (newParentId) {
-        // Cycle check
+        // Cycle check + collect descendants for height calc
         const descendants = new Set<string>();
+        const childrenByParent = new Map<string, string[]>();
+        allCategories.forEach((c) => {
+          if (!c.parent_id) return;
+          const arr = childrenByParent.get(c.parent_id);
+          if (arr) arr.push(c.id);
+          else childrenByParent.set(c.parent_id, [c.id]);
+        });
         const stack = [id];
         while (stack.length) {
           const cur = stack.pop()!;
-          allCategories
-            .filter((c) => c.parent_id === cur)
-            .forEach((c) => {
-              if (!descendants.has(c.id)) {
-                descendants.add(c.id);
-                stack.push(c.id);
-              }
-            });
+          (childrenByParent.get(cur) ?? []).forEach((childId) => {
+            if (!descendants.has(childId)) {
+              descendants.add(childId);
+              stack.push(childId);
+            }
+          });
         }
         if (descendants.has(newParentId)) {
           throw new Error('Move would create a cycle in the category tree.');
         }
-        // Depth check: a parent (has children) cannot be moved under another category
-        const sourceHasChildren = allCategories.some((c) => c.parent_id === id);
-        if (sourceHasChildren) {
-          throw new Error('This category has subcategories. Move it to Top Level instead.');
-        }
-        // The intended parent must itself be Level 0 (no parent)
+
+        // Depth-aware check: keep the whole tree within 3 levels (depth 0, 1, 2).
+        // targetDepth = depth of the destination parent.
         const target = allCategories.find((c) => c.id === newParentId);
-        if (target?.parent_id) {
-          throw new Error('Destination must be a Level 0 category.');
+        const depthOf = (nodeId: string | null | undefined): number => {
+          let d = 0;
+          let cursor = nodeId ?? null;
+          const seen = new Set<string>();
+          while (cursor) {
+            if (seen.has(cursor)) break; // safety
+            seen.add(cursor);
+            const node = allCategories.find((c) => c.id === cursor);
+            if (!node?.parent_id) break;
+            d += 1;
+            cursor = node.parent_id;
+          }
+          return d;
+        };
+        const targetDepth = depthOf(newParentId);
+
+        // subtreeHeight = max relative depth of descendants below the moved node
+        let subtreeHeight = 0;
+        const measure = (nodeId: string, rel: number) => {
+          if (rel > subtreeHeight) subtreeHeight = rel;
+          (childrenByParent.get(nodeId) ?? []).forEach((cid) => measure(cid, rel + 1));
+        };
+        measure(id, 0);
+
+        if (targetDepth + 1 + subtreeHeight > 2) {
+          throw new Error('Move would exceed the 3-level category limit (Level 0, Level 1, Level 2).');
         }
+
         // Global source can only sit under a global parent
         const source = allCategories.find((c) => c.id === id);
         if (source && !source.company_id && target && target.company_id) {

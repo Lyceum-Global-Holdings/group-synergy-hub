@@ -1,101 +1,88 @@
-## Phase 9.2 — Tool Import: stop hiding 96.9% of the catalog behind a category filter
+## Phase 9.3 — Allow 3-level category hierarchy so industry presets and tool subcategories can be imported
 
-### What's actually happening
+### Root cause
 
-I queried the catalog and the picture is unambiguous:
+The import fails with:
 
-| Active catalog rows | Categorized | Uncategorized (`category_id IS NULL`) |
-|---|---|---|
-| **14,904** | **467** (3.1%) | **14,437** (96.9%) |
+> `Category hierarchy is limited to 2 levels (Level 0 and Level 1)`
 
-The items the user listed:
+This comes from the trigger `enforce_item_category_hierarchy` (migration `20260423052345_*`) which hard-caps the tree at depth 1.
 
-- `T jak`, `Tile trowels`, `Ackro jak` → **already in `TOO-HND-GNR`**, so they DO show under "Suggested" / "Tools" scope today.
-- `Mason Trowel` (×16 sizes), `Notch trowel - For Tile working`, `Plastering Trowel`, `Hand Rake | Trowel`, `Trowel | Plastic - Finishing`, `Manis Trowel`, etc. → all `category_id = NULL`. They are invisible under "Suggested" / "Tools" scope and only appear when the user manually switches to "All item master".
+But the system was designed for **3 levels (depth 0–2)**, not 2:
 
-So the visible symptom — "items missing when importing" — is real, but the cause isn't the source query, the keyset, or the RPC. The cause is that the **default scope is "Suggested"**, which gates by tool category IDs, and **96.9% of the catalog has no category at all**. Importing tools currently requires the user to know they must change scope to "All item master" — which most users don't.
+1. `STANDARD_INDUSTRY_TEMPLATES` (`src/constants/standardCategories.ts`) is built as a 3-deep tree:
+   `Clothing → Men's Apparel → Shirts`, `Tools (TOO-HND) → Hammers → Claw Hammers`, etc.
+2. The DB already contains 65 depth-2 rows and 1 depth-3 row that pre-date the trigger and were grandfathered in — the picker reads them today.
+3. Phase 9 explicitly rewrote `src/features/tools/lib/toolCategories.ts` and the `get_tool_catalog_candidates` RPC to walk **all descendants at any depth** because tool leaves live at depth 2. We have a depth-2 reader and a depth-1 writer — that contradiction is the bug.
+4. The import dialog's `flattenCategories()` helper produces `level: 0|1|2` rows, sorts them by level, and resolves `parentName` for each, so level-2 inserts are well-formed — they're just rejected.
 
 ### Best solution
 
-Two-part fix, no schema changes, no migration needed:
+Lift the cap from 2 levels to **3 levels (depth 0, 1, 2)**, and align both the trigger and client guards on the same number. This:
 
-1. **Change the default scope to `"all"`** so the picker behaves like the Item Master tab itself: every active catalog row is reachable out of the box. The "Suggested" and "Tools" filters remain available as opt-in narrowing for power users with a well-curated catalog — but they are no longer the gatekeeper.
+- Matches what the presets, the existing data, and the Phase 9 tool picker all already assume.
+- Keeps a real bound (no unlimited-depth trees, which would break flat pickers and breadcrumbs).
+- Fixes "Failed to import categories" without changing the dialog UX.
 
-2. **Make the scope chooser self-explanatory** so users understand the trade-off:
-   - Show row counts next to each scope tab in real time, fetched cheaply from the same RPC pattern. Example: `All item master (14,904) · Tools categories (467) · Suggested (467)`.
-   - Add an inline hint when scope is `"tools"` or `"suggested"` and the count is dramatically lower than `"all"`: *"96% of your catalog has no category yet — switch to All item master to see every item."*
+Do **not** drop the trigger — we still need cycle prevention and an upper bound. Just move the bound from `> 1` to `> 2`, and update the matching error messages and the descendant-shift guard.
 
-This is the right call architecturally:
-- Matches `mem://architecture/tool-promotion-source-of-truth` — the catalog is the single source of truth, and visibility shouldn't depend on whether someone happened to assign a category.
-- Matches the SAP MM "material → equipment" promotion pattern: any active material can be promoted to equipment; categorization is a curation aid, not a visibility gate.
-- Matches the existing Item Master tab UX, which shows all 14,904 rows by default.
+### What to change
 
-### Why not just backfill categories?
+#### 1) Migration: relax `enforce_item_category_hierarchy` to 3 levels
 
-That was explicitly listed as out of scope in Phase 9, and it's the wrong fix:
-- It would silently mask the design defect (the picker shouldn't depend on catalog curation completeness).
-- 14,437 rows would need human review to assign correct categories — that's a multi-week curation project, not a code fix.
-- A new bulk-imported batch tomorrow would re-introduce the same bug.
+Replace the function body so it:
 
-The right invariant is: **the picker must work correctly even when 100% of the catalog is uncategorized.** That means no category-based default gate.
+- Still rejects self-parenting and cycles.
+- Rejects ancestor depth `> 2` instead of `> 1`.
+- Replaces the "parent must stay at Level 0" check with: a category that has descendants cannot be moved to a position where any descendant would land below depth 2. Concretely, compute `max_descendant_depth(NEW.id)` (relative to NEW) + new own depth; reject if the resulting subtree would exceed depth 2.
+- Updates error messages to say "3 levels (Level 0, 1, 2)".
 
-### Changes
+Trigger binding remains `BEFORE INSERT OR UPDATE OF parent_id`. No data migration needed; existing depth-2 rows already comply, and the lone depth-3 row is left untouched (the trigger only fires on writes — same grandfathering behavior as before).
 
-**`src/components/warehouse/tools/ImportFromItemMasterDialog.tsx`**
+#### 2) Client guards in `useItemCategories.ts` (`moveCategoryMutation`)
 
-1. Default `sourceScope` from `"suggested"` → `"all"` (line 98).
-2. Reorder the scope tabs so "All item master" is first/leftmost (visual default).
-3. Fetch lightweight counts for each scope using the existing RPC (one extra query — `p_limit = 1` is unsafe because we want the count, so use a small dedicated count RPC OR derive from the already-loaded `items` for the active scope and a single cheap `select count(*)` for the others). Simplest: add a second `useQuery` that calls a new minimal `get_tool_catalog_candidate_counts` RPC returning `{ all, tools, suggested }` in a single round trip.
-4. Render the counts inside each `<TabsTrigger>` as a muted badge.
-5. Add the inline hint `<Alert>` shown only when scope ≠ `"all"` AND `tools_count < all_count * 0.5`.
-6. Update the dialog description to clarify the new default: *"Showing every active catalog item by default. Use the scope tabs to narrow to curated tool categories."*
+Currently throws "Destination must be a Level 0 category" and "This category has subcategories. Move it to Top Level instead." Replace those with depth-aware checks consistent with the new 3-level cap:
 
-**New migration: `get_tool_catalog_candidate_counts` RPC**
+- Compute target depth = (target?.parent_id ? (target's parent's parent_id ? 2 : 1) : 0).
+- Compute moved subtree height (max descendant depth below the moved node).
+- Reject if `targetDepth + 1 + subtreeHeight > 2` with: "Move would exceed the 3-level category limit."
 
-`SECURITY INVOKER`, returns one row:
+Keep the cycle and global-vs-company-parent guards as-is.
 
-```sql
-get_tool_catalog_candidate_counts(
-  p_target_company_id uuid DEFAULT NULL,
-  p_tool_category_ids uuid[] DEFAULT NULL
-) RETURNS TABLE (all_count bigint, tools_count bigint, suggested_count bigint)
-```
+#### 3) Import dialog (`ImportCategoriesDialog.tsx`)
 
-One query, three `count(*) FILTER (...)` aggregates over `warehouse_item_catalog WHERE status='active'`, with the same per-target-company "already imported" exclusion logic as `get_tool_catalog_candidates`. Reuses the same indexes added in Phase 9 / 9.1, so it's <100 ms at 15k rows.
+No structural change — `flattenCategories` already emits correct levels and the bulk import already orders by level. Just:
 
-**No changes** to:
-- `get_tool_catalog_candidates` — already correct, just under-used.
-- `toolCategories.ts` — recursive walk is correct.
-- `warehouse_tools` schema — `catalog_item_id` provenance still works.
-- The Item Master tab — unaffected.
+- Add a small inline note under the count badge: "Up to 3 levels supported."
+- Surface the actual DB error message in the failure toast instead of the generic "Failed to import categories", so future schema mismatches are visible. Do this in `useItemCategories.bulkImportCategoriesMutation.onError` by reading `error.message`.
 
-### Memory
+#### 4) Documentation
 
-Update `mem://architecture/tool-promotion-source-of-truth.md` with one line:
+Update the standard categories memory note (or create one if absent) to record: "Item category hierarchy is capped at 3 levels (depth 0–2). The cap is enforced by trigger `enforce_item_category_hierarchy` and mirrored in client move guards. Tool category roots `TOO-HND`, `TOO-PWR` rely on this — pickers walk to depth 2."
 
-> Default picker scope is "All item master", not "Suggested". Category-based scopes are opt-in narrowing only — they must never be the visibility gate, because the catalog is overwhelmingly uncategorized in production.
+### Files to change
 
-### Verification
+**New migration**
+- `enforce_item_category_hierarchy` updated to allow depth ≤ 2 with descendant-aware move check.
 
-1. Open Tool Management → Import from Item Master.
-   - Default scope is "All item master".
-   - Visible candidate count ≈ 14,904 minus already-imported (was ~467 before).
-   - `Mason Trowel`, `Notch trowel - For Tile working`, `Plastering Trowel`, `Hand Rake | Trowel`, etc. all appear without changing scope.
-
-2. Search for `trowel` → all 21+ trowel variants visible (was 0 under default scope before).
-
-3. Switch to "Tools categories" → count drops to ~467, hint appears: *"96% of your catalog has no category yet — switch to All item master to see every item."*
-
-4. `T jak`, `Tile trowels`, `Ackro jak` still appear under "Suggested" / "Tools" scopes (regression check).
-
-5. Import flow unchanged: `catalog_item_id` provenance still set, duplicate prevention still works per-target-company.
-
-6. Performance: dialog opens in <1.5 s with 14,904-row default scope (Phase 9.1 indexes already in place).
-
-7. `supabase--linter` clean.
+**Modify**
+- `src/hooks/useItemCategories.ts` — depth-aware move guards; surface real error in import toast.
+- `src/components/warehouse/ImportCategoriesDialog.tsx` — add "Up to 3 levels supported" hint.
+- `.lovable/memory/architecture/item-category-depth-cap.md` — new memory documenting the 3-level rule.
 
 ### Out of scope
 
-- Backfilling category assignments on the 14,437 uncategorized catalog rows (separate curation effort).
-- Auto-suggesting categories based on item name keywords (ML / fuzzy match).
-- Changing the Item Master tab default behavior (already correct).
+- Backfilling or normalizing the existing depth-3 row.
+- Changing preset content.
+- Touching the tool import flow (Phase 9.x) — it already walks any depth and will benefit automatically.
+
+### Verification
+
+1. Open Item Bin Master → Import Standard Categories → Apparel → Select All → Import.
+   - All Level 0, Level 1, and Level 2 categories insert successfully (no trigger error).
+2. Repeat for Construction (which contains the `TOO-HND` / `TOO-PWR` subtree the tool picker depends on).
+3. In the Tool Management import dialog, the newly imported deep tool categories now appear in the "Tools" scope (Phase 9 recursive walker already handles them).
+4. Try to create a 4th-level child via the UI: the trigger rejects with "3 levels (Level 0, 1, 2)".
+5. Move a Level 0 category that has Level 2 descendants under another Level 0: rejected by the new descendant-aware guard.
+6. Move a leaf category (no children) under a Level 1 parent: succeeds (becomes Level 2).
+7. `supabase--linter` reports no new warnings.
