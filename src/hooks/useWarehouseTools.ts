@@ -59,6 +59,25 @@ export function useWarehouseTools() {
     };
   }, [queryClient]);
 
+  // Realtime: invalidate when warehouse_tools rows are inserted/updated/deleted
+  // (cross-tab sync per project memory: realtime-stock-synchronization).
+  // UUID-suffixed channel name avoids StrictMode double-subscribe collisions.
+  useEffect(() => {
+    const channel = supabase
+      .channel(`warehouse-tools-changes-${Math.random().toString(36).slice(2)}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "warehouse_tools" },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ["warehouse-tools"] });
+        }
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [queryClient]);
+
   const createToolMutation = useMutation({
     mutationFn: async (toolData: CreateWarehouseToolData) => {
       const { data: userData } = await supabase.auth.getUser();
