@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useSuperAdmin } from "@/hooks/useSuperAdmin";
 import { useCurrentUserProfile } from "@/hooks/useCurrentUserProfile";
+import { RealtimeBusProvider } from "@/hooks/useRealtimeBus";
 import { Loader2 } from "lucide-react";
 import { useState, useEffect } from "react";
 
@@ -49,6 +50,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   }
 
   return (
+    <RealtimeBusProvider>
     <SidebarProvider>
       <div className="h-svh flex w-full bg-background overflow-hidden">
         <CompanySidebar />
@@ -88,5 +90,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </div>
       </div>
     </SidebarProvider>
+    </RealtimeBusProvider>
   );
 }

@@ -1,11 +1,13 @@
 // Warehouse Tools Hook - Handles CRUD operations for tool inventory
-import { useEffect } from "react";
+import { useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import type { WarehouseTool, CreateWarehouseToolData } from "@/types/toolManagement";
 import { useToast } from "@/hooks/use-toast";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useLocationFilter } from "@/contexts/LocationFilterContext";
+import { useRealtimeChannel } from "@/hooks/useRealtimeBus";
+import { scheduleInvalidate } from "@/lib/queryInvalidation";
 
 export function useWarehouseTools() {
   const { toast } = useToast();
@@ -42,41 +44,29 @@ export function useWarehouseTools() {
     },
   });
 
-  // Realtime: invalidate when any tool bin allocation changes
-  useEffect(() => {
-    const channel = supabase
-      .channel(`warehouse-tools-bin-sync-${Math.random().toString(36).slice(2)}`)
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "tool_bin_allocations" },
-        () => {
-          queryClient.invalidateQueries({ queryKey: ["warehouse-tools"] });
-        }
-      )
-      .subscribe();
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [queryClient]);
+  // Realtime via shared bus — invalidate on tool_bin_allocations changes,
+  // scoped to the changed company_id when the payload carries one.
+  const onBinAllocChange = useCallback(
+    (payload: any) => {
+      const cid = (payload?.new ?? payload?.old)?.company_id;
+      // Invalidate the broad key (covers all variants); debounced bursts.
+      scheduleInvalidate(queryClient, ["warehouse-tools"]);
+      if (cid) scheduleInvalidate(queryClient, ["warehouse-tools", cid]);
+    },
+    [queryClient],
+  );
+  useRealtimeChannel("tool_bin_allocations", onBinAllocChange);
 
-  // Realtime: invalidate when warehouse_tools rows are inserted/updated/deleted
-  // (cross-tab sync per project memory: realtime-stock-synchronization).
-  // UUID-suffixed channel name avoids StrictMode double-subscribe collisions.
-  useEffect(() => {
-    const channel = supabase
-      .channel(`warehouse-tools-changes-${Math.random().toString(36).slice(2)}`)
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "warehouse_tools" },
-        () => {
-          queryClient.invalidateQueries({ queryKey: ["warehouse-tools"] });
-        }
-      )
-      .subscribe();
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [queryClient]);
+  // Realtime via shared bus — invalidate on warehouse_tools INSERT/UPDATE/DELETE.
+  const onToolsChange = useCallback(
+    (payload: any) => {
+      const cid = (payload?.new ?? payload?.old)?.company_id;
+      scheduleInvalidate(queryClient, ["warehouse-tools"]);
+      if (cid) scheduleInvalidate(queryClient, ["warehouse-tools", cid]);
+    },
+    [queryClient],
+  );
+  useRealtimeChannel("warehouse_tools", onToolsChange);
 
   const createToolMutation = useMutation({
     mutationFn: async (toolData: CreateWarehouseToolData) => {

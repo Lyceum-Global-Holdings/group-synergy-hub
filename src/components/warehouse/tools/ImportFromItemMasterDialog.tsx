@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef } from "react";
+import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import {
   Dialog,
   DialogContent,
@@ -32,6 +32,8 @@ import { AlertCircle, Info, Loader2, PackagePlus, RefreshCw, Search } from "luci
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { supabase } from "@/integrations/supabase/client";
+import { useRealtimeChannel } from "@/hooks/useRealtimeBus";
+import { scheduleInvalidate } from "@/lib/queryInvalidation";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useLocationFilter } from "@/contexts/LocationFilterContext";
 import { useItemCategories } from "@/hooks/useItemCategories";
@@ -336,34 +338,19 @@ export function ImportFromItemMasterDialog({
   };
 
   // Realtime: keep the candidate list fresh when items are added/edited/deleted
-  // in the source warehouse_items table (project memory: realtime-stock-synchronization).
-  // We invalidate unconditionally on every change — INSERT payloads may not carry
-  // company_id reliably, and the query's own scope filter handles tenancy on refetch.
-  useEffect(() => {
+  // in the source warehouse_items table, via the shared realtime bus.
+  // Debounced + scoped to avoid refetch storms during bulk imports.
+  const onItemsChange = useCallback(() => {
     if (!open || effectiveCompanyIds.length === 0) return;
-    const channelName = `import-item-master-candidates-${crypto.randomUUID()}`;
-    const channel = supabase.channel(channelName);
-    channel
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "warehouse_items" },
-        () => {
-          queryClient.invalidateQueries({ queryKey: ["warehouse-items-tool-candidates"] });
-        },
-      )
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "warehouse_tools" },
-        () => {
-          // New tools elsewhere → existingToolKeys updates → candidate de-dup refreshes.
-          queryClient.invalidateQueries({ queryKey: ["warehouse-tools"] });
-        },
-      )
-      .subscribe();
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    scheduleInvalidate(queryClient, ["warehouse-items-tool-candidates"]);
   }, [open, effectiveCompanyIds, queryClient]);
+  const onToolsChange = useCallback(() => {
+    if (!open) return;
+    // New tools elsewhere → existingToolKeys updates → candidate de-dup refreshes.
+    scheduleInvalidate(queryClient, ["warehouse-tools"]);
+  }, [open, queryClient]);
+  useRealtimeChannel("warehouse_items", onItemsChange);
+  useRealtimeChannel("warehouse_tools", onToolsChange);
 
   const selectedCount = filteredItems.filter((it) => selectedIds.has(it.id)).length;
   const hasActiveFilters = searchTerm.trim().length > 0 || categoryFilter !== "all";
