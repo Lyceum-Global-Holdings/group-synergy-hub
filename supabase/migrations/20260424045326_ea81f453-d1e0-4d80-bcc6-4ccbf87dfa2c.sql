@@ -1,0 +1,1 @@
+ALTER TABLE public.warehouse_items REPLICA IDENTITY DEFAULT;
