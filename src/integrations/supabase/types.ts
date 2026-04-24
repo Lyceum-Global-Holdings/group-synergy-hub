@@ -19815,6 +19815,46 @@ export type Database = {
       get_user_company_id: { Args: { _user_id: string }; Returns: string }
       get_user_company_ids: { Args: { _user_id: string }; Returns: string[] }
       get_user_location_ids: { Args: { _user_id: string }; Returns: string[] }
+      get_warehouse_catalog_count: {
+        Args: {
+          p_category_id?: string
+          p_search?: string
+          p_status?: string
+          p_supplier_id?: string
+        }
+        Returns: number
+      }
+      get_warehouse_catalog_page: {
+        Args: {
+          p_category_id?: string
+          p_cursor_code?: string
+          p_cursor_created?: string
+          p_cursor_id?: string
+          p_limit?: number
+          p_search?: string
+          p_status?: string
+          p_supplier_id?: string
+        }
+        Returns: {
+          barcode: string
+          brand: string
+          category_id: string
+          created_at: string
+          description: string
+          id: string
+          image_url: string
+          item_code: string
+          name: string
+          reorder_level: number
+          selling_price: number
+          sku: string
+          status: string
+          supplier_id: string
+          supplier_name: string
+          unit_cost: number
+          unit_id: string
+        }[]
+      }
       get_warehouse_tools_list: {
         Args: {
           p_company_id?: string
