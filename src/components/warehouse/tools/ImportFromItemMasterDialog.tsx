@@ -549,6 +549,27 @@ export function ImportFromItemMasterDialog({
               </AlertDescription>
             </Alert>
           )}
+          {sourceScope !== "all" &&
+            scopeCounts &&
+            scopeCounts.all > 0 &&
+            scopeCounts.tools < scopeCounts.all * 0.5 && (
+              <Alert>
+                <Info className="h-4 w-4" />
+                <AlertDescription>
+                  Only{" "}
+                  <strong>{scopeCounts.tools.toLocaleString()}</strong> of{" "}
+                  <strong>{scopeCounts.all.toLocaleString()}</strong> catalog
+                  items have a tool category assigned (
+                  {Math.round(
+                    ((scopeCounts.all - scopeCounts.tools) / scopeCounts.all) *
+                      100,
+                  )}
+                  % uncategorized). Items like trowels, hand rakes etc. may
+                  be missing from this scope — switch to{" "}
+                  <strong>All item master</strong> to see every item.
+                </AlertDescription>
+              </Alert>
+            )}
           {sourceScope !== "all" && toolCategoryIds.length === 0 && (
             <Alert variant="destructive">
               <AlertCircle className="h-4 w-4" />
