@@ -51,6 +51,9 @@ export function useKpiData(kpiId: string | undefined, refreshInterval?: number) 
     },
     enabled: !!kpiId,
     refetchInterval: refreshInterval ? refreshInterval * 1000 : false,
+    // Live-critical: KPI tiles always show latest computed value on mount.
+    staleTime: 0,
+    refetchOnMount: 'always',
   });
 }
 

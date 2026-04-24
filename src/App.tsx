@@ -124,14 +124,17 @@ const SocialMediaNDA = lazy(() => import("./pages/social-media/NDACompliance"));
 const SocialMediaActivityLog = lazy(() => import("./pages/social-media/ActivityLog"));
 const TestEnvironmentPage = lazy(() => import("./pages/admin/test-environment/TestEnvironmentPage"));
 
+// Tiered freshness policy: stale-while-revalidate by default for performance.
+// Live-critical hooks (stock, approvals, dashboards/KPIs) opt into staleTime:0
+// per-hook. Realtime subscriptions remain authoritative for cross-tab updates.
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       retry: 1,
-      staleTime: 0, // Always fetch fresh data to prevent stale cache issues
-      gcTime: 5 * 60 * 1000, // Keep unused data in cache for 5 minutes for quick navigation
-      refetchOnWindowFocus: true, // Refetch when user returns to tab
-      refetchOnMount: 'always', // Always refetch when component mounts
+      staleTime: 30_000, // 30s SWR window cuts duplicate refetches on navigation
+      gcTime: 5 * 60 * 1000, // Keep unused data 5 min for quick back-navigation
+      refetchOnWindowFocus: false, // Disabled globally; per-hook opt-in if needed
+      refetchOnMount: true, // Refetch on mount only when stale
     },
   },
 });

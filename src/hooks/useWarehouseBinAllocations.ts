@@ -45,6 +45,9 @@ export function useWarehouseBinAllocations(options?: { disableFetch?: boolean })
       return allAllocations as BinAllocationWithDetails[];
     },
     enabled: !options?.disableFetch && !!(isViewingAllCompanies || selectedCompany?.id),
+    // Live-critical: bin allocations drive available stock numbers.
+    staleTime: 0,
+    refetchOnMount: 'always',
   });
 
   // Get allocations for a specific item
