@@ -1,94 +1,126 @@
 
 
-## Phase 1 Performance Optimization (Option A)
+## Phase 2 Performance — Realtime hygiene + targeted query slimming
+
+Phase 1 (cache tuning, bundle splitting, console drop) is live. The system should already feel snappier on navigation. The next biggest wins — based on the diagnosis already done — are **eliminating refetch storms from realtime** and **shrinking the heaviest list payloads**. This phase is independently shippable and does not require any user-facing behaviour change.
 
 ### Outcome
 
-System feels 40–60% faster on navigation and route loads. Stale-while-revalidate caching reduces redundant network calls; production bundle drops console noise and splits heavy libraries; freshness preserved for stock/approvals/dashboards via explicit per-hook opt-in.
+- Realtime events no longer trigger full-table refetches across every open tab — invalidations are scoped, debounced, and de-duplicated.
+- Hot list endpoints (Tools, Items, Assets) ship 40–60% smaller payloads by projecting only used columns.
+- A shared realtime "bus" replaces ad-hoc per-page Supabase channels, cutting WebSocket subscription churn during navigation.
+- INP on `/warehouse/tool-management`, `/warehouse/item-bin-master`, and the Approval Console drops below 200 ms even during bulk imports.
 
-### Memory update
+### Standards applied
 
-Replace `mem://architecture/react-query-global-cache-freshness-permanent` with the new policy:
-
-> Global React Query defaults: `staleTime: 30_000`, `refetchOnMount: true`, `refetchOnWindowFocus: false`, `gcTime: 5 * 60_000`. **Exception list (must pass `staleTime: 0` explicitly):** stock hooks (`useWarehouseItems`, `useWarehouseBinAllocations`, `useAllItemsLocationStock`), approval hooks (`useApprovalConsole`, `useUnifiedApprovals`), dashboard KPI hooks (`useDashboards`, KPI calculation hooks). Realtime subscriptions remain authoritative for live updates.
-
-Also update `mem://index.md` Core line accordingly.
+- **TanStack Query**: scoped invalidation keys; debounced bursts (Query v5 best practice).
+- **Supabase Realtime**: one channel per logical concern; payload-driven scoped routing; `REPLICA IDENTITY FULL` only where DELETE filtering requires it (cuts WAL cost).
+- **PostgREST**: explicit column projection per "select only what you render" guidance.
+- **WCAG 2.2 SC 2.2.1**: realtime UI updates are user-pausable via existing manual refresh affordances.
 
 ### Changes
 
-**1. `src/App.tsx` — global QueryClient defaults**
+#### A) Shared realtime bus — `src/hooks/useRealtimeBus.ts` (new)
+
+Single React provider that opens **one channel per table** at app mount, then dispatches `postgres_changes` payloads to subscribers via a tiny event emitter. Replaces:
+
+- `useRealtimeStockUpdates` (currently re-opens 3 subscriptions per page that mounts it)
+- The two ad-hoc channels in `useWarehouseTools`
+- The two ad-hoc channels in `ImportFromItemMasterDialog`
+
+Hooks subscribe with a selector + handler:
+
 ```ts
-defaultOptions: {
-  queries: {
-    staleTime: 30_000,
-    gcTime: 5 * 60_000,
-    refetchOnMount: true,          // was 'always'
-    refetchOnWindowFocus: false,   // was true
-    retry: 1,
-  },
-},
+useRealtimeChannel("warehouse_tools", (payload) => {
+  // scoped: only invalidate variants matching the changed company_id
+  qc.invalidateQueries({ queryKey: ["warehouse-tools", payload.new?.company_id ?? payload.old?.company_id] });
+});
 ```
 
-**2. `vite.config.ts` — drop console + manual chunks**
+Mounted once in `AppLayout`, subscribed by hooks. New page mount → no new channel; just an in-memory listener.
+
+#### B) Debounced invalidation helper — `src/lib/queryInvalidation.ts` (new)
+
+`scheduleInvalidate(qc, key, 250)` coalesces bursts (e.g. 1,000-row bulk imports emitting 1k INSERT events) into a single refetch per key per 250 ms window. Uses a `Map<string, Timeout>` keyed by stringified queryKey.
+
+#### C) Scoped invalidations across stock/tool/item/asset hooks
+
+Replace generic `invalidateQueries({ queryKey: ['warehouse-tools'] })` with payload-aware scoped keys in:
+
+- `src/hooks/useWarehouseTools.ts`
+- `src/hooks/useRealtimeStockUpdates.ts` (now just a thin wrapper around the bus for backward compat)
+- `src/components/warehouse/tools/ImportFromItemMasterDialog.tsx`
+- `src/hooks/useWarehouseItems.ts` (if it self-subscribes anywhere)
+
+Pattern:
+
 ```ts
-build: {
-  rollupOptions: {
-    output: {
-      manualChunks: {
-        'react-vendor': ['react', 'react-dom', 'react-router-dom'],
-        'radix-vendor': [/* all @radix-ui/* present in package.json */],
-        'query-vendor': ['@tanstack/react-query', '@tanstack/react-table', '@tanstack/react-virtual'],
-        'supabase-vendor': ['@supabase/supabase-js'],
-        'charts-vendor': ['recharts'],
-        'three-vendor': ['three', '@react-three/fiber', '@react-three/drei'],
-        'pdf-vendor': ['jspdf', 'jspdf-autotable', 'html2canvas'],
-        'excel-vendor': ['exceljs'],
-        'mermaid-vendor': ['mermaid'],
-      },
-    },
-  },
-  chunkSizeWarningLimit: 800,
-},
-esbuild: mode === 'production' ? { drop: ['console', 'debugger'] } : undefined,
+const cid = (payload.new ?? payload.old)?.company_id;
+scheduleInvalidate(qc, ["warehouse-tools", cid]);
 ```
 
-**3. Per-hook `staleTime: 0` opt-in (exception list)**
-Add `staleTime: 0, refetchOnMount: 'always'` explicitly on:
-- `src/hooks/useWarehouseItems.ts` (and bin/allocation/location-stock variants)
-- `src/hooks/useApprovalConsole.ts`, `src/hooks/useUnifiedApprovals.ts` (whichever exist)
-- `src/hooks/useDashboards.ts` and KPI hooks
+#### D) Replication identity right-sizing — migration
 
-**4. `src/hooks/useWarehouseTools.ts` — narrow `select`**
-Replace `select('*, …')` star with explicit projected columns to cut payload size on each refetch.
+`REPLICA IDENTITY FULL` is currently set on `warehouse_items` and `warehouse_tools`. It doubles WAL write cost. Audit:
 
-**5. New helper `src/lib/lazyHeavy.ts`**
-Single dynamic-import helper for `jspdf`, `exceljs`, `mermaid`, `three` so future call sites stay consistent. (Migration of existing static imports deferred to Phase 1.5 — out of scope here to keep diff small.)
+- **Keep FULL** on tables we filter DELETE payloads by (company_id-scoped delete UIs): `warehouse_tools`, `warehouse_bin_allocations`.
+- **Revert to DEFAULT** on `warehouse_items` (DELETE payload only needs PK; we re-fetch list anyway).
 
-**6. Memory file updates**
-- Rewrite `mem://architecture/react-query-global-cache-freshness-permanent` with new policy + exception list.
-- Update Core block of `mem://index.md` (replace the "staleTime: 0, refetchOnMount: 'always'" line with the new tiered policy summary).
+Migration:
+
+```sql
+ALTER TABLE public.warehouse_items REPLICA IDENTITY DEFAULT;
+-- warehouse_tools and warehouse_bin_allocations remain FULL
+```
+
+#### E) Narrow `select(*)` on the three heaviest list queries
+
+Project only columns actually rendered. Each cuts JSON payload by 40–60% on 5k–14k row pages.
+
+- `useWarehouseTools.ts` — drop nested `*` on category/location/unit; keep only `id, name, code` from each join.
+- `useWarehouseItems.ts` (the master list query) — same pattern.
+- `useWarehouseAssets.ts` — same pattern.
+
+#### F) Fix the unrelated dev console warning blocking tool dialog QA
+
+Console shows `Function components cannot be given refs` from `Badge` inside `ImportFromItemMasterDialog`. Wrap `Badge` in `React.forwardRef` (it's the canonical fix from the React docs and unblocks any future `asChild` usage). One-line change in `src/components/ui/badge.tsx`.
 
 ### Files
 
-**Modified**
-- `src/App.tsx`
-- `vite.config.ts`
-- `src/hooks/useWarehouseItems.ts` (+ related stock hooks)
-- `src/hooks/useApprovalConsole.ts` / `useUnifiedApprovals.ts` (whichever exist)
-- `src/hooks/useDashboards.ts`
-- `src/hooks/useWarehouseTools.ts` (narrow select)
-- `mem://architecture/react-query-global-cache-freshness-permanent`
-- `mem://index.md`
-
 **New**
-- `src/lib/lazyHeavy.ts`
+- `src/hooks/useRealtimeBus.ts` — provider + `useRealtimeChannel(table, handler)` hook
+- `src/lib/queryInvalidation.ts` — debounced `scheduleInvalidate`
+
+**Modified**
+- `src/components/layout/AppLayout.tsx` — mount `<RealtimeBusProvider>`
+- `src/hooks/useRealtimeStockUpdates.ts` — re-implement on top of bus
+- `src/hooks/useWarehouseTools.ts` — bus + scoped invalidation + narrow select
+- `src/hooks/useWarehouseItems.ts` — narrow select
+- `src/hooks/useWarehouseAssets.ts` — narrow select
+- `src/components/warehouse/tools/ImportFromItemMasterDialog.tsx` — bus + scoped invalidation
+- `src/components/ui/badge.tsx` — `forwardRef`
+
+**New migration**
+- `supabase/migrations/<ts>_replica_identity_rightsizing.sql` — revert `warehouse_items` to `REPLICA IDENTITY DEFAULT`
+
+**Memory**
+- New: `mem://architecture/realtime-bus-pattern` — "All realtime subscriptions go through `useRealtimeChannel`; never call `supabase.channel()` directly in feature code."
+- Update `mem://architecture/realtime-stock-synchronization` to reference the bus.
+- Update Core line in `mem://index.md`.
+
+### Out of scope (later phases)
+
+- **Phase 3**: roll out `<VirtualTable>` shared component to Item Master, Asset Master, GRN list, MDP table.
+- **Phase 4**: DB indexes audit (`(company_id, created_at)`, etc.) + materialized RPCs for >5k-row lists.
+- **Phase 5**: `web-vitals` reporter + Lighthouse CI budget.
 
 ### Verification
 
-1. Navigating Dashboard ⇄ Warehouse ⇄ Finance within 30 s triggers no duplicate refetches in the Network tab.
-2. Tool/Item creation still appears in the Tool Master and stock screens within ~1 s (realtime path intact).
-3. Production build (`vite build`) splits vendors — initial JS for `/` route under ~350 KB gzipped; `three`, `mermaid`, `pdf`, `excel` chunks load only on demand.
-4. Production console is empty (no `console.log` output).
-5. Approval Console and Stock pages still refetch on mount (per-hook override verified).
-6. No regression in import-from-Item-Master dialog scrolling/refresh.
+1. Open Tool Management in two tabs → import 50 items in tab A → tab B's candidate list updates within ~1 s, **with one refetch in DevTools Network**, not 50.
+2. Bulk-import 1,000 items in another module → DevTools shows a single coalesced refetch per affected query (debounce working).
+3. Navigate Dashboard → Warehouse → Finance → Procurement → back: WebSocket frames panel shows no new channel subscriptions after the initial app mount.
+4. `/warehouse/tool-management` initial JSON payload (Network tab) drops from current size by ≥40%.
+5. Console is free of the `Function components cannot be given refs` warning.
+6. Realtime stock updates still propagate to all open pages within ~1 s (no regression vs Phase 1).
+7. Approval Console, stock pages, dashboard KPIs still refetch on mount (Phase 1 exceptions intact).
 
