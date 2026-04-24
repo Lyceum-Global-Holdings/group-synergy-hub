@@ -18,29 +18,32 @@ export function useWarehouseTools() {
   const toolsQuery = useQuery({
     queryKey: ["warehouse-tools", selectedCompany?.id, globalLocationId],
     queryFn: async () => {
-      let query = supabase
-        .from("warehouse_tools")
-        .select(`
-          *,
-          category:item_categories!category_id(id, name),
-          location:warehouse_locations!location_id(id, name),
-          unit:item_units!unit_id(id, name, abbreviation)
-        `)
-        .order("created_at", { ascending: false });
-
-      // Filter by company if selected
-      if (selectedCompany?.id) {
-        query = query.or(`company_id.eq.${selectedCompany.id},company_id.is.null`);
-      }
-
-      // Filter by global location when set
-      if (globalLocationId) {
-        query = query.eq("location_id", globalLocationId);
-      }
-
-      const { data, error } = await query;
+      // Phase 4: single materialized RPC replaces the embed-join.
+      // Server-side LEFT JOIN + composite (company_id, created_at DESC) index.
+      const { data, error } = await supabase.rpc("get_warehouse_tools_list", {
+        p_company_id: selectedCompany?.id ?? null,
+        p_location_id: globalLocationId ?? null,
+        p_limit: 5000,
+      });
       if (error) throw error;
-      return data as WarehouseTool[];
+
+      // Map flat rows back to the embedded shape consumers expect (WarehouseTool).
+      return (data ?? []).map((row: any) => ({
+        ...row,
+        category: row.category_id
+          ? { id: row.category_id, name: row.category_name }
+          : null,
+        location: row.location_id
+          ? { id: row.location_id, name: row.location_name }
+          : null,
+        unit: row.unit_id
+          ? {
+              id: row.unit_id,
+              name: row.unit_name,
+              abbreviation: row.unit_abbreviation,
+            }
+          : null,
+      })) as WarehouseTool[];
     },
   });
 
