@@ -337,6 +337,8 @@ export function ImportFromItemMasterDialog({
 
   // Realtime: keep the candidate list fresh when items are added/edited/deleted
   // in the source warehouse_items table (project memory: realtime-stock-synchronization).
+  // We invalidate unconditionally on every change — INSERT payloads may not carry
+  // company_id reliably, and the query's own scope filter handles tenancy on refetch.
   useEffect(() => {
     if (!open || effectiveCompanyIds.length === 0) return;
     const channelName = `import-item-master-candidates-${crypto.randomUUID()}`;
@@ -345,10 +347,16 @@ export function ImportFromItemMasterDialog({
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "warehouse_items" },
-        (payload: any) => {
-          const row = (payload.new ?? payload.old) as { company_id?: string } | null;
-          if (row?.company_id && !effectiveCompanyIds.includes(row.company_id)) return;
+        () => {
           queryClient.invalidateQueries({ queryKey: ["warehouse-items-tool-candidates"] });
+        },
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "warehouse_tools" },
+        () => {
+          // New tools elsewhere → existingToolKeys updates → candidate de-dup refreshes.
+          queryClient.invalidateQueries({ queryKey: ["warehouse-tools"] });
         },
       )
       .subscribe();
