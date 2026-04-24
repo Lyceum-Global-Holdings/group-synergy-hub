@@ -145,7 +145,7 @@ export function ImportFromItemMasterDialog({
     [tools],
   );
 
-  const { data: items = [], isLoading, error } = useQuery({
+  const { data: items = [], isLoading, isFetching, error, refetch } = useQuery({
     queryKey: [
       "warehouse-items-tool-candidates",
       companyScope,
@@ -325,11 +325,37 @@ export function ImportFromItemMasterDialog({
 
     createBulkTools(payload, {
       onSuccess: () => {
+        // Refresh both candidate list (promoted rows disappear) and the
+        // tools list (new keys reflect in existingToolKeys de-dup).
+        queryClient.invalidateQueries({ queryKey: ["warehouse-items-tool-candidates"] });
+        queryClient.invalidateQueries({ queryKey: ["warehouse-tools"] });
         onOpenChange(false);
         resetState();
       },
     });
   };
+
+  // Realtime: keep the candidate list fresh when items are added/edited/deleted
+  // in the source warehouse_items table (project memory: realtime-stock-synchronization).
+  useEffect(() => {
+    if (!open || effectiveCompanyIds.length === 0) return;
+    const channelName = `import-item-master-candidates-${crypto.randomUUID()}`;
+    const channel = supabase.channel(channelName);
+    channel
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "warehouse_items" },
+        (payload: any) => {
+          const row = (payload.new ?? payload.old) as { company_id?: string } | null;
+          if (row?.company_id && !effectiveCompanyIds.includes(row.company_id)) return;
+          queryClient.invalidateQueries({ queryKey: ["warehouse-items-tool-candidates"] });
+        },
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [open, effectiveCompanyIds, queryClient]);
 
   const selectedCount = filteredItems.filter((it) => selectedIds.has(it.id)).length;
   const hasActiveFilters = searchTerm.trim().length > 0 || categoryFilter !== "all";
