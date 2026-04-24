@@ -5,20 +5,13 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { VirtualTable, type DataTableColumn } from '@/components/shared/VirtualTable';
 import { useCompany } from '@/contexts/CompanyContext';
 import { useGoodsReceiptNotes, useGrnSummary } from '@/hooks/useGoodsReceiptNotes';
 import { useCurrentUserRoles } from '@/hooks/useCurrentUserRoles';
@@ -159,65 +152,60 @@ function GoodsReceiptNote() {
       {/* GRN Table */}
       <Card>
         <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>GRN Number</TableHead>
-                <TableHead>Date</TableHead>
-                <TableHead>PO Number</TableHead>
-                <TableHead>Supplier</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right">Total Value</TableHead>
-                <TableHead>Received By</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {isLoading ? (
-                <TableRow>
-                  <TableCell colSpan={8} className="text-center py-8">
-                    Loading...
-                  </TableCell>
-                </TableRow>
-              ) : filteredGrns.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={8} className="text-center py-8">
-                    No goods receipt notes found
-                  </TableCell>
-                </TableRow>
-              ) : (
-                filteredGrns.map((grn) => (
-                  <TableRow key={grn.id}>
-                    <TableCell className="font-medium">{grn.grn_number}</TableCell>
-                    <TableCell>{format(new Date(grn.grn_date), 'PP')}</TableCell>
-                    <TableCell>{grn.po_number || '-'}</TableCell>
-                    <TableCell>{grn.supplier_name || '-'}</TableCell>
-                    <TableCell>
-                      <Badge className={statusColors[grn.status]}>
-                        {statusLabels[grn.status]}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      {new Intl.NumberFormat('en-US', {
-                        style: 'currency',
-                        currency: 'LKR',
-                      }).format(grn.total_value || 0)}
-                    </TableCell>
-                    <TableCell>{grn.received_by_profile?.full_name || '-'}</TableCell>
-                    <TableCell className="text-right">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setSelectedGrn(grn.id)}
-                      >
-                        View Details
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
+          <VirtualTable
+            ariaLabel="Goods receipt notes"
+            data={filteredGrns}
+            isLoading={isLoading}
+            emptyMessage="No goods receipt notes found"
+            getRowId={(grn) => grn.id}
+            columns={[
+              {
+                key: 'grn_number',
+                header: 'GRN Number',
+                className: 'font-medium',
+                render: (grn) => grn.grn_number,
+              },
+              {
+                key: 'grn_date',
+                header: 'Date',
+                render: (grn) => format(new Date(grn.grn_date), 'PP'),
+              },
+              { key: 'po_number', header: 'PO Number', render: (grn) => grn.po_number || '-' },
+              { key: 'supplier_name', header: 'Supplier', render: (grn) => grn.supplier_name || '-' },
+              {
+                key: 'status',
+                header: 'Status',
+                render: (grn) => (
+                  <Badge className={statusColors[grn.status]}>{statusLabels[grn.status]}</Badge>
+                ),
+              },
+              {
+                key: 'total_value',
+                header: 'Total Value',
+                className: 'text-right',
+                render: (grn) =>
+                  new Intl.NumberFormat('en-US', {
+                    style: 'currency',
+                    currency: 'LKR',
+                  }).format(grn.total_value || 0),
+              },
+              {
+                key: 'received_by',
+                header: 'Received By',
+                render: (grn) => grn.received_by_profile?.full_name || '-',
+              },
+              {
+                key: 'actions',
+                header: 'Actions',
+                className: 'text-right',
+                render: (grn) => (
+                  <Button variant="ghost" size="sm" onClick={() => setSelectedGrn(grn.id)}>
+                    View Details
+                  </Button>
+                ),
+              },
+            ] as DataTableColumn<typeof filteredGrns[number]>[]}
+          />
         </CardContent>
       </Card>
 

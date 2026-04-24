@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { VirtualTable } from '@/components/shared/VirtualTable';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Calendar, Calculator, FileText, AlertTriangle, CheckCircle, Clock, TrendingUp, Package, Box, ShoppingCart, Truck, Ruler } from 'lucide-react';
@@ -730,133 +731,145 @@ const MaterialDemandPlanning = () => {
                       </div>
                     </div>
                   </div>
-                   <Table>
-                     <TableHeader>
-                       <TableRow>
-                         <TableHead>Status</TableHead>
-                         <TableHead>Item Code</TableHead>
-                         <TableHead>Item Name</TableHead>
-                         <TableHead>Type</TableHead>
-                         <TableHead>Category</TableHead>
-                         <TableHead>Required</TableHead>
-                         <TableHead>Available</TableHead>
-                          <TableHead>Reserved</TableHead>
-                          <TableHead>On Order</TableHead>
-                          <TableHead>Issued</TableHead>
-                          <TableHead>Shortage</TableHead>
-                         <TableHead>Suggested Order</TableHead>
-                         <TableHead>Priority</TableHead>
-                         <TableHead>Actions</TableHead>
-                       </TableRow>
-                     </TableHeader>
-                     <TableBody>
-                       {calculationResult.map((item, index) => (
-                         <TableRow key={index}>
-                           <TableCell>{getStatusIcon(item.shortage)}</TableCell>
-                           <TableCell className="font-mono text-sm">
-                             {item.item_code}
-                           </TableCell>
-                            <TableCell>
-                              <div className="flex flex-col">
-                                <span className="font-medium">{item.item_name}</span>
-                                {item.finished_good_info && (
-                                  <span className="text-sm text-muted-foreground">
-                                    FG: {item.finished_good_info.product_name} (Stock: {item.finished_good_info.current_stock})
-                                  </span>
-                                )}
-                                {item.bom_info && (
-                                  <span className="text-sm text-muted-foreground">
-                                    BOM: {item.bom_info.bom_number}
-                                  </span>
-                                )}
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              {item.finished_good_info && item.category === 'Fulfilled from Stock' ? (
-                                <Badge variant="secondary" className="bg-green-500 text-white">
-                                  <Package className="h-3 w-3 mr-1" />
-                                  Fulfilled from Stock
-                                </Badge>
-                              ) : item.category === 'BOM Material' ? (
-                                <Badge variant="default">
-                                  <Box className="h-3 w-3 mr-1" />
-                                  BOM Material
-                                </Badge>
-                              ) : (
-                                <Badge variant="outline">
-                                  <ShoppingCart className="h-3 w-3 mr-1" />
-                                  Direct Purchase
-                                </Badge>
-                              )}
-                            </TableCell>
-                           <TableCell>
-                             <Badge variant="outline">{item.category || 'N/A'}</Badge>
-                           </TableCell>
-                           <TableCell>{item.total_required} {item.unit_of_measure}</TableCell>
-                           <TableCell>{item.available_stock} {item.unit_of_measure}</TableCell>
-                           <TableCell>
-                             <div className="flex flex-col gap-1">
-                               <span>{item.reserved_quantity || 0} {item.unit_of_measure}</span>
-                               {(item.reserved_quantity || 0) > 0 && (
-                                 <span className="text-xs text-muted-foreground">
-                                   Avail: {(item.available_stock - (item.reserved_quantity || 0))} {item.unit_of_measure}
-                                 </span>
-                               )}
-                             </div>
-                            </TableCell>
-                            <TableCell>{item.on_order} {item.unit_of_measure}</TableCell>
-                            <TableCell>
-                              {item.issued_quantity ? (
-                                <div className="flex flex-col gap-1">
-                                  <span className="text-green-600 dark:text-green-400 font-medium">
-                                    {item.issued_quantity} {item.unit_of_measure}
-                                  </span>
-                                  <span className="text-xs text-muted-foreground">Issued for CPO</span>
-                                </div>
-                              ) : (
-                                <span className="text-muted-foreground">-</span>
-                              )}
-                            </TableCell>
-                            <TableCell className={item.shortage > 0 ? 'text-destructive font-medium' : ''}>
-                              {item.shortage} {item.unit_of_measure}
-                            </TableCell>
-                           <TableCell className={item.suggested_order > 0 ? 'text-primary font-medium' : ''}>
-                             {item.suggested_order} {item.unit_of_measure}
-                           </TableCell>
-                           <TableCell>
-                             <Badge variant={getPriorityColor(item.priority)}>
-                               {item.priority}
+                   <VirtualTable
+                     ariaLabel="Material demand planning results"
+                     data={calculationResult as unknown as Record<string, unknown>[]}
+                     getRowId={(_row, index) => String(index)}
+                     emptyMessage="No items to display"
+                     columns={[
+                       { key: 'status', header: 'Status', render: (item: any) => getStatusIcon(item.shortage) },
+                       { key: 'item_code', header: 'Item Code', className: 'font-mono text-sm', render: (item: any) => item.item_code },
+                       {
+                         key: 'item_name',
+                         header: 'Item Name',
+                         render: (item: any) => (
+                           <div className="flex flex-col">
+                             <span className="font-medium">{item.item_name}</span>
+                             {item.finished_good_info && (
+                               <span className="text-sm text-muted-foreground">
+                                 FG: {item.finished_good_info.product_name} (Stock: {item.finished_good_info.current_stock})
+                               </span>
+                             )}
+                             {item.bom_info && (
+                               <span className="text-sm text-muted-foreground">BOM: {item.bom_info.bom_number}</span>
+                             )}
+                           </div>
+                         ),
+                       },
+                       {
+                         key: 'type',
+                         header: 'Type',
+                         render: (item: any) =>
+                           item.finished_good_info && item.category === 'Fulfilled from Stock' ? (
+                             <Badge variant="secondary" className="bg-green-500 text-white">
+                               <Package className="h-3 w-3 mr-1" />
+                               Fulfilled from Stock
                              </Badge>
-                           </TableCell>
-                           <TableCell>
-                             <div className="flex gap-2">
-                                {item.category === 'BOM Material' && item.shortage > 0 && (
-                                  <Button
-                                    size="sm"
-                                    variant="default"
-                                    onClick={() => handleOpenPrAdjustment(item)}
-                                    disabled={createPrMutation.isPending}
-                                  >
-                                    <FileText className="h-3 w-3 mr-1" />
-                                    Generate PR...
-                                  </Button>
-                                )}
-                               {item.category === 'Fulfilled from Stock' && item.finished_good_info && (
-                                 <Button
-                                   size="sm"
-                                   variant="secondary"
-                                   onClick={() => handleCreateDispatchNote(item)}
-                                 >
-                                   <Truck className="h-3 w-3 mr-1" />
-                                   Create Dispatch
-                                 </Button>
-                               )}
+                           ) : item.category === 'BOM Material' ? (
+                             <Badge variant="default">
+                               <Box className="h-3 w-3 mr-1" />
+                               BOM Material
+                             </Badge>
+                           ) : (
+                             <Badge variant="outline">
+                               <ShoppingCart className="h-3 w-3 mr-1" />
+                               Direct Purchase
+                             </Badge>
+                           ),
+                       },
+                       {
+                         key: 'category',
+                         header: 'Category',
+                         render: (item: any) => <Badge variant="outline">{item.category || 'N/A'}</Badge>,
+                       },
+                       { key: 'required', header: 'Required', render: (item: any) => `${item.total_required} ${item.unit_of_measure}` },
+                       { key: 'available', header: 'Available', render: (item: any) => `${item.available_stock} ${item.unit_of_measure}` },
+                       {
+                         key: 'reserved',
+                         header: 'Reserved',
+                         render: (item: any) => (
+                           <div className="flex flex-col gap-1">
+                             <span>{item.reserved_quantity || 0} {item.unit_of_measure}</span>
+                             {(item.reserved_quantity || 0) > 0 && (
+                               <span className="text-xs text-muted-foreground">
+                                 Avail: {(item.available_stock - (item.reserved_quantity || 0))} {item.unit_of_measure}
+                               </span>
+                             )}
+                           </div>
+                         ),
+                       },
+                       { key: 'on_order', header: 'On Order', render: (item: any) => `${item.on_order} ${item.unit_of_measure}` },
+                       {
+                         key: 'issued',
+                         header: 'Issued',
+                         render: (item: any) =>
+                           item.issued_quantity ? (
+                             <div className="flex flex-col gap-1">
+                               <span className="text-green-600 dark:text-green-400 font-medium">
+                                 {item.issued_quantity} {item.unit_of_measure}
+                               </span>
+                               <span className="text-xs text-muted-foreground">Issued for CPO</span>
                              </div>
-                           </TableCell>
-                         </TableRow>
-                       ))}
-                    </TableBody>
-                  </Table>
+                           ) : (
+                             <span className="text-muted-foreground">-</span>
+                           ),
+                       },
+                       {
+                         key: 'shortage',
+                         header: 'Shortage',
+                         render: (item: any) => (
+                           <span className={item.shortage > 0 ? 'text-destructive font-medium' : ''}>
+                             {item.shortage} {item.unit_of_measure}
+                           </span>
+                         ),
+                       },
+                       {
+                         key: 'suggested_order',
+                         header: 'Suggested Order',
+                         render: (item: any) => (
+                           <span className={item.suggested_order > 0 ? 'text-primary font-medium' : ''}>
+                             {item.suggested_order} {item.unit_of_measure}
+                           </span>
+                         ),
+                       },
+                       {
+                         key: 'priority',
+                         header: 'Priority',
+                         render: (item: any) => (
+                           <Badge variant={getPriorityColor(item.priority)}>{item.priority}</Badge>
+                         ),
+                       },
+                       {
+                         key: 'actions',
+                         header: 'Actions',
+                         render: (item: any) => (
+                           <div className="flex gap-2">
+                             {item.category === 'BOM Material' && item.shortage > 0 && (
+                               <Button
+                                 size="sm"
+                                 variant="default"
+                                 onClick={() => handleOpenPrAdjustment(item)}
+                                 disabled={createPrMutation.isPending}
+                               >
+                                 <FileText className="h-3 w-3 mr-1" />
+                                 Generate PR...
+                               </Button>
+                             )}
+                             {item.category === 'Fulfilled from Stock' && item.finished_good_info && (
+                               <Button
+                                 size="sm"
+                                 variant="secondary"
+                                 onClick={() => handleCreateDispatchNote(item)}
+                               >
+                                 <Truck className="h-3 w-3 mr-1" />
+                                 Create Dispatch
+                               </Button>
+                             )}
+                           </div>
+                         ),
+                       },
+                     ]}
+                   />
                 </CardContent>
               </Card>
 
