@@ -20020,6 +20020,10 @@ export type Database = {
           statement_line_id: string
         }[]
       }
+      next_catalog_item_code: {
+        Args: { p_category_code: string }
+        Returns: string
+      }
       process_fifo_batch_issue: {
         Args: {
           p_company_id: string
