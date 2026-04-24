@@ -3,14 +3,14 @@ import react from "@vitejs/plugin-react-swc";
 import path from "path";
 
 // https://vitejs.dev/config/
-export default defineConfig(({ mode }) => ({
+export default defineConfig(async ({ mode }) => ({
   server: {
     host: "::",
     port: 8080,
   },
   plugins: [
     react(),
-    mode === "development" && import("lovable-tagger").then(m => m.componentTagger()),
+    mode === "development" && (await import("lovable-tagger")).componentTagger(),
   ].filter(Boolean),
   resolve: {
     alias: {
@@ -22,7 +22,7 @@ export default defineConfig(({ mode }) => ({
   },
   // Strip console.* and debugger statements from production builds (prod only).
   // Keeps dev logs intact for debugging.
-  esbuild: mode === "production" ? { drop: ["console", "debugger"] } : undefined,
+  esbuild: mode === "production" ? { drop: ["console", "debugger"] as ("console" | "debugger")[] } : undefined,
   build: {
     chunkSizeWarningLimit: 800,
     rollupOptions: {
