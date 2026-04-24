@@ -19,8 +19,8 @@ type VitalKind = keyof typeof VITAL_THRESHOLDS;
 
 function gradeBadge(kind: VitalKind, value: number) {
   const t = VITAL_THRESHOLDS[kind];
-  if (value <= t.good) return <Badge className="bg-emerald-500/15 text-emerald-600 border-emerald-500/30">good</Badge>;
-  if (value <= t.poor) return <Badge className="bg-amber-500/15 text-amber-600 border-amber-500/30">needs-improvement</Badge>;
+  if (value <= t.good) return <Badge variant="secondary">good</Badge>;
+  if (value <= t.poor) return <Badge variant="outline">needs-improvement</Badge>;
   return <Badge variant="destructive">poor</Badge>;
 }
 

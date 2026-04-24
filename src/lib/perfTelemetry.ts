@@ -73,7 +73,8 @@ async function flush() {
     // Filter rows missing user_id — RLS requires it
     const valid = batch.filter((r) => r.user_id);
     if (valid.length === 0) return;
-    await supabase.from("performance_metrics").insert(valid);
+    // Cast: our `context` is a plain object; the generated type expects Json.
+    await supabase.from("performance_metrics").insert(valid as any);
   } catch (err) {
     // Telemetry must never break the app
     if (import.meta.env.DEV) {
