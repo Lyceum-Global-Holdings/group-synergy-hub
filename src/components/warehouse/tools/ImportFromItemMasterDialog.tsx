@@ -47,6 +47,21 @@ import {
 } from "@/features/tools/lib/toolCategories";
 import type { CreateWarehouseToolData } from "@/types/toolManagement";
 
+/**
+ * Phase 9.4 — whitespace + diacritic-tolerant normalizer.
+ * Catalog data has been observed with leading/trailing spaces and double
+ * internal spaces (e.g. "   Pvc  pipe-20MM"), so a naive `.includes()` over
+ * raw strings silently hides legitimately-matching rows. Apply this on BOTH
+ * sides of every comparison.
+ */
+const norm = (s: string | null | undefined): string =>
+  (s ?? "")
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+
 interface ImportFromItemMasterDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
