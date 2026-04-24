@@ -14,6 +14,9 @@ export function useDashboards() {
       if (error) throw error;
       return data;
     },
+    // Live-critical: dashboards/KPIs always show latest data on mount.
+    staleTime: 0,
+    refetchOnMount: 'always',
   });
 }
 
@@ -33,5 +36,7 @@ export function useDashboard(id: string | undefined) {
       return data;
     },
     enabled: !!id,
+    staleTime: 0,
+    refetchOnMount: 'always',
   });
 }

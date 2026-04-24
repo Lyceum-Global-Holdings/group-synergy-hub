@@ -152,6 +152,10 @@ export const useWarehouseItems = (options?: { skipCompanyFilter?: boolean; disab
       return itemsWithBins as WarehouseItem[];
     },
     enabled: !disableFetch && (skipCompanyFilter || !!(isViewingAllCompanies || selectedCompany?.id)),
+    // Live-critical: stock data must always reflect latest DB state on mount.
+    // Realtime subscriptions also invalidate this key (see useRealtimeStockUpdates).
+    staleTime: 0,
+    refetchOnMount: 'always',
   });
 
   const createItemMutation = useMutation({

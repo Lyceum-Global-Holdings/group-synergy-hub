@@ -97,5 +97,8 @@ export const useApprovalConsole = (filters?: ApprovalFilters) => {
       return filtered;
     },
     refetchInterval: 30000, // Refresh every 30 seconds
+    // Live-critical: pending approvals must reflect latest state on mount.
+    staleTime: 0,
+    refetchOnMount: 'always',
   });
 };
