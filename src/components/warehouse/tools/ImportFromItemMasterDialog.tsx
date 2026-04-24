@@ -28,8 +28,9 @@ import {
 } from "@/components/ui/table";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { AlertCircle, Info, Loader2, PackagePlus, RefreshCw, Search } from "lucide-react";
+import { AlertCircle, Crosshair, Info, Loader2, PackagePlus, RefreshCw, Search } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "@/hooks/use-toast";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { supabase } from "@/integrations/supabase/client";
 import { useRealtimeChannel } from "@/hooks/useRealtimeBus";
@@ -45,6 +46,21 @@ import {
   getToolCategoryIds,
 } from "@/features/tools/lib/toolCategories";
 import type { CreateWarehouseToolData } from "@/types/toolManagement";
+
+/**
+ * Phase 9.4 — whitespace + diacritic-tolerant normalizer.
+ * Catalog data has been observed with leading/trailing spaces and double
+ * internal spaces (e.g. "   Pvc  pipe-20MM"), so a naive `.includes()` over
+ * raw strings silently hides legitimately-matching rows. Apply this on BOTH
+ * sides of every comparison.
+ */
+const norm = (s: string | null | undefined): string =>
+  (s ?? "")
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
 
 interface ImportFromItemMasterDialogProps {
   open: boolean;
@@ -152,6 +168,11 @@ export function ImportFromItemMasterDialog({
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [quantities, setQuantities] = useState<Record<string, number>>({});
+
+  // Phase 9.4 — "Find by exact code" finder state.
+  const [finderCode, setFinderCode] = useState("");
+  const [isFinding, setIsFinding] = useState(false);
+  const [highlightedId, setHighlightedId] = useState<string | null>(null);
 
   // ---------------------------------------------------------------------------
   // Duplicate detection — prefer catalog_item_id (Phase 9 provenance), fall back
@@ -280,7 +301,7 @@ export function ImportFromItemMasterDialog({
   }, [items, importedCatalogIds, importedToolCodes]);
 
   const filteredItems = useMemo(() => {
-    const q = searchTerm.trim().toLowerCase();
+    const q = norm(searchTerm);
     return items.filter((item) => {
       // Hide items already promoted into the target company (catalog_item_id first,
       // tool_code as legacy fallback).
@@ -292,11 +313,15 @@ export function ImportFromItemMasterDialog({
         return false;
       }
       if (!q) return true;
+      // Phase 9.4 — whitespace + diacritic-tolerant match across every
+      // user-visible field. Without this, names like "   Pvc  pipe-20MM"
+      // were silently unfindable.
       return (
-        item.item_code?.toLowerCase().includes(q) ||
-        item.name?.toLowerCase().includes(q) ||
-        item.description?.toLowerCase().includes(q) ||
-        item.category_name?.toLowerCase().includes(q)
+        norm(item.item_code).includes(q) ||
+        norm(item.name).includes(q) ||
+        norm(item.description).includes(q) ||
+        norm(item.category_name).includes(q) ||
+        norm(item.category_code).includes(q)
       );
     });
   }, [items, searchTerm, categoryFilter, importedCatalogIds, importedToolCodes]);
@@ -337,11 +362,14 @@ export function ImportFromItemMasterDialog({
     setCategoryFilter("all");
     setSelectedIds(new Set());
     setQuantities({});
+    setFinderCode("");
+    setHighlightedId(null);
   };
 
   const clearFilters = () => {
     setSearchTerm("");
     setCategoryFilter("all");
+    setHighlightedId(null);
   };
 
   const handleClose = (next: boolean) => {
@@ -409,7 +437,85 @@ export function ImportFromItemMasterDialog({
     overscan: 8,
   });
 
-  // Categories visible in the inline category picker depend on scope.
+  // ---------------------------------------------------------------------------
+  // Phase 9.4 — "Find by exact code" handler.
+  //
+  // Asks the database directly whether a code exists, whether it's active, and
+  // whether it has already been promoted into the target company. Removes the
+  // "is the item missing or am I just not finding it?" ambiguity for users
+  // staring at a 14k-row catalog.
+  // ---------------------------------------------------------------------------
+  const runFinder = useCallback(async () => {
+    const codeRaw = finderCode.trim();
+    if (!codeRaw) return;
+    setIsFinding(true);
+    try {
+      const { data, error } = await supabase.rpc("find_catalog_item_by_code", {
+        p_code: codeRaw,
+        p_target_company_id: targetCompanyId || null,
+      });
+      if (error) throw error;
+      const row = Array.isArray(data) ? data[0] : data;
+
+      if (!row || !row.found) {
+        toast({
+          variant: "destructive",
+          title: "Code not found",
+          description: `No active or inactive Item Master row matches “${codeRaw}”.`,
+        });
+        return;
+      }
+      if (row.status !== "active") {
+        toast({
+          variant: "destructive",
+          title: "Item is inactive",
+          description: `“${row.item_code}” exists in the Item Master but its status is “${row.status}”. Re-activate it first.`,
+        });
+        return;
+      }
+      if (row.already_imported) {
+        toast({
+          title: "Already in Tool Master",
+          description: `“${row.item_code}” has already been imported as “${row.tool_name ?? row.name}” for this company.`,
+        });
+        return;
+      }
+
+      // Force the item visible: clear filters that could hide it, then sync
+      // search to its exact code so it's the only row standing.
+      setCategoryFilter("all");
+      setSearchTerm(row.item_code);
+      setHighlightedId(row.catalog_id);
+
+      // Defer scrolling to the next tick so `filteredItems` reflects the new
+      // search term before the virtualizer is asked to scroll.
+      setTimeout(() => {
+        // After re-filter, the matched row should be at index 0.
+        try {
+          rowVirtualizer.scrollToIndex(0, { align: "center" });
+        } catch {
+          /* virtualizer not mounted yet — harmless */
+        }
+      }, 50);
+
+      // Auto-clear highlight after 2s.
+      setTimeout(() => setHighlightedId(null), 2000);
+
+      toast({
+        title: "Item found",
+        description: `“${row.item_code}” — ${row.name}. Tick it and click Import.`,
+      });
+    } catch (e: any) {
+      toast({
+        variant: "destructive",
+        title: "Lookup failed",
+        description: e?.message ?? "Unknown error",
+      });
+    } finally {
+      setIsFinding(false);
+    }
+  }, [finderCode, targetCompanyId, rowVirtualizer]);
+
   const inlineCategoryOptions = useMemo(() => {
     if (sourceScope !== "all") return categoryOptions;
     // For "all" scope, list every category that actually appears in the result set.
@@ -582,6 +688,45 @@ export function ImportFromItemMasterDialog({
             </Alert>
           )}
 
+          {/* Phase 9.4 — direct code finder. Asks the DB whether a specific
+              code exists, is active, and isn't already imported. Resolves the
+              "is the item missing or am I just not finding it?" ambiguity. */}
+          <div className="flex flex-wrap items-center gap-2 rounded-md border bg-muted/20 p-2">
+            <Crosshair className="h-4 w-4 text-muted-foreground ml-1" />
+            <span className="text-xs font-medium text-muted-foreground">
+              Find by exact code
+            </span>
+            <Input
+              placeholder="e.g. INV-CMP-CBL-0001"
+              value={finderCode}
+              onChange={(e) => setFinderCode(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  void runFinder();
+                }
+              }}
+              className="h-8 w-[260px] font-mono text-sm"
+              disabled={isFinding}
+            />
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={() => void runFinder()}
+              disabled={isFinding || !finderCode.trim()}
+            >
+              {isFinding ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                "Find & jump"
+              )}
+            </Button>
+            <span className="text-[11px] text-muted-foreground">
+              Confirms presence on the server in one click — no scrolling.
+            </span>
+          </div>
+
           {/* Search & inline category filter */}
           <div className="flex flex-wrap items-center gap-2">
             <div className="relative flex-1 min-w-[220px] max-w-md">
@@ -701,13 +846,50 @@ export function ImportFromItemMasterDialog({
                     ? "No items match the current filters."
                     : `All ${items.length.toLocaleString()} items in this scope are already imported into ${targetCompanyName}.`}
                 </span>
+                {/* Phase 9.4 — actionable diagnostic when search yields nothing.
+                    If the term looks like a code, push the user straight at the
+                    server-side finder rather than letting them wonder. */}
+                {hasActiveFilters &&
+                  searchTerm.trim().length > 0 &&
+                  /^[A-Za-z]{2,}-|^[A-Za-z0-9]+-\d/.test(searchTerm.trim()) && (
+                    <Button
+                      variant="default"
+                      size="sm"
+                      onClick={() => {
+                        setFinderCode(searchTerm.trim());
+                        void runFinder();
+                      }}
+                    >
+                      <Crosshair className="h-3.5 w-3.5 mr-2" />
+                      Look up “{searchTerm.trim()}” on the server
+                    </Button>
+                  )}
+                {hasActiveFilters && categoryFilter !== "all" && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCategoryFilter("all")}
+                  >
+                    Clear category filter
+                  </Button>
+                )}
+                {sourceScope !== "all" && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setSourceScope("all")}
+                  >
+                    Switch to All item master
+                  </Button>
+                )}
                 {hasActiveFilters && (
-                  <Button variant="outline" size="sm" onClick={clearFilters}>
-                    Clear filters
+                  <Button variant="ghost" size="sm" onClick={clearFilters}>
+                    Clear all filters
                   </Button>
                 )}
               </div>
             )}
+
 
           {targetCompanyId && !isLoading && filteredItems.length > 0 && (
             <div className="flex-1 min-h-[300px] border rounded-md overflow-hidden">
@@ -778,6 +960,11 @@ export function ImportFromItemMasterDialog({
                                 key={item.id}
                                 data-state={isSelected ? "selected" : undefined}
                                 aria-rowindex={virtualRow.index + 2}
+                                className={
+                                  highlightedId === item.id
+                                    ? "ring-2 ring-primary ring-offset-1 transition-shadow"
+                                    : undefined
+                                }
                               >
                                 <TableCell>
                                   <Checkbox
@@ -859,6 +1046,11 @@ export function ImportFromItemMasterDialog({
                             key={item.id}
                             data-state={isSelected ? "selected" : undefined}
                             aria-rowindex={idx + 2}
+                            className={
+                              highlightedId === item.id
+                                ? "ring-2 ring-primary ring-offset-1 transition-shadow"
+                                : undefined
+                            }
                           >
                             <TableCell>
                               <Checkbox
