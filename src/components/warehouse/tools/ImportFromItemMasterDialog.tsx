@@ -95,7 +95,11 @@ export function ImportFromItemMasterDialog({
   // catalog rows are visible.
   // ---------------------------------------------------------------------------
 
-  const [sourceScope, setSourceScope] = useState<SourceScope>("suggested");
+  // Phase 9.2 — Default to "all" because ~97% of the catalog is uncategorized
+  // in production. A category-gated default silently hides the bulk of the
+  // Item Master from the picker. The narrower scopes remain available as
+  // opt-in filters for power users with a fully curated catalog.
+  const [sourceScope, setSourceScope] = useState<SourceScope>("all");
   const [targetCompanyId, setTargetCompanyId] = useState<string>("");
   const [destinationLocationId, setDestinationLocationId] = useState<string>("none");
 
@@ -415,10 +419,10 @@ export function ImportFromItemMasterDialog({
             Import from Item Master
           </DialogTitle>
           <DialogDescription>
-            Promote items from the global Item Master catalog into the Tool
-            Master of the selected target company. Source is always the full
-            catalog — company and location below only control where tools are
-            created, not what is visible.
+            Showing every active Item Master entry by default so nothing is
+            hidden behind catalog curation gaps. Use the scope tabs to narrow
+            to curated tool categories. Company &amp; location below only
+            control where tools are created.
           </DialogDescription>
         </DialogHeader>
 
