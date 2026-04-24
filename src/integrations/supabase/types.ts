@@ -19509,27 +19509,49 @@ export type Database = {
           location_id: string
         }[]
       }
-      get_approval_console: {
-        Args: { user_id?: string }
-        Returns: {
-          amount: number
-          assigned_to: string
-          assigned_to_name: string
-          created_at: string
-          currency: string
-          description: string
-          entity_data: Json
-          entity_id: string
-          id: string
-          priority_text: string
-          stage: string
-          stage_order: number
-          status_text: string
-          title: string
-          type: string
-          view_url: string
-        }[]
-      }
+      get_approval_console:
+        | {
+            Args: { user_id?: string }
+            Returns: {
+              amount: number
+              assigned_to: string
+              assigned_to_name: string
+              created_at: string
+              currency: string
+              description: string
+              entity_data: Json
+              entity_id: string
+              id: string
+              priority_text: string
+              stage: string
+              stage_order: number
+              status_text: string
+              title: string
+              type: string
+              view_url: string
+            }[]
+          }
+        | {
+            Args: { p_limit?: number; user_id?: string }
+            Returns: {
+              amount: number
+              assigned_to: string
+              assigned_to_name: string
+              created_at: string
+              currency: string
+              description: string
+              entity_data: Json
+              entity_id: string
+              id: string
+              priority_text: string
+              stage: string
+              stage_order: number
+              status_text: string
+              title: string
+              type: string
+              view_url: string
+            }[]
+          }
       get_balance_sheet: {
         Args: { p_as_of_date: string; p_company_id: string }
         Returns: {
@@ -19736,6 +19758,37 @@ export type Database = {
       get_user_company_id: { Args: { _user_id: string }; Returns: string }
       get_user_company_ids: { Args: { _user_id: string }; Returns: string[] }
       get_user_location_ids: { Args: { _user_id: string }; Returns: string[] }
+      get_warehouse_tools_list: {
+        Args: {
+          p_company_id?: string
+          p_limit?: number
+          p_location_id?: string
+        }
+        Returns: {
+          available_quantity: number
+          category_id: string
+          category_name: string
+          company_id: string
+          condition: string
+          created_at: string
+          created_by: string
+          description: string
+          id: string
+          image_url: string
+          issued_quantity: number
+          location_id: string
+          location_name: string
+          name: string
+          notes: string
+          tool_code: string
+          total_quantity: number
+          unit_abbreviation: string
+          unit_cost: number
+          unit_id: string
+          unit_name: string
+          updated_at: string
+        }[]
+      }
       has_construction_access: { Args: { _user_id: string }; Returns: boolean }
       has_dashboard_access: {
         Args: { _dashboard_id: string; _user_id: string }
