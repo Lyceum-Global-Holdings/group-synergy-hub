@@ -50,17 +50,20 @@ export async function allocateItemCodes(
   if (count <= 0) return [];
 
   const prefix = `INV-${categoryCode}-`;
-  const table = scope === 'catalog' ? 'warehouse_item_catalog' : 'warehouse_items';
 
+  // Phase 9.5: ALWAYS query the global catalog. Both `catalog` and
+  // `inventory` writes ultimately have to satisfy
+  // `warehouse_item_catalog_item_code_key` (the catalog row is created
+  // first in the dual-insert flow), so the per-company inventory layer
+  // cannot be the source of truth for the next sequence number.
   let query: any = supabase
-    .from(table as any)
+    .from('warehouse_item_catalog' as any)
     .select('item_code')
     .ilike('item_code', `${prefix}%`);
 
-  // Company scoping only applies to inventory (catalog is global)
-  if (scope === 'inventory' && companyId) {
-    query = query.eq('company_id', companyId);
-  }
+  // companyId retained in the API for back-compat but no longer used —
+  // catalog has no company_id column.
+  void companyId;
 
   const { data, error } = await query;
 
