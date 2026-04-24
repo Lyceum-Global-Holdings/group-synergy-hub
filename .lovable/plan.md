@@ -1,126 +1,88 @@
 
 
-## Phase 2 Performance — Realtime hygiene + targeted query slimming
+## Phase 3 — Shared `<VirtualTable>` rollout
 
-Phase 1 (cache tuning, bundle splitting, console drop) is live. The system should already feel snappier on navigation. The next biggest wins — based on the diagnosis already done — are **eliminating refetch storms from realtime** and **shrinking the heaviest list payloads**. This phase is independently shippable and does not require any user-facing behaviour change.
+Phase 2 is live (realtime bus, debounced invalidations, narrow selects). The next bottleneck is the DOM cost of the largest tables: **Item Master (~14k rows), Asset Master (10k+), Tool Management, GRN list, MDP**. Currently they render every row, so even with smaller payloads the browser stalls on initial paint and slows down on scroll. Phase 3 standardizes a single virtualized table component and applies it across these screens.
 
 ### Outcome
 
-- Realtime events no longer trigger full-table refetches across every open tab — invalidations are scoped, debounced, and de-duplicated.
-- Hot list endpoints (Tools, Items, Assets) ship 40–60% smaller payloads by projecting only used columns.
-- A shared realtime "bus" replaces ad-hoc per-page Supabase channels, cutting WebSocket subscription churn during navigation.
-- INP on `/warehouse/tool-management`, `/warehouse/item-bin-master`, and the Approval Console drops below 200 ms even during bulk imports.
+- Tables of any size render in <100 ms (only ~30 rows in DOM at a time).
+- Smooth 60 fps scrolling on Item Master, Asset Master, Tool Management, GRN list, MDP results table.
+- One shared, accessible (`role="grid"` + ARIA) virtualization wrapper — consistent UX, easier future maintenance.
+- No behavioural change: column layout, sorting, row click, selection checkbox, action buttons all preserved.
 
 ### Standards applied
 
-- **TanStack Query**: scoped invalidation keys; debounced bursts (Query v5 best practice).
-- **Supabase Realtime**: one channel per logical concern; payload-driven scoped routing; `REPLICA IDENTITY FULL` only where DELETE filtering requires it (cuts WAL cost).
-- **PostgREST**: explicit column projection per "select only what you render" guidance.
-- **WCAG 2.2 SC 2.2.1**: realtime UI updates are user-pausable via existing manual refresh affordances.
+- **WAI-ARIA Authoring Practices — Grid pattern**: `role="grid"`, `role="row"`, `aria-rowcount`, `aria-rowindex` so screen readers announce "row N of total" while only ~30 rows are in DOM.
+- **TanStack Virtual best practice**: dynamic row measurement (`measureElement`), `overscan: 8`, sticky `<thead>` outside the scroll container so columns stay aligned.
+- **React performance**: row component wrapped in `React.memo` to avoid re-render on parent state changes.
+- **Project memory `shared-foundational-components`**: live in `src/components/shared/`.
 
-### Changes
+### Component API
 
-#### A) Shared realtime bus — `src/hooks/useRealtimeBus.ts` (new)
+`src/components/shared/VirtualTable.tsx` (new)
 
-Single React provider that opens **one channel per table** at app mount, then dispatches `postgres_changes` payloads to subscribers via a tiny event emitter. Replaces:
-
-- `useRealtimeStockUpdates` (currently re-opens 3 subscriptions per page that mounts it)
-- The two ad-hoc channels in `useWarehouseTools`
-- The two ad-hoc channels in `ImportFromItemMasterDialog`
-
-Hooks subscribe with a selector + handler:
-
-```ts
-useRealtimeChannel("warehouse_tools", (payload) => {
-  // scoped: only invalidate variants matching the changed company_id
-  qc.invalidateQueries({ queryKey: ["warehouse-tools", payload.new?.company_id ?? payload.old?.company_id] });
-});
+```tsx
+<VirtualTable
+  columns={columns}                  // existing DataTableColumn<T>[] shape, reused
+  data={rows}                        // T[]
+  isLoading={isLoading}
+  estimatedRowHeight={48}
+  overscan={8}
+  virtualizeFromRowCount={200}       // below this, render normally (no virtualization overhead)
+  getRowId={(row) => row.id}
+  onRowClick={...}
+  rowClassName={...}
+  emptyMessage="No data found."
+  stickyHeader                       // default true
+  ariaLabel="Item master table"
+/>
 ```
 
-Mounted once in `AppLayout`, subscribed by hooks. New page mount → no new channel; just an in-memory listener.
+- Below `virtualizeFromRowCount`, falls back to plain `<DataTable>` rendering — small lists pay zero virtualization cost.
+- Above the threshold, renders header + a virtualized `<div role="rowgroup">` body using `useVirtualizer` (proven in `ImportFromItemMasterDialog`).
+- Reuses the existing `DataTableColumn<T>` interface so migration is mostly a one-line component swap when columns are already declarative.
 
-#### B) Debounced invalidation helper — `src/lib/queryInvalidation.ts` (new)
+### Migration matrix
 
-`scheduleInvalidate(qc, key, 250)` coalesces bursts (e.g. 1,000-row bulk imports emitting 1k INSERT events) into a single refetch per key per 250 ms window. Uses a `Map<string, Timeout>` keyed by stringified queryKey.
-
-#### C) Scoped invalidations across stock/tool/item/asset hooks
-
-Replace generic `invalidateQueries({ queryKey: ['warehouse-tools'] })` with payload-aware scoped keys in:
-
-- `src/hooks/useWarehouseTools.ts`
-- `src/hooks/useRealtimeStockUpdates.ts` (now just a thin wrapper around the bus for backward compat)
-- `src/components/warehouse/tools/ImportFromItemMasterDialog.tsx`
-- `src/hooks/useWarehouseItems.ts` (if it self-subscribes anywhere)
-
-Pattern:
-
-```ts
-const cid = (payload.new ?? payload.old)?.company_id;
-scheduleInvalidate(qc, ["warehouse-tools", cid]);
-```
-
-#### D) Replication identity right-sizing — migration
-
-`REPLICA IDENTITY FULL` is currently set on `warehouse_items` and `warehouse_tools`. It doubles WAL write cost. Audit:
-
-- **Keep FULL** on tables we filter DELETE payloads by (company_id-scoped delete UIs): `warehouse_tools`, `warehouse_bin_allocations`.
-- **Revert to DEFAULT** on `warehouse_items` (DELETE payload only needs PK; we re-fetch list anyway).
-
-Migration:
-
-```sql
-ALTER TABLE public.warehouse_items REPLICA IDENTITY DEFAULT;
--- warehouse_tools and warehouse_bin_allocations remain FULL
-```
-
-#### E) Narrow `select(*)` on the three heaviest list queries
-
-Project only columns actually rendered. Each cuts JSON payload by 40–60% on 5k–14k row pages.
-
-- `useWarehouseTools.ts` — drop nested `*` on category/location/unit; keep only `id, name, code` from each join.
-- `useWarehouseItems.ts` (the master list query) — same pattern.
-- `useWarehouseAssets.ts` — same pattern.
-
-#### F) Fix the unrelated dev console warning blocking tool dialog QA
-
-Console shows `Function components cannot be given refs` from `Badge` inside `ImportFromItemMasterDialog`. Wrap `Badge` in `React.forwardRef` (it's the canonical fix from the React docs and unblocks any future `asChild` usage). One-line change in `src/components/ui/badge.tsx`.
+| Screen | Current pattern | Migration approach |
+|---|---|---|
+| **Item Master** (`ItemMasterTab.tsx`, 1,049 lines, ~14k rows) | Inline `<Table>` with imperative `<TableRow>` map (lines 623–879), heavy per-row JSX (checkbox, status badges, action menu) | Extract row JSX into a `<ItemRow>` memoized component; swap `<TableBody>` for `<VirtualTable>` keeping the same column descriptors. Preserve: row selection, bulk action bar, sorting, filters. |
+| **Asset Master** (`AssetManagement.tsx`, 1,347 lines, 10k+ rows) | Inline `<Table>` map (lines 1100–1191) | Same approach: extract `<AssetRow>` memo + swap to `<VirtualTable>`. |
+| **Tool Management** main grid (`ToolManagement.tsx`) | Already smaller; only virtualize if row count >200 (auto via threshold). | Drop-in `<VirtualTable>`; threshold takes care of small lists. |
+| **GRN list** (`GoodsReceiptNote.tsx`, 240 lines) | Inline `<Table>` map (lines 175–219) | Drop-in swap; usually small lists so threshold keeps it un-virtualized — still benefits from consistent ARIA. |
+| **MDP results** (`MaterialDemandPlanning.tsx`, lines 750–860) | Inline map of `calculationResult` | Swap result table only (other small dialogs unchanged). |
 
 ### Files
 
 **New**
-- `src/hooks/useRealtimeBus.ts` — provider + `useRealtimeChannel(table, handler)` hook
-- `src/lib/queryInvalidation.ts` — debounced `scheduleInvalidate`
+- `src/components/shared/VirtualTable.tsx` — the shared component.
+- `src/components/shared/VirtualTable.types.ts` — re-exports `DataTableColumn<T>` for one-import ergonomics.
 
 **Modified**
-- `src/components/layout/AppLayout.tsx` — mount `<RealtimeBusProvider>`
-- `src/hooks/useRealtimeStockUpdates.ts` — re-implement on top of bus
-- `src/hooks/useWarehouseTools.ts` — bus + scoped invalidation + narrow select
-- `src/hooks/useWarehouseItems.ts` — narrow select
-- `src/hooks/useWarehouseAssets.ts` — narrow select
-- `src/components/warehouse/tools/ImportFromItemMasterDialog.tsx` — bus + scoped invalidation
-- `src/components/ui/badge.tsx` — `forwardRef`
-
-**New migration**
-- `supabase/migrations/<ts>_replica_identity_rightsizing.sql` — revert `warehouse_items` to `REPLICA IDENTITY DEFAULT`
+- `src/components/warehouse/ItemMasterTab.tsx` — extract `ItemRow` memo + swap body to `<VirtualTable>`.
+- `src/pages/warehouse/AssetManagement.tsx` — extract `AssetRow` memo + swap body to `<VirtualTable>`.
+- `src/pages/warehouse/ToolManagement.tsx` — replace main grid with `<VirtualTable>`.
+- `src/pages/warehouse/GoodsReceiptNote.tsx` — replace `<Table>` block with `<VirtualTable>`.
+- `src/pages/procurement/MaterialDemandPlanning.tsx` — only the `calculationResult` results table.
 
 **Memory**
-- New: `mem://architecture/realtime-bus-pattern` — "All realtime subscriptions go through `useRealtimeChannel`; never call `supabase.channel()` directly in feature code."
-- Update `mem://architecture/realtime-stock-synchronization` to reference the bus.
-- Update Core line in `mem://index.md`.
+- New: `mem://architecture/virtual-table-pattern` — "Lists ≥200 rows must use `<VirtualTable>` from `src/components/shared/`. Never roll a custom virtualizer in feature code."
+- Update Core line in `mem://index.md` referencing the standard.
 
 ### Out of scope (later phases)
 
-- **Phase 3**: roll out `<VirtualTable>` shared component to Item Master, Asset Master, GRN list, MDP table.
-- **Phase 4**: DB indexes audit (`(company_id, created_at)`, etc.) + materialized RPCs for >5k-row lists.
-- **Phase 5**: `web-vitals` reporter + Lighthouse CI budget.
+- Phase 4: DB indexes + materialized RPCs for >5k-row lists.
+- Phase 5: `web-vitals` reporter + Lighthouse CI budget.
+- Sortable column headers inside `<VirtualTable>` (the wrapper passes through; existing per-page sort UI stays).
 
 ### Verification
 
-1. Open Tool Management in two tabs → import 50 items in tab A → tab B's candidate list updates within ~1 s, **with one refetch in DevTools Network**, not 50.
-2. Bulk-import 1,000 items in another module → DevTools shows a single coalesced refetch per affected query (debounce working).
-3. Navigate Dashboard → Warehouse → Finance → Procurement → back: WebSocket frames panel shows no new channel subscriptions after the initial app mount.
-4. `/warehouse/tool-management` initial JSON payload (Network tab) drops from current size by ≥40%.
-5. Console is free of the `Function components cannot be given refs` warning.
-6. Realtime stock updates still propagate to all open pages within ~1 s (no regression vs Phase 1).
-7. Approval Console, stock pages, dashboard KPIs still refetch on mount (Phase 1 exceptions intact).
+1. Item Master with ≥10k items: initial paint <500 ms, DOM contains <50 `<tr>` elements while idle, scrolling stays at 60 fps (DevTools Performance).
+2. Asset Master: same — no jank on bulk row select/scroll.
+3. Tool Management & GRN list (smaller datasets): visually unchanged, no regression.
+4. Screen reader (VoiceOver/NVDA) announces "row 47 of 14,771" while scrolling through Item Master.
+5. Sticky header stays aligned with body columns at all scroll positions and at the 1870px viewport.
+6. Row selection checkboxes, action menus, click-to-open behaviour all still work on virtualized rows.
+7. No console warnings (ARIA, key duplication, ref forwarding).
 
