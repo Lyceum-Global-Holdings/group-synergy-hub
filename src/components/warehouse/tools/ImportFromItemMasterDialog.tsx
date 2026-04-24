@@ -362,11 +362,14 @@ export function ImportFromItemMasterDialog({
     setCategoryFilter("all");
     setSelectedIds(new Set());
     setQuantities({});
+    setFinderCode("");
+    setHighlightedId(null);
   };
 
   const clearFilters = () => {
     setSearchTerm("");
     setCategoryFilter("all");
+    setHighlightedId(null);
   };
 
   const handleClose = (next: boolean) => {
