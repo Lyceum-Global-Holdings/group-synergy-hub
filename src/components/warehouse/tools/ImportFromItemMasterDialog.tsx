@@ -301,7 +301,7 @@ export function ImportFromItemMasterDialog({
   }, [items, importedCatalogIds, importedToolCodes]);
 
   const filteredItems = useMemo(() => {
-    const q = searchTerm.trim().toLowerCase();
+    const q = norm(searchTerm);
     return items.filter((item) => {
       // Hide items already promoted into the target company (catalog_item_id first,
       // tool_code as legacy fallback).
@@ -313,11 +313,15 @@ export function ImportFromItemMasterDialog({
         return false;
       }
       if (!q) return true;
+      // Phase 9.4 — whitespace + diacritic-tolerant match across every
+      // user-visible field. Without this, names like "   Pvc  pipe-20MM"
+      // were silently unfindable.
       return (
-        item.item_code?.toLowerCase().includes(q) ||
-        item.name?.toLowerCase().includes(q) ||
-        item.description?.toLowerCase().includes(q) ||
-        item.category_name?.toLowerCase().includes(q)
+        norm(item.item_code).includes(q) ||
+        norm(item.name).includes(q) ||
+        norm(item.description).includes(q) ||
+        norm(item.category_name).includes(q) ||
+        norm(item.category_code).includes(q)
       );
     });
   }, [items, searchTerm, categoryFilter, importedCatalogIds, importedToolCodes]);
