@@ -538,6 +538,20 @@ export function ImportFromItemMasterDialog({
             {selectedCount > 0 && (
               <Badge variant="default">{selectedCount} selected</Badge>
             )}
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              onClick={() => refetch()}
+              disabled={isFetching}
+              aria-label="Refresh candidates"
+              title="Refresh candidates"
+            >
+              <RefreshCw
+                className={`h-4 w-4 ${isFetching ? "animate-spin" : ""}`}
+              />
+            </Button>
           </div>
 
           {error && (
