@@ -1,6 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import { ReportDefinition } from "@/lib/reports/registry";
-import { ReportEnvelope } from "@/lib/reports/types";
+import { ReportEnvelope, NotesFilterOp } from "@/lib/reports/types";
 
 export interface BuildEnvelopeContext {
   companyName: string;
@@ -16,7 +16,8 @@ function envelopeBase(
   rows: Record<string, unknown>[],
   totals?: Record<string, unknown>,
   period?: { start?: string; end?: string },
-  highlightTerms?: Record<string, string>,
+  highlightTerms?: Record<string, string[]>,
+  highlightWholeCell?: boolean,
 ): ReportEnvelope {
   return {
     reportCode: def.code,
@@ -34,11 +35,78 @@ function envelopeBase(
     rows,
     totals,
     highlightTerms,
+    highlightWholeCell,
   };
 }
 
 function sumCol(rows: Record<string, unknown>[], key: string): number {
   return rows.reduce((s, r) => s + Number(r[key] ?? 0), 0);
+}
+
+/* ---------------- Notes filter parsing ---------------- */
+
+const VALID_OPS: readonly NotesFilterOp[] = [
+  "contains",
+  "equals",
+  "startsWith",
+  "endsWith",
+  "notContains",
+] as const;
+
+const MAX_TERMS = 5;
+
+export interface ParsedNotesFilter {
+  op: NotesFilterOp;
+  /** 1+ tokens for "contains"; exactly 1 for the other operators. */
+  terms: string[];
+}
+
+/**
+ * Parse a `textOperator` parameter value into RPC arguments.
+ * For "contains", the term string is split on whitespace OUTSIDE double quotes
+ * so users can AND multiple words and use "quoted phrases" with embedded spaces.
+ * Returns null when the filter is inactive (no/blank term).
+ */
+export function parseNotesFilter(v: unknown): ParsedNotesFilter | null {
+  if (!v || typeof v !== "object") return null;
+  const raw = v as { op?: unknown; term?: unknown };
+  const op = (VALID_OPS as readonly string[]).includes(String(raw.op))
+    ? (raw.op as NotesFilterOp)
+    : "contains";
+  const term = typeof raw.term === "string" ? raw.term : "";
+  const trimmed = term.trim();
+  if (!trimmed) return null;
+
+  if (op !== "contains") {
+    return { op, terms: [trimmed] };
+  }
+
+  // Tokenize: keep "quoted phrases" intact, split everything else on whitespace.
+  const tokens: string[] = [];
+  const re = /"([^"]*)"|(\S+)/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(trimmed)) !== null) {
+    const t = (m[1] ?? m[2] ?? "").trim();
+    if (t) tokens.push(t);
+    if (tokens.length >= MAX_TERMS) break;
+  }
+  if (tokens.length === 0) return null;
+  return { op, terms: tokens };
+}
+
+/** Build the highlight-terms map + wholeCell flag for a given operator/terms. */
+function buildHighlight(
+  columnKey: string,
+  parsed: ParsedNotesFilter | null,
+): { terms: Record<string, string[]> | undefined; wholeCell: boolean } {
+  if (!parsed) return { terms: undefined, wholeCell: false };
+  // notContains: nothing matched, by definition — no highlight.
+  if (parsed.op === "notContains") return { terms: undefined, wholeCell: false };
+  // equals: wrap the entire matching cell.
+  if (parsed.op === "equals") {
+    return { terms: { [columnKey]: parsed.terms }, wholeCell: true };
+  }
+  return { terms: { [columnKey]: parsed.terms }, wholeCell: false };
 }
 
 /* ---------------- Inventory ---------------- */
