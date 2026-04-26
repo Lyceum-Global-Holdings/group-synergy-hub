@@ -178,10 +178,18 @@ export async function fetchCycleCountVariance(
   });
   if (error) throw error;
   const rows = (data ?? []) as Record<string, unknown>[];
-  return envelopeBase(def, ctx, rows, {
-    variance_quantity: sumCol(rows, "variance_quantity"),
-    variance_value: sumCol(rows, "variance_value"),
-  }, { start: from ?? undefined, end: to ?? undefined });
+  const term = (params.notesContains || "").trim();
+  return envelopeBase(
+    def,
+    ctx,
+    rows,
+    {
+      variance_quantity: sumCol(rows, "variance_quantity"),
+      variance_value: sumCol(rows, "variance_value"),
+    },
+    { start: from ?? undefined, end: to ?? undefined },
+    term ? { variance_reason: term } : undefined,
+  );
 }
 
 export async function fetchBinUtilisation(
