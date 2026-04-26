@@ -105,6 +105,8 @@ function LabourResourcesInner() {
         </div>
       </div>
 
+      <AsOfDateBar noun="labour allocations" />
+
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
         <TabsList>
           <TabsTrigger value="allocation">Allocation View</TabsTrigger>
@@ -280,5 +282,13 @@ function LabourResourcesInner() {
         onOpenChange={setBulkImportOpen}
       />
     </div>
+  );
+}
+
+export default function LabourResources() {
+  return (
+    <ResourceDateProvider>
+      <LabourResourcesInner />
+    </ResourceDateProvider>
   );
 }
