@@ -140,7 +140,7 @@ function ParameterInput({
   param: ReportParameter;
   value: unknown;
   onChange: (v: unknown) => void;
-  locations: { id: string; name: string }[];
+  locations: { id: string; name: string; type: string; parent_id: string | null }[];
   locationsLoading: boolean;
   companySelected: boolean;
   categories: { id: string; name: string }[];
@@ -212,30 +212,20 @@ function ParameterInput({
       const disabled = !companySelected || (!locationsLoading && locations.length === 0);
       const placeholder = !companySelected
         ? "Select a company first"
-        : locationsLoading
-          ? "Loading locations…"
-          : locations.length === 0
-            ? "No locations allocated to this company"
-            : "All locations";
+        : locations.length === 0 && !locationsLoading
+          ? "No locations allocated to this company"
+          : "All locations";
       return (
         <>
-          <Select
-            value={(value as string) ?? "all"}
-            onValueChange={(v) => onChange(v === "all" ? null : v)}
+          <LocationTreePicker
+            id={param.key}
+            value={(value as string) ?? null}
+            onChange={(v) => onChange(v)}
+            nodes={locations}
+            loading={locationsLoading}
             disabled={disabled}
-          >
-            <SelectTrigger id={param.key}>
-              <SelectValue placeholder={placeholder} />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All locations</SelectItem>
-              {locations.map((l) => (
-                <SelectItem key={l.id} value={l.id}>
-                  {l.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            placeholder={placeholder}
+          />
           {!locationsLoading && companySelected && locations.length === 0 && (
             <p className="text-xs text-muted-foreground">
               No locations are allocated to the active company. Ask an admin to assign locations.
