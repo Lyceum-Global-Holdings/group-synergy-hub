@@ -34,8 +34,25 @@ function isoToday(offsetDays = 0): string {
 
 export function ReportParameterPanel({ definition, values, onChange }: Props) {
   const { selectedCompany } = useCompany();
-  const { locations = [] } = useWarehouseLocations();
+  const { user } = useAuth();
+  const { globalLocationId } = useLocationFilter();
   const { categories = [] } = useItemCategories(selectedCompany?.id);
+
+  // Company-scoped + permission-aware location resolution.
+  // Mirrors SAP EWM / S4HANA: pickers only enumerate plants allocated to
+  // the active company code. See mem://architecture/warehouse-location-and-bin-management.
+  const { data: companyLocations = [], isLoading: locationsLoading } =
+    useEffectiveLocationsForCompany(selectedCompany?.id);
+  const { data: userPerms = [] } = useUserLocationPermissions(user?.id);
+  const { data: viewAllLocations = false } = useUserViewAllLocations(user?.id);
+
+  const allowedLocations = useMemo(() => {
+    const onlyLocations = companyLocations.filter((l) => l.type === "location");
+    if (viewAllLocations) return onlyLocations;
+    if (!user?.id) return [] as typeof onlyLocations;
+    const allowedIds = new Set(userPerms.map((p) => p.location_id));
+    return onlyLocations.filter((l) => allowedIds.has(l.id));
+  }, [companyLocations, userPerms, viewAllLocations, user?.id]);
 
   // Apply defaults on mount / definition change
   useEffect(() => {
@@ -50,6 +67,11 @@ export function ReportParameterPanel({ definition, values, onChange }: Props) {
       } else if (p.type === "textOperator") {
         next[p.key] = { op: "contains", term: "" };
         changed = true;
+      } else if (p.type === "location" && globalLocationId) {
+        // Seed from header global location filter only — actual scope check
+        // happens in the dedicated effect below once allowedLocations resolves.
+        next[p.key] = globalLocationId;
+        changed = true;
       } else if ("defaultValue" in p && p.defaultValue !== undefined) {
         next[p.key] = p.defaultValue;
         changed = true;
@@ -58,6 +80,25 @@ export function ReportParameterPanel({ definition, values, onChange }: Props) {
     if (changed) onChange(next);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [definition.code]);
+
+  // Clear any locationId that is not in the allowed set for the active company.
+  // Prevents silent zero-row reports after a company switch.
+  useEffect(() => {
+    if (locationsLoading) return;
+    const allowedIds = new Set(allowedLocations.map((l) => l.id));
+    const next: Record<string, unknown> = { ...values };
+    let changed = false;
+    definition.parameters.forEach((p) => {
+      if (p.type !== "location") return;
+      const current = next[p.key];
+      if (typeof current === "string" && current && !allowedIds.has(current)) {
+        next[p.key] = null;
+        changed = true;
+      }
+    });
+    if (changed) onChange(next);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedCompany?.id, allowedLocations, locationsLoading, definition.code]);
 
   const set = (key: string, v: unknown) => onChange({ ...values, [key]: v });
 
@@ -70,7 +111,9 @@ export function ReportParameterPanel({ definition, values, onChange }: Props) {
             param={p}
             value={values[p.key]}
             onChange={(v) => set(p.key, v)}
-            locations={locations.filter((l) => l.type === "location")}
+            locations={allowedLocations}
+            locationsLoading={locationsLoading}
+            companySelected={!!selectedCompany?.id}
             categories={categories}
           />
         </div>
