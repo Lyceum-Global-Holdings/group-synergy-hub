@@ -1,58 +1,60 @@
-## Fix: Notes filter silently returns no results for multi-word input
+## Problem
 
-### What's actually happening
+The Reports Center location dropdown lists **every warehouse location in the database**, regardless of which company is currently selected. This breaks data isolation: a user working under Company A can pick a location that is allocated only to Company B, producing empty/irrelevant report results and exposing the existence of out-of-scope locations.
 
-I checked the live request you ran. The Stock Movement Ledger sent this to the database:
+The rest of the app (Dashboards, GRN, Stock Add, Construction Inventory, Assign Location dialog) already uses the canonical company-scoped resolver `get_effective_locations_for_company` — only the Reports Center was overlooked.
 
-```
-p_notes_op    = "contains"
-p_notes_terms = ["ORDER", "PO", "NUMBERS"]
-```
+## Standard being followed
 
-Because the previous design split your input on spaces and `AND`-ed every word, the database was looking for rows whose notes contain **all three** of "ORDER" *and* "PO" *and* "NUMBERS". I checked the 284 stock movements in your selected date range — every existing note looks like:
+- **SAP EWM / S4HANA** — storage locations are always resolved relative to the active company code; pickers never enumerate cross-company plants.
+- **ISO 8000 master-data integrity** — reference-data dropdowns must reflect the active organizational scope.
+- **Project memory** (`mem://architecture/warehouse-location-and-bin-management`, `mem://access-control/hierarchical-location-permissions`) — locations are resolved through explicit assignments + `inherit_parent` chains via the `get_effective_locations_for_company` SECURITY DEFINER RPC, plus the user's `user_location_permissions` / `view_all_locations` flag.
 
-- `Bulk stock upload - Bin: LNPE`
-- `Transfer STR-20260425-001 - FIFO out from bin`
-- `Bulk stock upload - Bin: LAN`
+## Solution
 
-None contain the words "order", "PO", or "numbers", so the empty result is technically correct — but the **input model is wrong**. International ERPs (SAP S/4HANA Fiori smart filter, Oracle Fusion, Excel AutoFilter "Contains", Jira basic search) all treat unquoted multi-word input as a **single literal phrase**, not as an implicit AND. That's the standard our users expect.
+Replace the global `useWarehouseLocations()` call inside `ReportParameterPanel` with the canonical company-scoped + permission-aware resolver, and honor the global header location filter as a default.
 
-### The fix (one file, one function)
+### Resolution order for the dropdown options
 
-Change the tokeniser in `parseNotesFilter` (`src/hooks/reports/useReportData.ts`) so the `contains` operator follows ISO/SAP-style search semantics:
+1. Start from `useEffectiveLocationsForCompany(selectedCompany.id)` — only locations allocated (explicit or inherited) to the active company.
+2. Intersect with the user's `user_location_permissions` unless their profile flag `view_all_locations = true` (matches the rest of the app).
+3. Keep only nodes of type `location` (same filter the panel already applies), sorted by name.
+4. If `selectedCompany` is null, show an empty list with a hint "Select a company first" rather than every location in the system.
 
-| What you type | What the DB matches |
-|---|---|
-| `Bulk stock upload` | notes contain the literal phrase **"Bulk stock upload"** (one substring, spaces preserved) |
-| `STR-20260425` | notes contain **"STR-20260425"** |
-| `"return to vendor"` | notes contain **"return to vendor"** |
-| `"return to vendor" urgent` | notes contain **"return to vendor"** AND **"urgent"** |
-| `"audit" "spillage"` | notes contain **"audit"** AND **"spillage"** |
+### Behavior changes in the panel
 
-Rules:
-- No double-quotes anywhere → the entire trimmed input is **one** literal substring.
-- Quotes present → each `"…"` becomes its own AND token; everything outside the quotes is collapsed into **one** additional literal token (so users can never accidentally trigger a strict AND of every single word).
-- Capped at 5 tokens for safety.
+- Default value of any `location` parameter becomes the header `globalLocationId` (from `LocationFilterContext`) when it is in the allowed set; otherwise "All locations".
+- When the selected company changes, the panel re-runs the location query and clears any stale `locationId` value that is no longer in the allowed set (prevents silent zero-row reports).
+- Loading state shown in the Select trigger ("Loading locations…") while the RPC is in flight.
+- Disabled state with helper text when the resolved list is empty ("No locations allocated to this company").
 
-The other operators (`equals`, `startsWith`, `endsWith`, `notContains`) already treat the term as one literal string — no change needed there.
+### Server-side safety net
 
-### Why this is the right fix
+Reports already pass `p_company_id` to their RPCs, so a stray location id cannot leak data. We add a defensive guard in `useReportData.ts`: if `locationId` is set but not present in the company's effective list, drop it before calling the RPC and surface a non-blocking toast ("Location not available for this company — showing all locations").
 
-- Matches international convention — same as SAP Fiori, Excel "Contains", Jira basic search, ISO 25964-1 thesaurus search.
-- Predictable: what the user types is what the database matches, with `"…"` as the only "advanced" syntax.
-- Keeps every safety property of the current design — server-side execution, parameterized RPC arguments, `LIKE` wildcard escaping (`%`, `_`, `\`), operator whitelist.
-- No database migration needed — the RPCs already accept `text[]` and `bool_and(... ILIKE ...)`. We're only changing how the client builds the array.
+### Files to change
 
-### Quick sanity check after the change
+- `src/components/management/reports/ReportParameterPanel.tsx`
+  - Swap `useWarehouseLocations` → `useEffectiveLocationsForCompany(selectedCompany?.id)`.
+  - Apply user-permission intersection using `useUserLocationPermissions(user.id)` + `useUserViewAllLocations(user.id)`.
+  - Read `globalLocationId` from `useLocationFilter()` for default seeding.
+  - Add loading / empty / disabled UX for the `location` Select.
+  - Clear stale `locationId` when the allowed set changes.
+- `src/hooks/reports/useReportData.ts`
+  - Defensive scrub: if `locationId` ∉ effective set for `selectedCompany`, set to `null` before calling the RPC.
+- `src/pages/management/ReportsCenter.tsx`
+  - Pass the resolved effective-location list down (or expose via the same hook in the panel — no prop drilling needed).
 
-With the fix in place, typing `Bulk stock upload` against your live data will return all the "Bulk stock upload - Bin: …" rows; typing `Transfer STR` will return the FIFO transfer rows. The filter chip in the report header will show:
+### What is NOT changed
 
-```
-Notes filter = contains "Bulk stock upload"
-```
+- No DB migrations. Existing RPCs (`get_effective_locations_for_company`, report RPCs) already enforce company scope.
+- No changes to report registry signatures or column outputs.
+- No change to the global header Location Selector.
 
-so the audit trail is unambiguous.
+## Acceptance criteria
 
-### Files touched
-
-- `src/hooks/reports/useReportData.ts` — rewrite `parseNotesFilter` tokeniser only. No other files, no DB migration.
+- Switching the active company instantly refreshes the Reports Center location dropdown to only that company's allocated locations.
+- Users without `view_all_locations` only see locations they are explicitly permitted on.
+- Selecting "All locations" runs the report scoped to all of the company's effective locations (current behavior).
+- A previously chosen location id that becomes invalid after a company switch is cleared automatically.
+- No location belonging exclusively to another company appears in the dropdown for any user (verified for Stock On Hand, Stock Movement Ledger, Cycle Count Variance, Batch Traceability, and the construction inventory report).
