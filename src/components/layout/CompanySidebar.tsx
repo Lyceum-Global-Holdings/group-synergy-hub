@@ -343,30 +343,57 @@ export function CompanySidebar() {
                                   <CollapsibleContent>
                                     <div className="ml-4 mt-1 space-y-0.5 border-l border-sidebar-border pl-2">
                                       {item.children.map((child) => (
-                                        <NavLink
+                                        <div
                                           key={child.url}
-                                          to={child.url}
-                                          className={`block text-xs py-1.5 px-2 rounded-sm transition-colors ${
-                                            isActive(child.url)
-                                              ? 'bg-sidebar-primary/15 text-sidebar-primary font-medium'
-                                              : 'text-sidebar-muted hover:text-sidebar-accent-foreground hover:bg-sidebar-accent/40'
-                                          }`}
+                                          className="group/pin-row flex items-center gap-1 pr-1"
                                         >
-                                          {child.name}
-                                        </NavLink>
+                                          <NavLink
+                                            to={child.url}
+                                            className={`flex-1 block text-xs py-1.5 px-2 rounded-sm transition-colors ${
+                                              isActive(child.url)
+                                                ? 'bg-sidebar-primary/15 text-sidebar-primary font-medium'
+                                                : 'text-sidebar-muted hover:text-sidebar-accent-foreground hover:bg-sidebar-accent/40'
+                                            }`}
+                                          >
+                                            {child.name}
+                                          </NavLink>
+                                          {!isViewingAllCompanies && selectedCompany && (
+                                            <SidebarPinButton
+                                              isPinned={isItemPinned(dept.key, child.key)}
+                                              companyId={selectedCompany.id}
+                                              moduleKey={dept.key}
+                                              submoduleKey={child.key}
+                                              submoduleUrl={child.url}
+                                              submoduleTitle={child.name}
+                                            />
+                                          )}
+                                        </div>
                                       ))}
                                     </div>
                                   </CollapsibleContent>
                                 </SidebarMenuSubItem>
                               </Collapsible>
                             ) : (
-                              <SidebarMenuSubItem key={item.url}>
-                                <SidebarMenuSubButton
-                                  asChild
-                                  isActive={isActive(item.url)}
-                                >
-                                  <NavLink to={item.url}>{item.title}</NavLink>
-                                </SidebarMenuSubButton>
+                              <SidebarMenuSubItem key={item.url} className="group/pin-row">
+                                <div className="flex items-center gap-1 pr-1">
+                                  <SidebarMenuSubButton
+                                    asChild
+                                    isActive={isActive(item.url)}
+                                    className="flex-1"
+                                  >
+                                    <NavLink to={item.url}>{item.title}</NavLink>
+                                  </SidebarMenuSubButton>
+                                  {!isViewingAllCompanies && selectedCompany && (
+                                    <SidebarPinButton
+                                      isPinned={isItemPinned(dept.key, item.key)}
+                                      companyId={selectedCompany.id}
+                                      moduleKey={dept.key}
+                                      submoduleKey={item.key}
+                                      submoduleUrl={item.url}
+                                      submoduleTitle={item.title}
+                                    />
+                                  )}
+                                </div>
                               </SidebarMenuSubItem>
                             )
                           ))}
