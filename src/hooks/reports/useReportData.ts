@@ -305,7 +305,15 @@ export async function fetchBatchTraceability(
   });
   if (error) throw error;
   const rows = (data ?? []) as Record<string, unknown>[];
-  return envelopeBase(def, ctx, rows);
+  const term = (params.notesContains || "").trim();
+  return envelopeBase(
+    def,
+    ctx,
+    rows,
+    undefined,
+    undefined,
+    term ? { notes: term } : undefined,
+  );
 }
 
 /* ---------------- Phase 3: generic RPC helper ---------------- */
