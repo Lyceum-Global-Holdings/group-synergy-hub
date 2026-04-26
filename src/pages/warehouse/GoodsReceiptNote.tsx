@@ -70,10 +70,18 @@ function GoodsReceiptNote() {
             Manage goods receipts and track inventory inbound
           </p>
         </div>
-        <Button onClick={() => setShowCreateDialog(true)}>
-          <PackageCheck className="mr-2 h-4 w-4" />
-          Create GRN
-        </Button>
+        <div className="flex gap-2">
+          <Button asChild variant="outline">
+            <Link to="/management/reports?template=WH-GRN-REG-001">
+              <FileBarChart className="mr-2 h-4 w-4" />
+              Generate Report
+            </Link>
+          </Button>
+          <Button onClick={() => setShowCreateDialog(true)}>
+            <PackageCheck className="mr-2 h-4 w-4" />
+            Create GRN
+          </Button>
+        </div>
       </div>
 
       {/* Summary Cards */}
