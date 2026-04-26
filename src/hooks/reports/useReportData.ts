@@ -151,7 +151,11 @@ export async function fetchStockMovement(
 export async function fetchCycleCountVariance(
   def: ReportDefinition,
   ctx: BuildEnvelopeContext,
-  params: { period?: { from?: string; to?: string }; locationId?: string | null },
+  params: {
+    period?: { from?: string; to?: string };
+    locationId?: string | null;
+    notesContains?: string | null;
+  },
 ): Promise<ReportEnvelope> {
   const from = params.period?.from || null;
   const to = params.period?.to || null;
@@ -160,6 +164,7 @@ export async function fetchCycleCountVariance(
     p_date_from: from,
     p_date_to: to,
     p_location_id: params.locationId || null,
+    p_notes_contains: (params.notesContains || "").trim() || null,
   });
   if (error) throw error;
   const rows = (data ?? []) as Record<string, unknown>[];
