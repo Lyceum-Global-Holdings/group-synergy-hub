@@ -13512,6 +13512,48 @@ export type Database = {
         }
         Relationships: []
       }
+      report_audit_log: {
+        Row: {
+          company_id: string | null
+          format: string
+          generated_at: string
+          generated_by: string
+          id: string
+          module_key: string
+          params: Json
+          report_code: string
+          report_title: string
+          row_count: number
+          user_agent: string | null
+        }
+        Insert: {
+          company_id?: string | null
+          format: string
+          generated_at?: string
+          generated_by?: string
+          id?: string
+          module_key: string
+          params?: Json
+          report_code: string
+          report_title: string
+          row_count?: number
+          user_agent?: string | null
+        }
+        Update: {
+          company_id?: string | null
+          format?: string
+          generated_at?: string
+          generated_by?: string
+          id?: string
+          module_key?: string
+          params?: Json
+          report_code?: string
+          report_title?: string
+          row_count?: number
+          user_agent?: string | null
+        }
+        Relationships: []
+      }
       rfq_rfp_invited_suppliers: {
         Row: {
           created_at: string | null
@@ -20091,6 +20133,68 @@ export type Database = {
       remove_item_from_inventory: {
         Args: { p_item_id: string }
         Returns: undefined
+      }
+      report_inventory_aging: {
+        Args: { p_category_id?: string; p_company_id: string }
+        Returns: {
+          aging_bucket: string
+          category_name: string
+          current_stock: number
+          days_since_movement: number
+          item_code: string
+          item_id: string
+          item_name: string
+          last_movement_at: string
+          stock_value: number
+          unit_cost: number
+        }[]
+      }
+      report_inventory_valuation: {
+        Args: {
+          p_as_of_date?: string
+          p_category_id?: string
+          p_company_id: string
+        }
+        Returns: {
+          category_name: string
+          current_stock: number
+          fifo_value: number
+          item_code: string
+          item_id: string
+          item_name: string
+          last_unit_cost: number
+          nrv_adjustment: number
+          selling_price: number
+          unit_name: string
+          weighted_avg_cost: number
+          weighted_avg_value: number
+        }[]
+      }
+      report_stock_on_hand: {
+        Args: {
+          p_category_id?: string
+          p_company_id: string
+          p_include_zero?: boolean
+          p_location_id?: string
+        }
+        Returns: {
+          available_quantity: number
+          category_id: string
+          category_name: string
+          current_stock: number
+          item_code: string
+          item_id: string
+          item_name: string
+          location_id: string
+          location_name: string
+          min_stock_level: number
+          reorder_level: number
+          reserved_quantity: number
+          status: string
+          stock_value: number
+          unit_cost: number
+          unit_name: string
+        }[]
       }
       return_tool_to_bin: {
         Args: {

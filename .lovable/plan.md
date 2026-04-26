@@ -1,53 +1,138 @@
-# Fix: Tool Import "Find by exact code" — found items must appear in the list
+## Goal
 
-## Symptom
-On `/warehouse/tool-management` → "Import from Item Master", typing an exact code (e.g. `INV-CMP-CBL-0001`) into the finder shows the green "Item found" toast, but the row never appears in the table for the user to tick.
+Add a single **Reports Center** under the Management module that can generate standardised reports for every operational module, with a deep, first-class set of warehouse reports. The system follows international reporting standards so the output is audit-ready.
 
-## Root cause
-The candidate query in `ImportFromItemMasterDialog.tsx` is keyed on:
+## International standards applied
 
-```ts
-queryKey: [
-  "tool-catalog-candidates",
-  sourceScope,                       // "suggested" | "tools" | "all"
-  targetCompanyId,
-  destinationLocationId,
-  effectiveCategoryIds.join(","),    // null when scope === "all"
-]
+- **WCO / ISO 9001 §7.5 (Documented Information)** — every report carries a header block: company, report code, generated-by, generated-at (UTC + local), period, filters, page x/y, signature line.
+- **ISO 8601** dates/times, **ISO 4217** currency codes, **ISO 3166** country codes.
+- **GS1 / ISO/IEC 15459** item & batch identifiers shown alongside internal codes.
+- **IFRS / IAS 2 (Inventories)** valuation reports show cost basis (FIFO/Weighted Avg), NRV, and write-down columns.
+- **COSO / SOX-style** audit trail report (who/what/when/before/after).
+- **GDPR Art. 30** processing-records friendly export (PII fields flagged, can be redacted).
+- Output formats: **XLSX** (openpyxl-style structured workbooks via existing `writeExcelFromJSON`), **PDF/A-ready** (jsPDF + autoTable, already in stack), and **CSV (RFC 4180)**.
+
+## What will be built
+
+### 1. New route & navigation
+
+- New page `src/pages/management/ReportsCenter.tsx` at `/management/reports`.
+- Add `{ key: 'reports', name: 'Reports Center', description: 'Standardised reports for all modules', url: '/management/reports' }` to `moduleConfig.management.subModules`.
+- Wire route in `src/App.tsx` (lazy import).
+- Sidebar entry inherits automatically from module config.
+
+### 2. Reports Center UI
+
+```text
+┌──────────────────────────────────────────────────────────┐
+│  Reports Center                                          │
+│  [ Module ▾ ]  [ Search reports… ]   [ Recently run ]    │
+├──────────────────────────────────────────────────────────┤
+│  Warehouse  │  Stock on Hand        ISO/IAS 2            │
+│             │  Stock Movement       ISO 8601 period      │
+│             │  Inventory Valuation  IFRS/IAS 2 (FIFO/WA) │
+│             │  ABC / Pareto         ISO 55000 asset mgmt │
+│             │  Aging & Dead Stock   IAS 2 §28 NRV        │
+│             │  Cycle Count Variance ISO 9001 §8.7        │
+│             │  Bin Utilisation      WMS best practice    │
+│             │  GRN Register         WCO trade docs       │
+│             │  Asset Register       ISO 55000 / IAS 16   │
+│             │  Tool Issue / Return  ISO 55000            │
+│             │  Batch Traceability   GS1 CTE/KDE, ISO22005│
+│  Finance    │  …                                         │
+│  Procurement│  …                                         │
+└──────────────────────────────────────────────────────────┘
 ```
 
-When `sourceScope` is `"tools"` or `"suggested"`, the RPC is called with the recursive descendant set of `TOO-HND` / `TOO-PWR`. Catalog rows that are **uncategorized** (the bulk of the catalog — see existing memory `tool-promotion-source-of-truth`) or whose category sits outside the tool subtree are **never returned by the server**, so:
+- Left rail = module list (warehouse expanded by default).
+- Middle = grid of report cards (title, standard tag, description, last run).
+- Right slide-over = parameter panel (period, location, category, status, currency, format).
+- Footer of dialog: **Preview**, **Export XLSX**, **Export PDF**, **Export CSV**, **Schedule** (future).
 
-1. `runFinder` confirms the row exists via `find_catalog_item_by_code`,
-2. sets `searchTerm = row.item_code` and `categoryFilter = "all"`,
-3. but leaves `sourceScope` untouched,
-4. so `items` still doesn't contain the row → `filteredItems` is empty → nothing to tick.
+### 3. Warehouse reports (priority set)
 
-The current code also scrolls via a fixed `setTimeout(..., 50)` which races with the React Query refetch when the scope *does* change.
+Each report is an SQL-backed `SECURITY INVOKER` RPC returning a flat row shape (keeps with the existing list-RPC pattern), plus a TS adapter that maps it to the standard report envelope.
 
-## Fix — "Lookup outranks filter"
+| Report | RPC | Source tables | Standard |
+|---|---|---|---|
+| Stock on Hand (by location/category) | `report_stock_on_hand` | warehouse_items, warehouse_bins, warehouse_locations, item_categories | IAS 2 |
+| Stock Movement Ledger | reuse `useStockMovementReport` + extend | stock_transactions | ISO 8601 period |
+| Inventory Valuation (FIFO / Weighted Avg) | `report_inventory_valuation` | warehouse_items, grn_items, batches | IFRS / IAS 2 |
+| ABC / Pareto Classification | `report_abc_classification` | stock_transactions (12-mo consumption) | ISO 55000 |
+| Aging & Dead Stock | `report_inventory_aging` | warehouse_items, stock_transactions | IAS 2 §28 NRV |
+| Cycle Count Variance | `report_cycle_count_variance` | cycle_counts, cycle_count_lines | ISO 9001 §8.7 |
+| Bin Utilisation / Capacity | `report_bin_utilisation` | warehouse_bins | WMS best practice |
+| GRN Register | `report_grn_register` | grn, grn_items, suppliers | WCO |
+| Asset Register | reuse `useWarehouseAssetReport` + add depreciation columns | warehouse_assets | ISO 55000 / IAS 16 |
+| Tool Issue / Return Ledger | `report_tool_ledger` | tool_issues, tool_returns | ISO 55000 |
+| Batch Traceability (forward + backward) | `report_batch_traceability` | batches, grn_items, stock_transactions | GS1 CTE/KDE, ISO 22005 |
 
-Edit `src/components/warehouse/tools/ImportFromItemMasterDialog.tsx`, in `runFinder` after the success/active/already-imported guards:
+All RPCs respect existing RLS and `selected_company_id` scoping.
 
-1. **Force `setSourceScope("all")`** before setting search/category. This is the only scope guaranteed to include the confirmed row, since `find_catalog_item_by_code` scans the entire `warehouse_item_catalog` regardless of category.
-2. Keep `setCategoryFilter("all")` and `setSearchTerm(row.item_code)`.
-3. **Replace the fixed `setTimeout(50)` scroll** with a poll loop (≤2s) that watches the React Query cache for any `["tool-catalog-candidates", …]` entry containing the matched `catalog_id`. Once present, `requestAnimationFrame` then `rowVirtualizer.scrollToIndex(0, { align: "center" })`. This works whether the data was already cached (instant) or had to refetch (waits for the broadened scope's response).
-4. **Update the success toast** to tell the user when the scope was switched, so the UI change isn't surprising:
-   - If `sourceScope !== "all"` or `categoryFilter !== "all"` before the lookup → append `"Switched scope to \"All item master\" so it's visible."`
-   - Otherwise keep the existing copy.
-5. Add `sourceScope`, `categoryFilter`, `queryClient` to the `useCallback` dep array.
+### 4. Standard report envelope
 
-No other files need changing. The existing RPC `find_catalog_item_by_code` and the candidate RPC `get_tool_catalog_candidates` already support this — only the client orchestration was wrong.
+Every report (regardless of module) is rendered through one shared renderer so headers, footers, and metadata are identical. Implemented in `src/lib/reports/reportEnvelope.ts`:
 
-## Memory update
-Append to `.lovable/memory/architecture/tool-promotion-source-of-truth.md` under "How to apply":
+```text
+HEADER:
+  Lyceum Global Holdings · <Company>
+  <Report Title>                       Report Code: WH-INV-VAL-001
+  Period: 2026-01-01 → 2026-04-26 (ISO 8601, UTC)
+  Filters: Location=All, Category=Electronics, Currency=LKR (ISO 4217)
+  Generated: 2026-04-26T10:14:22Z by jane.doe@lgh.lk
+BODY (table)
+FOOTER:
+  Page x/y  ·  Signature: __________  Date: __________
+  Source: Lyceum ERP  ·  Confidential — Internal Use
+```
 
-> - **Lookup outranks filter.** When `find_catalog_item_by_code` returns a server-confirmed row, the dialog MUST broaden the data window (`sourceScope = "all"`, `categoryFilter = "all"`) before applying the search term. A confirmed row is authoritative and must never stay invisible because of a narrowing UI filter. Wait for the candidate query to contain the matched `catalog_id` (poll the React Query cache, ≤2s deadline) BEFORE asking the virtualizer to scroll, otherwise the scroll lands on an empty list mid-refetch.
+### 5. Export pipeline
 
-## Verification
-1. Open Import from Item Master with the default scope tab.
-2. Switch to the "Tools" scope tab (narrow window).
-3. Type `INV-CMP-CBL-0001` → click Find.
-4. Expected: scope tab flips to "All item master", the row appears highlighted at the top, ready to tick. Toast mentions the scope switch.
-5. Repeat with an inactive code → "Item is inactive" toast, no scope change.
-6. Repeat with an already-imported code → "Already in Tool Master" toast, no scope change.
+- **XLSX**: extend `writeExcelFromJSON` with a `reportMeta` parameter to emit the header rows, freeze panes, bold totals, ISO date formatting (`yyyy-mm-dd`), and ISO 4217 currency formatting.
+- **PDF**: shared `src/lib/reports/pdfRenderer.ts` (jsPDF + autoTable) with the same header/footer; A4 portrait by default, A3 landscape for wide tables; embeds a small QR code linking back to the live report URL with current filters (verification).
+- **CSV**: RFC 4180 quoting, UTF-8 BOM for Excel compatibility.
+
+### 6. Permissions & audit
+
+- New RBAC operation: `management.reports.view` and `management.reports.export`.
+- Every export inserts a row into `report_audit_log` (report_code, params hash, format, user_id, company_id, row_count, generated_at) — satisfies COSO / SOX-style audit trail.
+
+### 7. Discoverability
+
+- "Generate Report" buttons inside each warehouse page (e.g. Inventory Valuation, GRN, Tool Mgmt) link directly to Reports Center with the matching template + filters pre-filled via query params (e.g. `/management/reports?template=WH-INV-VAL-001&location=...`).
+
+## Out of scope (this iteration)
+
+- Scheduled / emailed reports (Telegram + email delivery is a follow-up; the Schedule button will be present but disabled with "coming soon").
+- Per-user saved report presets.
+- Cross-company consolidated reports (requires separate consolidation rules).
+
+## Files to create / edit
+
+**Create**
+- `src/pages/management/ReportsCenter.tsx`
+- `src/components/management/reports/ReportCard.tsx`
+- `src/components/management/reports/ReportParameterPanel.tsx`
+- `src/components/management/reports/ReportPreviewDialog.tsx`
+- `src/lib/reports/reportEnvelope.ts`
+- `src/lib/reports/pdfRenderer.ts`
+- `src/lib/reports/csvRenderer.ts`
+- `src/lib/reports/registry.ts` (catalog of report definitions per module)
+- `src/hooks/reports/use<ReportName>.ts` (one per warehouse report)
+- Migration: new RPCs listed above + `report_audit_log` table with RLS
+- `.lovable/memory/architecture/reporting-standards.md`
+
+**Edit**
+- `src/App.tsx` (route)
+- `src/constants/moduleConfig.ts` (sub-module entry)
+- `src/utils/excelUtils.ts` (header/meta block support)
+- `src/constants/rbacConfig.ts` (new operations)
+
+## Acceptance criteria
+
+- `/management/reports` lists all warehouse templates and at least placeholder cards for the other modules.
+- Each warehouse report can be previewed on screen, exported to XLSX/PDF/CSV, and produces an entry in `report_audit_log`.
+- All exports carry the ISO-compliant header/footer block and use ISO 8601 dates and ISO 4217 currency codes.
+- Inventory Valuation report shows both FIFO and Weighted Average columns and a NRV adjustment column.
+- Batch Traceability report supports both forward and backward trace from a batch number or item code.
+- Permissions are honoured (non-authorised users see neither the page nor the buttons).
