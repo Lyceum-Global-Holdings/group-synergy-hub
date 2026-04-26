@@ -17,7 +17,8 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "
 import { useCompany } from "@/contexts/CompanyContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
-import { REPORT_REGISTRY, ReportDefinition, getReportsByModule } from "@/lib/reports/registry";
+import { REPORT_REGISTRY, ReportDefinition, getReportsByModule, groupReports } from "@/lib/reports/registry";
+import { RotateCcw } from "lucide-react";
 import { ReportParameterPanel } from "@/components/management/reports/ReportParameterPanel";
 import { ReportPreviewTable } from "@/components/management/reports/ReportPreviewTable";
 import { buildReportEnvelope } from "@/hooks/reports/useReportData";
