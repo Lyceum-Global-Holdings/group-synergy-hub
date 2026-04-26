@@ -96,6 +96,13 @@ export function ReportPreviewTable({ envelope }: Props) {
                     (c.type === "number" || c.type === "currency" || c.type === "integer"
                       ? "right"
                       : "left");
+                  const formatted = formatValue(row[c.key], c, envelope.currency);
+                  const term = envelope.highlightTerms?.[c.key];
+                  const isStringCol = !c.type || c.type === "string";
+                  const shouldHighlight =
+                    isStringCol &&
+                    !!term &&
+                    formatted.toLowerCase().includes(term.toLowerCase());
                   return (
                     <TableCell
                       key={c.key}
@@ -104,7 +111,7 @@ export function ReportPreviewTable({ envelope }: Props) {
                         align === "center" && "text-center",
                       )}
                     >
-                      {formatValue(row[c.key], c, envelope.currency)}
+                      {shouldHighlight ? renderHighlighted(formatted, term!) : formatted}
                     </TableCell>
                   );
                 })}
