@@ -98,7 +98,8 @@ function SubcontractorResourcesInner() {
 
       <AsOfDateBar noun="subcontractor allocations" />
 
-
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+        <TabsList>
           <TabsTrigger value="allocation">Allocation View</TabsTrigger>
           <TabsTrigger value="master">Subcontractor Master List</TabsTrigger>
         </TabsList>
