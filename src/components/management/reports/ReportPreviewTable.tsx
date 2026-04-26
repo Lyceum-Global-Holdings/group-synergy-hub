@@ -9,18 +9,32 @@ interface Props {
 }
 
 /**
- * Render a string with case-insensitive matches of `term` wrapped in <mark>.
- * Uses semantic <mark> + warning design token so it adapts to light/dark themes
- * and is announced by assistive tech as "highlighted text" (WCAG 2.2).
+ * Render a string with case-insensitive matches of any term in `terms` wrapped
+ * in <mark>. Uses semantic <mark> + warning design token so it adapts to
+ * light/dark themes and is announced by assistive tech as "highlighted text"
+ * (WCAG 2.2). When `wholeCell` is true the entire string is wrapped in <mark>
+ * (used for the "equals" operator).
  */
-function renderHighlighted(text: string, term: string) {
-  if (!term) return text;
-  const safe = term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const re = new RegExp(`(${safe})`, "ig");
+function escapeRegex(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function renderHighlighted(text: string, terms: string[], wholeCell = false) {
+  if (!terms.length) return text;
+  if (wholeCell) {
+    return (
+      <mark className="rounded-sm bg-warning/30 text-foreground px-0.5">
+        {text}
+      </mark>
+    );
+  }
+  // Sort by length desc so longer phrases win over substrings of themselves.
+  const ordered = [...terms].sort((a, b) => b.length - a.length);
+  const re = new RegExp(`(${ordered.map(escapeRegex).join("|")})`, "ig");
   const parts = text.split(re);
-  const lower = term.toLowerCase();
+  const lowerSet = new Set(ordered.map((t) => t.toLowerCase()));
   return parts.map((part, i) =>
-    part.toLowerCase() === lower ? (
+    lowerSet.has(part.toLowerCase()) ? (
       <mark
         key={i}
         className="rounded-sm bg-warning/30 text-foreground px-0.5"
@@ -97,12 +111,16 @@ export function ReportPreviewTable({ envelope }: Props) {
                       ? "right"
                       : "left");
                   const formatted = formatValue(row[c.key], c, envelope.currency);
-                  const term = envelope.highlightTerms?.[c.key];
+                  const terms = envelope.highlightTerms?.[c.key] ?? [];
                   const isStringCol = !c.type || c.type === "string";
+                  const wholeCell = !!envelope.highlightWholeCell;
+                  const lower = formatted.toLowerCase();
                   const shouldHighlight =
                     isStringCol &&
-                    !!term &&
-                    formatted.toLowerCase().includes(term.toLowerCase());
+                    terms.length > 0 &&
+                    (wholeCell
+                      ? terms.some((t) => lower === t.trim().toLowerCase())
+                      : terms.some((t) => lower.includes(t.toLowerCase())));
                   return (
                     <TableCell
                       key={c.key}
@@ -111,7 +129,9 @@ export function ReportPreviewTable({ envelope }: Props) {
                         align === "center" && "text-center",
                       )}
                     >
-                      {shouldHighlight ? renderHighlighted(formatted, term!) : formatted}
+                      {shouldHighlight
+                        ? renderHighlighted(formatted, terms, wholeCell)
+                        : formatted}
                     </TableCell>
                   );
                 })}

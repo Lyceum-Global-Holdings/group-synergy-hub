@@ -315,6 +315,13 @@ function buildFilterDescriptors(
   def: ReportDefinition,
   params: Record<string, unknown>,
 ): { label: string; value: string }[] {
+  const opLabels: Record<string, string> = {
+    contains: "contains",
+    equals: "equals",
+    startsWith: "starts with",
+    endsWith: "ends with",
+    notContains: "does not contain",
+  };
   return def.parameters
     .map((p) => {
       const v = params[p.key];
@@ -331,6 +338,11 @@ function buildFilterDescriptors(
         display = opt?.label ?? String(v);
       } else if (p.type === "location" || p.type === "category" || p.type === "supplier") {
         display = String(v).slice(0, 8) + "…";
+      } else if (p.type === "textOperator") {
+        const tv = v as { op?: string; term?: string };
+        const term = (tv.term ?? "").trim();
+        if (!term) return null;
+        display = `${opLabels[tv.op ?? "contains"] ?? "contains"} “${term}”`;
       } else {
         display = String(v);
       }

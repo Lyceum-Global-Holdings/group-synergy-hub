@@ -1,6 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import { ReportDefinition } from "@/lib/reports/registry";
-import { ReportEnvelope } from "@/lib/reports/types";
+import { ReportEnvelope, NotesFilterOp } from "@/lib/reports/types";
 
 export interface BuildEnvelopeContext {
   companyName: string;
@@ -16,7 +16,8 @@ function envelopeBase(
   rows: Record<string, unknown>[],
   totals?: Record<string, unknown>,
   period?: { start?: string; end?: string },
-  highlightTerms?: Record<string, string>,
+  highlightTerms?: Record<string, string[]>,
+  highlightWholeCell?: boolean,
 ): ReportEnvelope {
   return {
     reportCode: def.code,
@@ -34,11 +35,78 @@ function envelopeBase(
     rows,
     totals,
     highlightTerms,
+    highlightWholeCell,
   };
 }
 
 function sumCol(rows: Record<string, unknown>[], key: string): number {
   return rows.reduce((s, r) => s + Number(r[key] ?? 0), 0);
+}
+
+/* ---------------- Notes filter parsing ---------------- */
+
+const VALID_OPS: readonly NotesFilterOp[] = [
+  "contains",
+  "equals",
+  "startsWith",
+  "endsWith",
+  "notContains",
+] as const;
+
+const MAX_TERMS = 5;
+
+export interface ParsedNotesFilter {
+  op: NotesFilterOp;
+  /** 1+ tokens for "contains"; exactly 1 for the other operators. */
+  terms: string[];
+}
+
+/**
+ * Parse a `textOperator` parameter value into RPC arguments.
+ * For "contains", the term string is split on whitespace OUTSIDE double quotes
+ * so users can AND multiple words and use "quoted phrases" with embedded spaces.
+ * Returns null when the filter is inactive (no/blank term).
+ */
+export function parseNotesFilter(v: unknown): ParsedNotesFilter | null {
+  if (!v || typeof v !== "object") return null;
+  const raw = v as { op?: unknown; term?: unknown };
+  const op = (VALID_OPS as readonly string[]).includes(String(raw.op))
+    ? (raw.op as NotesFilterOp)
+    : "contains";
+  const term = typeof raw.term === "string" ? raw.term : "";
+  const trimmed = term.trim();
+  if (!trimmed) return null;
+
+  if (op !== "contains") {
+    return { op, terms: [trimmed] };
+  }
+
+  // Tokenize: keep "quoted phrases" intact, split everything else on whitespace.
+  const tokens: string[] = [];
+  const re = /"([^"]*)"|(\S+)/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(trimmed)) !== null) {
+    const t = (m[1] ?? m[2] ?? "").trim();
+    if (t) tokens.push(t);
+    if (tokens.length >= MAX_TERMS) break;
+  }
+  if (tokens.length === 0) return null;
+  return { op, terms: tokens };
+}
+
+/** Build the highlight-terms map + wholeCell flag for a given operator/terms. */
+function buildHighlight(
+  columnKey: string,
+  parsed: ParsedNotesFilter | null,
+): { terms: Record<string, string[]> | undefined; wholeCell: boolean } {
+  if (!parsed) return { terms: undefined, wholeCell: false };
+  // notContains: nothing matched, by definition — no highlight.
+  if (parsed.op === "notContains") return { terms: undefined, wholeCell: false };
+  // equals: wrap the entire matching cell.
+  if (parsed.op === "equals") {
+    return { terms: { [columnKey]: parsed.terms }, wholeCell: true };
+  }
+  return { terms: { [columnKey]: parsed.terms }, wholeCell: false };
 }
 
 /* ---------------- Inventory ---------------- */
@@ -128,21 +196,23 @@ export async function fetchStockMovement(
   params: {
     period?: { from?: string; to?: string };
     locationId?: string | null;
-    notesContains?: string | null;
+    notesFilter?: unknown;
   },
 ): Promise<ReportEnvelope> {
   const from = params.period?.from ? new Date(params.period.from).toISOString() : null;
   const to = params.period?.to ? new Date(params.period.to).toISOString() : null;
+  const parsed = parseNotesFilter(params.notesFilter);
   const { data, error } = await supabase.rpc("report_stock_movement_ledger", {
     p_company_id: ctx.companyId,
     p_date_from: from,
     p_date_to: to,
     p_location_id: params.locationId || null,
-    p_notes_contains: (params.notesContains || "").trim() || null,
+    p_notes_op: parsed?.op ?? "contains",
+    p_notes_terms: parsed?.terms ?? null,
   });
   if (error) throw error;
   const rows = (data ?? []) as Record<string, unknown>[];
-  const term = (params.notesContains || "").trim();
+  const hl = buildHighlight("notes", parsed);
   return envelopeBase(
     def,
     ctx,
@@ -152,7 +222,8 @@ export async function fetchStockMovement(
       total_value: sumCol(rows, "total_value"),
     },
     { start: from?.slice(0, 10), end: to?.slice(0, 10) },
-    term ? { notes: term } : undefined,
+    hl.terms,
+    hl.wholeCell,
   );
 }
 
@@ -164,21 +235,23 @@ export async function fetchCycleCountVariance(
   params: {
     period?: { from?: string; to?: string };
     locationId?: string | null;
-    notesContains?: string | null;
+    notesFilter?: unknown;
   },
 ): Promise<ReportEnvelope> {
   const from = params.period?.from || null;
   const to = params.period?.to || null;
+  const parsed = parseNotesFilter(params.notesFilter);
   const { data, error } = await supabase.rpc("report_cycle_count_variance", {
     p_company_id: ctx.companyId,
     p_date_from: from,
     p_date_to: to,
     p_location_id: params.locationId || null,
-    p_notes_contains: (params.notesContains || "").trim() || null,
+    p_notes_op: parsed?.op ?? "contains",
+    p_notes_terms: parsed?.terms ?? null,
   });
   if (error) throw error;
   const rows = (data ?? []) as Record<string, unknown>[];
-  const term = (params.notesContains || "").trim();
+  const hl = buildHighlight("variance_reason", parsed);
   return envelopeBase(
     def,
     ctx,
@@ -188,7 +261,8 @@ export async function fetchCycleCountVariance(
       variance_value: sumCol(rows, "variance_value"),
     },
     { start: from ?? undefined, end: to ?? undefined },
-    term ? { variance_reason: term } : undefined,
+    hl.terms,
+    hl.wholeCell,
   );
 }
 
@@ -288,7 +362,7 @@ export async function fetchBatchTraceability(
     batchNumber?: string;
     itemCode?: string;
     direction?: string;
-    notesContains?: string | null;
+    notesFilter?: unknown;
   },
 ): Promise<ReportEnvelope> {
   const batch = (params.batchNumber || "").trim() || null;
@@ -296,23 +370,26 @@ export async function fetchBatchTraceability(
   if (!batch && !code) {
     throw new Error("Provide either a Batch Number or an Item Code to trace.");
   }
+  const parsed = parseNotesFilter(params.notesFilter);
   const { data, error } = await supabase.rpc("report_batch_traceability", {
     p_company_id: ctx.companyId,
     p_batch_number: batch,
     p_item_code: code,
     p_direction: params.direction || "both",
-    p_notes_contains: (params.notesContains || "").trim() || null,
+    p_notes_op: parsed?.op ?? "contains",
+    p_notes_terms: parsed?.terms ?? null,
   });
   if (error) throw error;
   const rows = (data ?? []) as Record<string, unknown>[];
-  const term = (params.notesContains || "").trim();
+  const hl = buildHighlight("notes", parsed);
   return envelopeBase(
     def,
     ctx,
     rows,
     undefined,
     undefined,
-    term ? { notes: term } : undefined,
+    hl.terms,
+    hl.wholeCell,
   );
 }
 
