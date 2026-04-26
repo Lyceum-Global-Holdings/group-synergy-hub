@@ -24,6 +24,8 @@ import { useLocations } from "@/hooks/construction/useConstructionInventory";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { ResourceDateProvider } from "@/contexts/ResourceDateContext";
+import { AsOfDateBar } from "@/components/construction/AsOfDateBar";
 
 // Allocation sub-tabs
 const ALLOCATION_TABS = [
@@ -34,7 +36,7 @@ const ALLOCATION_TABS = [
   { value: "service-repair", label: "Service & Repair", icon: Wrench },
 ];
 
-export default function InventoryItems() {
+function InventoryItemsInner() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("allocation");
   const [allocationSubTab, setAllocationSubTab] = useState("dashboard");
