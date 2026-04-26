@@ -61,6 +61,19 @@ export type ReportParameter =
       label: string;
       type: "boolean";
       defaultValue?: boolean;
+    }
+  | {
+      key: string;
+      label: string;
+      /**
+       * Composite text filter with an operator dropdown
+       * (contains / equals / startsWith / endsWith / notContains).
+       * Value shape: { op: NotesFilterOp; term: string }
+       */
+      type: "textOperator";
+      placeholder?: string;
+      /** Column key to highlight in the preview when a match is found. */
+      highlightColumn: string;
     };
 
 export const REPORT_REGISTRY: ReportDefinition[] = [
