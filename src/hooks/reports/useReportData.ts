@@ -16,6 +16,7 @@ function envelopeBase(
   rows: Record<string, unknown>[],
   totals?: Record<string, unknown>,
   period?: { start?: string; end?: string },
+  highlightTerms?: Record<string, string>,
 ): ReportEnvelope {
   return {
     reportCode: def.code,
@@ -32,6 +33,7 @@ function envelopeBase(
     columns: def.columns,
     rows,
     totals,
+    highlightTerms,
   };
 }
 
