@@ -32,7 +32,45 @@ const MODULES = [
   { key: "sourcing", label: "Sourcing" },
   { key: "production", label: "Production" },
   { key: "construction", label: "Construction" },
+  { key: "management", label: "Management" },
 ];
+
+/** Reserved query keys that drive ReportsCenter itself, not template parameters. */
+const RESERVED_QUERY_KEYS = new Set(["template", "module"]);
+
+/**
+ * Seed a parameter object from URL query params, only for keys declared by the
+ * report definition. Values are coerced to the parameter's expected type.
+ */
+function seedParamsFromUrl(
+  def: ReportDefinition | null,
+  searchParams: URLSearchParams,
+): Record<string, unknown> {
+  if (!def) return {};
+  const out: Record<string, unknown> = {};
+  for (const p of def.parameters) {
+    const raw = searchParams.get(p.key);
+    if (raw === null) {
+      // Special handling for dateRange — read `${key}From` and `${key}To`.
+      if (p.type === "dateRange") {
+        const from = searchParams.get(`${p.key}From`);
+        const to = searchParams.get(`${p.key}To`);
+        if (from || to) out[p.key] = { from: from ?? undefined, to: to ?? undefined };
+      }
+      continue;
+    }
+    if (p.type === "boolean") {
+      out[p.key] = raw === "true" || raw === "1";
+    } else if (p.type === "dateRange") {
+      // Allow `from|to` shorthand
+      const [from, to] = raw.split("|");
+      out[p.key] = { from: from || undefined, to: to || undefined };
+    } else {
+      out[p.key] = raw;
+    }
+  }
+  return out;
+}
 
 export default function ReportsCenter() {
   const [searchParams] = useSearchParams();
