@@ -274,6 +274,30 @@ export async function fetchBatchTraceability(
   return envelopeBase(def, ctx, rows);
 }
 
+/* ---------------- Phase 3: generic RPC helper ---------------- */
+
+async function fetchRpc(
+  def: ReportDefinition,
+  ctx: BuildEnvelopeContext,
+  rpcName: string,
+  args: Record<string, unknown>,
+  period?: { start?: string; end?: string },
+): Promise<ReportEnvelope> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (supabase.rpc as any)(rpcName, args);
+  if (error) throw error;
+  const rows = (data ?? []) as Record<string, unknown>[];
+  return envelopeBase(def, ctx, rows, undefined, period);
+}
+
+function periodArgs(p?: { from?: string; to?: string }) {
+  return {
+    from: p?.from || null,
+    to: p?.to || null,
+    period: { start: p?.from, end: p?.to },
+  };
+}
+
 /* ---------------- Dispatcher ---------------- */
 
 export async function buildReportEnvelope(
@@ -304,6 +328,218 @@ export async function buildReportEnvelope(
       return fetchToolLedger(def, ctx, params as never);
     case "warehouse.batchTraceability":
       return fetchBatchTraceability(def, ctx, params as never);
+
+    /* ---- Finance ---- */
+    case "finance.trialBalance": {
+      const p = params as { asOfDate?: string };
+      return fetchRpc(def, ctx, "report_trial_balance", {
+        p_company_id: ctx.companyId,
+        p_as_of_date: p.asOfDate || new Date().toISOString().slice(0, 10),
+      });
+    }
+    case "finance.generalLedgerDetail": {
+      const p = params as { period?: { from?: string; to?: string }; accountId?: string };
+      const pa = periodArgs(p.period);
+      return fetchRpc(def, ctx, "report_general_ledger_detail", {
+        p_company_id: ctx.companyId,
+        p_date_from: pa.from,
+        p_date_to: pa.to,
+        p_account_id: (p.accountId || "").trim() || null,
+      }, pa.period);
+    }
+    case "finance.apAging": {
+      const p = params as { asOfDate?: string };
+      return fetchRpc(def, ctx, "report_ap_aging", {
+        p_company_id: ctx.companyId,
+        p_as_of_date: p.asOfDate || new Date().toISOString().slice(0, 10),
+        p_supplier_id: null,
+      });
+    }
+    case "finance.arAging": {
+      const p = params as { asOfDate?: string };
+      return fetchRpc(def, ctx, "report_ar_aging", {
+        p_company_id: ctx.companyId,
+        p_as_of_date: p.asOfDate || new Date().toISOString().slice(0, 10),
+        p_customer_id: null,
+      });
+    }
+    case "finance.fixedAssetRegister": {
+      const p = params as { asOfDate?: string };
+      return fetchRpc(def, ctx, "report_fixed_asset_register", {
+        p_company_id: ctx.companyId,
+        p_as_of_date: p.asOfDate || new Date().toISOString().slice(0, 10),
+      });
+    }
+    case "finance.cashBankStatement": {
+      const p = params as { period?: { from?: string; to?: string } };
+      const pa = periodArgs(p.period);
+      return fetchRpc(def, ctx, "report_cash_bank_statement", {
+        p_company_id: ctx.companyId,
+        p_date_from: pa.from,
+        p_date_to: pa.to,
+        p_bank_account_id: null,
+      }, pa.period);
+    }
+
+    /* ---- Procurement ---- */
+    case "procurement.prRegister": {
+      const p = params as { period?: { from?: string; to?: string } };
+      const pa = periodArgs(p.period);
+      return fetchRpc(def, ctx, "report_pr_register", {
+        p_company_id: ctx.companyId,
+        p_date_from: pa.from,
+        p_date_to: pa.to,
+        p_status: null,
+      }, pa.period);
+    }
+    case "procurement.poRegister": {
+      const p = params as { period?: { from?: string; to?: string } };
+      const pa = periodArgs(p.period);
+      return fetchRpc(def, ctx, "report_po_register", {
+        p_company_id: ctx.companyId,
+        p_date_from: pa.from,
+        p_date_to: pa.to,
+        p_status: null,
+      }, pa.period);
+    }
+    case "procurement.openPo":
+      return fetchRpc(def, ctx, "report_open_po", { p_company_id: ctx.companyId });
+    case "procurement.threeWayMatchExceptions": {
+      const p = params as { period?: { from?: string; to?: string } };
+      const pa = periodArgs(p.period);
+      return fetchRpc(def, ctx, "report_three_way_match_exceptions", {
+        p_company_id: ctx.companyId,
+        p_date_from: pa.from,
+        p_date_to: pa.to,
+      }, pa.period);
+    }
+    case "procurement.spendAnalysis": {
+      const p = params as { period?: { from?: string; to?: string } };
+      const pa = periodArgs(p.period);
+      return fetchRpc(def, ctx, "report_spend_analysis", {
+        p_company_id: ctx.companyId,
+        p_date_from: pa.from,
+        p_date_to: pa.to,
+      }, pa.period);
+    }
+
+    /* ---- Sourcing ---- */
+    case "sourcing.rfqRegister": {
+      const p = params as { period?: { from?: string; to?: string } };
+      const pa = periodArgs(p.period);
+      return fetchRpc(def, ctx, "report_rfq_register", {
+        p_company_id: ctx.companyId,
+        p_date_from: pa.from,
+        p_date_to: pa.to,
+        p_status: null,
+      }, pa.period);
+    }
+    case "sourcing.quoteComparison": {
+      const p = params as { requestId?: string };
+      return fetchRpc(def, ctx, "report_quote_comparison", {
+        p_company_id: ctx.companyId,
+        p_request_id: (p.requestId || "").trim() || null,
+      });
+    }
+    case "sourcing.supplierScorecard": {
+      const p = params as { period?: { from?: string; to?: string } };
+      const pa = periodArgs(p.period);
+      return fetchRpc(def, ctx, "report_supplier_scorecard", {
+        p_company_id: ctx.companyId,
+        p_date_from: pa.from,
+        p_date_to: pa.to,
+      }, pa.period);
+    }
+    case "sourcing.contractExpiry": {
+      const p = params as { horizon?: string };
+      return fetchRpc(def, ctx, "report_contract_expiry", {
+        p_company_id: ctx.companyId,
+        p_horizon_days: Number(p.horizon || 180),
+      });
+    }
+
+    /* ---- Production ---- */
+    case "production.wip":
+      return fetchRpc(def, ctx, "report_production_wip", { p_company_id: ctx.companyId });
+    case "production.dailyOutput": {
+      const p = params as { period?: { from?: string; to?: string } };
+      const pa = periodArgs(p.period);
+      return fetchRpc(def, ctx, "report_production_daily_output", {
+        p_company_id: ctx.companyId,
+        p_date_from: pa.from,
+        p_date_to: pa.to,
+      }, pa.period);
+    }
+    case "production.stageCost": {
+      const p = params as { orderId?: string };
+      return fetchRpc(def, ctx, "report_production_stage_cost", {
+        p_company_id: ctx.companyId,
+        p_order_id: (p.orderId || "").trim() || null,
+      });
+    }
+    case "production.efficiency": {
+      const p = params as { period?: { from?: string; to?: string } };
+      const pa = periodArgs(p.period);
+      return fetchRpc(def, ctx, "report_production_efficiency", {
+        p_company_id: ctx.companyId,
+        p_date_from: pa.from,
+        p_date_to: pa.to,
+      }, pa.period);
+    }
+
+    /* ---- Construction ---- */
+    case "construction.dsrSummary": {
+      const p = params as { period?: { from?: string; to?: string } };
+      const pa = periodArgs(p.period);
+      return fetchRpc(def, ctx, "report_construction_dsr_summary", {
+        p_company_id: ctx.companyId,
+        p_date_from: pa.from,
+        p_date_to: pa.to,
+        p_project_id: null,
+      }, pa.period);
+    }
+    case "construction.progress":
+      return fetchRpc(def, ctx, "report_construction_progress", { p_company_id: ctx.companyId });
+    case "construction.budgetVariance": {
+      const p = params as { projectId?: string };
+      return fetchRpc(def, ctx, "report_construction_budget_variance", {
+        p_company_id: ctx.companyId,
+        p_project_id: (p.projectId || "").trim() || null,
+      });
+    }
+    case "construction.materialMovements": {
+      const p = params as { period?: { from?: string; to?: string } };
+      const pa = periodArgs(p.period);
+      return fetchRpc(def, ctx, "report_construction_material_movements", {
+        p_company_id: ctx.companyId,
+        p_date_from: pa.from,
+        p_date_to: pa.to,
+      }, pa.period);
+    }
+
+    /* ---- Management ---- */
+    case "management.pendingApprovals":
+      return fetchRpc(def, ctx, "report_pending_approvals", { p_company_id: ctx.companyId });
+    case "management.systemAuditLog": {
+      const p = params as { period?: { from?: string; to?: string }; module?: string };
+      const pa = periodArgs(p.period);
+      return fetchRpc(def, ctx, "report_system_audit_log", {
+        p_company_id: ctx.companyId,
+        p_date_from: pa.from,
+        p_date_to: pa.to,
+        p_module: (p.module || "").trim() || null,
+      }, pa.period);
+    }
+    case "management.reportUsage": {
+      const p = params as { period?: { from?: string; to?: string } };
+      const pa = periodArgs(p.period);
+      return fetchRpc(def, ctx, "report_report_usage", {
+        p_company_id: ctx.companyId,
+        p_date_from: pa.from,
+        p_date_to: pa.to,
+      }, pa.period);
+    }
+
     default:
       throw new Error(`Unknown report hook: ${def.hookId}`);
   }
