@@ -423,5 +423,6 @@ export function CompanySidebar() {
 
       </SidebarContent>
     </Sidebar>
+    </TooltipProvider>
   );
 }
