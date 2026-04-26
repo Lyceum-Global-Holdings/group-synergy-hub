@@ -25,28 +25,31 @@ import { DeleteConfirmDialog } from "@/components/construction/dialogs/DeleteCon
 import { LabourMasterDialog } from "@/components/construction/dialogs/LabourMasterDialog";
 import { LabourDashboard, LabourWiseView, LabourLocationWiseView } from "@/components/construction/labour";
 import { LabourBulkImportDialog } from "@/components/construction/labour/LabourBulkImportDialog";
+import { ResourceDateProvider, useResourceDate } from "@/contexts/ResourceDateContext";
+import { AsOfDateBar } from "@/components/construction/AsOfDateBar";
 
-export default function LabourResources() {
+function LabourResourcesInner() {
   const navigate = useNavigate();
+  const { asOfDateISO } = useResourceDate();
   const [activeTab, setActiveTab] = useState("allocation");
   const [allocationSubTab, setAllocationSubTab] = useState("dashboard");
   const [searchTerm, setSearchTerm] = useState("");
-  
+
   // Allocation state
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingResource, setEditingResource] = useState<ConstructionResource | null>(null);
   const [deletingResource, setDeletingResource] = useState<ConstructionResource | null>(null);
-  
+
   // Master list state
   const [masterDialogOpen, setMasterDialogOpen] = useState(false);
   const [editingMaster, setEditingMaster] = useState<LabourMaster | null>(null);
   const [deletingMaster, setDeletingMaster] = useState<LabourMaster | null>(null);
   const [bulkImportOpen, setBulkImportOpen] = useState(false);
 
-  // Hooks
-  const { data: resources, isLoading: resourcesLoading } = useConstructionResources();
+  // Hooks — pass as-of date so allocations are filtered server-side
+  const { data: resources, isLoading: resourcesLoading } = useConstructionResources(undefined, { asOfDate: asOfDateISO });
   const deleteResourceMutation = useDeleteConstructionResource();
-  
+
   const { data: labourMaster, isLoading: masterLoading } = useLabourMaster();
   const deleteLabourMutation = useDeleteLabourMaster();
 
@@ -101,6 +104,8 @@ export default function LabourResources() {
           </p>
         </div>
       </div>
+
+      <AsOfDateBar noun="labour allocations" />
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
         <TabsList>
@@ -277,5 +282,13 @@ export default function LabourResources() {
         onOpenChange={setBulkImportOpen}
       />
     </div>
+  );
+}
+
+export default function LabourResources() {
+  return (
+    <ResourceDateProvider>
+      <LabourResourcesInner />
+    </ResourceDateProvider>
   );
 }
