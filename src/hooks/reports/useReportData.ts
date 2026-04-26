@@ -266,7 +266,12 @@ export async function fetchToolLedger(
 export async function fetchBatchTraceability(
   def: ReportDefinition,
   ctx: BuildEnvelopeContext,
-  params: { batchNumber?: string; itemCode?: string; direction?: string },
+  params: {
+    batchNumber?: string;
+    itemCode?: string;
+    direction?: string;
+    notesContains?: string | null;
+  },
 ): Promise<ReportEnvelope> {
   const batch = (params.batchNumber || "").trim() || null;
   const code = (params.itemCode || "").trim() || null;
@@ -278,6 +283,7 @@ export async function fetchBatchTraceability(
     p_batch_number: batch,
     p_item_code: code,
     p_direction: params.direction || "both",
+    p_notes_contains: (params.notesContains || "").trim() || null,
   });
   if (error) throw error;
   const rows = (data ?? []) as Record<string, unknown>[];
