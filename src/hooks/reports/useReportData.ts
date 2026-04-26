@@ -142,10 +142,18 @@ export async function fetchStockMovement(
   });
   if (error) throw error;
   const rows = (data ?? []) as Record<string, unknown>[];
-  return envelopeBase(def, ctx, rows, {
-    quantity_change: sumCol(rows, "quantity_change"),
-    total_value: sumCol(rows, "total_value"),
-  }, { start: from?.slice(0, 10), end: to?.slice(0, 10) });
+  const term = (params.notesContains || "").trim();
+  return envelopeBase(
+    def,
+    ctx,
+    rows,
+    {
+      quantity_change: sumCol(rows, "quantity_change"),
+      total_value: sumCol(rows, "total_value"),
+    },
+    { start: from?.slice(0, 10), end: to?.slice(0, 10) },
+    term ? { notes: term } : undefined,
+  );
 }
 
 /* ---------------- Compliance ---------------- */
