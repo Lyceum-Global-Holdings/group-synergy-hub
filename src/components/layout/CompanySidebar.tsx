@@ -32,6 +32,10 @@ import { moduleConfig, normalizeCompanyModules } from "@/constants/moduleConfig"
 import { useSuperAdmin } from "@/hooks/useSuperAdmin";
 import { useAuth } from "@/contexts/AuthContext";
 import { useUserEffectiveModules } from "@/hooks/useModuleAccess";
+import { useUserPins } from "@/hooks/useSidebarPins";
+import { PinnedSubmodulesGroup } from "./PinnedSubmodulesGroup";
+import { SidebarPinButton } from "./SidebarPinButton";
+import { TooltipProvider } from "@/components/ui/tooltip";
 
 type SubModuleChild = {
   key: string;
@@ -62,6 +66,7 @@ export function CompanySidebar() {
   const { data: isSuperAdmin } = useSuperAdmin();
   const { user } = useAuth();
   const { data: userEffectiveModules } = useUserEffectiveModules(user?.id);
+  const { data: allPins } = useUserPins();
   const currentPath = location.pathname;
 
   const isActive = (path: string) => currentPath === path;
@@ -163,7 +168,45 @@ export function CompanySidebar() {
     })
     .filter(Boolean) as ModuleWithCompanies[];
 
+  // ===== Pinned sub-modules =====
+  const allowedKeys = new Set<string>();
+  departments.forEach((dept) => {
+    dept.items.forEach((item) => {
+      allowedKeys.add(`${dept.key}|${item.key}`);
+      item.children?.forEach((child) =>
+        allowedKeys.add(`${dept.key}|${child.key}`)
+      );
+    });
+  });
+
+  const accessibleCompanyIds = new Set(companies.map((c) => c.id));
+  const visiblePinsAll = (allPins ?? []).filter(
+    (p) =>
+      accessibleCompanyIds.has(p.company_id) &&
+      allowedKeys.has(`${p.module_key}|${p.submodule_key}`)
+  );
+
+  const visiblePins = isViewingAllCompanies
+    ? [...visiblePinsAll].sort((a, b) => {
+        const ca = companies.find((c) => c.id === a.company_id)?.name ?? "";
+        const cb = companies.find((c) => c.id === b.company_id)?.name ?? "";
+        return ca.localeCompare(cb) || a.position - b.position;
+      })
+    : visiblePinsAll
+        .filter((p) => p.company_id === selectedCompany?.id)
+        .sort((a, b) => a.position - b.position);
+
+  const isItemPinned = (moduleKey: string, submoduleKey: string) =>
+    !!selectedCompany &&
+    visiblePinsAll.some(
+      (p) =>
+        p.company_id === selectedCompany.id &&
+        p.module_key === moduleKey &&
+        p.submodule_key === submoduleKey
+    );
+
   return (
+    <TooltipProvider delayDuration={300}>
     <Sidebar className="border-r-0 shadow-[var(--shadow-md)]">
       <SidebarContent className="bg-sidebar">
         {/* Company Header */}
@@ -190,6 +233,13 @@ export function CompanySidebar() {
             </div>
           </div>
         </SidebarGroup>
+
+        {/* Pinned Sub-Modules (per-user, per-company) */}
+        <PinnedSubmodulesGroup
+          pins={visiblePins}
+          reorderDisabled={isViewingAllCompanies}
+          showCompanyBadge={isViewingAllCompanies}
+        />
 
         {/* Main Navigation */}
         <SidebarGroup>
@@ -293,30 +343,57 @@ export function CompanySidebar() {
                                   <CollapsibleContent>
                                     <div className="ml-4 mt-1 space-y-0.5 border-l border-sidebar-border pl-2">
                                       {item.children.map((child) => (
-                                        <NavLink
+                                        <div
                                           key={child.url}
-                                          to={child.url}
-                                          className={`block text-xs py-1.5 px-2 rounded-sm transition-colors ${
-                                            isActive(child.url)
-                                              ? 'bg-sidebar-primary/15 text-sidebar-primary font-medium'
-                                              : 'text-sidebar-muted hover:text-sidebar-accent-foreground hover:bg-sidebar-accent/40'
-                                          }`}
+                                          className="group/pin-row flex items-center gap-1 pr-1"
                                         >
-                                          {child.name}
-                                        </NavLink>
+                                          <NavLink
+                                            to={child.url}
+                                            className={`flex-1 block text-xs py-1.5 px-2 rounded-sm transition-colors ${
+                                              isActive(child.url)
+                                                ? 'bg-sidebar-primary/15 text-sidebar-primary font-medium'
+                                                : 'text-sidebar-muted hover:text-sidebar-accent-foreground hover:bg-sidebar-accent/40'
+                                            }`}
+                                          >
+                                            {child.name}
+                                          </NavLink>
+                                          {!isViewingAllCompanies && selectedCompany && (
+                                            <SidebarPinButton
+                                              isPinned={isItemPinned(dept.key, child.key)}
+                                              companyId={selectedCompany.id}
+                                              moduleKey={dept.key}
+                                              submoduleKey={child.key}
+                                              submoduleUrl={child.url}
+                                              submoduleTitle={child.name}
+                                            />
+                                          )}
+                                        </div>
                                       ))}
                                     </div>
                                   </CollapsibleContent>
                                 </SidebarMenuSubItem>
                               </Collapsible>
                             ) : (
-                              <SidebarMenuSubItem key={item.url}>
-                                <SidebarMenuSubButton
-                                  asChild
-                                  isActive={isActive(item.url)}
-                                >
-                                  <NavLink to={item.url}>{item.title}</NavLink>
-                                </SidebarMenuSubButton>
+                              <SidebarMenuSubItem key={item.url} className="group/pin-row">
+                                <div className="flex items-center gap-1 pr-1">
+                                  <SidebarMenuSubButton
+                                    asChild
+                                    isActive={isActive(item.url)}
+                                    className="flex-1"
+                                  >
+                                    <NavLink to={item.url}>{item.title}</NavLink>
+                                  </SidebarMenuSubButton>
+                                  {!isViewingAllCompanies && selectedCompany && (
+                                    <SidebarPinButton
+                                      isPinned={isItemPinned(dept.key, item.key)}
+                                      companyId={selectedCompany.id}
+                                      moduleKey={dept.key}
+                                      submoduleKey={item.key}
+                                      submoduleUrl={item.url}
+                                      submoduleTitle={item.title}
+                                    />
+                                  )}
+                                </div>
                               </SidebarMenuSubItem>
                             )
                           ))}
@@ -346,5 +423,6 @@ export function CompanySidebar() {
 
       </SidebarContent>
     </Sidebar>
+    </TooltipProvider>
   );
 }
