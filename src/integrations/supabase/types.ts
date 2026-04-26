@@ -20297,7 +20297,8 @@ export type Database = {
               p_company_id: string
               p_direction?: string
               p_item_code?: string
-              p_notes_contains?: string
+              p_notes_op?: string
+              p_notes_terms?: string[]
             }
             Returns: {
               batch_number: string
@@ -20467,7 +20468,8 @@ export type Database = {
               p_date_from?: string
               p_date_to?: string
               p_location_id?: string
-              p_notes_contains?: string
+              p_notes_op?: string
+              p_notes_terms?: string[]
             }
             Returns: {
               count_date: string
@@ -20811,7 +20813,8 @@ export type Database = {
               p_date_from?: string
               p_date_to?: string
               p_location_id?: string
-              p_notes_contains?: string
+              p_notes_op?: string
+              p_notes_terms?: string[]
             }
             Returns: {
               item_code: string
