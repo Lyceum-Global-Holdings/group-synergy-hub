@@ -16,6 +16,7 @@ function envelopeBase(
   rows: Record<string, unknown>[],
   totals?: Record<string, unknown>,
   period?: { start?: string; end?: string },
+  highlightTerms?: Record<string, string>,
 ): ReportEnvelope {
   return {
     reportCode: def.code,
@@ -32,6 +33,7 @@ function envelopeBase(
     columns: def.columns,
     rows,
     totals,
+    highlightTerms,
   };
 }
 
@@ -140,10 +142,18 @@ export async function fetchStockMovement(
   });
   if (error) throw error;
   const rows = (data ?? []) as Record<string, unknown>[];
-  return envelopeBase(def, ctx, rows, {
-    quantity_change: sumCol(rows, "quantity_change"),
-    total_value: sumCol(rows, "total_value"),
-  }, { start: from?.slice(0, 10), end: to?.slice(0, 10) });
+  const term = (params.notesContains || "").trim();
+  return envelopeBase(
+    def,
+    ctx,
+    rows,
+    {
+      quantity_change: sumCol(rows, "quantity_change"),
+      total_value: sumCol(rows, "total_value"),
+    },
+    { start: from?.slice(0, 10), end: to?.slice(0, 10) },
+    term ? { notes: term } : undefined,
+  );
 }
 
 /* ---------------- Compliance ---------------- */
@@ -168,10 +178,18 @@ export async function fetchCycleCountVariance(
   });
   if (error) throw error;
   const rows = (data ?? []) as Record<string, unknown>[];
-  return envelopeBase(def, ctx, rows, {
-    variance_quantity: sumCol(rows, "variance_quantity"),
-    variance_value: sumCol(rows, "variance_value"),
-  }, { start: from ?? undefined, end: to ?? undefined });
+  const term = (params.notesContains || "").trim();
+  return envelopeBase(
+    def,
+    ctx,
+    rows,
+    {
+      variance_quantity: sumCol(rows, "variance_quantity"),
+      variance_value: sumCol(rows, "variance_value"),
+    },
+    { start: from ?? undefined, end: to ?? undefined },
+    term ? { variance_reason: term } : undefined,
+  );
 }
 
 export async function fetchBinUtilisation(
@@ -287,7 +305,15 @@ export async function fetchBatchTraceability(
   });
   if (error) throw error;
   const rows = (data ?? []) as Record<string, unknown>[];
-  return envelopeBase(def, ctx, rows);
+  const term = (params.notesContains || "").trim();
+  return envelopeBase(
+    def,
+    ctx,
+    rows,
+    undefined,
+    undefined,
+    term ? { notes: term } : undefined,
+  );
 }
 
 /* ---------------- Phase 3: generic RPC helper ---------------- */
