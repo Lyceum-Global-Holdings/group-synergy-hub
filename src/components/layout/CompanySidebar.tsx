@@ -32,6 +32,10 @@ import { moduleConfig, normalizeCompanyModules } from "@/constants/moduleConfig"
 import { useSuperAdmin } from "@/hooks/useSuperAdmin";
 import { useAuth } from "@/contexts/AuthContext";
 import { useUserEffectiveModules } from "@/hooks/useModuleAccess";
+import { useUserPins } from "@/hooks/useSidebarPins";
+import { PinnedSubmodulesGroup } from "./PinnedSubmodulesGroup";
+import { SidebarPinButton } from "./SidebarPinButton";
+import { TooltipProvider } from "@/components/ui/tooltip";
 
 type SubModuleChild = {
   key: string;
