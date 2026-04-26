@@ -8,6 +8,31 @@ interface Props {
   envelope: ReportEnvelope;
 }
 
+/**
+ * Render a string with case-insensitive matches of `term` wrapped in <mark>.
+ * Uses semantic <mark> + warning design token so it adapts to light/dark themes
+ * and is announced by assistive tech as "highlighted text" (WCAG 2.2).
+ */
+function renderHighlighted(text: string, term: string) {
+  if (!term) return text;
+  const safe = term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const re = new RegExp(`(${safe})`, "ig");
+  const parts = text.split(re);
+  const lower = term.toLowerCase();
+  return parts.map((part, i) =>
+    part.toLowerCase() === lower ? (
+      <mark
+        key={i}
+        className="rounded-sm bg-warning/30 text-foreground px-0.5"
+      >
+        {part}
+      </mark>
+    ) : (
+      <span key={i}>{part}</span>
+    ),
+  );
+}
+
 export function ReportPreviewTable({ envelope }: Props) {
   return (
     <div className="rounded-lg border bg-card">
