@@ -21,17 +21,19 @@ async function logAudit(
   params: Record<string, unknown>,
 ): Promise<void> {
   try {
-    await supabase.from("report_audit_log").insert({
-      report_code: envelope.reportCode,
-      report_title: envelope.title,
-      module_key: envelope.moduleKey,
-      format,
-      params,
-      row_count: envelope.rows.length,
-      company_id: companyId,
-      user_agent:
-        typeof navigator !== "undefined" ? navigator.userAgent.slice(0, 240) : null,
-    });
+    await supabase.from("report_audit_log").insert([
+      {
+        report_code: envelope.reportCode,
+        report_title: envelope.title,
+        module_key: envelope.moduleKey,
+        format,
+        params: params as never,
+        row_count: envelope.rows.length,
+        company_id: companyId ?? undefined,
+        user_agent:
+          typeof navigator !== "undefined" ? navigator.userAgent.slice(0, 240) : undefined,
+      },
+    ]);
   } catch (e) {
     // Audit logging must never break the export
     console.warn("[Reports] audit log insert failed", e);

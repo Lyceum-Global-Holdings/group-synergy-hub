@@ -89,7 +89,7 @@ export async function renderXlsx(envelope: ReportEnvelope, fileName: string): Pr
     envelope.columns.forEach((col, cIdx) => {
       const cell = r.getCell(cIdx + 1);
       const raw = row[col.key];
-      cell.value = toExcelValue(raw, col.type);
+      cell.value = toExcelValue(raw, col.type) as ExcelJS.CellValue;
       const fmt = excelNumFmt(col);
       if (fmt) cell.numFmt = fmt;
       cell.alignment = {
@@ -116,7 +116,7 @@ export async function renderXlsx(envelope: ReportEnvelope, fileName: string): Pr
       if (cIdx === 0 && value === undefined) {
         cell.value = "Total";
       } else if (value !== undefined && value !== null) {
-        cell.value = toExcelValue(value, col.type);
+        cell.value = toExcelValue(value, col.type) as ExcelJS.CellValue;
         const fmt = excelNumFmt(col);
         if (fmt) cell.numFmt = fmt;
       }
