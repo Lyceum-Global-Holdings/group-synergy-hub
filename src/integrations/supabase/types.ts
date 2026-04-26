@@ -20150,6 +20150,52 @@ export type Database = {
           item_name: string
         }[]
       }
+      report_ap_aging: {
+        Args: {
+          p_as_of_date?: string
+          p_company_id: string
+          p_supplier_id?: string
+        }
+        Returns: {
+          amount_paid: number
+          bucket: string
+          bucket_0_30: number
+          bucket_31_60: number
+          bucket_61_90: number
+          bucket_90_plus: number
+          currency: string
+          days_overdue: number
+          due_date: string
+          invoice_date: string
+          invoice_number: string
+          net_amount: number
+          outstanding: number
+          supplier_name: string
+        }[]
+      }
+      report_ar_aging: {
+        Args: {
+          p_as_of_date?: string
+          p_company_id: string
+          p_customer_id?: string
+        }
+        Returns: {
+          amount_received: number
+          bucket: string
+          bucket_0_30: number
+          bucket_31_60: number
+          bucket_61_90: number
+          bucket_90_plus: number
+          currency: string
+          customer_name: string
+          days_overdue: number
+          due_date: string
+          invoice_date: string
+          invoice_number: string
+          net_amount: number
+          outstanding: number
+        }[]
+      }
       report_asset_register: {
         Args: {
           p_company_id: string
@@ -20210,6 +20256,118 @@ export type Database = {
           utilisation_pct: number
         }[]
       }
+      report_cash_bank_statement: {
+        Args: {
+          p_bank_account_id?: string
+          p_company_id: string
+          p_date_from?: string
+          p_date_to?: string
+        }
+        Returns: {
+          account_name: string
+          bank_name: string
+          credit_amount: number
+          currency: string
+          debit_amount: number
+          description: string
+          is_reconciled: boolean
+          reference_number: string
+          running_balance: number
+          transaction_date: string
+          transaction_type: string
+        }[]
+      }
+      report_construction_budget_variance: {
+        Args: { p_company_id: string; p_project_id?: string }
+        Returns: {
+          actual_amount: number
+          budget_code: string
+          category: string
+          committed_amount: number
+          description: string
+          planned_amount: number
+          project_code: string
+          project_name: string
+          quantity: number
+          unit: string
+          unit_cost: number
+          variance_amount: number
+          variance_pct: number
+        }[]
+      }
+      report_construction_dsr_summary: {
+        Args: {
+          p_company_id: string
+          p_date_from?: string
+          p_date_to?: string
+          p_project_id?: string
+        }
+        Returns: {
+          attendance_absent: number
+          attendance_present: number
+          labor_count: number
+          project_code: string
+          project_name: string
+          report_date: string
+          report_number: string
+          skilled_labor_count: number
+          status: string
+          subcontractor_count: number
+          temperature_high: number
+          temperature_low: number
+          unskilled_labor_count: number
+          visitor_count: number
+          weather_conditions: string
+        }[]
+      }
+      report_construction_material_movements: {
+        Args: { p_company_id: string; p_date_from?: string; p_date_to?: string }
+        Returns: {
+          item_code: string
+          item_name: string
+          location_name: string
+          notes: string
+          performed_by: string
+          quantity_change: number
+          transaction_date: string
+          transaction_type: string
+        }[]
+      }
+      report_construction_progress: {
+        Args: { p_company_id: string }
+        Returns: {
+          actual_cost: number
+          actual_end_date: string
+          completion_percentage: number
+          days_elapsed: number
+          days_total: number
+          estimated_budget: number
+          project_code: string
+          project_name: string
+          schedule_variance_pct: number
+          start_date: string
+          status: string
+          target_end_date: string
+        }[]
+      }
+      report_contract_expiry: {
+        Args: { p_company_id: string; p_horizon_days?: number }
+        Returns: {
+          auto_renew: boolean
+          contract_number: string
+          contract_title: string
+          contract_type: string
+          contract_value: number
+          counterparty_name: string
+          currency: string
+          days_to_expiry: number
+          effective_date: string
+          expiry_date: string
+          owner_id: string
+          renewal_count: number
+          status: string
+        }[]
+      }
       report_cycle_count_variance: {
         Args: {
           p_company_id: string
@@ -20230,6 +20388,46 @@ export type Database = {
           variance_quantity: number
           variance_reason: string
           variance_value: number
+        }[]
+      }
+      report_fixed_asset_register: {
+        Args: { p_as_of_date?: string; p_company_id: string }
+        Returns: {
+          accumulated_depreciation: number
+          asset_id: string
+          asset_tag: string
+          category: string
+          depreciation_method: string
+          depreciation_rate: number
+          location_name: string
+          name: string
+          net_book_value: number
+          purchase_date: string
+          purchase_price: number
+          salvage_value: number
+          serial_number: string
+          status: string
+          useful_life_years: number
+        }[]
+      }
+      report_general_ledger_detail: {
+        Args: {
+          p_account_id?: string
+          p_company_id: string
+          p_date_from?: string
+          p_date_to?: string
+        }
+        Returns: {
+          account_code: string
+          account_name: string
+          cost_center: string
+          credit_amount: number
+          debit_amount: number
+          description: string
+          journal_date: string
+          journal_number: string
+          journal_type: string
+          reference_number: string
         }[]
       }
       report_grn_register: {
@@ -20290,6 +20488,205 @@ export type Database = {
           weighted_avg_value: number
         }[]
       }
+      report_open_po: {
+        Args: { p_company_id: string }
+        Returns: {
+          currency: string
+          days_open: number
+          expected_delivery_date: string
+          outstanding_value: number
+          po_date: string
+          po_number: string
+          status: string
+          supplier_name: string
+          total_qty_ordered: number
+          total_qty_pending: number
+          total_qty_received: number
+        }[]
+      }
+      report_pending_approvals: {
+        Args: { p_company_id: string }
+        Returns: {
+          amount: number
+          currency: string
+          current_status: string
+          days_pending: number
+          document_number: string
+          document_type: string
+          module: string
+          submitted_date: string
+          title: string
+        }[]
+      }
+      report_po_register: {
+        Args: {
+          p_company_id: string
+          p_date_from?: string
+          p_date_to?: string
+          p_status?: string
+        }
+        Returns: {
+          actual_delivery_date: string
+          approved_date: string
+          currency: string
+          expected_delivery_date: string
+          final_amount: number
+          line_count: number
+          po_date: string
+          po_number: string
+          status: string
+          supplier_name: string
+        }[]
+      }
+      report_pr_register: {
+        Args: {
+          p_company_id: string
+          p_date_from?: string
+          p_date_to?: string
+          p_status?: string
+        }
+        Returns: {
+          approved_date: string
+          department: string
+          line_count: number
+          pr_number: string
+          priority: string
+          requested_date: string
+          required_date: string
+          status: string
+          title: string
+          total_estimated_amount: number
+        }[]
+      }
+      report_production_daily_output: {
+        Args: { p_company_id: string; p_date_from?: string; p_date_to?: string }
+        Returns: {
+          efficiency_pct: number
+          entry_date: string
+          input_qty: number
+          notes: string
+          order_number: string
+          output_qty: number
+          product_name: string
+          stage_name: string
+          wastage_qty: number
+        }[]
+      }
+      report_production_efficiency: {
+        Args: { p_company_id: string; p_date_from?: string; p_date_to?: string }
+        Returns: {
+          completion_pct: number
+          due_date: string
+          order_number: string
+          product_name: string
+          start_date: string
+          status: string
+          target_qty: number
+          total_input: number
+          total_output: number
+          total_wastage: number
+          wastage_pct: number
+          yield_pct: number
+        }[]
+      }
+      report_production_stage_cost: {
+        Args: { p_company_id: string; p_order_id?: string }
+        Returns: {
+          item_name: string
+          order_number: string
+          product_name: string
+          quantity_used: number
+          sequence_order: number
+          source: string
+          stage_name: string
+          total_cost: number
+          unit_cost: number
+          unit_of_measure: string
+        }[]
+      }
+      report_production_wip: {
+        Args: { p_company_id: string }
+        Returns: {
+          completed_at: string
+          input_qty: number
+          order_number: string
+          output_qty: number
+          product_name: string
+          sequence_order: number
+          stage_cost: number
+          stage_name: string
+          stage_status: string
+          started_at: string
+          style_no: string
+          target_qty: number
+          wastage_qty: number
+          wip_qty: number
+        }[]
+      }
+      report_quote_comparison: {
+        Args: { p_company_id: string; p_request_id?: string }
+        Returns: {
+          currency: string
+          delivery_commitment: string
+          evaluation_score: number
+          payment_terms: string
+          quote_number: string
+          request_number: string
+          request_title: string
+          status: string
+          submission_date: string
+          supplier_name: string
+          total_quoted_amount: number
+          validity_period: number
+        }[]
+      }
+      report_report_usage: {
+        Args: { p_company_id: string; p_date_from?: string; p_date_to?: string }
+        Returns: {
+          format: string
+          generated_at: string
+          generated_by: string
+          module_key: string
+          report_code: string
+          report_title: string
+          row_count: number
+          user_agent: string
+        }[]
+      }
+      report_rfq_register: {
+        Args: {
+          p_company_id: string
+          p_date_from?: string
+          p_date_to?: string
+          p_status?: string
+        }
+        Returns: {
+          budget_estimate: number
+          category: string
+          currency: string
+          evaluation_deadline: string
+          invited_count: number
+          issue_date: string
+          priority: string
+          quote_count: number
+          request_number: string
+          request_type: string
+          status: string
+          submission_deadline: string
+          title: string
+        }[]
+      }
+      report_spend_analysis: {
+        Args: { p_company_id: string; p_date_from?: string; p_date_to?: string }
+        Returns: {
+          currency: string
+          period_month: string
+          po_count: number
+          supplier_name: string
+          total_qty: number
+          total_spend: number
+        }[]
+      }
       report_stock_movement_ledger: {
         Args: {
           p_company_id: string
@@ -20339,6 +20736,51 @@ export type Database = {
           unit_name: string
         }[]
       }
+      report_supplier_scorecard: {
+        Args: { p_company_id: string; p_date_from?: string; p_date_to?: string }
+        Returns: {
+          avg_evaluation_score: number
+          category: string
+          on_time_delivery_pct: number
+          open_action_items: number
+          rating: number
+          status: string
+          supplier_code: string
+          supplier_name: string
+          total_pos: number
+          total_spend: number
+        }[]
+      }
+      report_system_audit_log: {
+        Args: {
+          p_company_id: string
+          p_date_from?: string
+          p_date_to?: string
+          p_module?: string
+        }
+        Returns: {
+          details: string
+          event_time: string
+          event_type: string
+          module: string
+          reference: string
+          user_id: string
+        }[]
+      }
+      report_three_way_match_exceptions: {
+        Args: { p_company_id: string; p_date_from?: string; p_date_to?: string }
+        Returns: {
+          currency: string
+          grn_number: string
+          invoice_amount: number
+          invoice_date: string
+          invoice_number: string
+          po_number: string
+          status: string
+          supplier_name: string
+          three_way_match_status: string
+        }[]
+      }
       report_tool_ledger: {
         Args: {
           p_company_id: string
@@ -20361,6 +20803,19 @@ export type Database = {
           status: string
           tool_code: string
           tool_name: string
+        }[]
+      }
+      report_trial_balance: {
+        Args: { p_as_of_date?: string; p_company_id: string }
+        Returns: {
+          account_category: string
+          account_code: string
+          account_name: string
+          account_type: string
+          closing_balance: number
+          opening_balance: number
+          period_credit: number
+          period_debit: number
         }[]
       }
       return_tool_to_bin: {
