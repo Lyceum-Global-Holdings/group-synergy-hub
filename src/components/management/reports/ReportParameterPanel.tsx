@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { ReportDefinition, ReportParameter } from "@/lib/reports/registry";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -10,9 +10,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useWarehouseLocations } from "@/hooks/useWarehouseLocations";
+import { useEffectiveLocationsForCompany } from "@/hooks/useWarehouseLocations";
+import {
+  useUserLocationPermissions,
+  useUserViewAllLocations,
+} from "@/hooks/useUserLocationPermissions";
 import { useItemCategories } from "@/hooks/useItemCategories";
 import { useCompany } from "@/contexts/CompanyContext";
+import { useAuth } from "@/contexts/AuthContext";
+import { useLocationFilter } from "@/contexts/LocationFilterContext";
 
 interface Props {
   definition: ReportDefinition;
