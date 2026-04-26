@@ -63,8 +63,19 @@ export interface ParsedNotesFilter {
 
 /**
  * Parse a `textOperator` parameter value into RPC arguments.
- * For "contains", the term string is split on whitespace OUTSIDE double quotes
- * so users can AND multiple words and use "quoted phrases" with embedded spaces.
+ *
+ * Tokenisation rules (aligned with SAP Fiori smart-filter, Excel AutoFilter
+ * "Contains", Jira basic search and ISO 25964-1 thesaurus search):
+ *   - Unquoted text is treated as ONE literal substring, exactly as typed,
+ *     spaces preserved. So `Bulk stock upload` matches notes containing the
+ *     full phrase "Bulk stock upload" — not three separate words.
+ *   - Each `"quoted phrase"` becomes its own AND token.
+ *     e.g. `"return to vendor" urgent`  →  notes must contain BOTH
+ *          `return to vendor` AND `urgent`.
+ *   - Everything outside the quotes is collapsed into ONE additional literal
+ *     token (trimmed) so users cannot accidentally trigger a strict AND of
+ *     every word in their input.
+ *
  * Returns null when the filter is inactive (no/blank term).
  */
 export function parseNotesFilter(v: unknown): ParsedNotesFilter | null {
@@ -77,21 +88,36 @@ export function parseNotesFilter(v: unknown): ParsedNotesFilter | null {
   const trimmed = term.trim();
   if (!trimmed) return null;
 
+  // Non-contains operators always treat the term as one literal string.
   if (op !== "contains") {
     return { op, terms: [trimmed] };
   }
 
-  // Tokenize: keep "quoted phrases" intact, split everything else on whitespace.
+  // No quotes → entire input is one literal substring (the common case).
+  if (!trimmed.includes('"')) {
+    return { op, terms: [trimmed] };
+  }
+
+  // Mixed input: extract every "quoted phrase" as its own AND token, and
+  // collapse the remaining unquoted fragments into a single literal token.
   const tokens: string[] = [];
-  const re = /"([^"]*)"|(\S+)/g;
+  let unquotedBuf = "";
+  const re = /"([^"]*)"|([^"]+)/g;
   let m: RegExpExecArray | null;
   while ((m = re.exec(trimmed)) !== null) {
-    const t = (m[1] ?? m[2] ?? "").trim();
-    if (t) tokens.push(t);
-    if (tokens.length >= MAX_TERMS) break;
+    if (m[1] !== undefined) {
+      const phrase = m[1].trim();
+      if (phrase) tokens.push(phrase);
+    } else if (m[2] !== undefined) {
+      unquotedBuf += m[2];
+    }
   }
-  if (tokens.length === 0) return null;
-  return { op, terms: tokens };
+  const tail = unquotedBuf.trim();
+  if (tail) tokens.push(tail);
+
+  const capped = tokens.slice(0, MAX_TERMS);
+  if (capped.length === 0) return null;
+  return { op, terms: capped };
 }
 
 /** Build the highlight-terms map + wholeCell flag for a given operator/terms. */
