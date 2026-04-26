@@ -75,7 +75,11 @@ function seedParamsFromUrl(
 export default function ReportsCenter() {
   const [searchParams] = useSearchParams();
   const initialTemplate = searchParams.get("template") ?? undefined;
-  const initialModule = searchParams.get("module") ?? "warehouse";
+  const initialDef = initialTemplate
+    ? REPORT_REGISTRY.find((r) => r.code === initialTemplate) ?? null
+    : null;
+  const initialModule =
+    searchParams.get("module") ?? initialDef?.moduleKey ?? "warehouse";
 
   const { selectedCompany, baseCurrency } = useCompany();
   const { user } = useAuth();
@@ -83,10 +87,10 @@ export default function ReportsCenter() {
   const [activeModule, setActiveModule] = useState(initialModule);
   const [search, setSearch] = useState("");
 
-  const [openReport, setOpenReport] = useState<ReportDefinition | null>(
-    initialTemplate ? REPORT_REGISTRY.find((r) => r.code === initialTemplate) ?? null : null,
+  const [openReport, setOpenReport] = useState<ReportDefinition | null>(initialDef);
+  const [params, setParams] = useState<Record<string, unknown>>(() =>
+    seedParamsFromUrl(initialDef, searchParams),
   );
-  const [params, setParams] = useState<Record<string, unknown>>({});
   const [previewEnvelope, setPreviewEnvelope] = useState<ReportEnvelope | null>(null);
   const [busyFormat, setBusyFormat] = useState<ReportFormat | null>(null);
 
