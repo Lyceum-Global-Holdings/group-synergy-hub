@@ -121,6 +121,7 @@ export default function DailySiteReports() {
           </p>
         </div>
         <div className="flex gap-2">
+          <GenerateReportButton template="CN-DSR-001" label="Standard Report" />
           <Button 
             variant="outline" 
             onClick={() => setGenerateDialogOpen(true)}
