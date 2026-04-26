@@ -22,25 +22,29 @@ import { ResourceDialog, DeleteConfirmDialog } from "@/components/construction/d
 import { SubcontractorMasterDialog } from "@/components/construction/dialogs/SubcontractorMasterDialog";
 import type { SubcontractorMaster } from "@/types/construction";
 
-export default function SubcontractorResources() {
+import { ResourceDateProvider, useResourceDate } from "@/contexts/ResourceDateContext";
+import { AsOfDateBar } from "@/components/construction/AsOfDateBar";
+
+function SubcontractorResourcesInner() {
   const navigate = useNavigate();
+  const { asOfDateISO } = useResourceDate();
   const [activeTab, setActiveTab] = useState("allocation");
   const [searchTerm, setSearchTerm] = useState("");
-  
+
   // Allocation state
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingResource, setEditingResource] = useState<ConstructionResource | null>(null);
   const [deletingResource, setDeletingResource] = useState<ConstructionResource | null>(null);
-  
+
   // Master list state
   const [masterDialogOpen, setMasterDialogOpen] = useState(false);
   const [editingMaster, setEditingMaster] = useState<SubcontractorMaster | null>(null);
   const [deletingMaster, setDeletingMaster] = useState<SubcontractorMaster | null>(null);
 
-  // Hooks
-  const { data: resources, isLoading: resourcesLoading } = useConstructionResources();
+  // Hooks — pass the as-of date so allocations are filtered server-side
+  const { data: resources, isLoading: resourcesLoading } = useConstructionResources(undefined, { asOfDate: asOfDateISO });
   const deleteResourceMutation = useDeleteConstructionResource();
-  
+
   const { data: subcontractorMaster, isLoading: masterLoading } = useSubcontractorMaster();
   const deleteSubcontractorMutation = useDeleteSubcontractorMaster();
 
