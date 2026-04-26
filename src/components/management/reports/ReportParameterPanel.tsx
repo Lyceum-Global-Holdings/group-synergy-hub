@@ -130,12 +130,16 @@ function ParameterInput({
   value,
   onChange,
   locations,
+  locationsLoading,
+  companySelected,
   categories,
 }: {
   param: ReportParameter;
   value: unknown;
   onChange: (v: unknown) => void;
   locations: { id: string; name: string }[];
+  locationsLoading: boolean;
+  companySelected: boolean;
   categories: { id: string; name: string }[];
 }) {
   switch (param.type) {
@@ -201,22 +205,42 @@ function ParameterInput({
           <span className="text-sm text-muted-foreground">{value ? "Yes" : "No"}</span>
         </div>
       );
-    case "location":
+    case "location": {
+      const disabled = !companySelected || (!locationsLoading && locations.length === 0);
+      const placeholder = !companySelected
+        ? "Select a company first"
+        : locationsLoading
+          ? "Loading locations…"
+          : locations.length === 0
+            ? "No locations allocated to this company"
+            : "All locations";
       return (
-        <Select value={(value as string) ?? "all"} onValueChange={(v) => onChange(v === "all" ? null : v)}>
-          <SelectTrigger id={param.key}>
-            <SelectValue placeholder="All locations" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All locations</SelectItem>
-            {locations.map((l) => (
-              <SelectItem key={l.id} value={l.id}>
-                {l.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <>
+          <Select
+            value={(value as string) ?? "all"}
+            onValueChange={(v) => onChange(v === "all" ? null : v)}
+            disabled={disabled}
+          >
+            <SelectTrigger id={param.key}>
+              <SelectValue placeholder={placeholder} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All locations</SelectItem>
+              {locations.map((l) => (
+                <SelectItem key={l.id} value={l.id}>
+                  {l.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {!locationsLoading && companySelected && locations.length === 0 && (
+            <p className="text-xs text-muted-foreground">
+              No locations are allocated to the active company. Ask an admin to assign locations.
+            </p>
+          )}
+        </>
       );
+    }
     case "category":
       return (
         <Select value={(value as string) ?? "all"} onValueChange={(v) => onChange(v === "all" ? null : v)}>
