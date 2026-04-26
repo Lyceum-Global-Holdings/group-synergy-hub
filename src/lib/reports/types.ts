@@ -53,8 +53,27 @@ export interface ReportEnvelope {
   totals?: Record<string, unknown>;
   /**
    * Optional per-column substring(s) to highlight in the on-screen preview.
-   * Keyed by column key; value is the user-entered search term (case-insensitive).
+   * Keyed by column key; value is one or more terms (case-insensitive).
    * Preview-only — XLSX/PDF/CSV exports remain plain text.
    */
-  highlightTerms?: Record<string, string>;
+  highlightTerms?: Record<string, string[]>;
+  /**
+   * When true, the highlighter wraps the entire matched cell (used for the
+   * "equals" operator). Defaults to per-substring highlighting.
+   */
+  highlightWholeCell?: boolean;
+}
+
+/** Operators supported by the advanced notes filter. */
+export type NotesFilterOp =
+  | "contains"
+  | "equals"
+  | "startsWith"
+  | "endsWith"
+  | "notContains";
+
+/** Value shape stored under a `textOperator` parameter key. */
+export interface NotesFilterValue {
+  op: NotesFilterOp;
+  term: string;
 }
