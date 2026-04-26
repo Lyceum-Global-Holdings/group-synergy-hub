@@ -349,7 +349,7 @@ serve(async (req) => {
               try {
                 const formData = new FormData();
                 formData.append('chat_id', chatId);
-                formData.append('document', new Blob([pdfBytes], { type: 'application/pdf' }), `${report.report_number}.pdf`);
+                formData.append('document', new Blob([pdfBytes as BlobPart], { type: 'application/pdf' }), `${report.report_number}.pdf`);
                 formData.append('caption', formatCaption(report, projectName, projectCode));
                 formData.append('parse_mode', 'HTML');
                 
