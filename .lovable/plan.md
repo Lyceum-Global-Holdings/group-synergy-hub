@@ -1,113 +1,84 @@
-## Reports Center — Phase 3 (cross-module expansion)
+# Phase 3 Follow-up — Deep Links, Memory Refresh & Smoke Test
 
-The Warehouse tab in `/management/reports` now ships 11 standards-aligned reports. The other module tabs (Finance, Procurement, Sourcing, Production, Construction, Management) currently render empty. Phase 3 fills them with the most-needed reports per module, keeping the same envelope / exporter / `report_audit_log` pattern so every export remains SOX-traceable, ISO 8601-dated, and ISO 4217-currencied.
+The 26 Phase 3 reports are live in the registry, RPCs, and dispatcher. This pass closes the three items that were intentionally skipped last turn so every module surface can launch its own templates and the docs stay in sync.
 
-## What gets added
+## What you'll get
 
-### Finance (6 reports — IFRS / IAS aligned)
+A "Generate Report" button (icon + label) on the 12 most-used module pages that opens the Reports Center with the right template pre-selected and, where natural, parameters pre-filled (date range, supplier, project, etc.). The button only renders for users who can access the Management → Reports module, so it never leaks to unauthorised roles.
 
-| Code | Title | Standard | Source |
-|---|---|---|---|
-| `FN-TB-001` | Trial Balance (as-of date) | IFRS presentation | `journal_entries`, `journal_lines`, `chart_of_accounts` |
-| `FN-GL-001` | General Ledger Detail (account × period) | IAS 1 | `journal_lines` |
-| `FN-AP-AGE-001` | Accounts Payable Aging (0/30/60/90/90+) | IFRS 9 | `supplier_invoices`, `payments` |
-| `FN-AR-AGE-001` | Accounts Receivable Aging | IFRS 9 / IFRS 15 | `customer_invoices`, `receipts` |
-| `FN-FA-REG-001` | Fixed Asset Register & Depreciation Schedule | IAS 16 | `warehouse_assets` (single source of truth, per existing memory) |
-| `FN-CF-001` | Cash & Bank Statement (period) | IAS 7 | `bank_accounts`, `bank_transactions` |
+## 1. Deep-link buttons (12 pages, 19 templates)
 
-### Procurement (5 reports)
+Each button uses the existing pattern:
+```ts
+navigate(`/management/reports?template=<CODE>`);
+```
+ReportsCenter already reads `?template=` and selects the matching definition.
 
-| Code | Title | Standard |
+| Module | Page | Templates exposed |
 |---|---|---|
-| `PR-PR-REG-001` | Purchase Requisition Register | ISO 9001 §7.4 |
-| `PR-PO-REG-001` | Purchase Order Register (period, status) | WCO trade docs |
-| `PR-PO-OPN-001` | Open PO / Outstanding Commitments | IAS 37 (commitments disclosure) |
-| `PR-3WM-001` | Three-Way Match Exceptions (PO ↔ GRN ↔ Invoice) | SOX ITGC |
-| `PR-SPND-001` | Spend Analysis (by supplier, category, month) | CIPS spend cube |
+| Finance | `GeneralLedger.tsx` | FN-GL-001, FN-TB-001 |
+| Finance | `AccountsPayable.tsx` | FN-AP-AGE-001 |
+| Finance | `AccountsReceivable.tsx` | FN-AR-AGE-001 |
+| Finance | `FixedAssets.tsx` | FN-FA-REG-001 |
+| Finance | `CashBank.tsx` | FN-CF-001 |
+| Procurement | `PurchaseRequisition.tsx` | PR-PR-REG-001 |
+| Procurement | `PurchaseOrder.tsx` | PR-PO-REG-001, PR-PO-OPN-001, PR-SPND-001 |
+| Procurement | `ThreeWayMatch.tsx` | PR-3WM-001 |
+| Sourcing | `RfqManagement.tsx` | SR-RFQ-REG-001 |
+| Sourcing | `QuotationComparison.tsx` | SR-QUOTE-CMP-001 |
+| Sourcing | `SupplierScorecard.tsx` | SR-SUP-SCORE-001 |
+| Sourcing | `Contracts.tsx` | SR-CTR-EXP-001 |
+| Production | `ProductionModule.tsx` | PD-WIP-001, PD-DAILY-001, PD-STG-COST-001, PD-EFF-001 |
+| Construction | `DailySiteReports.tsx` | CN-DSR-001 |
+| Construction | `ProgressTracking.tsx` | CN-PROG-001 |
+| Construction | `ProjectBudgeting.tsx` | CN-BUD-VAR-001 |
+| Construction | `ResourceAllocation.tsx` | CN-MAT-MOV-001 |
+| Management | `ApprovalConsole.tsx` | MG-APR-PEND-001 |
+| Management | `AuditLogs.tsx` | MG-AUD-LOG-001 |
 
-### Sourcing (4 reports)
+For pages with multiple templates, render a small dropdown ("Generate Report ▾") instead of a single button. Single-template pages get a plain button.
 
-| Code | Title | Standard |
-|---|---|---|
-| `SR-RFQ-REG-001` | RFQ / RFP Register & Status | ISO 9001 §8.4 |
-| `SR-QUOTE-CMP-001` | Quotation Comparison (per RFQ) | CIPS evaluation |
-| `SR-SUP-SCORE-001` | Supplier Scorecard (quality, OTD, price, compliance) | ISO 9001 §8.4.2 |
-| `SR-CTR-EXP-001` | Contract Expiry & Renewal Pipeline | ISO 9001 §7.5 |
+A tiny shared helper keeps usage one-liner and consistent:
 
-### Production (4 reports)
+```tsx
+// src/components/management/reports/GenerateReportButton.tsx
+<GenerateReportButton template="FN-GL-001" />
+<GenerateReportButton templates={["PR-PO-REG-001","PR-PO-OPN-001","PR-SPND-001"]} />
+```
 
-| Code | Title | Standard |
-|---|---|---|
-| `PD-WIP-001` | Work-In-Progress by Stage (qty + cost) | IAS 2 |
-| `PD-DAILY-001` | Daily Production Output (period) | OEE / ISO 22400 |
-| `PD-STG-COST-001` | Stage-wise Cost Breakdown (per order) | IAS 2 §10 |
-| `PD-EFF-001` | Production Efficiency / OEE | ISO 22400-2 |
+The helper:
+- gates visibility via the existing module/role check used elsewhere for Management → Reports,
+- forwards optional `params` (e.g. `{ from, to, supplier_id }`) as extra query string keys that ReportsCenter already understands.
 
-### Construction (4 reports)
+## 2. ReportsCenter parameter pre-fill
 
-| Code | Title | Standard |
-|---|---|---|
-| `CN-DSR-001` | Daily Site Report Summary (labour, weather, progress) | ISO 19650 |
-| `CN-PROG-001` | Project Progress vs Plan (% complete) | PMI EVM (PV/EV/AC) |
-| `CN-BUD-VAR-001` | Project Budget vs Actual Variance | PMI EVM |
-| `CN-MAT-MOV-001` | Material Issues / Returns by Project | ISO 9001 §8.5 |
+Tiny addition: after reading `?template=`, also read any other query params and merge them into the parameter form's initial state (only keys that match the selected template's declared parameters). No schema change.
 
-### Management (3 cross-module reports)
+## 3. Memory refresh
 
-| Code | Title | Standard |
-|---|---|---|
-| `MG-APR-PEND-001` | Pending Approvals Aging (across all modules) | SOX delegation-of-authority |
-| `MG-AUD-LOG-001` | System Audit Log (filterable by module/user/period) | ISO 27001 A.12.4 |
-| `MG-RPT-USE-001` | Report Usage / Export Audit (from `report_audit_log`) | SOX evidence pack |
+Update `mem://architecture/reporting-standards.md` to:
+- list all 37 codes (11 warehouse + 26 Phase 3) with their standard reference (IFRS/ISO/PMI/SOX),
+- document the `GenerateReportButton` deep-link contract and supported query params,
+- note the 50k-row RPC cap and `ReportEnvelope` audit pattern.
 
-## Technical changes
+## 4. Smoke test
 
-**Database** — one consolidated migration adding `SECURITY INVOKER` RPCs, one per report (26 functions). Each:
-- Filters by `p_company_id` and respects RLS via the invoker session.
-- Caps result at 50k rows.
-- Returns flat rows matching the column definitions in `registry.ts`.
-- Uses existing tables only — no schema changes — except `MG-RPT-USE-001` which selects from the existing `report_audit_log` table.
-
-Per existing memory `mem://architecture/finance-warehouse-asset-sync`, `FN-FA-REG-001` reads from `warehouse_assets` (single source of truth) — not a duplicate finance table.
-
-**Files to create**
-- `supabase/migrations/<timestamp>_reports_phase_3.sql` — 26 new RPCs.
-
-**Files to edit**
-- `src/lib/reports/registry.ts` — append 26 `ReportDefinition` entries with full column maps and grouping (`Ledger`, `Aging`, `Assets`, `Cash`, `Orders`, `Compliance`, `Spend`, `Sourcing`, `Contracts`, `WIP`, `Output`, `Cost`, `Site`, `Progress`, `Budget`, `Materials`, `Approvals`, `Audit`).
-- `src/hooks/reports/useReportData.ts` — add 26 `fetchXxx` functions and switch cases in the dispatcher.
-- `src/components/management/reports/ReportParameterPanel.tsx` — add a `supplier` picker (already declared in the type union but not yet rendered) and a `customer` picker for AR aging; add an `account` picker for GL detail.
-- `src/pages/management/ReportsCenter.tsx` — no structural change; already supports all module tabs and grouping.
-- `.lovable/memory/architecture/reporting-standards.md` — append the 26 new report codes and standards mapping.
-
-**Discoverability hooks (deep links)** — add a "Generate Report" button on:
-- `src/pages/finance/GeneralLedger.tsx` → `?template=FN-GL-001`
-- `src/pages/finance/AccountsPayable.tsx` → `?template=FN-AP-AGE-001`
-- `src/pages/finance/AccountsReceivable.tsx` → `?template=FN-AR-AGE-001`
-- `src/pages/finance/FixedAssets.tsx` → `?template=FN-FA-REG-001`
-- `src/pages/procurement/PurchaseOrder.tsx` → `?template=PR-PO-REG-001`
-- `src/pages/procurement/ThreeWayMatch.tsx` → `?template=PR-3WM-001`
-- `src/pages/sourcing/SupplierScorecard.tsx` → `?template=SR-SUP-SCORE-001`
-- `src/pages/sourcing/Contracts.tsx` → `?template=SR-CTR-EXP-001`
-- `src/pages/production/ProductionModule.tsx` → `?template=PD-WIP-001`
-- `src/pages/construction/ProgressTracking.tsx` → `?template=CN-PROG-001`
-- `src/pages/management/ApprovalConsole.tsx` → `?template=MG-APR-PEND-001`
-- `src/pages/management/AuditLogs.tsx` → `?template=MG-AUD-LOG-001`
+After wiring is complete, open ReportsCenter and run one report per module (7 total) to confirm:
+- template appears under the right tab,
+- RPC returns rows (or an empty-state with no error),
+- export to CSV/XLSX/PDF works on at least one report.
+Capture any failures and patch before closing the task.
 
 ## Out of scope
 
-- Scheduled / emailed delivery (Phase 4).
-- Per-user saved presets / favourites (Phase 4).
-- Multi-currency consolidation (uses each company's `baseCurrency` for now, per ISO 4217).
-- Drill-down from preview rows to source documents (Phase 4).
+- No new RPCs or registry entries — the 26 Phase 3 reports already exist.
+- No changes to RLS, role model, or navigation registry.
+- No redesign of ReportsCenter UI; only the param-prefill tweak.
 
-## Acceptance criteria
+## Technical notes
 
-- Each module tab in `/management/reports` shows its full set of templates, grouped logically.
-- All 26 reports run end-to-end: Preview, XLSX, PDF, CSV.
-- Every export writes a row to `report_audit_log` (already enforced by the central exporter).
-- Aging reports (`FN-AP-AGE-001`, `FN-AR-AGE-001`) bucket by 0-30 / 31-60 / 61-90 / 90+ and total per bucket in the footer.
-- `FN-FA-REG-001` reconciles to `WH-AST-REG-001` (same source of truth).
-- `PR-3WM-001` lists only invoices where qty or price variance breaches tolerance.
-- `MG-RPT-USE-001` lets admins audit every report exported by every user across the system.
-- All new RPCs are `SECURITY INVOKER` and respect existing RLS — no privilege escalation.
+- New file: `src/components/management/reports/GenerateReportButton.tsx` (≈40 LOC, uses `useNavigate`, `Button`, `DropdownMenu`, and the existing role/module access hook).
+- Edits to 12 page files: import + place the button in the page header's action area (next to existing "Export" / "Add" buttons).
+- Edit to `src/pages/management/ReportsCenter.tsx`: extend the existing `useSearchParams` effect to seed parameter defaults from the URL.
+- Edit to `mem://architecture/reporting-standards.md`.
+- No DB migration.
