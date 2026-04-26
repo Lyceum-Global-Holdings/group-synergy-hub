@@ -1,84 +1,116 @@
-# Phase 3 Follow-up — Deep Links, Memory Refresh & Smoke Test
+# Pin Sub-Modules to Top (Per Company)
 
-The 26 Phase 3 reports are live in the registry, RPCs, and dispatcher. This pass closes the three items that were intentionally skipped last turn so every module surface can launch its own templates and the docs stay in sync.
+Add a personal favorites/pinned sub-modules feature so each user can pin the sub-modules they use most often per company, displayed in a dedicated "Pinned" section at the top of the sidebar.
 
-## What you'll get
+## Why this design (international standards)
 
-A "Generate Report" button (icon + label) on the 12 most-used module pages that opens the Reports Center with the right template pre-selected and, where natural, parameters pre-filled (date range, supplier, project, etc.). The button only renders for users who can access the Management → Reports module, so it never leaks to unauthorised roles.
+- **Per-user, per-company scope** — matches SAP Fiori "My Favorites" and Oracle Cloud "Favorites" patterns where pins are scoped to the user within an organizational/company context. A user working across multiple companies sees a different pin set per company.
+- **Sub-module level granularity** — pins target leaf navigation items (the actionable pages), aligned with NN/g and ISO 9241-110 navigation guidance: surface frequently used destinations one click away.
+- **Reorderable, capped list** — drag-to-reorder and a soft cap of ~10 pins, in line with Microsoft Fluent and SAP Fiori favorites guidance to prevent visual overload.
+- **Server-persisted** — pins follow the user across devices (stored in Supabase with RLS), not localStorage.
 
-## 1. Deep-link buttons (12 pages, 19 templates)
+## User experience
 
-Each button uses the existing pattern:
-```ts
-navigate(`/management/reports?template=<CODE>`);
+- A new **"Pinned"** group appears at the top of the sidebar (between the company header and "Navigation"), only when the user has at least one pin for the active company.
+- Each sub-module row in the regular module groups gets a small pin icon (visible on hover, filled when pinned). Clicking toggles the pin for the currently selected company.
+- When "All Companies" is active, the Pinned section shows the union of pins across the user's accessible companies, each labelled with the company code.
+- Pinned items respect existing RBAC: if a user loses access to a sub-module, it is hidden from the Pinned list automatically (record stays in DB so access restoration brings it back).
+- A small "Reorder" affordance (drag handle on hover) lets the user reorder pins; order persists.
+
+```text
+┌─ Sidebar ──────────────────┐
+│  [Company Header]          │
+│                            │
+│  PINNED                    │
+│   ⭐ Purchase Requisition  │
+│   ⭐ GRN                   │
+│   ⭐ Daily Site Reports    │
+│                            │
+│  NAVIGATION                │
+│   Dashboard                │
+│                            │
+│  MODULES                   │
+│   ▾ Procurement            │
+│      Purchase Req.    📌   │ ← hover shows pin
+│      Purchase Order   📌   │
+│   ▸ Warehouse              │
+└────────────────────────────┘
 ```
-ReportsCenter already reads `?template=` and selects the matching definition.
 
-| Module | Page | Templates exposed |
+## Technical implementation
+
+### 1. Database (migration)
+
+New table `user_pinned_submodules`:
+
+| Column | Type | Notes |
 |---|---|---|
-| Finance | `GeneralLedger.tsx` | FN-GL-001, FN-TB-001 |
-| Finance | `AccountsPayable.tsx` | FN-AP-AGE-001 |
-| Finance | `AccountsReceivable.tsx` | FN-AR-AGE-001 |
-| Finance | `FixedAssets.tsx` | FN-FA-REG-001 |
-| Finance | `CashBank.tsx` | FN-CF-001 |
-| Procurement | `PurchaseRequisition.tsx` | PR-PR-REG-001 |
-| Procurement | `PurchaseOrder.tsx` | PR-PO-REG-001, PR-PO-OPN-001, PR-SPND-001 |
-| Procurement | `ThreeWayMatch.tsx` | PR-3WM-001 |
-| Sourcing | `RfqManagement.tsx` | SR-RFQ-REG-001 |
-| Sourcing | `QuotationComparison.tsx` | SR-QUOTE-CMP-001 |
-| Sourcing | `SupplierScorecard.tsx` | SR-SUP-SCORE-001 |
-| Sourcing | `Contracts.tsx` | SR-CTR-EXP-001 |
-| Production | `ProductionModule.tsx` | PD-WIP-001, PD-DAILY-001, PD-STG-COST-001, PD-EFF-001 |
-| Construction | `DailySiteReports.tsx` | CN-DSR-001 |
-| Construction | `ProgressTracking.tsx` | CN-PROG-001 |
-| Construction | `ProjectBudgeting.tsx` | CN-BUD-VAR-001 |
-| Construction | `ResourceAllocation.tsx` | CN-MAT-MOV-001 |
-| Management | `ApprovalConsole.tsx` | MG-APR-PEND-001 |
-| Management | `AuditLogs.tsx` | MG-AUD-LOG-001 |
+| `id` | uuid PK | `gen_random_uuid()` |
+| `user_id` | uuid | FK `auth.users(id)` on delete cascade |
+| `company_id` | uuid | FK `companies(id)` on delete cascade |
+| `module_key` | text | e.g. `procurement` |
+| `submodule_key` | text | e.g. `purchase-requisition` |
+| `submodule_url` | text | snapshot of route, used for navigation |
+| `submodule_title` | text | snapshot of label (fallback) |
+| `position` | int | 0-based ordering within (user, company) |
+| `created_at` | timestamptz | default `now()` |
 
-For pages with multiple templates, render a small dropdown ("Generate Report ▾") instead of a single button. Single-template pages get a plain button.
+- Unique constraint: `(user_id, company_id, module_key, submodule_key)`.
+- Index: `(user_id, company_id, position)`.
+- RLS: enable; policies — user can `SELECT/INSERT/UPDATE/DELETE` only `WHERE user_id = auth.uid()` AND `public.can_access_company(company_id)` (uses existing helper from the multi-company visibility framework).
+- No CHECK on `position`; ordering enforced in app code.
 
-A tiny shared helper keeps usage one-liner and consistent:
+### 2. Hook layer
 
-```tsx
-// src/components/management/reports/GenerateReportButton.tsx
-<GenerateReportButton template="FN-GL-001" />
-<GenerateReportButton templates={["PR-PO-REG-001","PR-PO-OPN-001","PR-SPND-001"]} />
-```
+`src/hooks/useSidebarPins.ts`:
+- `usePinnedSubmodules(companyId | "all")` — React Query, returns ordered pins (for "all", merges across `companies` the user can access).
+- `useTogglePin()` — mutation: insert if missing (append at next position), delete if present.
+- `useReorderPins(companyId)` — mutation: bulk update positions.
+- Cache key includes `userId` and `companyId`; invalidated on toggle/reorder.
+- Follows existing 30s staleTime convention from the global React Query cache memory.
 
-The helper:
-- gates visibility via the existing module/role check used elsewhere for Management → Reports,
-- forwards optional `params` (e.g. `{ from, to, supplier_id }`) as extra query string keys that ReportsCenter already understands.
+### 3. Sidebar UI
 
-## 2. ReportsCenter parameter pre-fill
+Edit `src/components/layout/CompanySidebar.tsx`:
+- Compute `effectiveCompanyId = isViewingAllCompanies ? "all" : selectedCompany?.id`.
+- Fetch pins with `usePinnedSubmodules(effectiveCompanyId)`.
+- Cross-reference each pin against the already-computed `departments[]` to confirm the user still has RBAC access; drop orphans from the visible list.
+- Render a new `SidebarGroup` titled "Pinned" above "Navigation" when `visiblePins.length > 0`.
+  - Each pin: icon from its parent module config + title; in "All Companies" mode, suffix with company code badge.
+  - Active state matches existing styling (left border + accent bg).
+- For each leaf `SidebarMenuSubButton` in the existing module list, add a trailing pin button (lucide `Pin` / `PinOff`):
+  - Visible on row hover (`opacity-0 group-hover/sub:opacity-100`); always visible when pinned.
+  - Disabled when `isViewingAllCompanies` (pinning requires a specific company); tooltip explains.
+  - `onClick`: stop propagation, call `toggle({ companyId: selectedCompany.id, ... })`.
 
-Tiny addition: after reading `?template=`, also read any other query params and merge them into the parameter form's initial state (only keys that match the selected template's declared parameters). No schema change.
+### 4. Reordering
 
-## 3. Memory refresh
+- Use `@dnd-kit/core` + `@dnd-kit/sortable` (already a common shadcn pattern; add deps if not present) inside the Pinned group only.
+- Drag handle visible on hover; on drop, call `useReorderPins`.
+- Keep changes optimistic: update React Query cache before server confirms, rollback on error.
 
-Update `mem://architecture/reporting-standards.md` to:
-- list all 37 codes (11 warehouse + 26 Phase 3) with their standard reference (IFRS/ISO/PMI/SOX),
-- document the `GenerateReportButton` deep-link contract and supported query params,
-- note the 50k-row RPC cap and `ReportEnvelope` audit pattern.
+### 5. Edge cases & guardrails
 
-## 4. Smoke test
+- **Cap**: soft limit of 12 pins per (user, company); show a toast "Pin limit reached — unpin something first" when exceeded.
+- **All Companies mode**: pin button hidden (only toggle from a specific company context). Reordering disabled in "all" view (pins shown in per-company groups, ordered by company name then `position`).
+- **RBAC drift**: orphaned pins (user lost access) are filtered from the UI but kept in DB; an optional cleanup job is out of scope.
+- **Collapsed sidebar**: Pinned group renders icon-only (parent module icon) consistent with `collapsible="icon"` behaviour.
+- **Super admin "All Companies"**: same union behaviour; no special-case beyond RBAC filter.
 
-After wiring is complete, open ReportsCenter and run one report per module (7 total) to confirm:
-- template appears under the right tab,
-- RPC returns rows (or an empty-state with no error),
-- export to CSV/XLSX/PDF works on at least one report.
-Capture any failures and patch before closing the task.
+## Files
+
+**Create**
+- `supabase/migrations/<timestamp>_user_pinned_submodules.sql`
+- `src/hooks/useSidebarPins.ts`
+- `src/components/layout/SidebarPinButton.tsx` (small reusable trailing pin toggle)
+- `src/components/layout/PinnedSubmodulesGroup.tsx` (the new sidebar group + dnd wiring)
+
+**Edit**
+- `src/components/layout/CompanySidebar.tsx` — mount `PinnedSubmodulesGroup`, attach `SidebarPinButton` to each leaf row.
+- `package.json` — add `@dnd-kit/core` and `@dnd-kit/sortable` if missing.
 
 ## Out of scope
 
-- No new RPCs or registry entries — the 26 Phase 3 reports already exist.
-- No changes to RLS, role model, or navigation registry.
-- No redesign of ReportsCenter UI; only the param-prefill tweak.
-
-## Technical notes
-
-- New file: `src/components/management/reports/GenerateReportButton.tsx` (≈40 LOC, uses `useNavigate`, `Button`, `DropdownMenu`, and the existing role/module access hook).
-- Edits to 12 page files: import + place the button in the page header's action area (next to existing "Export" / "Add" buttons).
-- Edit to `src/pages/management/ReportsCenter.tsx`: extend the existing `useSearchParams` effect to seed parameter defaults from the URL.
-- Edit to `mem://architecture/reporting-standards.md`.
-- No DB migration.
+- Pinning entire module groups (only sub-modules / leaves).
+- Sharing pin sets across users or roles.
+- Default pins seeded by admins (can be a follow-up).
