@@ -10,7 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useEffectiveLocationsForCompany } from "@/hooks/useWarehouseLocations";
+import { useStockBearingLocationsForCompany } from "@/hooks/useWarehouseLocations";
 import {
   useUserLocationPermissions,
   useUserViewAllLocations,
@@ -19,6 +19,7 @@ import { useItemCategories } from "@/hooks/useItemCategories";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLocationFilter } from "@/contexts/LocationFilterContext";
+import { LocationTreePicker } from "@/components/management/reports/LocationTreePicker";
 
 interface Props {
   definition: ReportDefinition;
@@ -39,19 +40,21 @@ export function ReportParameterPanel({ definition, values, onChange }: Props) {
   const { categories = [] } = useItemCategories(selectedCompany?.id);
 
   // Company-scoped + permission-aware location resolution.
-  // Mirrors SAP EWM / S4HANA: pickers only enumerate plants allocated to
-  // the active company code. See mem://architecture/warehouse-location-and-bin-management.
+  // Uses get_stock_bearing_locations_for_company so the picker exposes
+  // every node a user can stock against — locations, sub-locations and
+  // departments — matching SAP EWM Plant→StorLoc→Bin hierarchy.
   const { data: companyLocations = [], isLoading: locationsLoading } =
-    useEffectiveLocationsForCompany(selectedCompany?.id);
+    useStockBearingLocationsForCompany(selectedCompany?.id);
   const { data: userPerms = [] } = useUserLocationPermissions(user?.id);
   const { data: viewAllLocations = false } = useUserViewAllLocations(user?.id);
 
   const allowedLocations = useMemo(() => {
-    const onlyLocations = companyLocations.filter((l) => l.type === "location");
-    if (viewAllLocations) return onlyLocations;
-    if (!user?.id) return [] as typeof onlyLocations;
+    if (viewAllLocations) return companyLocations;
+    if (!user?.id) return [] as typeof companyLocations;
     const allowedIds = new Set(userPerms.map((p) => p.location_id));
-    return onlyLocations.filter((l) => allowedIds.has(l.id));
+    // Strict per-node permission — matches the rest of the app. Children of a
+    // permitted parent are NOT auto-included.
+    return companyLocations.filter((l) => allowedIds.has(l.id));
   }, [companyLocations, userPerms, viewAllLocations, user?.id]);
 
   // Apply defaults on mount / definition change
