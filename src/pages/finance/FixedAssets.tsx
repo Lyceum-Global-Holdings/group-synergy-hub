@@ -8,6 +8,7 @@ import { AssetTransactionList } from "@/components/finance/assets/AssetTransacti
 import { AssetReports } from "@/components/finance/assets/AssetReports";
 import { RunDepreciationDialog } from "@/components/finance/assets/RunDepreciationDialog";
 import { AssetLocationReportDialog } from "@/components/finance/assets/AssetLocationReportDialog";
+import { GenerateReportButton } from "@/components/management/reports/GenerateReportButton";
 
 export default function FixedAssets() {
   const [activeTab, setActiveTab] = useState("register");
@@ -24,6 +25,7 @@ export default function FixedAssets() {
           </p>
         </div>
         <div className="flex gap-2">
+          <GenerateReportButton size="sm" template="FN-FA-REG-001" />
           <Button variant="outline" size="sm" onClick={() => setShowLocationReportDialog(true)}>
             <MapPin className="h-4 w-4 mr-2" />
             Location Report

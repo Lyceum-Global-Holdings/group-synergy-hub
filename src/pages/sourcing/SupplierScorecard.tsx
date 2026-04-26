@@ -19,6 +19,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle, BarChart3, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
+import { GenerateReportButton } from "@/components/management/reports/GenerateReportButton";
 
 export default function SupplierScorecard() {
   const navigate = useNavigate();
@@ -84,10 +85,13 @@ export default function SupplierScorecard() {
             Advanced analytics and performance insights
           </p>
         </div>
-        <Button onClick={() => navigate("/sourcing/supplier-evaluation")}>
-          <FileText className="mr-2 h-4 w-4" />
-          Manage Evaluations
-        </Button>
+        <div className="flex items-center gap-2">
+          <GenerateReportButton template="SR-SUP-SCORE-001" />
+          <Button onClick={() => navigate("/sourcing/supplier-evaluation")}>
+            <FileText className="mr-2 h-4 w-4" />
+            Manage Evaluations
+          </Button>
+        </div>
       </div>
 
       {/* Overview Cards */}

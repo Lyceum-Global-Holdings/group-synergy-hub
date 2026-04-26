@@ -1,6 +1,7 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Plus, FileDown, FileUp, BarChart3 } from "lucide-react";
+import { GenerateReportButton } from "@/components/management/reports/GenerateReportButton";
 import { ChartOfAccountsTab } from "@/components/finance/ChartOfAccountsTab";
 import { JournalEntriesTab } from "@/components/finance/JournalEntriesTab";
 import { FinancialReportsTab } from "@/components/finance/FinancialReportsTab";
@@ -25,6 +26,7 @@ export default function GeneralLedger() {
           </p>
         </div>
         <div className="flex gap-2">
+          <GenerateReportButton size="sm" templates={["FN-GL-001", "FN-TB-001"]} />
           <Button variant="outline" size="sm" onClick={() => toast.info("Export feature coming soon")}>
             <FileDown className="h-4 w-4 mr-2" />
             Export

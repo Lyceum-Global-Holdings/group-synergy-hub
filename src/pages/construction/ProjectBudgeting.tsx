@@ -23,6 +23,7 @@ import {
 import { useProjectBudgetItems, useCreateProjectBudgetItem, useUpdateProjectBudgetItem, useDeleteProjectBudgetItem } from "@/hooks/construction/useProjectBudgets";
 import { BUDGET_CATEGORIES, ProjectBudgetItem } from "@/types/construction";
 import { BudgetItemDialog, DeleteConfirmDialog } from "@/components/construction/dialogs";
+import { GenerateReportButton } from "@/components/management/reports/GenerateReportButton";
 
 export default function ProjectBudgeting() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -106,10 +107,13 @@ export default function ProjectBudgeting() {
             Track and manage project budgets, costs, and variances
           </p>
         </div>
-        <Button onClick={handleCreate}>
-          <Plus className="mr-2 h-4 w-4" />
-          Add Budget Item
-        </Button>
+        <div className="flex items-center gap-2">
+          <GenerateReportButton template="CN-BUD-VAR-001" />
+          <Button onClick={handleCreate}>
+            <Plus className="mr-2 h-4 w-4" />
+            Add Budget Item
+          </Button>
+        </div>
       </div>
 
       <div className="grid gap-4 md:grid-cols-4">

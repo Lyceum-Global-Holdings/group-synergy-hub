@@ -2,6 +2,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { BarChart3, FileSearch, Scale } from "lucide-react";
+import { GenerateReportButton } from "@/components/management/reports/GenerateReportButton";
 
 export default function QuotationComparison() {
   return (
@@ -13,6 +14,7 @@ export default function QuotationComparison() {
             Compare supplier quotations side-by-side for informed decisions
           </p>
         </div>
+        <GenerateReportButton template="SR-QUOTE-CMP-001" />
       </div>
 
       <Card>

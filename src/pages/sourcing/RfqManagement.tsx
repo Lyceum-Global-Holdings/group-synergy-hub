@@ -2,6 +2,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { FileText, FilePlus, History, Clock } from "lucide-react";
+import { GenerateReportButton } from "@/components/management/reports/GenerateReportButton";
 
 export default function RfqManagement() {
   return (
@@ -13,10 +14,13 @@ export default function RfqManagement() {
             Create and manage Request for Quotations and Proposals
           </p>
         </div>
-        <Button>
-          <FilePlus className="h-4 w-4 mr-2" />
-          New RFQ
-        </Button>
+        <div className="flex items-center gap-2">
+          <GenerateReportButton template="SR-RFQ-REG-001" />
+          <Button>
+            <FilePlus className="h-4 w-4 mr-2" />
+            New RFQ
+          </Button>
+        </div>
       </div>
 
       <Tabs defaultValue="active-rfq" className="w-full">

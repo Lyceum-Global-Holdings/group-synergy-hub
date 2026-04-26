@@ -28,6 +28,7 @@ import { DailySiteReportDialog, DeleteConfirmDialog, ViewSiteReportDialog } from
 import { GenerateReportDialog } from "@/components/construction/dialogs/GenerateReportDialog";
 import { SiteReportAnalytics } from "@/components/construction/reports/SiteReportAnalytics";
 import { TelegramSettingsTab } from "@/components/construction/TelegramSettingsTab";
+import { GenerateReportButton } from "@/components/management/reports/GenerateReportButton";
 
 const REPORT_TYPE_CONFIG = {
   daily: { label: "Daily", color: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300" },
