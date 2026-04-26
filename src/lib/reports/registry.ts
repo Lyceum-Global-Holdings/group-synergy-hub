@@ -173,6 +173,12 @@ export const REPORT_REGISTRY: ReportDefinition[] = [
     parameters: [
       { key: "period", label: "Period", type: "dateRange", defaultDays: 30 },
       { key: "locationId", label: "Location", type: "location" },
+      {
+        key: "notesContains",
+        label: "Notes contain",
+        type: "text",
+        placeholder: "e.g. damaged, audit, return",
+      },
     ],
     columns: [
       { key: "txn_date", label: "Date", type: "datetime", width: 22 },
@@ -187,6 +193,7 @@ export const REPORT_REGISTRY: ReportDefinition[] = [
       { key: "total_value", label: "Value", type: "currency", width: 14, align: "right" },
       { key: "location_name", label: "Location", type: "string", width: 20 },
       { key: "user_email", label: "User", type: "string", width: 26 },
+      { key: "notes", label: "Notes", type: "string", width: 36 },
     ],
   },
 
