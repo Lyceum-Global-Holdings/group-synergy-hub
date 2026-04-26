@@ -111,6 +111,8 @@ function InventoryItemsInner() {
         )}
       </div>
 
+      <AsOfDateBar noun="inventory" />
+
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
         <TabsList>
           <TabsTrigger value="allocation" className="gap-2">
@@ -160,5 +162,13 @@ function InventoryItemsInner() {
         </TabsContent>
       </Tabs>
     </div>
+  );
+}
+
+export default function InventoryItems() {
+  return (
+    <ResourceDateProvider>
+      <InventoryItemsInner />
+    </ResourceDateProvider>
   );
 }
