@@ -8,11 +8,20 @@ type ConstructionResourceWithProject = Omit<ConstructionResource, 'project'> & {
   project?: { id: string; project_name: string; project_code: string } | null;
 };
 
-export function useConstructionResources(projectId?: string) {
+interface UseConstructionResourcesOptions {
+  /** ISO YYYY-MM-DD as-of date. When set, only rows active on that date are returned. */
+  asOfDate?: string;
+}
+
+export function useConstructionResources(
+  projectId?: string,
+  options: UseConstructionResourcesOptions = {}
+) {
   const { selectedCompany } = useCompany();
+  const { asOfDate } = options;
 
   return useQuery({
-    queryKey: ["construction-resources", selectedCompany?.id, projectId],
+    queryKey: ["construction-resources", selectedCompany?.id, projectId, asOfDate ?? null],
     queryFn: async () => {
       let query = supabase
         .from("construction_resources")
@@ -28,6 +37,14 @@ export function useConstructionResources(projectId?: string) {
 
       if (projectId) {
         query = query.eq("project_id", projectId);
+      }
+
+      if (asOfDate) {
+        // Active on date when: (start_date IS NULL OR start_date <= asOf)
+        //                AND  (end_date   IS NULL OR end_date   >= asOf)
+        query = query
+          .or(`start_date.is.null,start_date.lte.${asOfDate}`)
+          .or(`end_date.is.null,end_date.gte.${asOfDate}`);
       }
 
       const { data, error } = await query;
