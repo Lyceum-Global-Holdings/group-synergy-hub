@@ -154,31 +154,44 @@ export default function ReportsCenter() {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {filteredReports.map((r) => (
-            <Card
-              key={r.code}
-              className="cursor-pointer transition-shadow hover:shadow-md"
-              onClick={() => openTemplate(r)}
-            >
-              <CardHeader>
-                <div className="flex items-start justify-between gap-2">
-                  <div className="space-y-1">
-                    <CardTitle className="text-base">{r.title}</CardTitle>
-                    <CardDescription className="text-xs">{r.code}</CardDescription>
-                  </div>
-                  <FileText className="h-5 w-5 text-muted-foreground" />
-                </div>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground mb-3">{r.description}</p>
-                {r.standard && (
-                  <Badge variant="outline" className="text-[10px]">
-                    {r.standard}
-                  </Badge>
-                )}
-              </CardContent>
-            </Card>
+        <div className="space-y-8">
+          {Object.entries(groupReports(filteredReports)).map(([groupName, reports]) => (
+            <div key={groupName} className="space-y-3">
+              <div className="flex items-center gap-2">
+                <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+                  {groupName}
+                </h2>
+                <span className="h-px flex-1 bg-border" />
+                <Badge variant="secondary">{reports.length}</Badge>
+              </div>
+              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                {reports.map((r) => (
+                  <Card
+                    key={r.code}
+                    className="cursor-pointer transition-shadow hover:shadow-md"
+                    onClick={() => openTemplate(r)}
+                  >
+                    <CardHeader>
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="space-y-1">
+                          <CardTitle className="text-base">{r.title}</CardTitle>
+                          <CardDescription className="text-xs">{r.code}</CardDescription>
+                        </div>
+                        <FileText className="h-5 w-5 text-muted-foreground" />
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <p className="text-sm text-muted-foreground mb-3">{r.description}</p>
+                      {r.standard && (
+                        <Badge variant="outline" className="text-[10px]">
+                          {r.standard}
+                        </Badge>
+                      )}
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </div>
           ))}
         </div>
       )}
