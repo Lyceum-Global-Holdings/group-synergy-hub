@@ -51,4 +51,10 @@ export interface ReportEnvelope {
   rows: Record<string, unknown>[];
   /** Optional totals row keyed by column key */
   totals?: Record<string, unknown>;
+  /**
+   * Optional per-column substring(s) to highlight in the on-screen preview.
+   * Keyed by column key; value is the user-entered search term (case-insensitive).
+   * Preview-only — XLSX/PDF/CSV exports remain plain text.
+   */
+  highlightTerms?: Record<string, string>;
 }
