@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { PackageCheck, Search, FileText, CheckCircle2, Clock, DollarSign } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { PackageCheck, Search, FileText, CheckCircle2, Clock, DollarSign, FileBarChart } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -69,10 +70,18 @@ function GoodsReceiptNote() {
             Manage goods receipts and track inventory inbound
           </p>
         </div>
-        <Button onClick={() => setShowCreateDialog(true)}>
-          <PackageCheck className="mr-2 h-4 w-4" />
-          Create GRN
-        </Button>
+        <div className="flex gap-2">
+          <Button asChild variant="outline">
+            <Link to="/management/reports?template=WH-GRN-REG-001">
+              <FileBarChart className="mr-2 h-4 w-4" />
+              Generate Report
+            </Link>
+          </Button>
+          <Button onClick={() => setShowCreateDialog(true)}>
+            <PackageCheck className="mr-2 h-4 w-4" />
+            Create GRN
+          </Button>
+        </div>
       </div>
 
       {/* Summary Cards */}

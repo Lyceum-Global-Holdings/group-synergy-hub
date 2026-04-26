@@ -17,7 +17,8 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "
 import { useCompany } from "@/contexts/CompanyContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
-import { REPORT_REGISTRY, ReportDefinition, getReportsByModule } from "@/lib/reports/registry";
+import { REPORT_REGISTRY, ReportDefinition, getReportsByModule, groupReports } from "@/lib/reports/registry";
+import { RotateCcw } from "lucide-react";
 import { ReportParameterPanel } from "@/components/management/reports/ReportParameterPanel";
 import { ReportPreviewTable } from "@/components/management/reports/ReportPreviewTable";
 import { buildReportEnvelope } from "@/hooks/reports/useReportData";
@@ -153,31 +154,44 @@ export default function ReportsCenter() {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {filteredReports.map((r) => (
-            <Card
-              key={r.code}
-              className="cursor-pointer transition-shadow hover:shadow-md"
-              onClick={() => openTemplate(r)}
-            >
-              <CardHeader>
-                <div className="flex items-start justify-between gap-2">
-                  <div className="space-y-1">
-                    <CardTitle className="text-base">{r.title}</CardTitle>
-                    <CardDescription className="text-xs">{r.code}</CardDescription>
-                  </div>
-                  <FileText className="h-5 w-5 text-muted-foreground" />
-                </div>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground mb-3">{r.description}</p>
-                {r.standard && (
-                  <Badge variant="outline" className="text-[10px]">
-                    {r.standard}
-                  </Badge>
-                )}
-              </CardContent>
-            </Card>
+        <div className="space-y-8">
+          {Object.entries(groupReports(filteredReports)).map(([groupName, reports]) => (
+            <div key={groupName} className="space-y-3">
+              <div className="flex items-center gap-2">
+                <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+                  {groupName}
+                </h2>
+                <span className="h-px flex-1 bg-border" />
+                <Badge variant="secondary">{reports.length}</Badge>
+              </div>
+              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                {reports.map((r) => (
+                  <Card
+                    key={r.code}
+                    className="cursor-pointer transition-shadow hover:shadow-md"
+                    onClick={() => openTemplate(r)}
+                  >
+                    <CardHeader>
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="space-y-1">
+                          <CardTitle className="text-base">{r.title}</CardTitle>
+                          <CardDescription className="text-xs">{r.code}</CardDescription>
+                        </div>
+                        <FileText className="h-5 w-5 text-muted-foreground" />
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <p className="text-sm text-muted-foreground mb-3">{r.description}</p>
+                      {r.standard && (
+                        <Badge variant="outline" className="text-[10px]">
+                          {r.standard}
+                        </Badge>
+                      )}
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </div>
           ))}
         </div>
       )}
@@ -234,6 +248,17 @@ export default function ReportsCenter() {
                     )}
                     Export CSV
                   </Button>
+                  <Button
+                    onClick={() => {
+                      setParams({});
+                      setPreviewEnvelope(null);
+                    }}
+                    disabled={busyFormat !== null}
+                    variant="ghost"
+                  >
+                    <RotateCcw className="h-4 w-4 mr-2" />
+                    Reset
+                  </Button>
                 </div>
 
                 {previewEnvelope && <ReportPreviewTable envelope={previewEnvelope} />}
@@ -254,9 +279,21 @@ function buildFilterDescriptors(
     .map((p) => {
       const v = params[p.key];
       if (v === undefined || v === null || v === "") return null;
-      let display = String(v);
-      if (p.type === "boolean") display = v ? "Yes" : "No";
-      if (p.type === "location" || p.type === "category") display = display.slice(0, 8) + "…"; // id snippet
+      let display = "";
+      if (p.type === "boolean") {
+        display = v ? "Yes" : "No";
+      } else if (p.type === "dateRange") {
+        const r = v as { from?: string; to?: string };
+        if (!r.from && !r.to) return null;
+        display = `${r.from ?? "—"} → ${r.to ?? "—"}`;
+      } else if (p.type === "select") {
+        const opt = p.options.find((o) => o.value === v);
+        display = opt?.label ?? String(v);
+      } else if (p.type === "location" || p.type === "category" || p.type === "supplier") {
+        display = String(v).slice(0, 8) + "…";
+      } else {
+        display = String(v);
+      }
       return { label: p.label, value: display };
     })
     .filter((x): x is { label: string; value: string } => x !== null);

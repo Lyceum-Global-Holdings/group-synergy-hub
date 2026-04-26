@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import {
@@ -7,7 +8,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Plus, Wrench, ArrowRightLeft, RotateCcw, AlertTriangle, ChevronDown, Layers, FileSpreadsheet, PackagePlus } from "lucide-react";
+import { Plus, Wrench, ArrowRightLeft, RotateCcw, AlertTriangle, ChevronDown, Layers, FileSpreadsheet, PackagePlus, FileBarChart } from "lucide-react";
 import { useWarehouseTools } from "@/hooks/useWarehouseTools";
 import { useToolIssues } from "@/hooks/useToolIssues";
 import { useToolReturns } from "@/hooks/useToolReturns";
@@ -61,6 +62,12 @@ export default function ToolManagement() {
           </p>
         </div>
         <div className="flex gap-2">
+          <Button asChild variant="outline">
+            <Link to="/management/reports?template=WH-TOOL-LED-001">
+              <FileBarChart className="h-4 w-4 mr-2" />
+              Generate Report
+            </Link>
+          </Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline">

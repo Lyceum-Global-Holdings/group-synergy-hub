@@ -1,7 +1,9 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { BarChart3, Package, TrendingUp, FileText, Camera, Settings, Clock } from 'lucide-react';
+import { BarChart3, Package, TrendingUp, FileText, Camera, Settings, Clock, FileBarChart } from 'lucide-react';
 import { ValuationDashboard } from '@/components/warehouse/valuation/ValuationDashboard';
 import { DetailedValuationTable } from '@/components/warehouse/valuation/DetailedValuationTable';
 import { ValuationMethodsManager } from '@/components/warehouse/valuation/ValuationMethodsManager';
@@ -23,7 +25,14 @@ export default function InventoryValuation() {
               Comprehensive inventory valuation and analysis
             </p>
           </div>
+          <Button asChild variant="outline">
+            <Link to="/management/reports?template=WH-INV-VAL-001">
+              <FileBarChart className="mr-2 h-4 w-4" />
+              Generate Report
+            </Link>
+          </Button>
         </div>
+
 
         <Tabs defaultValue="dashboard" className="space-y-6">
           <TabsList className="grid w-full grid-cols-7 lg:w-auto">

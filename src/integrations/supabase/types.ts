@@ -20134,6 +20134,126 @@ export type Database = {
         Args: { p_item_id: string }
         Returns: undefined
       }
+      report_abc_classification: {
+        Args: {
+          p_category_id?: string
+          p_company_id: string
+          p_months?: number
+        }
+        Returns: {
+          abc_class: string
+          category_name: string
+          consumption_qty: number
+          consumption_value: number
+          cumulative_pct: number
+          item_code: string
+          item_name: string
+        }[]
+      }
+      report_asset_register: {
+        Args: {
+          p_company_id: string
+          p_location_id?: string
+          p_status?: string
+        }
+        Returns: {
+          accumulated_depreciation: number
+          asset_id: string
+          asset_tag: string
+          brand: string
+          category: string
+          condition: string
+          depreciation_method: string
+          depreciation_rate: number
+          location_name: string
+          name: string
+          net_book_value: number
+          purchase_date: string
+          purchase_price: number
+          salvage_value: number
+          serial_number: string
+          status: string
+          useful_life_years: number
+        }[]
+      }
+      report_batch_traceability: {
+        Args: {
+          p_batch_number?: string
+          p_company_id: string
+          p_direction?: string
+          p_item_code?: string
+        }
+        Returns: {
+          batch_number: string
+          counterparty: string
+          event_date: string
+          event_type: string
+          item_code: string
+          item_name: string
+          notes: string
+          quantity: number
+          reference_number: string
+          trace_direction: string
+          unit_cost: number
+        }[]
+      }
+      report_bin_utilisation: {
+        Args: { p_company_id: string; p_location_id?: string }
+        Returns: {
+          available_capacity: number
+          bin_code: string
+          bin_name: string
+          capacity: number
+          current_quantity: number
+          location_name: string
+          status: string
+          utilisation_pct: number
+        }[]
+      }
+      report_cycle_count_variance: {
+        Args: {
+          p_company_id: string
+          p_date_from?: string
+          p_date_to?: string
+          p_location_id?: string
+        }
+        Returns: {
+          count_date: string
+          count_number: string
+          item_code: string
+          item_name: string
+          location_name: string
+          physical_quantity: number
+          status: string
+          system_quantity: number
+          variance_percentage: number
+          variance_quantity: number
+          variance_reason: string
+          variance_value: number
+        }[]
+      }
+      report_grn_register: {
+        Args: {
+          p_company_id: string
+          p_date_from?: string
+          p_date_to?: string
+          p_supplier_id?: string
+        }
+        Returns: {
+          approved_at: string
+          grn_date: string
+          grn_number: string
+          invoice_date: string
+          invoice_number: string
+          line_count: number
+          po_number: string
+          remarks: string
+          status: string
+          supplier_name: string
+          total_qty_received: number
+          total_value: number
+        }[]
+      }
       report_inventory_aging: {
         Args: { p_category_id?: string; p_company_id: string }
         Returns: {
@@ -20170,6 +20290,29 @@ export type Database = {
           weighted_avg_value: number
         }[]
       }
+      report_stock_movement_ledger: {
+        Args: {
+          p_company_id: string
+          p_date_from?: string
+          p_date_to?: string
+          p_location_id?: string
+        }
+        Returns: {
+          item_code: string
+          item_name: string
+          location_name: string
+          notes: string
+          quantity_after: number
+          quantity_before: number
+          quantity_change: number
+          reference_type: string
+          total_value: number
+          transaction_type: string
+          txn_date: string
+          unit_cost: number
+          user_email: string
+        }[]
+      }
       report_stock_on_hand: {
         Args: {
           p_category_id?: string
@@ -20194,6 +20337,30 @@ export type Database = {
           stock_value: number
           unit_cost: number
           unit_name: string
+        }[]
+      }
+      report_tool_ledger: {
+        Args: {
+          p_company_id: string
+          p_date_from?: string
+          p_date_to?: string
+          p_status?: string
+        }
+        Returns: {
+          department: string
+          expected_return_date: string
+          issue_date: string
+          issue_number: string
+          issued_to_name: string
+          last_condition: string
+          last_return_date: string
+          outstanding_qty: number
+          purpose: string
+          quantity_issued: number
+          quantity_returned: number
+          status: string
+          tool_code: string
+          tool_name: string
         }[]
       }
       return_tool_to_bin: {
