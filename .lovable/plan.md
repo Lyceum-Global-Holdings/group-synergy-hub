@@ -1,116 +1,138 @@
-# Pin Sub-Modules to Top (Per Company)
+## Goal
 
-Add a personal favorites/pinned sub-modules feature so each user can pin the sub-modules they use most often per company, displayed in a dedicated "Pinned" section at the top of the sidebar.
+Add a global **"As-of Date"** filter to the Resource Allocation module (and its three sub-modules: Labour, Inventory, Subcontractors), defaulting to **today** on every page entry. This implements **time-phased resource availability** per **PMI PMBOK § 9 (Resource Management)** and **ISO 21500/21502** scheduling standards — the same model used by SAP PS, Oracle Primavera, and MS Project.
 
-## Why this design (international standards)
+## International Standard Applied
 
-- **Per-user, per-company scope** — matches SAP Fiori "My Favorites" and Oracle Cloud "Favorites" patterns where pins are scoped to the user within an organizational/company context. A user working across multiple companies sees a different pin set per company.
-- **Sub-module level granularity** — pins target leaf navigation items (the actionable pages), aligned with NN/g and ISO 9241-110 navigation guidance: surface frequently used destinations one click away.
-- **Reorderable, capped list** — drag-to-reorder and a soft cap of ~10 pins, in line with Microsoft Fluent and SAP Fiori favorites guidance to prevent visual overload.
-- **Server-persisted** — pins follow the user across devices (stored in Supabase with RLS), not localStorage.
-
-## User experience
-
-- A new **"Pinned"** group appears at the top of the sidebar (between the company header and "Navigation"), only when the user has at least one pin for the active company.
-- Each sub-module row in the regular module groups gets a small pin icon (visible on hover, filled when pinned). Clicking toggles the pin for the currently selected company.
-- When "All Companies" is active, the Pinned section shows the union of pins across the user's accessible companies, each labelled with the company code.
-- Pinned items respect existing RBAC: if a user loses access to a sub-module, it is hidden from the Pinned list automatically (record stays in DB so access restoration brings it back).
-- A small "Reorder" affordance (drag handle on hover) lets the user reorder pins; order persists.
-
-```text
-┌─ Sidebar ──────────────────┐
-│  [Company Header]          │
-│                            │
-│  PINNED                    │
-│   ⭐ Purchase Requisition  │
-│   ⭐ GRN                   │
-│   ⭐ Daily Site Reports    │
-│                            │
-│  NAVIGATION                │
-│   Dashboard                │
-│                            │
-│  MODULES                   │
-│   ▾ Procurement            │
-│      Purchase Req.    📌   │ ← hover shows pin
-│      Purchase Order   📌   │
-│   ▸ Warehouse              │
-└────────────────────────────┘
+**Date-effective ("as-of date") filtering**, where a record is visible on date `D` if:
+```
+start_date <= D  AND  (end_date IS NULL OR end_date >= D)
 ```
 
-## Technical implementation
+This is the canonical *resource availability window* semantics. Combined with **ISO 8601 date format** (`YYYY-MM-DD`) and the user's **local timezone** (matches the existing `LiveClock` component), it gives a reliable "what is allocated right now" view that auditors and project managers expect.
 
-### 1. Database (migration)
+The filter always **resets to today** on navigation (does not persist across sessions) — matching SAP Fiori's "Today by default, user can override" pattern. A **"Today"** quick-reset button is always visible.
 
-New table `user_pinned_submodules`:
+## What the User Will See
 
-| Column | Type | Notes |
+1. A new **date filter bar** at the top of `/construction/resource-allocation` and each sub-page, showing:
+   - A date picker (default = today, ISO 8601 display: `Sat, 26 Apr 2026`)
+   - A **"Today"** button (highlighted when active)
+   - Quick presets: **Yesterday · Today · Tomorrow · This Week · This Month**
+   - A subtle indicator: *"Showing resources active on 26 Apr 2026"*
+2. The 3 KPI cards on the parent page (Labour / Inventory / Subcontractor counts) recalculate to count only resources **active on the selected date**.
+3. Sub-pages filter their tables/dashboards by the same date.
+4. The selected date propagates to sub-pages via a shared context (and via a `?date=YYYY-MM-DD` URL param for shareable links).
+
+## Scope per Sub-Module
+
+| Sub-module | Filter applied to | Date column |
 |---|---|---|
-| `id` | uuid PK | `gen_random_uuid()` |
-| `user_id` | uuid | FK `auth.users(id)` on delete cascade |
-| `company_id` | uuid | FK `companies(id)` on delete cascade |
-| `module_key` | text | e.g. `procurement` |
-| `submodule_key` | text | e.g. `purchase-requisition` |
-| `submodule_url` | text | snapshot of route, used for navigation |
-| `submodule_title` | text | snapshot of label (fallback) |
-| `position` | int | 0-based ordering within (user, company) |
-| `created_at` | timestamptz | default `now()` |
+| **Parent (ResourceAllocation.tsx)** | KPI counts on 3 cards | `start_date` / `end_date` on `construction_resources` |
+| **Subcontractors** | Allocation View table | `start_date` / `end_date` |
+| **Labour → Allocation View** | Dashboard, Labour-Wise, Location-Wise sub-tabs | `start_date` / `end_date` on resources; `attendance_date` for attendance widgets |
+| **Labour → Master List** | Not date-filtered (master data is timeless) | — |
+| **Inventory → Allocation Dashboard / Inventory-Wise / Location-Wise** | Stock-on-hand snapshot as of date (transactions ≤ date) | `transaction_date` on stock movements |
+| **Inventory → Transfers / Service & Repair** | Filter rows where `transaction_date` ≤ as-of date | `transaction_date` |
+| **Inventory → Item Master** | Not date-filtered | — |
 
-- Unique constraint: `(user_id, company_id, module_key, submodule_key)`.
-- Index: `(user_id, company_id, position)`.
-- RLS: enable; policies — user can `SELECT/INSERT/UPDATE/DELETE` only `WHERE user_id = auth.uid()` AND `public.can_access_company(company_id)` (uses existing helper from the multi-company visibility framework).
-- No CHECK on `position`; ordering enforced in app code.
+Master lists (Labour Master, Item Master, Subcontractor Master) are intentionally **not** date-filtered — they're reference data, not allocations.
 
-### 2. Hook layer
+## Technical Design
 
-`src/hooks/useSidebarPins.ts`:
-- `usePinnedSubmodules(companyId | "all")` — React Query, returns ordered pins (for "all", merges across `companies` the user can access).
-- `useTogglePin()` — mutation: insert if missing (append at next position), delete if present.
-- `useReorderPins(companyId)` — mutation: bulk update positions.
-- Cache key includes `userId` and `companyId`; invalidated on toggle/reorder.
-- Follows existing 30s staleTime convention from the global React Query cache memory.
+### 1. New shared context: `ResourceDateContext`
 
-### 3. Sidebar UI
+`src/contexts/ResourceDateContext.tsx`
 
-Edit `src/components/layout/CompanySidebar.tsx`:
-- Compute `effectiveCompanyId = isViewingAllCompanies ? "all" : selectedCompany?.id`.
-- Fetch pins with `usePinnedSubmodules(effectiveCompanyId)`.
-- Cross-reference each pin against the already-computed `departments[]` to confirm the user still has RBAC access; drop orphans from the visible list.
-- Render a new `SidebarGroup` titled "Pinned" above "Navigation" when `visiblePins.length > 0`.
-  - Each pin: icon from its parent module config + title; in "All Companies" mode, suffix with company code badge.
-  - Active state matches existing styling (left border + accent bg).
-- For each leaf `SidebarMenuSubButton` in the existing module list, add a trailing pin button (lucide `Pin` / `PinOff`):
-  - Visible on row hover (`opacity-0 group-hover/sub:opacity-100`); always visible when pinned.
-  - Disabled when `isViewingAllCompanies` (pinning requires a specific company); tooltip explains.
-  - `onClick`: stop propagation, call `toggle({ companyId: selectedCompany.id, ... })`.
+```ts
+interface ResourceDateContextValue {
+  asOfDate: Date;              // always a valid Date, defaults to today
+  setAsOfDate: (d: Date) => void;
+  resetToToday: () => void;
+  isToday: boolean;
+  asOfDateISO: string;         // YYYY-MM-DD for queries
+}
+```
+- Mounted in `ResourceAllocation.tsx` (and re-mounted on each sub-page) so the default re-resolves to "today" on every entry.
+- Reads/writes `?date=YYYY-MM-DD` URL param via `useSearchParams` for deep linking. Invalid/missing param → today.
+- Exposes `useResourceDate()` hook.
 
-### 4. Reordering
+### 2. New shared component: `<AsOfDateBar />`
 
-- Use `@dnd-kit/core` + `@dnd-kit/sortable` (already a common shadcn pattern; add deps if not present) inside the Pinned group only.
-- Drag handle visible on hover; on drop, call `useReorderPins`.
-- Keep changes optimistic: update React Query cache before server confirms, rollback on error.
+`src/components/construction/AsOfDateBar.tsx`
+- Calendar icon + Shadcn DatePicker (Popover + Calendar with `pointer-events-auto`)
+- Quick-preset buttons (Yesterday, Today, Tomorrow, This Week, This Month)
+- "Today" reset button (visible when `!isToday`, primary variant)
+- Active-date badge: `Showing resources active on {format(date, 'EEE, dd MMM yyyy')}`
+- Compact responsive layout (collapses presets into a dropdown < 768px)
 
-### 5. Edge cases & guardrails
+### 3. Reusable filter helper
 
-- **Cap**: soft limit of 12 pins per (user, company); show a toast "Pin limit reached — unpin something first" when exceeded.
-- **All Companies mode**: pin button hidden (only toggle from a specific company context). Reordering disabled in "all" view (pins shown in per-company groups, ordered by company name then `position`).
-- **RBAC drift**: orphaned pins (user lost access) are filtered from the UI but kept in DB; an optional cleanup job is out of scope.
-- **Collapsed sidebar**: Pinned group renders icon-only (parent module icon) consistent with `collapsible="icon"` behaviour.
-- **Super admin "All Companies"**: same union behaviour; no special-case beyond RBAC filter.
+`src/lib/construction/dateEffective.ts`
+```ts
+export function isActiveOn<T extends { start_date?: string|null; end_date?: string|null }>(
+  row: T, asOfISO: string
+): boolean {
+  const start = row.start_date ?? null;
+  const end = row.end_date ?? null;
+  if (start && start > asOfISO) return false;
+  if (end && end < asOfISO) return false;
+  return true;
+}
+```
+String comparison on ISO 8601 dates is safe and timezone-stable.
 
-## Files
+### 4. Hook updates
 
-**Create**
-- `supabase/migrations/<timestamp>_user_pinned_submodules.sql`
-- `src/hooks/useSidebarPins.ts`
-- `src/components/layout/SidebarPinButton.tsx` (small reusable trailing pin toggle)
-- `src/components/layout/PinnedSubmodulesGroup.tsx` (the new sidebar group + dnd wiring)
+- **`useConstructionResources`**: accept optional `{ asOfDate?: string }`; when provided, push the effective-date predicate to Supabase:
+  ```ts
+  .or(`start_date.is.null,start_date.lte.${asOf}`)
+  .or(`end_date.is.null,end_date.gte.${asOf}`)
+  ```
+  This keeps filtering server-side (better with RLS + pagination).
+- **Inventory transaction queries** (`useConstructionInventory.ts`, `AllocationDashboard.tsx`): add `transaction_date <= asOf` predicate.
+- **Labour attendance views**: pre-fill `attendance_date` filter with `asOf`.
 
-**Edit**
-- `src/components/layout/CompanySidebar.tsx` — mount `PinnedSubmodulesGroup`, attach `SidebarPinButton` to each leaf row.
-- `package.json` — add `@dnd-kit/core` and `@dnd-kit/sortable` if missing.
+### 5. Page integration
 
-## Out of scope
+- `ResourceAllocation.tsx`: wrap in `<ResourceDateProvider>`, render `<AsOfDateBar />` above the existing controls row, recompute the 3 card counts via `isActiveOn`. Pass `?date=` through navigation `onClick` so sub-pages inherit the date.
+- `SubcontractorResources.tsx`, `LabourResources.tsx`, `InventoryItems.tsx`: each wraps in its own `<ResourceDateProvider>` (reading `?date=` from URL → today fallback), renders `<AsOfDateBar />` above the Tabs, threads `asOfDate` into hooks/views.
+- Inventory `AllocationDashboard`, `InventoryWiseView`, `LocationWiseView`, `TransfersView`, `ServiceRepairView`: accept `asOfDate` prop and apply to their queries.
+- Labour `LabourDashboard`, `LabourWiseView`, `LabourLocationWiseView`: same treatment.
 
-- Pinning entire module groups (only sub-modules / leaves).
-- Sharing pin sets across users or roles.
-- Default pins seeded by admins (can be a follow-up).
+### 6. Defaulting & Reset Rules (Standards)
+
+1. On every page **mount**, `asOfDate` resolves in this order:
+   (a) `?date=YYYY-MM-DD` query param if valid; otherwise
+   (b) **today** in user's local timezone (`new Date()` truncated to date).
+2. The date is **never** persisted to localStorage — fresh visit = today.
+3. Each navigation between sibling sub-pages preserves the selected date via URL param.
+4. Returning to `/construction/resource-allocation` from any other module resets to today (no `?date=` in fresh navigation).
+
+### 7. Accessibility & i18n
+
+- `<AsOfDateBar />` uses `aria-label="Resource allocation as-of date"`.
+- Date format respects locale via `date-fns/format` (`PPP` token) — currently English; ready for i18n later.
+- All quick-preset buttons keyboard-navigable.
+
+## Files to Create
+
+- `src/contexts/ResourceDateContext.tsx`
+- `src/components/construction/AsOfDateBar.tsx`
+- `src/lib/construction/dateEffective.ts`
+
+## Files to Edit
+
+- `src/pages/construction/ResourceAllocation.tsx` — wrap with provider, add bar, filter KPI counts, propagate `?date=` to nav
+- `src/pages/construction/resources/LabourResources.tsx` — wrap, add bar, pass date down
+- `src/pages/construction/resources/InventoryItems.tsx` — wrap, add bar, pass date down
+- `src/pages/construction/resources/SubcontractorResources.tsx` — wrap, add bar, filter table
+- `src/hooks/construction/useConstructionResources.ts` — accept `asOfDate` and apply server-side predicate
+- `src/components/construction/labour/LabourDashboard.tsx`, `LabourWiseView.tsx`, `LabourLocationWiseView.tsx` — consume `useResourceDate()`
+- `src/components/construction/inventory/AllocationDashboard.tsx`, `InventoryWiseView.tsx`, `LocationWiseView.tsx`, `TransfersView.tsx`, `ServiceRepairView.tsx` — consume `useResourceDate()` and apply to transaction queries
+
+## Out of Scope (future work, not part of this change)
+
+- Persisting user's preferred date across sessions (intentionally avoided per standard)
+- Date-range mode (we use a single as-of date — the standard for snapshot views; range mode belongs to reports)
+- Backfilling historical `start_date`/`end_date` for existing resources (records with NULL dates are treated as "always active", matching ERP convention)
