@@ -123,7 +123,11 @@ export async function fetchAbcClassification(
 export async function fetchStockMovement(
   def: ReportDefinition,
   ctx: BuildEnvelopeContext,
-  params: { period?: { from?: string; to?: string }; locationId?: string | null },
+  params: {
+    period?: { from?: string; to?: string };
+    locationId?: string | null;
+    notesContains?: string | null;
+  },
 ): Promise<ReportEnvelope> {
   const from = params.period?.from ? new Date(params.period.from).toISOString() : null;
   const to = params.period?.to ? new Date(params.period.to).toISOString() : null;
@@ -132,6 +136,7 @@ export async function fetchStockMovement(
     p_date_from: from,
     p_date_to: to,
     p_location_id: params.locationId || null,
+    p_notes_contains: (params.notesContains || "").trim() || null,
   });
   if (error) throw error;
   const rows = (data ?? []) as Record<string, unknown>[];
