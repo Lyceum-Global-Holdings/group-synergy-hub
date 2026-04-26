@@ -119,7 +119,8 @@ export const moduleConfig: Record<string, ModuleConfig> = {
       { key: 'approvals', name: 'Approval Console', description: 'Workflow approvals', url: '/management/approvals' },
       { key: 'audit-logs', name: 'Audit Logs', description: 'System activity tracking', url: '/management/audit-logs' },
       { key: 'budget-actual', name: 'Budget vs Actual', description: 'Budget variance analysis', url: '/management/budget-actual' },
-      { key: 'exceptions', name: 'Exception Overrides', description: 'Handle system exceptions', url: '/management/exceptions' }
+      { key: 'exceptions', name: 'Exception Overrides', description: 'Handle system exceptions', url: '/management/exceptions' },
+      { key: 'reports', name: 'Reports Center', description: 'Standardised reports for every module (ISO/IFRS/GS1)', url: '/management/reports' }
     ]
   },
   training: {

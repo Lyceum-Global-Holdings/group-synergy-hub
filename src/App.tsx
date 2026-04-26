@@ -121,6 +121,7 @@ const PriceLists = lazy(() => import("./pages/procurement/PriceLists"));
 const AuditLogs = lazy(() => import("./pages/management/AuditLogs"));
 const BudgetVsActual = lazy(() => import("./pages/management/BudgetVsActual"));
 const Exceptions = lazy(() => import("./pages/management/Exceptions"));
+const ReportsCenter = lazy(() => import("./pages/management/ReportsCenter"));
 const SocialMediaAccounts = lazy(() => import("./pages/social-media/AccountRegistry"));
 const SocialMediaAccess = lazy(() => import("./pages/social-media/AccessManagement"));
 const SocialMediaNDA = lazy(() => import("./pages/social-media/NDACompliance"));
@@ -255,6 +256,7 @@ function App() {
                 <Route path="/management/audit-logs" element={<AuditLogs />} />
                 <Route path="/management/budget-actual" element={<BudgetVsActual />} />
                 <Route path="/management/exceptions" element={<Exceptions />} />
+                <Route path="/management/reports" element={<ReportsCenter />} />
                 
                 {/* Additional Sourcing routes */}
                 <Route path="/sourcing/rfq-management" element={<RfqManagement />} />
