@@ -9,6 +9,7 @@ import { ARAgingReport } from "@/components/finance/ar/ARAgingReport";
 import { CreateCustomerDialog } from "@/components/finance/ar/CreateCustomerDialog";
 import { CreateCustomerInvoiceDialog } from "@/components/finance/ar/CreateCustomerInvoiceDialog";
 import { CreateReceiptDialog } from "@/components/finance/ar/CreateReceiptDialog";
+import { GenerateReportButton } from "@/components/management/reports/GenerateReportButton";
 
 export default function AccountsReceivable() {
   const [activeTab, setActiveTab] = useState("customers");
@@ -26,6 +27,7 @@ export default function AccountsReceivable() {
           </p>
         </div>
         <div className="flex gap-2">
+          <GenerateReportButton size="sm" template="FN-AR-AGE-001" />
           <Button variant="outline" size="sm">
             <Download className="h-4 w-4 mr-2" />
             Export

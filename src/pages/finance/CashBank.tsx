@@ -7,6 +7,7 @@ import { BankTransactionList } from "@/components/finance/bank/BankTransactionLi
 import { CashPositionDashboard } from "@/components/finance/bank/CashPositionDashboard";
 import { CreateBankAccountDialog } from "@/components/finance/bank/CreateBankAccountDialog";
 import { CreateBankTransactionDialog } from "@/components/finance/bank/CreateBankTransactionDialog";
+import { GenerateReportButton } from "@/components/management/reports/GenerateReportButton";
 
 export default function CashBank() {
   const [activeTab, setActiveTab] = useState("accounts");
@@ -23,6 +24,7 @@ export default function CashBank() {
           </p>
         </div>
         <div className="flex gap-2">
+          <GenerateReportButton size="sm" template="FN-CF-001" />
           <Button variant="outline" size="sm">
             <Download className="h-4 w-4 mr-2" />
             Export

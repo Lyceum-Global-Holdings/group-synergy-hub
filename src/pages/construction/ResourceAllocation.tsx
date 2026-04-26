@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useConstructionResources } from "@/hooks/construction/useConstructionResources";
 import { useConstructionSites } from "@/hooks/construction/useConstructionSites";
+import { GenerateReportButton } from "@/components/management/reports/GenerateReportButton";
 
 export default function ResourceAllocation() {
   const navigate = useNavigate();
@@ -51,8 +52,10 @@ export default function ResourceAllocation() {
           </p>
         </div>
 
-        {/* Site Location Filter */}
-        <div className="flex items-center gap-2 min-w-[240px]">
+        <div className="flex items-center gap-3">
+          <GenerateReportButton template="CN-MAT-MOV-001" />
+          {/* Site Location Filter */}
+          <div className="flex items-center gap-2 min-w-[240px]">
           <MapPin className="h-4 w-4 text-muted-foreground shrink-0" />
           <Select value={selectedSiteId} onValueChange={setSelectedSiteId}>
             <SelectTrigger className="w-full">
@@ -67,6 +70,7 @@ export default function ResourceAllocation() {
               ))}
             </SelectContent>
           </Select>
+          </div>
         </div>
       </div>
 

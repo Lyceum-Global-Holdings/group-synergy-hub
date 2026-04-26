@@ -8,6 +8,7 @@ import { ScrollText, Download, Filter, AlertTriangle, CheckCircle, XCircle, Acti
 import { useSystemErrorLogs } from "@/hooks/useSystemErrorLogs";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
+import { GenerateReportButton } from "@/components/management/reports/GenerateReportButton";
 
 export default function AuditLogs() {
   const { toast } = useToast();
@@ -58,6 +59,7 @@ export default function AuditLogs() {
             Monitor edge function errors, auto-retries, and resolution suggestions
           </p>
         </div>
+        <GenerateReportButton template="MG-AUD-LOG-001" />
       </div>
 
       {/* Summary Cards */}

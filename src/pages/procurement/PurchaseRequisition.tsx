@@ -20,6 +20,7 @@ import { usePurchaseRequisitions } from '@/hooks/usePurchaseRequisitions';
 import { useAuth } from '@/contexts/AuthContext';
 import type { PurchaseRequisition, PrStatus } from '@/types/procurement';
 import { format } from 'date-fns';
+import { GenerateReportButton } from '@/components/management/reports/GenerateReportButton';
 
 const statusColors: Record<PrStatus, string> = {
   draft: 'bg-gray-500',
@@ -109,10 +110,13 @@ export default function PurchaseRequisition() {
             Manage and track purchase requisition requests
           </p>
         </div>
-        <Button onClick={() => setIsCreateDialogOpen(true)}>
-          <Plus className="mr-2 h-4 w-4" />
-          Create PR
-        </Button>
+        <div className="flex gap-2">
+          <GenerateReportButton template="PR-PR-REG-001" />
+          <Button onClick={() => setIsCreateDialogOpen(true)}>
+            <Plus className="mr-2 h-4 w-4" />
+            Create PR
+          </Button>
+        </div>
       </div>
 
       {/* Stats Cards */}

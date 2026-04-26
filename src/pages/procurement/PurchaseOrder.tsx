@@ -12,6 +12,7 @@ import { CreatePoDialog } from "@/components/procurement/CreatePoDialog";
 import { PoDetailsDialog } from "@/components/procurement/PoDetailsDialog";
 import { PurchaseOrder, PoStatus } from "@/types/purchaseOrder";
 import { format } from "date-fns";
+import { GenerateReportButton } from "@/components/management/reports/GenerateReportButton";
 
 const statusColors: Record<PoStatus, string> = {
   draft: "bg-gray-100 text-gray-800",
@@ -94,10 +95,15 @@ export default function PurchaseOrderPage() {
           <h1 className="text-2xl font-bold text-foreground">Purchase Orders</h1>
           <p className="text-muted-foreground">Manage your purchase orders and track deliveries</p>
         </div>
-        <Button onClick={() => setShowCreateDialog(true)} className="flex items-center gap-2">
-          <Plus className="h-4 w-4" />
-          Create Purchase Order
-        </Button>
+        <div className="flex items-center gap-2">
+          <GenerateReportButton
+            templates={["PR-PO-REG-001", "PR-PO-OPN-001", "PR-SPND-001"]}
+          />
+          <Button onClick={() => setShowCreateDialog(true)} className="flex items-center gap-2">
+            <Plus className="h-4 w-4" />
+            Create Purchase Order
+          </Button>
+        </div>
       </div>
 
       {/* Summary Cards */}

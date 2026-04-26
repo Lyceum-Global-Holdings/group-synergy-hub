@@ -18,6 +18,7 @@ import { ApprovalFilters, ApprovalType, ApprovalPriority } from "@/types/approva
 import { Search, Filter, RefreshCw, Bell } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useIsAdmin } from "@/hooks/useSuperAdmin";
+import { GenerateReportButton } from "@/components/management/reports/GenerateReportButton";
 
 export default function ApprovalConsole() {
   const [filters, setFilters] = useState<ApprovalFilters>({});
@@ -73,6 +74,7 @@ export default function ApprovalConsole() {
               </ToggleGroupItem>
             </ToggleGroup>
           )}
+          <GenerateReportButton size="sm" template="MG-APR-PEND-001" />
           <Button variant="outline" size="icon" onClick={() => refetch()}>
             <RefreshCw className={`h-4 w-4 ${isRefetching ? 'animate-spin' : ''}`} />
           </Button>

@@ -6,6 +6,7 @@ import ProductionOrdersList from "@/components/production/ProductionOrdersList";
 import StagePlannerDialog from "@/components/production/StagePlannerDialog";
 import ProductionOrderDetail from "@/components/production/ProductionOrderDetail";
 import DailyProductionSummary from "@/components/production/DailyProductionSummary";
+import { GenerateReportButton } from "@/components/management/reports/GenerateReportButton";
 
 export default function ProductionModule() {
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
@@ -24,7 +25,12 @@ export default function ProductionModule() {
             <p className="text-sm text-muted-foreground">WIP tracking & stage-wise cost management</p>
           </div>
         </div>
-        <StagePlannerDialog />
+        <div className="flex items-center gap-2">
+          <GenerateReportButton
+            templates={["PD-WIP-001", "PD-DAILY-001", "PD-STG-COST-001", "PD-EFF-001"]}
+          />
+          <StagePlannerDialog />
+        </div>
       </div>
 
       <Tabs defaultValue="dashboard">

@@ -14,6 +14,7 @@ import {
 import { useProjects } from "@/hooks/construction/useProjects";
 import { PROJECT_STATUSES } from "@/types/construction";
 import { format, differenceInDays } from "date-fns";
+import { GenerateReportButton } from "@/components/management/reports/GenerateReportButton";
 
 export default function ProgressTracking() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -68,6 +69,7 @@ export default function ProgressTracking() {
             Monitor project progress and completion status
           </p>
         </div>
+        <GenerateReportButton template="CN-PROG-001" />
       </div>
 
       <div className="grid gap-4 md:grid-cols-4">

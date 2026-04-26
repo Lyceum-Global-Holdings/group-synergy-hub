@@ -29,6 +29,7 @@ import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { Contract } from "@/types/contracts";
 import { ColumnDef } from "@tanstack/react-table";
+import { GenerateReportButton } from "@/components/management/reports/GenerateReportButton";
 
 const Contracts = () => {
   const [search, setSearch] = useState("");
@@ -193,10 +194,13 @@ const Contracts = () => {
             Manage all your contracts in one place
           </p>
         </div>
-        <Button onClick={() => setIsCreateOpen(true)}>
-          <Plus className="mr-2 h-4 w-4" />
-          Create Contract
-        </Button>
+        <div className="flex items-center gap-2">
+          <GenerateReportButton template="SR-CTR-EXP-001" />
+          <Button onClick={() => setIsCreateOpen(true)}>
+            <Plus className="mr-2 h-4 w-4" />
+            Create Contract
+          </Button>
+        </div>
       </div>
 
       <div className="grid gap-4 md:grid-cols-4">

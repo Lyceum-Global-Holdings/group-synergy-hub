@@ -32,12 +32,52 @@ const MODULES = [
   { key: "sourcing", label: "Sourcing" },
   { key: "production", label: "Production" },
   { key: "construction", label: "Construction" },
+  { key: "management", label: "Management" },
 ];
+
+
+/**
+ * Seed a parameter object from URL query params, only for keys declared by the
+ * report definition. Values are coerced to the parameter's expected type.
+ */
+function seedParamsFromUrl(
+  def: ReportDefinition | null,
+  searchParams: URLSearchParams,
+): Record<string, unknown> {
+  if (!def) return {};
+  const out: Record<string, unknown> = {};
+  for (const p of def.parameters) {
+    const raw = searchParams.get(p.key);
+    if (raw === null) {
+      // Special handling for dateRange — read `${key}From` and `${key}To`.
+      if (p.type === "dateRange") {
+        const from = searchParams.get(`${p.key}From`);
+        const to = searchParams.get(`${p.key}To`);
+        if (from || to) out[p.key] = { from: from ?? undefined, to: to ?? undefined };
+      }
+      continue;
+    }
+    if (p.type === "boolean") {
+      out[p.key] = raw === "true" || raw === "1";
+    } else if (p.type === "dateRange") {
+      // Allow `from|to` shorthand
+      const [from, to] = raw.split("|");
+      out[p.key] = { from: from || undefined, to: to || undefined };
+    } else {
+      out[p.key] = raw;
+    }
+  }
+  return out;
+}
 
 export default function ReportsCenter() {
   const [searchParams] = useSearchParams();
   const initialTemplate = searchParams.get("template") ?? undefined;
-  const initialModule = searchParams.get("module") ?? "warehouse";
+  const initialDef = initialTemplate
+    ? REPORT_REGISTRY.find((r) => r.code === initialTemplate) ?? null
+    : null;
+  const initialModule =
+    searchParams.get("module") ?? initialDef?.moduleKey ?? "warehouse";
 
   const { selectedCompany, baseCurrency } = useCompany();
   const { user } = useAuth();
@@ -45,10 +85,10 @@ export default function ReportsCenter() {
   const [activeModule, setActiveModule] = useState(initialModule);
   const [search, setSearch] = useState("");
 
-  const [openReport, setOpenReport] = useState<ReportDefinition | null>(
-    initialTemplate ? REPORT_REGISTRY.find((r) => r.code === initialTemplate) ?? null : null,
+  const [openReport, setOpenReport] = useState<ReportDefinition | null>(initialDef);
+  const [params, setParams] = useState<Record<string, unknown>>(() =>
+    seedParamsFromUrl(initialDef, searchParams),
   );
-  const [params, setParams] = useState<Record<string, unknown>>({});
   const [previewEnvelope, setPreviewEnvelope] = useState<ReportEnvelope | null>(null);
   const [busyFormat, setBusyFormat] = useState<ReportFormat | null>(null);
 

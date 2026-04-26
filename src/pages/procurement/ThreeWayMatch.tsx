@@ -28,6 +28,7 @@ import {
 import { useState } from "react";
 import { useThreeWayMatch, MatchResult, MatchStatus } from "@/hooks/useThreeWayMatch";
 import ThreeWayMatchDetail from "@/components/procurement/ThreeWayMatchDetail";
+import { GenerateReportButton } from "@/components/management/reports/GenerateReportButton";
 
 function statusBadge(status: MatchStatus) {
   const map: Record<MatchStatus, { variant: "default" | "secondary" | "destructive" | "outline"; label: string }> = {
@@ -135,10 +136,13 @@ export default function ThreeWayMatch() {
             Match Purchase Orders, Goods Receipts, and Invoices
           </p>
         </div>
-        <Button onClick={autoMatch} disabled={isUpdating}>
-          <Zap className="h-4 w-4 mr-2" />
-          Auto-Match All
-        </Button>
+        <div className="flex items-center gap-2">
+          <GenerateReportButton template="PR-3WM-001" />
+          <Button onClick={autoMatch} disabled={isUpdating}>
+            <Zap className="h-4 w-4 mr-2" />
+            Auto-Match All
+          </Button>
+        </div>
       </div>
 
       {/* KPI Cards */}

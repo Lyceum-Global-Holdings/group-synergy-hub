@@ -7,6 +7,7 @@ import { SupplierPaymentList } from "@/components/finance/ap/SupplierPaymentList
 import { APAgingReport } from "@/components/finance/ap/APAgingReport";
 import { CreateSupplierInvoiceDialog } from "@/components/finance/ap/CreateSupplierInvoiceDialog";
 import { CreatePaymentDialog } from "@/components/finance/ap/CreatePaymentDialog";
+import { GenerateReportButton } from "@/components/management/reports/GenerateReportButton";
 
 export default function AccountsPayable() {
   const [activeTab, setActiveTab] = useState("invoices");
@@ -23,6 +24,7 @@ export default function AccountsPayable() {
           </p>
         </div>
         <div className="flex gap-2">
+          <GenerateReportButton size="sm" template="FN-AP-AGE-001" />
           <Button variant="outline" size="sm">
             <Download className="h-4 w-4 mr-2" />
             Export
