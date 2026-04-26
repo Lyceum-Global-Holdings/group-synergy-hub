@@ -248,6 +248,17 @@ export default function ReportsCenter() {
                     )}
                     Export CSV
                   </Button>
+                  <Button
+                    onClick={() => {
+                      setParams({});
+                      setPreviewEnvelope(null);
+                    }}
+                    disabled={busyFormat !== null}
+                    variant="ghost"
+                  >
+                    <RotateCcw className="h-4 w-4 mr-2" />
+                    Reset
+                  </Button>
                 </div>
 
                 {previewEnvelope && <ReportPreviewTable envelope={previewEnvelope} />}
