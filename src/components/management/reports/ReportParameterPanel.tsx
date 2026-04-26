@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { ReportDefinition, ReportParameter } from "@/lib/reports/registry";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -10,9 +10,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useWarehouseLocations } from "@/hooks/useWarehouseLocations";
+import { useEffectiveLocationsForCompany } from "@/hooks/useWarehouseLocations";
+import {
+  useUserLocationPermissions,
+  useUserViewAllLocations,
+} from "@/hooks/useUserLocationPermissions";
 import { useItemCategories } from "@/hooks/useItemCategories";
 import { useCompany } from "@/contexts/CompanyContext";
+import { useAuth } from "@/contexts/AuthContext";
+import { useLocationFilter } from "@/contexts/LocationFilterContext";
 
 interface Props {
   definition: ReportDefinition;
@@ -28,8 +34,25 @@ function isoToday(offsetDays = 0): string {
 
 export function ReportParameterPanel({ definition, values, onChange }: Props) {
   const { selectedCompany } = useCompany();
-  const { locations = [] } = useWarehouseLocations();
+  const { user } = useAuth();
+  const { globalLocationId } = useLocationFilter();
   const { categories = [] } = useItemCategories(selectedCompany?.id);
+
+  // Company-scoped + permission-aware location resolution.
+  // Mirrors SAP EWM / S4HANA: pickers only enumerate plants allocated to
+  // the active company code. See mem://architecture/warehouse-location-and-bin-management.
+  const { data: companyLocations = [], isLoading: locationsLoading } =
+    useEffectiveLocationsForCompany(selectedCompany?.id);
+  const { data: userPerms = [] } = useUserLocationPermissions(user?.id);
+  const { data: viewAllLocations = false } = useUserViewAllLocations(user?.id);
+
+  const allowedLocations = useMemo(() => {
+    const onlyLocations = companyLocations.filter((l) => l.type === "location");
+    if (viewAllLocations) return onlyLocations;
+    if (!user?.id) return [] as typeof onlyLocations;
+    const allowedIds = new Set(userPerms.map((p) => p.location_id));
+    return onlyLocations.filter((l) => allowedIds.has(l.id));
+  }, [companyLocations, userPerms, viewAllLocations, user?.id]);
 
   // Apply defaults on mount / definition change
   useEffect(() => {
@@ -44,6 +67,11 @@ export function ReportParameterPanel({ definition, values, onChange }: Props) {
       } else if (p.type === "textOperator") {
         next[p.key] = { op: "contains", term: "" };
         changed = true;
+      } else if (p.type === "location" && globalLocationId) {
+        // Seed from header global location filter only — actual scope check
+        // happens in the dedicated effect below once allowedLocations resolves.
+        next[p.key] = globalLocationId;
+        changed = true;
       } else if ("defaultValue" in p && p.defaultValue !== undefined) {
         next[p.key] = p.defaultValue;
         changed = true;
@@ -52,6 +80,25 @@ export function ReportParameterPanel({ definition, values, onChange }: Props) {
     if (changed) onChange(next);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [definition.code]);
+
+  // Clear any locationId that is not in the allowed set for the active company.
+  // Prevents silent zero-row reports after a company switch.
+  useEffect(() => {
+    if (locationsLoading) return;
+    const allowedIds = new Set(allowedLocations.map((l) => l.id));
+    const next: Record<string, unknown> = { ...values };
+    let changed = false;
+    definition.parameters.forEach((p) => {
+      if (p.type !== "location") return;
+      const current = next[p.key];
+      if (typeof current === "string" && current && !allowedIds.has(current)) {
+        next[p.key] = null;
+        changed = true;
+      }
+    });
+    if (changed) onChange(next);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedCompany?.id, allowedLocations, locationsLoading, definition.code]);
 
   const set = (key: string, v: unknown) => onChange({ ...values, [key]: v });
 
@@ -64,7 +111,9 @@ export function ReportParameterPanel({ definition, values, onChange }: Props) {
             param={p}
             value={values[p.key]}
             onChange={(v) => set(p.key, v)}
-            locations={locations.filter((l) => l.type === "location")}
+            locations={allowedLocations}
+            locationsLoading={locationsLoading}
+            companySelected={!!selectedCompany?.id}
             categories={categories}
           />
         </div>
@@ -81,12 +130,16 @@ function ParameterInput({
   value,
   onChange,
   locations,
+  locationsLoading,
+  companySelected,
   categories,
 }: {
   param: ReportParameter;
   value: unknown;
   onChange: (v: unknown) => void;
   locations: { id: string; name: string }[];
+  locationsLoading: boolean;
+  companySelected: boolean;
   categories: { id: string; name: string }[];
 }) {
   switch (param.type) {
@@ -152,22 +205,42 @@ function ParameterInput({
           <span className="text-sm text-muted-foreground">{value ? "Yes" : "No"}</span>
         </div>
       );
-    case "location":
+    case "location": {
+      const disabled = !companySelected || (!locationsLoading && locations.length === 0);
+      const placeholder = !companySelected
+        ? "Select a company first"
+        : locationsLoading
+          ? "Loading locations…"
+          : locations.length === 0
+            ? "No locations allocated to this company"
+            : "All locations";
       return (
-        <Select value={(value as string) ?? "all"} onValueChange={(v) => onChange(v === "all" ? null : v)}>
-          <SelectTrigger id={param.key}>
-            <SelectValue placeholder="All locations" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All locations</SelectItem>
-            {locations.map((l) => (
-              <SelectItem key={l.id} value={l.id}>
-                {l.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <>
+          <Select
+            value={(value as string) ?? "all"}
+            onValueChange={(v) => onChange(v === "all" ? null : v)}
+            disabled={disabled}
+          >
+            <SelectTrigger id={param.key}>
+              <SelectValue placeholder={placeholder} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All locations</SelectItem>
+              {locations.map((l) => (
+                <SelectItem key={l.id} value={l.id}>
+                  {l.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {!locationsLoading && companySelected && locations.length === 0 && (
+            <p className="text-xs text-muted-foreground">
+              No locations are allocated to the active company. Ask an admin to assign locations.
+            </p>
+          )}
+        </>
       );
+    }
     case "category":
       return (
         <Select value={(value as string) ?? "all"} onValueChange={(v) => onChange(v === "all" ? null : v)}>
