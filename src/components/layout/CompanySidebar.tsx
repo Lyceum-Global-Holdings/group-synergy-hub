@@ -168,7 +168,45 @@ export function CompanySidebar() {
     })
     .filter(Boolean) as ModuleWithCompanies[];
 
+  // ===== Pinned sub-modules =====
+  const allowedKeys = new Set<string>();
+  departments.forEach((dept) => {
+    dept.items.forEach((item) => {
+      allowedKeys.add(`${dept.key}|${item.key}`);
+      item.children?.forEach((child) =>
+        allowedKeys.add(`${dept.key}|${child.key}`)
+      );
+    });
+  });
+
+  const accessibleCompanyIds = new Set(companies.map((c) => c.id));
+  const visiblePinsAll = (allPins ?? []).filter(
+    (p) =>
+      accessibleCompanyIds.has(p.company_id) &&
+      allowedKeys.has(`${p.module_key}|${p.submodule_key}`)
+  );
+
+  const visiblePins = isViewingAllCompanies
+    ? [...visiblePinsAll].sort((a, b) => {
+        const ca = companies.find((c) => c.id === a.company_id)?.name ?? "";
+        const cb = companies.find((c) => c.id === b.company_id)?.name ?? "";
+        return ca.localeCompare(cb) || a.position - b.position;
+      })
+    : visiblePinsAll
+        .filter((p) => p.company_id === selectedCompany?.id)
+        .sort((a, b) => a.position - b.position);
+
+  const isItemPinned = (moduleKey: string, submoduleKey: string) =>
+    !!selectedCompany &&
+    visiblePinsAll.some(
+      (p) =>
+        p.company_id === selectedCompany.id &&
+        p.module_key === moduleKey &&
+        p.submodule_key === submoduleKey
+    );
+
   return (
+    <TooltipProvider delayDuration={300}>
     <Sidebar className="border-r-0 shadow-[var(--shadow-md)]">
       <SidebarContent className="bg-sidebar">
         {/* Company Header */}
