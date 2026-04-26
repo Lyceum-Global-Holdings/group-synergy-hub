@@ -35,8 +35,6 @@ const MODULES = [
   { key: "management", label: "Management" },
 ];
 
-/** Reserved query keys that drive ReportsCenter itself, not template parameters. */
-const RESERVED_QUERY_KEYS = new Set(["template", "module"]);
 
 /**
  * Seed a parameter object from URL query params, only for keys declared by the
