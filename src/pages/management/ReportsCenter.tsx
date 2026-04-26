@@ -279,9 +279,21 @@ function buildFilterDescriptors(
     .map((p) => {
       const v = params[p.key];
       if (v === undefined || v === null || v === "") return null;
-      let display = String(v);
-      if (p.type === "boolean") display = v ? "Yes" : "No";
-      if (p.type === "location" || p.type === "category") display = display.slice(0, 8) + "…"; // id snippet
+      let display = "";
+      if (p.type === "boolean") {
+        display = v ? "Yes" : "No";
+      } else if (p.type === "dateRange") {
+        const r = v as { from?: string; to?: string };
+        if (!r.from && !r.to) return null;
+        display = `${r.from ?? "—"} → ${r.to ?? "—"}`;
+      } else if (p.type === "select") {
+        const opt = p.options.find((o) => o.value === v);
+        display = opt?.label ?? String(v);
+      } else if (p.type === "location" || p.type === "category" || p.type === "supplier") {
+        display = String(v).slice(0, 8) + "…";
+      } else {
+        display = String(v);
+      }
       return { label: p.label, value: display };
     })
     .filter((x): x is { label: string; value: string } => x !== null);
