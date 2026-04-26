@@ -311,3 +311,11 @@ function SubcontractorResourcesInner() {
     </div>
   );
 }
+
+export default function SubcontractorResources() {
+  return (
+    <ResourceDateProvider>
+      <SubcontractorResourcesInner />
+    </ResourceDateProvider>
+  );
+}
