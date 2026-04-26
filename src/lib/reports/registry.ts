@@ -385,6 +385,12 @@ export const REPORT_REGISTRY: ReportDefinition[] = [
         ],
         defaultValue: "both",
       },
+      {
+        key: "notesContains",
+        label: "Notes contain",
+        type: "text",
+        placeholder: "e.g. damaged, audit, return",
+      },
     ],
     columns: [
       { key: "trace_direction", label: "Direction", type: "string", width: 12 },
