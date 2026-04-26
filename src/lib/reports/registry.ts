@@ -209,6 +209,12 @@ export const REPORT_REGISTRY: ReportDefinition[] = [
     parameters: [
       { key: "period", label: "Count Date Range", type: "dateRange", defaultDays: 90 },
       { key: "locationId", label: "Location", type: "location" },
+      {
+        key: "notesContains",
+        label: "Variance reason contains",
+        type: "text",
+        placeholder: "e.g. spillage, miscount, damaged",
+      },
     ],
     columns: [
       { key: "count_number", label: "Count #", type: "string", width: 18 },
