@@ -62,6 +62,12 @@ export default function ToolManagement() {
           </p>
         </div>
         <div className="flex gap-2">
+          <Button asChild variant="outline">
+            <Link to="/management/reports?template=WH-TOOL-LED-001">
+              <FileBarChart className="h-4 w-4 mr-2" />
+              Generate Report
+            </Link>
+          </Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline">
