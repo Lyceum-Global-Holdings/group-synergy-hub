@@ -1,60 +1,72 @@
 ## Problem
 
-The Reports Center location dropdown lists **every warehouse location in the database**, regardless of which company is currently selected. This breaks data isolation: a user working under Company A can pick a location that is allocated only to Company B, producing empty/irrelevant report results and exposing the existence of out-of-scope locations.
-
-The rest of the app (Dashboards, GRN, Stock Add, Construction Inventory, Assign Location dialog) already uses the canonical company-scoped resolver `get_effective_locations_for_company` — only the Reports Center was overlooked.
+The Reports Center "Location" filter only lists top-level **locations** (`type = 'location'`). Sub-locations and department-level stocking nodes are hidden, so users can't drill into a specific warehouse zone, bay, or department for any report — even though stock is actually held against those nodes (`warehouse_items.location_id` may point to a location, sublocation, or department per `get_stock_bearing_locations_for_company`).
 
 ## Standard being followed
 
-- **SAP EWM / S4HANA** — storage locations are always resolved relative to the active company code; pickers never enumerate cross-company plants.
-- **ISO 8000 master-data integrity** — reference-data dropdowns must reflect the active organizational scope.
-- **Project memory** (`mem://architecture/warehouse-location-and-bin-management`, `mem://access-control/hierarchical-location-permissions`) — locations are resolved through explicit assignments + `inherit_parent` chains via the `get_effective_locations_for_company` SECURITY DEFINER RPC, plus the user's `user_location_permissions` / `view_all_locations` flag.
+- **SAP EWM hierarchy** — Plant → Storage Location → Storage Bin. Pickers expose every level a user can stock against, indented under its parent.
+- **Oracle Fusion Inventory Org pickers** — same indented dropdown with type chips.
+- **WCO Data Model / GS1 GLN** — physical locations form a tree; reports must support filtering at any node.
+- Project memory `mem://architecture/warehouse-location-and-bin-management` confirms any node can be stock-bearing.
 
 ## Solution
 
-Replace the global `useWarehouseLocations()` call inside `ReportParameterPanel` with the canonical company-scoped + permission-aware resolver, and honor the global header location filter as a default.
+Switch the Reports Center location parameter from a flat list to a **hierarchical, indented, single-select dropdown** that includes locations + sub-locations + departments. The selected node id is sent as the existing `p_location_id` parameter — no DB or RPC changes.
 
-### Resolution order for the dropdown options
+### Data source
 
-1. Start from `useEffectiveLocationsForCompany(selectedCompany.id)` — only locations allocated (explicit or inherited) to the active company.
-2. Intersect with the user's `user_location_permissions` unless their profile flag `view_all_locations = true` (matches the rest of the app).
-3. Keep only nodes of type `location` (same filter the panel already applies), sorted by name.
-4. If `selectedCompany` is null, show an empty list with a hint "Select a company first" rather than every location in the system.
+Use the canonical `useStockBearingLocationsForCompany(selectedCompany.id)` RPC (`get_stock_bearing_locations_for_company`) instead of `useEffectiveLocationsForCompany`. It already returns every node — location, sublocation, department — that the active company can stock against, with `parent_id`, `depth`, `is_standalone_warehouse`. It also already enforces user permissions via RLS.
 
-### Behavior changes in the panel
+### UI
 
-- Default value of any `location` parameter becomes the header `globalLocationId` (from `LocationFilterContext`) when it is in the allowed set; otherwise "All locations".
-- When the selected company changes, the panel re-runs the location query and clears any stale `locationId` value that is no longer in the allowed set (prevents silent zero-row reports).
-- Loading state shown in the Select trigger ("Loading locations…") while the RPC is in flight.
-- Disabled state with helper text when the resolved list is empty ("No locations allocated to this company").
+Replace the basic `<Select>` for `type: "location"` with a searchable Combobox built from the existing shadcn `Popover` + `Command` primitives (already used elsewhere in the project — see `src/components/common/LocationSelector.tsx` if present, otherwise create inline):
 
-### Server-side safety net
+```text
+[ All locations                          ▾ ]
+ ┌──────────────────────────────────────────┐
+ │ 🔍 Search locations…                     │
+ ├──────────────────────────────────────────┤
+ │ All locations                            │
+ │ ▸ Main Warehouse                  LOC    │
+ │     ▸ Receiving Zone              SUB    │
+ │         ▸ Bay 1                   DEPT   │
+ │     ▸ Storage Zone                SUB    │
+ │ ▸ Distribution Center             LOC    │
+ └──────────────────────────────────────────┘
+```
 
-Reports already pass `p_company_id` to their RPCs, so a stray location id cannot leak data. We add a defensive guard in `useReportData.ts`: if `locationId` is set but not present in the company's effective list, drop it before calling the RPC and surface a non-blocking toast ("Location not available for this company — showing all locations").
+- Tree built client-side from the flat list using `parent_id`. Roots first, children indented by `depth`.
+- Each row shows: indent + name + small muted type chip (`LOC`, `SUB`, `DEPT`).
+- Search filters by name across all levels; matching descendants keep their ancestors visible for context.
+- Single-select. Selecting a parent filters by **only that node** (matches existing RPC semantics — equality on `location_id`). A short helper line under the field reads:
+  *"Filters by the exact node selected. Pick a sub-location or department to drill down."*
+- Keyboard nav (↑ ↓ Enter Esc) and ARIA listbox roles via `Command`.
+- Loading / empty / disabled states reuse the patterns already added in the previous fix.
+
+### Permissions / company scoping (unchanged guarantees)
+
+- Server-side RPC is company-scoped and RLS-protected.
+- `useUserViewAllLocations` + `user_location_permissions` intersection still applied client-side, now against the full hierarchy (a child is included only if it's in the permitted set OR `view_all_locations` is true). Children of a permitted parent are NOT auto-included — matches the rest of the app's strict per-node permission model.
+- Stale-id cleanup effect from the previous fix continues to clear any selection that drops out of the allowed set on company switch.
+
+### Server-side compatibility
+
+No migration needed. All five report RPCs that take `p_location_id` already do `WHERE location_id = p_location_id`, which works for any node id whether it's a location, sublocation, or department, because `warehouse_items.location_id` stores whichever node owns the stock.
 
 ### Files to change
 
 - `src/components/management/reports/ReportParameterPanel.tsx`
-  - Swap `useWarehouseLocations` → `useEffectiveLocationsForCompany(selectedCompany?.id)`.
-  - Apply user-permission intersection using `useUserLocationPermissions(user.id)` + `useUserViewAllLocations(user.id)`.
-  - Read `globalLocationId` from `useLocationFilter()` for default seeding.
-  - Add loading / empty / disabled UX for the `location` Select.
-  - Clear stale `locationId` when the allowed set changes.
-- `src/hooks/reports/useReportData.ts`
-  - Defensive scrub: if `locationId` ∉ effective set for `selectedCompany`, set to `null` before calling the RPC.
-- `src/pages/management/ReportsCenter.tsx`
-  - Pass the resolved effective-location list down (or expose via the same hook in the panel — no prop drilling needed).
-
-### What is NOT changed
-
-- No DB migrations. Existing RPCs (`get_effective_locations_for_company`, report RPCs) already enforce company scope.
-- No changes to report registry signatures or column outputs.
-- No change to the global header Location Selector.
+  - Swap data source: `useEffectiveLocationsForCompany` → `useStockBearingLocationsForCompany`.
+  - Replace the `case "location"` Select with a new `<LocationTreePicker>` subcomponent (Popover + Command + indented items, type chips, search).
+  - Keep the existing permission intersection, default-from-`globalLocationId`, stale-id cleanup, and empty-state UX.
+- No registry, RPC, or types changes.
 
 ## Acceptance criteria
 
-- Switching the active company instantly refreshes the Reports Center location dropdown to only that company's allocated locations.
-- Users without `view_all_locations` only see locations they are explicitly permitted on.
-- Selecting "All locations" runs the report scoped to all of the company's effective locations (current behavior).
-- A previously chosen location id that becomes invalid after a company switch is cleared automatically.
-- No location belonging exclusively to another company appears in the dropdown for any user (verified for Stock On Hand, Stock Movement Ledger, Cycle Count Variance, Batch Traceability, and the construction inventory report).
+- The Location dropdown lists every stock-bearing node for the active company: locations, their sub-locations, and departments.
+- Items are visibly indented; type chip shown next to each name.
+- Search box filters across all levels and keeps matching ancestors visible.
+- Selecting a sub-location or department runs the report scoped to that exact node.
+- Selecting "All locations" preserves the current behavior (no `p_location_id` passed).
+- Switching company refreshes the tree; an out-of-scope previously-selected node is cleared automatically.
+- Users without `view_all_locations` only see nodes they are explicitly permitted on (no implicit inheritance through children).
