@@ -123,7 +123,11 @@ export async function fetchAbcClassification(
 export async function fetchStockMovement(
   def: ReportDefinition,
   ctx: BuildEnvelopeContext,
-  params: { period?: { from?: string; to?: string }; locationId?: string | null },
+  params: {
+    period?: { from?: string; to?: string };
+    locationId?: string | null;
+    notesContains?: string | null;
+  },
 ): Promise<ReportEnvelope> {
   const from = params.period?.from ? new Date(params.period.from).toISOString() : null;
   const to = params.period?.to ? new Date(params.period.to).toISOString() : null;
@@ -132,6 +136,7 @@ export async function fetchStockMovement(
     p_date_from: from,
     p_date_to: to,
     p_location_id: params.locationId || null,
+    p_notes_contains: (params.notesContains || "").trim() || null,
   });
   if (error) throw error;
   const rows = (data ?? []) as Record<string, unknown>[];
@@ -146,7 +151,11 @@ export async function fetchStockMovement(
 export async function fetchCycleCountVariance(
   def: ReportDefinition,
   ctx: BuildEnvelopeContext,
-  params: { period?: { from?: string; to?: string }; locationId?: string | null },
+  params: {
+    period?: { from?: string; to?: string };
+    locationId?: string | null;
+    notesContains?: string | null;
+  },
 ): Promise<ReportEnvelope> {
   const from = params.period?.from || null;
   const to = params.period?.to || null;
@@ -155,6 +164,7 @@ export async function fetchCycleCountVariance(
     p_date_from: from,
     p_date_to: to,
     p_location_id: params.locationId || null,
+    p_notes_contains: (params.notesContains || "").trim() || null,
   });
   if (error) throw error;
   const rows = (data ?? []) as Record<string, unknown>[];
@@ -256,7 +266,12 @@ export async function fetchToolLedger(
 export async function fetchBatchTraceability(
   def: ReportDefinition,
   ctx: BuildEnvelopeContext,
-  params: { batchNumber?: string; itemCode?: string; direction?: string },
+  params: {
+    batchNumber?: string;
+    itemCode?: string;
+    direction?: string;
+    notesContains?: string | null;
+  },
 ): Promise<ReportEnvelope> {
   const batch = (params.batchNumber || "").trim() || null;
   const code = (params.itemCode || "").trim() || null;
@@ -268,6 +283,7 @@ export async function fetchBatchTraceability(
     p_batch_number: batch,
     p_item_code: code,
     p_direction: params.direction || "both",
+    p_notes_contains: (params.notesContains || "").trim() || null,
   });
   if (error) throw error;
   const rows = (data ?? []) as Record<string, unknown>[];

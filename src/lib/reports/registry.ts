@@ -173,6 +173,12 @@ export const REPORT_REGISTRY: ReportDefinition[] = [
     parameters: [
       { key: "period", label: "Period", type: "dateRange", defaultDays: 30 },
       { key: "locationId", label: "Location", type: "location" },
+      {
+        key: "notesContains",
+        label: "Notes contain",
+        type: "text",
+        placeholder: "e.g. damaged, audit, return",
+      },
     ],
     columns: [
       { key: "txn_date", label: "Date", type: "datetime", width: 22 },
@@ -187,6 +193,7 @@ export const REPORT_REGISTRY: ReportDefinition[] = [
       { key: "total_value", label: "Value", type: "currency", width: 14, align: "right" },
       { key: "location_name", label: "Location", type: "string", width: 20 },
       { key: "user_email", label: "User", type: "string", width: 26 },
+      { key: "notes", label: "Notes", type: "string", width: 36 },
     ],
   },
 
@@ -202,6 +209,12 @@ export const REPORT_REGISTRY: ReportDefinition[] = [
     parameters: [
       { key: "period", label: "Count Date Range", type: "dateRange", defaultDays: 90 },
       { key: "locationId", label: "Location", type: "location" },
+      {
+        key: "notesContains",
+        label: "Variance reason contains",
+        type: "text",
+        placeholder: "e.g. spillage, miscount, damaged",
+      },
     ],
     columns: [
       { key: "count_number", label: "Count #", type: "string", width: 18 },
@@ -371,6 +384,12 @@ export const REPORT_REGISTRY: ReportDefinition[] = [
           { value: "forward", label: "Forward (downstream)" },
         ],
         defaultValue: "both",
+      },
+      {
+        key: "notesContains",
+        label: "Notes contain",
+        type: "text",
+        placeholder: "e.g. damaged, audit, return",
       },
     ],
     columns: [

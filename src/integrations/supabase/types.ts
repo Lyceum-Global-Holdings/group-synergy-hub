@@ -20269,27 +20269,50 @@ export type Database = {
           useful_life_years: number
         }[]
       }
-      report_batch_traceability: {
-        Args: {
-          p_batch_number?: string
-          p_company_id: string
-          p_direction?: string
-          p_item_code?: string
-        }
-        Returns: {
-          batch_number: string
-          counterparty: string
-          event_date: string
-          event_type: string
-          item_code: string
-          item_name: string
-          notes: string
-          quantity: number
-          reference_number: string
-          trace_direction: string
-          unit_cost: number
-        }[]
-      }
+      report_batch_traceability:
+        | {
+            Args: {
+              p_batch_number?: string
+              p_company_id: string
+              p_direction?: string
+              p_item_code?: string
+            }
+            Returns: {
+              batch_number: string
+              counterparty: string
+              event_date: string
+              event_type: string
+              item_code: string
+              item_name: string
+              notes: string
+              quantity: number
+              reference_number: string
+              trace_direction: string
+              unit_cost: number
+            }[]
+          }
+        | {
+            Args: {
+              p_batch_number?: string
+              p_company_id: string
+              p_direction?: string
+              p_item_code?: string
+              p_notes_contains?: string
+            }
+            Returns: {
+              batch_number: string
+              counterparty: string
+              event_date: string
+              event_type: string
+              item_code: string
+              item_name: string
+              notes: string
+              quantity: number
+              reference_number: string
+              trace_direction: string
+              unit_cost: number
+            }[]
+          }
       report_bin_utilisation: {
         Args: { p_company_id: string; p_location_id?: string }
         Returns: {
@@ -20415,28 +20438,52 @@ export type Database = {
           status: string
         }[]
       }
-      report_cycle_count_variance: {
-        Args: {
-          p_company_id: string
-          p_date_from?: string
-          p_date_to?: string
-          p_location_id?: string
-        }
-        Returns: {
-          count_date: string
-          count_number: string
-          item_code: string
-          item_name: string
-          location_name: string
-          physical_quantity: number
-          status: string
-          system_quantity: number
-          variance_percentage: number
-          variance_quantity: number
-          variance_reason: string
-          variance_value: number
-        }[]
-      }
+      report_cycle_count_variance:
+        | {
+            Args: {
+              p_company_id: string
+              p_date_from?: string
+              p_date_to?: string
+              p_location_id?: string
+            }
+            Returns: {
+              count_date: string
+              count_number: string
+              item_code: string
+              item_name: string
+              location_name: string
+              physical_quantity: number
+              status: string
+              system_quantity: number
+              variance_percentage: number
+              variance_quantity: number
+              variance_reason: string
+              variance_value: number
+            }[]
+          }
+        | {
+            Args: {
+              p_company_id: string
+              p_date_from?: string
+              p_date_to?: string
+              p_location_id?: string
+              p_notes_contains?: string
+            }
+            Returns: {
+              count_date: string
+              count_number: string
+              item_code: string
+              item_name: string
+              location_name: string
+              physical_quantity: number
+              status: string
+              system_quantity: number
+              variance_percentage: number
+              variance_quantity: number
+              variance_reason: string
+              variance_value: number
+            }[]
+          }
       report_fixed_asset_register: {
         Args: { p_as_of_date?: string; p_company_id: string }
         Returns: {
@@ -20734,29 +20781,54 @@ export type Database = {
           total_spend: number
         }[]
       }
-      report_stock_movement_ledger: {
-        Args: {
-          p_company_id: string
-          p_date_from?: string
-          p_date_to?: string
-          p_location_id?: string
-        }
-        Returns: {
-          item_code: string
-          item_name: string
-          location_name: string
-          notes: string
-          quantity_after: number
-          quantity_before: number
-          quantity_change: number
-          reference_type: string
-          total_value: number
-          transaction_type: string
-          txn_date: string
-          unit_cost: number
-          user_email: string
-        }[]
-      }
+      report_stock_movement_ledger:
+        | {
+            Args: {
+              p_company_id: string
+              p_date_from?: string
+              p_date_to?: string
+              p_location_id?: string
+            }
+            Returns: {
+              item_code: string
+              item_name: string
+              location_name: string
+              notes: string
+              quantity_after: number
+              quantity_before: number
+              quantity_change: number
+              reference_type: string
+              total_value: number
+              transaction_type: string
+              txn_date: string
+              unit_cost: number
+              user_email: string
+            }[]
+          }
+        | {
+            Args: {
+              p_company_id: string
+              p_date_from?: string
+              p_date_to?: string
+              p_location_id?: string
+              p_notes_contains?: string
+            }
+            Returns: {
+              item_code: string
+              item_name: string
+              location_name: string
+              notes: string
+              quantity_after: number
+              quantity_before: number
+              quantity_change: number
+              reference_type: string
+              total_value: number
+              transaction_type: string
+              txn_date: string
+              unit_cost: number
+              user_email: string
+            }[]
+          }
       report_stock_on_hand: {
         Args: {
           p_category_id?: string
