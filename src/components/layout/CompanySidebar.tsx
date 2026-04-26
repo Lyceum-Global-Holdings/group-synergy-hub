@@ -234,6 +234,13 @@ export function CompanySidebar() {
           </div>
         </SidebarGroup>
 
+        {/* Pinned Sub-Modules (per-user, per-company) */}
+        <PinnedSubmodulesGroup
+          pins={visiblePins}
+          reorderDisabled={isViewingAllCompanies}
+          showCompanyBadge={isViewingAllCompanies}
+        />
+
         {/* Main Navigation */}
         <SidebarGroup>
           <SidebarGroupLabel className="text-[10px] uppercase tracking-[0.1em] font-semibold text-sidebar-muted px-4">
