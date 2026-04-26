@@ -41,6 +41,9 @@ export function ReportParameterPanel({ definition, values, onChange }: Props) {
         const days = p.defaultDays ?? 30;
         next[p.key] = { from: isoToday(days), to: isoToday(0) };
         changed = true;
+      } else if (p.type === "textOperator") {
+        next[p.key] = { op: "contains", term: "" };
+        changed = true;
       } else if ("defaultValue" in p && p.defaultValue !== undefined) {
         next[p.key] = p.defaultValue;
         changed = true;
@@ -186,5 +189,47 @@ function ParameterInput({
       return (
         <Input id={param.key} disabled placeholder="Supplier filter (coming soon)" />
       );
+    case "textOperator": {
+      const v = (value as { op?: string; term?: string } | undefined) ?? {};
+      const op = (v.op as NotesOp) || "contains";
+      const term = v.term ?? "";
+      return (
+        <div className="grid grid-cols-[10rem_1fr] gap-2">
+          <Select
+            value={op}
+            onValueChange={(next) => onChange({ op: next, term })}
+          >
+            <SelectTrigger aria-label={`${param.label} operator`}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="contains">contains</SelectItem>
+              <SelectItem value="equals">equals</SelectItem>
+              <SelectItem value="startsWith">starts with</SelectItem>
+              <SelectItem value="endsWith">ends with</SelectItem>
+              <SelectItem value="notContains">does not contain</SelectItem>
+            </SelectContent>
+          </Select>
+          <Input
+            id={param.key}
+            type="text"
+            placeholder={
+              op === "contains"
+                ? param.placeholder ?? 'e.g. damaged "return to vendor"'
+                : "Enter text…"
+            }
+            value={term}
+            onChange={(e) => onChange({ op, term: e.target.value })}
+          />
+        </div>
+      );
+    }
   }
 }
+
+type NotesOp =
+  | "contains"
+  | "equals"
+  | "startsWith"
+  | "endsWith"
+  | "notContains";
