@@ -66,6 +66,7 @@ export function CompanySidebar() {
   const { data: isSuperAdmin } = useSuperAdmin();
   const { user } = useAuth();
   const { data: userEffectiveModules } = useUserEffectiveModules(user?.id);
+  const { data: allPins } = useUserPins();
   const currentPath = location.pathname;
 
   const isActive = (path: string) => currentPath === path;
