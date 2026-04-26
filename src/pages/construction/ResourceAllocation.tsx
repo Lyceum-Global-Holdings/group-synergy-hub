@@ -70,6 +70,7 @@ export default function ResourceAllocation() {
               ))}
             </SelectContent>
           </Select>
+          </div>
         </div>
       </div>
 
