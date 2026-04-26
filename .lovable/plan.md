@@ -1,86 +1,73 @@
-## Filter Stock by Notes Content — Reports Center (Warehouse)
+## Highlight Matching Notes Text in Report Preview
 
-Add a standards-aligned **"Notes contains…"** text filter to the warehouse stock reports in Reports Center, plus expose the `notes` column where it isn't already shown. The filter searches the free-text notes/comment fields attached to stock transactions (e.g., reason, remarks, batch comments) using a case-insensitive partial match performed **server-side** in the report RPCs.
+When a user enters a "Notes contain" search term in the warehouse stock reports, the matched substring will be visually highlighted in the preview table so the reason a row matched is immediately obvious.
 
-### Why this design (international standards)
+### Why this design
 
-- **ISO 9001 §7.5 / §8.7** — documented information & nonconformity records require traceable, searchable comments on stock movements (reasons, deviations, root causes).
-- **GS1 EPCIS / CTE-KDE** — traceability events carry free-text "bizStep notes" that auditors must be able to query.
-- **IAS 2 / IFRS audit trail** — write-down justifications and adjustment narratives stored in notes must be locatable for external audit.
-- **WCAG 2.2** — single text input with clear label, no hidden behaviour, accessible by keyboard.
-- **Server-side ILIKE filtering** (not client filtering) ensures the filter applies to the full result set even when the report is exported to XLSX/PDF/CSV — matching SAP/Oracle EBS report behaviour where every column filter is part of the report criteria printed in the header.
-
-### Scope — which reports get the filter
-
-Three warehouse reports actually surface stock-level free-text notes:
-
-| Report | Code | Notes source |
-|---|---|---|
-| Stock Movement Ledger | `WH-MOV-001` | `warehouse_stock_movements.notes` |
-| Cycle Count Variance | `WH-CYC-VAR-001` | `cycle_count_items.variance_reason` (already returned as `variance_reason`) |
-| Batch Traceability | `WH-BATCH-TRC-001` | event-level notes (already returned) |
-
-Stock Movement Ledger does **not** currently expose `notes` in its column list even though the RPC already returns it — we'll surface the column **and** add the filter parameter.
+- **Match user mental model** — same UX as Gmail / Jira / SAP Fiori "Find" results: the matched text is wrapped in a yellow `<mark>` so the eye lands on it instantly.
+- **WCAG 2.2 AA** — using the semantic `<mark>` element with a themed background (mapped to a design-system token, not hard-coded yellow) gives both visual and assistive-tech meaning ("highlighted text").
+- **Preview-only, exports untouched** — XLSX/PDF/CSV stay plain text per ISO 9001 §7.5 (documented information must be machine-readable). The filter value is already printed in the report header on every export, which is the audit-grade evidence; on-screen highlighting is purely a navigation aid.
+- **Server-driven term** — the highlight term is the exact string that was sent to the RPC, so what the database matched is what the UI highlights (no drift between filter and highlight).
 
 ### Changes
 
-**1. Database — extend 3 RPCs with a `p_notes_contains text` parameter (nullable, default NULL)**
+**1. Envelope contract** (`src/lib/reports/types.ts`)
 
-New migration adds an overloaded signature (or `CREATE OR REPLACE` with the new trailing param) for:
-- `report_stock_movement_ledger(... , p_notes_contains text DEFAULT NULL)`
-- `report_cycle_count_variance(... , p_notes_contains text DEFAULT NULL)`
-- `report_batch_traceability(... , p_notes_contains text DEFAULT NULL)`
-
-Filter logic inside each function:
-```sql
-AND (
-  p_notes_contains IS NULL
-  OR p_notes_contains = ''
-  OR notes ILIKE '%' || p_notes_contains || '%'
-)
-```
-For Cycle Count, the predicate is applied to `variance_reason`. Special characters in the search term are escaped with `replace(replace(p_notes_contains,'\','\\'),'%','\%')` to prevent wildcard injection — same pattern used by the existing item-search sanitiser (see `mem://features/warehouse/search-special-character-handling`). RLS is unchanged (functions remain `SECURITY INVOKER`).
-
-**2. Report registry — add the parameter and the missing column** (`src/lib/reports/registry.ts`)
-
-For each of the 3 reports above, append:
+Add an optional field:
 ```ts
-{
-  key: "notesContains",
-  label: "Notes contain",
-  type: "text",
-  placeholder: "e.g. damaged, audit, return",
+highlightTerms?: Record<string, string>; // columnKey -> term to highlight
+```
+
+**2. Fetcher hooks** (`src/hooks/reports/useReportData.ts`)
+
+In `fetchStockMovement`, `fetchCycleCountVariance`, and `fetchBatchTraceability`, when a non-empty `notesContains` is provided, attach it to the envelope mapped to the correct column key:
+
+| Report | Column key highlighted |
+|---|---|
+| Stock Movement Ledger | `notes` |
+| Cycle Count Variance | `variance_reason` |
+| Batch Traceability | `notes` |
+
+`envelopeBase` will accept an optional `highlightTerms` argument and pass it through.
+
+**3. Preview renderer** (`src/components/management/reports/ReportPreviewTable.tsx`)
+
+For each body cell:
+- If the column type is `string` (or untyped) AND `envelope.highlightTerms?.[c.key]` is set AND the cell value contains the term (case-insensitive), render the cell as a sequence of plain-text and `<mark>` segments instead of a single string.
+- Otherwise fall back to the current `formatValue(...)` output.
+
+A small helper `renderHighlighted(text, term)`:
+```tsx
+function renderHighlighted(text: string, term: string) {
+  if (!term) return text;
+  const safe = term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); // escape regex
+  const re = new RegExp(`(${safe})`, "ig");
+  return text.split(re).map((part, i) =>
+    re.test(part) && part.toLowerCase() === term.toLowerCase() ? (
+      <mark key={i} className="rounded-sm bg-warning/30 text-foreground px-0.5">
+        {part}
+      </mark>
+    ) : (
+      <span key={i}>{part}</span>
+    ),
+  );
 }
 ```
-For `WH-MOV-001` only, also add:
-```ts
-{ key: "notes", label: "Notes", type: "string", width: 36 }
-```
-to the columns array so the filtered results clearly show **why** each row matched.
+The `<mark>` uses the existing `--warning` design-system token (with 30% alpha), so it adapts to light/dark themes and never uses raw hex colours — consistent with the project's design system rules.
 
-**3. Hook layer — pass the new param to the RPC** (`src/hooks/reports/useReportData.ts`)
-
-Update `fetchStockMovement`, `fetchCycleCountVariance`, and `fetchBatchTraceability` to:
-- accept `notesContains?: string` in the params type
-- trim and pass it as `p_notes_contains: (params.notesContains || "").trim() || null`
-
-The existing `buildFilterDescriptors` already handles `text`-type params, so the filter value will appear in the report header automatically (visible in Preview, XLSX, PDF, CSV).
-
-**4. Parameter panel** — no changes needed; `ReportParameterPanel` already renders `text` parameters with placeholder support.
+Empty cells, non-string columns, and rows where the cell does not contain the term are unchanged.
 
 ### Files touched
 
-- `supabase/migrations/<timestamp>_reports_notes_filter.sql` (new) — `CREATE OR REPLACE` for the 3 RPCs
-- `src/lib/reports/registry.ts` (edit) — add `notesContains` parameter to 3 reports + `notes` column to `WH-MOV-001`
-- `src/hooks/reports/useReportData.ts` (edit) — wire the new param into the 3 fetchers
+- `src/lib/reports/types.ts` (edit) — add `highlightTerms` to `ReportEnvelope`
+- `src/hooks/reports/useReportData.ts` (edit) — accept/pass `highlightTerms` in `envelopeBase`; populate it in the 3 stock-related fetchers
+- `src/components/management/reports/ReportPreviewTable.tsx` (edit) — render `<mark>` segments for highlighted string cells
 
 ### UX
 
-In Reports Center → Warehouse → open **Stock Movement Ledger** (or Cycle Count Variance / Batch Traceability):
-- A **"Notes contain"** text input appears alongside Period and Location
-- Empty → no filtering (current behaviour)
-- Typing e.g. `damaged` → server returns only rows whose notes contain "damaged" (case-insensitive)
-- The filter value is printed in the report header ("Notes contain: damaged") on every export per ISO 9001 §7.5 documentation requirements
-- Filter persists in the URL (`?notesContains=damaged`) for sharable, reproducible reports — same mechanism as existing params
+In Reports Center → Warehouse → Stock Movement Ledger (or Cycle Count Variance / Batch Traceability):
+1. Type `damaged` in **Notes contain** and click Preview.
+2. Each row now shows its `Notes` (or `Variance reason`) cell with the substring **damaged** wrapped in a soft warning-tinted highlight.
+3. Exports (XLSX, PDF, CSV) remain plain text with the filter value printed in the report header — preserving audit integrity.
 
-No breaking changes: the new RPC parameter has `DEFAULT NULL`, so any other caller continues to work.
+No breaking changes; reports without a notes filter render exactly as today.
