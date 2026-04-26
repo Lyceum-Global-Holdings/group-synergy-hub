@@ -196,21 +196,23 @@ export async function fetchStockMovement(
   params: {
     period?: { from?: string; to?: string };
     locationId?: string | null;
-    notesContains?: string | null;
+    notesFilter?: unknown;
   },
 ): Promise<ReportEnvelope> {
   const from = params.period?.from ? new Date(params.period.from).toISOString() : null;
   const to = params.period?.to ? new Date(params.period.to).toISOString() : null;
+  const parsed = parseNotesFilter(params.notesFilter);
   const { data, error } = await supabase.rpc("report_stock_movement_ledger", {
     p_company_id: ctx.companyId,
     p_date_from: from,
     p_date_to: to,
     p_location_id: params.locationId || null,
-    p_notes_contains: (params.notesContains || "").trim() || null,
+    p_notes_op: parsed?.op ?? "contains",
+    p_notes_terms: parsed?.terms ?? null,
   });
   if (error) throw error;
   const rows = (data ?? []) as Record<string, unknown>[];
-  const term = (params.notesContains || "").trim();
+  const hl = buildHighlight("notes", parsed);
   return envelopeBase(
     def,
     ctx,
@@ -220,7 +222,8 @@ export async function fetchStockMovement(
       total_value: sumCol(rows, "total_value"),
     },
     { start: from?.slice(0, 10), end: to?.slice(0, 10) },
-    term ? { notes: term } : undefined,
+    hl.terms,
+    hl.wholeCell,
   );
 }
 
@@ -232,21 +235,23 @@ export async function fetchCycleCountVariance(
   params: {
     period?: { from?: string; to?: string };
     locationId?: string | null;
-    notesContains?: string | null;
+    notesFilter?: unknown;
   },
 ): Promise<ReportEnvelope> {
   const from = params.period?.from || null;
   const to = params.period?.to || null;
+  const parsed = parseNotesFilter(params.notesFilter);
   const { data, error } = await supabase.rpc("report_cycle_count_variance", {
     p_company_id: ctx.companyId,
     p_date_from: from,
     p_date_to: to,
     p_location_id: params.locationId || null,
-    p_notes_contains: (params.notesContains || "").trim() || null,
+    p_notes_op: parsed?.op ?? "contains",
+    p_notes_terms: parsed?.terms ?? null,
   });
   if (error) throw error;
   const rows = (data ?? []) as Record<string, unknown>[];
-  const term = (params.notesContains || "").trim();
+  const hl = buildHighlight("variance_reason", parsed);
   return envelopeBase(
     def,
     ctx,
@@ -256,7 +261,8 @@ export async function fetchCycleCountVariance(
       variance_value: sumCol(rows, "variance_value"),
     },
     { start: from ?? undefined, end: to ?? undefined },
-    term ? { variance_reason: term } : undefined,
+    hl.terms,
+    hl.wholeCell,
   );
 }
 
@@ -356,7 +362,7 @@ export async function fetchBatchTraceability(
     batchNumber?: string;
     itemCode?: string;
     direction?: string;
-    notesContains?: string | null;
+    notesFilter?: unknown;
   },
 ): Promise<ReportEnvelope> {
   const batch = (params.batchNumber || "").trim() || null;
@@ -364,23 +370,26 @@ export async function fetchBatchTraceability(
   if (!batch && !code) {
     throw new Error("Provide either a Batch Number or an Item Code to trace.");
   }
+  const parsed = parseNotesFilter(params.notesFilter);
   const { data, error } = await supabase.rpc("report_batch_traceability", {
     p_company_id: ctx.companyId,
     p_batch_number: batch,
     p_item_code: code,
     p_direction: params.direction || "both",
-    p_notes_contains: (params.notesContains || "").trim() || null,
+    p_notes_op: parsed?.op ?? "contains",
+    p_notes_terms: parsed?.terms ?? null,
   });
   if (error) throw error;
   const rows = (data ?? []) as Record<string, unknown>[];
-  const term = (params.notesContains || "").trim();
+  const hl = buildHighlight("notes", parsed);
   return envelopeBase(
     def,
     ctx,
     rows,
     undefined,
     undefined,
-    term ? { notes: term } : undefined,
+    hl.terms,
+    hl.wholeCell,
   );
 }
 
