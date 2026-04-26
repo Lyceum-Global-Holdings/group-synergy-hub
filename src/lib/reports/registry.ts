@@ -187,10 +187,11 @@ export const REPORT_REGISTRY: ReportDefinition[] = [
       { key: "period", label: "Period", type: "dateRange", defaultDays: 30 },
       { key: "locationId", label: "Location", type: "location" },
       {
-        key: "notesContains",
-        label: "Notes contain",
-        type: "text",
-        placeholder: "e.g. damaged, audit, return",
+        key: "notesFilter",
+        label: "Notes filter",
+        type: "textOperator",
+        placeholder: 'e.g. damaged "return to vendor"',
+        highlightColumn: "notes",
       },
     ],
     columns: [
@@ -223,10 +224,11 @@ export const REPORT_REGISTRY: ReportDefinition[] = [
       { key: "period", label: "Count Date Range", type: "dateRange", defaultDays: 90 },
       { key: "locationId", label: "Location", type: "location" },
       {
-        key: "notesContains",
-        label: "Variance reason contains",
-        type: "text",
-        placeholder: "e.g. spillage, miscount, damaged",
+        key: "notesFilter",
+        label: "Variance reason filter",
+        type: "textOperator",
+        placeholder: 'e.g. spillage "physical recount"',
+        highlightColumn: "variance_reason",
       },
     ],
     columns: [
@@ -399,10 +401,11 @@ export const REPORT_REGISTRY: ReportDefinition[] = [
         defaultValue: "both",
       },
       {
-        key: "notesContains",
-        label: "Notes contain",
-        type: "text",
-        placeholder: "e.g. damaged, audit, return",
+        key: "notesFilter",
+        label: "Notes filter",
+        type: "textOperator",
+        placeholder: 'e.g. damaged "return to vendor"',
+        highlightColumn: "notes",
       },
     ],
     columns: [
