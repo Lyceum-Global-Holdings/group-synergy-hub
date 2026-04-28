@@ -24,7 +24,6 @@ interface AddFromCatalogDialogProps {
 export function AddFromCatalogDialog({ open, onOpenChange }: AddFromCatalogDialogProps) {
   const { selectedCompany } = useCompany();
   const { bins } = useWarehouseBins();
-  const { createAllocation } = useWarehouseBinAllocations();
   const { categories } = useItemCategories(selectedCompany?.id);
   const queryClient = useQueryClient();
 
