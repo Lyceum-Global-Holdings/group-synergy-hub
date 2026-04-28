@@ -330,10 +330,16 @@ export function AddFromCatalogDialog({ open, onOpenChange }: AddFromCatalogDialo
                 <Input
                   id="quantity"
                   type="number"
-                  min={1}
+                  step={QTY_STEP}
+                  min={QTY_MIN}
+                  inputMode="decimal"
+                  placeholder="e.g. 12.500"
                   value={quantity}
-                  onChange={(e) => setQuantity(Math.max(1, parseInt(e.target.value) || 1))}
+                  onChange={(e) => setQuantity(e.target.value)}
                 />
+                <p className="text-xs text-muted-foreground">
+                  Decimals supported (up to 3 places, e.g. 12.5 kg, 0.750 m).
+                </p>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="bin">Assign to Bin *</Label>
