@@ -111,9 +111,11 @@ export function BulkStockUploadDialog({ open, onOpenChange }: BulkStockUploadDia
   }, [locationBins, selectedBinId]);
 
   const downloadTemplate = () => {
+    // Items can be identified by item_code (preferred) OR item_name (fallback).
+    // GS1 / SAP MM convention: primary identifier wins; name only used when code is blank.
     const csv = binMode === 'single'
-      ? 'item_code,quantity\nITEM001,50\nITEM002,12.500'
-      : 'item_code,quantity,bin_code\nITEM001,50,BIN-A1\nITEM002,12.500,BIN-B2';
+      ? 'item_code,item_name,quantity\nITEM001,,50\n,Steel Rod 12mm,12.500'
+      : 'item_code,item_name,quantity,bin_code\nITEM001,,50,BIN-A1\n,Steel Rod 12mm,12.500,BIN-B2';
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
