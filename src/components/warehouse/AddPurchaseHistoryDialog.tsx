@@ -141,7 +141,7 @@ export function AddPurchaseHistoryDialog({ assetMasterId, open, onOpenChange }: 
                 <FormItem>
                   <FormLabel>Quantity Purchased</FormLabel>
                   <FormControl>
-                    <Input type="number" {...field} placeholder="0" />
+                    <Input type="number" step="0.001" min="0" inputMode="decimal" {...field} placeholder="0.000" />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

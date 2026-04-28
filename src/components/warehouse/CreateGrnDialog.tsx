@@ -560,6 +560,9 @@ export function CreateGrnDialog({ open, onOpenChange, poId }: CreateGrnDialogPro
                     <TableCell>
                       <Input
                         type="number"
+                        step="0.001"
+                        min="0"
+                        inputMode="decimal"
                         value={item.quantity_received}
                         onChange={(e) =>
                           handleItemChange(

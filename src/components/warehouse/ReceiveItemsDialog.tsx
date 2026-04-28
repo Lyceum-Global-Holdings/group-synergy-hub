@@ -310,7 +310,8 @@ export function ReceiveItemsDialog({ open, onOpenChange, issueId, onSuccess }: R
                       <Input
                         type="number"
                         min="0"
-                        step="0.01"
+                        step="0.001"
+                        inputMode="decimal"
                         max={item.quantity_issued || 0}
                         value={data.receivedQty || ''}
                         onChange={(e) => updateReceiveData(item.id, 'receivedQty', parseFloat(e.target.value) || 0)}
