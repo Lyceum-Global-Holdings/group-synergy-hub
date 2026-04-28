@@ -32,7 +32,7 @@ export function AddFromCatalogDialog({ open, onOpenChange }: AddFromCatalogDialo
   const [step, setStep] = useState<'select' | 'configure'>('select');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedItem, setSelectedItem] = useState<CatalogItem | null>(null);
-  const [quantity, setQuantity] = useState<number>(1);
+  const [quantity, setQuantity] = useState<string>('1');
   const [selectedBinId, setSelectedBinId] = useState<string>('');
 
   // Fetch all catalog items using cursor-based batching to bypass 1,000-row limit
