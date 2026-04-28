@@ -604,6 +604,7 @@ export function BulkStockUploadDialog({ open, onOpenChange }: BulkStockUploadDia
       case 'matched': return <Badge className="bg-green-100 text-green-800 border-green-200">Matched</Badge>;
       case 'new_to_inventory': return <Badge className="bg-blue-100 text-blue-800 border-blue-200">New to Inventory</Badge>;
       case 'item_not_found': return <Badge variant="destructive">Not in Item Master</Badge>;
+      case 'ambiguous_name': return <Badge className="bg-amber-100 text-amber-800 border-amber-200">Ambiguous Name</Badge>;
       case 'bin_not_found': return <Badge className="bg-orange-100 text-orange-800 border-orange-200">Bin Not Found</Badge>;
       case 'error': return <Badge variant="destructive">Error</Badge>;
     }
