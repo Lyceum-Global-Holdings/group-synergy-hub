@@ -128,8 +128,9 @@ export function AddFromCatalogDialog({ open, onOpenChange }: AddFromCatalogDialo
 
   const importMutation = useMutation({
     mutationFn: async () => {
-      if (!selectedItem || !selectedCompany?.id || !selectedBinId || quantity <= 0) {
-        throw new Error('Please fill in all required fields');
+      const qty = parseQty(quantity);
+      if (!selectedItem || !selectedCompany?.id || !selectedBinId || !qty || qty <= 0) {
+        throw new Error('Please fill in all required fields with a valid quantity');
       }
 
       const userId = (await supabase.auth.getUser()).data.user?.id;
@@ -149,7 +150,7 @@ export function AddFromCatalogDialog({ open, onOpenChange }: AddFromCatalogDialo
         const { data: updated, error: updateError } = await supabase
           .from('warehouse_items')
           .update({
-            current_stock: quantity,
+            current_stock: qty,
             reserved_quantity: 0,
             status: 'active',
             name: selectedItem.name,
@@ -200,10 +201,10 @@ export function AddFromCatalogDialog({ open, onOpenChange }: AddFromCatalogDialo
             is_serialized: selectedItem.is_serialized,
             status: 'active',
             company_id: selectedCompany.id,
-            current_stock: quantity,
+            current_stock: qty,
             reserved_quantity: 0,
             created_by: userId,
-          })
+          } as any)
           .select()
           .single();
 
@@ -215,7 +216,7 @@ export function AddFromCatalogDialog({ open, onOpenChange }: AddFromCatalogDialo
       await createAllocation({
         warehouse_item_id: itemId,
         bin_id: selectedBinId,
-        allocated_quantity: quantity,
+        allocated_quantity: qty,
         company_id: selectedCompany.id,
       });
 
