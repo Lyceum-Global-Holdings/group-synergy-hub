@@ -50,7 +50,8 @@ interface ParsedRow {
   catalog_item?: CatalogItem;
   existing_inventory_id?: string;
   needs_import?: boolean;
-  status: 'matched' | 'new_to_inventory' | 'item_not_found' | 'bin_not_found' | 'error';
+  matched_by?: 'item_code' | 'item_name';
+  status: 'matched' | 'new_to_inventory' | 'item_not_found' | 'ambiguous_name' | 'bin_not_found' | 'error';
   error?: string;
 }
 
