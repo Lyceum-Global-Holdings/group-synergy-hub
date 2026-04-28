@@ -1,87 +1,40 @@
-## Goal
+Plan to fix decimal quantities when importing an item from the catalog:
 
-Allow decimal quantities when adding initial/opening stock (and across all warehouse stock entry points), aligned with international ERP conventions (SAP / Oracle EBS / ISO units of measure). Quantities like `12.5 kg`, `3.250 L`, `0.75 m` must be enterable, storable, and displayed accurately.
+1. Update the catalog import dialog quantity state
+   - Change `quantity` handling in `src/components/warehouse/AddFromCatalogDialog.tsx` from a numeric state that is coerced on every keystroke to a string state, matching the working `SingleItemForm` pattern.
+   - This prevents the input from immediately converting `1.` or `1.5` back to `1` while the user is typing.
 
-## Standard chosen
+2. Apply the standard 3-decimal quantity input settings
+   - Import and use the existing `QTY_STEP` and `QTY_MIN` constants from `src/lib/quantityInput.ts`.
+   - Set the Initial Quantity input to:
+     - `step={QTY_STEP}` (`0.001`)
+     - `min={QTY_MIN}` (`0`)
+     - `inputMode="decimal"`
+     - a decimal-friendly placeholder like `e.g. 12.500`
+   - Add the same helper text used elsewhere: decimals supported up to 3 places.
 
-**3 decimal places** for quantities (precision `numeric(18,3)`):
-- Matches SAP MM (`MENGE_D` = DEC 13,3) and Oracle EBS inventory transactions.
-- Sufficient for kilograms/litres/metres without floating-point artefacts.
-- Money/value fields stay at 2 decimals (unchanged).
+3. Parse and validate only on submit
+   - Convert the string input to a number using `parseQty`/`parseFloat` inside the import mutation.
+   - Reject empty, invalid, zero, or negative quantities with a clear validation error.
+   - Use the parsed quantity for:
+     - `warehouse_items.current_stock`
+     - `warehouse_bin_allocations.allocated_quantity`
+     - disabled-state validation for the submit button
 
-Inputs that today force integers or `step="0.01"` will use `step="0.001"` with up to 3 decimals.
+4. Keep behavior consistent after import/close
+   - Reset the quantity field to a sensible default such as `1` when the dialog closes.
+   - Preserve the existing catalog item selection, bin allocation, cache invalidation, and company-scoped write behavior.
 
-## What's wrong today
+Technical root cause:
 
-1. **DB columns are too narrow**: `warehouse_items.current_stock`, `warehouse_bin_allocations.allocated_quantity / reserved_quantity / available_quantity`, `finished_goods.current_stock`, `construction_inventory_stock.quantity` are all `numeric(15,2)` — only 2 decimals.
-2. **Form inputs are inconsistent**:
-   - `CreateItemDialog` / `SingleItemForm` initial stock: `step="0.01"` (2 dp only).
-   - `AddPurchaseHistoryDialog` quantity: no `step` → integer-only spinner, placeholder `"0"`.
-   - `CreateGrnDialog` `quantity_received` & `unit_price`: no `step` → integer spinner.
-   - `ReceiveItemsDialog`: `step="0.01"`.
-3. The min/max/reorder fields use `step="0.01"` but the underlying catalog columns are unconstrained `numeric` — already fine, just need UI consistency.
+```text
+Current code:
+quantity state is number
+onChange => Math.max(1, parseInt(e.target.value) || 1)
 
-## Changes
-
-### 1. Database migration (one migration)
-
-Widen quantity columns to `numeric(18,3)`. Money columns (`unit_cost`, `selling_price`, `total_value`, `unit_price`) stay at their current `numeric(15,2)` / `numeric(18,2)`.
-
-Tables/columns to alter:
-- `warehouse_items.current_stock`, `reserved_quantity`
-  - `available_quantity` is a generated column → drop & recreate after base columns change (per project memory on generated-column constraint).
-- `warehouse_bin_allocations.allocated_quantity`, `reserved_quantity`
-  - `available_quantity` (generated) → drop & recreate.
-- `warehouse_item_reservations.reserved_quantity`
-- `finished_goods.current_stock`
-- `finished_goods_batches.quantity`
-- `finished_goods_movements.quantity_change / quantity_before / quantity_after`
-- `finished_goods_reservations.reserved_quantity`
-- `construction_inventory_stock.quantity / reserved_quantity`
-- `construction_inventory_master.quantity`
-- `construction_inventory_transactions.quantity_change`
-- `construction_repair_records.quantity`
-- `construction_transfer_items.quantity`
-- `pr_items.quantity`, `rfq_rfp_items.quantity`, `bom_items.quantity`, `project_budget_items.quantity` → bump to `numeric(18,3)`.
-
-Out of scope (already adequate or different domain):
-- `customer_invoice_lines.quantity` and `supplier_invoice_lines.quantity` already `numeric(18,4)` — leave as-is.
-- `tool_adjustments.*` are `integer` (tools are counted units) — leave as-is.
-- `stock_transactions.quantity_*` already unconstrained `numeric` — leave as-is.
-
-### 2. Frontend — quantity input standard
-
-Create a small helper `src/lib/quantityInput.ts` exporting:
-```ts
-export const QTY_STEP = "0.001";
-export const QTY_DECIMALS = 3;
-export const formatQty = (n: number | string | null | undefined) =>
-  n == null || n === "" ? "" : Number(n).toLocaleString(undefined, {
-    minimumFractionDigits: 0, maximumFractionDigits: QTY_DECIMALS,
-  });
+Effect:
+Typing 1.5 becomes parseInt("1.5") = 1,
+so decimal input is impossible.
 ```
 
-Update every quantity `<Input type="number">` to use `step={QTY_STEP}` and `min="0"`:
-- `src/components/warehouse/CreateItemDialog.tsx` (initial stock)
-- `src/components/warehouse/SingleItemForm.tsx` (initial stock)
-- `src/components/warehouse/AddPurchaseHistoryDialog.tsx` (quantity_purchased — currently integer)
-- `src/components/warehouse/CreateGrnDialog.tsx` (quantity_received)
-- `src/components/warehouse/ReceiveItemsDialog.tsx` (receivedQty)
-- `src/components/warehouse/BulkStockUploadDialog.tsx` — already uses `parseFloat`; update CSV template comment to clarify decimals are accepted (`"50.250"`).
-
-Replace any `parseInt(value)` for quantity reads with `parseFloat(value)` (audit while editing).
-
-### 3. Display formatting
-
-Where we render quantities (BinMasterTab, BinAllocationsTab, item lists), use `formatQty()` so trailing zeros are trimmed (`12` not `12.000`, but `12.5` shows as `12.5`).
-
-## Out of scope
-
-- No change to UoM master, no change to per-item decimal precision (could be a future enhancement: per-UoM `decimal_places`).
-- Reports/exports already pass numeric values through; no formatting change needed beyond what the helper provides.
-
-## Risk & rollback
-
-- Widening `numeric(15,2)` → `numeric(18,3)` is a non-lossy `ALTER COLUMN TYPE` and safe on existing data.
-- Generated columns (`available_quantity`) must be dropped before altering and recreated after — handled inside the same migration in a single transaction.
-- No RLS/policy changes.
+The fix is frontend-only because the earlier quantity migration already widened the database columns to 3 decimal precision.

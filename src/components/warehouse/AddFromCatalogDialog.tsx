@@ -15,6 +15,7 @@ import { useWarehouseBinAllocations } from '@/hooks/useWarehouseBinAllocations';
 import { useItemCategories } from '@/hooks/useItemCategories';
 import { toast } from 'sonner';
 import { CatalogItem } from '@/types/itemBin';
+import { QTY_STEP, QTY_MIN, parseQty } from '@/lib/quantityInput';
 
 interface AddFromCatalogDialogProps {
   open: boolean;
