@@ -284,34 +284,48 @@ export function AddFromCatalogDialog({ open, onOpenChange }: AddFromCatalogDialo
                 <div className="p-4 text-center text-muted-foreground">Loading catalog...</div>
               ) : availableItems.length === 0 ? (
                 <div className="p-4 text-center text-muted-foreground">
-                  {searchTerm ? 'No matching items found' : 'All catalog items are already in your inventory'}
+                  {searchTerm ? 'No matching items found' : 'No active catalog items found'}
                 </div>
               ) : (
                 <div className="overflow-hidden">
-                  {availableItems.map(item => (
-                    <button
-                      key={item.id}
-                      className="w-full block text-left px-4 py-3 hover:bg-accent transition-colors border-b last:border-b-0 cursor-pointer overflow-hidden box-border"
-                      onClick={() => handleSelectItem(item)}
-                    >
-                      <div className="flex w-full items-start gap-3">
-                        <div className="flex-1 min-w-0 space-y-1">
-                          <div className="font-medium text-sm break-words text-foreground">{item.name}</div>
-                          <div className="text-xs text-muted-foreground flex flex-wrap items-center gap-x-2 gap-y-1">
-                            <span className="font-mono bg-muted px-1 rounded text-[10px]">{item.item_code}</span>
-                            {item.brand && <span className="break-words">• {item.brand}</span>}
-                            <span className="break-words">• {categoryName(item.category_id)}</span>
+                  {availableItems.map(item => {
+                    const alreadyInInventory = existingCatalogIds?.has(item.id);
+                    return (
+                      <button
+                        key={item.id}
+                        className="w-full block text-left px-4 py-3 hover:bg-accent transition-colors border-b last:border-b-0 cursor-pointer overflow-hidden box-border"
+                        onClick={() => handleSelectItem(item)}
+                      >
+                        <div className="flex w-full items-start gap-3">
+                          <div className="flex-1 min-w-0 space-y-1">
+                            <div className="font-medium text-sm break-words text-foreground">{item.name}</div>
+                            <div className="text-xs text-muted-foreground flex flex-wrap items-center gap-x-2 gap-y-1">
+                              <span className="font-mono bg-muted px-1 rounded text-[10px]">{item.item_code}</span>
+                              {item.brand && <span className="break-words">• {item.brand}</span>}
+                              <span className="break-words">• {categoryName(item.category_id)}</span>
+                            </div>
+                            {alreadyInInventory && (
+                              <div className="text-[11px] text-emerald-600 dark:text-emerald-400 flex items-center gap-1 pt-0.5">
+                                <CheckCircle2 className="h-3 w-3" />
+                                Already in inventory — selecting will add stock to another bin
+                              </div>
+                            )}
                           </div>
+                          <Badge
+                            variant={alreadyInInventory ? 'outline' : 'secondary'}
+                            className="shrink-0 text-[10px] mt-0.5"
+                          >
+                            {alreadyInInventory ? 'Add to bin' : 'Select'}
+                          </Badge>
                         </div>
-                        <Badge variant="secondary" className="shrink-0 text-[10px] mt-0.5">Select</Badge>
-                      </div>
-                    </button>
-                  ))}
+                      </button>
+                    );
+                  })}
                 </div>
               )}
             </ScrollArea>
             <p className="text-xs text-muted-foreground">
-              Showing {availableItems.length} item{availableItems.length !== 1 ? 's' : ''} not yet in your inventory
+              Showing {availableItems.length} catalog item{availableItems.length !== 1 ? 's' : ''}. Same item can be allocated to multiple bins and locations within a company.
             </p>
           </div>
         )}
