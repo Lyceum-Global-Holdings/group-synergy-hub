@@ -693,7 +693,7 @@ export function BulkStockUploadDialog({ open, onOpenChange }: BulkStockUploadDia
                 <Download className="mr-2 h-4 w-4" /> Download Template
               </Button>
               <span className="text-xs text-muted-foreground">
-                {binMode === 'single' ? 'Template: item_code, quantity' : 'Template: item_code, quantity, bin_code'}
+                {binMode === 'single' ? 'Template: item_code, item_name, quantity' : 'Template: item_code, item_name, quantity, bin_code'}
               </span>
             </div>
 
