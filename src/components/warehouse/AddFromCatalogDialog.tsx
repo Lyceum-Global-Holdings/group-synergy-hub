@@ -15,6 +15,7 @@ import { useWarehouseBinAllocations } from '@/hooks/useWarehouseBinAllocations';
 import { useItemCategories } from '@/hooks/useItemCategories';
 import { toast } from 'sonner';
 import { CatalogItem } from '@/types/itemBin';
+import { QTY_STEP, QTY_MIN, parseQty } from '@/lib/quantityInput';
 
 interface AddFromCatalogDialogProps {
   open: boolean;
@@ -31,7 +32,7 @@ export function AddFromCatalogDialog({ open, onOpenChange }: AddFromCatalogDialo
   const [step, setStep] = useState<'select' | 'configure'>('select');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedItem, setSelectedItem] = useState<CatalogItem | null>(null);
-  const [quantity, setQuantity] = useState<number>(1);
+  const [quantity, setQuantity] = useState<string>('1');
   const [selectedBinId, setSelectedBinId] = useState<string>('');
 
   // Fetch all catalog items using cursor-based batching to bypass 1,000-row limit
@@ -127,8 +128,9 @@ export function AddFromCatalogDialog({ open, onOpenChange }: AddFromCatalogDialo
 
   const importMutation = useMutation({
     mutationFn: async () => {
-      if (!selectedItem || !selectedCompany?.id || !selectedBinId || quantity <= 0) {
-        throw new Error('Please fill in all required fields');
+      const qty = parseQty(quantity);
+      if (!selectedItem || !selectedCompany?.id || !selectedBinId || !qty || qty <= 0) {
+        throw new Error('Please fill in all required fields with a valid quantity');
       }
 
       const userId = (await supabase.auth.getUser()).data.user?.id;
@@ -148,7 +150,7 @@ export function AddFromCatalogDialog({ open, onOpenChange }: AddFromCatalogDialo
         const { data: updated, error: updateError } = await supabase
           .from('warehouse_items')
           .update({
-            current_stock: quantity,
+            current_stock: qty,
             reserved_quantity: 0,
             status: 'active',
             name: selectedItem.name,
@@ -199,10 +201,10 @@ export function AddFromCatalogDialog({ open, onOpenChange }: AddFromCatalogDialo
             is_serialized: selectedItem.is_serialized,
             status: 'active',
             company_id: selectedCompany.id,
-            current_stock: quantity,
+            current_stock: qty,
             reserved_quantity: 0,
             created_by: userId,
-          })
+          } as any)
           .select()
           .single();
 
@@ -214,7 +216,7 @@ export function AddFromCatalogDialog({ open, onOpenChange }: AddFromCatalogDialo
       await createAllocation({
         warehouse_item_id: itemId,
         bin_id: selectedBinId,
-        allocated_quantity: quantity,
+        allocated_quantity: qty,
         company_id: selectedCompany.id,
       });
 
@@ -237,7 +239,7 @@ export function AddFromCatalogDialog({ open, onOpenChange }: AddFromCatalogDialo
     setStep('select');
     setSearchTerm('');
     setSelectedItem(null);
-    setQuantity(1);
+    setQuantity('1');
     setSelectedBinId('');
     onOpenChange(false);
   };
@@ -328,10 +330,16 @@ export function AddFromCatalogDialog({ open, onOpenChange }: AddFromCatalogDialo
                 <Input
                   id="quantity"
                   type="number"
-                  min={1}
+                  step={QTY_STEP}
+                  min={QTY_MIN}
+                  inputMode="decimal"
+                  placeholder="e.g. 12.500"
                   value={quantity}
-                  onChange={(e) => setQuantity(Math.max(1, parseInt(e.target.value) || 1))}
+                  onChange={(e) => setQuantity(e.target.value)}
                 />
+                <p className="text-xs text-muted-foreground">
+                  Decimals supported (up to 3 places, e.g. 12.5 kg, 0.750 m).
+                </p>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="bin">Assign to Bin *</Label>
@@ -357,7 +365,7 @@ export function AddFromCatalogDialog({ open, onOpenChange }: AddFromCatalogDialo
             <Button variant="outline" onClick={handleClose}>Cancel</Button>
             <Button
               onClick={() => importMutation.mutate()}
-              disabled={importMutation.isPending || !selectedBinId || quantity <= 0}
+              disabled={importMutation.isPending || !selectedBinId || !parseQty(quantity) || (parseQty(quantity) ?? 0) <= 0}
             >
               {importMutation.isPending ? 'Importing...' : 'Import to Inventory'}
             </Button>
