@@ -365,7 +365,7 @@ export function AddFromCatalogDialog({ open, onOpenChange }: AddFromCatalogDialo
             <Button variant="outline" onClick={handleClose}>Cancel</Button>
             <Button
               onClick={() => importMutation.mutate()}
-              disabled={importMutation.isPending || !selectedBinId || quantity <= 0}
+              disabled={importMutation.isPending || !selectedBinId || !parseQty(quantity) || (parseQty(quantity) ?? 0) <= 0}
             >
               {importMutation.isPending ? 'Importing...' : 'Import to Inventory'}
             </Button>
