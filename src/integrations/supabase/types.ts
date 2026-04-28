@@ -19924,33 +19924,62 @@ export type Database = {
           tools_count: number
         }[]
       }
-      get_tool_catalog_candidates: {
-        Args: {
-          p_category_ids?: string[]
-          p_include_all_categories?: boolean
-          p_limit?: number
-          p_search?: string
-          p_target_company_id?: string
-          p_target_location_id?: string
-        }
-        Returns: {
-          category_code: string
-          category_id: string
-          category_name: string
-          current_stock: number
-          description: string
-          id: string
-          image_url: string
-          inventory_item_id: string
-          inventory_location_id: string
-          item_code: string
-          name: string
-          status: string
-          unit_abbreviation: string
-          unit_cost: number
-          unit_id: string
-        }[]
-      }
+      get_tool_catalog_candidates:
+        | {
+            Args: {
+              p_category_ids?: string[]
+              p_include_all_categories?: boolean
+              p_limit?: number
+              p_search?: string
+              p_target_company_id?: string
+              p_target_location_id?: string
+            }
+            Returns: {
+              category_code: string
+              category_id: string
+              category_name: string
+              current_stock: number
+              description: string
+              id: string
+              image_url: string
+              inventory_item_id: string
+              inventory_location_id: string
+              item_code: string
+              name: string
+              status: string
+              unit_abbreviation: string
+              unit_cost: number
+              unit_id: string
+            }[]
+          }
+        | {
+            Args: {
+              p_category_ids?: string[]
+              p_include_all_categories?: boolean
+              p_limit?: number
+              p_offset?: number
+              p_search?: string
+              p_target_company_id?: string
+              p_target_location_id?: string
+            }
+            Returns: {
+              category_code: string
+              category_id: string
+              category_name: string
+              current_stock: number
+              description: string
+              id: string
+              image_url: string
+              inventory_item_id: string
+              inventory_location_id: string
+              item_code: string
+              name: string
+              status: string
+              unit_abbreviation: string
+              unit_cost: number
+              unit_id: string
+            }[]
+          }
       get_trial_balance: {
         Args: { p_as_of_date: string; p_company_id: string }
         Returns: {
