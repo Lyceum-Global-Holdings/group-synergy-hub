@@ -111,8 +111,8 @@ export function BulkStockUploadDialog({ open, onOpenChange }: BulkStockUploadDia
 
   const downloadTemplate = () => {
     const csv = binMode === 'single'
-      ? 'item_code,quantity\nITEM001,50\nITEM002,100'
-      : 'item_code,quantity,bin_code\nITEM001,50,BIN-A1\nITEM002,100,BIN-B2';
+      ? 'item_code,quantity\nITEM001,50\nITEM002,12.500'
+      : 'item_code,quantity,bin_code\nITEM001,50,BIN-A1\nITEM002,12.500,BIN-B2';
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');

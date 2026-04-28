@@ -1,123 +1,87 @@
-## Root cause (verified against production data)
+## Goal
 
-I queried the database directly. The notes value the user is filtering for **does exist**:
+Allow decimal quantities when adding initial/opening stock (and across all warehouse stock entry points), aligned with international ERP conventions (SAP / Oracle EBS / ISO units of measure). Quantities like `12.5 kg`, `3.250 L`, `0.75 m` must be enterable, storable, and displayed accurately.
 
-```
-SELECT count(*) FROM stock_transactions WHERE notes ILIKE '%23/07/2255n%';
-→ 8 rows
-```
+## Standard chosen
 
-But every one of those 8 rows has `company_id = NULL`. The report function does:
+**3 decimal places** for quantities (precision `numeric(18,3)`):
+- Matches SAP MM (`MENGE_D` = DEC 13,3) and Oracle EBS inventory transactions.
+- Sufficient for kilograms/litres/metres without floating-point artefacts.
+- Money/value fields stay at 2 decimals (unchanged).
 
-```sql
-WHERE st.company_id = p_company_id
-```
+Inputs that today force integers or `step="0.01"` will use `step="0.001"` with up to 3 decimals.
 
-`NULL = anything` is never true, so those rows are silently filtered out **before** the notes filter ever runs. That's why no result appears regardless of what is typed in the notes box.
+## What's wrong today
 
-This is a project-wide data-integrity gap, not a UI bug:
+1. **DB columns are too narrow**: `warehouse_items.current_stock`, `warehouse_bin_allocations.allocated_quantity / reserved_quantity / available_quantity`, `finished_goods.current_stock`, `construction_inventory_stock.quantity` are all `numeric(15,2)` — only 2 decimals.
+2. **Form inputs are inconsistent**:
+   - `CreateItemDialog` / `SingleItemForm` initial stock: `step="0.01"` (2 dp only).
+   - `AddPurchaseHistoryDialog` quantity: no `step` → integer-only spinner, placeholder `"0"`.
+   - `CreateGrnDialog` `quantity_received` & `unit_price`: no `step` → integer spinner.
+   - `ReceiveItemsDialog`: `step="0.01"`.
+3. The min/max/reorder fields use `step="0.01"` but the underlying catalog columns are unconstrained `numeric` — already fine, just need UI consistency.
 
-```
-stock_transactions
-  total rows           : 2,021
-  company_id IS NULL   : 1,114   ← 55%
-  company_id NOT NULL  :   907
-```
+## Changes
 
-Every NULL row's parent `warehouse_items.company_id` IS populated, so the canonical company is always recoverable.
+### 1. Database migration (one migration)
 
-A secondary problem: there are **two overloads** of `report_stock_movement_ledger` in the database (a legacy 4-arg version and the current 6-arg version with notes filter). PostgREST has to disambiguate by argument set, which works today but is brittle and should be cleaned up.
+Widen quantity columns to `numeric(18,3)`. Money columns (`unit_cost`, `selling_price`, `total_value`, `unit_price`) stay at their current `numeric(15,2)` / `numeric(18,2)`.
 
-## Solution
+Tables/columns to alter:
+- `warehouse_items.current_stock`, `reserved_quantity`
+  - `available_quantity` is a generated column → drop & recreate after base columns change (per project memory on generated-column constraint).
+- `warehouse_bin_allocations.allocated_quantity`, `reserved_quantity`
+  - `available_quantity` (generated) → drop & recreate.
+- `warehouse_item_reservations.reserved_quantity`
+- `finished_goods.current_stock`
+- `finished_goods_batches.quantity`
+- `finished_goods_movements.quantity_change / quantity_before / quantity_after`
+- `finished_goods_reservations.reserved_quantity`
+- `construction_inventory_stock.quantity / reserved_quantity`
+- `construction_inventory_master.quantity`
+- `construction_inventory_transactions.quantity_change`
+- `construction_repair_records.quantity`
+- `construction_transfer_items.quantity`
+- `pr_items.quantity`, `rfq_rfp_items.quantity`, `bom_items.quantity`, `project_budget_items.quantity` → bump to `numeric(18,3)`.
 
-A single migration that:
+Out of scope (already adequate or different domain):
+- `customer_invoice_lines.quantity` and `supplier_invoice_lines.quantity` already `numeric(18,4)` — leave as-is.
+- `tool_adjustments.*` are `integer` (tools are counted units) — leave as-is.
+- `stock_transactions.quantity_*` already unconstrained `numeric` — leave as-is.
 
-### 1. Backfills the historical NULL company_ids
+### 2. Frontend — quantity input standard
 
-```sql
-UPDATE stock_transactions st
-SET company_id = wi.company_id
-FROM warehouse_items wi
-WHERE st.item_id = wi.id
-  AND st.company_id IS NULL
-  AND wi.company_id IS NOT NULL;
-```
-
-Safe, idempotent, reversible (only touches NULL rows).
-
-### 2. Adds a BEFORE INSERT/UPDATE trigger to prevent regression
-
-```sql
-CREATE OR REPLACE FUNCTION public.fill_stock_transaction_company_id()
-RETURNS trigger LANGUAGE plpgsql AS $$
-BEGIN
-  IF NEW.company_id IS NULL AND NEW.item_id IS NOT NULL THEN
-    SELECT company_id INTO NEW.company_id
-    FROM warehouse_items WHERE id = NEW.item_id;
-  END IF;
-  RETURN NEW;
-END $$;
-
-CREATE TRIGGER stock_transactions_fill_company_id
-BEFORE INSERT OR UPDATE OF item_id, company_id ON stock_transactions
-FOR EACH ROW EXECUTE FUNCTION public.fill_stock_transaction_company_id();
+Create a small helper `src/lib/quantityInput.ts` exporting:
+```ts
+export const QTY_STEP = "0.001";
+export const QTY_DECIMALS = 3;
+export const formatQty = (n: number | string | null | undefined) =>
+  n == null || n === "" ? "" : Number(n).toLocaleString(undefined, {
+    minimumFractionDigits: 0, maximumFractionDigits: QTY_DECIMALS,
+  });
 ```
 
-This is the SAP / Oracle EBS pattern: **the transaction inherits its tenant scope from the master record it operates on**. No code changes required at the call sites — every existing INSERT path is automatically corrected.
+Update every quantity `<Input type="number">` to use `step={QTY_STEP}` and `min="0"`:
+- `src/components/warehouse/CreateItemDialog.tsx` (initial stock)
+- `src/components/warehouse/SingleItemForm.tsx` (initial stock)
+- `src/components/warehouse/AddPurchaseHistoryDialog.tsx` (quantity_purchased — currently integer)
+- `src/components/warehouse/CreateGrnDialog.tsx` (quantity_received)
+- `src/components/warehouse/ReceiveItemsDialog.tsx` (receivedQty)
+- `src/components/warehouse/BulkStockUploadDialog.tsx` — already uses `parseFloat`; update CSV template comment to clarify decimals are accepted (`"50.250"`).
 
-### 3. Hardens the report function against any remaining NULLs (defence in depth)
+Replace any `parseInt(value)` for quantity reads with `parseFloat(value)` (audit while editing).
 
-Replace the strict equality with a coalesce-aware filter so a stray NULL row joined to a known item is still scoped correctly:
+### 3. Display formatting
 
-```sql
-WHERE COALESCE(st.company_id, wi.company_id) = p_company_id
-```
+Where we render quantities (BinMasterTab, BinAllocationsTab, item lists), use `formatQty()` so trailing zeros are trimmed (`12` not `12.000`, but `12.5` shows as `12.5`).
 
-That guarantees the report is correct even if a future code path forgets to set `company_id`.
+## Out of scope
 
-### 4. Drops the obsolete 4-arg overload
+- No change to UoM master, no change to per-item decimal precision (could be a future enhancement: per-UoM `decimal_places`).
+- Reports/exports already pass numeric values through; no formatting change needed beyond what the helper provides.
 
-```sql
-DROP FUNCTION IF EXISTS public.report_stock_movement_ledger(
-  uuid, timestamptz, timestamptz, uuid
-);
-```
+## Risk & rollback
 
-Removes PostgREST overload ambiguity. Only the 6-arg version (with notes filter) remains.
-
-### 5. (Optional but recommended) Same hardening for the other two notes-filter reports
-
-`report_cycle_count_variance` and `report_batch_traceability` join through their own parent records. I will mirror the COALESCE-pattern + drop-old-overload there too so notes filtering can never silently drop rows for the same class of reason.
-
-## What is NOT changed
-
-- No frontend changes. The UI parser, parameter shape, and RPC call signature stay exactly as they are — they were correct already.
-- No RLS policy changes; backfill runs as the migration role.
-- No change to the columns returned or to the report row shape.
-
-## Verification after migration
-
-I will re-run, with the same notes term, against the same company that owns those 8 rows:
-
-```sql
-SELECT count(*)
-FROM report_stock_movement_ledger(
-  '<company_id>'::uuid, NULL, NULL, NULL,
-  'contains', ARRAY['23/07/2255n']
-);
--- expected: 8
-```
-
-And without filter:
-
-```sql
-SELECT count(*) FROM report_stock_movement_ledger(
-  '<company_id>'::uuid, NULL, NULL, NULL, 'contains', NULL
-);
--- expected: previous count + 1,114 (or whatever subset belongs to that company)
-```
-
-## Files
-
-- 1 new migration: `supabase/migrations/<ts>_fix_stock_txn_company_id_and_notes_filter.sql`
-- No application code changes.
+- Widening `numeric(15,2)` → `numeric(18,3)` is a non-lossy `ALTER COLUMN TYPE` and safe on existing data.
+- Generated columns (`available_quantity`) must be dropped before altering and recreated after — handled inside the same migration in a single transaction.
+- No RLS/policy changes.
