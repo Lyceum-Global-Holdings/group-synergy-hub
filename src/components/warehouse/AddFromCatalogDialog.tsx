@@ -5,13 +5,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Search, PackagePlus, ArrowLeft } from 'lucide-react';
+import { Search, PackagePlus, ArrowLeft, CheckCircle2 } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useCompany } from '@/contexts/CompanyContext';
 import { useWarehouseBins } from '@/hooks/useWarehouseBins';
-import { useWarehouseBinAllocations } from '@/hooks/useWarehouseBinAllocations';
 import { useItemCategories } from '@/hooks/useItemCategories';
 import { toast } from 'sonner';
 import { CatalogItem } from '@/types/itemBin';
@@ -25,7 +24,6 @@ interface AddFromCatalogDialogProps {
 export function AddFromCatalogDialog({ open, onOpenChange }: AddFromCatalogDialogProps) {
   const { selectedCompany } = useCompany();
   const { bins } = useWarehouseBins();
-  const { createAllocation } = useWarehouseBinAllocations();
   const { categories } = useItemCategories(selectedCompany?.id);
   const queryClient = useQueryClient();
 
@@ -72,7 +70,8 @@ export function AddFromCatalogDialog({ open, onOpenChange }: AddFromCatalogDialo
     enabled: open,
   });
 
-  // Fetch existing catalog_item_ids using cursor-based batching
+  // Fetch existing catalog_item_ids in this company so we can badge them
+  // (no longer used to hide rows — same item can live in multiple bins/locations).
   const { data: existingCatalogIds } = useQuery({
     queryKey: ['warehouse-items-catalog-ids', selectedCompany?.id],
     queryFn: async () => {
@@ -86,7 +85,6 @@ export function AddFromCatalogDialog({ open, onOpenChange }: AddFromCatalogDialo
           .select('id, catalog_item_id')
           .eq('company_id', selectedCompany!.id)
           .not('catalog_item_id', 'is', null)
-          .gt('current_stock', 0)
           .order('id')
           .limit(batchSize);
 
@@ -111,10 +109,11 @@ export function AddFromCatalogDialog({ open, onOpenChange }: AddFromCatalogDialo
     enabled: open && !!selectedCompany?.id,
   });
 
-  // Filter to only items NOT already in current company's inventory
+  // Show ALL active catalog items. Items already in this company's inventory
+  // remain selectable so users can allocate the same item to additional bins
+  // (international WMS standard: 1 item × N bins × N locations per company).
   const availableItems = useMemo(() => {
     return catalogItems.filter(item => {
-      if (existingCatalogIds?.has(item.id)) return false;
       if (!searchTerm) return true;
       const term = searchTerm.toLowerCase();
       return (
@@ -135,10 +134,10 @@ export function AddFromCatalogDialog({ open, onOpenChange }: AddFromCatalogDialo
 
       const userId = (await supabase.auth.getUser()).data.user?.id;
 
-      // Check if an existing inventory row exists (even with 0 stock)
+      // Look for existing inventory row in this company for this catalog item.
       const { data: existingRow } = await supabase
         .from('warehouse_items')
-        .select('id')
+        .select('id, current_stock')
         .eq('company_id', selectedCompany.id)
         .or(`catalog_item_id.eq.${selectedItem.id},item_code.eq.${selectedItem.item_code}`)
         .maybeSingle();
@@ -146,38 +145,23 @@ export function AddFromCatalogDialog({ open, onOpenChange }: AddFromCatalogDialo
       let itemId: string;
 
       if (existingRow) {
-        // Reactivate existing row
+        // Item already exists in this company → ADD to stock (do not overwrite),
+        // so the same item can live across multiple bins/locations.
+        const newStock = Number(existingRow.current_stock || 0) + qty;
         const { data: updated, error: updateError } = await supabase
           .from('warehouse_items')
           .update({
-            current_stock: qty,
-            reserved_quantity: 0,
+            current_stock: newStock,
             status: 'active',
-            name: selectedItem.name,
-            description: selectedItem.description,
-            category_id: selectedItem.category_id,
-            unit_id: selectedItem.unit_id,
-            brand: selectedItem.brand,
-            manufacturer: selectedItem.manufacturer,
-            barcode: selectedItem.barcode,
-            sku: selectedItem.sku,
-            unit_cost: selectedItem.unit_cost,
-            selling_price: selectedItem.selling_price,
-            reorder_level: selectedItem.reorder_level,
-            min_stock_level: selectedItem.min_stock_level,
-            max_stock_level: selectedItem.max_stock_level,
-            image_url: selectedItem.image_url,
-            is_batch_tracked: selectedItem.is_batch_tracked,
-            is_serialized: selectedItem.is_serialized,
           })
           .eq('id', existingRow.id)
-          .select()
+          .select('id')
           .single();
 
         if (updateError) throw updateError;
         itemId = updated.id;
       } else {
-        // Fresh insert
+        // Fresh insert (first time this catalog item lands in this company)
         const { data: newItem, error: insertError } = await supabase
           .from('warehouse_items')
           .insert({
@@ -212,13 +196,36 @@ export function AddFromCatalogDialog({ open, onOpenChange }: AddFromCatalogDialo
         itemId = newItem.id;
       }
 
-      // Create bin allocation
-      await createAllocation({
-        warehouse_item_id: itemId,
-        bin_id: selectedBinId,
-        allocated_quantity: qty,
-        company_id: selectedCompany.id,
-      });
+      // Upsert bin allocation on (warehouse_item_id, bin_id, company_id).
+      // If allocation already exists, increment allocated_quantity.
+      const { data: existingAlloc } = await supabase
+        .from('warehouse_bin_allocations')
+        .select('id, allocated_quantity')
+        .eq('warehouse_item_id', itemId)
+        .eq('bin_id', selectedBinId)
+        .eq('company_id', selectedCompany.id)
+        .maybeSingle();
+
+      if (existingAlloc) {
+        const newAlloc = Number(existingAlloc.allocated_quantity || 0) + qty;
+        const { error: allocUpdateError } = await supabase
+          .from('warehouse_bin_allocations')
+          .update({ allocated_quantity: newAlloc })
+          .eq('id', existingAlloc.id);
+        if (allocUpdateError) throw allocUpdateError;
+      } else {
+        const { error: allocInsertError } = await supabase
+          .from('warehouse_bin_allocations')
+          .insert({
+            warehouse_item_id: itemId,
+            bin_id: selectedBinId,
+            allocated_quantity: qty,
+            reserved_quantity: 0,
+            company_id: selectedCompany.id,
+            created_by: userId,
+          });
+        if (allocInsertError) throw allocInsertError;
+      }
 
       return { id: itemId };
     },
@@ -277,34 +284,48 @@ export function AddFromCatalogDialog({ open, onOpenChange }: AddFromCatalogDialo
                 <div className="p-4 text-center text-muted-foreground">Loading catalog...</div>
               ) : availableItems.length === 0 ? (
                 <div className="p-4 text-center text-muted-foreground">
-                  {searchTerm ? 'No matching items found' : 'All catalog items are already in your inventory'}
+                  {searchTerm ? 'No matching items found' : 'No active catalog items found'}
                 </div>
               ) : (
                 <div className="overflow-hidden">
-                  {availableItems.map(item => (
-                    <button
-                      key={item.id}
-                      className="w-full block text-left px-4 py-3 hover:bg-accent transition-colors border-b last:border-b-0 cursor-pointer overflow-hidden box-border"
-                      onClick={() => handleSelectItem(item)}
-                    >
-                      <div className="flex w-full items-start gap-3">
-                        <div className="flex-1 min-w-0 space-y-1">
-                          <div className="font-medium text-sm break-words text-foreground">{item.name}</div>
-                          <div className="text-xs text-muted-foreground flex flex-wrap items-center gap-x-2 gap-y-1">
-                            <span className="font-mono bg-muted px-1 rounded text-[10px]">{item.item_code}</span>
-                            {item.brand && <span className="break-words">• {item.brand}</span>}
-                            <span className="break-words">• {categoryName(item.category_id)}</span>
+                  {availableItems.map(item => {
+                    const alreadyInInventory = existingCatalogIds?.has(item.id);
+                    return (
+                      <button
+                        key={item.id}
+                        className="w-full block text-left px-4 py-3 hover:bg-accent transition-colors border-b last:border-b-0 cursor-pointer overflow-hidden box-border"
+                        onClick={() => handleSelectItem(item)}
+                      >
+                        <div className="flex w-full items-start gap-3">
+                          <div className="flex-1 min-w-0 space-y-1">
+                            <div className="font-medium text-sm break-words text-foreground">{item.name}</div>
+                            <div className="text-xs text-muted-foreground flex flex-wrap items-center gap-x-2 gap-y-1">
+                              <span className="font-mono bg-muted px-1 rounded text-[10px]">{item.item_code}</span>
+                              {item.brand && <span className="break-words">• {item.brand}</span>}
+                              <span className="break-words">• {categoryName(item.category_id)}</span>
+                            </div>
+                            {alreadyInInventory && (
+                              <div className="text-[11px] text-emerald-600 dark:text-emerald-400 flex items-center gap-1 pt-0.5">
+                                <CheckCircle2 className="h-3 w-3" />
+                                Already in inventory — selecting will add stock to another bin
+                              </div>
+                            )}
                           </div>
+                          <Badge
+                            variant={alreadyInInventory ? 'outline' : 'secondary'}
+                            className="shrink-0 text-[10px] mt-0.5"
+                          >
+                            {alreadyInInventory ? 'Add to bin' : 'Select'}
+                          </Badge>
                         </div>
-                        <Badge variant="secondary" className="shrink-0 text-[10px] mt-0.5">Select</Badge>
-                      </div>
-                    </button>
-                  ))}
+                      </button>
+                    );
+                  })}
                 </div>
               )}
             </ScrollArea>
             <p className="text-xs text-muted-foreground">
-              Showing {availableItems.length} item{availableItems.length !== 1 ? 's' : ''} not yet in your inventory
+              Showing {availableItems.length} catalog item{availableItems.length !== 1 ? 's' : ''}. Same item can be allocated to multiple bins and locations within a company.
             </p>
           </div>
         )}
