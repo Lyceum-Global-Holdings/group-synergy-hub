@@ -70,7 +70,8 @@ export function AddFromCatalogDialog({ open, onOpenChange }: AddFromCatalogDialo
     enabled: open,
   });
 
-  // Fetch existing catalog_item_ids using cursor-based batching
+  // Fetch existing catalog_item_ids in this company so we can badge them
+  // (no longer used to hide rows — same item can live in multiple bins/locations).
   const { data: existingCatalogIds } = useQuery({
     queryKey: ['warehouse-items-catalog-ids', selectedCompany?.id],
     queryFn: async () => {
@@ -84,7 +85,6 @@ export function AddFromCatalogDialog({ open, onOpenChange }: AddFromCatalogDialo
           .select('id, catalog_item_id')
           .eq('company_id', selectedCompany!.id)
           .not('catalog_item_id', 'is', null)
-          .gt('current_stock', 0)
           .order('id')
           .limit(batchSize);
 
@@ -109,10 +109,11 @@ export function AddFromCatalogDialog({ open, onOpenChange }: AddFromCatalogDialo
     enabled: open && !!selectedCompany?.id,
   });
 
-  // Filter to only items NOT already in current company's inventory
+  // Show ALL active catalog items. Items already in this company's inventory
+  // remain selectable so users can allocate the same item to additional bins
+  // (international WMS standard: 1 item × N bins × N locations per company).
   const availableItems = useMemo(() => {
     return catalogItems.filter(item => {
-      if (existingCatalogIds?.has(item.id)) return false;
       if (!searchTerm) return true;
       const term = searchTerm.toLowerCase();
       return (
