@@ -765,6 +765,9 @@ export function BulkStockUploadDialog({ open, onOpenChange }: BulkStockUploadDia
                       <TableCell>
                         <div className="flex flex-col gap-1">
                           {statusBadge(row.status)}
+                          {row.matched_by === 'item_name' && (row.status === 'matched' || row.status === 'new_to_inventory') && (
+                            <span className="text-[10px] text-muted-foreground">Matched by name</span>
+                          )}
                           {row.error && <span className="text-xs text-destructive">{row.error}</span>}
                         </div>
                       </TableCell>
