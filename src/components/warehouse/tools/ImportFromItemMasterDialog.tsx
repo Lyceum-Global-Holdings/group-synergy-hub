@@ -514,6 +514,39 @@ export function ImportFromItemMasterDialog({
       setSearchTerm(row.item_code);
       setHighlightedId(row.catalog_id);
 
+      // Phase 9.5 — Inject the matched row directly into every active
+      // candidate cache. PostgREST's 1k-row response cap means a paginated
+      // bulk fetch can still race the user, and on cold opens the matched
+      // row may sit on a page that hasn't arrived yet. Writing it in
+      // makes the "found" toast match what the list shows — always.
+      const injected: CandidateItem = {
+        id: row.catalog_id,
+        item_code: row.item_code,
+        name: row.name,
+        description: row.description ?? null,
+        category_id: row.category_id ?? null,
+        unit_id: row.unit_id ?? null,
+        unit_cost: row.unit_cost ?? null,
+        category_name:
+          row.category_name ??
+          (row.category_id ? categoryNameById.get(row.category_id)?.name ?? null : null),
+        category_code:
+          row.category_code ??
+          (row.category_id ? categoryNameById.get(row.category_id)?.code ?? null : null),
+        unit_abbreviation: row.unit_abbreviation ?? null,
+        inventory_item_id: null,
+        current_stock: null,
+        inventory_location_id: null,
+      };
+      queryClient.setQueriesData<CandidateItem[]>(
+        { queryKey: ["tool-catalog-candidates"] },
+        (prev) => {
+          const list = prev ?? [];
+          if (list.some((r) => r?.id === injected.id)) return list;
+          return [injected, ...list];
+        },
+      );
+
       // Wait for the candidate query to settle with the broadened scope
       // BEFORE asking the virtualizer to scroll, otherwise we're scrolling
       // an empty list. Poll the cache for the matched row id (≤2s) so this
