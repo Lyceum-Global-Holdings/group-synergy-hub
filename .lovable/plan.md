@@ -1,67 +1,39 @@
+# Fix: Tool import "Find by code" finds the item but the list stays empty
 
-## Goal
+## Root cause
 
-When uploading stock via `BulkStockUploadDialog`, identify each row's catalog item by **either** `item_code` **or** `item_name` (case-insensitive, trimmed). Today only `item_code` is matched, so rows with only a name fail with "Item not found in Item Master".
+The "Item Master" catalog has **14,985 active rows**. The catalog row the user found (`FIX-MNT-000-0003` — "Generator | Weichai - 500KVA") sorts at **position 5,714** alphabetically.
 
-## International standard being applied
+The dialog fetches candidates via the `get_tool_catalog_candidates` RPC with `p_limit=20000`. The server-side function does have `LIMIT 20000`, but the RPC response delivered to the browser is being truncated well before that — only the first ~1,000 rows make it into `items`. Anything past that point is invisible to the dialog regardless of search term, scope, or category filter.
 
-GS1 / SAP MM / Oracle Inventory bulk-load convention:
+Result: `find_catalog_item_by_code` correctly tells the user "Item found", `setSearchTerm(row.item_code)` runs, the highlight is set, the virtualizer is asked to scroll — but `filteredItems` is empty because the matched catalog row was never in `items` to begin with. The toast lies; the list is empty.
 
-- A **primary identifier** (item code / SKU / GTIN) is preferred and must win when both are present.
-- A **secondary identifier** (item description / item name) is allowed as a fallback only when the primary is missing.
-- Matching is **case-insensitive** and **whitespace-trimmed**.
-- A name match must be **unique within the catalog scope** — if it resolves to >1 catalog item, reject the row as ambiguous so the user disambiguates with `item_code` (prevents silent mis-posting of stock, which is a hard SOX/inventory-audit rule).
+The previous bin/code/scope-broadening fixes were all correct but they all assume the row exists in the candidate set. It doesn't.
 
-So the resolution order per row:
+## Fix
 
-```text
-1. item_code present  → match by item_code (exact, case-insensitive)
-2. else item_name present → match by name (case-insensitive)
-       ├── 1 match  → use it
-       ├── 0 match  → row error "Item not found"
-       └── >1 match → row error "Ambiguous item name — please specify item_code"
-3. neither present → row error "Provide item_code or item_name"
-```
+Two complementary changes — one immediate, one structural.
 
-## What changes (frontend only — no DB changes)
+### 1. Inject the found row directly into the candidate cache (immediate fix)
 
-### File: `src/components/warehouse/BulkStockUploadDialog.tsx`
+When `runFinder` gets a server-confirmed importable row back from `find_catalog_item_by_code`, write that single row into the active `["tool-catalog-candidates", ...]` query cache(s) via `queryClient.setQueryData`, prepending it if it isn't already present. The lookup RPC already returns every field the candidate row needs (`id`, `item_code`, `name`, `description`, `category_id`, `unit_id`, `unit_cost`, `category_name`, `category_code`, `unit_abbreviation`, `status`). Map it to the `CandidateItem` shape with `inventory_item_id: null`, `current_stock: null`, `inventory_location_id: null` — the inventory snapshot is optional and never filters visibility (per `tool-promotion-source-of-truth` memory).
 
-1. **CSV template + header parsing**
-   - Update both downloadable templates to: `item_code,item_name,quantity[,bin_code]` with a comment row example showing one row using only `item_code` and one row using only `item_name`.
-   - On parse, accept any subset of `{item_code, item_name}` columns. Require at least one to be present in the header. `quantity` (and `bin_code` in per-row mode) remain required.
+This guarantees that any item the server confirms exists is visible immediately, regardless of how many rows the bulk fetch dropped. The existing `scrollWhenReady` poll then succeeds on the first tick.
 
-2. **Catalog lookup batches**
-   - Keep the existing batched `IN (item_code, ...)` lookup for codes.
-   - Add a parallel batched lookup for names: `warehouse_item_catalog` filtered by `status=active` and `name ILIKE ANY (...)` — but use a normalized client-side map (`name.toLowerCase().trim()` → `CatalogItem[]`) so we can detect duplicate names and flag ambiguity.
-   - To avoid scanning the full catalog when many name-only rows exist, fetch by chunks of `name.in.(...)` (case-insensitive via `.ilike` per chunk OR a single `or=name.ilike.x,name.ilike.y` with PostgREST escaping). Use a single `select` with `.in('name', uniqueNames)` first (exact case match — covers the common case), then a fallback `.ilike` only for the unmatched remainder.
+### 2. Paginate the candidates RPC to actually fetch the full catalog (structural fix)
 
-3. **Row resolution**
-   - Replace the current `catalogMap.get(itemCode.toLowerCase())` block with the resolution order above.
-   - Add two new statuses to `ParsedRow.status`: `'ambiguous_name'` (badge: amber, error: "Multiple items match this name; specify item_code") — keep `'item_not_found'` for the no-match case.
-   - When a name-only row matches, fill `item_code` in the parsed row from the resolved catalog item so downstream import logic and the preview table both stay code-driven.
+Add `p_offset integer DEFAULT 0` to `get_tool_catalog_candidates` and update the client to fetch the catalog in 1,000-row pages until a short page is returned, concatenating into one array before resolving the React Query result. This restores the dialog's promise of "showing every active Item Master entry" — without it, scope counts say `14,985` but only the first ~1,000 are actually selectable by scrolling/searching.
 
-4. **Preview UI**
-   - Show both `Item Code` and `Item Name` columns (already present); ensure `item_code` populates from the resolved catalog item for name-only rows so the user can verify the match before confirming.
-   - Add a small badge "Matched by name" on rows that resolved via the name path so reviewers can audit.
+Keep the server-side `LIMIT` clause as a safety upper bound (`LIMIT LEAST(p_limit, 20000) OFFSET p_offset`).
 
-5. **Help text**
-   - Update the dialog description from "matched by item_code" to: *"Items are matched by **item_code** (preferred) or **item_name** (fallback). If a name matches multiple items, specify item_code instead."*
+## Files
 
-### Catalog-import additive flow stays the same
+- **DB migration**: alter `get_tool_catalog_candidates` to accept `p_offset`. No behavior change when caller omits it.
+- **`src/components/warehouse/tools/ImportFromItemMasterDialog.tsx`**:
+  - In the `useQuery` `queryFn`, loop with `p_offset += 1000` until a page returns `< 1000` rows.
+  - In `runFinder`, after the validation toasts pass and before `scrollWhenReady`, write the matched row into every cached `["tool-catalog-candidates", ...]` entry that doesn't already contain it (prepend, dedup by `id`).
+  - No UI/copy changes; the behavior is now "Item found" → row visible.
 
-Once a row is resolved to a `catalog_item.id`, the existing additive logic (increment `current_stock`, upsert `warehouse_bin_allocations` on `(warehouse_item_id, bin_id, company_id)`) is unchanged. So uploading stock for an item that already lives in another bin still adds to the new bin without overwriting.
+## Out of scope
 
-## What we explicitly do NOT change
-
-- No DB migration. `warehouse_item_catalog.name` is not unique, and we will NOT add a unique constraint — name collisions are legitimate (different brands, sizes). We handle ambiguity at row-validation time instead.
-- No change to `item_code` generation, RLS, company scoping, or the bin allocation uniqueness rule established in the previous change.
-- `BulkStockUploadDialog` remains the only file edited.
-
-## Acceptance criteria
-
-1. CSV with only `item_code` column → continues to work exactly as today.
-2. CSV with only `item_name` column → resolves rows by name; matched rows show the resolved `item_code` in the preview with a "Matched by name" badge; ambiguous names produce a clear row-level error.
-3. CSV with both columns → `item_code` wins; `item_name` is ignored for matching but shown in preview for human verification.
-4. CSV with neither column populated for a row → row error "Provide item_code or item_name".
-5. Existing additive bin allocation behaviour (item across multiple bins/locations within a company) is preserved.
+- No change to `find_catalog_item_by_code`, no change to dedup logic, no change to bin allocation, no change to import payload. The issue is strictly visibility of the matched row in the candidate list.
