@@ -239,7 +239,7 @@ export function AddFromCatalogDialog({ open, onOpenChange }: AddFromCatalogDialo
     setStep('select');
     setSearchTerm('');
     setSelectedItem(null);
-    setQuantity(1);
+    setQuantity('1');
     setSelectedBinId('');
     onOpenChange(false);
   };
