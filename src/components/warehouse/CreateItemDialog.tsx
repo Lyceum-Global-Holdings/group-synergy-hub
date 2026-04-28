@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
+import { QTY_STEP, QTY_MIN } from '@/lib/quantityInput';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -603,12 +604,16 @@ export function CreateItemDialog({ open, onOpenChange, editingItem }: CreateItem
                 <Input
                   id="initial_stock"
                   type="number"
-                  step="0.01"
-                  min="0"
-                  placeholder="Enter opening stock quantity"
+                  step={QTY_STEP}
+                  min={QTY_MIN}
+                  inputMode="decimal"
+                  placeholder="e.g. 12.500"
                   value={initialStock}
                   onChange={(e) => setInitialStock(e.target.value)}
                 />
+                <p className="text-xs text-muted-foreground">
+                  Decimals supported (up to 3 places, e.g. 12.5 kg, 0.750 m).
+                </p>
               </div>
 
               {initialStock && parseFloat(initialStock) > 0 && (
