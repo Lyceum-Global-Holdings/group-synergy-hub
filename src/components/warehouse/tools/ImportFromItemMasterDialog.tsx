@@ -519,21 +519,22 @@ export function ImportFromItemMasterDialog({
       // bulk fetch can still race the user, and on cold opens the matched
       // row may sit on a page that hasn't arrived yet. Writing it in
       // makes the "found" toast match what the list shows — always.
+      const r: any = row;
       const injected: CandidateItem = {
-        id: row.catalog_id,
-        item_code: row.item_code,
-        name: row.name,
-        description: row.description ?? null,
-        category_id: row.category_id ?? null,
-        unit_id: row.unit_id ?? null,
-        unit_cost: row.unit_cost ?? null,
+        id: r.catalog_id,
+        item_code: r.item_code,
+        name: r.name,
+        description: r.description ?? null,
+        category_id: r.category_id ?? null,
+        unit_id: r.unit_id ?? null,
+        unit_cost: r.unit_cost ?? null,
         category_name:
-          row.category_name ??
-          (row.category_id ? categoryNameById.get(row.category_id)?.name ?? null : null),
+          r.category_name ??
+          (r.category_id ? categoryNameById.get(r.category_id)?.name ?? null : null),
         category_code:
-          row.category_code ??
-          (row.category_id ? categoryNameById.get(row.category_id)?.code ?? null : null),
-        unit_abbreviation: row.unit_abbreviation ?? null,
+          r.category_code ??
+          (r.category_id ? categoryNameById.get(r.category_id)?.code ?? null : null),
+        unit_abbreviation: r.unit_abbreviation ?? null,
         inventory_item_id: null,
         current_stock: null,
         inventory_location_id: null,
