@@ -223,18 +223,34 @@ export function ImportFromItemMasterDialog({
     ],
     enabled: open,
     queryFn: async () => {
-      const { data, error } = await supabase.rpc("get_tool_catalog_candidates", {
-        p_search: null,
-        p_category_ids: effectiveCategoryIds,
-        p_include_all_categories: sourceScope === "all",
-        p_target_company_id: targetCompanyId || null,
-        p_target_location_id:
-          destinationLocationId !== "none" ? destinationLocationId : null,
-        p_limit: 20000,
-      });
-      if (error) throw error;
+      // Phase 9.5 — Paginate the RPC in 1,000-row pages.
+      // PostgREST caps RPC responses at the configured `db-max-rows` (1000 by
+      // default). The catalog has ~15k active rows, so a single fetch silently
+      // dropped >90% of the Item Master, which made the "Find by code" toast
+      // appear successful while leaving the matched row invisible in the list.
+      const PAGE = 1000;
+      const all: any[] = [];
+      let offset = 0;
+      // Hard ceiling so we never hot-loop on a misbehaving RPC.
+      while (offset < 50000) {
+        const { data, error } = await supabase.rpc("get_tool_catalog_candidates", {
+          p_search: null,
+          p_category_ids: effectiveCategoryIds,
+          p_include_all_categories: sourceScope === "all",
+          p_target_company_id: targetCompanyId || null,
+          p_target_location_id:
+            destinationLocationId !== "none" ? destinationLocationId : null,
+          p_limit: PAGE,
+          p_offset: offset,
+        });
+        if (error) throw error;
+        const page = data ?? [];
+        all.push(...page);
+        if (page.length < PAGE) break;
+        offset += PAGE;
+      }
 
-      return (data ?? []).map((row: any) => ({
+      return all.map((row: any) => ({
         id: row.id,
         item_code: row.item_code,
         name: row.name,
