@@ -134,10 +134,10 @@ export function AddFromCatalogDialog({ open, onOpenChange }: AddFromCatalogDialo
 
       const userId = (await supabase.auth.getUser()).data.user?.id;
 
-      // Check if an existing inventory row exists (even with 0 stock)
+      // Look for existing inventory row in this company for this catalog item.
       const { data: existingRow } = await supabase
         .from('warehouse_items')
-        .select('id')
+        .select('id, current_stock')
         .eq('company_id', selectedCompany.id)
         .or(`catalog_item_id.eq.${selectedItem.id},item_code.eq.${selectedItem.item_code}`)
         .maybeSingle();
@@ -145,38 +145,23 @@ export function AddFromCatalogDialog({ open, onOpenChange }: AddFromCatalogDialo
       let itemId: string;
 
       if (existingRow) {
-        // Reactivate existing row
+        // Item already exists in this company → ADD to stock (do not overwrite),
+        // so the same item can live across multiple bins/locations.
+        const newStock = Number(existingRow.current_stock || 0) + qty;
         const { data: updated, error: updateError } = await supabase
           .from('warehouse_items')
           .update({
-            current_stock: qty,
-            reserved_quantity: 0,
+            current_stock: newStock,
             status: 'active',
-            name: selectedItem.name,
-            description: selectedItem.description,
-            category_id: selectedItem.category_id,
-            unit_id: selectedItem.unit_id,
-            brand: selectedItem.brand,
-            manufacturer: selectedItem.manufacturer,
-            barcode: selectedItem.barcode,
-            sku: selectedItem.sku,
-            unit_cost: selectedItem.unit_cost,
-            selling_price: selectedItem.selling_price,
-            reorder_level: selectedItem.reorder_level,
-            min_stock_level: selectedItem.min_stock_level,
-            max_stock_level: selectedItem.max_stock_level,
-            image_url: selectedItem.image_url,
-            is_batch_tracked: selectedItem.is_batch_tracked,
-            is_serialized: selectedItem.is_serialized,
           })
           .eq('id', existingRow.id)
-          .select()
+          .select('id')
           .single();
 
         if (updateError) throw updateError;
         itemId = updated.id;
       } else {
-        // Fresh insert
+        // Fresh insert (first time this catalog item lands in this company)
         const { data: newItem, error: insertError } = await supabase
           .from('warehouse_items')
           .insert({
@@ -211,13 +196,36 @@ export function AddFromCatalogDialog({ open, onOpenChange }: AddFromCatalogDialo
         itemId = newItem.id;
       }
 
-      // Create bin allocation
-      await createAllocation({
-        warehouse_item_id: itemId,
-        bin_id: selectedBinId,
-        allocated_quantity: qty,
-        company_id: selectedCompany.id,
-      });
+      // Upsert bin allocation on (warehouse_item_id, bin_id, company_id).
+      // If allocation already exists, increment allocated_quantity.
+      const { data: existingAlloc } = await supabase
+        .from('warehouse_bin_allocations')
+        .select('id, allocated_quantity')
+        .eq('warehouse_item_id', itemId)
+        .eq('bin_id', selectedBinId)
+        .eq('company_id', selectedCompany.id)
+        .maybeSingle();
+
+      if (existingAlloc) {
+        const newAlloc = Number(existingAlloc.allocated_quantity || 0) + qty;
+        const { error: allocUpdateError } = await supabase
+          .from('warehouse_bin_allocations')
+          .update({ allocated_quantity: newAlloc })
+          .eq('id', existingAlloc.id);
+        if (allocUpdateError) throw allocUpdateError;
+      } else {
+        const { error: allocInsertError } = await supabase
+          .from('warehouse_bin_allocations')
+          .insert({
+            warehouse_item_id: itemId,
+            bin_id: selectedBinId,
+            allocated_quantity: qty,
+            reserved_quantity: 0,
+            company_id: selectedCompany.id,
+            created_by: userId,
+          });
+        if (allocInsertError) throw allocInsertError;
+      }
 
       return { id: itemId };
     },
