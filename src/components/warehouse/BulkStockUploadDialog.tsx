@@ -50,7 +50,8 @@ interface ParsedRow {
   catalog_item?: CatalogItem;
   existing_inventory_id?: string;
   needs_import?: boolean;
-  status: 'matched' | 'new_to_inventory' | 'item_not_found' | 'bin_not_found' | 'error';
+  matched_by?: 'item_code' | 'item_name';
+  status: 'matched' | 'new_to_inventory' | 'item_not_found' | 'ambiguous_name' | 'bin_not_found' | 'error';
   error?: string;
 }
 
@@ -110,9 +111,11 @@ export function BulkStockUploadDialog({ open, onOpenChange }: BulkStockUploadDia
   }, [locationBins, selectedBinId]);
 
   const downloadTemplate = () => {
+    // Items can be identified by item_code (preferred) OR item_name (fallback).
+    // GS1 / SAP MM convention: primary identifier wins; name only used when code is blank.
     const csv = binMode === 'single'
-      ? 'item_code,quantity\nITEM001,50\nITEM002,12.500'
-      : 'item_code,quantity,bin_code\nITEM001,50,BIN-A1\nITEM002,12.500,BIN-B2';
+      ? 'item_code,item_name,quantity\nITEM001,,50\n,Steel Rod 12mm,12.500'
+      : 'item_code,item_name,quantity,bin_code\nITEM001,,50,BIN-A1\n,Steel Rod 12mm,12.500,BIN-B2';
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -179,11 +182,12 @@ export function BulkStockUploadDialog({ open, onOpenChange }: BulkStockUploadDia
 
       const headers = rows[0].map(h => h.toLowerCase().replace(/\s+/g, '_'));
       const codeIdx = headers.indexOf('item_code');
+      const nameIdx = headers.indexOf('item_name');
       const qtyIdx = headers.indexOf('quantity');
       const binIdx = headers.indexOf('bin_code');
 
-      if (codeIdx === -1 || qtyIdx === -1) {
-        toast.error('CSV must have columns: item_code, quantity' + (binMode === 'per-row' ? ', bin_code' : ''));
+      if ((codeIdx === -1 && nameIdx === -1) || qtyIdx === -1) {
+        toast.error('CSV must have a quantity column and at least one of: item_code, item_name' + (binMode === 'per-row' ? ' (plus bin_code)' : ''));
         setIsValidating(false);
         return;
       }
@@ -195,10 +199,19 @@ export function BulkStockUploadDialog({ open, onOpenChange }: BulkStockUploadDia
       }
 
       const dataRows = rows.slice(1);
-      const itemCodesOriginal = [...new Set(dataRows.map(r => (r[codeIdx] || '').trim()).filter(Boolean))];
+      const getCode = (r: string[]) => codeIdx === -1 ? '' : (r[codeIdx] || '').trim();
+      const getName = (r: string[]) => nameIdx === -1 ? '' : (r[nameIdx] || '').trim();
 
-      // Fetch items from global catalog by item_code (batch)
-      const catalogMap = new Map<string, CatalogItem>();
+      const itemCodesOriginal = [...new Set(dataRows.map(getCode).filter(Boolean))];
+      // Names only matter for rows that have NO item_code (code wins when both present).
+      const itemNamesOriginal = [...new Set(
+        dataRows
+          .filter(r => !getCode(r) && getName(r))
+          .map(getName)
+      )];
+
+      // 1. Catalog lookup by item_code (batch)
+      const catalogByCode = new Map<string, CatalogItem>();
       for (let i = 0; i < itemCodesOriginal.length; i += 500) {
         const chunk = itemCodesOriginal.slice(i, i + 500);
         const { data } = await supabase
@@ -207,22 +220,50 @@ export function BulkStockUploadDialog({ open, onOpenChange }: BulkStockUploadDia
           .eq('status', 'active')
           .in('item_code', chunk);
         data?.forEach(item => {
-          catalogMap.set((item.item_code || '').toLowerCase().trim(), item as CatalogItem);
+          catalogByCode.set((item.item_code || '').toLowerCase().trim(), item as CatalogItem);
         });
       }
 
-      // Fetch existing inventory items for this company to check which already exist
-      const inventoryMap = new Map<string, string>(); // item_code -> warehouse_items.id
-      const allCatalogIds = [...catalogMap.values()].map(c => c.id);
-      for (let i = 0; i < allCatalogIds.length; i += 500) {
-        const chunk = allCatalogIds.slice(i, i + 500);
+      // 2. Catalog lookup by item_name (batch). Case-insensitive via .ilike.any.
+      // Group results so we can detect ambiguity (same name, multiple catalog rows).
+      const catalogByName = new Map<string, CatalogItem[]>();
+      for (let i = 0; i < itemNamesOriginal.length; i += 200) {
+        const chunk = itemNamesOriginal.slice(i, i + 200);
+        // Build an OR filter of ilike clauses; escape commas/parens which break PostgREST .or().
+        const orClauses = chunk
+          .map(n => `name.ilike.${n.replace(/[,()]/g, ' ').trim()}`)
+          .join(',');
+        if (!orClauses) continue;
+        const { data } = await supabase
+          .from('warehouse_item_catalog')
+          .select('id, item_code, name, description, category_id, unit_id, brand, manufacturer, barcode, sku, unit_cost, selling_price, reorder_level, min_stock_level, max_stock_level, image_url, is_batch_tracked, is_serialized')
+          .eq('status', 'active')
+          .or(orClauses);
+        data?.forEach(item => {
+          const key = (item.name || '').toLowerCase().trim();
+          const list = catalogByName.get(key) || [];
+          list.push(item as CatalogItem);
+          catalogByName.set(key, list);
+        });
+      }
+
+      // Fetch existing inventory items for this company to check which already exist.
+      // Combine catalog ids resolved by BOTH code and name lookups.
+      const inventoryMap = new Map<string, string>(); // catalog_item_id -> warehouse_items.id
+      const allCatalogIds = [
+        ...[...catalogByCode.values()].map(c => c.id),
+        ...[...catalogByName.values()].flat().map(c => c.id),
+      ];
+      const uniqueCatalogIds = [...new Set(allCatalogIds)];
+      for (let i = 0; i < uniqueCatalogIds.length; i += 500) {
+        const chunk = uniqueCatalogIds.slice(i, i + 500);
         const { data } = await supabase
           .from('warehouse_items')
-          .select('id, item_code, catalog_item_id')
+          .select('id, catalog_item_id')
           .eq('company_id', selectedCompany.id)
           .in('catalog_item_id', chunk);
         data?.forEach(item => {
-          inventoryMap.set((item.item_code || '').toLowerCase().trim(), item.id);
+          if (item.catalog_item_id) inventoryMap.set(item.catalog_item_id, item.id);
         });
       }
 
@@ -245,37 +286,110 @@ export function BulkStockUploadDialog({ open, onOpenChange }: BulkStockUploadDia
 
       // Parse and validate
       const parsed: ParsedRow[] = dataRows.map((row, idx) => {
-        const itemCode = (row[codeIdx] || '').trim();
+        const rawCode = getCode(row);
+        const rawName = getName(row);
         const qtyStr = (row[qtyIdx] || '').trim();
         const binCode = binMode === 'single' ? selectedBinLabel : (row[binIdx] || '').trim();
         const binId = binMode === 'single' ? selectedBinId : binMap.get(binCode.toLowerCase());
         const qty = parseFloat(qtyStr);
 
-        if (!itemCode || !qtyStr) {
-          return { rowNumber: idx + 2, item_code: itemCode, quantity: 0, bin_code: binCode, status: 'error' as const, error: 'Missing required fields' };
+        if (!rawCode && !rawName) {
+          return { rowNumber: idx + 2, item_code: '', quantity: 0, bin_code: binCode, status: 'error' as const, error: 'Provide item_code or item_name' };
+        }
+        if (!qtyStr) {
+          return { rowNumber: idx + 2, item_code: rawCode, item_name: rawName, quantity: 0, bin_code: binCode, status: 'error' as const, error: 'Missing quantity' };
         }
         if (binMode === 'per-row' && !binCode) {
-          return { rowNumber: idx + 2, item_code: itemCode, quantity: 0, bin_code: '', status: 'error' as const, error: 'Missing bin_code' };
+          return { rowNumber: idx + 2, item_code: rawCode, item_name: rawName, quantity: 0, bin_code: '', status: 'error' as const, error: 'Missing bin_code' };
         }
         if (isNaN(qty) || qty <= 0) {
-          return { rowNumber: idx + 2, item_code: itemCode, quantity: 0, bin_code: binCode, status: 'error' as const, error: 'Quantity must be a positive number' };
+          return { rowNumber: idx + 2, item_code: rawCode, item_name: rawName, quantity: 0, bin_code: binCode, status: 'error' as const, error: 'Quantity must be a positive number' };
         }
 
-        const catalogItem = catalogMap.get(itemCode.toLowerCase());
-        if (!catalogItem) {
-          return { rowNumber: idx + 2, item_code: itemCode, quantity: qty, bin_code: binCode, status: 'item_not_found' as const, error: `Item code "${itemCode}" not found in Item Master` };
+        // Resolution: code wins; fall back to name only if code is blank.
+        let catalogItem: CatalogItem | undefined;
+        let matchedBy: 'item_code' | 'item_name' | undefined;
+
+        if (rawCode) {
+          catalogItem = catalogByCode.get(rawCode.toLowerCase());
+          if (catalogItem) matchedBy = 'item_code';
+        } else if (rawName) {
+          const matches = catalogByName.get(rawName.toLowerCase()) || [];
+          if (matches.length > 1) {
+            return {
+              rowNumber: idx + 2,
+              item_code: '',
+              item_name: rawName,
+              quantity: qty,
+              bin_code: binCode,
+              status: 'ambiguous_name' as const,
+              error: `Multiple items match name "${rawName}" — please specify item_code`,
+            };
+          }
+          if (matches.length === 1) {
+            catalogItem = matches[0];
+            matchedBy = 'item_name';
+          }
         }
+
+        if (!catalogItem) {
+          const id = rawCode || rawName;
+          return {
+            rowNumber: idx + 2,
+            item_code: rawCode,
+            item_name: rawName,
+            quantity: qty,
+            bin_code: binCode,
+            status: 'item_not_found' as const,
+            error: `Item "${id}" not found in Item Master`,
+          };
+        }
+
+        // From here on, always carry the resolved canonical item_code.
+        const resolvedCode = catalogItem.item_code;
 
         if (!binId) {
-          return { rowNumber: idx + 2, item_code: itemCode, quantity: qty, bin_code: binCode, item_name: catalogItem.name, catalog_item: catalogItem, status: 'bin_not_found' as const, error: `Bin "${binCode}" not found at this location` };
+          return {
+            rowNumber: idx + 2,
+            item_code: resolvedCode,
+            quantity: qty,
+            bin_code: binCode,
+            item_name: catalogItem.name,
+            catalog_item: catalogItem,
+            matched_by: matchedBy,
+            status: 'bin_not_found' as const,
+            error: `Bin "${binCode}" not found at this location`,
+          };
         }
 
-        const existingId = inventoryMap.get(itemCode.toLowerCase());
+        const existingId = inventoryMap.get(catalogItem.id);
         if (existingId) {
-          return { rowNumber: idx + 2, item_code: itemCode, quantity: qty, bin_code: binCode, item_id: existingId, item_name: catalogItem.name, bin_id: binId, catalog_item: catalogItem, existing_inventory_id: existingId, status: 'matched' as const };
-        } else {
-          return { rowNumber: idx + 2, item_code: itemCode, quantity: qty, bin_code: binCode, item_name: catalogItem.name, bin_id: binId, catalog_item: catalogItem, needs_import: true, status: 'new_to_inventory' as const };
+          return {
+            rowNumber: idx + 2,
+            item_code: resolvedCode,
+            quantity: qty,
+            bin_code: binCode,
+            item_id: existingId,
+            item_name: catalogItem.name,
+            bin_id: binId,
+            catalog_item: catalogItem,
+            existing_inventory_id: existingId,
+            matched_by: matchedBy,
+            status: 'matched' as const,
+          };
         }
+        return {
+          rowNumber: idx + 2,
+          item_code: resolvedCode,
+          quantity: qty,
+          bin_code: binCode,
+          item_name: catalogItem.name,
+          bin_id: binId,
+          catalog_item: catalogItem,
+          needs_import: true,
+          matched_by: matchedBy,
+          status: 'new_to_inventory' as const,
+        };
       });
 
       setParsedRows(parsed);
@@ -490,6 +604,7 @@ export function BulkStockUploadDialog({ open, onOpenChange }: BulkStockUploadDia
       case 'matched': return <Badge className="bg-green-100 text-green-800 border-green-200">Matched</Badge>;
       case 'new_to_inventory': return <Badge className="bg-blue-100 text-blue-800 border-blue-200">New to Inventory</Badge>;
       case 'item_not_found': return <Badge variant="destructive">Not in Item Master</Badge>;
+      case 'ambiguous_name': return <Badge className="bg-amber-100 text-amber-800 border-amber-200">Ambiguous Name</Badge>;
       case 'bin_not_found': return <Badge className="bg-orange-100 text-orange-800 border-orange-200">Bin Not Found</Badge>;
       case 'error': return <Badge variant="destructive">Error</Badge>;
     }
@@ -507,7 +622,7 @@ export function BulkStockUploadDialog({ open, onOpenChange }: BulkStockUploadDia
             <Alert>
               <AlertCircle className="h-4 w-4" />
               <AlertDescription>
-                Upload a CSV to add stock quantities. Items are matched by <strong>item_code</strong> from the Item Master catalog. Items not yet in this company's inventory will be auto-imported.
+                Upload a CSV to add stock quantities. Items are matched by <strong>item_code</strong> (preferred) or <strong>item_name</strong> (fallback). If a name matches multiple items, specify item_code. Items not yet in this company's inventory will be auto-imported.
               </AlertDescription>
             </Alert>
 
@@ -578,7 +693,7 @@ export function BulkStockUploadDialog({ open, onOpenChange }: BulkStockUploadDia
                 <Download className="mr-2 h-4 w-4" /> Download Template
               </Button>
               <span className="text-xs text-muted-foreground">
-                {binMode === 'single' ? 'Template: item_code, quantity' : 'Template: item_code, quantity, bin_code'}
+                {binMode === 'single' ? 'Template: item_code, item_name, quantity' : 'Template: item_code, item_name, quantity, bin_code'}
               </span>
             </div>
 
@@ -650,6 +765,9 @@ export function BulkStockUploadDialog({ open, onOpenChange }: BulkStockUploadDia
                       <TableCell>
                         <div className="flex flex-col gap-1">
                           {statusBadge(row.status)}
+                          {row.matched_by === 'item_name' && (row.status === 'matched' || row.status === 'new_to_inventory') && (
+                            <span className="text-[10px] text-muted-foreground">Matched by name</span>
+                          )}
                           {row.error && <span className="text-xs text-destructive">{row.error}</span>}
                         </div>
                       </TableCell>
