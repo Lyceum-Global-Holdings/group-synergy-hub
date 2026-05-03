@@ -7,6 +7,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useWarehouseBinAllocations } from '@/hooks/useWarehouseBinAllocations';
 import { useWarehouseItems } from '@/hooks/useWarehouseItems';
 import { useWarehouseBins } from '@/hooks/useWarehouseBins';
+import { useWarehouseLocations } from '@/hooks/useWarehouseLocations';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface CreateBinAllocationDialogProps {
