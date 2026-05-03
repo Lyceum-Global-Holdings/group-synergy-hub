@@ -60,14 +60,26 @@ const fetchBinAllocations = async (itemId: string): Promise<BinAllocation[]> => 
   return (data || []) as BinAllocation[];
 };
 
-const fetchStockTransactions = async (itemId: string): Promise<StockTransaction[]> => {
-  const { data, error } = await supabase
+const fetchStockTransactions = async (
+  itemId: string,
+  locationId: string | null | undefined,
+): Promise<StockTransaction[]> => {
+  let q = supabase
     .from('stock_transactions')
     .select('id, transaction_type, quantity_change, quantity_before, quantity_after, notes, created_at')
-    .eq('item_id', itemId)
+    .eq('item_id', itemId);
+
+  // Same item_code at a different location is a separate SKU-at-Location.
+  if (locationId) {
+    q = q.eq('location_id', locationId);
+  } else if (locationId === null) {
+    q = q.is('location_id', null);
+  }
+
+  const { data, error } = await q
     .order('created_at', { ascending: false })
     .limit(100);
-  
+
   if (error) throw error;
   return (data || []) as StockTransaction[];
 };
@@ -88,8 +100,8 @@ export const ItemDetailsDialog = ({ item, open, onOpenChange }: ItemDetailsDialo
   });
 
   const { data: stockTransactions = [] } = useQuery<StockTransaction[]>({
-    queryKey: ['stock-transactions', item?.id],
-    queryFn: () => fetchStockTransactions(item!.id),
+    queryKey: ['stock-transactions', item?.id, item?.location_id ?? null],
+    queryFn: () => fetchStockTransactions(item!.id, item?.location_id ?? null),
     enabled: !!item?.id && open,
   });
 
