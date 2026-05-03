@@ -7,6 +7,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useWarehouseBinAllocations } from '@/hooks/useWarehouseBinAllocations';
 import { useWarehouseItems } from '@/hooks/useWarehouseItems';
 import { useWarehouseBins } from '@/hooks/useWarehouseBins';
+import { useWarehouseLocations } from '@/hooks/useWarehouseLocations';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface CreateBinAllocationDialogProps {
@@ -18,6 +19,8 @@ export function CreateBinAllocationDialog({ open, onOpenChange }: CreateBinAlloc
   const { createAllocation, isCreating } = useWarehouseBinAllocations();
   const { items } = useWarehouseItems();
   const { bins } = useWarehouseBins();
+  const { locations } = useWarehouseLocations();
+  const locationNameById = new Map((locations || []).map((l: any) => [l.id, l.name]));
   
   const [formData, setFormData] = useState({
     warehouse_item_id: '',
@@ -89,11 +92,15 @@ export function CreateBinAllocationDialog({ open, onOpenChange }: CreateBinAlloc
                 <SelectValue placeholder="Select bin" />
               </SelectTrigger>
               <SelectContent>
-                {bins?.map((bin) => (
-                  <SelectItem key={bin.id} value={bin.id}>
-                    {bin.bin_code} - {bin.name}
-                  </SelectItem>
-                ))}
+                {bins?.map((bin) => {
+                  const locName = bin.location_id ? locationNameById.get(bin.location_id) : null;
+                  return (
+                    <SelectItem key={bin.id} value={bin.id}>
+                      {bin.bin_code} - {bin.name}
+                      {locName ? ` · ${locName}` : ''}
+                    </SelectItem>
+                  );
+                })}
               </SelectContent>
             </Select>
           </div>

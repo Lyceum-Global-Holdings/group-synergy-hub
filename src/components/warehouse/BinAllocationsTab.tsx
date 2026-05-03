@@ -39,7 +39,8 @@ export function BinAllocationsTab() {
       allocation.warehouse_item?.item_code?.toLowerCase().includes(term) ||
       allocation.warehouse_item?.name?.toLowerCase().includes(term) ||
       allocation.warehouse_bin?.bin_code?.toLowerCase().includes(term) ||
-      allocation.warehouse_bin?.name?.toLowerCase().includes(term)
+      allocation.warehouse_bin?.name?.toLowerCase().includes(term) ||
+      allocation.warehouse_bin?.warehouse_location?.name?.toLowerCase().includes(term)
     );
   }, [binAllocations, searchTerm]);
   const { canDelete } = useIsAdminOrHigher();
@@ -59,6 +60,14 @@ export function BinAllocationsTab() {
     {
       accessorKey: 'warehouse_item.name',
       header: 'Item Name',
+    },
+    {
+      id: 'location',
+      header: 'Location',
+      cell: ({ row }) =>
+        row.original.warehouse_bin?.warehouse_location?.name ?? (
+          <span className="text-muted-foreground italic">Unassigned</span>
+        ),
     },
     {
       accessorKey: 'warehouse_bin.bin_code',
