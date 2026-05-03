@@ -62,6 +62,14 @@ export function BinAllocationsTab() {
       header: 'Item Name',
     },
     {
+      id: 'location',
+      header: 'Location',
+      cell: ({ row }) =>
+        row.original.warehouse_bin?.warehouse_location?.name ?? (
+          <span className="text-muted-foreground italic">Unassigned</span>
+        ),
+    },
+    {
       accessorKey: 'warehouse_bin.bin_code',
       header: 'Bin Code',
     },
