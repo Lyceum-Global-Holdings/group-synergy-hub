@@ -1,30 +1,28 @@
-# Fix: Stock Details dialog showing all warehouses with 0
+## Problem
+The Location dropdown in *Upload Stock via CSV* hides sub-locations because of:
+```ts
+const topLocations = (locations || []).filter(l => !l.parent_id);
+```
+Stock at child sites (e.g. LNQ-Aluminium, LNQ–Short Term Stock) cannot be received.
 
-## Root cause
+## Standard
+SAP EWM / Oracle WMS / GS1 GLN: stock is posted to the lowest-level **Storage Location**. Parents are organisational nodes; the picker must expose every active location the user can access, with hierarchy visualised.
 
-`ItemStockDetailsDialog` merges the per-item `locationStock` (resolved from bin → location, often returning **child** locations) with `allLocations`, which is fetched in `ItemMasterTab.tsx` (lines 202-214) restricted to **top-level locations only** (`.is('parent_id', null)`).
+## Changes
 
-When stock lives in child locations (LAN, VEB, LNQ-Aluminium sub-bins, etc.), the join key never matches the top-level list, so every row renders `0` while "Total Stock" still reads `183` (totalled from the unmerged `locationStock` array). That is exactly what the screenshot shows for `INV-HAW-000-0389`.
+### `src/components/warehouse/BulkStockUploadDialog.tsx`
+1. Drop the `topLocations` filter; use the full permission-scoped `locations` list from `useWarehouseLocations()`.
+2. Build a flat, depth-aware ordered list (parent → children, sorted by `location_code`/`name`) via a `buildLocationTree` helper.
+3. Render each `SelectItem` with indentation based on depth and a code badge, e.g.:
+   ```
+   Lyceum Nugegoda Quarters     LNQ
+     └ LNQ-Aluminium            LNQ-AL
+     └ LNQ – Short Term Stock   LNQ-STS
+   ```
+4. If a `is_storage_location` flag exists on the location row, disable non-storage parents; otherwise leave all selectable.
+5. Empty-bin message when chosen location has no active bins: "No bins configured at this location. Create a bin first or pick a different location."
 
-## Fix (international WMS standard)
-
-SAP EWM / Oracle WMS "Stock by Location" / "Stock Overview" panels list **only locations that physically hold stock** for the SKU, sorted by quantity descending, with % of total. Empty locations are not shown — they live in the separate Bin Master / Location Master view.
-
-### `src/components/warehouse/ItemStockDetailsDialog.tsx`
-- Drop the `allLocations` merge logic.
-- Aggregate `locationStock` by `locationId` (defensive — handles duplicate rows from multiple bins per location).
-- Filter to `stock > 0`.
-- Sort by `stock DESC`, tie-break alphabetically.
-- Compute `totalStock` from the aggregated list so the header and rows always reconcile.
-- Empty-state copy: "No stock available in any location for this item."
-- `allLocations` prop becomes unused — keep it optional for backward compatibility but stop relying on it.
-
-### `src/components/warehouse/ItemMasterTab.tsx`
-- No functional change required; the `allLocations` query can stay (used elsewhere) but is no longer needed by the dialog.
-
-### Accessibility
-- Add `DialogDescription` to `ItemStockDetailsDialog` to clear the radix `aria-describedby` warning currently in console.
-
-## Outcome
-
-For `INV-HAW-000-0389`, the dialog will list only LAN / VEB / LNQ (or whichever locations actually hold the 183 units), each with the correct quantity and % of total — matching the per-bin reconciliation already enforced server-side.
+### Not changing
+- DB / RLS — locations are already company- and permission-scoped.
+- Bin query — already filters by `location_id`; will work correctly once a sub-location is selectable.
+- Other dialogs — out of scope unless reported.
