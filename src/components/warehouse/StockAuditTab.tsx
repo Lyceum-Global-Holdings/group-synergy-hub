@@ -186,7 +186,7 @@ function AuditHistoryPanel({ history }: { history: StockAuditLogEntry[] }) {
 }
 
 export function StockAuditTab() {
-  const { auditItems, isLoading, refetch, summary, auditHistory, logSnapshot, fixDesync, isFixingDesync, fixAllDesyncs, isFixingAll } = useStockAudit();
+  const { auditItems, isLoading, refetch, summary, auditHistory, locationScoped, logSnapshot, fixDesync, isFixingDesync, fixAllDesyncs, isFixingAll } = useStockAudit();
   const { canDelete: isAdmin } = useIsAdminOrHigher();
   const { selectedCompany } = useCompany();
 
@@ -449,7 +449,9 @@ export function StockAuditTab() {
               Stock Audit
             </CardTitle>
             <CardDescription>
-              Compares item master stock against the sum of bin allocations to surface desyncs
+              {locationScoped
+                ? 'Scoped to the selected location — only bins at this physical site are reconciled.'
+                : 'Compares item master stock against the sum of bin allocations to surface desyncs (global view).'}
             </CardDescription>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
