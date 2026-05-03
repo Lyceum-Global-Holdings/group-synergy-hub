@@ -15122,6 +15122,7 @@ export type Database = {
           id: string
           issued_to_location_id: string | null
           item_id: string
+          location_id: string | null
           notes: string | null
           quantity_after: number
           quantity_before: number
@@ -15144,6 +15145,7 @@ export type Database = {
           id?: string
           issued_to_location_id?: string | null
           item_id: string
+          location_id?: string | null
           notes?: string | null
           quantity_after?: number
           quantity_before?: number
@@ -15166,6 +15168,7 @@ export type Database = {
           id?: string
           issued_to_location_id?: string | null
           item_id?: string
+          location_id?: string | null
           notes?: string | null
           quantity_after?: number
           quantity_before?: number
@@ -19435,6 +19438,44 @@ export type Database = {
           total_value_impact: number | null
         }
         Relationships: []
+      }
+      v_stock_transactions_location_mismatch: {
+        Row: {
+          created_at: string | null
+          item_code: string | null
+          item_company_id: string | null
+          item_id: string | null
+          item_location_id: string | null
+          transaction_id: string | null
+          transaction_type:
+            | Database["public"]["Enums"]["stock_transaction_type"]
+            | null
+          tx_company_id: string | null
+          tx_location_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_stock_transactions_warehouse_items"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "v_adjustment_summary_by_item"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_stock_transactions_warehouse_items"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "warehouse_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "warehouse_items_location_id_fkey"
+            columns: ["item_location_id"]
+            isOneToOne: false
+            referencedRelation: "warehouse_locations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Functions: {
