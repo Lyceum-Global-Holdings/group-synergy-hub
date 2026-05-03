@@ -92,11 +92,15 @@ export function CreateBinAllocationDialog({ open, onOpenChange }: CreateBinAlloc
                 <SelectValue placeholder="Select bin" />
               </SelectTrigger>
               <SelectContent>
-                {bins?.map((bin) => (
-                  <SelectItem key={bin.id} value={bin.id}>
-                    {bin.bin_code} - {bin.name}
-                  </SelectItem>
-                ))}
+                {bins?.map((bin) => {
+                  const locName = bin.location_id ? locationNameById.get(bin.location_id) : null;
+                  return (
+                    <SelectItem key={bin.id} value={bin.id}>
+                      {bin.bin_code} - {bin.name}
+                      {locName ? ` · ${locName}` : ''}
+                    </SelectItem>
+                  );
+                })}
               </SelectContent>
             </Select>
           </div>
