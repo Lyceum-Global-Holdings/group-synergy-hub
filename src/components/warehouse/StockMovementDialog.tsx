@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -14,11 +14,20 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
 import { useStockTransactions } from '@/hooks/useStockTransactions';
 import { StockAdjustmentDialog } from './StockAdjustmentDialog';
 import { Loader2, Plus } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 
 interface StockMovementDialogProps {
   open: boolean;
@@ -26,10 +35,12 @@ interface StockMovementDialogProps {
   itemId: string;
   itemName: string;
   currentStock?: number;
-  /** Physical storage location of this stock-keeping unit. Required to keep
-   *  histories of the same item_code at different locations from merging. */
+  /** Physical storage location of this stock-keeping unit. */
   locationId?: string | null;
   locationName?: string | null;
+  /** Specific bin scope. When provided, history filters to this bin only. */
+  binId?: string | null;
+  binCode?: string | null;
 }
 
 const transactionTypeLabels: Record<string, string> = {
