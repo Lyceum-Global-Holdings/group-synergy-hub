@@ -15116,6 +15116,7 @@ export type Database = {
           approved_by: string | null
           approved_date: string | null
           batch_id: string | null
+          bin_id: string | null
           company_id: string | null
           created_at: string
           created_by: string | null
@@ -15139,6 +15140,7 @@ export type Database = {
           approved_by?: string | null
           approved_date?: string | null
           batch_id?: string | null
+          bin_id?: string | null
           company_id?: string | null
           created_at?: string
           created_by?: string | null
@@ -15162,6 +15164,7 @@ export type Database = {
           approved_by?: string | null
           approved_date?: string | null
           batch_id?: string | null
+          bin_id?: string | null
           company_id?: string | null
           created_at?: string
           created_by?: string | null
@@ -15200,6 +15203,13 @@ export type Database = {
             columns: ["batch_id"]
             isOneToOne: false
             referencedRelation: "stock_adjustment_batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_transactions_bin_id_fkey"
+            columns: ["bin_id"]
+            isOneToOne: false
+            referencedRelation: "warehouse_bins"
             referencedColumns: ["id"]
           },
           {
@@ -19438,6 +19448,46 @@ export type Database = {
           total_value_impact: number | null
         }
         Relationships: []
+      }
+      v_stock_transactions_bin_mismatch: {
+        Row: {
+          bin_id: string | null
+          bin_location_id: string | null
+          created_at: string | null
+          item_id: string | null
+          transaction_id: string | null
+          transaction_location_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_stock_transactions_warehouse_items"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "v_adjustment_summary_by_item"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_stock_transactions_warehouse_items"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "warehouse_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_transactions_bin_id_fkey"
+            columns: ["bin_id"]
+            isOneToOne: false
+            referencedRelation: "warehouse_bins"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "warehouse_bins_location_id_fkey"
+            columns: ["bin_location_id"]
+            isOneToOne: false
+            referencedRelation: "warehouse_locations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       v_stock_transactions_location_mismatch: {
         Row: {
