@@ -74,6 +74,9 @@ export function ItemStockDetailsDialog({
             <Package className="h-5 w-5" />
             Stock Details
           </DialogTitle>
+          <DialogDescription>
+            Physical stock on hand at each warehouse location holding this item.
+          </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
@@ -112,43 +115,34 @@ export function ItemStockDetailsDialog({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {allLocationsWithStock.length === 0 ? (
+                {stockedLocations.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={3} className="text-center py-4 text-muted-foreground">
-                      No warehouse locations found
+                      No stock available in any location for this item
                     </TableCell>
                   </TableRow>
                 ) : (
-                  allLocationsWithStock.map((loc) => {
-                    const percentage = totalStock > 0 
-                      ? ((loc.stock / totalStock) * 100).toFixed(1) 
+                  stockedLocations.map((loc) => {
+                    const percentage = totalStock > 0
+                      ? ((loc.stock / totalStock) * 100).toFixed(1)
                       : '0.0';
-                    const hasStock = loc.stock > 0;
-                    
+                    const isLocLow = loc.stock <= (item.reorder_level || 0);
+
                     return (
-                      <TableRow 
-                        key={loc.locationId}
-                        className={!hasStock ? 'opacity-50' : ''}
-                      >
+                      <TableRow key={loc.locationId}>
                         <TableCell>
                           <div className="flex items-center gap-2">
-                            <MapPin className={`h-3.5 w-3.5 ${hasStock ? 'text-primary' : 'text-muted-foreground'}`} />
-                            <span className={hasStock ? 'font-medium' : ''}>{loc.locationName}</span>
+                            <MapPin className="h-3.5 w-3.5 text-primary" />
+                            <span className="font-medium">{loc.locationName}</span>
                           </div>
                         </TableCell>
                         <TableCell className="text-right">
-                          <span className={`font-medium ${
-                            hasStock 
-                              ? loc.stock <= (item.reorder_level || 0) 
-                                ? 'text-destructive' 
-                                : 'text-green-600'
-                              : 'text-muted-foreground'
-                          }`}>
+                          <span className={`font-medium ${isLocLow ? 'text-destructive' : 'text-green-600'}`}>
                             {loc.stock}
                           </span>
                         </TableCell>
                         <TableCell className="text-right text-muted-foreground">
-                          {hasStock ? `${percentage}%` : '-'}
+                          {`${percentage}%`}
                         </TableCell>
                       </TableRow>
                     );
