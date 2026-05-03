@@ -1,78 +1,68 @@
-# Per-Location Stock Movement History
+# Stop cross-bin bleed in Stock Movement history
 
-## Problem
+## Problem (verified in DB)
 
-Same `item_code` legitimately exists as **separate `warehouse_items` rows per (company, location)** — confirmed in DB:
+`INV-HAW-000-0389` at location `Lyceum Holdings Warehouse` (warehouse_item `80210bce…`) is split across two bins:
 
-```
-INV-ALU-000-0073 | company A | location L1 | id 02c0…  | stock 0
-INV-ALU-000-0073 | company B | location ∅  | id b1b5…  | stock 10
-```
+- `LAN` — 163 units
+- `4-A-2-2` — 20 units
 
-But several writers (bulk stock upload, adjustment, transfer, GRN posting) historically resolved the inventory row by **item_code alone** or pointed `stock_transactions.item_id` at the *first* match. Result: movements that physically happened at one location/company end up attached to the wrong `warehouse_items.id`, and the Stock Movement History dialog shows a single merged feed for what should be distinct stock keeping units.
+The Stock Movement dialog is currently keyed by `(item_id, location_id)` only, so it shows every transaction for that warehouse_item — mixing the two bins together. That is why the user sees rows like `Bulk stock upload - Bin: 4-A-2-2` and `Bulk stock upload - Bin: LAN` listed under what they expect to be a single bin's history. Same problem exists wherever the same SKU lives in more than one bin.
 
-The reader (`StockMovementDialog` → `useStockTransactions`) only filters by `item_id`, so it has no way to disambiguate even when the data is correct.
+International WMS standards (SAP EWM HU/Bin, Oracle WMS LPN, Manhattan, NetSuite Bin Mgmt) treat **(item, location, bin, batch/serial)** as the atomic stock-keeping unit. We already enforce item + location; we need to add bin scoping.
 
-## International Standard Followed
+## Solution overview
 
-WMS practice (GS1 / SAP IM / Oracle WMS / ISO 9001 traceability):
+Make `stock_transactions` carry an explicit `bin_id` and scope every reader/writer in the system per bin. Where a UI surface represents a multi-bin warehouse_item (e.g. the Inventory list row), the movement history opens with a bin selector and defaults to "All bins (this location)" only when no bin context exists; once a bin is chosen, history is strictly filtered.
 
-- The atomic unit of stock is the **Stock Keeping Unit at a Storage Location** — `(Item, Plant/Company, Storage Location, optional Bin/Batch)`.
-- Every goods movement document line is timestamped against **exactly one** SKU-at-Location.
-- History/ledger queries are always scoped by that tuple — never by item code alone.
+## Database migration
 
-We adopt this by making `(item_id, location_id, company_id)` the mandatory scope of every `stock_transactions` row, with `location_id` derived from the source `warehouse_items` row at write time.
+1. `ALTER TABLE public.stock_transactions ADD COLUMN bin_id uuid NULL REFERENCES public.warehouse_bins(id);`
+2. Index: `CREATE INDEX idx_stock_transactions_item_loc_bin ON stock_transactions(item_id, location_id, bin_id, created_at DESC);`
+3. Best-effort backfill: parse the existing `notes` pattern `Bin: <code>` and resolve to `bin_id` via `warehouse_bins.bin_code` scoped to the same `location_id` — only update rows where exactly one match exists; leave ambiguous ones NULL.
+4. Extend the existing `trg_stock_transactions_location_guard` trigger so that when a writer supplies `bin_id` it is validated to belong to the resolved `location_id`; when not supplied and the warehouse_item has only ONE active bin allocation, auto-fill `bin_id` from that allocation.
+5. Diagnostic view `v_stock_transactions_bin_mismatch` listing rows whose `bin_id`'s `location_id` ≠ the transaction's `location_id`.
 
-## Plan
+## Writer changes (every path that inserts stock_transactions)
 
-### 1. Database — add and enforce location scope on the ledger
+Every existing writer must pass `bin_id`. Files to update:
 
-Migration:
+- `src/components/warehouse/StockAdjustmentDialog.tsx` — add bin picker (defaults if single bin allocation).
+- `src/components/warehouse/BulkAdjustmentDialog.tsx` — per-row bin selection.
+- `src/components/warehouse/BulkStockUploadDialog.tsx` — already resolves bin by code; pass resolved `bin_id` into the insert.
+- `src/components/warehouse/CreateItemDialog.tsx` / `SingleItemForm.tsx` (opening stock) — pass the bin chosen for the initial allocation.
+- `src/components/warehouse/ReturnStockFromSublocationDialog.tsx`, `ItemTransferDialog.tsx`, `CreateStockTransferDialog.tsx`, `CreatePutawayDialog.tsx` — pass source/destination bin per leg (transfer_out tagged with source bin, transfer_in with destination bin).
+- GRN allocation flow (`grn-approval-allocation-workflow`) — already knows the destination bin; thread it into the txn insert.
+- Material Issue / MRN flows in `MaterialIssueReturn.tsx` and tool issue/return — pass source bin (FIFO picker already resolves bins).
+- Construction issue/return paths that mirror into `stock_transactions`.
 
-- Add `location_id uuid null` to `stock_transactions` (kept nullable only during backfill).
-- Backfill: `update stock_transactions st set location_id = wi.location_id from warehouse_items wi where wi.id = st.item_id and st.location_id is null;`
-- Add trigger `stock_transactions_location_guard` (BEFORE INSERT/UPDATE): forces `NEW.location_id := (select location_id from warehouse_items where id = NEW.item_id)` and `NEW.company_id := warehouse_items.company_id`. Prevents drift even if a future caller forgets to set it.
-- Index: `(item_id, location_id, created_at desc)` and `(company_id, location_id, item_id, created_at desc)` — supports the new history filter and matches the existing list-RPC pattern.
-- Same treatment for `construction_inventory_transactions` (already has `from_location_id`/`to_location_id`; add a `scope_location_id` resolved from the construction inventory row for the per-location feed).
+`useStockTransactions.createTransaction` and `CreateStockTransactionData` (`src/types/stockTransaction.ts`) gain optional `bin_id`.
 
-### 2. Writers — resolve inventory row by (catalog_item_id|item_code, company_id, location_id)
+## Reader changes
 
-Audit and standardise these call sites so they always insert `item_id` belonging to the correct location row:
+- `src/hooks/useStockTransactions.ts` — accept `binId?: string | null`, add `.eq('bin_id', binId)` (and `.is('bin_id', null)` when explicitly null). Cache key becomes `['stock-transactions', itemId, locationId, binId]`.
+- `src/components/warehouse/StockMovementDialog.tsx`:
+  - New optional props `binId`, `binCode`.
+  - Render bin selector in the header populated from `warehouse_bin_allocations` for that warehouse_item; default to the prop if provided, else "All bins at this location" with a warning chip explaining why values may aggregate.
+  - Header line shows `Item @ Location › Bin <code>` when scoped.
+  - New "Bin" column in the table for transparency.
+- `src/components/warehouse/ItemDetailsDialog.tsx` — each bin allocation row gets a "View movements" action that opens `StockMovementDialog` with that `bin_id`.
+- `src/components/warehouse/ItemMasterTab.tsx`:
+  - Inventory row's "Stock Movement" button: if the row has exactly one allocation, open scoped to that bin; otherwise open at location scope with the bin selector visible.
+- `src/components/warehouse/BinAllocationsTab.tsx` — add "View movements" per allocation row.
+- `src/components/warehouse/valuation/MovementAnalysisTab.tsx` and `useStockMovementAnalytics.ts` — accept optional `binId` and propagate when called from a bin-scoped context.
+- Tool Management (`useToolBinAllocations`, `ToolBinAllocationsPanel`) — same per-bin scoping for tool transactions if/when it shares the table.
 
-- `src/components/warehouse/BulkStockUploadDialog.tsx` — already scopes to `effectiveLocationId`; add explicit `location_id` to the `stock_transactions` insert payload (defence in depth before trigger lands).
-- `src/components/warehouse/StockAdjustmentDialog.tsx`
-- `src/components/warehouse/IssueItemsDialog.tsx`
-- `src/components/warehouse/CreateMaterialIssueDialog.tsx` / `CreateMaterialReturnDialog.tsx`
-- `src/components/warehouse/CreateGrnDialog.tsx` and the GRN approval/allocation hook
-- `src/pages/warehouse/StockTransfer.tsx` (writes a paired `transfer_out` at source location and `transfer_in` at destination — each must carry its own `location_id`)
-- `src/components/warehouse/FixMissingOpeningStockDialog.tsx`
-- `src/hooks/useStockTransactions.ts` `createTransactionMutation` — extend `CreateStockTransactionData` with required `location_id`.
+## Reconciliation impact
 
-For any caller that historically searched by `item_code`, switch to: `select id from warehouse_items where item_code=? and company_id=? and location_id is not distinct from ?`.
+Stock Audit / Reconciliation (`src/utils/stockReconciliation.ts`, `StockAuditTab.tsx`) currently rolls up to warehouse_item.current_stock. After this change, reconciliation must group transactions by `(item_id, bin_id)` and compare against `warehouse_bin_allocations.allocated_quantity`, then sum bins to validate `warehouse_items.current_stock`. This prevents a multi-bin item from being "reconciled" by averaging bins together — the explicit complaint.
 
-### 3. Reader — filter history by physical scope
+## Memory updates
 
-- `useStockTransactions(itemId, locationId?)` — add second arg, push `.eq('location_id', locationId)` when provided, include in query key.
-- `StockMovementDialog` — accept and pass `locationId` from the row the user clicked. Show a "Location" column and a header chip indicating the scope (e.g. `Stock Movement History — INV-ALU-000-0073 @ Main Warehouse`).
-- `ItemMasterTab.tsx` and `ItemMasterDefinitionTab.tsx` — pass `item.location_id` when opening the dialog.
-- `ItemDetailsDialog.tsx` `fetchStockTransactions` — same scope filter.
-- `useStockMovementReport.ts` — add a "Location" group/filter so the cross-location report stays correct after backfill.
+- Update `mem://architecture/stock-transactions-location-scope.md` → rename concept to **SKU-at-Bin**: atomic key is `(item_id, location_id, bin_id)`. Readers MUST filter by all three when a bin context exists; writers MUST supply `bin_id`.
+- Add a Core rule: "Stock movement history is per-bin. Never aggregate transactions across bins of the same warehouse_item."
 
-### 4. Backfill verification utility (admin-only, read-only)
+## Out of scope
 
-Add a one-off SQL view `v_stock_transactions_location_mismatch` that lists rows where `st.location_id <> wi.location_id` after the trigger lands — surfaces any historical drift the trigger would otherwise silently rewrite. Surface count in the existing Backend → Transactions Monitor panel.
-
-### 5. UI safety net
-
-In `StockMovementDialog` header, when the same `item_code` exists in multiple `(company, location)` combinations, show a small selector ("Viewing: Company A · Main Warehouse — switch") so a user who lands here from a generic place can pick the right SKU-at-Location instead of seeing a merged feed.
-
-## Out of Scope
-
-- No change to `warehouse_items` row identity or to existing bin allocations.
-- No retro-splitting of historical transactions whose true source location is unknowable — the trigger only governs new writes; the verification view exposes legacy mismatches for manual review.
-
-## Files Touched (summary)
-
-- New migration: add column, backfill, trigger, indexes, view.
-- Edit: `useStockTransactions.ts`, `StockMovementDialog.tsx`, `ItemMasterTab.tsx`, `ItemMasterDefinitionTab.tsx`, `ItemDetailsDialog.tsx`, `useStockMovementReport.ts`, `BulkStockUploadDialog.tsx`, `StockAdjustmentDialog.tsx`, `IssueItemsDialog.tsx`, `CreateMaterialIssueDialog.tsx`, `CreateMaterialReturnDialog.tsx`, `CreateGrnDialog.tsx`, `StockTransfer.tsx`, `FixMissingOpeningStockDialog.tsx`, `types/stockTransaction.ts`.
-- Memory: add `mem://architecture/stock-transactions-location-scope` capturing the SKU-at-Location rule.
+- Batch/serial layering on top of bin (already tracked separately via `batch_id`).
+- Backfilling transactions whose `notes` don't contain a parseable `Bin:` token — they remain `bin_id NULL` and surface only under "All bins" view with a legacy badge.
