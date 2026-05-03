@@ -152,7 +152,8 @@ async function findFirstActiveBin(locationId: string): Promise<string | null> {
 export async function reconcileItems(
   items: ReconcileItemInput[],
   companyId: string,
-  overrides?: Map<string, ReconcileOverride>
+  overrides?: Map<string, ReconcileOverride>,
+  locationId?: string | null,
 ): Promise<{ results: ReconcileResult[]; fixed: number; created: number; blocked: number; failed: number }> {
   const { data: { user } } = await supabase.auth.getUser();
 
@@ -169,7 +170,8 @@ export async function reconcileItems(
     p_company_id: companyId,
     p_overrides: overridesObj,
     p_user_id: user?.id || null,
-  });
+    p_location_id: locationId ?? null,
+  } as any);
 
   if (error) {
     // Fallback: if RPC fails, return all as failed

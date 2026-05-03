@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useCompany } from '@/contexts/CompanyContext';
+import { useLocationFilter } from '@/contexts/LocationFilterContext';
 import { reconcileItem, reconcileItems, type ReconcileOverride, type ReconcileResult } from '@/utils/stockReconciliation';
 
 export type StockAuditStatus = 'ok' | 'desync' | 'no_bins';
@@ -32,11 +33,32 @@ export interface StockAuditLogEntry {
 export function useStockAudit() {
   const queryClient = useQueryClient();
   const { selectedCompany, isViewingAllCompanies } = useCompany();
+  const { globalLocationId } = useLocationFilter();
 
   const { data: auditItems = [], isLoading, error, refetch } = useQuery({
-    queryKey: ['stock-audit', selectedCompany?.id, isViewingAllCompanies],
+    queryKey: ['stock-audit', selectedCompany?.id, isViewingAllCompanies, globalLocationId],
     queryFn: async (): Promise<StockAuditItem[]> => {
       const companyId = (!isViewingAllCompanies && selectedCompany?.id) ? selectedCompany.id : null;
+
+      // Location-scoped audit: bin totals at the selected physical location only.
+      if (companyId && globalLocationId) {
+        const { data, error: rpcError } = await supabase.rpc(
+          'stock_audit_summary_by_location' as any,
+          { p_company_id: companyId, p_location_id: globalLocationId },
+        );
+        if (rpcError) throw rpcError;
+        return (data || []).map((row: any) => ({
+          id: row.id,
+          item_code: row.item_code,
+          name: row.name,
+          current_stock: Number(row.current_stock),
+          bin_total: Number(row.bin_total),
+          bin_count: Number(row.bin_count),
+          variance: Number(row.variance),
+          status: row.status as StockAuditStatus,
+        }));
+      }
+
       const { data, error: rpcError } = await supabase.rpc('stock_audit_summary', {
         p_company_id: companyId,
       });
@@ -138,7 +160,7 @@ export function useStockAudit() {
       if (!selectedCompany?.id) throw new Error('No company selected');
       const itemsToFix = auditItems.filter((i) => i.status === 'desync' || i.status === 'no_bins');
       if (itemsToFix.length === 0) throw new Error('No items to fix.');
-      return reconcileItems(itemsToFix, selectedCompany.id, overrides);
+      return reconcileItems(itemsToFix, selectedCompany.id, overrides, globalLocationId ?? null);
     },
     onSuccess: (result) => {
       invalidateAll();
@@ -168,6 +190,7 @@ export function useStockAudit() {
     refetch,
     summary,
     auditHistory,
+    locationScoped: !!globalLocationId,
     logSnapshot: logSnapshotMutation.mutate,
     fixDesync: (item: StockAuditItem, override?: ReconcileOverride) => fixDesyncMutation.mutate({ item, override }),
     isFixingDesync: fixDesyncMutation.isPending,

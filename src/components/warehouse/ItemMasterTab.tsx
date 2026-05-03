@@ -763,7 +763,10 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
                               )}
                               {(() => {
                                 const calculatedTotal = itemLocationStock[item.id]?.reduce((sum, loc) => sum + loc.stock, 0) || 0;
-                                const isOutOfSync = calculatedTotal !== (item.current_stock || 0);
+                                // When the user is viewing a specific location, the totals here
+                                // are intentionally a subset (this location only) of the item
+                                // master total — do NOT flag that as a desync.
+                                const isOutOfSync = !globalLocationId && calculatedTotal !== (item.current_stock || 0);
                                 return (
                                   <div className="text-xs border-t border-border pt-1 mt-1 text-muted-foreground flex items-center justify-end gap-2">
                                     {isOutOfSync && (
