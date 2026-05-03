@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -14,11 +14,20 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
 import { useStockTransactions } from '@/hooks/useStockTransactions';
 import { StockAdjustmentDialog } from './StockAdjustmentDialog';
 import { Loader2, Plus } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 
 interface StockMovementDialogProps {
   open: boolean;
@@ -26,10 +35,12 @@ interface StockMovementDialogProps {
   itemId: string;
   itemName: string;
   currentStock?: number;
-  /** Physical storage location of this stock-keeping unit. Required to keep
-   *  histories of the same item_code at different locations from merging. */
+  /** Physical storage location of this stock-keeping unit. */
   locationId?: string | null;
   locationName?: string | null;
+  /** Specific bin scope. When provided, history filters to this bin only. */
+  binId?: string | null;
+  binCode?: string | null;
 }
 
 const transactionTypeLabels: Record<string, string> = {
@@ -64,15 +75,59 @@ const getTransactionTypeColor = (type: string) => {
   }
 };
 
-export function StockMovementDialog({ open, onOpenChange, itemId, itemName, currentStock, locationId, locationName }: StockMovementDialogProps) {
-  const { transactions, isLoading } = useStockTransactions(itemId, locationId ?? undefined);
+export function StockMovementDialog({ open, onOpenChange, itemId, itemName, currentStock, locationId, locationName, binId, binCode }: StockMovementDialogProps) {
+  // Fetch bin allocations for this warehouse_item so the user can scope the
+  // history to a specific bin (SKU-at-Bin standard).
+  const { data: binOptions = [] } = useQuery({
+    queryKey: ['stock-movement-bin-options', itemId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('warehouse_bin_allocations')
+        .select('bin_id, warehouse_bins(id, bin_code, name, location_id)')
+        .eq('warehouse_item_id', itemId);
+      if (error) throw error;
+      const seen = new Set<string>();
+      const opts: { id: string; code: string; name: string }[] = [];
+      (data || []).forEach((row: any) => {
+        const b = row.warehouse_bins;
+        if (!b?.id || seen.has(b.id)) return;
+        if (locationId && b.location_id && b.location_id !== locationId) return;
+        seen.add(b.id);
+        opts.push({ id: b.id, code: b.bin_code, name: b.name });
+      });
+      return opts;
+    },
+    enabled: open && !!itemId,
+  });
+
+  // Default selected bin: prop > first allocation > "all" (only when zero/one bins exist)
+  const [selectedBinId, setSelectedBinId] = useState<string | 'all' | undefined>(undefined);
+  const effectiveBinId = useMemo<string | undefined>(() => {
+    if (binId) return binId;
+    if (selectedBinId === 'all') return undefined;
+    if (selectedBinId) return selectedBinId;
+    if (binOptions.length === 1) return binOptions[0].id;
+    if (binOptions.length > 1) return binOptions[0].id; // default to first to prevent cross-bin bleed
+    return undefined;
+  }, [binId, selectedBinId, binOptions]);
+
+  const effectiveBinCode = useMemo(() => {
+    if (binCode) return binCode;
+    return binOptions.find((b) => b.id === effectiveBinId)?.code;
+  }, [binCode, binOptions, effectiveBinId]);
+
+  const { transactions, isLoading } = useStockTransactions(
+    itemId,
+    locationId ?? undefined,
+    effectiveBinId ?? undefined,
+  );
   const [isAdjustmentDialogOpen, setIsAdjustmentDialogOpen] = useState(false);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto flex flex-col">
         <DialogHeader>
-          <DialogTitle className="flex items-center justify-between">
+          <DialogTitle className="flex items-center justify-between gap-4 flex-wrap">
             <span>
               Stock Movement History — {itemName}
               {locationName && (
@@ -80,15 +135,39 @@ export function StockMovementDialog({ open, onOpenChange, itemId, itemName, curr
                   @ {locationName}
                 </span>
               )}
+              {effectiveBinCode && (
+                <span className="ml-1 text-sm font-normal text-muted-foreground">
+                  › Bin {effectiveBinCode}
+                </span>
+              )}
             </span>
-            <Button
-              onClick={() => setIsAdjustmentDialogOpen(true)}
-              size="sm"
-              className="ml-4"
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              New Adjustment
-            </Button>
+            <div className="flex items-center gap-2">
+              {!binId && binOptions.length > 1 && (
+                <Select
+                  value={selectedBinId ?? binOptions[0].id}
+                  onValueChange={(v) => setSelectedBinId(v as string)}
+                >
+                  <SelectTrigger className="h-8 w-[200px] text-xs">
+                    <SelectValue placeholder="Filter by bin" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {binOptions.map((b) => (
+                      <SelectItem key={b.id} value={b.id}>
+                        {b.code} — {b.name}
+                      </SelectItem>
+                    ))}
+                    <SelectItem value="all">All bins (this location)</SelectItem>
+                  </SelectContent>
+                </Select>
+              )}
+              <Button
+                onClick={() => setIsAdjustmentDialogOpen(true)}
+                size="sm"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                New Adjustment
+              </Button>
+            </div>
           </DialogTitle>
         </DialogHeader>
 
