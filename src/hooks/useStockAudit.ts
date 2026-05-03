@@ -160,7 +160,7 @@ export function useStockAudit() {
       if (!selectedCompany?.id) throw new Error('No company selected');
       const itemsToFix = auditItems.filter((i) => i.status === 'desync' || i.status === 'no_bins');
       if (itemsToFix.length === 0) throw new Error('No items to fix.');
-      return reconcileItems(itemsToFix, selectedCompany.id, overrides);
+      return reconcileItems(itemsToFix, selectedCompany.id, overrides, globalLocationId ?? null);
     },
     onSuccess: (result) => {
       invalidateAll();
@@ -190,6 +190,7 @@ export function useStockAudit() {
     refetch,
     summary,
     auditHistory,
+    locationScoped: !!globalLocationId,
     logSnapshot: logSnapshotMutation.mutate,
     fixDesync: (item: StockAuditItem, override?: ReconcileOverride) => fixDesyncMutation.mutate({ item, override }),
     isFixingDesync: fixDesyncMutation.isPending,
