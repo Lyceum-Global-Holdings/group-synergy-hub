@@ -26,6 +26,10 @@ interface StockMovementDialogProps {
   itemId: string;
   itemName: string;
   currentStock?: number;
+  /** Physical storage location of this stock-keeping unit. Required to keep
+   *  histories of the same item_code at different locations from merging. */
+  locationId?: string | null;
+  locationName?: string | null;
 }
 
 const transactionTypeLabels: Record<string, string> = {
@@ -60,8 +64,8 @@ const getTransactionTypeColor = (type: string) => {
   }
 };
 
-export function StockMovementDialog({ open, onOpenChange, itemId, itemName, currentStock }: StockMovementDialogProps) {
-  const { transactions, isLoading } = useStockTransactions(itemId);
+export function StockMovementDialog({ open, onOpenChange, itemId, itemName, currentStock, locationId, locationName }: StockMovementDialogProps) {
+  const { transactions, isLoading } = useStockTransactions(itemId, locationId ?? undefined);
   const [isAdjustmentDialogOpen, setIsAdjustmentDialogOpen] = useState(false);
 
   return (
@@ -69,7 +73,14 @@ export function StockMovementDialog({ open, onOpenChange, itemId, itemName, curr
       <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center justify-between">
-            Stock Movement History - {itemName}
+            <span>
+              Stock Movement History — {itemName}
+              {locationName && (
+                <span className="ml-2 text-sm font-normal text-muted-foreground">
+                  @ {locationName}
+                </span>
+              )}
+            </span>
             <Button
               onClick={() => setIsAdjustmentDialogOpen(true)}
               size="sm"

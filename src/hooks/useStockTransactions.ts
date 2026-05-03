@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { StockTransaction, CreateStockTransactionData } from '@/types/stockTransaction';
 import { useToast } from '@/hooks/use-toast';
 
-export const useStockTransactions = (itemId?: string) => {
+export const useStockTransactions = (itemId?: string, locationId?: string | null) => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -12,7 +12,9 @@ export const useStockTransactions = (itemId?: string) => {
     isLoading,
     error
   } = useQuery({
-    queryKey: ['stock-transactions', itemId],
+    // Scope per (item, location) — same item_code at different locations is a
+    // distinct SKU-at-Location and must NOT share a movement feed.
+    queryKey: ['stock-transactions', itemId, locationId ?? null],
     queryFn: async () => {
       let query = supabase
         .from('stock_transactions')
@@ -21,6 +23,12 @@ export const useStockTransactions = (itemId?: string) => {
       
       if (itemId) {
         query = query.eq('item_id', itemId);
+      }
+      if (locationId) {
+        query = query.eq('location_id', locationId);
+      } else if (locationId === null) {
+        // Explicit "no location" scope (legacy unassigned rows)
+        query = query.is('location_id', null);
       }
 
       const { data: transactionsData, error } = await query;
