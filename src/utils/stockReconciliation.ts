@@ -169,7 +169,8 @@ export async function reconcileItems(
     p_company_id: companyId,
     p_overrides: overridesObj,
     p_user_id: user?.id || null,
-  });
+    p_location_id: locationId ?? null,
+  } as any);
 
   if (error) {
     // Fallback: if RPC fails, return all as failed
