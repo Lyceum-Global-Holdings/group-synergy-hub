@@ -19,6 +19,8 @@ export function CreateBinAllocationDialog({ open, onOpenChange }: CreateBinAlloc
   const { createAllocation, isCreating } = useWarehouseBinAllocations();
   const { items } = useWarehouseItems();
   const { bins } = useWarehouseBins();
+  const { locations } = useWarehouseLocations();
+  const locationNameById = new Map((locations || []).map((l: any) => [l.id, l.name]));
   
   const [formData, setFormData] = useState({
     warehouse_item_id: '',
