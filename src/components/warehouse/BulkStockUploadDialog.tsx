@@ -656,9 +656,17 @@ export function BulkStockUploadDialog({ open, onOpenChange }: BulkStockUploadDia
                   <SelectTrigger>
                     <SelectValue placeholder="Select location" />
                   </SelectTrigger>
-                  <SelectContent>
-                    {topLocations.map(loc => (
-                      <SelectItem key={loc.id} value={loc.id}>{loc.name}</SelectItem>
+                  <SelectContent className="max-h-[320px]">
+                    {locationTree.map(({ loc, depth }) => (
+                      <SelectItem key={loc.id} value={loc.id}>
+                        <span style={{ paddingLeft: depth * 12 }} className="inline-flex items-center gap-2">
+                          {depth > 0 && <span className="text-muted-foreground">└</span>}
+                          <span>{loc.name}</span>
+                          {loc.location_code && (
+                            <span className="text-xs text-muted-foreground">({loc.location_code})</span>
+                          )}
+                        </span>
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
