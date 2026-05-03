@@ -75,11 +75,36 @@ export function BulkStockUploadDialog({ open, onOpenChange }: BulkStockUploadDia
   const { globalLocationId } = useLocationFilter();
   const queryClient = useQueryClient();
 
-  // Only top-level locations
-  const topLocations = useMemo(() =>
-    (locations || []).filter(l => !l.parent_id),
-    [locations]
-  );
+  // WMS standard (SAP EWM / Oracle WMS): expose every active storage location
+  // (parent + children) the user can access. Stock is posted to the lowest-level
+  // storage node, so sub-locations MUST be selectable. Render as an indented tree.
+  const locationTree = useMemo(() => {
+    const all = (locations || []).filter(l => (l.status ?? 'active') === 'active');
+    const byParent = new Map<string | null, typeof all>();
+    for (const l of all) {
+      const key = l.parent_id ?? null;
+      const list = byParent.get(key) || [];
+      list.push(l);
+      byParent.set(key, list);
+    }
+    const sortFn = (a: typeof all[number], b: typeof all[number]) =>
+      (a.location_code || a.name || '').localeCompare(b.location_code || b.name || '');
+    const out: { loc: typeof all[number]; depth: number }[] = [];
+    const walk = (parentId: string | null, depth: number) => {
+      const children = (byParent.get(parentId) || []).slice().sort(sortFn);
+      for (const c of children) {
+        out.push({ loc: c, depth });
+        walk(c.id, depth + 1);
+      }
+    };
+    walk(null, 0);
+    // Append any orphans (parent_id points to a location not in the visible set)
+    const seen = new Set(out.map(o => o.loc.id));
+    for (const l of all) {
+      if (!seen.has(l.id)) out.push({ loc: l, depth: 0 });
+    }
+    return out;
+  }, [locations]);
 
   // Pre-select from global filter
   const effectiveLocationId = selectedLocationId || globalLocationId || '';
