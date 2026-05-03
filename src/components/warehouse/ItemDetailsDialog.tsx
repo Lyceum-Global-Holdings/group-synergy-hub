@@ -64,24 +64,23 @@ const fetchStockTransactions = async (
   itemId: string,
   locationId: string | null | undefined,
 ): Promise<StockTransaction[]> => {
-  let q = supabase
-    .from('stock_transactions')
-    .select('id, transaction_type, quantity_change, quantity_before, quantity_after, notes, created_at')
-    .eq('item_id', itemId);
-
-  // Same item_code at a different location is a separate SKU-at-Location.
-  if (locationId) {
-    q = q.eq('location_id', locationId);
-  } else if (locationId === null) {
-    q = q.is('location_id', null);
-  }
-
-  const { data, error } = await q
-    .order('created_at', { ascending: false })
-    .limit(100);
-
+  // Bin-scoped RPC: same item at a different bin/location is a distinct SKU
+  // and must NOT pollute this item's history. Quantities are bin-level.
+  const { data, error } = await supabase.rpc('get_bin_scoped_stock_movements', {
+    p_item_id: itemId,
+    p_location_id: locationId ?? null,
+    p_bin_id: null,
+  });
   if (error) throw error;
-  return (data || []) as StockTransaction[];
+  return ((data || []) as any[]).slice(0, 100).map((r) => ({
+    id: r.id,
+    transaction_type: r.transaction_type,
+    quantity_change: Number(r.quantity_change),
+    quantity_before: Number(r.quantity_before),
+    quantity_after: Number(r.quantity_after),
+    notes: r.notes,
+    created_at: r.created_at,
+  })) as StockTransaction[];
 };
 
 export const ItemDetailsDialog = ({ item, open, onOpenChange }: ItemDetailsDialogProps) => {
