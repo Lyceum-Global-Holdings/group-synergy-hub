@@ -39,7 +39,8 @@ export function BinAllocationsTab() {
       allocation.warehouse_item?.item_code?.toLowerCase().includes(term) ||
       allocation.warehouse_item?.name?.toLowerCase().includes(term) ||
       allocation.warehouse_bin?.bin_code?.toLowerCase().includes(term) ||
-      allocation.warehouse_bin?.name?.toLowerCase().includes(term)
+      allocation.warehouse_bin?.name?.toLowerCase().includes(term) ||
+      allocation.warehouse_bin?.warehouse_location?.name?.toLowerCase().includes(term)
     );
   }, [binAllocations, searchTerm]);
   const { canDelete } = useIsAdminOrHigher();
