@@ -20333,6 +20333,10 @@ export type Database = {
             }
             Returns: undefined
           }
+      recompute_item_primary_location: {
+        Args: { p_item_id: string }
+        Returns: undefined
+      }
       reconcile_stock_batch:
         | {
             Args: {
