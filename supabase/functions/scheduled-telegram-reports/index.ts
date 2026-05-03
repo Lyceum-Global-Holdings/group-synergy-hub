@@ -117,6 +117,40 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
+    // ---- Auth guard for on-demand invocations ----
+    // Cron-triggered runs send no body (no force, no company_id) and proceed unauthenticated.
+    // Any manual/force/targeted invocation MUST come from an authenticated admin.
+    if (forceMode || targetCompanyId) {
+      const authHeader = req.headers.get('Authorization') ?? '';
+      if (!authHeader.startsWith('Bearer ')) {
+        return new Response(
+          JSON.stringify({ error: 'Unauthorized' }),
+          { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      const userClient = createClient(
+        supabaseUrl,
+        Deno.env.get('SUPABASE_ANON_KEY')!,
+        { global: { headers: { Authorization: authHeader } } }
+      );
+      const token = authHeader.replace('Bearer ', '');
+      const { data: claimsData, error: claimsErr } = await userClient.auth.getClaims(token);
+      if (claimsErr || !claimsData?.claims) {
+        return new Response(
+          JSON.stringify({ error: 'Unauthorized' }),
+          { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      const userId = claimsData.claims.sub as string;
+      const { data: isAdmin, error: roleErr } = await supabase.rpc('is_admin', { _user_id: userId });
+      if (roleErr || !isAdmin) {
+        return new Response(
+          JSON.stringify({ error: 'Forbidden — admin role required for manual triggers' }),
+          { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    }
+
     if (forceMode) {
       console.log('Force mode enabled - bypassing time check');
     }
