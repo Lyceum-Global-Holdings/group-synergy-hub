@@ -19449,6 +19449,42 @@ export type Database = {
         }
         Relationships: []
       }
+      v_stock_transactions_balance_drift: {
+        Row: {
+          bin_id: string | null
+          computed_after: number | null
+          computed_before: number | null
+          created_at: string | null
+          id: string | null
+          item_id: string | null
+          quantity_change: number | null
+          stored_after: number | null
+          stored_before: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_stock_transactions_warehouse_items"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "v_adjustment_summary_by_item"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_stock_transactions_warehouse_items"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "warehouse_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_transactions_bin_id_fkey"
+            columns: ["bin_id"]
+            isOneToOne: false
+            referencedRelation: "warehouse_bins"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       v_stock_transactions_bin_mismatch: {
         Row: {
           bin_id: string | null
@@ -19801,6 +19837,29 @@ export type Database = {
           category: string
           level_depth: number
           parent_id: string
+        }[]
+      }
+      get_bin_scoped_stock_movements: {
+        Args: { p_bin_id?: string; p_item_id: string; p_location_id?: string }
+        Returns: {
+          bin_code: string
+          bin_id: string
+          bin_name: string
+          created_at: string
+          created_by: string
+          id: string
+          location_code: string
+          location_id: string
+          location_name: string
+          notes: string
+          quantity_after: number
+          quantity_before: number
+          quantity_change: number
+          reference_id: string
+          reference_type: string
+          total_value: number
+          transaction_type: string
+          unit_cost: number
         }[]
       }
       get_cash_flow_statement: {
