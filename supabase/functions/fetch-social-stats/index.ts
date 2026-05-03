@@ -1,7 +1,31 @@
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
+
+// Allowlist of social-platform hosts the scrape fallback may contact.
+// Prevents this endpoint being abused as an SSRF proxy to internal/arbitrary URLs.
+const ALLOWED_SCRAPE_HOSTS = new Set<string>([
+  'youtube.com', 'www.youtube.com', 'm.youtube.com',
+  'twitter.com', 'www.twitter.com', 'mobile.twitter.com',
+  'x.com', 'www.x.com',
+  'tiktok.com', 'www.tiktok.com',
+  'facebook.com', 'www.facebook.com', 'm.facebook.com',
+  'instagram.com', 'www.instagram.com',
+  'linkedin.com', 'www.linkedin.com',
+]);
+
+function isAllowedScrapeUrl(url: string): boolean {
+  try {
+    const u = new URL(url);
+    if (u.protocol !== 'https:' && u.protocol !== 'http:') return false;
+    return ALLOWED_SCRAPE_HOSTS.has(u.hostname.toLowerCase());
+  } catch {
+    return false;
+  }
+}
 
 function parseSocialCount(text: string): number | null {
   if (!text) return null;
@@ -174,6 +198,9 @@ async function fetchTwitterFollowers(handle: string, bearerToken: string): Promi
 // --- Scraping fallback ---
 
 async function scrapeFallback(url: string, platform: string): Promise<{ count: number | null; message?: string }> {
+  if (!isAllowedScrapeUrl(url)) {
+    return { count: null, message: 'URL host is not on the allowed social-platform list' };
+  }
   try {
     const response = await fetch(url, {
       headers: {
@@ -200,6 +227,35 @@ async function scrapeFallback(url: string, platform: string): Promise<{ count: n
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
+  }
+
+  // ---- Auth guard: require a valid Supabase JWT ----
+  const authHeader = req.headers.get('Authorization') ?? '';
+  if (!authHeader.startsWith('Bearer ')) {
+    return new Response(
+      JSON.stringify({ success: false, error: 'Unauthorized' }),
+      { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
+  try {
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_ANON_KEY')!,
+      { global: { headers: { Authorization: authHeader } } }
+    );
+    const token = authHeader.replace('Bearer ', '');
+    const { data, error } = await supabase.auth.getClaims(token);
+    if (error || !data?.claims) {
+      return new Response(
+        JSON.stringify({ success: false, error: 'Unauthorized' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+  } catch {
+    return new Response(
+      JSON.stringify({ success: false, error: 'Unauthorized' }),
+      { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
   }
 
   try {
