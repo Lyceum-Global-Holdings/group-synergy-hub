@@ -27,7 +27,12 @@ export function useWarehouseBinAllocations(options?: { disableFetch?: boolean })
           ),
           warehouse_bin:warehouse_bins!warehouse_bin_allocations_bin_id_fkey(
             bin_code,
-            name
+            name,
+            location_id,
+            warehouse_location:warehouse_locations!warehouse_bins_location_id_fkey(
+              id,
+              name
+            )
           )
         `)
         .order('created_at', { ascending: false });
