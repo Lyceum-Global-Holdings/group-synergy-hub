@@ -198,6 +198,9 @@ async function fetchTwitterFollowers(handle: string, bearerToken: string): Promi
 // --- Scraping fallback ---
 
 async function scrapeFallback(url: string, platform: string): Promise<{ count: number | null; message?: string }> {
+  if (!isAllowedScrapeUrl(url)) {
+    return { count: null, message: 'URL host is not on the allowed social-platform list' };
+  }
   try {
     const response = await fetch(url, {
       headers: {
