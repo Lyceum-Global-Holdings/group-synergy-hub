@@ -914,6 +914,10 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
           itemId={stockMovementItem.id}
           itemName={stockMovementItem.name}
           currentStock={stockMovementItem.current_stock || 0}
+          locationId={stockMovementItem.location_id ?? null}
+          locationName={
+            allLocations.find((l) => l.id === stockMovementItem.location_id)?.name ?? null
+          }
         />
       )}
 
