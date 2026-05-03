@@ -540,7 +540,7 @@ export function BulkStockUploadDialog({ open, onOpenChange }: BulkStockUploadDia
               if (insertErr) throw new Error(`Bin allocation insert failed: ${insertErr.message}`);
             }
 
-            // Create stock transaction
+            // Create stock transaction (scoped per bin — SKU-at-Bin)
             await supabase
               .from('stock_transactions')
               .insert({
@@ -550,6 +550,7 @@ export function BulkStockUploadDialog({ open, onOpenChange }: BulkStockUploadDia
                 quantity_change: row.quantity,
                 quantity_before: qtyBefore,
                 quantity_after: qtyBefore + row.quantity,
+                bin_id: row.bin_id ?? null,
                 notes: `Bulk stock upload - Bin: ${row.bin_code}`,
                 company_id: selectedCompany?.id,
                 created_by: user?.id,
