@@ -1,6 +1,7 @@
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
@@ -27,7 +28,8 @@ interface ItemStockDetailsDialogProps {
   onOpenChange: (open: boolean) => void;
   item: WarehouseItem | null;
   locationStock: LocationStock[];
-  allLocations: { id: string; name: string }[];
+  /** @deprecated Stock-by-Location panel only renders locations that physically hold stock. */
+  allLocations?: { id: string; name: string }[];
 }
 
 export function ItemStockDetailsDialog({
@@ -35,29 +37,34 @@ export function ItemStockDetailsDialog({
   onOpenChange,
   item,
   locationStock,
-  allLocations,
 }: ItemStockDetailsDialogProps) {
   if (!item) return null;
 
-  const totalStock = locationStock.reduce((sum, loc) => sum + loc.stock, 0);
+  // International WMS standard (SAP EWM / Oracle WMS "Stock by Location"):
+  // show only physical locations that currently hold stock for this SKU.
+  // Aggregate defensively in case multiple bin rows resolve to the same location.
+  const aggregated = new Map<string, { locationId: string; locationName: string; stock: number }>();
+  for (const ls of locationStock) {
+    if (!ls.locationId) continue;
+    const qty = Number(ls.stock) || 0;
+    const existing = aggregated.get(ls.locationId);
+    if (existing) {
+      existing.stock += qty;
+    } else {
+      aggregated.set(ls.locationId, {
+        locationId: ls.locationId,
+        locationName: ls.locationName,
+        stock: qty,
+      });
+    }
+  }
+
+  const stockedLocations = Array.from(aggregated.values())
+    .filter((l) => l.stock > 0)
+    .sort((a, b) => b.stock - a.stock || a.locationName.localeCompare(b.locationName));
+
+  const totalStock = stockedLocations.reduce((sum, loc) => sum + loc.stock, 0);
   const isLowStock = totalStock <= (item.reorder_level || 0);
-
-  // Merge all locations with their stock (0 if no stock)
-  const allLocationsWithStock = allLocations.map((location) => {
-    const stockInfo = locationStock.find((ls) => ls.locationId === location.id);
-    return {
-      locationId: location.id,
-      locationName: location.name,
-      stock: stockInfo?.stock || 0,
-    };
-  });
-
-  // Sort: locations with stock first, then alphabetically
-  allLocationsWithStock.sort((a, b) => {
-    if (a.stock > 0 && b.stock === 0) return -1;
-    if (a.stock === 0 && b.stock > 0) return 1;
-    return a.locationName.localeCompare(b.locationName);
-  });
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
