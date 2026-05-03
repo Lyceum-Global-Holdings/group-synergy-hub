@@ -1,8 +1,16 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { StockTransaction, CreateStockTransactionData } from '@/types/stockTransaction';
+import { CreateStockTransactionData } from '@/types/stockTransaction';
 import { useToast } from '@/hooks/use-toast';
 
+/**
+ * SKU-at-Bin movement history.
+ *
+ * Reader uses `get_bin_scoped_stock_movements` RPC so quantity_before /
+ * quantity_after are always recomputed per (item, bin) — never the legacy
+ * item-total values. When `locationId` is provided, only transactions whose
+ * bin physically belongs to that location are returned.
+ */
 export const useStockTransactions = (
   itemId?: string,
   locationId?: string | null,
@@ -14,61 +22,47 @@ export const useStockTransactions = (
   const {
     data: transactions = [],
     isLoading,
-    error
+    error,
   } = useQuery({
-    // Scope per (item, location, bin) — same item_code in different bins is a
-    // distinct SKU-at-Bin and must NOT share a movement feed.
     queryKey: ['stock-transactions', itemId, locationId ?? null, binId ?? 'any'],
+    enabled: !!itemId,
     queryFn: async () => {
-      let query = supabase
-        .from('stock_transactions')
-        .select('*')
-        .order('created_at', { ascending: false });
-      
-      if (itemId) {
-        query = query.eq('item_id', itemId);
-      }
-      if (locationId) {
-        query = query.eq('location_id', locationId);
-      } else if (locationId === null) {
-        query = query.is('location_id', null);
-      }
-      if (binId) {
-        query = query.eq('bin_id', binId);
-      } else if (binId === null) {
-        query = query.is('bin_id', null);
-      }
+      if (!itemId) return [];
 
-      const { data: transactionsData, error } = await query;
-      if (error) throw error;
+      const { data, error: rpcError } = await supabase.rpc(
+        'get_bin_scoped_stock_movements',
+        {
+          p_item_id: itemId,
+          p_location_id: locationId ?? null,
+          p_bin_id: binId ?? null,
+        },
+      );
+      if (rpcError) throw rpcError;
 
-      // Fetch profiles for all unique created_by user IDs
-      const userIds = [...new Set(transactionsData?.map(t => t.created_by).filter(Boolean))] as string[];
-      
+      const rows = (data || []) as any[];
+
+      // Hydrate creator profile for display.
+      const userIds = [...new Set(rows.map((r) => r.created_by).filter(Boolean))] as string[];
       let profilesMap: Record<string, { full_name: string | null; email: string | null }> = {};
-      
       if (userIds.length > 0) {
         const { data: profilesData } = await supabase
           .from('profiles_directory')
           .select('user_id, full_name, email')
           .in('user_id', userIds);
-        
         if (profilesData) {
-          profilesMap = profilesData.reduce((acc, profile) => {
-            acc[profile.user_id] = { full_name: profile.full_name, email: profile.email };
+          profilesMap = profilesData.reduce((acc, p) => {
+            acc[p.user_id] = { full_name: p.full_name, email: p.email };
             return acc;
           }, {} as Record<string, { full_name: string | null; email: string | null }>);
         }
       }
 
-      // Merge profiles with transactions
-      const transactionsWithProfiles = transactionsData?.map(transaction => ({
-        ...transaction,
-        profiles: transaction.created_by ? profilesMap[transaction.created_by] || null : null
-      })) || [];
-
-      return transactionsWithProfiles as StockTransaction[];
-    }
+      return rows.map((r) => ({
+        ...r,
+        item_id: itemId,
+        profiles: r.created_by ? profilesMap[r.created_by] || null : null,
+      }));
+    },
   });
 
   const createTransactionMutation = useMutation({
@@ -76,34 +70,31 @@ export const useStockTransactions = (
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User not authenticated');
 
-      const { data, error } = await supabase
+      const { data, error: insErr } = await supabase
         .from('stock_transactions')
         .insert({
           ...transactionData,
-          created_by: user.id
+          created_by: user.id,
         })
         .select()
         .single();
 
-      if (error) throw error;
+      if (insErr) throw insErr;
       return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['stock-transactions'] });
       queryClient.invalidateQueries({ queryKey: ['warehouse-items'] });
+      toast({ title: 'Success', description: 'Stock transaction recorded successfully' });
+    },
+    onError: (err) => {
+      console.error('Error creating stock transaction:', err);
       toast({
-        title: "Success",
-        description: "Stock transaction recorded successfully",
+        title: 'Error',
+        description: 'Failed to record stock transaction',
+        variant: 'destructive',
       });
     },
-    onError: (error) => {
-      console.error('Error creating stock transaction:', error);
-      toast({
-        title: "Error",
-        description: "Failed to record stock transaction",
-        variant: "destructive",
-      });
-    }
   });
 
   return {
