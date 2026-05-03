@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useCompany } from '@/contexts/CompanyContext';
+import { useLocationFilter } from '@/contexts/LocationFilterContext';
 import { reconcileItem, reconcileItems, type ReconcileOverride, type ReconcileResult } from '@/utils/stockReconciliation';
 
 export type StockAuditStatus = 'ok' | 'desync' | 'no_bins';
