@@ -152,7 +152,8 @@ async function findFirstActiveBin(locationId: string): Promise<string | null> {
 export async function reconcileItems(
   items: ReconcileItemInput[],
   companyId: string,
-  overrides?: Map<string, ReconcileOverride>
+  overrides?: Map<string, ReconcileOverride>,
+  locationId?: string | null,
 ): Promise<{ results: ReconcileResult[]; fixed: number; created: number; blocked: number; failed: number }> {
   const { data: { user } } = await supabase.auth.getUser();
 
