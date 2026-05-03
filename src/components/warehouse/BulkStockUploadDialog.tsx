@@ -501,15 +501,8 @@ export function BulkStockUploadDialog({ open, onOpenChange }: BulkStockUploadDia
 
             if (!itemId) throw new Error('Could not resolve item ID');
 
-            // Read current_stock BEFORE updating allocation
-            const { data: itemData } = await supabase
-              .from('warehouse_items')
-              .select('current_stock')
-              .eq('id', itemId)
-              .single();
-            const qtyBefore = Number(itemData?.current_stock || 0);
-
-            // Additive bin allocation: check existing, then update or insert
+            // Read this bin's current allocation BEFORE updating it.
+            // SKU-at-Bin rule: stock movement quantities are bin-level, not item-total.
             const { data: existingAlloc } = await supabase
               .from('warehouse_bin_allocations')
               .select('id, allocated_quantity')
@@ -518,16 +511,16 @@ export function BulkStockUploadDialog({ open, onOpenChange }: BulkStockUploadDia
               .eq('company_id', selectedCompany!.id)
               .maybeSingle();
 
+            const binQtyBefore = Number(existingAlloc?.allocated_quantity || 0);
+
             if (existingAlloc) {
-              // Add to existing allocation
-              const newQty = (existingAlloc.allocated_quantity || 0) + row.quantity;
+              const newQty = binQtyBefore + row.quantity;
               const { error: updateErr } = await supabase
                 .from('warehouse_bin_allocations')
                 .update({ allocated_quantity: newQty })
                 .eq('id', existingAlloc.id);
               if (updateErr) throw new Error(`Bin allocation update failed: ${updateErr.message}`);
             } else {
-              // Insert new allocation with created_by for RLS
               const { error: insertErr } = await supabase
                 .from('warehouse_bin_allocations')
                 .insert({
@@ -540,7 +533,7 @@ export function BulkStockUploadDialog({ open, onOpenChange }: BulkStockUploadDia
               if (insertErr) throw new Error(`Bin allocation insert failed: ${insertErr.message}`);
             }
 
-            // Create stock transaction (scoped per bin — SKU-at-Bin)
+            // Create stock transaction with bin-level before/after.
             await supabase
               .from('stock_transactions')
               .insert({
@@ -548,8 +541,8 @@ export function BulkStockUploadDialog({ open, onOpenChange }: BulkStockUploadDia
                 transaction_type: 'opening_stock',
                 reference_type: 'manual',
                 quantity_change: row.quantity,
-                quantity_before: qtyBefore,
-                quantity_after: qtyBefore + row.quantity,
+                quantity_before: binQtyBefore,
+                quantity_after: binQtyBefore + row.quantity,
                 bin_id: row.bin_id ?? null,
                 notes: `Bulk stock upload - Bin: ${row.bin_code}`,
                 company_id: selectedCompany?.id,

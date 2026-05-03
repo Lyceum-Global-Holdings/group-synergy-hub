@@ -905,21 +905,25 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
         editingItem={editingItem}
       />
 
-      {stockMovementItem && (
-        <StockMovementDialog
-          open={!!stockMovementItem}
-          onOpenChange={(open) => {
-            if (!open) setStockMovementItem(null);
-          }}
-          itemId={stockMovementItem.id}
-          itemName={stockMovementItem.name}
-          currentStock={stockMovementItem.current_stock || 0}
-          locationId={stockMovementItem.location_id ?? null}
-          locationName={
-            allLocations.find((l) => l.id === stockMovementItem.location_id)?.name ?? null
-          }
-        />
-      )}
+      {stockMovementItem && (() => {
+        // Prefer the globally-selected location so history is scoped to bins at that physical site.
+        const scopeLocationId = globalLocationId ?? stockMovementItem.location_id ?? null;
+        const scopeLocationName =
+          allLocations.find((l) => l.id === scopeLocationId)?.name ?? null;
+        return (
+          <StockMovementDialog
+            open={!!stockMovementItem}
+            onOpenChange={(open) => {
+              if (!open) setStockMovementItem(null);
+            }}
+            itemId={stockMovementItem.id}
+            itemName={stockMovementItem.name}
+            currentStock={stockMovementItem.current_stock || 0}
+            locationId={scopeLocationId}
+            locationName={scopeLocationName}
+          />
+        );
+      })()}
 
       {stockAdjustmentItem && (
         <StockAdjustmentDialog

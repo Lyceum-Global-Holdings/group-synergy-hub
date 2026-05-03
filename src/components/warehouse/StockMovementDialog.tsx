@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -35,7 +35,7 @@ interface StockMovementDialogProps {
   itemId: string;
   itemName: string;
   currentStock?: number;
-  /** Physical storage location of this stock-keeping unit. */
+  /** Physical storage location of this stock-keeping unit. Filters bins to this location only. */
   locationId?: string | null;
   locationName?: string | null;
   /** Specific bin scope. When provided, history filters to this bin only. */
@@ -75,89 +75,72 @@ const getTransactionTypeColor = (type: string) => {
   }
 };
 
-export function StockMovementDialog({ open, onOpenChange, itemId, itemName, currentStock, locationId, locationName, binId, binCode }: StockMovementDialogProps) {
-  // Bin options come from the actual allocations of this warehouse_item.
-  // We deliberately do NOT filter by warehouse_bins.location_id here because
-  // historical data can have bins allocated under a different recorded location.
+export function StockMovementDialog({
+  open,
+  onOpenChange,
+  itemId,
+  itemName,
+  currentStock,
+  locationId,
+  locationName,
+  binId,
+  binCode,
+}: StockMovementDialogProps) {
+  // Bin options come from this item's allocations.
+  // When a location is in scope, restrict to bins physically at that location.
   const { data: binOptions = [] } = useQuery({
-    queryKey: ['stock-movement-bin-options', itemId],
+    queryKey: ['stock-movement-bin-options', itemId, locationId ?? null],
+    enabled: open && !!itemId,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('warehouse_bin_allocations')
-        .select('bin_id, warehouse_bins(id, bin_code, name, location_id)')
+        .select('bin_id, allocated_quantity, warehouse_bins(id, bin_code, name, location_id)')
         .eq('warehouse_item_id', itemId);
       if (error) throw error;
+
       const seen = new Set<string>();
-      const opts: { id: string; code: string; name: string; mismatched: boolean }[] = [];
+      const opts: { id: string; code: string; name: string; quantity: number }[] = [];
       (data || []).forEach((row: any) => {
         const b = row.warehouse_bins;
         if (!b?.id || seen.has(b.id)) return;
+        if (locationId && b.location_id !== locationId) return; // strict location scope
         seen.add(b.id);
         opts.push({
           id: b.id,
           code: b.bin_code,
           name: b.name,
-          mismatched: !!locationId && !!b.location_id && b.location_id !== locationId,
+          quantity: Number(row.allocated_quantity || 0),
         });
       });
       return opts;
     },
-    enabled: open && !!itemId,
   });
 
-  // Default scope: explicit prop > user picked > "all bins" when multiple bins exist
-  // (single-bin items still default to that bin via the picker hidden state).
-  const [selectedBinId, setSelectedBinId] = useState<string | 'all' | undefined>(undefined);
-  const effectiveBinId = useMemo<string | undefined>(() => {
-    if (binId) return binId;
-    if (selectedBinId === 'all') return undefined;
-    if (selectedBinId) return selectedBinId;
-    if (binOptions.length === 1) return binOptions[0].id;
-    return undefined; // multiple bins → All bins by default with warning
-  }, [binId, selectedBinId, binOptions]);
+  // Default to the first bin (never silently merge bins).
+  const [selectedBinId, setSelectedBinId] = useState<string | undefined>(undefined);
+  useEffect(() => {
+    if (!open) return;
+    if (binId) return;
+    if (selectedBinId && binOptions.some((b) => b.id === selectedBinId)) return;
+    setSelectedBinId(binOptions[0]?.id);
+  }, [open, binId, binOptions, selectedBinId]);
 
-  const effectiveBinCode = useMemo(() => {
-    if (binCode) return binCode;
-    return binOptions.find((b) => b.id === effectiveBinId)?.code;
-  }, [binCode, binOptions, effectiveBinId]);
+  const effectiveBinId = binId ?? selectedBinId;
+  const effectiveBinCode =
+    binCode ?? binOptions.find((b) => b.id === effectiveBinId)?.code ?? null;
 
   const { transactions, isLoading } = useStockTransactions(
     itemId,
-    locationId ?? undefined,
-    effectiveBinId ?? undefined,
+    locationId ?? null,
+    effectiveBinId ?? null,
   );
+
   const [isAdjustmentDialogOpen, setIsAdjustmentDialogOpen] = useState(false);
 
-  // Resolve bin codes for any transactions whose bin isn't in the current
-  // allocations (e.g. legacy transfers from a bin no longer allocated).
-  const txBinIds = useMemo(() => {
-    const ids = new Set<string>();
-    transactions.forEach((t: any) => { if (t.bin_id) ids.add(t.bin_id); });
-    binOptions.forEach((b) => ids.delete(b.id));
-    return Array.from(ids);
-  }, [transactions, binOptions]);
-
-  const { data: extraBinMap = {} } = useQuery({
-    queryKey: ['stock-movement-extra-bin-codes', txBinIds.sort().join(',')],
-    queryFn: async () => {
-      if (txBinIds.length === 0) return {} as Record<string, string>;
-      const { data } = await supabase
-        .from('warehouse_bins')
-        .select('id, bin_code')
-        .in('id', txBinIds);
-      const map: Record<string, string> = {};
-      (data || []).forEach((b: any) => { map[b.id] = b.bin_code; });
-      return map;
-    },
-    enabled: txBinIds.length > 0,
-  });
-
-  const binCodeFor = (id?: string | null) => {
-    if (!id) return null;
-    return binOptions.find((b) => b.id === id)?.code ?? extraBinMap[id] ?? null;
-  };
-
-  const showAllBinsWarning = !binId && binOptions.length > 1 && !effectiveBinId;
+  const binBalance = useMemo(() => {
+    if (!effectiveBinId) return null;
+    return binOptions.find((b) => b.id === effectiveBinId)?.quantity ?? null;
+  }, [effectiveBinId, binOptions]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -174,33 +157,31 @@ export function StockMovementDialog({ open, onOpenChange, itemId, itemName, curr
               {effectiveBinCode && (
                 <span className="ml-1 text-sm font-normal text-muted-foreground">
                   › Bin {effectiveBinCode}
+                  {binBalance !== null && (
+                    <span className="ml-1">(Qty {binBalance})</span>
+                  )}
                 </span>
               )}
             </span>
             <div className="flex items-center gap-2">
               {!binId && binOptions.length > 1 && (
                 <Select
-                  value={selectedBinId ?? 'all'}
-                  onValueChange={(v) => setSelectedBinId(v as string)}
+                  value={selectedBinId ?? ''}
+                  onValueChange={(v) => setSelectedBinId(v)}
                 >
-                  <SelectTrigger className="h-8 w-[240px] text-xs">
-                    <SelectValue placeholder="Filter by bin" />
+                  <SelectTrigger className="h-8 w-[260px] text-xs">
+                    <SelectValue placeholder="Select bin" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">All bins ({binOptions.length})</SelectItem>
                     {binOptions.map((b) => (
                       <SelectItem key={b.id} value={b.id}>
-                        {b.code} — {b.name}
-                        {b.mismatched ? ' (cross-location)' : ''}
+                        {b.code} — {b.name} ({b.quantity})
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               )}
-              <Button
-                onClick={() => setIsAdjustmentDialogOpen(true)}
-                size="sm"
-              >
+              <Button onClick={() => setIsAdjustmentDialogOpen(true)} size="sm">
                 <Plus className="h-4 w-4 mr-2" />
                 New Adjustment
               </Button>
@@ -208,9 +189,9 @@ export function StockMovementDialog({ open, onOpenChange, itemId, itemName, curr
           </DialogTitle>
         </DialogHeader>
 
-        {showAllBinsWarning && (
+        {locationId && binOptions.length === 0 && (
           <div className="rounded-md border border-yellow-300 bg-yellow-50 px-3 py-2 text-xs text-yellow-900">
-            Showing movements across all {binOptions.length} bins for this item. Pick a specific bin above to isolate its history.
+            This item has no bin allocation at {locationName ?? 'this location'}.
           </div>
         )}
 
@@ -222,7 +203,7 @@ export function StockMovementDialog({ open, onOpenChange, itemId, itemName, curr
             </div>
           ) : transactions.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
-              No stock movements found for this item.
+              No stock movements found for this bin.
             </div>
           ) : (
             <Table>
@@ -231,6 +212,7 @@ export function StockMovementDialog({ open, onOpenChange, itemId, itemName, curr
                   <TableHead>Date</TableHead>
                   <TableHead>Type</TableHead>
                   <TableHead>Bin</TableHead>
+                  <TableHead>Location</TableHead>
                   <TableHead>Reference</TableHead>
                   <TableHead className="text-right">Qty Change</TableHead>
                   <TableHead className="text-right">Qty Before</TableHead>
@@ -242,53 +224,59 @@ export function StockMovementDialog({ open, onOpenChange, itemId, itemName, curr
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {transactions.map((transaction: any) => {
-                  const txBinCode = binCodeFor(transaction.bin_id);
-                  return (
-                    <TableRow key={transaction.id}>
-                      <TableCell>
-                        {format(new Date(transaction.created_at), 'MMM dd, yyyy HH:mm')}
-                      </TableCell>
-                      <TableCell>
-                        <Badge
-                          variant="secondary"
-                          className={getTransactionTypeColor(transaction.transaction_type)}
-                        >
-                          {transactionTypeLabels[transaction.transaction_type]}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="font-mono text-xs">
-                        {txBinCode ?? <span className="text-muted-foreground">—</span>}
-                      </TableCell>
-                      <TableCell>
-                        {transaction.reference_id || '-'}
-                      </TableCell>
-                      <TableCell className={`text-right font-medium ${
+                {transactions.map((transaction: any) => (
+                  <TableRow key={transaction.id}>
+                    <TableCell>
+                      {format(new Date(transaction.created_at), 'MMM dd, yyyy HH:mm')}
+                    </TableCell>
+                    <TableCell>
+                      <Badge
+                        variant="secondary"
+                        className={getTransactionTypeColor(transaction.transaction_type)}
+                      >
+                        {transactionTypeLabels[transaction.transaction_type] ??
+                          transaction.transaction_type}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="font-mono text-xs">
+                      {transaction.bin_code ?? <span className="text-muted-foreground">—</span>}
+                    </TableCell>
+                    <TableCell className="text-xs">
+                      {transaction.location_code ?? transaction.location_name ?? '—'}
+                    </TableCell>
+                    <TableCell>{transaction.reference_id || '-'}</TableCell>
+                    <TableCell
+                      className={`text-right font-medium ${
                         transaction.quantity_change > 0 ? 'text-green-600' : 'text-red-600'
-                      }`}>
-                        {transaction.quantity_change > 0 ? '+' : ''}{transaction.quantity_change}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {transaction.quantity_before}
-                      </TableCell>
-                      <TableCell className="text-right font-medium">
-                        {transaction.quantity_after}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {transaction.unit_cost ? `LKR ${transaction.unit_cost.toFixed(2)}` : '-'}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {transaction.total_value ? `LKR ${transaction.total_value.toFixed(2)}` : '-'}
-                      </TableCell>
-                      <TableCell>
-                        {transaction.profiles?.full_name || transaction.profiles?.email || '-'}
-                      </TableCell>
-                      <TableCell>
-                        {transaction.notes || '-'}
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
+                      }`}
+                    >
+                      {transaction.quantity_change > 0 ? '+' : ''}
+                      {transaction.quantity_change}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {transaction.quantity_before}
+                    </TableCell>
+                    <TableCell className="text-right font-medium">
+                      {transaction.quantity_after}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {transaction.unit_cost
+                        ? `LKR ${Number(transaction.unit_cost).toFixed(2)}`
+                        : '-'}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {transaction.total_value
+                        ? `LKR ${Number(transaction.total_value).toFixed(2)}`
+                        : '-'}
+                    </TableCell>
+                    <TableCell>
+                      {transaction.profiles?.full_name ||
+                        transaction.profiles?.email ||
+                        '-'}
+                    </TableCell>
+                    <TableCell>{transaction.notes || '-'}</TableCell>
+                  </TableRow>
+                ))}
               </TableBody>
             </Table>
           )}
@@ -299,7 +287,9 @@ export function StockMovementDialog({ open, onOpenChange, itemId, itemName, curr
           onOpenChange={setIsAdjustmentDialogOpen}
           itemId={itemId}
           itemName={itemName}
-          currentStock={currentStock || transactions[0]?.quantity_after || 0}
+          currentStock={
+            binBalance ?? currentStock ?? transactions[0]?.quantity_after ?? 0
+          }
         />
       </DialogContent>
     </Dialog>
