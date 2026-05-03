@@ -369,7 +369,8 @@ export function useWarehouseBinAllocations(options?: { disableFetch?: boolean })
         p_company_id: selectedCompany.id,
         p_overrides: overrides as any,
         p_user_id: user.user?.id || null,
-      });
+        p_location_id: selectedLocationId ?? null,
+      } as any);
 
       if (rpcError) {
         console.error('Batch reconciliation RPC failed:', rpcError);
