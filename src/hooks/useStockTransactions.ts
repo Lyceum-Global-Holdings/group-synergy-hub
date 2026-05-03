@@ -3,7 +3,11 @@ import { supabase } from '@/integrations/supabase/client';
 import { StockTransaction, CreateStockTransactionData } from '@/types/stockTransaction';
 import { useToast } from '@/hooks/use-toast';
 
-export const useStockTransactions = (itemId?: string, locationId?: string | null) => {
+export const useStockTransactions = (
+  itemId?: string,
+  locationId?: string | null,
+  binId?: string | null,
+) => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -12,9 +16,9 @@ export const useStockTransactions = (itemId?: string, locationId?: string | null
     isLoading,
     error
   } = useQuery({
-    // Scope per (item, location) — same item_code at different locations is a
-    // distinct SKU-at-Location and must NOT share a movement feed.
-    queryKey: ['stock-transactions', itemId, locationId ?? null],
+    // Scope per (item, location, bin) — same item_code in different bins is a
+    // distinct SKU-at-Bin and must NOT share a movement feed.
+    queryKey: ['stock-transactions', itemId, locationId ?? null, binId ?? 'any'],
     queryFn: async () => {
       let query = supabase
         .from('stock_transactions')
@@ -27,8 +31,12 @@ export const useStockTransactions = (itemId?: string, locationId?: string | null
       if (locationId) {
         query = query.eq('location_id', locationId);
       } else if (locationId === null) {
-        // Explicit "no location" scope (legacy unassigned rows)
         query = query.is('location_id', null);
+      }
+      if (binId) {
+        query = query.eq('bin_id', binId);
+      } else if (binId === null) {
+        query = query.is('bin_id', null);
       }
 
       const { data: transactionsData, error } = await query;
