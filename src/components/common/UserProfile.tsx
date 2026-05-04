@@ -1,4 +1,5 @@
-import { User, Settings, LogOut } from "lucide-react";
+import { User, Settings, LogOut, ShieldCheck } from "lucide-react";
+import { Link } from "react-router-dom";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -90,6 +91,12 @@ export function UserProfile() {
         <DropdownMenuItem>
           <User className="mr-2 h-4 w-4" />
           Profile
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild>
+          <Link to="/account/mfa">
+            <ShieldCheck className="mr-2 h-4 w-4" />
+            Two-factor authentication
+          </Link>
         </DropdownMenuItem>
         <DropdownMenuItem>
           <Settings className="mr-2 h-4 w-4" />

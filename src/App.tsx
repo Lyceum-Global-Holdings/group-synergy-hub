@@ -88,6 +88,8 @@ const ToolManagement = lazy(() => import("./pages/warehouse/ToolManagement"));
 const PoEmailApproval = lazy(() => import("./pages/procurement/PoEmailApproval"));
 const Accounting = lazy(() => import("./pages/Accounting"));
 const Auth = lazy(() => import("./pages/Auth"));
+const MfaChallenge = lazy(() => import("./pages/auth/MfaChallenge"));
+const MfaSetup = lazy(() => import("./pages/auth/MfaSetup"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const Training = lazy(() => import("./pages/admin/Training"));
 const ModuleTrainings = lazy(() => import("./pages/admin/training/ModuleTrainings"));
@@ -198,10 +200,16 @@ function App() {
               <Route path="/asset/:assetId" element={<PublicAssetView />} />
               <Route path="/register-supplier" element={<PublicSupplierRegistration />} />
               <Route path="/procurement/po-email-approval" element={<PoEmailApproval />} />
+              <Route path="/auth/mfa" element={
+                <AuthProvider>
+                  <MfaChallenge />
+                </AuthProvider>
+              } />
               
               {/* Protected routes - all wrapped with auth/company context */}
               <Route element={<ProtectedLayout />}>
                 <Route path="/" element={<Dashboard />} />
+                <Route path="/account/mfa" element={<MfaSetup />} />
                 
                 {/* Admin routes - protected by AdminRoute */}
                 <Route path="/admin/companies" element={<AdminRoute><CompanyManagement /></AdminRoute>} />

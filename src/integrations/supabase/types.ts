@@ -17825,6 +17825,30 @@ export type Database = {
           },
         ]
       }
+      user_mfa_recovery_codes: {
+        Row: {
+          code_hash: string
+          consumed_at: string | null
+          created_at: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          code_hash: string
+          consumed_at?: string | null
+          created_at?: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          code_hash?: string
+          consumed_at?: string | null
+          created_at?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_modules: {
         Row: {
           access_type: string
@@ -19675,6 +19699,7 @@ export type Database = {
           tax_id: string
         }[]
       }
+      consume_mfa_recovery_code: { Args: { p_code: string }; Returns: boolean }
       create_assets_from_request: {
         Args: { p_request_id: string }
         Returns: {
@@ -19735,6 +19760,7 @@ export type Database = {
       generate_grn_number: { Args: never; Returns: string }
       generate_issue_number: { Args: never; Returns: string }
       generate_journal_entry_number: { Args: never; Returns: string }
+      generate_mfa_recovery_codes: { Args: never; Returns: string[] }
       generate_min_number: { Args: never; Returns: string }
       generate_mr_number: { Args: never; Returns: string }
       generate_mrn_number: { Args: never; Returns: string }
