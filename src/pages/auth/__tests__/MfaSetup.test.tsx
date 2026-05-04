@@ -92,7 +92,7 @@ describe("MfaSetup", () => {
 
     await user.click(screen.getByRole("button", { name: /^copy$/i }));
     expect(writeText).toHaveBeenCalled();
-    const written = writeText.mock.calls[0][0] as string;
+    const written = (writeText.mock.calls[0] as any[])[0] as string;
     expect(written.split("\n")).toHaveLength(10);
 
     await user.click(screen.getByRole("button", { name: /^download$/i }));
