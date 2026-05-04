@@ -22,12 +22,7 @@ Object.defineProperty(window.URL, "createObjectURL", { value: vi.fn(() => "blob:
 Object.defineProperty(window.URL, "revokeObjectURL", { value: vi.fn(), configurable: true });
 Object.defineProperty(window.HTMLElement.prototype, "scrollIntoView", { value: vi.fn(), configurable: true });
 
-if (!("clipboard" in navigator)) {
-  Object.defineProperty(navigator, "clipboard", {
-    value: { writeText: vi.fn(async () => {}) },
-    configurable: true,
-  });
-} else {
-  // ensure spy-able
-  (navigator as any).clipboard.writeText = vi.fn(async () => {});
-}
+Object.defineProperty(navigator, "clipboard", {
+  value: { writeText: vi.fn(async () => {}), readText: vi.fn(async () => "") },
+  configurable: true,
+});
