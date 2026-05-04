@@ -26,9 +26,9 @@ export default function MfaSetup() {
   const [busy, setBusy] = useState(false);
   const [recoveryCodes, setRecoveryCodes] = useState<string[] | null>(null);
 
-  useEffect(() => {
-    if (!mfa.loading && mfa.hasVerifiedFactor) setStep('list');
-  }, [mfa.loading, mfa.hasVerifiedFactor]);
+  // Do not snap back to the list when the verified-factor flag flips during
+  // enrollment — that would hide the recovery-codes step right after success.
+  // The list view is the default initial state already.
 
   const startEnrollment = async () => {
     setBusy(true);
