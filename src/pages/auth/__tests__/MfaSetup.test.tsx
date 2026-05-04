@@ -79,6 +79,8 @@ describe("MfaSetup", () => {
   });
 
   it("recovery codes can be copied and downloaded", async () => {
+    const writeText = vi.fn(async () => {});
+    Object.assign(navigator, { clipboard: { writeText } });
     const user = userEvent.setup();
     renderWithRouter(<MfaSetup />);
     await user.click(await screen.findByRole("button", { name: /enable two-factor/i }));
@@ -89,8 +91,8 @@ describe("MfaSetup", () => {
     await screen.findByText(/save these codes in a safe place/i);
 
     await user.click(screen.getByRole("button", { name: /^copy$/i }));
-    expect(navigator.clipboard.writeText).toHaveBeenCalled();
-    const written = (navigator.clipboard.writeText as any).mock.calls[0][0] as string;
+    expect(writeText).toHaveBeenCalled();
+    const written = writeText.mock.calls[0][0] as string;
     expect(written.split("\n")).toHaveLength(10);
 
     await user.click(screen.getByRole("button", { name: /^download$/i }));
