@@ -80,7 +80,10 @@ describe("MfaSetup", () => {
 
   it("recovery codes can be copied and downloaded", async () => {
     const writeText = vi.fn(async () => {});
-    Object.assign(navigator, { clipboard: { writeText } });
+    Object.defineProperty(navigator, "clipboard", {
+      value: { writeText },
+      configurable: true,
+    });
     const user = userEvent.setup();
     renderWithRouter(<MfaSetup />);
     await user.click(await screen.findByRole("button", { name: /enable two-factor/i }));
