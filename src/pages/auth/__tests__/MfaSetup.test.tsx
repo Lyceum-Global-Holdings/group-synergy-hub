@@ -83,7 +83,10 @@ describe("MfaSetup", () => {
     Object.defineProperty(navigator, "clipboard", {
       value: { writeText },
       configurable: true,
+      writable: true,
     });
+    // eslint-disable-next-line no-console
+    console.log("DEBUG immediately after define:", (navigator.clipboard as any).writeText === writeText, Object.getOwnPropertyDescriptor(navigator, "clipboard"));
     const user = userEvent.setup();
     renderWithRouter(<MfaSetup />);
     await user.click(await screen.findByRole("button", { name: /enable two-factor/i }));
