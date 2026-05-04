@@ -200,10 +200,16 @@ function App() {
               <Route path="/asset/:assetId" element={<PublicAssetView />} />
               <Route path="/register-supplier" element={<PublicSupplierRegistration />} />
               <Route path="/procurement/po-email-approval" element={<PoEmailApproval />} />
+              <Route path="/auth/mfa" element={
+                <AuthProvider>
+                  <MfaChallenge />
+                </AuthProvider>
+              } />
               
               {/* Protected routes - all wrapped with auth/company context */}
               <Route element={<ProtectedLayout />}>
                 <Route path="/" element={<Dashboard />} />
+                <Route path="/account/mfa" element={<MfaSetup />} />
                 
                 {/* Admin routes - protected by AdminRoute */}
                 <Route path="/admin/companies" element={<AdminRoute><CompanyManagement /></AdminRoute>} />
