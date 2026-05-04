@@ -33,16 +33,31 @@ export default function MfaSetup() {
   const startEnrollment = async () => {
     setBusy(true);
     try {
-      // Clean up any unverified factors from a previous attempt
+      // Sweep ALL stale (unverified) factors — Supabase enforces unique friendlyName per user
+      // across every factor, not just the totp[] array. listFactors().all covers them all.
       const { data: factors } = await supabase.auth.mfa.listFactors();
-      for (const f of factors?.totp ?? []) {
-        if (f.status !== 'verified') await supabase.auth.mfa.unenroll({ factorId: f.id });
+      const all = (factors as any)?.all ?? factors?.totp ?? [];
+      for (const f of all) {
+        if (f.status !== 'verified') {
+          await supabase.auth.mfa.unenroll({ factorId: f.id });
+        }
       }
 
-      const { data, error } = await supabase.auth.mfa.enroll({
+      const makeName = () =>
+        `Authenticator ${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+
+      let enrollResult = await supabase.auth.mfa.enroll({
         factorType: 'totp',
-        friendlyName: `Authenticator (${new Date().toLocaleDateString()})`,
+        friendlyName: makeName(),
       });
+      // Defensive retry once on name conflict (race with another tab / stale session cache).
+      if (enrollResult.error && /friendly.?name|already exists/i.test(enrollResult.error.message)) {
+        enrollResult = await supabase.auth.mfa.enroll({
+          factorType: 'totp',
+          friendlyName: makeName(),
+        });
+      }
+      const { data, error } = enrollResult;
       if (error) throw error;
       setFactorId(data.id);
       setSecret(data.totp.secret);
