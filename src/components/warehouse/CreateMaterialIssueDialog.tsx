@@ -366,12 +366,19 @@ export function CreateMaterialIssueDialog({ open, onOpenChange }: MaterialIssueD
             {/* Location Selection */}
             <div className="space-y-2">
               <Label htmlFor="location_id">Issue Location <span className="text-destructive">*</span></Label>
-              <Select value={formData.location_id} onValueChange={(value) => handleInputChange('location_id', value)}>
+              <Select
+                value={formData.location_id}
+                onValueChange={(value) => {
+                  setLocationTouched(true);
+                  handleInputChange('location_id', value);
+                }}
+                disabled={!selectedCompany?.id}
+              >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select storage location for this issue" />
+                  <SelectValue placeholder={selectedCompany?.id ? "Select storage location for this issue" : "Select a company first"} />
                 </SelectTrigger>
                 <SelectContent>
-                  {locations.map((loc: any) => (
+                  {filteredLocations.map((loc: any) => (
                     <SelectItem key={loc.id} value={loc.id}>
                       {loc.name}
                     </SelectItem>
@@ -379,7 +386,9 @@ export function CreateMaterialIssueDialog({ open, onOpenChange }: MaterialIssueD
                 </SelectContent>
               </Select>
               <p className="text-xs text-muted-foreground">
-                Stock will be issued only from bins at the selected location.
+                {selectedCompany?.name
+                  ? <>Company: <strong>{selectedCompany.name}</strong>{!locationTouched && formData.location_id ? ' — auto-selected from header context.' : '. Stock will be issued only from bins at the selected location.'}</>
+                  : 'Stock will be issued only from bins at the selected location.'}
               </p>
             </div>
 
