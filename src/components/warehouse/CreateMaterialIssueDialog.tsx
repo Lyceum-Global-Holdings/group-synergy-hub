@@ -414,6 +414,12 @@ export function CreateMaterialIssueDialog({ open, onOpenChange }: MaterialIssueD
               onChange={(v) => handleInputChange('srn_number', v)}
             />
 
+            <SrnDocumentUploadField
+              companyId={selectedCompany?.id}
+              currentDocumentUrl={srnDocumentTempPath || undefined}
+              onUpload={(path) => setSrnDocumentTempPath(path)}
+            />
+
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
