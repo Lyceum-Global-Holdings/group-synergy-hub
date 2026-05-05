@@ -19,7 +19,7 @@ import { useMaterialIssueItems } from '@/hooks/useMaterialIssueItems';
 import { ItemSelector } from '@/components/common/ItemSelector';
 import { SrnNumberField } from '@/components/warehouse/SrnNumberField';
 import { useWarehouseItems } from '@/hooks/useWarehouseItems';
-import { useWarehouseLocations } from '@/hooks/useWarehouseLocations';
+import { useStockBearingLocationsForCompany } from '@/hooks/useWarehouseLocations';
 import { useCompany } from '@/contexts/CompanyContext';
 import { useLocationFilter } from '@/contexts/LocationFilterContext';
 import { useToast } from '@/hooks/use-toast';
@@ -86,20 +86,16 @@ export function CreateMaterialIssueDialog({ open, onOpenChange }: MaterialIssueD
   const [locationTouched, setLocationTouched] = useState(false);
 
   const { items: warehouseItems } = useWarehouseItems();
-  const { locations = [] } = useWarehouseLocations();
+  
   const { createMaterialIssueAsync, isCreating } = useMaterialIssues();
   const { createItems } = useMaterialIssueItems();
   const { selectedCompany } = useCompany();
   const { globalLocationId } = useLocationFilter();
   const { toast } = useToast();
 
-  // Company-scoped locations (SAP MM standard: a storage location belongs to one company/plant)
-  const filteredLocations = useMemo(
-    () => (selectedCompany?.id
-      ? (locations as any[]).filter((l) => l.company_id === selectedCompany.id)
-      : []),
-    [locations, selectedCompany?.id]
-  );
+  // SAP EWM-style stock-bearing nodes: includes inherited sub-locations & departments
+  const { data: stockLocations = [] } = useStockBearingLocationsForCompany(selectedCompany?.id);
+  const filteredLocations = useMemo(() => stockLocations as any[], [stockLocations]);
 
   // Auto-default Issue Location from active context (global header location → single-location fallback)
   useEffect(() => {
@@ -380,7 +376,7 @@ export function CreateMaterialIssueDialog({ open, onOpenChange }: MaterialIssueD
                 <SelectContent>
                   {filteredLocations.map((loc: any) => (
                     <SelectItem key={loc.id} value={loc.id}>
-                      {loc.name}
+                      {'\u00A0\u00A0'.repeat(Math.max(0, loc.depth ?? 0))}{loc.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
