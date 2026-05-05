@@ -270,6 +270,24 @@ export function CreateMaterialIssueDialog({ open, onOpenChange }: MaterialIssueD
         srn_number: formData.srn_number || undefined,
       });
 
+      // Move SRN document from temp/ folder into the new MIN folder, then persist column.
+      if (srnDocumentTempPath && issueNote?.id && selectedCompany?.id) {
+        try {
+          const ext = srnDocumentTempPath.split('.').pop() ?? 'bin';
+          const finalPath = `${selectedCompany.id}/${issueNote.id}/srn_${Date.now()}.${ext}`;
+          const { error: moveErr } = await supabase.storage
+            .from('min-srn-documents')
+            .move(srnDocumentTempPath, finalPath);
+          const persistedPath = moveErr ? srnDocumentTempPath : finalPath;
+          await supabase
+            .from('material_issue_notes')
+            .update({ srn_document_url: persistedPath })
+            .eq('id', issueNote.id);
+        } catch (e) {
+          console.error('Failed to attach SRN document to MIN', e);
+        }
+      }
+
       // Create items with reservation linkage
       const itemsToCreate = items.map((item, index) => ({
         min_id: issueNote.id,
