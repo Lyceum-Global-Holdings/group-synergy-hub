@@ -330,9 +330,12 @@ export function CreateMaterialIssueDialog({ open, onOpenChange }: MaterialIssueD
               </Select>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="requested_by">Requested By *</Label>
+            <SrnNumberField
+              value={formData.srn_number}
+              onChange={(v) => handleInputChange('srn_number', v)}
+            />
+
+
                 <Input
                   id="requested_by"
                   value={formData.requested_by}
