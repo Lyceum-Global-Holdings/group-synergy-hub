@@ -83,13 +83,39 @@ export function CreateMaterialIssueDialog({ open, onOpenChange }: MaterialIssueD
   const [items, setItems] = useState<IssueItem[]>([]);
   const [currentItem, setCurrentItem] = useState<Partial<IssueItem>>({});
   const [reservedItems, setReservedItems] = useState<any[]>([]);
+  const [locationTouched, setLocationTouched] = useState(false);
 
   const { items: warehouseItems } = useWarehouseItems();
   const { locations = [] } = useWarehouseLocations();
   const { createMaterialIssueAsync, isCreating } = useMaterialIssues();
   const { createItems } = useMaterialIssueItems();
   const { selectedCompany } = useCompany();
+  const { globalLocationId } = useLocationFilter();
   const { toast } = useToast();
+
+  // Company-scoped locations (SAP MM standard: a storage location belongs to one company/plant)
+  const filteredLocations = useMemo(
+    () => (selectedCompany?.id
+      ? (locations as any[]).filter((l) => l.company_id === selectedCompany.id)
+      : []),
+    [locations, selectedCompany?.id]
+  );
+
+  // Auto-default Issue Location from active context (global header location → single-location fallback)
+  useEffect(() => {
+    if (!open || locationTouched) return;
+    if (!selectedCompany?.id) return;
+    const inScope = globalLocationId && filteredLocations.some((l) => l.id === globalLocationId);
+    if (inScope) {
+      setFormData((prev) => (prev.location_id === globalLocationId ? prev : { ...prev, location_id: globalLocationId as string }));
+    } else if (filteredLocations.length === 1) {
+      const only = filteredLocations[0].id;
+      setFormData((prev) => (prev.location_id === only ? prev : { ...prev, location_id: only }));
+    } else {
+      setFormData((prev) => (prev.location_id ? { ...prev, location_id: '' } : prev));
+    }
+  }, [open, locationTouched, selectedCompany?.id, globalLocationId, filteredLocations]);
+
 
   // Fetch confirmed CPOs
   const { data: confirmedCPOs = [] } = useQuery({
