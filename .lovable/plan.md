@@ -1,54 +1,89 @@
-## A3 Marketing Brochure — Lyceum Global Holdings ERP
+# Stores Requisition Note (SRN) — Implementation Plan
 
-Generate a professional, print-ready **A3 bi-fold brochure** (2 pages, front + back, landscape) summarizing the platform's modules, integrations, capabilities, and scalability story. Delivered as PDF to `/mnt/documents/`.
+Adds a first-class **Stores Requisition Note (SRN)** reference across the Material Issue & Return module, aligned with international stores-management standards (ISO 9001 traceability, GS1-style document referencing, and SAP/Oracle MM conventions where the SRN is the originating stores requisition that authorises a goods issue).
 
-### Format Decision
+## Standard followed
 
-**Standard chosen:** A3 landscape, 2 pages (front cover + inside spread style on a single A3, plus back). This matches industry-standard corporate ERP brochures (SAP, Oracle, Odoo) and prints/folds cleanly to A4 when halved.
+- **SRN** is the formal stores requisition raised by the requesting department/site that authorises issue of stock — it is the *source document* for the MIN.
+- Numbering format: `SRN-{YYYY}-{NNNNNN}` (year-scoped sequence per company), matching the existing MIN/MRN pattern.
+- Captured at header level on Request / MIN / MRN, plus optional per-line override (when one MIN consolidates lines from multiple SRNs — common in multi-site issues).
+- Unique per company; manual override allowed for back-dated or external SRNs (e.g. paper-based site requisitions being digitised), with uniqueness validation.
 
-- Page size: A3 landscape (420 × 297 mm)
-- Pages: 2 (front = hero + modules; back = integrations + scalability + engineering + contact strip)
-- Bleed-safe margins, brand palette `#1F4E78` / `#2E75B6` / neutral grays
-- Typography: clean sans-serif (Helvetica/Inter family via reportlab)
+## Database changes (migration)
 
-### Content Layout
+1. **New columns** (all nullable text, default NULL):
+   - `material_requests.srn_number`
+   - `material_issue_notes.srn_number`
+   - `material_return_notes.srn_number`
+   - `material_issue_items.srn_number` (per-line override)
+   - `material_request_items.srn_number` (per-line override)
 
-**Page 1 — Hero & Modules**
-- Brand band: "Lyceum Global Holdings — Group Synergy Hub"
-- Tagline: "One Platform. Every Function. Built to Scale."
-- Hero stats strip: 11 Modules · 70+ Sub-modules · Multi-tenant · Realtime
-- 3-column grid of all 11 modules (Warehouse, Procurement, Sourcing, Finance, Construction, Production, TUH/Customer, Management, Admin, Social Media, Auth) with sub-module bullet lists
-- Subtle iconography per module (vector glyphs drawn in reportlab)
+2. **Sequence + generator function**
+   - Postgres function `generate_srn_number(_company_id uuid)` returning `SRN-YYYY-NNNNNN`, using a per-company yearly counter table `srn_counters(company_id, year, last_seq)` with row-level locking — same pattern already used for MIN/MRN.
 
-**Page 2 — Integrations, Scalability, Engineering**
+3. **Uniqueness constraint**
+   - Partial unique index on `(company_id, srn_number)` where `srn_number IS NOT NULL` for each of the three header tables.
 
-*Integrations panel* (icon grid):
-Telegram Bot · Resend Email · MFA/TOTP · Supabase (Postgres, RLS, Auth, Storage, Edge, Realtime) · Lovable AI Gateway · 3D Floor-plan Analyzer · QR Code (PDF/PNG bulk) · PDF/Excel/CSV exports · SAP-compatible mappings
+4. **Indexes** for lookups: `(company_id, srn_number)` btree on each header table.
 
-*Scalability panel* (NEW — key addition):
-- Multi-tenant company isolation with company-scoped RLS
-- Horizontal scaling via Supabase managed Postgres + edge functions
-- Performance: composite `(company_id, created_at DESC)` indexes, keyset pagination, SECURITY INVOKER list RPCs
-- Virtualized tables for ≥200 rows, React Query tiered caching (30s SWR)
-- Realtime sync bus with debounced scoped invalidation
-- Bulk import bypassing 1,000-row API limits
-- Scheduled jobs via pg_cron + pg_net
-- Edge functions auto-scale; stateless React frontend on global CDN
-- Designed to handle multi-company, multi-location, multi-warehouse growth
+5. **Validation trigger** (not CHECK) on each header table: rejects duplicates within the same company; format-validates `^SRN-\d{4}-\d{6}$` when manually entered.
 
-*Platform Capabilities*: RBAC, approval workflows, FIFO batch tracking, three-way match, audit logs, error management
+## Type changes
 
-*Engineering & Quality*: React 18 / Vite / TS strict · Vitest unit testing · Web Vitals budget · Perf telemetry · Security scanner · Hardened edge functions
+Extend `src/types/materialIssueReturn.ts`:
+- Add `srn_number: string | null` to `MaterialRequest`, `MaterialIssueNote`, `MaterialReturnNote`, `MaterialIssueItem`, `MaterialRequestItem`.
+- Add optional `srn_number?: string` to all `Create*Data` interfaces.
 
-*Footer strip*: Confidential — Internal Use · Generated [date] · Lyceum ERP
+## UI changes
 
-### Technical Approach
+1. **Reusable component** `src/components/warehouse/SrnNumberField.tsx`
+   - Label: *"SRN Number (Stores Requisition Note)"*.
+   - Auto-fills via `useGenerateSrnNumber()` hook (calls RPC) when dialog opens; user can clear and type their own.
+   - Inline "Regenerate" button + "Manual" toggle.
+   - Validates uniqueness on blur via lightweight RPC `srn_number_exists(company_id, srn_number, exclude_id)`.
+   - Shows badge "Auto" or "Manual" beside the field.
 
-- Python `reportlab` Platypus + Canvas overlay for brand bands and icon glyphs
-- Two-page A3 landscape `BaseDocTemplate` with custom frames (3-col grid page 1; 2-col asymmetric page 2)
-- Color palette and typography centralized as constants
-- QA: `pdftoppm -r 150` → inspect both pages for overflow/clipping/overlap, iterate until clean
-- Output: `/mnt/documents/LGH_Brochure_A3.pdf`
-- Deliver via `<lov-artifact>` tag
+2. **Dialogs updated**:
+   - `CreateMaterialRequestDialog` — header SRN field.
+   - `CreateMaterialIssueDialog` — header SRN field; line-item editor gains optional SRN override column.
+   - `CreateMaterialReturnDialog` — header SRN field (links return back to originating SRN).
 
-No open questions — proceeding with A3 landscape 2-page bi-fold standard on approval.
+3. **Details dialogs** (`MaterialRequestDetailsDialog`, `MaterialIssueDetailsDialog`, `MaterialReturnDetailsDialog`) — display SRN as a labeled metadata row with copy-to-clipboard.
+
+4. **List columns** (`MaterialIssueReturn.tsx`) — add an "SRN #" column to all three tables, rendered as a `Badge variant="outline"` (matches existing CPO column treatment).
+
+## Hook / API changes
+
+- `src/hooks/useSrnNumber.ts` — `useGenerateSrnNumber()` (mutation calling RPC) + `useSrnExists()` (debounced query).
+- Update `useMaterialIssues`, `useMaterialReturns`, `useMaterialRequests` selects to include `srn_number`.
+- Create mutations: pass SRN through, normalising empty string → null per project memory rule.
+
+## Search & reporting
+
+- Add SRN to the global search filter on each tab (text input above the DataTable) so users can locate documents by SRN number.
+- SRN is included as a column in the existing CSV/PDF exports of these lists.
+
+## Out of scope
+
+- A separate "SRN module" with its own list view (current scope treats SRN purely as a reference/traceability field). If desired later, the schema is structured to support promoting it to its own entity without migration churn.
+
+## Files affected (approx.)
+
+```text
+supabase/migrations/<new>_add_srn_tracking.sql        (new)
+src/types/materialIssueReturn.ts                       (edit)
+src/hooks/useSrnNumber.ts                              (new)
+src/hooks/useMaterialIssues.ts                         (edit – select + create)
+src/hooks/useMaterialReturns.ts                        (edit)
+src/hooks/useMaterialRequests.ts                       (edit)
+src/components/warehouse/SrnNumberField.tsx            (new)
+src/components/warehouse/CreateMaterialRequestDialog.tsx   (edit)
+src/components/warehouse/CreateMaterialIssueDialog.tsx     (edit)
+src/components/warehouse/CreateMaterialReturnDialog.tsx    (edit)
+src/components/warehouse/MaterialRequestDetailsDialog.tsx  (edit)
+src/components/warehouse/MaterialIssueDetailsDialog.tsx    (edit)
+src/components/warehouse/MaterialReturnDetailsDialog.tsx   (edit)
+src/pages/warehouse/MaterialIssueReturn.tsx            (edit – columns)
+```
+
+Approve to implement.
