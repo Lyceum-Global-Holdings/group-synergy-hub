@@ -19,7 +19,7 @@ import { useMaterialIssueItems } from '@/hooks/useMaterialIssueItems';
 import { ItemSelector } from '@/components/common/ItemSelector';
 import { SrnNumberField } from '@/components/warehouse/SrnNumberField';
 import { useWarehouseItems } from '@/hooks/useWarehouseItems';
-import { useWarehouseLocations } from '@/hooks/useWarehouseLocations';
+import { useStockBearingLocationsForCompany } from '@/hooks/useWarehouseLocations';
 import { useCompany } from '@/contexts/CompanyContext';
 import { useLocationFilter } from '@/contexts/LocationFilterContext';
 import { useToast } from '@/hooks/use-toast';

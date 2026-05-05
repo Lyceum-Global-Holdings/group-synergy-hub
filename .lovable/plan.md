@@ -1,34 +1,25 @@
 ## Goal
-When stock is issued via a Material Issue Note (MIN), record each bin-level deduction in the canonical `stock_transactions` table so it appears in the standard Stock Movement History (SAP MM "Material Document" / 261 movement type equivalent).
+Show **sub-locations** (e.g. departments / stock-bearing child nodes) in the Issue Location selector of the Material Issue Note dialog, so materials can be issued from any storage node where stock physically lives.
 
 ## Root cause
-`process_material_issue_stock_update` currently:
-- Updates `warehouse_bin_allocations` (correct).
-- Inserts into `warehouse_stock_movements` (legacy table).
-- **Does NOT insert into `public.stock_transactions`** — the table read by `get_bin_scoped_stock_movements`, the official per-bin movement history viewer (per memory: *SKU-at-Bin Stock Transaction Scope*).
+`CreateMaterialIssueDialog` filters locations with `l.company_id === selectedCompany.id`. Sub-locations in this project intentionally have `company_id = NULL` and inherit access from their parent (49 of 59 sub-locations are like this). That client-side filter strips them all out — only top-level company-owned locations appear.
 
-Result: MIN issues silently bypass the audit trail shown to users.
+## Fix (SAP EWM / WMS standard)
+Use the canonical server-side resolver `get_stock_bearing_locations_for_company` (already exposed via `useStockBearingLocationsForCompany`). It returns every node where the company has effective access — including inherited sub-locations and standalone sub-warehouses — which is exactly the set of valid Goods-Issue storage points.
 
-## Fix (international standard — SAP MM Goods Issue / ISO 9001 traceability)
-Extend the RPC to additionally write **one `stock_transactions` row per consumed bin**, with:
-- `transaction_type = 'material_issue'`
-- `reference_type = 'manual'` (existing enum has no `min` value; matches what `IssueItemsDialog` already uses)
-- `reference_id = p_min_id`
-- `item_id`, `bin_id`, `location_id` (location_guard trigger normalizes from bin)
-- `quantity_change = -v_take` (negative)
-- `quantity_before / quantity_after` at **bin granularity** (`v_before` / `v_before - v_take`) — matches the per-bin running balance contract
-- `company_id` resolved from `material_issue_notes`
-- `notes = 'Material Issue: <MIN#>'`
-- `created_by = auth.uid()`
+## Technical changes
 
-## Technical change
-**Single migration** — recreate `process_material_issue_stock_update` to:
-1. Resolve `v_company_id` from `material_issue_notes` once.
-2. Inside the FIFO loop, after updating the bin allocation, INSERT into `stock_transactions`.
-3. Keep the existing `warehouse_stock_movements` insert (backward compat with any consumers).
+**File: `src/components/warehouse/CreateMaterialIssueDialog.tsx`**
+- Import `useStockBearingLocationsForCompany` from `@/hooks/useWarehouseLocations`.
+- Replace the `useWarehouseLocations()` + client-side `company_id` filter with:
+  ```ts
+  const { data: stockLocations = [] } = useStockBearingLocationsForCompany(selectedCompany?.id);
+  const filteredLocations = stockLocations;
+  ```
+- In the `<SelectItem>` render, indent sub-locations using their `depth` field (e.g. `'\u00A0\u00A0'.repeat(depth) + name`) so the hierarchy is visually clear (SAP Fiori tree-pattern).
+- Drop the unused `useWarehouseLocations` import if no longer needed.
 
-No client/types changes required — RPC signature stays identical, history page will start showing entries automatically.
+No DB / RPC / type changes. The existing auto-default and company helper text continue to work because the returned shape includes `id` and `name`.
 
 ## Out of scope
-- IssueItemsDialog already writes to stock_transactions correctly — no change.
-- Material Returns / Requests (separate user request if needed).
+Other dialogs (transfer, return, request) — separate request if the same fix is needed there.
