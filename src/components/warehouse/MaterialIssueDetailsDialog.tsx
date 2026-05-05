@@ -238,7 +238,7 @@ export function MaterialIssueDetailsDialog({ open, onOpenChange, issueId }: Mate
                   minId={issue.id}
                   currentDocumentUrl={issue.srn_document_url ?? undefined}
                   persistOnChange
-                  disabled={issue.status === 'received' || issue.status === 'cancelled'}
+                  disabled={issue.status === 'cancelled'}
                   onUpload={(path) =>
                     setIssue((prev) => (prev ? { ...prev, srn_document_url: path || null } : prev))
                   }
