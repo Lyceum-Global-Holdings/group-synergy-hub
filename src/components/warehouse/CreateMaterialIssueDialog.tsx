@@ -20,6 +20,8 @@ import { ItemSelector } from '@/components/common/ItemSelector';
 import { SrnNumberField } from '@/components/warehouse/SrnNumberField';
 import { useWarehouseItems } from '@/hooks/useWarehouseItems';
 import { useWarehouseLocations } from '@/hooks/useWarehouseLocations';
+import { useCompany } from '@/contexts/CompanyContext';
+import { useToast } from '@/hooks/use-toast';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import {
@@ -85,6 +87,8 @@ export function CreateMaterialIssueDialog({ open, onOpenChange }: MaterialIssueD
   const { locations = [] } = useWarehouseLocations();
   const { createMaterialIssueAsync, isCreating } = useMaterialIssues();
   const { createItems } = useMaterialIssueItems();
+  const { selectedCompany } = useCompany();
+  const { toast } = useToast();
 
   // Fetch confirmed CPOs
   const { data: confirmedCPOs = [] } = useQuery({
@@ -202,6 +206,23 @@ export function CreateMaterialIssueDialog({ open, onOpenChange }: MaterialIssueD
 
   const handleSubmit = async () => {
     if (!formData.requested_by || items.length === 0) return;
+    if (!formData.location_id) {
+      toast({
+        title: 'Location Required',
+        description: 'Please select an Issue Location. Stock is always issued from a specific storage location.',
+        variant: 'destructive',
+      });
+      setCurrentTab('header');
+      return;
+    }
+    if (!selectedCompany?.id) {
+      toast({
+        title: 'Company Required',
+        description: 'Please select a company in the header before creating a material issue.',
+        variant: 'destructive',
+      });
+      return;
+    }
 
     try {
       const issueNote = await createMaterialIssueAsync({
@@ -219,7 +240,8 @@ export function CreateMaterialIssueDialog({ open, onOpenChange }: MaterialIssueD
         job_number: formData.job_number || undefined,
         pr_number: formData.pr_number || undefined,
         po_number: formData.po_number || undefined,
-        location_id: formData.location_id || undefined,
+        location_id: formData.location_id,
+        company_id: selectedCompany.id,
         srn_number: formData.srn_number || undefined,
       });
 
@@ -315,10 +337,10 @@ export function CreateMaterialIssueDialog({ open, onOpenChange }: MaterialIssueD
 
             {/* Location Selection */}
             <div className="space-y-2">
-              <Label htmlFor="location_id">Issue Location</Label>
+              <Label htmlFor="location_id">Issue Location <span className="text-destructive">*</span></Label>
               <Select value={formData.location_id} onValueChange={(value) => handleInputChange('location_id', value)}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Select location for this issue" />
+                  <SelectValue placeholder="Select storage location for this issue" />
                 </SelectTrigger>
                 <SelectContent>
                   {locations.map((loc: any) => (
@@ -328,6 +350,9 @@ export function CreateMaterialIssueDialog({ open, onOpenChange }: MaterialIssueD
                   ))}
                 </SelectContent>
               </Select>
+              <p className="text-xs text-muted-foreground">
+                Stock will be issued only from bins at the selected location.
+              </p>
             </div>
 
             <SrnNumberField
@@ -468,7 +493,9 @@ export function CreateMaterialIssueDialog({ open, onOpenChange }: MaterialIssueD
                   <ItemSelector
                     value={currentItem.item_id || ''}
                     onSelect={handleItemSelect}
-                    placeholder="Search for item..."
+                    placeholder={formData.location_id ? "Search for item..." : "Select location first"}
+                    disabled={!formData.location_id}
+                    locationId={formData.location_id || undefined}
                   />
                 </div>
                 <div className="space-y-2">
