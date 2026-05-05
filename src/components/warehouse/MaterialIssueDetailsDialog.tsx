@@ -24,6 +24,7 @@ import { MaterialIssueNote, MaterialIssueItem } from '@/types/materialIssueRetur
 import { useToast } from '@/hooks/use-toast';
 import { IssueItemsDialog } from './IssueItemsDialog';
 import { ReceiveItemsDialog } from './ReceiveItemsDialog';
+import { SrnDocumentUploadField } from './SrnDocumentUploadField';
 
 interface MaterialIssueDetailsDialogProps {
   open: boolean;
