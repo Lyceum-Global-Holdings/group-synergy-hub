@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -21,6 +21,7 @@ import { SrnNumberField } from '@/components/warehouse/SrnNumberField';
 import { useWarehouseItems } from '@/hooks/useWarehouseItems';
 import { useWarehouseLocations } from '@/hooks/useWarehouseLocations';
 import { useCompany } from '@/contexts/CompanyContext';
+import { useLocationFilter } from '@/contexts/LocationFilterContext';
 import { useToast } from '@/hooks/use-toast';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -82,13 +83,39 @@ export function CreateMaterialIssueDialog({ open, onOpenChange }: MaterialIssueD
   const [items, setItems] = useState<IssueItem[]>([]);
   const [currentItem, setCurrentItem] = useState<Partial<IssueItem>>({});
   const [reservedItems, setReservedItems] = useState<any[]>([]);
+  const [locationTouched, setLocationTouched] = useState(false);
 
   const { items: warehouseItems } = useWarehouseItems();
   const { locations = [] } = useWarehouseLocations();
   const { createMaterialIssueAsync, isCreating } = useMaterialIssues();
   const { createItems } = useMaterialIssueItems();
   const { selectedCompany } = useCompany();
+  const { globalLocationId } = useLocationFilter();
   const { toast } = useToast();
+
+  // Company-scoped locations (SAP MM standard: a storage location belongs to one company/plant)
+  const filteredLocations = useMemo(
+    () => (selectedCompany?.id
+      ? (locations as any[]).filter((l) => l.company_id === selectedCompany.id)
+      : []),
+    [locations, selectedCompany?.id]
+  );
+
+  // Auto-default Issue Location from active context (global header location → single-location fallback)
+  useEffect(() => {
+    if (!open || locationTouched) return;
+    if (!selectedCompany?.id) return;
+    const inScope = globalLocationId && filteredLocations.some((l) => l.id === globalLocationId);
+    if (inScope) {
+      setFormData((prev) => (prev.location_id === globalLocationId ? prev : { ...prev, location_id: globalLocationId as string }));
+    } else if (filteredLocations.length === 1) {
+      const only = filteredLocations[0].id;
+      setFormData((prev) => (prev.location_id === only ? prev : { ...prev, location_id: only }));
+    } else {
+      setFormData((prev) => (prev.location_id ? { ...prev, location_id: '' } : prev));
+    }
+  }, [open, locationTouched, selectedCompany?.id, globalLocationId, filteredLocations]);
+
 
   // Fetch confirmed CPOs
   const { data: confirmedCPOs = [] } = useQuery({
@@ -282,6 +309,7 @@ export function CreateMaterialIssueDialog({ open, onOpenChange }: MaterialIssueD
       });
       setItems([]);
       setReservedItems([]);
+      setLocationTouched(false);
       setCurrentTab('header');
       onOpenChange(false);
     } catch (error) {
@@ -338,12 +366,19 @@ export function CreateMaterialIssueDialog({ open, onOpenChange }: MaterialIssueD
             {/* Location Selection */}
             <div className="space-y-2">
               <Label htmlFor="location_id">Issue Location <span className="text-destructive">*</span></Label>
-              <Select value={formData.location_id} onValueChange={(value) => handleInputChange('location_id', value)}>
+              <Select
+                value={formData.location_id}
+                onValueChange={(value) => {
+                  setLocationTouched(true);
+                  handleInputChange('location_id', value);
+                }}
+                disabled={!selectedCompany?.id}
+              >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select storage location for this issue" />
+                  <SelectValue placeholder={selectedCompany?.id ? "Select storage location for this issue" : "Select a company first"} />
                 </SelectTrigger>
                 <SelectContent>
-                  {locations.map((loc: any) => (
+                  {filteredLocations.map((loc: any) => (
                     <SelectItem key={loc.id} value={loc.id}>
                       {loc.name}
                     </SelectItem>
@@ -351,7 +386,9 @@ export function CreateMaterialIssueDialog({ open, onOpenChange }: MaterialIssueD
                 </SelectContent>
               </Select>
               <p className="text-xs text-muted-foreground">
-                Stock will be issued only from bins at the selected location.
+                {selectedCompany?.name
+                  ? <>Company: <strong>{selectedCompany.name}</strong>{!locationTouched && formData.location_id ? ' — auto-selected from header context.' : '. Stock will be issued only from bins at the selected location.'}</>
+                  : 'Stock will be issued only from bins at the selected location.'}
               </p>
             </div>
 
