@@ -376,7 +376,7 @@ export function CreateMaterialIssueDialog({ open, onOpenChange }: MaterialIssueD
                 <SelectContent>
                   {filteredLocations.map((loc: any) => (
                     <SelectItem key={loc.id} value={loc.id}>
-                      {loc.name}
+                      {'\u00A0\u00A0'.repeat(Math.max(0, loc.depth ?? 0))}{loc.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
