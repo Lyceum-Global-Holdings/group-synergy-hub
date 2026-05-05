@@ -86,7 +86,7 @@ export function CreateMaterialIssueDialog({ open, onOpenChange }: MaterialIssueD
   const [locationTouched, setLocationTouched] = useState(false);
 
   const { items: warehouseItems } = useWarehouseItems();
-  const { locations = [] } = useWarehouseLocations();
+  
   const { createMaterialIssueAsync, isCreating } = useMaterialIssues();
   const { createItems } = useMaterialIssueItems();
   const { selectedCompany } = useCompany();
