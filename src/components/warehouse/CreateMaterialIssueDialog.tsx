@@ -326,6 +326,7 @@ export function CreateMaterialIssueDialog({ open, onOpenChange }: MaterialIssueD
       setItems([]);
       setReservedItems([]);
       setLocationTouched(false);
+      setSrnDocumentTempPath('');
       setCurrentTab('header');
       onOpenChange(false);
     } catch (error) {
