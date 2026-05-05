@@ -493,7 +493,9 @@ export function CreateMaterialIssueDialog({ open, onOpenChange }: MaterialIssueD
                   <ItemSelector
                     value={currentItem.item_id || ''}
                     onSelect={handleItemSelect}
-                    placeholder="Search for item..."
+                    placeholder={formData.location_id ? "Search for item..." : "Select location first"}
+                    disabled={!formData.location_id}
+                    locationId={formData.location_id || undefined}
                   />
                 </div>
                 <div className="space-y-2">
