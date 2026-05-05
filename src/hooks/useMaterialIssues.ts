@@ -39,6 +39,7 @@ export const useMaterialIssues = () => {
         .from('material_issue_notes')
         .insert({
           ...issueData,
+          srn_number: issueData.srn_number?.trim() || null,
           min_number: minNumber,
           created_by: user.id
         })

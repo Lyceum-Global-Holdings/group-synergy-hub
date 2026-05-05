@@ -39,6 +39,7 @@ export const useMaterialReturns = () => {
         .from('material_return_notes')
         .insert({
           ...returnData,
+          srn_number: returnData.srn_number?.trim() || null,
           mrn_number: mrnNumber,
           created_by: user.id
         })
