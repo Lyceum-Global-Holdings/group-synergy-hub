@@ -76,6 +76,13 @@ export default function MaterialIssueReturn() {
       }
     },
     {
+      accessorKey: "srn_number",
+      header: "SRN #",
+      cell: ({ row }) => row.original.srn_number
+        ? <Badge variant="outline">{row.original.srn_number}</Badge>
+        : <span className="text-muted-foreground">-</span>
+    },
+    {
       accessorKey: "priority",
       header: "Priority",
       cell: ({ row }) => (
@@ -135,6 +142,13 @@ export default function MaterialIssueReturn() {
           {row.original.status}
         </Badge>
       )
+    },
+    {
+      accessorKey: "srn_number",
+      header: "SRN #",
+      cell: ({ row }) => row.original.srn_number
+        ? <Badge variant="outline">{row.original.srn_number}</Badge>
+        : <span className="text-muted-foreground">-</span>
     },
     {
       id: "actions",
