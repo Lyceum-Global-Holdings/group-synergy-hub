@@ -178,6 +178,13 @@ export default function MaterialIssueReturn() {
       )
     },
     {
+      accessorKey: "srn_number",
+      header: "SRN #",
+      cell: ({ row }) => row.original.srn_number
+        ? <Badge variant="outline">{row.original.srn_number}</Badge>
+        : <span className="text-muted-foreground">-</span>
+    },
+    {
       accessorKey: "status",
       header: "Status",
       cell: ({ row }) => (
