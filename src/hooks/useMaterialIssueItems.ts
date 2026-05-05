@@ -50,16 +50,21 @@ export const useMaterialIssueItems = () => {
             binAllocationId = reservation?.bin_allocation_id;
           }
 
-          // Get MIN number for reference
+          // Get MIN number + location for reference
           const { data: minData } = await supabase
             .from('material_issue_notes')
-            .select('min_number')
+            .select('min_number, location_id')
             .eq('id', item.min_id)
             .single();
+
+          if (!minData?.location_id) {
+            throw new Error('Material Issue Note has no location set; cannot deduct stock.');
+          }
 
           const { error: stockError } = await supabase.rpc('process_material_issue_stock_update', {
             p_item_id: item.item_id,
             p_quantity_issued: item.quantity_issued,
+            p_location_id: minData.location_id,
             p_bin_allocation_id: binAllocationId,
             p_min_id: item.min_id,
             p_min_number: minData?.min_number || null
