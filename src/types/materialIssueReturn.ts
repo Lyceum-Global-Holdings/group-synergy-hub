@@ -79,6 +79,7 @@ export interface CreateMaterialIssueData {
   po_number?: string;
   location_id?: string;
   srn_number?: string;
+  srn_document_url?: string | null;
 }
 
 export interface MaterialIssueItem {
