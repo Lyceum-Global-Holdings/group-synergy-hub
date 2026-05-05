@@ -87,6 +87,8 @@ export function CreateMaterialIssueDialog({ open, onOpenChange }: MaterialIssueD
   const { locations = [] } = useWarehouseLocations();
   const { createMaterialIssueAsync, isCreating } = useMaterialIssues();
   const { createItems } = useMaterialIssueItems();
+  const { selectedCompany } = useCompany();
+  const { toast } = useToast();
 
   // Fetch confirmed CPOs
   const { data: confirmedCPOs = [] } = useQuery({
