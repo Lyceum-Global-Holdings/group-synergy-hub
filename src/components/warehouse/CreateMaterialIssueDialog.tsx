@@ -336,6 +336,9 @@ export function CreateMaterialIssueDialog({ open, onOpenChange }: MaterialIssueD
             />
 
 
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="requested_by">Requested By *</Label>
                 <Input
                   id="requested_by"
                   value={formData.requested_by}
