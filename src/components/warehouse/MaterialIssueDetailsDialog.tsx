@@ -229,6 +229,22 @@ export function MaterialIssueDetailsDialog({ open, onOpenChange, issueId }: Mate
                 <p className="text-sm">{issue.notes}</p>
               </div>
             )}
+
+            {issue.company_id && (
+              <div className="border rounded-lg p-4 space-y-2">
+                <h3 className="font-semibold">SRN Evidence</h3>
+                <SrnDocumentUploadField
+                  companyId={issue.company_id}
+                  minId={issue.id}
+                  currentDocumentUrl={issue.srn_document_url ?? undefined}
+                  persistOnChange
+                  disabled={issue.status === 'received' || issue.status === 'cancelled'}
+                  onUpload={(path) =>
+                    setIssue((prev) => (prev ? { ...prev, srn_document_url: path || null } : prev))
+                  }
+                />
+              </div>
+            )}
           </TabsContent>
 
           <TabsContent value="items">
