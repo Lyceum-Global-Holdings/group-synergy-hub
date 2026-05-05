@@ -20,7 +20,7 @@ export const useMaterialRequestItems = (requestId?: string) => {
         .order('line_number', { ascending: true });
 
       if (error) throw error;
-      return data as MaterialRequestItem[];
+      return (data ?? []) as unknown as MaterialRequestItem[];
     },
     enabled: !!requestId,
   });

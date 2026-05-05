@@ -15,6 +15,7 @@ import { useWarehouseReservations } from "@/hooks/useWarehouseReservations";
 import { useWarehouseLocations } from "@/hooks/useWarehouseLocations";
 import { useCurrentUserProfile } from "@/hooks/useCurrentUserProfile";
 import { ItemSelector } from "@/components/common/ItemSelector";
+import { SrnNumberField } from "@/components/warehouse/SrnNumberField";
 import { MaterialRequestPriority } from "@/types/materialIssueReturn";
 import { WarehouseItem } from "@/types/itemBin";
 import { ReservationWithDetails } from "@/types/warehouseReservation";
@@ -48,6 +49,7 @@ export function CreateMaterialRequestDialog({ open, onOpenChange }: CreateMateri
     job_number: "",
     cpo_id: "",
     cpo_number: "",
+    srn_number: "",
     items_required_date: "",
     purpose: "",
     priority: "medium" as MaterialRequestPriority,
@@ -209,6 +211,7 @@ export function CreateMaterialRequestDialog({ open, onOpenChange }: CreateMateri
       job_number: "",
       cpo_id: "",
       cpo_number: "",
+      srn_number: "",
       items_required_date: "",
       purpose: "",
       priority: "medium",
@@ -366,6 +369,11 @@ export function CreateMaterialRequestDialog({ open, onOpenChange }: CreateMateri
                 Link to CPO to view reserved materials
               </p>
             </div>
+
+            <SrnNumberField
+              value={requestData.srn_number}
+              onChange={(v) => setRequestData({ ...requestData, srn_number: v })}
+            />
 
             <div>
               <Label htmlFor="purpose">Purpose *</Label>

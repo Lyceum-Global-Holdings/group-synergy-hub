@@ -9826,6 +9826,7 @@ export type Database = {
           received_at: string | null
           recipient_signature: string | null
           reservation_id: string | null
+          srn_number: string | null
           total_cost: number | null
           unit_cost: number | null
           unit_of_measure: string | null
@@ -9850,6 +9851,7 @@ export type Database = {
           received_at?: string | null
           recipient_signature?: string | null
           reservation_id?: string | null
+          srn_number?: string | null
           total_cost?: number | null
           unit_cost?: number | null
           unit_of_measure?: string | null
@@ -9874,6 +9876,7 @@ export type Database = {
           received_at?: string | null
           recipient_signature?: string | null
           reservation_id?: string | null
+          srn_number?: string | null
           total_cost?: number | null
           unit_cost?: number | null
           unit_of_measure?: string | null
@@ -9949,6 +9952,7 @@ export type Database = {
           received_date: string | null
           request_id: string | null
           requested_by: string | null
+          srn_number: string | null
           status: string
           total_value: number | null
           updated_at: string
@@ -9991,6 +9995,7 @@ export type Database = {
           received_date?: string | null
           request_id?: string | null
           requested_by?: string | null
+          srn_number?: string | null
           status?: string
           total_value?: number | null
           updated_at?: string
@@ -10033,6 +10038,7 @@ export type Database = {
           received_date?: string | null
           request_id?: string | null
           requested_by?: string | null
+          srn_number?: string | null
           status?: string
           total_value?: number | null
           updated_at?: string
@@ -10080,6 +10086,7 @@ export type Database = {
           received_at: string | null
           received_by: string | null
           request_id: string
+          srn_number: string | null
           unit_of_measure: string
           updated_at: string
         }
@@ -10101,6 +10108,7 @@ export type Database = {
           received_at?: string | null
           received_by?: string | null
           request_id: string
+          srn_number?: string | null
           unit_of_measure?: string
           updated_at?: string
         }
@@ -10122,6 +10130,7 @@ export type Database = {
           received_at?: string | null
           received_by?: string | null
           request_id?: string
+          srn_number?: string | null
           unit_of_measure?: string
           updated_at?: string
         }
@@ -10177,6 +10186,7 @@ export type Database = {
           request_date: string
           request_number: string
           requested_by: string
+          srn_number: string | null
           status: Database["public"]["Enums"]["material_request_status"]
           updated_at: string
         }
@@ -10207,6 +10217,7 @@ export type Database = {
           request_date?: string
           request_number: string
           requested_by: string
+          srn_number?: string | null
           status?: Database["public"]["Enums"]["material_request_status"]
           updated_at?: string
         }
@@ -10237,6 +10248,7 @@ export type Database = {
           request_date?: string
           request_number?: string
           requested_by?: string
+          srn_number?: string | null
           status?: Database["public"]["Enums"]["material_request_status"]
           updated_at?: string
         }
@@ -10341,6 +10353,7 @@ export type Database = {
           return_date: string
           return_type: string
           returned_by: string
+          srn_number: string | null
           status: string
           total_value: number | null
           updated_at: string
@@ -10360,6 +10373,7 @@ export type Database = {
           return_date?: string
           return_type?: string
           returned_by: string
+          srn_number?: string | null
           status?: string
           total_value?: number | null
           updated_at?: string
@@ -10379,6 +10393,7 @@ export type Database = {
           return_date?: string
           return_type?: string
           returned_by?: string
+          srn_number?: string | null
           status?: string
           total_value?: number | null
           updated_at?: string
@@ -14941,6 +14956,27 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      srn_counters: {
+        Row: {
+          company_id: string
+          last_seq: number
+          updated_at: string
+          year: number
+        }
+        Insert: {
+          company_id: string
+          last_seq?: number
+          updated_at?: string
+          year: number
+        }
+        Update: {
+          company_id?: string
+          last_seq?: number
+          updated_at?: string
+          year?: number
+        }
+        Relationships: []
       }
       staff_advances: {
         Row: {
@@ -19782,6 +19818,7 @@ export type Database = {
       generate_safety_incident_number: { Args: never; Returns: string }
       generate_safety_inspection_number: { Args: never; Returns: string }
       generate_sales_order_number: { Args: never; Returns: string }
+      generate_srn_number: { Args: { _company_id: string }; Returns: string }
       generate_supplier_code: { Args: never; Returns: string }
       generate_transfer_number: { Args: never; Returns: string }
       generate_work_order_number: { Args: never; Returns: string }
@@ -21135,6 +21172,10 @@ export type Database = {
           p_location_id: string
         }
         Returns: undefined
+      }
+      srn_number_exists: {
+        Args: { _company_id: string; _exclude_id?: string; _srn_number: string }
+        Returns: boolean
       }
       stock_audit_summary: {
         Args: { p_company_id?: string }

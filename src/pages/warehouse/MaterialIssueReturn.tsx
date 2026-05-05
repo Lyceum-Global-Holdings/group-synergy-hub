@@ -76,6 +76,13 @@ export default function MaterialIssueReturn() {
       }
     },
     {
+      accessorKey: "srn_number",
+      header: "SRN #",
+      cell: ({ row }) => row.original.srn_number
+        ? <Badge variant="outline">{row.original.srn_number}</Badge>
+        : <span className="text-muted-foreground">-</span>
+    },
+    {
       accessorKey: "priority",
       header: "Priority",
       cell: ({ row }) => (
@@ -137,6 +144,13 @@ export default function MaterialIssueReturn() {
       )
     },
     {
+      accessorKey: "srn_number",
+      header: "SRN #",
+      cell: ({ row }) => row.original.srn_number
+        ? <Badge variant="outline">{row.original.srn_number}</Badge>
+        : <span className="text-muted-foreground">-</span>
+    },
+    {
       id: "actions",
       cell: ({ row }) => (
         <Button variant="ghost" size="sm" onClick={() => handleViewDetails(row.original.id)}>
@@ -162,6 +176,13 @@ export default function MaterialIssueReturn() {
           {row.original.return_type}
         </Badge>
       )
+    },
+    {
+      accessorKey: "srn_number",
+      header: "SRN #",
+      cell: ({ row }) => row.original.srn_number
+        ? <Badge variant="outline">{row.original.srn_number}</Badge>
+        : <span className="text-muted-foreground">-</span>
     },
     {
       accessorKey: "status",

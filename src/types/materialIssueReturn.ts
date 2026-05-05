@@ -57,6 +57,7 @@ export interface MaterialIssueNote {
   mr_received_date: string | null;
   form_reference: string | null;
   location_id: string | null;
+  srn_number: string | null;
 }
 
 export interface CreateMaterialIssueData {
@@ -76,6 +77,7 @@ export interface CreateMaterialIssueData {
   pr_number?: string;
   po_number?: string;
   location_id?: string;
+  srn_number?: string;
 }
 
 export interface MaterialIssueItem {
@@ -105,6 +107,7 @@ export interface MaterialIssueItem {
   variance_notes?: string | null;
   condition?: 'good' | 'damaged' | 'expired' | null;
   warehouse_item_id?: string;
+  srn_number?: string | null;
 }
 
 export interface CreateMaterialIssueItemData {
@@ -136,6 +139,7 @@ export interface MaterialReturnNote {
   approved_date: string | null;
   created_at: string;
   updated_at: string;
+  srn_number: string | null;
 }
 
 export interface CreateMaterialReturnData {
@@ -147,6 +151,7 @@ export interface CreateMaterialReturnData {
   reference_id?: string;
   notes?: string;
   company_id?: string;
+  srn_number?: string;
 }
 
 export interface MaterialReturnItem {
@@ -201,6 +206,7 @@ export interface MaterialRequest {
   created_by: string | null;
   created_at: string;
   updated_at: string;
+  srn_number: string | null;
 }
 
 export interface CreateMaterialRequestData {
@@ -218,6 +224,7 @@ export interface CreateMaterialRequestData {
   priority?: MaterialRequestPriority;
   notes?: string;
   company_id?: string;
+  srn_number?: string;
 }
 
 export interface MaterialRequestItem {
@@ -241,6 +248,7 @@ export interface MaterialRequestItem {
   adjustment_reason: string | null;
   created_at: string;
   updated_at: string;
+  srn_number?: string | null;
 }
 
 export interface CreateMaterialRequestItemData {

@@ -33,6 +33,7 @@ export const useMaterialRequests = () => {
           ...requestData,
           cpo_id: requestData.cpo_id || null,
           cpo_number: requestData.cpo_number || null,
+          srn_number: requestData.srn_number?.trim() || null,
           created_by: user?.id,
         }])
         .select()
