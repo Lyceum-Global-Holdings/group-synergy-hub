@@ -18,6 +18,7 @@ import { useMaterialIssues } from '@/hooks/useMaterialIssues';
 import { useMaterialIssueItems } from '@/hooks/useMaterialIssueItems';
 import { ItemSelector } from '@/components/common/ItemSelector';
 import { SrnNumberField } from '@/components/warehouse/SrnNumberField';
+import { SrnDocumentUploadField } from '@/components/warehouse/SrnDocumentUploadField';
 import { useWarehouseItems } from '@/hooks/useWarehouseItems';
 import { useStockBearingLocationsForCompany } from '@/hooks/useWarehouseLocations';
 import { useCompany } from '@/contexts/CompanyContext';
@@ -84,6 +85,7 @@ export function CreateMaterialIssueDialog({ open, onOpenChange }: MaterialIssueD
   const [currentItem, setCurrentItem] = useState<Partial<IssueItem>>({});
   const [reservedItems, setReservedItems] = useState<any[]>([]);
   const [locationTouched, setLocationTouched] = useState(false);
+  const [srnDocumentTempPath, setSrnDocumentTempPath] = useState<string>('');
 
   const { items: warehouseItems } = useWarehouseItems();
   
@@ -268,6 +270,24 @@ export function CreateMaterialIssueDialog({ open, onOpenChange }: MaterialIssueD
         srn_number: formData.srn_number || undefined,
       });
 
+      // Move SRN document from temp/ folder into the new MIN folder, then persist column.
+      if (srnDocumentTempPath && issueNote?.id && selectedCompany?.id) {
+        try {
+          const ext = srnDocumentTempPath.split('.').pop() ?? 'bin';
+          const finalPath = `${selectedCompany.id}/${issueNote.id}/srn_${Date.now()}.${ext}`;
+          const { error: moveErr } = await supabase.storage
+            .from('min-srn-documents')
+            .move(srnDocumentTempPath, finalPath);
+          const persistedPath = moveErr ? srnDocumentTempPath : finalPath;
+          await supabase
+            .from('material_issue_notes')
+            .update({ srn_document_url: persistedPath })
+            .eq('id', issueNote.id);
+        } catch (e) {
+          console.error('Failed to attach SRN document to MIN', e);
+        }
+      }
+
       // Create items with reservation linkage
       const itemsToCreate = items.map((item, index) => ({
         min_id: issueNote.id,
@@ -306,6 +326,7 @@ export function CreateMaterialIssueDialog({ open, onOpenChange }: MaterialIssueD
       setItems([]);
       setReservedItems([]);
       setLocationTouched(false);
+      setSrnDocumentTempPath('');
       setCurrentTab('header');
       onOpenChange(false);
     } catch (error) {
@@ -391,6 +412,12 @@ export function CreateMaterialIssueDialog({ open, onOpenChange }: MaterialIssueD
             <SrnNumberField
               value={formData.srn_number}
               onChange={(v) => handleInputChange('srn_number', v)}
+            />
+
+            <SrnDocumentUploadField
+              companyId={selectedCompany?.id}
+              currentDocumentUrl={srnDocumentTempPath || undefined}
+              onUpload={(path) => setSrnDocumentTempPath(path)}
             />
 
 

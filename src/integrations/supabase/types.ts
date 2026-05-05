@@ -9952,6 +9952,7 @@ export type Database = {
           received_date: string | null
           request_id: string | null
           requested_by: string | null
+          srn_document_url: string | null
           srn_number: string | null
           status: string
           total_value: number | null
@@ -9995,6 +9996,7 @@ export type Database = {
           received_date?: string | null
           request_id?: string | null
           requested_by?: string | null
+          srn_document_url?: string | null
           srn_number?: string | null
           status?: string
           total_value?: number | null
@@ -10038,6 +10040,7 @@ export type Database = {
           received_date?: string | null
           request_id?: string | null
           requested_by?: string | null
+          srn_document_url?: string | null
           srn_number?: string | null
           status?: string
           total_value?: number | null

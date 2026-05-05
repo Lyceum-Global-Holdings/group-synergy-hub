@@ -24,6 +24,7 @@ import { MaterialIssueNote, MaterialIssueItem } from '@/types/materialIssueRetur
 import { useToast } from '@/hooks/use-toast';
 import { IssueItemsDialog } from './IssueItemsDialog';
 import { ReceiveItemsDialog } from './ReceiveItemsDialog';
+import { SrnDocumentUploadField } from './SrnDocumentUploadField';
 
 interface MaterialIssueDetailsDialogProps {
   open: boolean;
@@ -226,6 +227,22 @@ export function MaterialIssueDetailsDialog({ open, onOpenChange, issueId }: Mate
               <div className="border rounded-lg p-4 space-y-2">
                 <h3 className="font-semibold">Notes</h3>
                 <p className="text-sm">{issue.notes}</p>
+              </div>
+            )}
+
+            {issue.company_id && (
+              <div className="border rounded-lg p-4 space-y-2">
+                <h3 className="font-semibold">SRN Evidence</h3>
+                <SrnDocumentUploadField
+                  companyId={issue.company_id}
+                  minId={issue.id}
+                  currentDocumentUrl={issue.srn_document_url ?? undefined}
+                  persistOnChange
+                  disabled={issue.status === 'cancelled'}
+                  onUpload={(path) =>
+                    setIssue((prev) => (prev ? { ...prev, srn_document_url: path || null } : prev))
+                  }
+                />
               </div>
             )}
           </TabsContent>

@@ -58,6 +58,7 @@ export interface MaterialIssueNote {
   form_reference: string | null;
   location_id: string | null;
   srn_number: string | null;
+  srn_document_url?: string | null;
 }
 
 export interface CreateMaterialIssueData {
@@ -78,6 +79,7 @@ export interface CreateMaterialIssueData {
   po_number?: string;
   location_id?: string;
   srn_number?: string;
+  srn_document_url?: string | null;
 }
 
 export interface MaterialIssueItem {
