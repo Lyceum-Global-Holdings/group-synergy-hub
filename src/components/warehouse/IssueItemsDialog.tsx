@@ -145,11 +145,21 @@ export function IssueItemsDialog({ open, onOpenChange, issueId, onSuccess }: Iss
 
       const { data: issueNote, error: issueNoteError } = await supabase
         .from('material_issue_notes')
-        .select('company_id')
+        .select('company_id, location_id, min_number')
         .eq('id', issueId)
         .single();
 
       if (issueNoteError) throw issueNoteError;
+
+      if (!issueNote.location_id) {
+        toast({
+          title: 'Location Required',
+          description: 'This Material Issue Note has no location. Stock cannot be issued.',
+          variant: 'destructive',
+        });
+        setIssuing(false);
+        return;
+      }
 
       // Check batch insufficiency
       const hasInsufficient = batchPreviews.some(p => p.insufficient);
@@ -163,24 +173,33 @@ export function IssueItemsDialog({ open, onOpenChange, issueId, onSuccess }: Iss
         return;
       }
 
-      const itemIds = items.map(item => item.item_id);
-      const { data: warehouseItems, error: stockFetchError } = await supabase
-        .from('warehouse_items')
-        .select('id, current_stock')
-        .in('id', itemIds);
+      // Pre-flight: verify each item has enough stock at the issue location (per-bin sum)
+      const itemIds = items.map(i => i.item_id);
+      const { data: locAllocs, error: locAllocErr } = await supabase
+        .from('warehouse_bin_allocations')
+        .select('warehouse_item_id, allocated_quantity, warehouse_bins!inner(location_id)')
+        .in('warehouse_item_id', itemIds)
+        .eq('warehouse_bins.location_id', issueNote.location_id);
 
-      if (stockFetchError) throw stockFetchError;
+      if (locAllocErr) throw locAllocErr;
 
-      const stockMap = new Map(warehouseItems?.map(wi => [wi.id, wi.current_stock]) || []);
+      const availableAtLocation = new Map<string, number>();
+      (locAllocs || []).forEach((a: any) => {
+        availableAtLocation.set(
+          a.warehouse_item_id,
+          (availableAtLocation.get(a.warehouse_item_id) || 0) + Number(a.allocated_quantity || 0)
+        );
+      });
+
       const insufficientStock = items.filter(item => {
-        const currentStock = stockMap.get(item.item_id) || 0;
-        return currentStock < item.quantity_issued;
+        const avail = availableAtLocation.get(item.item_id) || 0;
+        return avail < item.quantity_issued;
       });
 
       if (insufficientStock.length > 0) {
         toast({
-          title: 'Insufficient Stock',
-          description: `${insufficientStock.length} item(s) have insufficient stock`,
+          title: 'Insufficient Stock at Location',
+          description: `${insufficientStock.length} item(s) lack stock at the selected issue location`,
           variant: 'destructive',
         });
         setIssuing(false);
@@ -189,20 +208,21 @@ export function IssueItemsDialog({ open, onOpenChange, issueId, onSuccess }: Iss
 
       const currentTimestamp = new Date().toISOString();
 
-      // Create stock transactions
+      // Create stock_transactions audit rows (location-scoped)
       const stockTransactions = items.map(item => {
-        const currentStock = stockMap.get(item.item_id) || 0;
+        const before = availableAtLocation.get(item.item_id) || 0;
         return {
           item_id: item.item_id,
+          location_id: issueNote.location_id,
           transaction_type: 'material_issue' as const,
           reference_type: 'manual' as const,
           reference_id: issueId,
           quantity_change: -item.quantity_issued,
-          quantity_before: currentStock,
-          quantity_after: currentStock - item.quantity_issued,
+          quantity_before: before,
+          quantity_after: before - item.quantity_issued,
           unit_cost: item.unit_cost || 0,
           total_value: item.total_cost || 0,
-          notes: `Material Issue: ${issueId}`,
+          notes: `Material Issue: ${issueNote.min_number || issueId}`,
           company_id: issueNote.company_id,
           created_by: user.id,
         };
@@ -229,36 +249,19 @@ export function IssueItemsDialog({ open, onOpenChange, issueId, onSuccess }: Iss
         }
       }
 
-      // Update warehouse items stock levels and bin allocations
+      // Deduct stock at the chosen location via location-scoped RPC
       for (const item of items) {
-        const currentStock = stockMap.get(item.item_id) || 0;
+        const { error: deductErr } = await supabase.rpc('process_material_issue_stock_update', {
+          p_item_id: item.item_id,
+          p_quantity_issued: item.quantity_issued,
+          p_location_id: issueNote.location_id,
+          p_bin_allocation_id: null,
+          p_min_id: issueId,
+          p_min_number: issueNote.min_number || null,
+        });
 
-        const { error: updateStockError } = await supabase
-          .from('warehouse_items')
-          .update({ current_stock: currentStock - item.quantity_issued })
-          .eq('id', item.item_id);
-
-        if (updateStockError) throw updateStockError;
-
-        const { data: allocations } = await supabase
-          .from('warehouse_bin_allocations')
-          .select('id, allocated_quantity')
-          .eq('warehouse_item_id', item.item_id)
-          .gt('allocated_quantity', 0)
-          .order('allocated_quantity', { ascending: false });
-
-        if (allocations && allocations.length > 0) {
-          let remainingToReduce = item.quantity_issued;
-
-          for (const alloc of allocations) {
-            if (remainingToReduce <= 0) break;
-            const reduceAmount = Math.min(remainingToReduce, alloc.allocated_quantity);
-            await supabase
-              .from('warehouse_bin_allocations')
-              .update({ allocated_quantity: alloc.allocated_quantity - reduceAmount })
-              .eq('id', alloc.id);
-            remainingToReduce -= reduceAmount;
-          }
+        if (deductErr) {
+          throw new Error(`Stock deduction failed for ${item.item_code || item.item_id}: ${deductErr.message}`);
         }
 
         const { error: updateItemError } = await supabase
