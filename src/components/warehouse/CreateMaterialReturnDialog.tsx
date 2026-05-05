@@ -162,6 +162,8 @@ export function CreateMaterialReturnDialog({
             </div>
           </div>
 
+          <SrnNumberField value={srnNumber} onChange={setSrnNumber} />
+
           <div>
             <Label htmlFor="reason">Reason for Return *</Label>
             <Textarea
