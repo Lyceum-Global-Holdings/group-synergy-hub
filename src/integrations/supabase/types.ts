@@ -20368,6 +20368,7 @@ export type Database = {
         Args: {
           p_bin_allocation_id?: string
           p_item_id: string
+          p_location_id: string
           p_min_id?: string
           p_min_number?: string
           p_quantity_issued: number
