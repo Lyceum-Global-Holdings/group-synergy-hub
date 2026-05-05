@@ -93,13 +93,9 @@ export function CreateMaterialIssueDialog({ open, onOpenChange }: MaterialIssueD
   const { globalLocationId } = useLocationFilter();
   const { toast } = useToast();
 
-  // Company-scoped locations (SAP MM standard: a storage location belongs to one company/plant)
-  const filteredLocations = useMemo(
-    () => (selectedCompany?.id
-      ? (locations as any[]).filter((l) => l.company_id === selectedCompany.id)
-      : []),
-    [locations, selectedCompany?.id]
-  );
+  // SAP EWM-style stock-bearing nodes: includes inherited sub-locations & departments
+  const { data: stockLocations = [] } = useStockBearingLocationsForCompany(selectedCompany?.id);
+  const filteredLocations = useMemo(() => stockLocations as any[], [stockLocations]);
 
   // Auto-default Issue Location from active context (global header location → single-location fallback)
   useEffect(() => {
