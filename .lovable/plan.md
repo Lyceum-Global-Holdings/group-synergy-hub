@@ -1,89 +1,44 @@
-# Stores Requisition Note (SRN) — Implementation Plan
+## Problem
 
-Adds a first-class **Stores Requisition Note (SRN)** reference across the Material Issue & Return module, aligned with international stores-management standards (ISO 9001 traceability, GS1-style document referencing, and SAP/Oracle MM conventions where the SRN is the originating stores requisition that authorises a goods issue).
+Material Requests, Material Issue Notes (MIN), and Material Return Notes (MRN) lists currently show records across **all companies and all locations** the user has access to. RLS (`can_access_company`) correctly allows multi-company access at the database layer, but the UI hooks do not narrow the result set by the **currently selected company** or the **globally selected location** in the header.
 
-## Standard followed
+International stores-management standard (ISO 9001 / SAP MM behaviour): a stores user operates within one **Plant (Company) + Storage Location** scope at a time. Cross-company visibility must be an explicit choice, not the default.
 
-- **SRN** is the formal stores requisition raised by the requesting department/site that authorises issue of stock — it is the *source document* for the MIN.
-- Numbering format: `SRN-{YYYY}-{NNNNNN}` (year-scoped sequence per company), matching the existing MIN/MRN pattern.
-- Captured at header level on Request / MIN / MRN, plus optional per-line override (when one MIN consolidates lines from multiple SRNs — common in multi-site issues).
-- Unique per company; manual override allowed for back-dated or external SRNs (e.g. paper-based site requisitions being digitised), with uniqueness validation.
+## Fix
 
-## Database changes (migration)
+Apply company + location scoping at the data-fetch layer in the three hooks driving the Material Issue & Return module.
 
-1. **New columns** (all nullable text, default NULL):
-   - `material_requests.srn_number`
-   - `material_issue_notes.srn_number`
-   - `material_return_notes.srn_number`
-   - `material_issue_items.srn_number` (per-line override)
-   - `material_request_items.srn_number` (per-line override)
+### 1. `src/hooks/useMaterialRequests.ts`
+- Read `selectedCompany` from `useCompany()` and `globalLocationId` from `useLocationFilter()`.
+- Update `useQuery`:
+  - `queryKey: ['material-requests', selectedCompany?.id, globalLocationId]`
+  - `enabled: !!selectedCompany?.id`
+  - Add `.eq('company_id', selectedCompany.id)`
+  - If `globalLocationId` is set, add `.eq('location_id', globalLocationId)`
 
-2. **Sequence + generator function**
-   - Postgres function `generate_srn_number(_company_id uuid)` returning `SRN-YYYY-NNNNNN`, using a per-company yearly counter table `srn_counters(company_id, year, last_seq)` with row-level locking — same pattern already used for MIN/MRN.
+### 2. `src/hooks/useMaterialIssues.ts`
+- Same pattern on `material_issue_notes` query (`['material-issues', companyId, locationId]`).
 
-3. **Uniqueness constraint**
-   - Partial unique index on `(company_id, srn_number)` where `srn_number IS NOT NULL` for each of the three header tables.
+### 3. `src/hooks/useMaterialReturns.ts`
+- Same pattern on `material_return_notes` query (`['material-returns', companyId, locationId]`).
 
-4. **Indexes** for lookups: `(company_id, srn_number)` btree on each header table.
+### 4. Create-side safety
+- In all three `create...Mutation` calls, ensure `company_id: selectedCompany.id` is passed (it currently relies on the form value). Add a guard that throws if no company is selected.
+- Invalidate queries with the new compound query keys (`['material-requests']` prefix invalidation still works via React Query's partial-match).
 
-5. **Validation trigger** (not CHECK) on each header table: rejects duplicates within the same company; format-validates `^SRN-\d{4}-\d{6}$` when manually entered.
+### 5. UI feedback
+- In `src/pages/warehouse/MaterialIssueReturn.tsx`, when no company is selected show an empty-state: "Select a company in the header to view material documents."
+- The existing global Location selector in the header already drives `globalLocationId`; the lists will now react to it automatically.
 
-## Type changes
+## Why not change RLS
 
-Extend `src/types/materialIssueReturn.ts`:
-- Add `srn_number: string | null` to `MaterialRequest`, `MaterialIssueNote`, `MaterialReturnNote`, `MaterialIssueItem`, `MaterialRequestItem`.
-- Add optional `srn_number?: string` to all `Create*Data` interfaces.
+RLS already enforces company-membership correctly. The bug is purely **client-side scoping**. Tightening RLS further would break legitimate cross-company admin views (Approval Console, Reports). Scoping at the hook layer keeps the lists context-aware while preserving admin capabilities elsewhere.
 
-## UI changes
+## Files to edit
 
-1. **Reusable component** `src/components/warehouse/SrnNumberField.tsx`
-   - Label: *"SRN Number (Stores Requisition Note)"*.
-   - Auto-fills via `useGenerateSrnNumber()` hook (calls RPC) when dialog opens; user can clear and type their own.
-   - Inline "Regenerate" button + "Manual" toggle.
-   - Validates uniqueness on blur via lightweight RPC `srn_number_exists(company_id, srn_number, exclude_id)`.
-   - Shows badge "Auto" or "Manual" beside the field.
+- `src/hooks/useMaterialRequests.ts`
+- `src/hooks/useMaterialIssues.ts`
+- `src/hooks/useMaterialReturns.ts`
+- `src/pages/warehouse/MaterialIssueReturn.tsx` (empty-state guard)
 
-2. **Dialogs updated**:
-   - `CreateMaterialRequestDialog` — header SRN field.
-   - `CreateMaterialIssueDialog` — header SRN field; line-item editor gains optional SRN override column.
-   - `CreateMaterialReturnDialog` — header SRN field (links return back to originating SRN).
-
-3. **Details dialogs** (`MaterialRequestDetailsDialog`, `MaterialIssueDetailsDialog`, `MaterialReturnDetailsDialog`) — display SRN as a labeled metadata row with copy-to-clipboard.
-
-4. **List columns** (`MaterialIssueReturn.tsx`) — add an "SRN #" column to all three tables, rendered as a `Badge variant="outline"` (matches existing CPO column treatment).
-
-## Hook / API changes
-
-- `src/hooks/useSrnNumber.ts` — `useGenerateSrnNumber()` (mutation calling RPC) + `useSrnExists()` (debounced query).
-- Update `useMaterialIssues`, `useMaterialReturns`, `useMaterialRequests` selects to include `srn_number`.
-- Create mutations: pass SRN through, normalising empty string → null per project memory rule.
-
-## Search & reporting
-
-- Add SRN to the global search filter on each tab (text input above the DataTable) so users can locate documents by SRN number.
-- SRN is included as a column in the existing CSV/PDF exports of these lists.
-
-## Out of scope
-
-- A separate "SRN module" with its own list view (current scope treats SRN purely as a reference/traceability field). If desired later, the schema is structured to support promoting it to its own entity without migration churn.
-
-## Files affected (approx.)
-
-```text
-supabase/migrations/<new>_add_srn_tracking.sql        (new)
-src/types/materialIssueReturn.ts                       (edit)
-src/hooks/useSrnNumber.ts                              (new)
-src/hooks/useMaterialIssues.ts                         (edit – select + create)
-src/hooks/useMaterialReturns.ts                        (edit)
-src/hooks/useMaterialRequests.ts                       (edit)
-src/components/warehouse/SrnNumberField.tsx            (new)
-src/components/warehouse/CreateMaterialRequestDialog.tsx   (edit)
-src/components/warehouse/CreateMaterialIssueDialog.tsx     (edit)
-src/components/warehouse/CreateMaterialReturnDialog.tsx    (edit)
-src/components/warehouse/MaterialRequestDetailsDialog.tsx  (edit)
-src/components/warehouse/MaterialIssueDetailsDialog.tsx    (edit)
-src/components/warehouse/MaterialReturnDetailsDialog.tsx   (edit)
-src/pages/warehouse/MaterialIssueReturn.tsx            (edit – columns)
-```
-
-Approve to implement.
+No DB migration required.
