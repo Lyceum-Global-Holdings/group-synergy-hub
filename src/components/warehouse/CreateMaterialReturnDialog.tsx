@@ -9,6 +9,7 @@ import { Plus, Trash2 } from "lucide-react";
 import { useMaterialReturns } from "@/hooks/useMaterialReturns";
 import { useMaterialReturnItems } from "@/hooks/useMaterialReturnItems";
 import { ItemSelector } from "@/components/common/ItemSelector";
+import { SrnNumberField } from "@/components/warehouse/SrnNumberField";
 import { useCompany } from "@/contexts/CompanyContext";
 import { format } from "date-fns";
 
@@ -44,6 +45,7 @@ export function CreateMaterialReturnDialog({
   const [returnType, setReturnType] = useState<'internal' | 'supplier'>('internal');
   const [reason, setReason] = useState('');
   const [notes, setNotes] = useState('');
+  const [srnNumber, setSrnNumber] = useState('');
   const [items, setItems] = useState<ReturnItem[]>([]);
 
   const handleAddItem = () => {
@@ -87,7 +89,8 @@ export function CreateMaterialReturnDialog({
         reference_type: referenceType,
         reference_id: referenceId || undefined,
         notes,
-        company_id: selectedCompany.id
+        company_id: selectedCompany.id,
+        srn_number: srnNumber || undefined,
       });
 
       const returnItems = items.map((item, idx) => ({
@@ -107,6 +110,7 @@ export function CreateMaterialReturnDialog({
       setReturnType('internal');
       setReason('');
       setNotes('');
+      setSrnNumber('');
       setItems([]);
       onOpenChange(false);
     } catch (error) {
