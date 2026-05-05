@@ -17,6 +17,7 @@ import { Plus, Trash2, Package, ListPlus, AlertTriangle } from 'lucide-react';
 import { useMaterialIssues } from '@/hooks/useMaterialIssues';
 import { useMaterialIssueItems } from '@/hooks/useMaterialIssueItems';
 import { ItemSelector } from '@/components/common/ItemSelector';
+import { SrnNumberField } from '@/components/warehouse/SrnNumberField';
 import { useWarehouseItems } from '@/hooks/useWarehouseItems';
 import { useWarehouseLocations } from '@/hooks/useWarehouseLocations';
 import { useQuery } from '@tanstack/react-query';
@@ -72,6 +73,7 @@ export function CreateMaterialIssueDialog({ open, onOpenChange }: MaterialIssueD
     notes: '',
     cpo_id: '',
     cpo_number: '',
+    srn_number: '',
     location_id: '',
   });
 
@@ -218,6 +220,7 @@ export function CreateMaterialIssueDialog({ open, onOpenChange }: MaterialIssueD
         pr_number: formData.pr_number || undefined,
         po_number: formData.po_number || undefined,
         location_id: formData.location_id || undefined,
+        srn_number: formData.srn_number || undefined,
       });
 
       // Create items with reservation linkage
@@ -252,6 +255,7 @@ export function CreateMaterialIssueDialog({ open, onOpenChange }: MaterialIssueD
         notes: '',
         cpo_id: '',
         cpo_number: '',
+        srn_number: '',
         location_id: '',
       });
       setItems([]);
