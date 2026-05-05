@@ -337,10 +337,10 @@ export function CreateMaterialIssueDialog({ open, onOpenChange }: MaterialIssueD
 
             {/* Location Selection */}
             <div className="space-y-2">
-              <Label htmlFor="location_id">Issue Location</Label>
+              <Label htmlFor="location_id">Issue Location <span className="text-destructive">*</span></Label>
               <Select value={formData.location_id} onValueChange={(value) => handleInputChange('location_id', value)}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Select location for this issue" />
+                  <SelectValue placeholder="Select storage location for this issue" />
                 </SelectTrigger>
                 <SelectContent>
                   {locations.map((loc: any) => (
@@ -350,6 +350,9 @@ export function CreateMaterialIssueDialog({ open, onOpenChange }: MaterialIssueD
                   ))}
                 </SelectContent>
               </Select>
+              <p className="text-xs text-muted-foreground">
+                Stock will be issued only from bins at the selected location.
+              </p>
             </div>
 
             <SrnNumberField
