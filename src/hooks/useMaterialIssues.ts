@@ -2,23 +2,35 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { MaterialIssueNote, CreateMaterialIssueData } from '@/types/materialIssueReturn';
 import { useToast } from '@/hooks/use-toast';
+import { useCompany } from '@/contexts/CompanyContext';
+import { useLocationFilter } from '@/contexts/LocationFilterContext';
 
 export const useMaterialIssues = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { selectedCompany } = useCompany();
+  const { globalLocationId } = useLocationFilter();
+  const companyId = selectedCompany?.id ?? null;
 
   const {
     data: materialIssues = [],
     isLoading,
     error
   } = useQuery({
-    queryKey: ['material-issues'],
+    queryKey: ['material-issues', companyId, globalLocationId],
+    enabled: !!companyId,
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from('material_issue_notes')
         .select('*, warehouse_locations(name)')
+        .eq('company_id', companyId as string)
         .order('created_at', { ascending: false });
 
+      if (globalLocationId) {
+        query = query.eq('location_id', globalLocationId);
+      }
+
+      const { data, error } = await query;
       if (error) throw error;
       return data as MaterialIssueNote[];
     }

@@ -2,21 +2,26 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { MaterialReturnNote, CreateMaterialReturnData } from '@/types/materialIssueReturn';
 import { useToast } from '@/hooks/use-toast';
+import { useCompany } from '@/contexts/CompanyContext';
 
 export const useMaterialReturns = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { selectedCompany } = useCompany();
+  const companyId = selectedCompany?.id ?? null;
 
   const {
     data: materialReturns = [],
     isLoading,
     error
   } = useQuery({
-    queryKey: ['material-returns'],
+    queryKey: ['material-returns', companyId],
+    enabled: !!companyId,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('material_return_notes')
         .select('*')
+        .eq('company_id', companyId as string)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
