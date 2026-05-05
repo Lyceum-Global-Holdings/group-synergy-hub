@@ -206,6 +206,23 @@ export function CreateMaterialIssueDialog({ open, onOpenChange }: MaterialIssueD
 
   const handleSubmit = async () => {
     if (!formData.requested_by || items.length === 0) return;
+    if (!formData.location_id) {
+      toast({
+        title: 'Location Required',
+        description: 'Please select an Issue Location. Stock is always issued from a specific storage location.',
+        variant: 'destructive',
+      });
+      setCurrentTab('header');
+      return;
+    }
+    if (!selectedCompany?.id) {
+      toast({
+        title: 'Company Required',
+        description: 'Please select a company in the header before creating a material issue.',
+        variant: 'destructive',
+      });
+      return;
+    }
 
     try {
       const issueNote = await createMaterialIssueAsync({
@@ -223,7 +240,8 @@ export function CreateMaterialIssueDialog({ open, onOpenChange }: MaterialIssueD
         job_number: formData.job_number || undefined,
         pr_number: formData.pr_number || undefined,
         po_number: formData.po_number || undefined,
-        location_id: formData.location_id || undefined,
+        location_id: formData.location_id,
+        company_id: selectedCompany.id,
         srn_number: formData.srn_number || undefined,
       });
 
