@@ -370,6 +370,11 @@ export function CreateMaterialRequestDialog({ open, onOpenChange }: CreateMateri
               </p>
             </div>
 
+            <SrnNumberField
+              value={requestData.srn_number}
+              onChange={(v) => setRequestData({ ...requestData, srn_number: v })}
+            />
+
             <div>
               <Label htmlFor="purpose">Purpose *</Label>
               <Textarea
