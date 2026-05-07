@@ -73,9 +73,12 @@ serve(async (req) => {
     }
     if (!inv.ubl_xml_path) return jsonError("UBL XML not built yet", 400);
 
-    if (!STORECOVE_API_KEY || !STORECOVE_LEGAL_ENTITY_ID) {
+    const apiKey = env === "live"
+      ? (Deno.env.get("STORECOVE_LIVE_API_KEY") ?? STORECOVE_API_KEY)
+      : STORECOVE_API_KEY;
+    if (!apiKey || !STORECOVE_LEGAL_ENTITY_ID) {
       return jsonError(
-        "Storecove not configured. Add STORECOVE_API_KEY and STORECOVE_SENDER_LEGAL_ENTITY_ID secrets.",
+        "Storecove not configured. Add STORECOVE_API_KEY (and STORECOVE_LIVE_API_KEY for live) plus STORECOVE_SENDER_LEGAL_ENTITY_ID secrets.",
         503,
       );
     }
