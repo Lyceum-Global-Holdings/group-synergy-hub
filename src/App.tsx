@@ -131,6 +131,18 @@ const SocialMediaActivityLog = lazy(() => import("./pages/social-media/ActivityL
 const TestEnvironmentPage = lazy(() => import("./pages/admin/test-environment/TestEnvironmentPage"));
 const PerformanceDashboard = lazy(() => import("./pages/admin/PerformanceDashboard"));
 
+// Supplier Portal pages
+const PortalLayout = lazy(() => import("./components/portal/PortalLayout").then((m) => ({ default: m.PortalLayout })));
+const PortalLogin = lazy(() => import("./pages/portal/PortalLogin"));
+const PortalAcceptInvite = lazy(() => import("./pages/portal/PortalAcceptInvite"));
+const PortalDashboard = lazy(() => import("./pages/portal/PortalDashboard"));
+const PortalProfile = lazy(() => import("./pages/portal/PortalProfile"));
+const PortalUsers = lazy(() => import("./pages/portal/PortalUsers"));
+const PortalPeppolIds = lazy(() => import("./pages/portal/PortalPeppolIds"));
+const PortalQuotes = lazy(() => import("./pages/portal/PortalQuotes"));
+const PortalInvoices = lazy(() => import("./pages/portal/PortalInvoices"));
+const PortalNoAccess = lazy(() => import("./pages/portal/PortalNoAccess"));
+
 // Phase 5 — fires markRouteChange on every SPA navigation so vitals tag the right route.
 function RouteChangeTracker() {
   const location = useLocation();
