@@ -47,7 +47,7 @@ export default function PortalInvoices() {
     setLoading(true);
     const { data } = await supabase
       .from("einvoices")
-      .select("id, invoice_number, status, match_status, direction, grand_total, currency, issue_date, peppol_message_id, ubl_xml_path")
+      .select("id, invoice_number, status, match_status, direction, document_type, compliance_profile, corrected_einvoice_id, grand_total, currency, issue_date, peppol_message_id, ubl_xml_path")
       .eq("supplier_id", activeSupplierId)
       .order("issue_date", { ascending: false })
       .limit(100);
