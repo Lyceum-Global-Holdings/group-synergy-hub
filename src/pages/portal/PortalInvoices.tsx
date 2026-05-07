@@ -68,6 +68,20 @@ export default function PortalInvoices() {
     await refresh();
   };
 
+  const issueCreditNote = async (id: string) => {
+    const reason = window.prompt("Reason for credit note?");
+    if (!reason) return;
+    setBusyId(id);
+    const { data, error } = await supabase.functions.invoke("peppol-credit-note", { body: { einvoice_id: id, reason } });
+    setBusyId(null);
+    if (error || (data as any)?.error) {
+      toast({ title: "Credit note failed", description: String((data as any)?.error || error?.message), variant: "destructive" });
+      return;
+    }
+    toast({ title: "Credit note created", description: `Number: ${(data as any).invoice_number}` });
+    await refresh();
+  };
+
   const downloadUbl = async (row: InvoiceRow) => {
     if (!row.ubl_xml_path) return;
     const { data, error } = await supabase.storage.from("einvoices").createSignedUrl(row.ubl_xml_path, 60);
