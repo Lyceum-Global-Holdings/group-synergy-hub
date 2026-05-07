@@ -20,3 +20,12 @@ verify_jwt = false
 
 [functions.admin-create-user]
 verify_jwt = false
+
+[functions.supplier-invite]
+verify_jwt = false
+
+[functions.supplier-accept-invite]
+verify_jwt = false
+
+[functions.peppol-build-invoice]
+verify_jwt = false
