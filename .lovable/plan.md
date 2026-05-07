@@ -1,84 +1,105 @@
-# Phase 2 — PEPPOL E-Invoicing Core (UBL 2.1 Schema + Builder + Supplier Quote Flow)
+# PEPPOL Phase 3 — Transmission, Receipts, Inbound Parsing, 3-Way Match
 
-## Context
-Phase 1 (database tables for supplier portal: `supplier_users`, `supplier_invitations`, `peppol_participants`, `supplier_profiles_extended`, `supplier_portal_audit`, helpers, RLS, storage bucket) is applied. Edge functions and `/portal/*` UI from Phase 1 were not built — Phase 2 will pick those up alongside the e-invoicing schema, since the portal is the surface where suppliers submit invoices that drive the PEPPOL pipeline.
+Builds on Phase 2 (canonical e-invoice tables, UBL builder, supplier portal). Phase 3 makes invoices actually leave and enter the system over the PEPPOL network and reconciles them against POs and GRNs.
 
-Phase 3 (live Storecove AP send/receive, AS4 webhooks, MLR/BLR) and Phase 4 (country-specific mandates: SA ZATCA, IN IRP, IT SDI, MX CFDI) remain out of scope.
+## Scope
 
-## Goal
-Stand up the canonical e-invoice domain (tables, RLS, storage, hash-chained events), a UBL 2.1 / PEPPOL BIS Billing 3.0 builder edge function that produces validated XML (no network send yet), the supplier portal shell + invite/accept flow, and the Sourcing-side supplier quote ingestion. Outputs are stored UBL XML files that pass schematron locally — ready for Phase 3 to ship to Storecove.
+1. **Outbound transmission** — submit `validated` UBL XML to the access point (Storecove) and track delivery state.
+2. **Inbound webhook** — receive PEPPOL messages + Message Level Responses (MLR) and Business Level Responses (BLR/Invoice Response) from the access point.
+3. **Inbound UBL parser** — turn received UBL XML into `einvoices` + `einvoice_lines` rows (`direction='inbound'`).
+4. **3-way match** — auto-link inbound invoices to PO/GRN, compute `match_status` and discrepancies.
+5. **UI surface** — Finance AP "PEPPOL Invoices" tab gets actions (Send, View XML, View match), supplier portal invoices tab shows live status from MLR/BLR.
 
-## Deliverables
+Out of scope (Phase 4): country-specific mandates (KSA ZATCA, IT SDI, FR Factur-X), credit notes, attachment encryption at rest, DSAR export.
 
-### 1. Database migration — e-invoicing core
-New tables (all `company_id` scoped, RLS):
-- `einvoices` — header: direction (`outbound` | `inbound`), `supplier_id`, `customer_company_id`, `invoice_number`, `issue_date`, `due_date`, `currency`, `subtotal`, `tax_total`, `grand_total`, `status` (`draft` | `validated` | `ready_to_send` | `sent` | `received` | `accepted` | `rejected` | `paid`), `peppol_message_id`, `ubl_xml_path` (storage), `pdf_path`, `po_id`, `grn_id`, `match_status`, `created_by`.
-- `einvoice_lines` — `einvoice_id`, `line_no`, `item_code`, `description`, `quantity`, `unit`, `unit_price`, `line_extension`, `tax_category`, `tax_rate`, `tax_amount`, `po_line_id`.
-- `einvoice_attachments` — file metadata + storage path (PDF, supporting docs).
-- `einvoice_events` — append-only, hash-chained (`prev_hash`/`row_hash` like `supplier_portal_audit`): `event_type` (`created`, `validated`, `submitted`, `ack_received`, `rejected`, `matched`, `posted`), `actor_user_id`, `payload jsonb`, `ip`, `user_agent`.
-- `supplier_quotes` (Sourcing bridge) — links `rfq_id` ↔ `supplier_id` with `quote_number`, `valid_until`, `currency`, `total`, `status`, `submitted_by_user_id`, plus `supplier_quote_lines`.
+## Architecture
 
-Indexes: `(company_id, status, created_at DESC)`, `(supplier_id, issue_date DESC)`, `(po_id)`, `(peppol_message_id)`.
+```text
+┌─────────────────┐  validated UBL   ┌──────────────────┐
+│ peppol-build    │─────────────────▶│ peppol-send      │──┐
+└─────────────────┘                  └──────────────────┘  │
+                                                           │ AS4
+                                  ┌──────── Storecove ────┘
+                                  │
+                       MLR/BLR    ▼
+                ┌──────────────────────────┐
+                │ peppol-webhook (public)  │──▶ einvoice_events
+                └──────────────────────────┘     status updates
+                          │ inbound invoice
+                          ▼
+                ┌──────────────────────────┐
+                │ peppol-ingest-inbound    │──▶ einvoices(direction=inbound)
+                └──────────────────────────┘     einvoice_lines
+                          │
+                          ▼
+                ┌──────────────────────────┐
+                │ peppol-three-way-match   │──▶ match_status + report
+                └──────────────────────────┘
+```
 
-Triggers: `einvoice_events` hash-chain trigger (mirror of `supplier_portal_audit_hash`); `set_updated_at` on all mutable tables; status-transition guard function rejecting illegal transitions.
+## Database changes
 
-RLS:
-- Internal admins/AP/finance roles: full company-scoped CRUD.
-- Suppliers (`is_supplier_member`): SELECT own outbound + own quotes; INSERT outbound drafts + quotes (owner/contributor); never see other suppliers.
-- Append-only enforcement on `einvoice_events` (no UPDATE/DELETE, even for admins).
+Migration `phase3_peppol_transmission`:
 
-Storage: private bucket `einvoices` with path `{company_id}/{einvoice_id}/ubl.xml` (+ `pdf/`, `attachments/`). RLS scoped on `foldername(name)[1] = company_id` for internal, supplier-owned subset for suppliers.
+- New table `einvoice_transmissions`:
+  - `einvoice_id` (FK), `provider` ('storecove'), `provider_message_id`, `direction`,
+    `submitted_at`, `last_status`, `last_status_at`, `attempt_count`, `error_message`, `raw_response jsonb`.
+- Extend `einvoice_status` enum with `submission_failed`, `delivered` (idempotent `ALTER TYPE`).
+- New table `einvoice_match_results`:
+  - `einvoice_id`, `po_id`, `grn_id`, `total_match`, `qty_match`, `price_match`,
+    `discrepancies jsonb`, `score numeric`, `evaluated_at`.
+- Indexes: `(provider_message_id)` unique partial, `(einvoice_id, evaluated_at DESC)`.
+- RLS: admin full; suppliers may read their own transmissions/match results (via `is_supplier_member`).
+- Append-only trigger on `einvoice_transmissions` (no UPDATE/DELETE; only INSERT new rows per state change).
 
-### 2. Edge functions (Deno, JWT-verified, Zod-validated, CORS, rate-limited)
-- `supplier-invite` (admin) — generates invite token, hashes, inserts `supplier_invitations`, sends email via existing transactional email pathway. Audit via `log_supplier_portal_event`.
-- `supplier-accept-invite` (public) — verifies token+expiry, creates auth user, links to `supplier_users`, redirects to `/portal/mfa`.
-- `peppol-build-invoice` (internal + supplier owner) — input `{ einvoice_id }`. Loads header+lines+supplier+customer+PEPPOL participants, builds UBL 2.1 XML (PEPPOL BIS Billing 3.0 / EN 16931 profile) using a vendored UBL template module, runs structural validation (required fields, totals reconciliation, currency, party identifiers, tax categories), writes XML to storage, sets status `validated`, appends `einvoice_events` row. Returns XML path + validation report.
-- `peppol-validate-invoice` (read-only) — re-runs validation on stored XML; used by retry flows. No network calls.
+## Edge functions
 
-All four functions: structured logging, return uniform error envelope, no service_role key on client, no path-style invocation.
+All functions: `verify_jwt = false`, validate JWT in code (admin-only) except the public webhook.
 
-### 3. Frontend — Supplier Portal shell
-New route tree under `/portal/*` (separate `PortalLayout`, no admin sidebar):
-- `/portal/accept-invite?token=…`
-- `/portal/login`, `/portal/mfa` (reuses existing MFA challenge components)
-- `/portal/dashboard` — quote/PO/invoice counters
-- `/portal/profile`, `/portal/users`, `/portal/peppol-ids`
-- `/portal/quotes` (list + submit-against-RFQ)
-- `/portal/invoices` — list, draft, attach PDF, validate, view UBL preview/XML
+1. **`peppol-send`** (admin): loads `einvoices` row in `validated` status, reads `ubl_xml_path` from Storage, POSTs to Storecove `/document_submissions`, writes a row in `einvoice_transmissions`, sets status `ready_to_send` → `sent`, appends `submitted` event.
+2. **`peppol-webhook`** (public, HMAC-verified via `STORECOVE_WEBHOOK_SECRET`): handles event types `invoice.delivered`, `invoice.received`, `invoice.mlr`, `invoice.blr`, `invoice.failed`. Updates `einvoice_transmissions.last_status`, transitions `einvoices.status`, appends `ack_received` / `rejected` / `delivered` events.
+3. **`peppol-ingest-inbound`** (internal, called by webhook for received UBL): downloads UBL from Storecove, parses with vendored XML walker (no schema validation here — that's the Phase 2 builder's job; we trust receipt), inserts `einvoices(direction='inbound', status='received')` + `einvoice_lines`, stores XML in `einvoices` bucket under `inbound/{message_id}.xml`.
+4. **`peppol-three-way-match`** (admin or invoked by ingest): finds candidate PO via `peppol_message_id` → buyer reference, GRN via PO. Computes line-by-line qty/price tolerance (configurable, defaults: ±5% qty, ±2% price, ±1 unit currency). Writes `einvoice_match_results`, sets `einvoices.match_status`, appends `matched` event.
 
-Components:
-- `SupplierRoute` — guards: must be authenticated, must have `supplier` role and an active `supplier_users` row. Non-supplier → `/`.
-- `SupplierContext` — exposes current supplier, role (`owner`|`contributor`|`viewer`), permission helpers.
-- Hooks: `useSupplierProfile`, `useSupplierUsers`, `useSupplierInvitations`, `useSupplierQuotes`, `useSupplierEinvoices`, `useEinvoiceLines`.
-- Reuse existing `VirtualTable`, `StatusBadge`, design tokens.
+## Frontend
 
-Internal admin surface:
-- New tab in **Sourcing → Supplier Registration**: "Portal Access" — invite/revoke users, view audit, manage PEPPOL IDs.
-- New module entry in `src/constants/moduleConfig.ts` for `/portal` (hidden from internal sidebar; documented for routing).
+- **Finance AP → PEPPOL Invoices tab** (existing read-only): add row actions
+  - "Send" (visible when `status='validated'`) → invokes `peppol-send`.
+  - "View UBL" → signed-URL download.
+  - "Match details" → drawer showing `einvoice_match_results` line-by-line table.
+  - Status badge supports the new states.
+- **Supplier portal → Invoices**: add a status timeline panel reading `einvoice_events` (filtered to non-internal types) and a "Download UBL" link for own invoices.
 
-### 4. Sourcing & Procurement integration (read-only bridge for now)
-- Quotation Comparison page picks up `supplier_quotes` alongside legacy quotes (union view).
-- Procurement PO detail dialog: badge "Supplier acknowledged on portal" if a `supplier_quotes` row references the PO source RFQ.
-- Finance AP: new "PEPPOL Invoices" sub-tab listing `einvoices` (read-only this phase). Posting/3-way match wiring stays in Phase 3.
+## Secrets required
 
-### 5. Compliance & security
-- All new edge functions JWT-verified in code; supplier endpoints check `is_supplier_member(supplier_id)`.
-- Tax ID and bank account fields written via `peppol-build-invoice` are read from `supplier_profiles_extended`; column-level encryption deferred to Phase 3 (documented).
-- Hash-chain integrity check helper RPC `verify_einvoice_event_chain(einvoice_id)` for audit dashboards.
-- Store every state transition + actor in `einvoice_events`; never mutate or delete.
-- Memories to add: `mem://features/einvoicing/ubl-builder-standards`, `mem://security/einvoice-append-only-events`.
+- `STORECOVE_API_KEY`
+- `STORECOVE_WEBHOOK_SECRET`
+- (later, for sender identity) `STORECOVE_SENDER_LEGAL_ENTITY_ID`
 
-## Out of Scope
-- Live Storecove AS4 send/receive, MLR/BLR webhooks (Phase 3).
-- Inbound parsing + auto 3-way match wiring (Phase 3).
-- Country-specific mandates and CIUS profiles (Phase 4).
-- Column-level encryption (`pgsodium`).
-- DSAR export.
+Phase 3 can scaffold all functions and DB without these set; `peppol-send` and the webhook will return a clear "provider not configured" error until they are added.
 
-## Acceptance Criteria
-- Migration applies with no new linter regressions in Phase 2 tables.
-- `peppol-build-invoice` produces UBL 2.1 XML that passes EN 16931 / PEPPOL BIS 3.0 schema + structural validation against fixture invoices.
-- Supplier can accept invite → log in (with MFA when role=owner) → submit a quote → draft an invoice → see validated UBL preview.
-- Internal admin can invite/revoke supplier users and see hash-chained audit.
-- Non-supplier users blocked from `/portal/*`; suppliers blocked from internal routes.
-- All RLS verified: cross-supplier and cross-company access denied in tests.
+## Acceptance criteria
+
+- Migration applies cleanly; no new RLS gaps in linter.
+- `peppol-send` posts a validated invoice and persists provider message ID; status moves to `sent`.
+- Mocked webhook payloads transition status and append events without breaking the hash chain.
+- Inbound UBL with mandatory BIS 3.0 headers parses into `einvoices` + lines.
+- `peppol-three-way-match` flags qty mismatch as `discrepancy`, exact match as `matched`.
+- Supplier portal shows live status updates after a webhook call.
+- Finance AP "Send" button works end-to-end against a Storecove sandbox tenant.
+
+## Implementation order
+
+1. DB migration (tables, enum extensions, RLS, append-only trigger).
+2. `peppol-send` + UI "Send" action + transmission viewer.
+3. `peppol-webhook` skeleton + HMAC verification + status transitions.
+4. `peppol-ingest-inbound` + UBL parser.
+5. `peppol-three-way-match` + match drawer UI.
+6. Supplier portal status timeline.
+7. Memory entries: `architecture/peppol-transmission`, `security/peppol-webhook-hmac`.
+
+## Confirmation needed before coding
+
+- **Provider**: defaulting to **Storecove**. Confirm or pick another (Pagero, Tickstar, Tradeshift, custom AS4).
+- **Sandbox vs live**: Phase 3 wires the sandbox tenant only; production toggle ships in Phase 4.
+- **3-way tolerance defaults**: qty ±5%, price ±2%, total ±1 unit currency. Adjust if you have policy.
