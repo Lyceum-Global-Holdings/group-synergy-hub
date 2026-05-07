@@ -1,217 +1,274 @@
-# E-Invoicing (PEPPOL / UBL 2.1) + Supplier Self-Service Portal
+# Phase 1 Implementation Plan — PEPPOL UBL 2.1 E-Invoicing & Supplier Portal Foundations
 
-Goal: deliver standards-compliant e-invoicing and a secure supplier portal where suppliers register, manage their profile, respond to RFQs with quotes, view POs, submit invoices, and track payments — fully integrated with the existing Procurement / Sourcing / Finance modules.
-
----
-
-## 1. Standards & Compliance Baseline
-
-| Area | Standard | Why |
-|------|----------|-----|
-| Invoice semantic model | EN 16931 (EU semantic standard) | Mandatory baseline for PEPPOL BIS Billing 3.0 |
-| Syntax | UBL 2.1 (OASIS) | Default PEPPOL syntax |
-| Transport | PEPPOL eDelivery Network (AS4 / OpenPEPPOL) | Internationally interoperable 4-corner model |
-| Identifiers | PEPPOL Participant ID (ISO 6523 schemes, e.g. 0088 GLN, 0184 DK CVR, 0151 ABN) | Required for routing |
-| Code lists | UN/CEFACT, UNCL1001 (invoice types), UNCL5305 (VAT categories), ISO 4217 (currency), ISO 3166 (country) | Required by EN 16931 |
-| Digital signature (where required: IT/ES/MX/SA/IN) | XAdES-BES on UBL | Country-specific extensions |
-| Archival | ISO 14641 / EN 16931-compliant retention 7–10 yrs, WORM-style | Tax law |
-| Security | ISO 27001 controls, OWASP ASVS L2, OAuth2 + PKCE for portal | Supplier-facing surface |
-| Privacy | GDPR (lawful basis, DSAR, retention) | Supplier PII |
-
-We will NOT operate our own PEPPOL Access Point (AP). We integrate via a certified AP provider (Storecove, Pagero, Tradeshift, Unimaze, or Tickstar/Qvalia) over REST. This is the standard, lowest-risk approach.
+Scope assumptions (filled in based on best-fit defaults; tell me if any should change):
+- **AP provider**: Storecove (REST-first, EU + APAC + LATAM coverage, built-in PEPPOL BIS Billing 3.0 + Schematron validation, sandbox available).
+- **Country scope (Day 1)**: PEPPOL BIS Billing 3.0 (EN 16931 baseline). Country-specific extensions deferred to Phase 4: SA ZATCA, IN IRP, IT SDI, MX CFDI.
+- **Supplier auth**: Supabase Auth (email + password) with mandatory TOTP MFA for `owner` role. SSO (Microsoft/Google) optional in Phase 4.
+- **Delivery**: Phase 1 only in this iteration — foundations (schema, RLS, supplier role, portal shell, profile, invitations). Phase 2 (sourcing flows), Phase 3 (PEPPOL pipeline), Phase 4 (hardening + country mandates) follow as separate iterations.
 
 ---
 
-## 2. Solution Architecture
+## Phase 1 Deliverables
 
-```text
- ┌──────────────────────────┐         ┌───────────────────────────┐
- │  Supplier Portal (React) │  HTTPS  │  Internal ERP (existing)  │
- │  - separate auth realm   │◀───────▶│  Procurement / Finance    │
- └──────────┬───────────────┘         └─────────────┬─────────────┘
-            │ Supabase Auth (supplier role)         │
-            ▼                                       ▼
- ┌──────────────────────────────────────────────────────────────┐
- │                    Supabase (Postgres + RLS)                 │
- │  supplier_users, supplier_quotes, einvoices, einvoice_events │
- └─────────┬─────────────────────────────────┬──────────────────┘
-           │                                 │
-           ▼                                 ▼
- ┌────────────────────┐          ┌──────────────────────────────┐
- │ Edge Fn: peppol-*  │ ───────▶ │ Certified PEPPOL Access Point│
- │ (UBL build, sign,  │  AS4     │   (Storecove / Pagero / etc) │
- │  send, webhook in) │ ◀─────── │                              │
- └────────────────────┘          └──────────────────────────────┘
-```
+A working **Supplier Portal shell** at `/portal/*` where invited suppliers can:
+1. Accept an invitation and create their account
+2. Log in with MFA
+3. View a portal dashboard (placeholder KPIs)
+4. Manage their company profile (legal name, tax IDs, PEPPOL participant ID, bank details, certifications)
+5. Manage additional users on their supplier account (owner / contributor / viewer)
 
-Key principles:
-- Supplier portal is the SAME app, but a dedicated route tree (`/portal/*`) and a new `supplier` app role with strict RLS — suppliers see only their own data.
-- E-invoicing is implemented as edge functions so secrets (AP API key, signing keys) never reach the browser.
-- All inbound/outbound invoices stored canonically in DB; UBL XML retained as immutable artifact in Storage.
+Plus internal admin screens to **invite suppliers** to the portal and view supplier-portal activity.
+
+E-invoicing UBL/PEPPOL pipeline and RFQ/quote flows are NOT in Phase 1 — only the foundations and tables they will plug into.
 
 ---
 
-## 3. Database Changes (new tables)
+## 1. Database Migration (single migration)
 
-Schema additions (RLS-enforced, company-scoped where applicable):
+### 1.1 Enum extension
+- Add `supplier` to existing `app_role` enum.
 
-- `supplier_users` — links `auth.users` → `suppliers` (many-to-one). Has `role` (owner, contributor, viewer).
-- `supplier_invitations` — token-based onboarding (email, expiry, role).
-- `supplier_quotes` — supplier-submitted quotes against `rfq_rfp` (header) + `supplier_quote_lines`.
-- `peppol_participants` — our company's + suppliers' PEPPOL IDs (`scheme_id`, `participant_id`, validated via SML lookup).
-- `einvoices` — header (direction: outbound|inbound, status, supplier_id/customer_id, currency, totals, ubl_storage_path, peppol_message_id, ap_provider, sent_at, ack_at).
-- `einvoice_lines` — line items mapped to PO/GRN for 3-way match.
-- `einvoice_events` — append-only audit (created, validated, sent, ack, mlr_received, rejected, paid). Hash-chained for tamper evidence.
-- `einvoice_attachments` — embedded binary refs (PDF/A-3 visual rendition).
-- New storage bucket `einvoices` (private), path `{company_id}/{yyyy}/{mm}/{einvoice_id}.xml`.
+### 1.2 New tables (all RLS-enabled, company-scoped where applicable)
 
-App roles: extend `app_role` enum with `supplier`. Add `has_role(uid, 'supplier')` checks in RLS.
+**`supplier_users`** — links auth users to a supplier
+- `id uuid pk`
+- `supplier_id uuid → suppliers(id) on delete cascade`
+- `user_id uuid → auth.users(id) on delete cascade`
+- `portal_role text check in ('owner','contributor','viewer')`
+- `is_active boolean default true`
+- `invited_by uuid`, `invited_at`, `accepted_at`
+- `created_at`, `updated_at`
+- Unique `(supplier_id, user_id)`
+- Index `(user_id)`, `(supplier_id, is_active)`
 
-RLS pattern for supplier-scoped tables:
-```sql
-using (
-  exists (select 1 from supplier_users su
-          where su.user_id = auth.uid()
-            and su.supplier_id = <table>.supplier_id)
-)
-```
+**`supplier_invitations`**
+- `id uuid pk`
+- `supplier_id uuid → suppliers(id) on delete cascade`
+- `email citext not null`
+- `portal_role text check (...)`
+- `token_hash text not null` (we store SHA-256 of the raw token; raw token only emailed)
+- `expires_at timestamptz not null` (default `now() + interval '7 days'`)
+- `accepted_at timestamptz`
+- `revoked_at timestamptz`
+- `invited_by uuid`
+- `company_id uuid → companies(id)` (the inviting tenant)
+- Unique `(supplier_id, email)` partial where `accepted_at is null and revoked_at is null`
+- Index `(token_hash)`, `(email)`
 
-Indexes: `(company_id, status, created_at desc)` on `einvoices`, `supplier_quotes`; partial index on `status='pending'`.
+**`peppol_participants`** (for both our companies and suppliers — populated now, used in Phase 3)
+- `id uuid pk`
+- `owner_type text check in ('company','supplier')`
+- `owner_id uuid not null`
+- `scheme_id text not null` (ISO 6523, e.g. `0088`, `0184`, `0151`, `0192`)
+- `participant_id text not null`
+- `is_primary boolean default true`
+- `verified_at timestamptz`
+- `created_at`
+- Unique `(owner_type, owner_id, scheme_id, participant_id)`
+- Check `participant_id ~ '^[A-Za-z0-9:_.-]+$'`
 
----
+**`supplier_profiles_extended`** (portal-only fields kept off the main `suppliers` table to avoid churn)
+- `supplier_id uuid pk → suppliers(id) on delete cascade`
+- `legal_name text`
+- `tax_id_encrypted bytea` (pgsodium column-encrypt later in Phase 4 — Phase 1 stores `tax_id text` plain; column renamed in Phase 4)
+- `bank_account_name text`
+- `bank_account_number text` (Phase 4 → encrypted)
+- `bank_iban text`
+- `bank_swift text`
+- `default_currency char(3)` (ISO 4217)
+- `default_payment_terms_days int`
+- `peppol_enabled boolean default false`
+- `updated_at`, `updated_by`
 
-## 4. Supplier Portal (UI)
+**`supplier_portal_audit`** (append-only)
+- `id bigserial pk`
+- `supplier_id uuid`
+- `actor_user_id uuid`
+- `action text` (login, profile_update, user_added, user_removed, invitation_accepted, ...)
+- `metadata jsonb`
+- `ip inet`
+- `user_agent text`
+- `prev_hash text`
+- `row_hash text` (sha256 over canonical row → tamper-evident chain; trigger computes)
+- `created_at timestamptz default now()`
 
-Route tree: `/portal`
-- `/portal/login` — separate themed login (still Supabase Auth)
-- `/portal/onboarding` — accept invitation, complete profile (legal name, tax IDs, PEPPOL ID, bank details, certifications upload)
-- `/portal/dashboard` — KPIs: open RFQs, awarded POs, invoices outstanding, payments
-- `/portal/rfqs` — list of RFQs visible to this supplier (driven by existing `supplier_allocation`)
-- `/portal/rfqs/:id/quote` — submit quote (line-by-line price, lead time, validity, attachments). Reuses `SubmitQuoteDialog` logic but in portal layout.
-- `/portal/purchase-orders` — list + acknowledge PO (sets `po.acknowledged_at`)
-- `/portal/invoices` — submit invoice against a PO. Two paths:
-  1. Manual form (we build the UBL on submit)
-  2. Upload existing UBL/PDF (validate against EN 16931)
-- `/portal/payments` — remittance advice list
-- `/portal/profile` — manage users, banking, certifications
+### 1.3 Storage
+- New private bucket `supplier-documents` (path `{supplier_id}/{yyyy}/{filename}`) for certifications uploaded via portal.
 
-Layout: new `PortalLayout` (no internal sidebar; supplier-branded header), guarded by `SupplierRoute` component — analogous to `AdminRoute.tsx` but checks `supplier` role + active supplier link.
+### 1.4 RLS policies (key ones)
 
-Existing internal screens get a "Pending supplier quotes" panel feeding the existing Quotation Comparison flow.
+`supplier_users`
+- Internal admins: `has_role(auth.uid(),'admin') OR has_role(auth.uid(),'super_admin')` — full access.
+- Supplier owners: can SELECT/INSERT/UPDATE rows for their own `supplier_id` (only `portal_role` other than `owner` for INSERT to prevent privilege escalation).
+- Other supplier roles: SELECT-only on rows in their `supplier_id`.
 
----
+`supplier_invitations`
+- Internal admins/managers: full.
+- No supplier-side access (token-based redemption goes through edge function).
 
-## 5. E-Invoicing Pipeline
+`supplier_profiles_extended`
+- Supplier members (any portal_role): SELECT.
+- Supplier `owner`: UPDATE.
+- Internal admins: SELECT/UPDATE.
 
-### 5.1 Outbound (we bill a customer)
-1. Trigger: user clicks "Send via PEPPOL" on a Customer Invoice in Finance/AR, OR automatic on invoice approval.
-2. Edge fn `peppol-build-invoice`:
-   - Loads invoice + lines + parties from DB
-   - Builds UBL 2.1 `<Invoice>` per PEPPOL BIS Billing 3.0 profile (`urn:fdc:peppol.eu:2017:poacc:billing:01:1.0`)
-   - Embeds PDF/A-3 visual rendition as `cac:AdditionalDocumentReference`
-   - Validates against EN 16931 + PEPPOL Schematron rules (using `@nordic-e-invoice/peppol-validator` or AP provider's pre-validate endpoint)
-3. Stores XML in `einvoices` bucket; row in `einvoices` with status `validated`.
-4. Edge fn `peppol-send`:
-   - Resolves recipient via SML/SMP lookup (AP provider does this)
-   - POSTs to AP REST API (e.g. Storecove `/invoices`)
-   - Stores `peppol_message_id`; status → `sent`
-5. Webhook `peppol-webhook` receives MLR (Message Level Response) + BLR (Business Level Response) → updates status (`acknowledged`, `rejected_by_recipient`) and writes to `einvoice_events`.
+`supplier_portal_audit`
+- Supplier members: SELECT only their own supplier's rows.
+- Internal admins: SELECT all.
+- INSERT only via SECURITY DEFINER function `log_supplier_portal_event(...)` — no direct INSERT.
 
-### 5.2 Inbound (supplier sends us an invoice via PEPPOL)
-1. AP provider posts to `peppol-inbound` webhook.
-2. Verify HMAC signature, parse UBL → canonical row in `einvoices` (direction=inbound).
-3. Auto-match to PO/GRN (existing 3-way match engine — reuse `three-way-match` logic). If matched within tolerance → route to AP approval queue. Else → exception queue.
-4. On approval, post to GL and AP ledger; trigger payment workflow.
+`peppol_participants`
+- Supplier members: SELECT/INSERT/UPDATE their own.
+- Internal admins: full.
 
-### 5.3 Manual / non-PEPPOL fallback
-- Supplier portal allows direct invoice submission (form or PDF+UBL upload). System still produces canonical UBL internally so all invoices share one data model.
+`storage.objects` (bucket `supplier-documents`)
+- Read/Write only when `(storage.foldername(name))[1] = supplier_id::text` AND user is in `supplier_users` for that supplier.
 
-### 5.4 Webhook security
-- Signed HMAC header verification.
-- Replay protection: store `(provider, message_id)` uniqueness.
-- Idempotency keys on all writes.
+### 1.5 Helper functions
+- `public.is_supplier_member(_supplier_id uuid)` SECURITY DEFINER STABLE — boolean, used in RLS to avoid recursion.
+- `public.current_supplier_ids()` SECURITY DEFINER STABLE — returns set of supplier_ids the caller belongs to.
+- `public.log_supplier_portal_event(_supplier_id, _action, _metadata)` SECURITY DEFINER — inserts into audit with hash chain.
+- Trigger on `supplier_portal_audit` BEFORE INSERT → sets `prev_hash` and `row_hash`.
 
----
-
-## 6. AP Provider Choice
-
-Recommend Storecove (REST-first, EU + APAC + LATAM coverage, PEPPOL + country mandates like SA ZATCA, IN IRP, IT SDI, MX CFDI). Alternatives: Pagero, Tickstar, Unimaze. Decision criteria:
-- Coverage of the countries where Lyceum operates
-- REST API + webhooks (no SOAP/AS4 client to maintain)
-- Built-in EN 16931 + Schematron validation
-- Sandbox environment for testing
-
-Required secrets (added via add_secret, never in DB):
-- `PEPPOL_AP_API_KEY`
-- `PEPPOL_AP_WEBHOOK_SECRET`
-- `PEPPOL_SENDER_ID` (our participant ID)
-
----
-
-## 7. Security & Compliance Controls
-
-- **AuthN/AuthZ**: Supplier auth via Supabase Auth; mandatory MFA for portal `owner` role. Session timeout 30 min idle, 8 hr absolute. Password policy NIST 800-63B.
-- **RLS**: every supplier-facing table enforces `supplier_users` membership. Cross-supplier reads impossible.
-- **Rate limiting** on portal edge functions (per IP + per supplier_id) to mitigate abuse.
-- **Input validation**: Zod schemas in every edge function; reject on schema fail with 400.
-- **Audit**: append-only `einvoice_events` and existing `audit_logs` for all portal actions. Hash-chained (each row stores `prev_hash`).
-- **Encryption**: bank account numbers, tax IDs encrypted at rest using `pgsodium` (column-level).
-- **PII minimization** in supplier directory views (already a pattern in this project).
-- **Retention**: invoices retained 10 yrs (configurable per company tax jurisdiction); job purges expired invitations and OTP tokens.
-- **GDPR**: DSAR export endpoint; right-to-erasure flagged but blocked while legally retained invoices exist.
-- **Tamper evidence**: stored UBL is immutable (storage policy denies update/delete); only superseding invoices allowed (credit note workflow).
-
----
-
-## 8. Integration with Existing Modules
-
-- Sourcing → `supplier_quotes` feeds `Quotation Comparison`
-- Procurement → PO acknowledgement updates `purchase_orders.acknowledged_at`
-- Warehouse → on GRN, an inbound invoice can be auto-matched
-- Finance → inbound approved invoices post to AP ledger; outbound invoices trigger PEPPOL send
-- Approvals → reuse central approval RPC for invoice approval workflow
-- Module registry → register `supplier-portal` and `e-invoicing` in `src/constants/moduleConfig.ts`
-- RBAC → add `supplier` app_role; new module operations for `e-invoicing` (view/send/approve/reject)
+### 1.6 Indexes
+- `supplier_users(user_id)`, `supplier_users(supplier_id, is_active)`
+- `supplier_invitations(token_hash)`, `(email)`, `(supplier_id) where accepted_at is null and revoked_at is null`
+- `supplier_portal_audit(supplier_id, created_at desc)`
 
 ---
 
-## 9. Files to Create / Modify
+## 2. Edge Functions
 
-Create:
-- Migrations: new tables, enum extension, RLS policies, storage bucket, hash-chain trigger
-- `src/pages/portal/*` (Login, Onboarding, Dashboard, Rfqs, RfqQuote, PurchaseOrders, Invoices, Payments, Profile)
-- `src/components/portal/PortalLayout.tsx`, `SupplierRoute.tsx`
-- `src/pages/finance/EInvoicing.tsx` (internal management screen: outbox, inbox, exceptions, retry)
-- `src/components/einvoicing/*` (InvoiceUblPreview, ValidationReport, EventTimeline)
-- `src/lib/einvoicing/ubl.ts` (UBL builder), `validators.ts`, `peppolIds.ts`
-- Edge functions: `peppol-build-invoice`, `peppol-send`, `peppol-webhook` (inbound + status), `supplier-invite`, `supplier-accept-invite`
-- `src/types/einvoice.ts`, `src/types/supplierPortal.ts`
+### 2.1 `supplier-invite` (admin → invites a supplier user)
+- Auth: requires logged-in user with `admin` or `manager` role; verify via JWT.
+- Input (Zod): `{ supplier_id: uuid, email: string, portal_role: 'owner'|'contributor'|'viewer' }`
+- Validates supplier belongs to caller's accessible companies.
+- Generates raw token (32 bytes URL-safe), stores SHA-256 hash + expires_at.
+- Sends invitation email via Resend (reuses pattern from `send-approval-notification`); link `https://<app>/portal/accept-invite?token=<raw>`.
+- Logs `invited` audit row.
+- Rate limit: 20 invites / hour / inviter (in-memory map keyed by user_id; documented as best-effort).
 
-Modify:
-- `src/App.tsx` — add `/portal/*` route tree
-- `src/constants/moduleConfig.ts` — register new modules
-- `src/constants/rbacConfig.ts` — add `supplier` role + e-invoicing operations
-- `src/components/auth/*` — supplier-aware redirects
-- `mem://index.md` — add memory entries for: PEPPOL AP integration pattern, supplier portal RLS, einvoice immutability
+Required secret check: `RESEND_API_KEY` (already exists per project pattern; if missing, ask user).
 
----
+### 2.2 `supplier-accept-invite` (public — token in body)
+- No JWT required (public endpoint). CORS open.
+- Input (Zod): `{ token: string, password: string (min 12, complexity), full_name: string }`
+- Looks up invitation by SHA-256(token); validates not expired/revoked.
+- Creates auth user via `supabase.auth.admin.createUser({ email_confirm: true })` (service role, server-side only).
+- Inserts `supplier_users` row with `portal_role` from invitation.
+- Marks invitation `accepted_at = now()`.
+- Logs `invitation_accepted` audit.
+- Returns `{ success: true }` — client then signs in via standard Supabase auth.
 
-## 10. Phased Delivery (recommended order)
-
-1. **Phase 1 — Foundations (this iteration)**: schema + RLS + supplier role + portal shell + login/onboarding + profile; register modules.
-2. **Phase 2 — Sourcing flows**: RFQ visibility + quote submission + PO acknowledgement.
-3. **Phase 3 — E-invoicing core**: UBL builder, validator, outbound send via AP sandbox, inbound webhook, exceptions UI.
-4. **Phase 4 — Hardening**: hash-chain audit, encryption, MFA enforcement, rate limiting, archival policy, country-specific extensions (ZATCA/IN-IRP if needed).
-
-Phase 1 is the largest single deliverable; Phases 2–4 are smaller increments. I will ask you to confirm scope before each phase.
+### 2.3 `supplier-portal-mfa-enroll` (Phase 1 stub — returns enrollment URI; reuses existing MFA flow from `MfaSetup.tsx`)
+- Optional in Phase 1 — we can reuse the existing internal MFA flow by routing supplier users through `/portal/mfa-setup`. No new edge function needed if so. Keep this as a TODO marker.
 
 ---
 
-## 11. Open Questions (please confirm before build)
+## 3. Frontend (React)
 
-1. **AP provider**: shall we proceed with Storecove, or do you have a preferred AP (Pagero, Tickstar, Unimaze, in-country provider)?
-2. **Countries in scope**: PEPPOL BIS only, or do we also need SA ZATCA, IN IRP, IT SDI, MX CFDI extensions on day one?
-3. **Supplier auth**: Supabase Auth (email + MFA) acceptable, or do you require SSO (Microsoft/Google) for suppliers as well?
-4. **Scope of this build**: deliver Phase 1 + Phase 2 now, and Phase 3 (PEPPOL) after AP credentials are provisioned? Or all phases in one go using AP sandbox?
+### 3.1 New routes (in `src/App.tsx`)
+- `/portal/accept-invite` — public, redeems token
+- `/portal/login` — themed login
+- `/portal/mfa-challenge`, `/portal/mfa-setup` — wrappers around existing MFA pages with portal layout
+- `/portal` (guarded) → redirects to `/portal/dashboard`
+- `/portal/dashboard`
+- `/portal/profile`
+- `/portal/users`
+- `/portal/peppol-ids`
 
-Once you approve and answer the open questions, I will switch to build mode and start with Phase 1 (schema, RLS, supplier role, portal shell).
+### 3.2 New components
+- `src/components/portal/PortalLayout.tsx` — header w/ Lyceum branding, supplier name, user menu, logout. No internal sidebar.
+- `src/components/portal/SupplierRoute.tsx` — guard analogous to `AdminRoute.tsx`:
+  - Checks session
+  - Checks `has_role(uid,'supplier')`
+  - Loads `supplier_users` row → exposes `currentSupplierId` via context
+  - Enforces MFA enrollment before any portal page
+- `src/contexts/SupplierContext.tsx` — provides `{ supplierId, portalRole, supplierName }`
+- `src/hooks/useSupplierProfile.ts`
+- `src/hooks/useSupplierUsers.ts`
+- `src/hooks/useSupplierInvitations.ts`
+
+### 3.3 Pages
+- `src/pages/portal/AcceptInvite.tsx` — form: full name + password; calls `supplier-accept-invite` edge fn; on success redirects to `/portal/login`.
+- `src/pages/portal/PortalLogin.tsx` — supplier-themed login, then redirects to `/portal/dashboard`.
+- `src/pages/portal/PortalDashboard.tsx` — placeholder cards: "Open RFQs (Phase 2)", "Active POs (Phase 2)", "Outstanding Invoices (Phase 3)", "Profile completeness %".
+- `src/pages/portal/SupplierProfile.tsx` — form for `supplier_profiles_extended` fields; uses Zod validation; empty strings → null per project rule.
+- `src/pages/portal/SupplierUsers.tsx` — list `supplier_users`, invite new (calls `supplier-invite`), revoke. Owner-only mutations.
+- `src/pages/portal/PeppolIds.tsx` — manage `peppol_participants` rows with scheme picker (ISO 6523 dropdown of common schemes).
+
+### 3.4 Internal admin additions
+- `src/pages/sourcing/SupplierPortalAdmin.tsx` — new screen under Sourcing module: list suppliers w/ portal status, invite users, view portal audit, deactivate users.
+- Add link from existing supplier detail dialog: "Invite to Portal" button.
+
+### 3.5 Module registration (`src/constants/moduleConfig.ts`)
+- Register `supplier-portal-admin` (internal admin) under Sourcing.
+- Portal routes are NOT in moduleConfig (separate auth realm). They are guarded only by `SupplierRoute`.
+
+### 3.6 RBAC (`src/constants/rbacConfig.ts`)
+- Add `supplier` to `APP_ROLE_HIERARCHY` (level 0 — below `user`; isolated tree).
+- Add `DEFAULT_OPERATIONS_BY_ROLE.supplier = ['view']`.
+
+### 3.7 Auth redirect logic
+- After login in `Auth.tsx`: if user's only role is `supplier`, redirect to `/portal/dashboard` instead of `/`.
+- After login on `/portal/login`: if user is NOT supplier, sign them out and show error "Use the main login at /auth".
+
+---
+
+## 4. Validation & Security
+
+- Zod schemas for every form and every edge function input.
+- Edge functions use service role internally only; never returned.
+- Tokens: 32-byte random, URL-safe; only hash stored; one-time use (set `accepted_at` on success).
+- Password policy enforced server-side in `supplier-accept-invite`: min 12 chars, mixed case + digit + symbol.
+- MFA mandatory for portal `owner` role — `SupplierRoute` blocks routes other than `/portal/mfa-setup` until enrolled.
+- All portal mutations log to `supplier_portal_audit` via the SECURITY DEFINER function.
+- CORS: edge functions return `Access-Control-Allow-Origin: *` for the public accept-invite endpoint only; others honor request origin.
+- Rate-limit notes documented; full Redis-backed rate limiting deferred to Phase 4.
+
+---
+
+## 5. Memory Updates
+
+After build, add to `mem://`:
+- `mem://architecture/supplier-portal-architecture` — separate `/portal/*` realm, `SupplierRoute` guard, `SupplierContext`.
+- `mem://security/supplier-portal-rls` — RLS via `is_supplier_member()` helper; never query `supplier_users` directly in policies (recursion).
+- `mem://access-control/supplier-role` — `supplier` is an isolated app_role; redirect target `/portal/dashboard`.
+- `mem://features/supplier-portal/invitations` — token hashed, 7-day expiry, single-use.
+- Update Core: add line "Supplier portal users are isolated to `/portal/*`; never grant them internal module access."
+
+---
+
+## 6. Out of Scope for Phase 1 (explicitly)
+
+- UBL builder, PEPPOL AP integration, Storecove credentials, webhooks
+- RFQ visibility / quote submission / PO acknowledgement
+- Inbound/outbound invoice tables and 3-way match wiring
+- Column-level encryption (pgsodium) — fields stored plain; migration in Phase 4 will encrypt in place
+- Country-specific extensions (ZATCA / IN IRP / SDI / CFDI)
+- DSAR export endpoint
+
+---
+
+## 7. Acceptance Criteria
+
+1. Admin can invite a supplier user from `Sourcing → Supplier Portal Admin`. Email arrives with link.
+2. Recipient opens link, sets full name + password, gets account; redirected to `/portal/login`.
+3. After first login, forced through MFA enrollment; subsequent logins prompt MFA challenge.
+4. Supplier sees only their own supplier in profile/users/peppol pages — verified by attempting URL/ID tampering (RLS blocks).
+5. Owner can add a contributor user; contributor cannot add or remove users (enforced by both UI and RLS).
+6. All portal actions appear in `supplier_portal_audit`, hash-chained.
+7. Internal users with non-`supplier` roles cannot access `/portal/*`. Supplier-role users cannot access internal routes.
+8. Supabase linter shows no new RLS warnings on the new tables.
+
+---
+
+## 8. Open confirmations before I start coding
+
+If you disagree with any of the filled-in defaults below, reply now; otherwise I proceed:
+
+1. **AP provider = Storecove** (Phase 3 only — no credentials needed for Phase 1).
+2. **Day-1 country scope = PEPPOL BIS Billing 3.0** (EN 16931). Country mandates in Phase 4.
+3. **Supplier auth = Supabase Auth + mandatory TOTP MFA for owners**. SSO later.
+4. **Phase 1 only this iteration**, then we proceed sequentially through Phases 2 → 3 → 4.
+
+Reply "go" (or with any overrides) and I will switch to build mode and execute Phase 1: migration first (for your approval), then edge functions and frontend in one pass.
