@@ -1,105 +1,122 @@
-# PEPPOL Phase 3 — Transmission, Receipts, Inbound Parsing, 3-Way Match
+# PEPPOL Phase 4 — Country Mandates, Credit Notes, Production Toggle, Compliance
 
-Builds on Phase 2 (canonical e-invoice tables, UBL builder, supplier portal). Phase 3 makes invoices actually leave and enter the system over the PEPPOL network and reconciles them against POs and GRNs.
+Builds on Phase 3 (Storecove transmission, webhook, inbound parsing, 3-way match). Phase 4 turns the system into a multi-jurisdiction, production-ready e-invoicing platform.
 
 ## Scope
 
-1. **Outbound transmission** — submit `validated` UBL XML to the access point (Storecove) and track delivery state.
-2. **Inbound webhook** — receive PEPPOL messages + Message Level Responses (MLR) and Business Level Responses (BLR/Invoice Response) from the access point.
-3. **Inbound UBL parser** — turn received UBL XML into `einvoices` + `einvoice_lines` rows (`direction='inbound'`).
-4. **3-way match** — auto-link inbound invoices to PO/GRN, compute `match_status` and discrepancies.
-5. **UI surface** — Finance AP "PEPPOL Invoices" tab gets actions (Send, View XML, View match), supplier portal invoices tab shows live status from MLR/BLR.
+1. **Credit notes & corrections** — UBL CreditNote 2.1 (doc type 381), linked to original invoice, full lifecycle parity with invoices.
+2. **Country mandates** — pluggable adapters for KSA ZATCA Phase 2, IT SDI (FatturaPA), FR Factur-X / Chorus Pro.
+3. **Production toggle** — per-company sandbox/live switch for the access point with audit trail.
+4. **Attachment encryption at rest** — encrypt PDF/UBL attachments stored in the `einvoices` bucket with AES-GCM, keys via Vault.
+5. **DSAR / compliance export** — admin tool to export all e-invoice records + events for a counterparty (GDPR Art. 15 / 20).
+6. **Archival & retention** — 10-year immutable archive policy enforcement (cold tier + legal hold).
 
-Out of scope (Phase 4): country-specific mandates (KSA ZATCA, IT SDI, FR Factur-X), credit notes, attachment encryption at rest, DSAR export.
+Out of scope: real-time clearance models beyond KSA/IT (e.g. Mexico CFDI, Chile DTE), supplier-onboarding self-service for portal admins.
 
 ## Architecture
 
 ```text
-┌─────────────────┐  validated UBL   ┌──────────────────┐
-│ peppol-build    │─────────────────▶│ peppol-send      │──┐
-└─────────────────┘                  └──────────────────┘  │
-                                                           │ AS4
-                                  ┌──────── Storecove ────┘
-                                  │
-                       MLR/BLR    ▼
-                ┌──────────────────────────┐
-                │ peppol-webhook (public)  │──▶ einvoice_events
-                └──────────────────────────┘     status updates
-                          │ inbound invoice
-                          ▼
-                ┌──────────────────────────┐
-                │ peppol-ingest-inbound    │──▶ einvoices(direction=inbound)
-                └──────────────────────────┘     einvoice_lines
-                          │
-                          ▼
-                ┌──────────────────────────┐
-                │ peppol-three-way-match   │──▶ match_status + report
-                └──────────────────────────┘
+                ┌────────────────────────────────────┐
+                │ peppol-build-invoice (router)      │
+                │  ├─ profile=peppol-bis  → UBL 2.1  │
+                │  ├─ profile=ksa-zatca   → ZATCA    │
+                │  ├─ profile=it-sdi      → FatturaPA│
+                │  └─ profile=fr-facturx  → Factur-X │
+                └────────────────────────────────────┘
+                              │
+                              ▼
+                ┌────────────────────────────────────┐
+                │ peppol-send (env-aware)            │
+                │  reads company.peppol_environment  │
+                │  routes sandbox/live Storecove     │
+                └────────────────────────────────────┘
+
+┌──────────────────────┐   ┌──────────────────────┐
+│ peppol-credit-note   │   │ peppol-dsar-export   │
+│ links to original    │   │ admin compliance pkg │
+└──────────────────────┘   └──────────────────────┘
 ```
 
 ## Database changes
 
-Migration `phase3_peppol_transmission`:
+Migration `phase4_peppol_mandates_compliance`:
 
-- New table `einvoice_transmissions`:
-  - `einvoice_id` (FK), `provider` ('storecove'), `provider_message_id`, `direction`,
-    `submitted_at`, `last_status`, `last_status_at`, `attempt_count`, `error_message`, `raw_response jsonb`.
-- Extend `einvoice_status` enum with `submission_failed`, `delivered` (idempotent `ALTER TYPE`).
-- New table `einvoice_match_results`:
-  - `einvoice_id`, `po_id`, `grn_id`, `total_match`, `qty_match`, `price_match`,
-    `discrepancies jsonb`, `score numeric`, `evaluated_at`.
-- Indexes: `(provider_message_id)` unique partial, `(einvoice_id, evaluated_at DESC)`.
-- RLS: admin full; suppliers may read their own transmissions/match results (via `is_supplier_member`).
-- Append-only trigger on `einvoice_transmissions` (no UPDATE/DELETE; only INSERT new rows per state change).
+- Extend `einvoices`:
+  - `document_type` enum (`invoice`, `credit_note`, `debit_note`) default `invoice`.
+  - `corrected_einvoice_id uuid` (FK self, nullable) for credit-note linkage.
+  - `compliance_profile` enum (`peppol_bis_3`, `ksa_zatca_phase2`, `it_sdi`, `fr_facturx`) default `peppol_bis_3`.
+  - `archive_until date` (computed default = created_at + 10 years).
+  - `legal_hold boolean` default false.
+- Extend `companies`:
+  - `peppol_environment` enum (`sandbox`, `live`) default `sandbox`.
+  - `peppol_live_enabled_at timestamptz`, `peppol_live_enabled_by uuid` (audit).
+  - `country_mandate_overrides jsonb` (per-country cert refs, endpoint URLs).
+- New table `einvoice_country_artifacts`:
+  - `einvoice_id`, `mandate` (`zatca`/`sdi`/`facturx`), `qr_code text`, `clearance_uuid text`, `clearance_status`, `government_response jsonb`, `cleared_at`.
+- New table `einvoice_attachment_keys`:
+  - `attachment_id` (FK), `key_id` (Vault reference), `iv bytea`, `auth_tag bytea`, `algorithm text` default `AES-256-GCM`.
+- Append-only trigger on `einvoice_country_artifacts`.
+- RLS: company-scoped (admin/finance read; supplier portal read own).
 
 ## Edge functions
 
-All functions: `verify_jwt = false`, validate JWT in code (admin-only) except the public webhook.
-
-1. **`peppol-send`** (admin): loads `einvoices` row in `validated` status, reads `ubl_xml_path` from Storage, POSTs to Storecove `/document_submissions`, writes a row in `einvoice_transmissions`, sets status `ready_to_send` → `sent`, appends `submitted` event.
-2. **`peppol-webhook`** (public, HMAC-verified via `STORECOVE_WEBHOOK_SECRET`): handles event types `invoice.delivered`, `invoice.received`, `invoice.mlr`, `invoice.blr`, `invoice.failed`. Updates `einvoice_transmissions.last_status`, transitions `einvoices.status`, appends `ack_received` / `rejected` / `delivered` events.
-3. **`peppol-ingest-inbound`** (internal, called by webhook for received UBL): downloads UBL from Storecove, parses with vendored XML walker (no schema validation here — that's the Phase 2 builder's job; we trust receipt), inserts `einvoices(direction='inbound', status='received')` + `einvoice_lines`, stores XML in `einvoices` bucket under `inbound/{message_id}.xml`.
-4. **`peppol-three-way-match`** (admin or invoked by ingest): finds candidate PO via `peppol_message_id` → buyer reference, GRN via PO. Computes line-by-line qty/price tolerance (configurable, defaults: ±5% qty, ±2% price, ±1 unit currency). Writes `einvoice_match_results`, sets `einvoices.match_status`, appends `matched` event.
+1. **`peppol-build-invoice`** (extended): branches on `compliance_profile`. Adds builders:
+   - `buildKsaZatca(einvoice)` — ZATCA Phase 2 UBL with embedded QR (TLV) and PIH chain hash.
+   - `buildItSdi(einvoice)` — FatturaPA XML 1.2.2 (different schema, separate namespace).
+   - `buildFrFacturx(einvoice)` — UBL 2.1 + PDF/A-3 hybrid via `pdf-lib`.
+2. **`peppol-credit-note`** (new, admin): clones a source invoice, flips signs, sets `document_type='credit_note'`, links via `corrected_einvoice_id`, builds CreditNote-2 UBL, appends `credit_note_issued` event.
+3. **`peppol-clearance-zatca`** (new, server-to-server): submits to ZATCA Fatoora, stores clearance UUID + QR.
+4. **`peppol-clearance-sdi`** (new): submits to Italian SDI via Storecove SDI channel; handles 5-day acceptance window.
+5. **`peppol-attachment-encrypt`** / **`peppol-attachment-decrypt`** (new, internal): wraps Storage put/get with AES-GCM via Vault DEKs.
+6. **`peppol-dsar-export`** (new, admin): builds a ZIP with all `einvoices`, `einvoice_lines`, `einvoice_events`, `einvoice_transmissions`, `einvoice_match_results` for a given supplier or customer; signed URL valid 24h.
+7. **`peppol-send`** (modified): chooses sandbox vs live Storecove endpoint based on `companies.peppol_environment`; refuses to send `live` unless `peppol_live_enabled_at` is set and the calling user is `super_admin`.
 
 ## Frontend
 
-- **Finance AP → PEPPOL Invoices tab** (existing read-only): add row actions
-  - "Send" (visible when `status='validated'`) → invokes `peppol-send`.
-  - "View UBL" → signed-URL download.
-  - "Match details" → drawer showing `einvoice_match_results` line-by-line table.
-  - Status badge supports the new states.
-- **Supplier portal → Invoices**: add a status timeline panel reading `einvoice_events` (filtered to non-internal types) and a "Download UBL" link for own invoices.
+- **Finance AP → PEPPOL Invoices**:
+  - "Issue Credit Note" row action on `posted` invoices → opens dialog (reason, lines selector).
+  - Mandate badge column (PEPPOL / ZATCA / SDI / Factur-X).
+  - QR preview for ZATCA invoices.
+  - "Compliance Export" admin action → triggers `peppol-dsar-export`.
+- **Company Settings → E-invoicing tab** (new):
+  - Sandbox/Live toggle (super-admin only) with confirmation modal listing prerequisites.
+  - Country mandate enablement matrix (KSA / IT / FR) with cert upload references.
+  - Retention policy display (10y) and legal-hold count.
+- **Supplier portal → Invoices**: credit-note linkage shown inline; download links transparently decrypt attachments.
 
 ## Secrets required
 
-- `STORECOVE_API_KEY`
-- `STORECOVE_WEBHOOK_SECRET`
-- (later, for sender identity) `STORECOVE_SENDER_LEGAL_ENTITY_ID`
+- `ZATCA_CSID_USERNAME`, `ZATCA_CSID_PASSWORD`, `ZATCA_PRODUCTION_CSID` (per-company override possible).
+- `SDI_TRANSMITTER_ID`.
+- `EINVOICE_ATTACHMENT_KEK` (key-encryption-key for envelope encryption).
+- Reuses Phase 3 `STORECOVE_API_KEY`, `STORECOVE_WEBHOOK_SECRET`. Add `STORECOVE_LIVE_API_KEY` for production tenant.
 
-Phase 3 can scaffold all functions and DB without these set; `peppol-send` and the webhook will return a clear "provider not configured" error until they are added.
+Functions degrade gracefully with a clear "mandate not configured" error until secrets are present.
 
 ## Acceptance criteria
 
-- Migration applies cleanly; no new RLS gaps in linter.
-- `peppol-send` posts a validated invoice and persists provider message ID; status moves to `sent`.
-- Mocked webhook payloads transition status and append events without breaking the hash chain.
-- Inbound UBL with mandatory BIS 3.0 headers parses into `einvoices` + lines.
-- `peppol-three-way-match` flags qty mismatch as `discrepancy`, exact match as `matched`.
-- Supplier portal shows live status updates after a webhook call.
-- Finance AP "Send" button works end-to-end against a Storecove sandbox tenant.
+- Credit note can be issued from a posted invoice; original invoice shows the link; UBL CreditNote validates against EN 16931 BR-CO rules.
+- A KSA-profiled invoice produces ZATCA-compliant UBL with QR (TLV base64) and is accepted by the ZATCA sandbox; clearance UUID stored.
+- An IT-profiled invoice produces FatturaPA XML accepted by Storecove SDI sandbox; SDI status transitions reflected via webhook.
+- A FR-profiled invoice produces a hybrid PDF/A-3 with embedded UBL.
+- Sandbox→Live toggle requires super-admin and writes an `einvoice_events` audit row scoped to the company.
+- New attachments are stored AES-256-GCM encrypted; retrieval transparent for authorized users; raw bucket bytes are unreadable.
+- DSAR export ZIP contains a complete, hash-chained record set for the requested counterparty.
+- Migration applies cleanly; supabase linter has no new warnings.
 
 ## Implementation order
 
-1. DB migration (tables, enum extensions, RLS, append-only trigger).
-2. `peppol-send` + UI "Send" action + transmission viewer.
-3. `peppol-webhook` skeleton + HMAC verification + status transitions.
-4. `peppol-ingest-inbound` + UBL parser.
-5. `peppol-three-way-match` + match drawer UI.
-6. Supplier portal status timeline.
-7. Memory entries: `architecture/peppol-transmission`, `security/peppol-webhook-hmac`.
+1. DB migration (enums, columns, new tables, triggers, RLS).
+2. Credit-note builder + UI action + lifecycle events.
+3. Country adapters: ZATCA → SDI → Factur-X (each behind feature flag).
+4. Attachment encryption layer (encrypt-on-write, decrypt-on-read), backfill skipped (only new files).
+5. Production toggle + super-admin gate + audit.
+6. DSAR export function + admin UI.
+7. Memory entries: `features/einvoicing/credit-notes`, `features/einvoicing/country-mandates`, `security/peppol-attachment-encryption`, `security/peppol-production-toggle`.
 
 ## Confirmation needed before coding
 
-- **Provider**: defaulting to **Storecove**. Confirm or pick another (Pagero, Tickstar, Tradeshift, custom AS4).
-- **Sandbox vs live**: Phase 3 wires the sandbox tenant only; production toggle ships in Phase 4.
-- **3-way tolerance defaults**: qty ±5%, price ±2%, total ±1 unit currency. Adjust if you have policy.
+- **Country priority**: default order KSA → IT → FR. Adjust if a specific tenant needs another first (e.g. PL KSeF, DE XRechnung).
+- **Encryption KEK**: use `EINVOICE_ATTACHMENT_KEK` secret (envelope encryption with per-file DEK), or integrate with an external KMS (AWS KMS / GCP KMS)?
+- **Retention**: 10 years default; confirm or override per jurisdiction (e.g. KSA = 6y, IT = 10y, FR = 10y).
+- **Live toggle gate**: require super-admin only, or also a second-person approval (4-eyes)?

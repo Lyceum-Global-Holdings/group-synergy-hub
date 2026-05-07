@@ -3461,6 +3461,7 @@ export type Database = {
         Row: {
           address: string | null
           code: string
+          country_mandate_overrides: Json
           created_at: string
           created_by: string | null
           hod_user_id: string | null
@@ -3470,12 +3471,16 @@ export type Database = {
           manager_user_id: string | null
           modules: Json | null
           name: string
+          peppol_environment: Database["public"]["Enums"]["peppol_environment"]
+          peppol_live_enabled_at: string | null
+          peppol_live_enabled_by: string | null
           status: string
           updated_at: string
         }
         Insert: {
           address?: string | null
           code: string
+          country_mandate_overrides?: Json
           created_at?: string
           created_by?: string | null
           hod_user_id?: string | null
@@ -3485,12 +3490,16 @@ export type Database = {
           manager_user_id?: string | null
           modules?: Json | null
           name: string
+          peppol_environment?: Database["public"]["Enums"]["peppol_environment"]
+          peppol_live_enabled_at?: string | null
+          peppol_live_enabled_by?: string | null
           status?: string
           updated_at?: string
         }
         Update: {
           address?: string | null
           code?: string
+          country_mandate_overrides?: Json
           created_at?: string
           created_by?: string | null
           hod_user_id?: string | null
@@ -3500,6 +3509,9 @@ export type Database = {
           manager_user_id?: string | null
           modules?: Json | null
           name?: string
+          peppol_environment?: Database["public"]["Enums"]["peppol_environment"]
+          peppol_live_enabled_at?: string | null
+          peppol_live_enabled_by?: string | null
           status?: string
           updated_at?: string
         }
@@ -7524,6 +7536,50 @@ export type Database = {
           },
         ]
       }
+      einvoice_attachment_keys: {
+        Row: {
+          algorithm: string
+          attachment_id: string
+          auth_tag: string
+          company_id: string
+          created_at: string
+          id: string
+          iv: string
+          key_id: string
+          wrapped_dek: string
+        }
+        Insert: {
+          algorithm?: string
+          attachment_id: string
+          auth_tag: string
+          company_id: string
+          created_at?: string
+          id?: string
+          iv: string
+          key_id: string
+          wrapped_dek: string
+        }
+        Update: {
+          algorithm?: string
+          attachment_id?: string
+          auth_tag?: string
+          company_id?: string
+          created_at?: string
+          id?: string
+          iv?: string
+          key_id?: string
+          wrapped_dek?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "einvoice_attachment_keys_attachment_id_fkey"
+            columns: ["attachment_id"]
+            isOneToOne: false
+            referencedRelation: "einvoice_attachments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       einvoice_attachments: {
         Row: {
           byte_size: number | null
@@ -7558,6 +7614,56 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "einvoice_attachments_einvoice_id_fkey"
+            columns: ["einvoice_id"]
+            isOneToOne: false
+            referencedRelation: "einvoices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      einvoice_country_artifacts: {
+        Row: {
+          clearance_status: string | null
+          clearance_uuid: string | null
+          cleared_at: string | null
+          company_id: string
+          created_at: string
+          created_by: string | null
+          einvoice_id: string
+          government_response: Json
+          id: string
+          mandate: Database["public"]["Enums"]["einvoice_country_mandate"]
+          qr_code: string | null
+        }
+        Insert: {
+          clearance_status?: string | null
+          clearance_uuid?: string | null
+          cleared_at?: string | null
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          einvoice_id: string
+          government_response?: Json
+          id?: string
+          mandate: Database["public"]["Enums"]["einvoice_country_mandate"]
+          qr_code?: string | null
+        }
+        Update: {
+          clearance_status?: string | null
+          clearance_uuid?: string | null
+          cleared_at?: string | null
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          einvoice_id?: string
+          government_response?: Json
+          id?: string
+          mandate?: Database["public"]["Enums"]["einvoice_country_mandate"]
+          qr_code?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "einvoice_country_artifacts_einvoice_id_fkey"
             columns: ["einvoice_id"]
             isOneToOne: false
             referencedRelation: "einvoices"
@@ -7779,18 +7885,23 @@ export type Database = {
       }
       einvoices: {
         Row: {
+          archive_until: string | null
           company_id: string
+          compliance_profile: Database["public"]["Enums"]["einvoice_compliance_profile"]
+          corrected_einvoice_id: string | null
           created_at: string
           created_by: string
           currency: string
           customer_company_id: string | null
           direction: Database["public"]["Enums"]["einvoice_direction"]
+          document_type: Database["public"]["Enums"]["einvoice_document_type"]
           due_date: string | null
           grand_total: number
           grn_id: string | null
           id: string
           invoice_number: string
           issue_date: string
+          legal_hold: boolean
           match_status: Database["public"]["Enums"]["einvoice_match_status"]
           notes: string | null
           pdf_path: string | null
@@ -7807,18 +7918,23 @@ export type Database = {
           validation_report: Json | null
         }
         Insert: {
+          archive_until?: string | null
           company_id: string
+          compliance_profile?: Database["public"]["Enums"]["einvoice_compliance_profile"]
+          corrected_einvoice_id?: string | null
           created_at?: string
           created_by: string
           currency?: string
           customer_company_id?: string | null
           direction: Database["public"]["Enums"]["einvoice_direction"]
+          document_type?: Database["public"]["Enums"]["einvoice_document_type"]
           due_date?: string | null
           grand_total?: number
           grn_id?: string | null
           id?: string
           invoice_number: string
           issue_date: string
+          legal_hold?: boolean
           match_status?: Database["public"]["Enums"]["einvoice_match_status"]
           notes?: string | null
           pdf_path?: string | null
@@ -7835,18 +7951,23 @@ export type Database = {
           validation_report?: Json | null
         }
         Update: {
+          archive_until?: string | null
           company_id?: string
+          compliance_profile?: Database["public"]["Enums"]["einvoice_compliance_profile"]
+          corrected_einvoice_id?: string | null
           created_at?: string
           created_by?: string
           currency?: string
           customer_company_id?: string | null
           direction?: Database["public"]["Enums"]["einvoice_direction"]
+          document_type?: Database["public"]["Enums"]["einvoice_document_type"]
           due_date?: string | null
           grand_total?: number
           grn_id?: string | null
           id?: string
           invoice_number?: string
           issue_date?: string
+          legal_hold?: boolean
           match_status?: Database["public"]["Enums"]["einvoice_match_status"]
           notes?: string | null
           pdf_path?: string | null
@@ -7868,6 +7989,13 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "einvoices_corrected_einvoice_id_fkey"
+            columns: ["corrected_einvoice_id"]
+            isOneToOne: false
+            referencedRelation: "einvoices"
             referencedColumns: ["id"]
           },
           {
@@ -21833,6 +21961,13 @@ export type Database = {
         }
         Returns: undefined
       }
+      set_peppol_environment: {
+        Args: {
+          p_company_id: string
+          p_env: Database["public"]["Enums"]["peppol_environment"]
+        }
+        Returns: undefined
+      }
       srn_number_exists: {
         Args: { _company_id: string; _exclude_id?: string; _srn_number: string }
         Returns: boolean
@@ -22081,7 +22216,14 @@ export type Database = {
         | "pending_receipt"
         | "partially_received"
         | "fully_received"
+      einvoice_compliance_profile:
+        | "peppol_bis_3"
+        | "ksa_zatca_phase2"
+        | "it_sdi"
+        | "fr_facturx"
+      einvoice_country_mandate: "zatca" | "sdi" | "facturx"
       einvoice_direction: "outbound" | "inbound"
+      einvoice_document_type: "invoice" | "credit_note" | "debit_note"
       einvoice_event_type:
         | "created"
         | "updated"
@@ -22155,6 +22297,7 @@ export type Database = {
         | "reporting"
         | "renewal_action"
         | "inspection"
+      peppol_environment: "sandbox" | "live"
       period_status: "open" | "closed" | "locked"
       permission_level: "view" | "edit" | "admin"
       po_amendment_type:
@@ -22571,7 +22714,15 @@ export const Constants = {
         "partially_received",
         "fully_received",
       ],
+      einvoice_compliance_profile: [
+        "peppol_bis_3",
+        "ksa_zatca_phase2",
+        "it_sdi",
+        "fr_facturx",
+      ],
+      einvoice_country_mandate: ["zatca", "sdi", "facturx"],
       einvoice_direction: ["outbound", "inbound"],
+      einvoice_document_type: ["invoice", "credit_note", "debit_note"],
       einvoice_event_type: [
         "created",
         "updated",
@@ -22653,6 +22804,7 @@ export const Constants = {
         "renewal_action",
         "inspection",
       ],
+      peppol_environment: ["sandbox", "live"],
       period_status: ["open", "closed", "locked"],
       permission_level: ["view", "edit", "admin"],
       po_amendment_type: [
