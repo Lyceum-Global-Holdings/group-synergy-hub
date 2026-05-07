@@ -1,0 +1,60 @@
+import { useEffect, useState } from "react";
+import { useNavigate, useSearchParams, Link } from "react-router-dom";
+import { Loader2 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { useToast } from "@/hooks/use-toast";
+
+export default function PortalLogin() {
+  const { user, signIn } = useAuth();
+  const navigate = useNavigate();
+  const [params] = useSearchParams();
+  const next = params.get("next") || "/portal";
+  const { toast } = useToast();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => { if (user) navigate(next, { replace: true }); }, [user, next, navigate]);
+
+  const onSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setBusy(true);
+    const { error } = await signIn(email, password);
+    setBusy(false);
+    if (error) {
+      toast({ title: "Sign-in failed", description: error.message, variant: "destructive" });
+      return;
+    }
+    navigate(next, { replace: true });
+  };
+
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-muted/20 p-4">
+      <Card className="w-full max-w-md">
+        <CardHeader>
+          <CardTitle>Supplier Portal</CardTitle>
+          <CardDescription>Sign in to manage your supplier account.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={onSubmit} className="space-y-3">
+            <Input type="email" required placeholder="Email" value={email}
+              onChange={(e) => setEmail(e.target.value)} autoComplete="email" />
+            <Input type="password" required placeholder="Password" value={password}
+              onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" />
+            <Button type="submit" className="w-full" disabled={busy}>
+              {busy && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Sign in
+            </Button>
+            <p className="text-xs text-muted-foreground text-center">
+              Have an invitation? <Link to={`/portal/accept-invite${window.location.search}`} className="underline">Accept invite</Link>
+            </p>
+          </form>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
