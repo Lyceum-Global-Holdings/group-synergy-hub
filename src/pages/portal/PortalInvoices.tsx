@@ -16,7 +16,7 @@ export default function PortalInvoices() {
     setLoading(true);
     supabase
       .from("einvoices")
-      .select("id, invoice_number, status, direction, total_amount, currency, issue_date, peppol_message_id")
+      .select("id, invoice_number, status, direction, grand_total, currency, issue_date, peppol_message_id")
       .eq("supplier_id", activeSupplierId)
       .order("issue_date", { ascending: false })
       .limit(100)
@@ -48,7 +48,7 @@ export default function PortalInvoices() {
                     <TableCell className="capitalize">{r.direction}</TableCell>
                     <TableCell><Badge variant="secondary" className="capitalize">{r.status}</Badge></TableCell>
                     <TableCell className="text-right">
-                      {r.total_amount != null ? `${r.currency ?? ""} ${Number(r.total_amount).toLocaleString()}` : "—"}
+                      {r.grand_total != null ? `${r.currency ?? ""} ${Number(r.grand_total).toLocaleString()}` : "—"}
                     </TableCell>
                     <TableCell>{r.issue_date ? new Date(r.issue_date).toLocaleDateString() : "—"}</TableCell>
                     <TableCell className="font-mono text-xs">{r.peppol_message_id ?? "—"}</TableCell>
