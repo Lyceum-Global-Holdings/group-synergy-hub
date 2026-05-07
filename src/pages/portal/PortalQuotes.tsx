@@ -16,7 +16,7 @@ export default function PortalQuotes() {
     setLoading(true);
     supabase
       .from("supplier_quotes")
-      .select("id, quote_number, status, total_amount, currency, valid_until, created_at")
+      .select("id, quote_number, status, total_quoted_amount, currency, validity_period, created_at")
       .eq("supplier_id", activeSupplierId)
       .order("created_at", { ascending: false })
       .limit(100)
