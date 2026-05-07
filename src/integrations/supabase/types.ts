@@ -7671,6 +7671,112 @@ export type Database = {
           },
         ]
       }
+      einvoice_match_results: {
+        Row: {
+          discrepancies: Json
+          einvoice_id: string
+          evaluated_at: string
+          evaluated_by: string | null
+          grn_id: string | null
+          id: string
+          po_id: string | null
+          price_match: boolean
+          qty_match: boolean
+          score: number
+          total_match: boolean
+        }
+        Insert: {
+          discrepancies?: Json
+          einvoice_id: string
+          evaluated_at?: string
+          evaluated_by?: string | null
+          grn_id?: string | null
+          id?: string
+          po_id?: string | null
+          price_match?: boolean
+          qty_match?: boolean
+          score?: number
+          total_match?: boolean
+        }
+        Update: {
+          discrepancies?: Json
+          einvoice_id?: string
+          evaluated_at?: string
+          evaluated_by?: string | null
+          grn_id?: string | null
+          id?: string
+          po_id?: string | null
+          price_match?: boolean
+          qty_match?: boolean
+          score?: number
+          total_match?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "einvoice_match_results_einvoice_id_fkey"
+            columns: ["einvoice_id"]
+            isOneToOne: false
+            referencedRelation: "einvoices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      einvoice_transmissions: {
+        Row: {
+          attempt_count: number
+          created_at: string
+          created_by: string | null
+          direction: Database["public"]["Enums"]["einvoice_direction"]
+          einvoice_id: string
+          error_message: string | null
+          id: string
+          last_status: string
+          last_status_at: string
+          provider: string
+          provider_message_id: string | null
+          raw_response: Json
+          submitted_at: string
+        }
+        Insert: {
+          attempt_count?: number
+          created_at?: string
+          created_by?: string | null
+          direction: Database["public"]["Enums"]["einvoice_direction"]
+          einvoice_id: string
+          error_message?: string | null
+          id?: string
+          last_status?: string
+          last_status_at?: string
+          provider?: string
+          provider_message_id?: string | null
+          raw_response?: Json
+          submitted_at?: string
+        }
+        Update: {
+          attempt_count?: number
+          created_at?: string
+          created_by?: string | null
+          direction?: Database["public"]["Enums"]["einvoice_direction"]
+          einvoice_id?: string
+          error_message?: string | null
+          id?: string
+          last_status?: string
+          last_status_at?: string
+          provider?: string
+          provider_message_id?: string | null
+          raw_response?: Json
+          submitted_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "einvoice_transmissions_einvoice_id_fkey"
+            columns: ["einvoice_id"]
+            isOneToOne: false
+            referencedRelation: "einvoices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       einvoices: {
         Row: {
           company_id: string
@@ -21997,6 +22103,8 @@ export type Database = {
         | "rejected"
         | "paid"
         | "cancelled"
+        | "submission_failed"
+        | "delivered"
       evaluation_recommendation:
         | "strongly_recommend"
         | "recommend"
@@ -22486,6 +22594,8 @@ export const Constants = {
         "rejected",
         "paid",
         "cancelled",
+        "submission_failed",
+        "delivered",
       ],
       evaluation_recommendation: [
         "strongly_recommend",
