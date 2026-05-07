@@ -116,21 +116,28 @@ export default function PortalInvoices() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Invoice #</TableHead>
+                  <TableHead>Type</TableHead>
+                  <TableHead>Profile</TableHead>
                   <TableHead>Direction</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Match</TableHead>
                   <TableHead className="text-right">Total</TableHead>
                   <TableHead>Issued</TableHead>
-                  <TableHead>PEPPOL Msg</TableHead>
-                  <TableHead className="w-[160px]">Actions</TableHead>
+                  <TableHead className="w-[200px]">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {rows.map((r) => {
                   const sendable = canSend && r.direction === "outbound" && ["validated","ready_to_send","submission_failed"].includes(r.status);
+                  const creditable = canSend && r.direction === "outbound" && r.document_type !== "credit_note" && ["sent","delivered","posted","matched"].includes(r.status);
                   return (
                     <TableRow key={r.id}>
-                      <TableCell className="font-mono">{r.invoice_number ?? r.id.slice(0, 8)}</TableCell>
+                      <TableCell className="font-mono">
+                        {r.invoice_number ?? r.id.slice(0, 8)}
+                        {r.corrected_einvoice_id && <Badge variant="outline" className="ml-2 text-xs">corrects</Badge>}
+                      </TableCell>
+                      <TableCell className="capitalize">{(r.document_type ?? "invoice").replace("_", " ")}</TableCell>
+                      <TableCell><Badge variant="outline">{PROFILE_LABEL[r.compliance_profile ?? "peppol_bis_3"] ?? r.compliance_profile}</Badge></TableCell>
                       <TableCell className="capitalize">{r.direction}</TableCell>
                       <TableCell><Badge variant="secondary" className="capitalize">{r.status}</Badge></TableCell>
                       <TableCell>{r.match_status ? <Badge variant="outline" className="capitalize">{r.match_status}</Badge> : "—"}</TableCell>
@@ -138,25 +145,29 @@ export default function PortalInvoices() {
                         {r.grand_total != null ? `${r.currency ?? ""} ${Number(r.grand_total).toLocaleString()}` : "—"}
                       </TableCell>
                       <TableCell>{r.issue_date ? new Date(r.issue_date).toLocaleDateString() : "—"}</TableCell>
-                      <TableCell className="font-mono text-xs">{r.peppol_message_id ?? "—"}</TableCell>
                       <TableCell className="space-x-1">
                         {sendable && (
-                          <Button size="sm" variant="outline" disabled={busyId === r.id} onClick={() => sendInvoice(r.id)}>
+                          <Button size="sm" variant="outline" disabled={busyId === r.id} onClick={() => sendInvoice(r.id)} title="Send via PEPPOL">
                             {busyId === r.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Send className="h-3 w-3" />}
                           </Button>
                         )}
+                        {creditable && (
+                          <Button size="sm" variant="ghost" disabled={busyId === r.id} onClick={() => issueCreditNote(r.id)} title="Issue credit note">
+                            <Receipt className="h-3 w-3" />
+                          </Button>
+                        )}
                         {r.ubl_xml_path && (
-                          <Button size="sm" variant="ghost" onClick={() => downloadUbl(r)}><FileText className="h-3 w-3" /></Button>
+                          <Button size="sm" variant="ghost" onClick={() => downloadUbl(r)} title="Download UBL"><FileText className="h-3 w-3" /></Button>
                         )}
                         {r.direction === "inbound" && (
-                          <Button size="sm" variant="ghost" onClick={() => openMatch(r)}><Search className="h-3 w-3" /></Button>
+                          <Button size="sm" variant="ghost" onClick={() => openMatch(r)} title="3-way match"><Search className="h-3 w-3" /></Button>
                         )}
                       </TableCell>
                     </TableRow>
                   );
                 })}
                 {rows.length === 0 && (
-                  <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground">No invoices yet</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground">No invoices yet</TableCell></TableRow>
                 )}
               </TableBody>
             </Table>
