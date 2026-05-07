@@ -46,9 +46,9 @@ export default function PortalQuotes() {
                     <TableCell className="font-mono">{r.quote_number ?? r.id.slice(0, 8)}</TableCell>
                     <TableCell><Badge variant="secondary" className="capitalize">{r.status ?? "draft"}</Badge></TableCell>
                     <TableCell className="text-right">
-                      {r.total_amount != null ? `${r.currency ?? ""} ${Number(r.total_amount).toLocaleString()}` : "—"}
+                      {r.total_quoted_amount != null ? `${r.currency ?? ""} ${Number(r.total_quoted_amount).toLocaleString()}` : "—"}
                     </TableCell>
-                    <TableCell>{r.valid_until ? new Date(r.valid_until).toLocaleDateString() : "—"}</TableCell>
+                    <TableCell>{r.validity_period ? new Date(r.validity_period).toLocaleDateString() : "—"}</TableCell>
                     <TableCell>{r.created_at ? new Date(r.created_at).toLocaleDateString() : "—"}</TableCell>
                   </TableRow>
                 ))}
