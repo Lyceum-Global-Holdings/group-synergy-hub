@@ -15,6 +15,7 @@ import { useBulkUpdateSupplierRatings } from '@/hooks/useSupplierRatings';
 import { CreateSupplierDialog } from '@/components/sourcing/CreateSupplierDialog';
 import { SupplierDetailsDialog } from '@/components/sourcing/SupplierDetailsDialog';
 import { SupplierRatingTooltip } from '@/components/sourcing/SupplierRatingTooltip';
+import { InviteSupplierUserDialog } from '@/components/sourcing/InviteSupplierUserDialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import type { Supplier } from '@/types/supplier';
 import { SUPPLIER_STATUSES, SUPPLIER_CATEGORIES } from '@/types/supplier';
@@ -27,6 +28,7 @@ export const SupplierMaster: React.FC = () => {
   const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null);
   const [supplierToDelete, setSupplierToDelete] = useState<Supplier | null>(null);
   const [supplierToEdit, setSupplierToEdit] = useState<Supplier | null>(null);
+  const [supplierToInvite, setSupplierToInvite] = useState<Supplier | null>(null);
 
   const { data: suppliers, isLoading, error } = useSuppliers();
   const { data: analytics } = useSupplierAnalytics();
@@ -440,6 +442,14 @@ export const SupplierMaster: React.FC = () => {
                               }}
                             >
                               Edit
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSupplierToInvite(supplier);
+                              }}
+                            >
+                              Invite to Portal
                             </DropdownMenuItem>
                             <DropdownMenuItem
                               onClick={(e) => {
