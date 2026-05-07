@@ -29,3 +29,15 @@ verify_jwt = false
 
 [functions.peppol-build-invoice]
 verify_jwt = false
+
+[functions.peppol-send]
+verify_jwt = false
+
+[functions.peppol-webhook]
+verify_jwt = false
+
+[functions.peppol-ingest-inbound]
+verify_jwt = false
+
+[functions.peppol-three-way-match]
+verify_jwt = false
