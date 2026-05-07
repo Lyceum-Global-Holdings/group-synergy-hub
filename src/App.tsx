@@ -36,6 +36,8 @@ import { BrowserRouter, Routes, Route, Outlet, useLocation } from "react-router-
 import { useEffect } from "react";
 import ScrollToTop from "@/components/layout/ScrollToTop";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { SupplierProvider } from "@/contexts/SupplierContext";
+import { SupplierRoute } from "@/components/portal/SupplierRoute";
 import { CompanyProvider } from "@/contexts/CompanyContext";
 import { LocationFilterProvider } from "@/contexts/LocationFilterContext";
 import ProtectedRoute from "./components/common/ProtectedRoute";
@@ -131,6 +133,18 @@ const SocialMediaActivityLog = lazy(() => import("./pages/social-media/ActivityL
 const TestEnvironmentPage = lazy(() => import("./pages/admin/test-environment/TestEnvironmentPage"));
 const PerformanceDashboard = lazy(() => import("./pages/admin/PerformanceDashboard"));
 
+// Supplier Portal pages
+const PortalLayout = lazy(() => import("./components/portal/PortalLayout").then((m) => ({ default: m.PortalLayout })));
+const PortalLogin = lazy(() => import("./pages/portal/PortalLogin"));
+const PortalAcceptInvite = lazy(() => import("./pages/portal/PortalAcceptInvite"));
+const PortalDashboard = lazy(() => import("./pages/portal/PortalDashboard"));
+const PortalProfile = lazy(() => import("./pages/portal/PortalProfile"));
+const PortalUsers = lazy(() => import("./pages/portal/PortalUsers"));
+const PortalPeppolIds = lazy(() => import("./pages/portal/PortalPeppolIds"));
+const PortalQuotes = lazy(() => import("./pages/portal/PortalQuotes"));
+const PortalInvoices = lazy(() => import("./pages/portal/PortalInvoices"));
+const PortalNoAccess = lazy(() => import("./pages/portal/PortalNoAccess"));
+
 // Phase 5 — fires markRouteChange on every SPA navigation so vitals tag the right route.
 function RouteChangeTracker() {
   const location = useLocation();
@@ -205,7 +219,35 @@ function App() {
                   <MfaChallenge />
                 </AuthProvider>
               } />
-              
+
+              {/* Supplier Portal - own auth/supplier context, separate from internal app shell */}
+              <Route path="/portal/login" element={<AuthProvider><PortalLogin /></AuthProvider>} />
+              <Route path="/portal/accept-invite" element={
+                <AuthProvider>
+                  <SupplierProvider>
+                    <PortalAcceptInvite />
+                  </SupplierProvider>
+                </AuthProvider>
+              } />
+              <Route path="/portal/no-access" element={
+                <AuthProvider><SupplierProvider><PortalNoAccess /></SupplierProvider></AuthProvider>
+              } />
+              <Route path="/portal" element={
+                <AuthProvider>
+                  <SupplierProvider>
+                    <SupplierRoute><PortalLayout /></SupplierRoute>
+                  </SupplierProvider>
+                </AuthProvider>
+              }>
+                <Route index element={<PortalDashboard />} />
+                <Route path="profile" element={<PortalProfile />} />
+                <Route path="users" element={<SupplierRoute requireRole={["owner","admin"]}><PortalUsers /></SupplierRoute>} />
+                <Route path="peppol-ids" element={<PortalPeppolIds />} />
+                <Route path="quotes" element={<PortalQuotes />} />
+                <Route path="invoices" element={<PortalInvoices />} />
+              </Route>
+
+
               {/* Protected routes - all wrapped with auth/company context */}
               <Route element={<ProtectedLayout />}>
                 <Route path="/" element={<Dashboard />} />
