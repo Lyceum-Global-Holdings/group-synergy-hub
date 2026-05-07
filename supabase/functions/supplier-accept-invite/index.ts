@@ -132,8 +132,8 @@ serve(async (req) => {
     // Best-effort audit log
     await admin.rpc("log_supplier_portal_event", {
       _supplier_id: inv.supplier_id,
-      _event_type: "invitation_accepted",
-      _payload: { invitation_id: inv.id, user_id: user.id },
+      _action: "invitation_accepted",
+      _metadata: { invitation_id: inv.id, user_id: user.id },
     }).catch((e: unknown) => console.warn("audit log failed", e));
 
     return new Response(
