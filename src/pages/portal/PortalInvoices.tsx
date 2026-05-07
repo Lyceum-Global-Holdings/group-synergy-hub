@@ -15,12 +15,22 @@ interface InvoiceRow {
   status: string;
   match_status: string | null;
   direction: string;
+  document_type: string | null;
+  compliance_profile: string | null;
+  corrected_einvoice_id: string | null;
   grand_total: number | null;
   currency: string | null;
   issue_date: string | null;
   peppol_message_id: string | null;
   ubl_xml_path: string | null;
 }
+
+const PROFILE_LABEL: Record<string, string> = {
+  peppol_bis_3: "PEPPOL",
+  ksa_zatca_phase2: "ZATCA",
+  it_sdi: "SDI",
+  fr_facturx: "Factur-X",
+};
 
 export default function PortalInvoices() {
   const { activeSupplierId, activeMembership } = useSupplierContext();
