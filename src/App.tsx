@@ -36,6 +36,8 @@ import { BrowserRouter, Routes, Route, Outlet, useLocation } from "react-router-
 import { useEffect } from "react";
 import ScrollToTop from "@/components/layout/ScrollToTop";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { SupplierProvider } from "@/contexts/SupplierContext";
+import { SupplierRoute } from "@/components/portal/SupplierRoute";
 import { CompanyProvider } from "@/contexts/CompanyContext";
 import { LocationFilterProvider } from "@/contexts/LocationFilterContext";
 import ProtectedRoute from "./components/common/ProtectedRoute";
