@@ -66,7 +66,7 @@ serve(async (req) => {
         .from("purchase_orders")
         .select("id")
         .eq("supplier_id", inv.supplier_id)
-        .or(`po_number.eq.${inv.invoice_number},external_reference.eq.${inv.invoice_number}`)
+        .eq("po_number", inv.invoice_number)
         .limit(1)
         .maybeSingle();
       if (poByRef) poId = poByRef.id;
@@ -84,13 +84,14 @@ serve(async (req) => {
       if (grn) grnId = grn.id;
     }
 
-    // Pull PO lines and GRN lines if available
     const { data: poLines } = poId
-      ? await admin.from("purchase_order_items").select("id, item_id, item_code, quantity, unit_price").eq("po_id", poId)
+      ? await admin.from("po_items")
+          .select("id, item_code, warehouse_item_id, quantity_ordered, unit_price")
+          .eq("po_id", poId)
       : { data: [] as any[] };
 
     const { data: grnLines } = grnId
-      ? await admin.from("grn_items").select("id, po_item_id, received_quantity").eq("grn_id", grnId)
+      ? await admin.from("grn_items").select("id, po_item_id, quantity_received").eq("grn_id", grnId)
       : { data: [] as any[] };
 
     const discrepancies: any[] = [];
@@ -104,7 +105,7 @@ serve(async (req) => {
         qtyOk = false; priceOk = false;
         continue;
       }
-      const recv = (grnLines ?? []).find((g: any) => g.po_item_id === pl.id)?.received_quantity ?? pl.quantity;
+      const recv = (grnLines ?? []).find((g: any) => g.po_item_id === pl.id)?.quantity_received ?? pl.quantity_ordered;
       const qtyDelta = Math.abs(Number(il.quantity) - Number(recv)) / Math.max(Number(recv) || 1, 1);
       const priceDelta = Math.abs(Number(il.unit_price) - Number(pl.unit_price)) / Math.max(Number(pl.unit_price) || 1, 1);
       if (qtyDelta > QTY_TOL) {
@@ -117,7 +118,7 @@ serve(async (req) => {
       }
     }
 
-    const poTotal = (poLines ?? []).reduce((s: number, p: any) => s + Number(p.quantity) * Number(p.unit_price), 0);
+    const poTotal = (poLines ?? []).reduce((s: number, p: any) => s + Number(p.quantity_ordered) * Number(p.unit_price), 0);
     const totalOk = Math.abs(Number(inv.grand_total ?? 0) - poTotal) <= TOTAL_TOL;
     if (!totalOk && poTotal > 0) {
       discrepancies.push({ code: "total", invoiced: inv.grand_total, po_total: poTotal });
