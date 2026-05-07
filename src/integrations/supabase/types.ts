@@ -10848,6 +10848,39 @@ export type Database = {
           },
         ]
       }
+      peppol_participants: {
+        Row: {
+          created_at: string
+          id: string
+          is_primary: boolean
+          owner_id: string
+          owner_type: string
+          participant_id: string
+          scheme_id: string
+          verified_at: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_primary?: boolean
+          owner_id: string
+          owner_type: string
+          participant_id: string
+          scheme_id: string
+          verified_at?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_primary?: boolean
+          owner_id?: string
+          owner_type?: string
+          participant_id?: string
+          scheme_id?: string
+          verified_at?: string | null
+        }
+        Relationships: []
+      }
       performance_metrics: {
         Row: {
           company_id: string | null
@@ -16055,6 +16088,63 @@ export type Database = {
           },
         ]
       }
+      supplier_invitations: {
+        Row: {
+          accepted_at: string | null
+          company_id: string | null
+          created_at: string
+          email: string
+          expires_at: string
+          id: string
+          invited_by: string | null
+          portal_role: string
+          revoked_at: string | null
+          supplier_id: string
+          token_hash: string
+        }
+        Insert: {
+          accepted_at?: string | null
+          company_id?: string | null
+          created_at?: string
+          email: string
+          expires_at?: string
+          id?: string
+          invited_by?: string | null
+          portal_role: string
+          revoked_at?: string | null
+          supplier_id: string
+          token_hash: string
+        }
+        Update: {
+          accepted_at?: string | null
+          company_id?: string | null
+          created_at?: string
+          email?: string
+          expires_at?: string
+          id?: string
+          invited_by?: string | null
+          portal_role?: string
+          revoked_at?: string | null
+          supplier_id?: string
+          token_hash?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "supplier_invitations_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_invitations_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       supplier_invoice_lines: {
         Row: {
           amount: number
@@ -16418,6 +16508,98 @@ export type Database = {
           },
         ]
       }
+      supplier_portal_audit: {
+        Row: {
+          action: string
+          actor_user_id: string | null
+          created_at: string
+          id: number
+          ip: unknown
+          metadata: Json
+          prev_hash: string | null
+          row_hash: string | null
+          supplier_id: string | null
+          user_agent: string | null
+        }
+        Insert: {
+          action: string
+          actor_user_id?: string | null
+          created_at?: string
+          id?: number
+          ip?: unknown
+          metadata?: Json
+          prev_hash?: string | null
+          row_hash?: string | null
+          supplier_id?: string | null
+          user_agent?: string | null
+        }
+        Update: {
+          action?: string
+          actor_user_id?: string | null
+          created_at?: string
+          id?: number
+          ip?: unknown
+          metadata?: Json
+          prev_hash?: string | null
+          row_hash?: string | null
+          supplier_id?: string | null
+          user_agent?: string | null
+        }
+        Relationships: []
+      }
+      supplier_profiles_extended: {
+        Row: {
+          bank_account_name: string | null
+          bank_account_number: string | null
+          bank_iban: string | null
+          bank_swift: string | null
+          default_currency: string | null
+          default_payment_terms_days: number | null
+          legal_name: string | null
+          peppol_enabled: boolean
+          supplier_id: string
+          tax_id: string | null
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          bank_account_name?: string | null
+          bank_account_number?: string | null
+          bank_iban?: string | null
+          bank_swift?: string | null
+          default_currency?: string | null
+          default_payment_terms_days?: number | null
+          legal_name?: string | null
+          peppol_enabled?: boolean
+          supplier_id: string
+          tax_id?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          bank_account_name?: string | null
+          bank_account_number?: string | null
+          bank_iban?: string | null
+          bank_swift?: string | null
+          default_currency?: string | null
+          default_payment_terms_days?: number | null
+          legal_name?: string | null
+          peppol_enabled?: boolean
+          supplier_id?: string
+          tax_id?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "supplier_profiles_extended_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: true
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       supplier_quote_items: {
         Row: {
           alternative_description: string | null
@@ -16770,6 +16952,53 @@ export type Database = {
           },
           {
             foreignKeyName: "supplier_risk_flags_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      supplier_users: {
+        Row: {
+          accepted_at: string | null
+          created_at: string
+          id: string
+          invited_at: string | null
+          invited_by: string | null
+          is_active: boolean
+          portal_role: string
+          supplier_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          accepted_at?: string | null
+          created_at?: string
+          id?: string
+          invited_at?: string | null
+          invited_by?: string | null
+          is_active?: boolean
+          portal_role: string
+          supplier_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          accepted_at?: string | null
+          created_at?: string
+          id?: string
+          invited_at?: string | null
+          invited_by?: string | null
+          is_active?: boolean
+          portal_role?: string
+          supplier_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "supplier_users_supplier_id_fkey"
             columns: ["supplier_id"]
             isOneToOne: false
             referencedRelation: "suppliers"
@@ -19760,6 +19989,7 @@ export type Database = {
         }
         Returns: Json
       }
+      current_supplier_ids: { Args: never; Returns: string[] }
       escalate_pending_approvals: { Args: never; Returns: undefined }
       find_catalog_item_by_code: {
         Args: { p_code: string; p_target_company_id?: string }
@@ -20325,6 +20555,8 @@ export type Database = {
       }
       is_same_company: { Args: { _target_user_id: string }; Returns: boolean }
       is_super_admin: { Args: { _user_id: string }; Returns: boolean }
+      is_supplier_member: { Args: { _supplier_id: string }; Returns: boolean }
+      is_supplier_owner: { Args: { _supplier_id: string }; Returns: boolean }
       issue_tool_from_bin: {
         Args: {
           p_bin_id: string
@@ -20344,6 +20576,10 @@ export type Database = {
       journal_entry_has_sensitive_accounts: {
         Args: { je_id: string }
         Returns: boolean
+      }
+      log_supplier_portal_event: {
+        Args: { _action: string; _metadata?: Json; _supplier_id: string }
+        Returns: number
       }
       match_bank_transactions: {
         Args: { p_import_id: string }
@@ -21285,7 +21521,7 @@ export type Database = {
         | "item_addition"
         | "item_removal"
         | "other"
-      app_role: "super_admin" | "admin" | "manager" | "user"
+      app_role: "super_admin" | "admin" | "manager" | "user" | "supplier"
       approval_level_type:
         | "hod"
         | "manager"
@@ -21742,7 +21978,7 @@ export const Constants = {
         "item_removal",
         "other",
       ],
-      app_role: ["super_admin", "admin", "manager", "user"],
+      app_role: ["super_admin", "admin", "manager", "user", "supplier"],
       approval_level_type: [
         "hod",
         "manager",
