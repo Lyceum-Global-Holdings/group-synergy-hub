@@ -219,7 +219,35 @@ function App() {
                   <MfaChallenge />
                 </AuthProvider>
               } />
-              
+
+              {/* Supplier Portal - own auth/supplier context, separate from internal app shell */}
+              <Route path="/portal/login" element={<AuthProvider><PortalLogin /></AuthProvider>} />
+              <Route path="/portal/accept-invite" element={
+                <AuthProvider>
+                  <SupplierProvider>
+                    <PortalAcceptInvite />
+                  </SupplierProvider>
+                </AuthProvider>
+              } />
+              <Route path="/portal/no-access" element={
+                <AuthProvider><SupplierProvider><PortalNoAccess /></SupplierProvider></AuthProvider>
+              } />
+              <Route path="/portal" element={
+                <AuthProvider>
+                  <SupplierProvider>
+                    <SupplierRoute><PortalLayout /></SupplierRoute>
+                  </SupplierProvider>
+                </AuthProvider>
+              }>
+                <Route index element={<PortalDashboard />} />
+                <Route path="profile" element={<PortalProfile />} />
+                <Route path="users" element={<SupplierRoute requireRole={["owner","admin"]}><PortalUsers /></SupplierRoute>} />
+                <Route path="peppol-ids" element={<PortalPeppolIds />} />
+                <Route path="quotes" element={<PortalQuotes />} />
+                <Route path="invoices" element={<PortalInvoices />} />
+              </Route>
+
+
               {/* Protected routes - all wrapped with auth/company context */}
               <Route element={<ProtectedLayout />}>
                 <Route path="/" element={<Dashboard />} />
