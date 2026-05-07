@@ -517,6 +517,15 @@ export const SupplierMaster: React.FC = () => {
           mode="edit"
         />
       )}
+
+      {supplierToInvite && (
+        <InviteSupplierUserDialog
+          open={!!supplierToInvite}
+          onOpenChange={(open) => !open && setSupplierToInvite(null)}
+          supplierId={supplierToInvite.id}
+          supplierName={supplierToInvite.name}
+        />
+      )}
     </div>
   );
 };
