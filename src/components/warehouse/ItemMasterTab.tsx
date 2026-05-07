@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
+import { useState, useMemo, useRef, useEffect, useCallback, lazy, Suspense } from 'react';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
@@ -33,19 +33,45 @@ import { useWarehouseItemsLazyInventory } from '@/hooks/useWarehouseItemsLazyInv
 import { useItemCategories } from '@/hooks/useItemCategories';
 import { useItemUnits } from '@/hooks/useItemUnits';
 import { useCompany } from '@/contexts/CompanyContext';
-import { AddItemsDialog } from '@/components/warehouse/AddItemsDialog';
-import { StockMovementDialog } from '@/components/warehouse/StockMovementDialog';
-import { StockAdjustmentDialog } from '@/components/warehouse/StockAdjustmentDialog';
-import { DeleteItemConfirmationDialog } from '@/components/warehouse/DeleteItemConfirmationDialog';
-import { ItemDetailsDialog } from '@/components/warehouse/ItemDetailsDialog';
-import { ItemTransferDialog } from '@/components/warehouse/ItemTransferDialog';
-import { ItemStockDetailsDialog } from '@/components/warehouse/ItemStockDetailsDialog';
-import { FixMissingOpeningStockDialog } from '@/components/warehouse/FixMissingOpeningStockDialog';
-import { StockMovementReportDialog } from '@/components/warehouse/StockMovementReportDialog';
-import { AddFromCatalogDialog } from '@/components/warehouse/AddFromCatalogDialog';
-import { BulkStockUploadDialog } from '@/components/warehouse/BulkStockUploadDialog';
-import { BulkInventoryUpdateDialog } from '@/components/warehouse/BulkInventoryUpdateDialog';
-import { BulkInventoryDeleteDialog } from '@/components/warehouse/BulkInventoryDeleteDialog';
+const AddItemsDialog = lazy(() =>
+  import('@/components/warehouse/AddItemsDialog').then(m => ({ default: m.AddItemsDialog }))
+);
+const StockMovementDialog = lazy(() =>
+  import('@/components/warehouse/StockMovementDialog').then(m => ({ default: m.StockMovementDialog }))
+);
+const StockAdjustmentDialog = lazy(() =>
+  import('@/components/warehouse/StockAdjustmentDialog').then(m => ({ default: m.StockAdjustmentDialog }))
+);
+const DeleteItemConfirmationDialog = lazy(() =>
+  import('@/components/warehouse/DeleteItemConfirmationDialog').then(m => ({ default: m.DeleteItemConfirmationDialog }))
+);
+const ItemDetailsDialog = lazy(() =>
+  import('@/components/warehouse/ItemDetailsDialog').then(m => ({ default: m.ItemDetailsDialog }))
+);
+const ItemTransferDialog = lazy(() =>
+  import('@/components/warehouse/ItemTransferDialog').then(m => ({ default: m.ItemTransferDialog }))
+);
+const ItemStockDetailsDialog = lazy(() =>
+  import('@/components/warehouse/ItemStockDetailsDialog').then(m => ({ default: m.ItemStockDetailsDialog }))
+);
+const FixMissingOpeningStockDialog = lazy(() =>
+  import('@/components/warehouse/FixMissingOpeningStockDialog').then(m => ({ default: m.FixMissingOpeningStockDialog }))
+);
+const StockMovementReportDialog = lazy(() =>
+  import('@/components/warehouse/StockMovementReportDialog').then(m => ({ default: m.StockMovementReportDialog }))
+);
+const AddFromCatalogDialog = lazy(() =>
+  import('@/components/warehouse/AddFromCatalogDialog').then(m => ({ default: m.AddFromCatalogDialog }))
+);
+const BulkStockUploadDialog = lazy(() =>
+  import('@/components/warehouse/BulkStockUploadDialog').then(m => ({ default: m.BulkStockUploadDialog }))
+);
+const BulkInventoryUpdateDialog = lazy(() =>
+  import('@/components/warehouse/BulkInventoryUpdateDialog').then(m => ({ default: m.BulkInventoryUpdateDialog }))
+);
+const BulkInventoryDeleteDialog = lazy(() =>
+  import('@/components/warehouse/BulkInventoryDeleteDialog').then(m => ({ default: m.BulkInventoryDeleteDialog }))
+);
 import { WarehouseItem } from '@/types/itemBin';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -899,14 +925,18 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
         )}
       </div>
 
-      <AddItemsDialog
-        open={isCreateDialogOpen || editingItem !== null}
-        onOpenChange={(open) => {
-          setIsCreateDialogOpen(open);
-          if (!open) setEditingItem(null);
-        }}
-        editingItem={editingItem}
-      />
+      {(isCreateDialogOpen || editingItem !== null) && (
+        <Suspense fallback={null}>
+          <AddItemsDialog
+            open={isCreateDialogOpen || editingItem !== null}
+            onOpenChange={(open) => {
+              setIsCreateDialogOpen(open);
+              if (!open) setEditingItem(null);
+            }}
+            editingItem={editingItem}
+          />
+        </Suspense>
+      )}
 
       {stockMovementItem && (() => {
         // Prefer the globally-selected location so history is scoped to bins at that physical site.
@@ -914,82 +944,102 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
         const scopeLocationName =
           allLocations.find((l) => l.id === scopeLocationId)?.name ?? null;
         return (
-          <StockMovementDialog
-            open={!!stockMovementItem}
-            onOpenChange={(open) => {
-              if (!open) setStockMovementItem(null);
-            }}
-            itemId={stockMovementItem.id}
-            itemName={stockMovementItem.name}
-            currentStock={stockMovementItem.current_stock || 0}
-            locationId={scopeLocationId}
-            locationName={scopeLocationName}
-          />
+          <Suspense fallback={null}>
+            <StockMovementDialog
+              open={!!stockMovementItem}
+              onOpenChange={(open) => {
+                if (!open) setStockMovementItem(null);
+              }}
+              itemId={stockMovementItem.id}
+              itemName={stockMovementItem.name}
+              currentStock={stockMovementItem.current_stock || 0}
+              locationId={scopeLocationId}
+              locationName={scopeLocationName}
+            />
+          </Suspense>
         );
       })()}
 
       {stockAdjustmentItem && (
-        <StockAdjustmentDialog
-          open={!!stockAdjustmentItem}
-          onOpenChange={(open) => {
-            if (!open) setStockAdjustmentItem(null);
-          }}
-          itemId={stockAdjustmentItem.id}
-          itemName={stockAdjustmentItem.name}
-          currentStock={stockAdjustmentItem.current_stock || 0}
-        />
+        <Suspense fallback={null}>
+          <StockAdjustmentDialog
+            open={!!stockAdjustmentItem}
+            onOpenChange={(open) => {
+              if (!open) setStockAdjustmentItem(null);
+            }}
+            itemId={stockAdjustmentItem.id}
+            itemName={stockAdjustmentItem.name}
+            currentStock={stockAdjustmentItem.current_stock || 0}
+          />
+        </Suspense>
       )}
 
-      <DeleteItemConfirmationDialog
-        open={!!deletingItem}
-        onOpenChange={(open) => {
-          if (!open) setDeletingItem(null);
-        }}
-        item={deletingItem}
-        onConfirmDelete={async (itemId) => {
-          try {
-            const { error } = await supabase.rpc('remove_item_from_inventory' as any, { p_item_id: itemId });
-            if (error) throw error;
-            toast.success('Item removed from inventory (catalog entry preserved)');
-            setDeletingItem(null);
-            queryClient.invalidateQueries({ queryKey: ['warehouse-items-inventory'] });
-            queryClient.invalidateQueries({ queryKey: ['warehouse-items-catalog-ids', selectedCompany?.id] });
-            queryClient.invalidateQueries({ queryKey: ['warehouse-items'] });
-            queryClient.invalidateQueries({ queryKey: ['warehouse-bin-allocations'] });
-          } catch (error: any) {
-            console.error('Error removing from inventory:', error);
-            toast.error(error?.message || 'Failed to remove item from inventory');
-          }
-        }}
-        onMarkInactive={markItemInactive}
-        isLoading={isDeleting || isMarkingInactive}
-      />
+      {deletingItem && (
+        <Suspense fallback={null}>
+          <DeleteItemConfirmationDialog
+            open={!!deletingItem}
+            onOpenChange={(open) => {
+              if (!open) setDeletingItem(null);
+            }}
+            item={deletingItem}
+            onConfirmDelete={async (itemId) => {
+              try {
+                const { error } = await supabase.rpc('remove_item_from_inventory' as any, { p_item_id: itemId });
+                if (error) throw error;
+                toast.success('Item removed from inventory (catalog entry preserved)');
+                setDeletingItem(null);
+                queryClient.invalidateQueries({ queryKey: ['warehouse-items-inventory'] });
+                queryClient.invalidateQueries({ queryKey: ['warehouse-items-catalog-ids', selectedCompany?.id] });
+                queryClient.invalidateQueries({ queryKey: ['warehouse-items'] });
+                queryClient.invalidateQueries({ queryKey: ['warehouse-bin-allocations'] });
+              } catch (error: any) {
+                console.error('Error removing from inventory:', error);
+                toast.error(error?.message || 'Failed to remove item from inventory');
+              }
+            }}
+            onMarkInactive={markItemInactive}
+            isLoading={isDeleting || isMarkingInactive}
+          />
+        </Suspense>
+      )}
 
-      <ItemDetailsDialog
-        item={viewingItem}
-        open={!!viewingItem}
-        onOpenChange={(open) => {
-          if (!open) setViewingItem(null);
-        }}
-      />
+      {viewingItem && (
+        <Suspense fallback={null}>
+          <ItemDetailsDialog
+            item={viewingItem}
+            open={!!viewingItem}
+            onOpenChange={(open) => {
+              if (!open) setViewingItem(null);
+            }}
+          />
+        </Suspense>
+      )}
 
-      <ItemTransferDialog
-        open={!!transferItem}
-        onOpenChange={(open) => {
-          if (!open) setTransferItem(null);
-        }}
-        item={transferItem}
-      />
+      {transferItem && (
+        <Suspense fallback={null}>
+          <ItemTransferDialog
+            open={!!transferItem}
+            onOpenChange={(open) => {
+              if (!open) setTransferItem(null);
+            }}
+            item={transferItem}
+          />
+        </Suspense>
+      )}
 
-      <ItemStockDetailsDialog
-        open={!!stockDetailsItem}
-        onOpenChange={(open) => {
-          if (!open) setStockDetailsItem(null);
-        }}
-        item={stockDetailsItem}
-        locationStock={stockDetailsItem ? (itemLocationStock[stockDetailsItem.id] || []) : []}
-        allLocations={allLocations}
-      />
+      {stockDetailsItem && (
+        <Suspense fallback={null}>
+          <ItemStockDetailsDialog
+            open={!!stockDetailsItem}
+            onOpenChange={(open) => {
+              if (!open) setStockDetailsItem(null);
+            }}
+            item={stockDetailsItem}
+            locationStock={stockDetailsItem ? (itemLocationStock[stockDetailsItem.id] || []) : []}
+            allLocations={allLocations}
+          />
+        </Suspense>
+      )}
 
       {/* Image Preview Dialog */}
       <Dialog open={!!previewImage} onOpenChange={() => setPreviewImage(null)}>
@@ -1007,25 +1057,41 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
         </DialogContent>
       </Dialog>
 
-      <FixMissingOpeningStockDialog
-        open={isFixOpeningStockDialogOpen}
-        onOpenChange={setIsFixOpeningStockDialogOpen}
-      />
+      {isFixOpeningStockDialogOpen && (
+        <Suspense fallback={null}>
+          <FixMissingOpeningStockDialog
+            open={isFixOpeningStockDialogOpen}
+            onOpenChange={setIsFixOpeningStockDialogOpen}
+          />
+        </Suspense>
+      )}
 
-      <StockMovementReportDialog
-        open={isStockMovementReportOpen}
-        onOpenChange={setIsStockMovementReportOpen}
-      />
+      {isStockMovementReportOpen && (
+        <Suspense fallback={null}>
+          <StockMovementReportDialog
+            open={isStockMovementReportOpen}
+            onOpenChange={setIsStockMovementReportOpen}
+          />
+        </Suspense>
+      )}
 
-      <AddFromCatalogDialog
-        open={isImportCatalogOpen}
-        onOpenChange={setIsImportCatalogOpen}
-      />
+      {isImportCatalogOpen && (
+        <Suspense fallback={null}>
+          <AddFromCatalogDialog
+            open={isImportCatalogOpen}
+            onOpenChange={setIsImportCatalogOpen}
+          />
+        </Suspense>
+      )}
 
-      <BulkStockUploadDialog
-        open={isBulkStockUploadOpen}
-        onOpenChange={setIsBulkStockUploadOpen}
-      />
+      {isBulkStockUploadOpen && (
+        <Suspense fallback={null}>
+          <BulkStockUploadDialog
+            open={isBulkStockUploadOpen}
+            onOpenChange={setIsBulkStockUploadOpen}
+          />
+        </Suspense>
+      )}
 
       {/* Floating selection action bar */}
       {selectedItemIds.size > 0 && (
@@ -1042,19 +1108,27 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
         </div>
       )}
 
-      <BulkInventoryUpdateDialog
-        open={isBulkUpdateOpen}
-        onOpenChange={setIsBulkUpdateOpen}
-        selectedIds={selectedItemIds}
-        onComplete={clearSelection}
-      />
+      {isBulkUpdateOpen && (
+        <Suspense fallback={null}>
+          <BulkInventoryUpdateDialog
+            open={isBulkUpdateOpen}
+            onOpenChange={setIsBulkUpdateOpen}
+            selectedIds={selectedItemIds}
+            onComplete={clearSelection}
+          />
+        </Suspense>
+      )}
 
-      <BulkInventoryDeleteDialog
-        open={isBulkDeleteOpen}
-        onOpenChange={setIsBulkDeleteOpen}
-        selectedItems={selectedItems}
-        onComplete={clearSelection}
-      />
+      {isBulkDeleteOpen && (
+        <Suspense fallback={null}>
+          <BulkInventoryDeleteDialog
+            open={isBulkDeleteOpen}
+            onOpenChange={setIsBulkDeleteOpen}
+            selectedItems={selectedItems}
+            onComplete={clearSelection}
+          />
+        </Suspense>
+      )}
     </div>
   );
 }
