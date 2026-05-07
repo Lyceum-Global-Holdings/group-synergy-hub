@@ -49,10 +49,23 @@ serve(async (req) => {
 
     const { data: inv, error: invErr } = await admin
       .from("einvoices")
-      .select("id, status, direction, ubl_xml_path, supplier_id, company_id, invoice_number")
+      .select("id, status, direction, ubl_xml_path, supplier_id, company_id, invoice_number, compliance_profile")
       .eq("id", einvoice_id)
       .maybeSingle();
     if (invErr || !inv) return jsonError("E-invoice not found", 404);
+
+    // Phase 4: env-aware send. Read company peppol_environment.
+    const { data: company } = await admin
+      .from("companies")
+      .select("peppol_environment, peppol_live_enabled_at")
+      .eq("id", inv.company_id)
+      .maybeSingle();
+    const env = (company?.peppol_environment as string) || "sandbox";
+    if (env === "live") {
+      const { data: isSuper } = await supaUser.rpc("has_role", { _user_id: user.id, _role: "super_admin" });
+      if (!isSuper) return jsonError("Forbidden: live sends require super_admin", 403);
+      if (!company?.peppol_live_enabled_at) return jsonError("Live environment not enabled", 400);
+    }
 
     if (inv.direction !== "outbound") return jsonError("Only outbound invoices can be sent", 400);
     if (!["validated", "ready_to_send", "submission_failed"].includes(inv.status)) {
