@@ -189,7 +189,8 @@ serve(async (req) => {
       .from("einvoice_lines").select("*").eq("einvoice_id", einvoiceId).order("line_no");
 
     const { data: supplier } = await admin
-      .from("suppliers").select("id,name,address,country_code,tax_id").eq("id", inv.supplier_id).maybeSingle();
+      .from("suppliers").select("id,name,country,tax_id").eq("id", inv.supplier_id).maybeSingle();
+    const supplierAddr = { address: "", country_code: supplier?.country || "US", name: supplier?.name };
     const { data: customer } = await admin
       .from("companies").select("id,name,address").eq("id", inv.customer_company_id ?? inv.company_id).maybeSingle();
 
@@ -207,7 +208,7 @@ serve(async (req) => {
       return json({ ok: false, issues }, 422);
     }
 
-    const xml = buildUBL(inv, lines ?? [], supplier, customer, supplierPart, customerPart);
+    const xml = buildUBL(inv, lines ?? [], supplierAddr, { ...customer, country_code: "US" }, supplierPart, customerPart);
     const path = `${inv.company_id}/${inv.supplier_id}/${einvoiceId}/ubl.xml`;
     const upload = await admin.storage.from("einvoices").upload(path, new Blob([xml], { type: "application/xml" }), {
       upsert: true,
