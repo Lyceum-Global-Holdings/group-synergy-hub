@@ -7524,6 +7524,269 @@ export type Database = {
           },
         ]
       }
+      einvoice_attachments: {
+        Row: {
+          byte_size: number | null
+          created_at: string
+          einvoice_id: string
+          file_name: string
+          file_path: string
+          id: string
+          mime_type: string | null
+          uploaded_by: string
+        }
+        Insert: {
+          byte_size?: number | null
+          created_at?: string
+          einvoice_id: string
+          file_name: string
+          file_path: string
+          id?: string
+          mime_type?: string | null
+          uploaded_by: string
+        }
+        Update: {
+          byte_size?: number | null
+          created_at?: string
+          einvoice_id?: string
+          file_name?: string
+          file_path?: string
+          id?: string
+          mime_type?: string | null
+          uploaded_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "einvoice_attachments_einvoice_id_fkey"
+            columns: ["einvoice_id"]
+            isOneToOne: false
+            referencedRelation: "einvoices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      einvoice_events: {
+        Row: {
+          actor_user_id: string | null
+          created_at: string
+          einvoice_id: string
+          event_type: Database["public"]["Enums"]["einvoice_event_type"]
+          id: string
+          ip: string | null
+          payload: Json
+          prev_hash: string | null
+          row_hash: string
+          user_agent: string | null
+        }
+        Insert: {
+          actor_user_id?: string | null
+          created_at?: string
+          einvoice_id: string
+          event_type: Database["public"]["Enums"]["einvoice_event_type"]
+          id?: string
+          ip?: string | null
+          payload?: Json
+          prev_hash?: string | null
+          row_hash?: string
+          user_agent?: string | null
+        }
+        Update: {
+          actor_user_id?: string | null
+          created_at?: string
+          einvoice_id?: string
+          event_type?: Database["public"]["Enums"]["einvoice_event_type"]
+          id?: string
+          ip?: string | null
+          payload?: Json
+          prev_hash?: string | null
+          row_hash?: string
+          user_agent?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "einvoice_events_einvoice_id_fkey"
+            columns: ["einvoice_id"]
+            isOneToOne: false
+            referencedRelation: "einvoices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      einvoice_lines: {
+        Row: {
+          created_at: string
+          description: string
+          einvoice_id: string
+          id: string
+          item_code: string | null
+          line_extension: number
+          line_no: number
+          po_line_id: string | null
+          quantity: number
+          tax_amount: number
+          tax_category: string
+          tax_rate: number
+          unit: string
+          unit_price: number
+        }
+        Insert: {
+          created_at?: string
+          description: string
+          einvoice_id: string
+          id?: string
+          item_code?: string | null
+          line_extension: number
+          line_no: number
+          po_line_id?: string | null
+          quantity: number
+          tax_amount?: number
+          tax_category?: string
+          tax_rate?: number
+          unit?: string
+          unit_price: number
+        }
+        Update: {
+          created_at?: string
+          description?: string
+          einvoice_id?: string
+          id?: string
+          item_code?: string | null
+          line_extension?: number
+          line_no?: number
+          po_line_id?: string | null
+          quantity?: number
+          tax_amount?: number
+          tax_category?: string
+          tax_rate?: number
+          unit?: string
+          unit_price?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "einvoice_lines_einvoice_id_fkey"
+            columns: ["einvoice_id"]
+            isOneToOne: false
+            referencedRelation: "einvoices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      einvoices: {
+        Row: {
+          company_id: string
+          created_at: string
+          created_by: string
+          currency: string
+          customer_company_id: string | null
+          direction: Database["public"]["Enums"]["einvoice_direction"]
+          due_date: string | null
+          grand_total: number
+          grn_id: string | null
+          id: string
+          invoice_number: string
+          issue_date: string
+          match_status: Database["public"]["Enums"]["einvoice_match_status"]
+          notes: string | null
+          pdf_path: string | null
+          peppol_customization: string
+          peppol_message_id: string | null
+          peppol_profile: string
+          po_id: string | null
+          status: Database["public"]["Enums"]["einvoice_status"]
+          subtotal: number
+          supplier_id: string | null
+          tax_total: number
+          ubl_xml_path: string | null
+          updated_at: string
+          validation_report: Json | null
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          created_by: string
+          currency?: string
+          customer_company_id?: string | null
+          direction: Database["public"]["Enums"]["einvoice_direction"]
+          due_date?: string | null
+          grand_total?: number
+          grn_id?: string | null
+          id?: string
+          invoice_number: string
+          issue_date: string
+          match_status?: Database["public"]["Enums"]["einvoice_match_status"]
+          notes?: string | null
+          pdf_path?: string | null
+          peppol_customization?: string
+          peppol_message_id?: string | null
+          peppol_profile?: string
+          po_id?: string | null
+          status?: Database["public"]["Enums"]["einvoice_status"]
+          subtotal?: number
+          supplier_id?: string | null
+          tax_total?: number
+          ubl_xml_path?: string | null
+          updated_at?: string
+          validation_report?: Json | null
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          created_by?: string
+          currency?: string
+          customer_company_id?: string | null
+          direction?: Database["public"]["Enums"]["einvoice_direction"]
+          due_date?: string | null
+          grand_total?: number
+          grn_id?: string | null
+          id?: string
+          invoice_number?: string
+          issue_date?: string
+          match_status?: Database["public"]["Enums"]["einvoice_match_status"]
+          notes?: string | null
+          pdf_path?: string | null
+          peppol_customization?: string
+          peppol_message_id?: string | null
+          peppol_profile?: string
+          po_id?: string | null
+          status?: Database["public"]["Enums"]["einvoice_status"]
+          subtotal?: number
+          supplier_id?: string | null
+          tax_total?: number
+          ubl_xml_path?: string | null
+          updated_at?: string
+          validation_report?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "einvoices_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "einvoices_customer_company_id_fkey"
+            columns: ["customer_company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "einvoices_po_id_fkey"
+            columns: ["po_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "einvoices_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       evaluation_rules: {
         Row: {
           action_type: string
@@ -20618,6 +20881,16 @@ export type Database = {
           updated_at: string
         }[]
       }
+      log_einvoice_event: {
+        Args: {
+          p_einvoice_id: string
+          p_event_type: Database["public"]["Enums"]["einvoice_event_type"]
+          p_ip?: string
+          p_payload?: Json
+          p_user_agent?: string
+        }
+        Returns: string
+      }
       log_supplier_portal_event: {
         Args: { _action: string; _metadata?: Json; _supplier_id: string }
         Returns: number
@@ -21531,6 +21804,15 @@ export type Database = {
         Args: { _operation_name: string }
         Returns: boolean
       }
+      verify_einvoice_event_chain: {
+        Args: { p_einvoice_id: string }
+        Returns: {
+          actual_hash: string
+          event_id: string
+          expected_hash: string
+          is_valid: boolean
+        }[]
+      }
     }
     Enums: {
       account_category:
@@ -21693,6 +21975,28 @@ export type Database = {
         | "pending_receipt"
         | "partially_received"
         | "fully_received"
+      einvoice_direction: "outbound" | "inbound"
+      einvoice_event_type:
+        | "created"
+        | "updated"
+        | "validated"
+        | "submitted"
+        | "ack_received"
+        | "rejected"
+        | "matched"
+        | "posted"
+        | "cancelled"
+      einvoice_match_status: "unmatched" | "partial" | "matched" | "discrepancy"
+      einvoice_status:
+        | "draft"
+        | "validated"
+        | "ready_to_send"
+        | "sent"
+        | "received"
+        | "accepted"
+        | "rejected"
+        | "paid"
+        | "cancelled"
       evaluation_recommendation:
         | "strongly_recommend"
         | "recommend"
@@ -22158,6 +22462,30 @@ export const Constants = {
         "pending_receipt",
         "partially_received",
         "fully_received",
+      ],
+      einvoice_direction: ["outbound", "inbound"],
+      einvoice_event_type: [
+        "created",
+        "updated",
+        "validated",
+        "submitted",
+        "ack_received",
+        "rejected",
+        "matched",
+        "posted",
+        "cancelled",
+      ],
+      einvoice_match_status: ["unmatched", "partial", "matched", "discrepancy"],
+      einvoice_status: [
+        "draft",
+        "validated",
+        "ready_to_send",
+        "sent",
+        "received",
+        "accepted",
+        "rejected",
+        "paid",
+        "cancelled",
       ],
       evaluation_recommendation: [
         "strongly_recommend",
