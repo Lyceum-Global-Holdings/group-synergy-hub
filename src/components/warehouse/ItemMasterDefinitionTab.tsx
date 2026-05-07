@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
+import { useState, useMemo, useEffect, useCallback, useRef, lazy, Suspense } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -26,10 +26,18 @@ import { useWarehouseItemsLazy, useWarehouseItemsCount, fetchAllWarehouseItemsBa
 import { useItemCategories } from '@/hooks/useItemCategories';
 import { useItemUnits } from '@/hooks/useItemUnits';
 import { useCompany } from '@/contexts/CompanyContext';
-import { AddItemsDialog } from '@/components/warehouse/AddItemsDialog';
-import { StockMovementDialog } from '@/components/warehouse/StockMovementDialog';
-import { StockMovementChart } from '@/components/warehouse/StockMovementChart';
-import { DeleteItemConfirmationDialog } from '@/components/warehouse/DeleteItemConfirmationDialog';
+const AddItemsDialog = lazy(() =>
+  import('@/components/warehouse/AddItemsDialog').then(m => ({ default: m.AddItemsDialog }))
+);
+const StockMovementDialog = lazy(() =>
+  import('@/components/warehouse/StockMovementDialog').then(m => ({ default: m.StockMovementDialog }))
+);
+const StockMovementChart = lazy(() =>
+  import('@/components/warehouse/StockMovementChart').then(m => ({ default: m.StockMovementChart }))
+);
+const DeleteItemConfirmationDialog = lazy(() =>
+  import('@/components/warehouse/DeleteItemConfirmationDialog').then(m => ({ default: m.DeleteItemConfirmationDialog }))
+);
 import { useIsAdminOrHigher } from '@/hooks/useIsAdminOrHigher';
 import { CatalogItem } from '@/types/itemBin';
 
@@ -251,7 +259,7 @@ export function ItemMasterDefinitionTab({ onNavigateToInventory, onNavigateToBin
 
   return (
     <div className="space-y-4">
-      <StockMovementChart />
+      <Suspense fallback={null}><StockMovementChart /></Suspense>
 
       <div className="flex flex-col gap-3">
         <div className="flex items-center justify-between">
@@ -488,33 +496,43 @@ export function ItemMasterDefinitionTab({ onNavigateToInventory, onNavigateToBin
         )}
       </div>
 
-      <AddItemsDialog
-        open={isCreateDialogOpen || editingItem !== null}
-        onOpenChange={(open) => {
-          if (!open) { setIsCreateDialogOpen(false); setEditingItem(null); }
-        }}
-        editingItem={editingItem || undefined}
-        mode="catalog"
-      />
-
-      {stockMovementItem && (
-        <StockMovementDialog
-          open={!!stockMovementItem}
-          onOpenChange={(open) => { if (!open) setStockMovementItem(null); }}
-          itemId={stockMovementItem.id}
-          itemName={stockMovementItem.name}
-          currentStock={0}
-        />
+      {(isCreateDialogOpen || editingItem !== null) && (
+        <Suspense fallback={null}>
+          <AddItemsDialog
+            open={isCreateDialogOpen || editingItem !== null}
+            onOpenChange={(open) => {
+              if (!open) { setIsCreateDialogOpen(false); setEditingItem(null); }
+            }}
+            editingItem={editingItem || undefined}
+            mode="catalog"
+          />
+        </Suspense>
       )}
 
-      <DeleteItemConfirmationDialog
-        open={!!deletingItem}
-        onOpenChange={(open) => { if (!open) setDeletingItem(null); }}
-        item={deletingItem}
-        onConfirmDelete={(itemId, forceDelete) => deleteItem({ id: itemId, forceDelete })}
-        onMarkInactive={markItemInactive}
-        isLoading={isDeleting || isMarkingInactive}
-      />
+      {stockMovementItem && (
+        <Suspense fallback={null}>
+          <StockMovementDialog
+            open={!!stockMovementItem}
+            onOpenChange={(open) => { if (!open) setStockMovementItem(null); }}
+            itemId={stockMovementItem.id}
+            itemName={stockMovementItem.name}
+            currentStock={0}
+          />
+        </Suspense>
+      )}
+
+      {deletingItem && (
+        <Suspense fallback={null}>
+          <DeleteItemConfirmationDialog
+            open={!!deletingItem}
+            onOpenChange={(open) => { if (!open) setDeletingItem(null); }}
+            item={deletingItem}
+            onConfirmDelete={(itemId, forceDelete) => deleteItem({ id: itemId, forceDelete })}
+            onMarkInactive={markItemInactive}
+            isLoading={isDeleting || isMarkingInactive}
+          />
+        </Suspense>
+      )}
 
       {previewImage && (
         <Dialog open={!!previewImage} onOpenChange={() => setPreviewImage(null)}>
