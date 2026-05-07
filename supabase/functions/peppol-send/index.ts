@@ -104,7 +104,7 @@ serve(async (req) => {
     const resp = await fetch(`${STORECOVE_BASE}/document_submissions`, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${STORECOVE_API_KEY}`,
+        Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify(submission),
