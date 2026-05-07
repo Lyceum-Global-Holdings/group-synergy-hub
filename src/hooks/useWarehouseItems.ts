@@ -152,10 +152,12 @@ export const useWarehouseItems = (options?: { skipCompanyFilter?: boolean; disab
       return itemsWithBins as WarehouseItem[];
     },
     enabled: !disableFetch && (skipCompanyFilter || !!(isViewingAllCompanies || selectedCompany?.id)),
-    // Live-critical: stock data must always reflect latest DB state on mount.
-    // Realtime subscriptions also invalidate this key (see useRealtimeStockUpdates).
-    staleTime: 0,
-    refetchOnMount: 'always',
+    // Project default 30s freshness. Realtime subscriptions invalidate this key
+    // on stock changes (see useRealtimeStockUpdates), so list browsing stays
+    // accurate without re-fetching all 14k+ rows on every mount.
+    // Stock-critical screens (MaterialIssue, GRN, StockAdjustment) use their
+    // own dedicated hooks with staleTime: 0.
+    staleTime: 30_000,
   });
 
   const createItemMutation = useMutation({

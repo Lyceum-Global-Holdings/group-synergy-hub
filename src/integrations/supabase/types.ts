@@ -20577,6 +20577,47 @@ export type Database = {
         Args: { je_id: string }
         Returns: boolean
       }
+      list_warehouse_inventory: {
+        Args: {
+          _category_id?: string
+          _company_id?: string
+          _cursor_created_at?: string
+          _cursor_id?: string
+          _limit?: number
+          _location_ids?: string[]
+          _search?: string
+          _status?: string
+        }
+        Returns: {
+          available_quantity: number
+          bins: Json
+          brand: string
+          category_id: string
+          category_name: string
+          company_id: string
+          created_at: string
+          current_stock: number
+          description: string
+          id: string
+          image_url: string
+          item_code: string
+          manufacturer: string
+          max_stock_level: number
+          min_stock_level: number
+          name: string
+          reorder_level: number
+          reserved_quantity: number
+          selling_price: number
+          status: string
+          supplier_id: string
+          supplier_name: string
+          unit_abbreviation: string
+          unit_cost: number
+          unit_id: string
+          unit_name: string
+          updated_at: string
+        }[]
+      }
       log_supplier_portal_event: {
         Args: { _action: string; _metadata?: Json; _supplier_id: string }
         Returns: number

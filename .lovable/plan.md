@@ -1,274 +1,105 @@
-# Phase 1 Implementation Plan — PEPPOL UBL 2.1 E-Invoicing & Supplier Portal Foundations
+# Warehouse Module Performance Fix
 
-Scope assumptions (filled in based on best-fit defaults; tell me if any should change):
-- **AP provider**: Storecove (REST-first, EU + APAC + LATAM coverage, built-in PEPPOL BIS Billing 3.0 + Schematron validation, sandbox available).
-- **Country scope (Day 1)**: PEPPOL BIS Billing 3.0 (EN 16931 baseline). Country-specific extensions deferred to Phase 4: SA ZATCA, IN IRP, IT SDI, MX CFDI.
-- **Supplier auth**: Supabase Auth (email + password) with mandatory TOTP MFA for `owner` role. SSO (Microsoft/Google) optional in Phase 4.
-- **Delivery**: Phase 1 only in this iteration — foundations (schema, RLS, supplier role, portal shell, profile, invitations). Phase 2 (sourcing flows), Phase 3 (PEPPOL pipeline), Phase 4 (hardening + country mandates) follow as separate iterations.
+## Why it's slow today (measured)
 
----
+Opening `/warehouse/item-bin-master` triggers, on every mount:
 
-## Phase 1 Deliverables
+1. **`useWarehouseItems` fetches all 14,842 rows of `warehouse_items`** in ~15 sequential 1,000-row round-trips (cursor pagination), each with a nested `suppliers` join. `staleTime: 0` + `refetchOnMount: 'always'` means cache never helps.
+2. Immediately followed by **a full sweep of `warehouse_bin_allocations`** (1,490 rows) and all `warehouse_bins`, then a client-side join.
+3. The result (14k+ rows) is rendered into a **non-virtualized `<Table>`** in `ItemMasterTab.tsx` (1,060 LOC), violating the project's own VirtualTable rule (≥200 rows).
+4. `ItemBinMaster.tsx` eagerly imports **all 7 tabs and ~30 dialogs**, so the initial JS chunk for the page is huge — every dialog (bulk import, QR print preview, stock movement chart, etc.) ships before first paint.
+5. `ItemMasterDefinitionTab` (the default tab) runs its own catalog fetch in parallel with the inventory hook because both are mounted under `<Tabs>`.
+6. `useRealtimeStockUpdates` is mounted at the page level and invalidates these heavy queries on every realtime event.
 
-A working **Supplier Portal shell** at `/portal/*` where invited suppliers can:
-1. Accept an invitation and create their account
-2. Log in with MFA
-3. View a portal dashboard (placeholder KPIs)
-4. Manage their company profile (legal name, tax IDs, PEPPOL participant ID, bank details, certifications)
-5. Manage additional users on their supplier account (owner / contributor / viewer)
+The combined effect on a cold load is 15+ serial round-trips totalling several MB of JSON, plus a multi-megabyte JS bundle, before the first row paints.
 
-Plus internal admin screens to **invite suppliers** to the portal and view supplier-portal activity.
+## Goal
 
-E-invoicing UBL/PEPPOL pipeline and RFQ/quote flows are NOT in Phase 1 — only the foundations and tables they will plug into.
+First contentful render of the active tab in **< 1.5s on a warm cache, < 3s cold**, with steady-state interactions (search, paging, tab switch) under **300 ms**.
 
----
+## Approach (aligned to project standards)
 
-## 1. Database Migration (single migration)
+This follows the existing project rules already in memory:
+- **List RPC pattern** — hot lists use SECURITY INVOKER RPCs returning flat rows, not PostgREST embeds.
+- **VirtualTable pattern** — lists ≥200 rows must use the shared `VirtualTable`.
+- **Keyset cursor uniqueness** — cursors use `(created_at, id)` tuples.
+- **Tiered React Query freshness** — only stock-critical queries opt into `staleTime: 0`; list browsing uses the 30s default.
+- **DB index strategy** — `(company_id, created_at DESC)` composite indexes on hot lists.
 
-### 1.1 Enum extension
-- Add `supplier` to existing `app_role` enum.
+## Plan
 
-### 1.2 New tables (all RLS-enabled, company-scoped where applicable)
+### 1. Database: server-side pagination + search RPC
 
-**`supplier_users`** — links auth users to a supplier
-- `id uuid pk`
-- `supplier_id uuid → suppliers(id) on delete cascade`
-- `user_id uuid → auth.users(id) on delete cascade`
-- `portal_role text check in ('owner','contributor','viewer')`
-- `is_active boolean default true`
-- `invited_by uuid`, `invited_at`, `accepted_at`
-- `created_at`, `updated_at`
-- Unique `(supplier_id, user_id)`
-- Index `(user_id)`, `(supplier_id, is_active)`
+Add a SECURITY INVOKER RPC `list_warehouse_inventory(...)` that returns one flat page (default 50 rows) joined with supplier name, category, unit, and an aggregated `bin_summary` JSON. This replaces the current "fetch everything then join client-side" pattern.
 
-**`supplier_invitations`**
-- `id uuid pk`
-- `supplier_id uuid → suppliers(id) on delete cascade`
-- `email citext not null`
-- `portal_role text check (...)`
-- `token_hash text not null` (we store SHA-256 of the raw token; raw token only emailed)
-- `expires_at timestamptz not null` (default `now() + interval '7 days'`)
-- `accepted_at timestamptz`
-- `revoked_at timestamptz`
-- `invited_by uuid`
-- `company_id uuid → companies(id)` (the inviting tenant)
-- Unique `(supplier_id, email)` partial where `accepted_at is null and revoked_at is null`
-- Index `(token_hash)`, `(email)`
+```text
+list_warehouse_inventory(
+  _company_id uuid,           -- null = all-companies admin view
+  _search text,               -- ILIKE on name/item_code/sku, sanitized
+  _category_id uuid,
+  _location_ids uuid[],       -- restricts allocations + bins by user permissions
+  _status text,
+  _cursor_created_at timestamptz,
+  _cursor_id uuid,
+  _limit int default 50
+) returns table (... row_count_estimate bigint)
+```
 
-**`peppol_participants`** (for both our companies and suppliers — populated now, used in Phase 3)
-- `id uuid pk`
-- `owner_type text check in ('company','supplier')`
-- `owner_id uuid not null`
-- `scheme_id text not null` (ISO 6523, e.g. `0088`, `0184`, `0151`, `0192`)
-- `participant_id text not null`
-- `is_primary boolean default true`
-- `verified_at timestamptz`
-- `created_at`
-- Unique `(owner_type, owner_id, scheme_id, participant_id)`
-- Check `participant_id ~ '^[A-Za-z0-9:_.-]+$'`
+Indexes to confirm/add (idempotent migration):
+- `warehouse_items (company_id, created_at DESC, id DESC)`
+- `warehouse_items (lower(name) text_pattern_ops)` and `(item_code text_pattern_ops)` for search
+- `warehouse_bin_allocations (warehouse_item_id) include (bin_id, available_quantity)`
+- `warehouse_bins (location_id)` (verify exists)
 
-**`supplier_profiles_extended`** (portal-only fields kept off the main `suppliers` table to avoid churn)
-- `supplier_id uuid pk → suppliers(id) on delete cascade`
-- `legal_name text`
-- `tax_id_encrypted bytea` (pgsodium column-encrypt later in Phase 4 — Phase 1 stores `tax_id text` plain; column renamed in Phase 4)
-- `bank_account_name text`
-- `bank_account_number text` (Phase 4 → encrypted)
-- `bank_iban text`
-- `bank_swift text`
-- `default_currency char(3)` (ISO 4217)
-- `default_payment_terms_days int`
-- `peppol_enabled boolean default false`
-- `updated_at`, `updated_by`
+A second RPC `warehouse_inventory_counts(_company_id, _filters jsonb)` returns header counts (total, low-stock, zero-stock) so the UI doesn't need the full list to show KPI tiles.
 
-**`supplier_portal_audit`** (append-only)
-- `id bigserial pk`
-- `supplier_id uuid`
-- `actor_user_id uuid`
-- `action text` (login, profile_update, user_added, user_removed, invitation_accepted, ...)
-- `metadata jsonb`
-- `ip inet`
-- `user_agent text`
-- `prev_hash text`
-- `row_hash text` (sha256 over canonical row → tamper-evident chain; trigger computes)
-- `created_at timestamptz default now()`
+### 2. Frontend: replace the page-level data hook
 
-### 1.3 Storage
-- New private bucket `supplier-documents` (path `{supplier_id}/{yyyy}/{filename}`) for certifications uploaded via portal.
+- Replace `useWarehouseItems()` usage in `ItemMasterTab` with a new `useWarehouseInventoryPage({ search, categoryId, status, pageSize: 50 })` built on `useInfiniteQuery` calling the new RPC. Default `staleTime: 30_000` (project default); realtime invalidation continues to work via `useRealtimeStockUpdates` which already debounces.
+- Keep `useWarehouseItems` (full-fetch) only for selectors and bulk operations that genuinely need the whole dataset; mark it with `enabled: false` by default and opt-in per call site.
+- Wire the inventory table to the shared `VirtualTable` so even 14k+ rows render in O(viewport).
+- Move search/filter to **server-side** (debounced 300 ms input → RPC call), so the client never holds 14k rows.
 
-### 1.4 RLS policies (key ones)
+### 3. Code-splitting inside the page
 
-`supplier_users`
-- Internal admins: `has_role(auth.uid(),'admin') OR has_role(auth.uid(),'super_admin')` — full access.
-- Supplier owners: can SELECT/INSERT/UPDATE rows for their own `supplier_id` (only `portal_role` other than `owner` for INSERT to prevent privilege escalation).
-- Other supplier roles: SELECT-only on rows in their `supplier_id`.
+`ItemBinMaster.tsx`:
+- Convert each tab body to `React.lazy()` (`ItemMasterTab`, `BinMasterTab`, `BinAllocationsTab`, `ItemCategoriesTab`, `ItemUnitsTab`, `StockAuditTab`, `ItemMasterDefinitionTab`) and render only the active tab. This stops mounting (and fetching for) all 7 tabs at once and shrinks the initial chunk.
+- Wrap each lazy tab in `Suspense` with a lightweight skeleton matching the table layout.
 
-`supplier_invitations`
-- Internal admins/managers: full.
-- No supplier-side access (token-based redemption goes through edge function).
+`ItemMasterTab.tsx`:
+- Convert the ~25 dialogs (`BulkItemImportDialog`, `BulkStockUploadDialog`, `BulkQRCodeDialog`, `StockMovementReportDialog`, `FixMissingOpeningStockDialog`, `ItemTransferDialog`, etc.) to `React.lazy` and only render them when `open === true`. Today they're all in the initial chunk.
+- Drop the unused-on-first-paint `StockMovementChart` from the eager import set; lazy-load on demand.
 
-`supplier_profiles_extended`
-- Supplier members (any portal_role): SELECT.
-- Supplier `owner`: UPDATE.
-- Internal admins: SELECT/UPDATE.
+### 4. Defer non-critical work on the active tab
 
-`supplier_portal_audit`
-- Supplier members: SELECT only their own supplier's rows.
-- Internal admins: SELECT all.
-- INSERT only via SECURITY DEFINER function `log_supplier_portal_event(...)` — no direct INSERT.
+- `useRealtimeStockUpdates` is fine to keep at the page level, but ensure it is a no-op until the user has been idle on the page for >500 ms (already debounced per memory note — verify and tighten).
+- `ItemMasterDefinitionTab` (catalog) currently runs a full catalog fetch even when not visible. After the lazy-tab change above this disappears automatically.
 
-`peppol_participants`
-- Supplier members: SELECT/INSERT/UPDATE their own.
-- Internal admins: full.
+### 5. Cache hygiene
 
-`storage.objects` (bucket `supplier-documents`)
-- Read/Write only when `(storage.foldername(name))[1] = supplier_id::text` AND user is in `supplier_users` for that supplier.
+- Switch `useWarehouseItems` (the full-fetch variant kept for selectors) from `staleTime: 0 / refetchOnMount: 'always'` to `staleTime: 30_000`. Stock-critical screens (Material Issue, GRN, Stock Adjustment) already have their own `staleTime: 0` hooks per project rule — they are not affected.
+- Add `placeholderData: keepPreviousData` to the paged query so paging/search doesn't blank the table.
 
-### 1.5 Helper functions
-- `public.is_supplier_member(_supplier_id uuid)` SECURITY DEFINER STABLE — boolean, used in RLS to avoid recursion.
-- `public.current_supplier_ids()` SECURITY DEFINER STABLE — returns set of supplier_ids the caller belongs to.
-- `public.log_supplier_portal_event(_supplier_id, _action, _metadata)` SECURITY DEFINER — inserts into audit with hash chain.
-- Trigger on `supplier_portal_audit` BEFORE INSERT → sets `prev_hash` and `row_hash`.
+### 6. Memory updates
 
-### 1.6 Indexes
-- `supplier_users(user_id)`, `supplier_users(supplier_id, is_active)`
-- `supplier_invitations(token_hash)`, `(email)`, `(supplier_id) where accepted_at is null and revoked_at is null`
-- `supplier_portal_audit(supplier_id, created_at desc)`
+After build:
+- Add `mem://performance/warehouse-inventory-server-pagination` — Inventory tab uses `list_warehouse_inventory` RPC + VirtualTable; never client-fetch the full table.
+- Update Core: "Warehouse Inventory tab is server-paginated; no full-table client fetches."
 
----
+## Acceptance criteria
 
-## 2. Edge Functions
+1. Cold load of `/warehouse/item-bin-master` issues ≤ 2 network requests for the active tab's first paint (RPC page + counts).
+2. Inventory tab paints first 50 rows in < 1.5 s on a warm cache.
+3. Switching to another tab fetches that tab's data only on activation.
+4. Bundle: initial chunk for `ItemBinMaster` route shrinks measurably (target ≥ 50% reduction); confirmed via `vite build` output.
+5. Search and filter happen server-side; typing in the search box does not freeze the UI.
+6. No regression in stock-critical screens (Material Issue, GRN, Adjustment) — they keep their existing `staleTime: 0` hooks.
+7. Supabase linter shows no new RLS issues; the new RPC is SECURITY INVOKER and respects existing RLS.
 
-### 2.1 `supplier-invite` (admin → invites a supplier user)
-- Auth: requires logged-in user with `admin` or `manager` role; verify via JWT.
-- Input (Zod): `{ supplier_id: uuid, email: string, portal_role: 'owner'|'contributor'|'viewer' }`
-- Validates supplier belongs to caller's accessible companies.
-- Generates raw token (32 bytes URL-safe), stores SHA-256 hash + expires_at.
-- Sends invitation email via Resend (reuses pattern from `send-approval-notification`); link `https://<app>/portal/accept-invite?token=<raw>`.
-- Logs `invited` audit row.
-- Rate limit: 20 invites / hour / inviter (in-memory map keyed by user_id; documented as best-effort).
+## Out of scope
 
-Required secret check: `RESEND_API_KEY` (already exists per project pattern; if missing, ask user).
+- Other warehouse pages (Putaway, GRN, etc.) — same pattern can be applied later if they show similar issues, but this plan addresses the page the user is on.
+- Migrating bin/allocation tabs to RPCs (their row counts are small enough today).
+- Visual redesign.
 
-### 2.2 `supplier-accept-invite` (public — token in body)
-- No JWT required (public endpoint). CORS open.
-- Input (Zod): `{ token: string, password: string (min 12, complexity), full_name: string }`
-- Looks up invitation by SHA-256(token); validates not expired/revoked.
-- Creates auth user via `supabase.auth.admin.createUser({ email_confirm: true })` (service role, server-side only).
-- Inserts `supplier_users` row with `portal_role` from invitation.
-- Marks invitation `accepted_at = now()`.
-- Logs `invitation_accepted` audit.
-- Returns `{ success: true }` — client then signs in via standard Supabase auth.
-
-### 2.3 `supplier-portal-mfa-enroll` (Phase 1 stub — returns enrollment URI; reuses existing MFA flow from `MfaSetup.tsx`)
-- Optional in Phase 1 — we can reuse the existing internal MFA flow by routing supplier users through `/portal/mfa-setup`. No new edge function needed if so. Keep this as a TODO marker.
-
----
-
-## 3. Frontend (React)
-
-### 3.1 New routes (in `src/App.tsx`)
-- `/portal/accept-invite` — public, redeems token
-- `/portal/login` — themed login
-- `/portal/mfa-challenge`, `/portal/mfa-setup` — wrappers around existing MFA pages with portal layout
-- `/portal` (guarded) → redirects to `/portal/dashboard`
-- `/portal/dashboard`
-- `/portal/profile`
-- `/portal/users`
-- `/portal/peppol-ids`
-
-### 3.2 New components
-- `src/components/portal/PortalLayout.tsx` — header w/ Lyceum branding, supplier name, user menu, logout. No internal sidebar.
-- `src/components/portal/SupplierRoute.tsx` — guard analogous to `AdminRoute.tsx`:
-  - Checks session
-  - Checks `has_role(uid,'supplier')`
-  - Loads `supplier_users` row → exposes `currentSupplierId` via context
-  - Enforces MFA enrollment before any portal page
-- `src/contexts/SupplierContext.tsx` — provides `{ supplierId, portalRole, supplierName }`
-- `src/hooks/useSupplierProfile.ts`
-- `src/hooks/useSupplierUsers.ts`
-- `src/hooks/useSupplierInvitations.ts`
-
-### 3.3 Pages
-- `src/pages/portal/AcceptInvite.tsx` — form: full name + password; calls `supplier-accept-invite` edge fn; on success redirects to `/portal/login`.
-- `src/pages/portal/PortalLogin.tsx` — supplier-themed login, then redirects to `/portal/dashboard`.
-- `src/pages/portal/PortalDashboard.tsx` — placeholder cards: "Open RFQs (Phase 2)", "Active POs (Phase 2)", "Outstanding Invoices (Phase 3)", "Profile completeness %".
-- `src/pages/portal/SupplierProfile.tsx` — form for `supplier_profiles_extended` fields; uses Zod validation; empty strings → null per project rule.
-- `src/pages/portal/SupplierUsers.tsx` — list `supplier_users`, invite new (calls `supplier-invite`), revoke. Owner-only mutations.
-- `src/pages/portal/PeppolIds.tsx` — manage `peppol_participants` rows with scheme picker (ISO 6523 dropdown of common schemes).
-
-### 3.4 Internal admin additions
-- `src/pages/sourcing/SupplierPortalAdmin.tsx` — new screen under Sourcing module: list suppliers w/ portal status, invite users, view portal audit, deactivate users.
-- Add link from existing supplier detail dialog: "Invite to Portal" button.
-
-### 3.5 Module registration (`src/constants/moduleConfig.ts`)
-- Register `supplier-portal-admin` (internal admin) under Sourcing.
-- Portal routes are NOT in moduleConfig (separate auth realm). They are guarded only by `SupplierRoute`.
-
-### 3.6 RBAC (`src/constants/rbacConfig.ts`)
-- Add `supplier` to `APP_ROLE_HIERARCHY` (level 0 — below `user`; isolated tree).
-- Add `DEFAULT_OPERATIONS_BY_ROLE.supplier = ['view']`.
-
-### 3.7 Auth redirect logic
-- After login in `Auth.tsx`: if user's only role is `supplier`, redirect to `/portal/dashboard` instead of `/`.
-- After login on `/portal/login`: if user is NOT supplier, sign them out and show error "Use the main login at /auth".
-
----
-
-## 4. Validation & Security
-
-- Zod schemas for every form and every edge function input.
-- Edge functions use service role internally only; never returned.
-- Tokens: 32-byte random, URL-safe; only hash stored; one-time use (set `accepted_at` on success).
-- Password policy enforced server-side in `supplier-accept-invite`: min 12 chars, mixed case + digit + symbol.
-- MFA mandatory for portal `owner` role — `SupplierRoute` blocks routes other than `/portal/mfa-setup` until enrolled.
-- All portal mutations log to `supplier_portal_audit` via the SECURITY DEFINER function.
-- CORS: edge functions return `Access-Control-Allow-Origin: *` for the public accept-invite endpoint only; others honor request origin.
-- Rate-limit notes documented; full Redis-backed rate limiting deferred to Phase 4.
-
----
-
-## 5. Memory Updates
-
-After build, add to `mem://`:
-- `mem://architecture/supplier-portal-architecture` — separate `/portal/*` realm, `SupplierRoute` guard, `SupplierContext`.
-- `mem://security/supplier-portal-rls` — RLS via `is_supplier_member()` helper; never query `supplier_users` directly in policies (recursion).
-- `mem://access-control/supplier-role` — `supplier` is an isolated app_role; redirect target `/portal/dashboard`.
-- `mem://features/supplier-portal/invitations` — token hashed, 7-day expiry, single-use.
-- Update Core: add line "Supplier portal users are isolated to `/portal/*`; never grant them internal module access."
-
----
-
-## 6. Out of Scope for Phase 1 (explicitly)
-
-- UBL builder, PEPPOL AP integration, Storecove credentials, webhooks
-- RFQ visibility / quote submission / PO acknowledgement
-- Inbound/outbound invoice tables and 3-way match wiring
-- Column-level encryption (pgsodium) — fields stored plain; migration in Phase 4 will encrypt in place
-- Country-specific extensions (ZATCA / IN IRP / SDI / CFDI)
-- DSAR export endpoint
-
----
-
-## 7. Acceptance Criteria
-
-1. Admin can invite a supplier user from `Sourcing → Supplier Portal Admin`. Email arrives with link.
-2. Recipient opens link, sets full name + password, gets account; redirected to `/portal/login`.
-3. After first login, forced through MFA enrollment; subsequent logins prompt MFA challenge.
-4. Supplier sees only their own supplier in profile/users/peppol pages — verified by attempting URL/ID tampering (RLS blocks).
-5. Owner can add a contributor user; contributor cannot add or remove users (enforced by both UI and RLS).
-6. All portal actions appear in `supplier_portal_audit`, hash-chained.
-7. Internal users with non-`supplier` roles cannot access `/portal/*`. Supplier-role users cannot access internal routes.
-8. Supabase linter shows no new RLS warnings on the new tables.
-
----
-
-## 8. Open confirmations before I start coding
-
-If you disagree with any of the filled-in defaults below, reply now; otherwise I proceed:
-
-1. **AP provider = Storecove** (Phase 3 only — no credentials needed for Phase 1).
-2. **Day-1 country scope = PEPPOL BIS Billing 3.0** (EN 16931). Country mandates in Phase 4.
-3. **Supplier auth = Supabase Auth + mandatory TOTP MFA for owners**. SSO later.
-4. **Phase 1 only this iteration**, then we proceed sequentially through Phases 2 → 3 → 4.
-
-Reply "go" (or with any overrides) and I will switch to build mode and execute Phase 1: migration first (for your approval), then edge functions and frontend in one pass.
+Reply "go" to switch to build mode and execute: migration first (for your approval), then the hook + lazy-loading refactor in one pass.
