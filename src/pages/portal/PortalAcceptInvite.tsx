@@ -19,6 +19,7 @@ export default function PortalAcceptInvite() {
   const { user, loading: authLoading } = useAuth();
   const { refresh } = useSupplierContext();
   const { data: turnstile } = useTurnstileSiteKey();
+  const turnstileEnabled = useTurnstileEnabledFor('portal_invite');
 
   const tokenFromUrl = params.get("token") ?? "";
   const idFromUrl = params.get("id") ?? "";
