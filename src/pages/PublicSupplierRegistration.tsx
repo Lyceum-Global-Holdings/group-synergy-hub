@@ -19,6 +19,7 @@ export default function PublicSupplierRegistration() {
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
   const { data: turnstile } = useTurnstileSiteKey();
+  const turnstileEnabled = useTurnstileEnabledFor('public_registration');
 
   const form = useForm({
     defaultValues: {
