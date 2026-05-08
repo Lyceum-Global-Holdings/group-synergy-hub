@@ -36,13 +36,22 @@ export function useSecuritySettings() {
   });
 }
 
+// Surfaces enforced by Supabase Auth's built-in CAPTCHA — never persist toggles for these.
+export const LOCKED_TURNSTILE_SURFACES = ["auth", "portal_login"] as const;
+
 export function useUpdateSecuritySettings() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (patch: Partial<Omit<SecuritySettings, "id" | "updated_at" | "updated_by">>) => {
+      const sanitized: typeof patch = { ...patch };
+      if (sanitized.turnstile_surfaces) {
+        const next = { ...sanitized.turnstile_surfaces };
+        for (const k of LOCKED_TURNSTILE_SURFACES) delete (next as any)[k];
+        sanitized.turnstile_surfaces = next as SecuritySettings["turnstile_surfaces"];
+      }
       const { data, error } = await (supabase as any)
         .from("security_settings")
-        .update(patch)
+        .update(sanitized)
         .eq("id", "global")
         .select()
         .single();
