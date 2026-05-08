@@ -21,6 +21,7 @@ export default function PortalLogin() {
   const [busy, setBusy] = useState(false);
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
   const { data: turnstile } = useTurnstileSiteKey();
+  const turnstileEnabled = useTurnstileEnabledFor('portal_login');
 
   useEffect(() => { if (user) navigate(next, { replace: true }); }, [user, next, navigate]);
 
