@@ -28,11 +28,29 @@ const MFA_POLICIES: { value: MfaPolicy; label: string; help: string }[] = [
   { value: "required_all",    label: "Required for everyone",    help: "Strongest. Every user must enroll within the grace period." },
 ];
 
-const SURFACES: { key: keyof Settings["turnstile_surfaces"]; label: string; help: string }[] = [
-  { key: "auth",                 label: "Internal sign-in (/auth)",                help: "Bot challenge on the staff login page." },
-  { key: "portal_login",         label: "Supplier portal sign-in",                  help: "Bot challenge on /portal/login." },
-  { key: "portal_invite",        label: "Supplier invite acceptance",               help: "Bot challenge when accepting supplier invitations." },
-  { key: "public_registration",  label: "Public supplier registration",             help: "Bot challenge on the unauthenticated supplier registration form." },
+const SURFACES: {
+  key: keyof Settings["turnstile_surfaces"];
+  label: string;
+  help: string;
+  locked?: boolean;
+  lockReason?: string;
+}[] = [
+  {
+    key: "auth",
+    label: "Internal sign-in (/auth)",
+    help: "Bot challenge on the staff login page.",
+    locked: true,
+    lockReason: "Enforced by Supabase Auth — manage in the Supabase dashboard (Auth → Bot and Abuse Protection).",
+  },
+  {
+    key: "portal_login",
+    label: "Supplier portal sign-in",
+    help: "Bot challenge on /portal/login.",
+    locked: true,
+    lockReason: "Enforced by Supabase Auth — manage in the Supabase dashboard (Auth → Bot and Abuse Protection).",
+  },
+  { key: "portal_invite",        label: "Supplier invite acceptance",   help: "Bot challenge when accepting supplier invitations." },
+  { key: "public_registration",  label: "Public supplier registration", help: "Bot challenge on the unauthenticated supplier registration form." },
 ];
 
 type Settings = NonNullable<ReturnType<typeof useSecuritySettings>["data"]>;
@@ -117,13 +135,19 @@ export default function SecuritySettings() {
                 <h3 className="text-sm font-semibold uppercase text-muted-foreground">Per-surface controls</h3>
                 {SURFACES.map((s) => (
                   <div key={s.key} className="flex items-center justify-between p-3 border rounded-md">
-                    <div>
-                      <Label>{s.label}</Label>
+                    <div className="pr-4">
+                      <div className="flex items-center gap-2">
+                        <Label>{s.label}</Label>
+                        {s.locked && <Badge variant="secondary" className="text-[10px]">Locked</Badge>}
+                      </div>
                       <p className="text-xs text-muted-foreground">{s.help}</p>
+                      {s.locked && (
+                        <p className="text-xs text-muted-foreground mt-1 italic">{s.lockReason}</p>
+                      )}
                     </div>
                     <Switch
-                      disabled={!settings.turnstile_enabled}
-                      checked={settings.turnstile_surfaces[s.key] !== false}
+                      disabled={!settings.turnstile_enabled || s.locked}
+                      checked={s.locked ? true : settings.turnstile_surfaces[s.key] !== false}
                       onCheckedChange={(v) =>
                         apply({
                           turnstile_surfaces: { ...settings.turnstile_surfaces, [s.key]: v },
