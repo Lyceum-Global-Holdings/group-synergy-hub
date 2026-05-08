@@ -78,7 +78,7 @@ export default function PortalAcceptInvite() {
                 onChange={(e) => setInvitationId(e.target.value)} required />
               <Input placeholder="Token" value={token}
                 onChange={(e) => setToken(e.target.value)} required />
-              {user && turnstile?.siteKey && (
+              {user && turnstileEnabled && turnstile?.siteKey && (
                 <div className="flex justify-center">
                   <TurnstileWidget
                     siteKey={turnstile.siteKey}
@@ -89,7 +89,7 @@ export default function PortalAcceptInvite() {
                   />
                 </div>
               )}
-              <Button type="submit" className="w-full" disabled={busy || authLoading || (!!user && !captchaToken)}>
+              <Button type="submit" className="w-full" disabled={busy || authLoading || (!!user && turnstileEnabled && !captchaToken)}>
                 {busy && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                 {user ? "Accept invitation" : "Sign in to continue"}
               </Button>
