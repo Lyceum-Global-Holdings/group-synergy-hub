@@ -26,15 +26,45 @@ export interface VerifyResult {
   action?: string;
 }
 
+type Surface = "auth" | "portal_login" | "portal_invite" | "public_registration";
+
+async function isSurfaceEnabled(surface?: Surface): Promise<boolean> {
+  if (!surface) return true;
+  try {
+    const url = Deno.env.get("SUPABASE_URL");
+    const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    if (!url || !key) return true;
+    const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2.45.0");
+    const sb = createClient(url, key, { auth: { persistSession: false } });
+    const { data } = await sb
+      .from("security_settings")
+      .select("turnstile_enabled, turnstile_surfaces")
+      .eq("id", "global")
+      .maybeSingle();
+    if (!data) return true;
+    if (!data.turnstile_enabled) return false;
+    const surfaces = (data.turnstile_surfaces ?? {}) as Record<string, boolean>;
+    return surfaces[surface] !== false;
+  } catch (e) {
+    console.warn("isSurfaceEnabled lookup failed; failing open", e);
+    return true;
+  }
+}
+
 export async function verifyTurnstile(
   token: string | undefined | null,
   remoteIp: string | undefined,
   expectedAction?: string,
+  surface?: Surface,
 ): Promise<VerifyResult> {
+  if (!(await isSurfaceEnabled(surface))) {
+    return { success: true, status: 200, action: expectedAction };
+  }
   if (!token || typeof token !== "string" || token.length < 10) {
     return { success: false, status: 400, error: "missing-captcha-token" };
   }
   const secret = Deno.env.get("TURNSTILE_SECRET_KEY") || TEST_SECRET;
+
 
   const form = new URLSearchParams();
   form.set("secret", secret);
