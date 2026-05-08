@@ -1,41 +1,32 @@
-# Fix: "captcha protection: request disallowed (no captcha_token found)"
+## Goal
+Make it impossible for the admin console to persist changes to Turnstile surfaces that are enforced by Supabase Auth (`auth`, `portal_login`), and surface a clear, immediate warning if a toggle attempt is made.
 
-## Why it broke
-Supabase Auth has CAPTCHA enforcement enabled at the project level. Once enabled in the Supabase dashboard, **every** `signInWithPassword` / `signUp` call must carry a `captchaToken`, otherwise Supabase rejects with `request disallowed (no captcha_token found)`.
+## Why
+Today the per-surface `Switch` is `disabled` for locked surfaces, but there is no second line of defence. If the disabled state is bypassed (devtools, future refactor, or master switch toggling state), the mutation would still write to `security_settings.turnstile_surfaces`. The toggles are also misleading — users get no feedback explaining why the setting cannot be changed.
 
-Our `/admin/security` console exposes per-surface toggles including `auth` and `portal_login`. When an admin turns those off, the `<TurnstileWidget>` is hidden, no token is generated, and Supabase blocks the login. The toggle cannot legitimately disable Supabase-enforced CAPTCHA from the client.
+## Changes
 
-This aligns with how Cloudflare/Supabase recommend it (NIST SP 800-63B, OWASP ASVS V11.1.4): bot protection on credential endpoints is enforced by the identity provider itself and must not be a user-tunable control once enabled upstream.
+### 1. `src/pages/admin/SecuritySettings.tsx`
+- Extract a `LOCKED_SURFACES` set derived from the `SURFACES` array (`auth`, `portal_login`).
+- Add a guarded handler `handleSurfaceToggle(key, value)`:
+  - If `key` is in `LOCKED_SURFACES`, call `toast({ variant: "destructive", title: "Locked by Supabase Auth", description: <lockReason> })` and return — no mutation is dispatched.
+  - Otherwise, call `apply({ turnstile_surfaces: { ...settings.turnstile_surfaces, [key]: value } })`.
+- Wire the per-surface `Switch.onCheckedChange` to `handleSurfaceToggle`.
+- In `apply()`, sanitise any incoming `turnstile_surfaces` patch by deleting `auth` and `portal_login` keys before sending to the mutation, so even a programmatic call cannot persist them.
+- Keep the existing `disabled` + `Locked` badge + italic `lockReason` UI, and add a small inline warning icon (`Lock` from lucide) next to the badge for stronger visual cue.
+- Add a top-level `Alert` (variant `default`, `Info` icon) inside the Bot Protection card explaining: "Internal sign-in and Supplier portal sign-in are managed by Supabase Auth's built-in CAPTCHA. Toggles for these surfaces are read-only here — change them in the Supabase dashboard (Auth → Bot and Abuse Protection)."
 
-## Fix
+### 2. `src/hooks/useSecuritySettings.ts` (defence in depth)
+- In `useUpdateSecuritySettings`'s mutation function, before the `update` call, if `payload.turnstile_surfaces` is present, strip the locked keys (`auth`, `portal_login`) from the merged object so they can never be written from anywhere in the app. Add a one-line comment referencing the rule.
 
-### 1. Always render Turnstile on Supabase-auth surfaces
-`src/pages/Auth.tsx` and `src/pages/portal/PortalLogin.tsx` will render the widget whenever a `siteKey` is available, regardless of the `useTurnstileEnabledFor('auth' | 'portal_login')` value. The submit button stays disabled until a token is obtained.
-
-### 2. Lock the toggles in the admin console
-`src/pages/admin/SecuritySettings.tsx` will:
-- Mark the `auth` and `portal_login` switches as read-only (disabled, locked badge).
-- Show an inline note: "Enforced by Supabase Auth provider — managed in Supabase dashboard, not here."
-- Keep `public_registration` and `portal_invite` fully toggleable (those go through our own edge functions, where `verifyTurnstile()` honors the per-surface flag).
-
-### 3. Edge-function verifier remains unchanged
-`supabase/functions/_shared/turnstile.ts` keeps its surface-aware fail-open behavior for the two surfaces that are genuinely app-controlled. Supabase-auth surfaces never reach our verifier, so no edge-function change is required.
-
-### 4. Guard the submit button
-Both auth forms will disable the submit button until `captchaToken` is set when the widget is rendered, preventing the request from ever leaving the browser without a token (better UX than a destructive toast).
-
-### 5. Memory update
-Update `mem://security/security-settings-console` and `mem://security/turnstile-bot-protection` to record:
-- `auth` and `portal_login` Turnstile surfaces are **always-on** (Supabase-enforced); admin console exposes them as read-only.
-- Only `public_registration` and `portal_invite` are app-toggleable.
-
-## Files touched
-- `src/pages/Auth.tsx` — drop `turnstileEnabled` gate on the widget; require token before submit.
-- `src/pages/portal/PortalLogin.tsx` — same.
-- `src/pages/admin/SecuritySettings.tsx` — lock the two Supabase-auth surface switches with an explanatory note.
-- `.lovable/memory/security/security-settings-console.md` — note locked surfaces.
-- `.lovable/memory/security/turnstile-bot-protection.md` — note Supabase-enforced surfaces.
+### 3. Memory
+- Append a one-liner to `.lovable/memory/security/security-settings-console.md` confirming: "Locked surfaces (`auth`, `portal_login`) are blocked client-side in both the page handler and the shared hook; admin UI shows a destructive toast on attempted toggle."
 
 ## Out of scope
-- Disabling Supabase's project-level CAPTCHA setting (must be done in Supabase dashboard, not from app code).
-- MFA enforcement changes — unrelated to this fix.
+- No DB migration. The existing column accepts arbitrary JSONB; super_admin RLS still applies. (A DB-level CHECK could be added later, but it would require coordinating with seeded data and is unnecessary given the hook + UI guards.)
+- No change to `MfaEnforcementGate`, edge functions, or the master switch.
+
+## Verification
+- Open `/admin/security`: `auth` and `portal_login` switches are disabled, show `Locked` badge + lock icon, and the explanatory alert is visible.
+- Programmatically calling `apply({ turnstile_surfaces: { auth: false } })` from devtools writes no change (hook strips the key) and the next reload shows the previous value.
+- Attempting a toggle (if re-enabled in devtools) fires the destructive toast and dispatches no network request.
