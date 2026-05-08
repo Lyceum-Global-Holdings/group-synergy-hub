@@ -51,7 +51,7 @@ export default function PortalLogin() {
               onChange={(e) => setEmail(e.target.value)} autoComplete="email" />
             <Input type="password" required placeholder="Password" value={password}
               onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" />
-            {turnstileEnabled && turnstile?.siteKey && (
+            {turnstile?.siteKey && (
               <div className="flex justify-center">
                 <TurnstileWidget
                   siteKey={turnstile.siteKey}
@@ -62,7 +62,11 @@ export default function PortalLogin() {
                 />
               </div>
             )}
-            <Button type="submit" className="w-full" disabled={busy}>
+            <Button
+              type="submit"
+              className="w-full"
+              disabled={busy || (!!turnstile?.siteKey && !captchaToken)}
+            >
               {busy && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               Sign in
             </Button>

@@ -131,7 +131,7 @@ export default function Auth() {
                   </Button>
                 </div>
               </div>
-              {turnstileEnabled && turnstile?.siteKey && (
+              {turnstile?.siteKey && (
                 <div className="flex justify-center">
                   <TurnstileWidget
                     siteKey={turnstile.siteKey}
@@ -142,15 +142,17 @@ export default function Auth() {
                   />
                 </div>
               )}
-              <Button type="submit" className="w-full" disabled={isLoading}>
+              <Button
+                type="submit"
+                className="w-full"
+                disabled={isLoading || (!!turnstile?.siteKey && !captchaToken)}
+              >
                 {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Sign In
               </Button>
-              {turnstileEnabled && (
-                <p className="text-xs text-muted-foreground text-center">
-                  Protected by Cloudflare Turnstile — no personal data is collected.
-                </p>
-              )}
+              <p className="text-xs text-muted-foreground text-center">
+                Protected by Cloudflare Turnstile — no personal data is collected.
+              </p>
             </form>
           </CardContent>
         </Card>
