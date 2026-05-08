@@ -8,6 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
+import TurnstileWidget from "@/components/security/TurnstileWidget";
+import { useTurnstileSiteKey } from "@/hooks/useTurnstileSiteKey";
 
 export default function PortalAcceptInvite() {
   const [params] = useSearchParams();
@@ -15,6 +17,7 @@ export default function PortalAcceptInvite() {
   const { toast } = useToast();
   const { user, loading: authLoading } = useAuth();
   const { refresh } = useSupplierContext();
+  const { data: turnstile } = useTurnstileSiteKey();
 
   const tokenFromUrl = params.get("token") ?? "";
   const idFromUrl = params.get("id") ?? "";
@@ -22,6 +25,7 @@ export default function PortalAcceptInvite() {
   const [invitationId, setInvitationId] = useState(idFromUrl);
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
 
   useEffect(() => { setToken(tokenFromUrl); setInvitationId(idFromUrl); }, [tokenFromUrl, idFromUrl]);
 
