@@ -1,95 +1,41 @@
-# Security Settings Admin Console
+# Fix: "captcha protection: request disallowed (no captcha_token found)"
 
-Add a single Administration page that lets super-admins toggle Cloudflare Turnstile and configure MFA enforcement, aligned with NIST SP 800-63B (AAL2), ISO 27001 A.9.4, and SOC 2 CC6.
+## Why it broke
+Supabase Auth has CAPTCHA enforcement enabled at the project level. Once enabled in the Supabase dashboard, **every** `signInWithPassword` / `signUp` call must carry a `captchaToken`, otherwise Supabase rejects with `request disallowed (no captcha_token found)`.
 
-## What the user gets
+Our `/admin/security` console exposes per-surface toggles including `auth` and `portal_login`. When an admin turns those off, the `<TurnstileWidget>` is hidden, no token is generated, and Supabase blocks the login. The toggle cannot legitimately disable Supabase-enforced CAPTCHA from the client.
 
-New route: `/admin/security` (Administration → Security Settings), super-admin only.
+This aligns with how Cloudflare/Supabase recommend it (NIST SP 800-63B, OWASP ASVS V11.1.4): bot protection on credential endpoints is enforced by the identity provider itself and must not be a user-tunable control once enabled upstream.
 
-**Bot Protection (Cloudflare Turnstile)** — per-surface toggles:
-- Internal sign-in (`/auth`)
-- Portal sign-in (`/portal/login`)
-- Portal invite acceptance
-- Public supplier registration
-- Master kill switch
+## Fix
 
-Each toggle shows current site-key health (from `turnstile-config`) and last verification stats.
+### 1. Always render Turnstile on Supabase-auth surfaces
+`src/pages/Auth.tsx` and `src/pages/portal/PortalLogin.tsx` will render the widget whenever a `siteKey` is available, regardless of the `useTurnstileEnabledFor('auth' | 'portal_login')` value. The submit button stays disabled until a token is obtained.
 
-**Multi-Factor Authentication** — policy selector:
-- `disabled` — MFA hidden
-- `optional` — users may self-enroll (current behavior)
-- `required_admins` — admin / super_admin / moderator must enroll (NIST AAL2 for privileged users)
-- `required_all` — every user must enroll
+### 2. Lock the toggles in the admin console
+`src/pages/admin/SecuritySettings.tsx` will:
+- Mark the `auth` and `portal_login` switches as read-only (disabled, locked badge).
+- Show an inline note: "Enforced by Supabase Auth provider — managed in Supabase dashboard, not here."
+- Keep `public_registration` and `portal_invite` fully toggleable (those go through our own edge functions, where `verifyTurnstile()` honors the per-surface flag).
 
-Plus: grace period (days) before unenrolled users are blocked, allowed factor types (TOTP always; WebAuthn reserved for later), and a "remember device" window (hours, default 0 per AAL2).
+### 3. Edge-function verifier remains unchanged
+`supabase/functions/_shared/turnstile.ts` keeps its surface-aware fail-open behavior for the two surfaces that are genuinely app-controlled. Supabase-auth surfaces never reach our verifier, so no edge-function change is required.
 
-## How it works
+### 4. Guard the submit button
+Both auth forms will disable the submit button until `captchaToken` is set when the widget is rendered, preventing the request from ever leaving the browser without a token (better UX than a destructive toast).
 
-```text
-security_settings (singleton, id = 'global')
-  ├─ turnstile_enabled            bool
-  ├─ turnstile_surfaces           jsonb { auth, portal_login, portal_invite, public_registration }
-  ├─ mfa_policy                   enum  disabled|optional|required_admins|required_all
-  ├─ mfa_grace_period_days        int   default 7
-  ├─ mfa_remember_device_hours    int   default 0
-  ├─ updated_by, updated_at
-```
+### 5. Memory update
+Update `mem://security/security-settings-console` and `mem://security/turnstile-bot-protection` to record:
+- `auth` and `portal_login` Turnstile surfaces are **always-on** (Supabase-enforced); admin console exposes them as read-only.
+- Only `public_registration` and `portal_invite` are app-toggleable.
 
-- RLS: SELECT for any authenticated user (needed by gates), UPDATE/INSERT only via `is_super_admin()`.
-- Trigger writes every change to `security_audit_log` (who/when/before/after) — SOC 2 evidence.
-- `useSecuritySettings()` hook with React Query (`staleTime: 60s`).
-- Edge function `security-settings-public` returns the subset needed pre-auth (Turnstile flags) so the login pages can decide whether to render `<TurnstileWidget />`.
+## Files touched
+- `src/pages/Auth.tsx` — drop `turnstileEnabled` gate on the widget; require token before submit.
+- `src/pages/portal/PortalLogin.tsx` — same.
+- `src/pages/admin/SecuritySettings.tsx` — lock the two Supabase-auth surface switches with an explanatory note.
+- `.lovable/memory/security/security-settings-console.md` — note locked surfaces.
+- `.lovable/memory/security/turnstile-bot-protection.md` — note Supabase-enforced surfaces.
 
-### Turnstile gating
-- `TurnstileWidget` and `verifyTurnstile()` become conditional: if the relevant surface flag is `false`, the widget is not rendered and the edge function skips verification (fail-open by config, never by missing token).
-- Master kill switch overrides per-surface flags.
-
-### MFA enforcement
-- New gate component `MfaEnforcementGate` mounted inside `AppLayout` (after `AuthContext` resolves):
-  1. Fetch settings + `supabase.auth.mfa.listFactors()` + current user role.
-  2. Decide if user is in scope (`required_admins` vs `required_all`).
-  3. If in scope and no verified factor:
-     - Within grace period → show dismissible banner with CTA to `/auth/mfa-setup`.
-     - After grace period → hard redirect to `/auth/mfa-setup` and block app routes (allow only `/auth/*` and logout).
-- AAL2 step-up: when `mfa_policy != disabled` and a verified factor exists, require an MFA challenge once per `mfa_remember_device_hours` for sensitive routes (admin/*, finance/*). Implemented via a `useRequireAal2()` hook that calls `supabase.auth.mfa.getAuthenticatorAssuranceLevel()` and routes to `/auth/mfa-challenge` when `currentLevel !== 'aal2'`.
-- Existing `MfaSetup.tsx` and `MfaChallenge.tsx` are reused unchanged.
-
-### Admin UI (`/admin/security`)
-- Two cards: "Bot Protection" and "Multi-Factor Authentication".
-- Each toggle is optimistic with a confirm dialog for destructive changes (e.g. turning Turnstile off, raising policy to `required_all`).
-- "Audit log" tab below pulls last 50 rows from `security_audit_log`.
-- Help copy cites the standard each control maps to (NIST AAL2, ISO 27001 A.9.4.2, OWASP ASVS V2).
-
-## Files to add / change
-
-**New**
-- `supabase/migrations/<ts>_security_settings.sql` — table, enum, RLS, audit trigger, seed singleton row.
-- `supabase/functions/security-settings-public/index.ts` — unauthenticated read of Turnstile flags.
-- `src/hooks/useSecuritySettings.ts` — authenticated full settings.
-- `src/hooks/usePublicSecuritySettings.ts` — pre-auth Turnstile flags.
-- `src/hooks/useRequireAal2.ts` — step-up gate for sensitive routes.
-- `src/components/auth/MfaEnforcementGate.tsx`
-- `src/pages/admin/SecuritySettings.tsx`
-
-**Edited**
-- `src/App.tsx` — register `/admin/security` route under `SuperAdminRoute`; mount `MfaEnforcementGate` inside `AppLayout`.
-- `src/constants/moduleConfig.ts` — add `security-settings` submodule under `administration`.
-- `src/components/security/TurnstileWidget.tsx` — accept `surface` prop and no-op when disabled.
-- `src/pages/Auth.tsx`, `src/pages/portal/PortalLogin.tsx`, `src/pages/portal/PortalAcceptInvite.tsx`, `src/pages/PublicSupplierRegistration.tsx` — pass `surface` to widget; allow submit when surface disabled.
-- `supabase/functions/_shared/turnstile.ts` — read flags via service-role client; skip verification when surface disabled (still log).
-- `supabase/functions/public-supplier-registration/index.ts`, `supplier-accept-invite/index.ts` — pass `surface` to verifier.
-- `supabase/config.toml` — register `security-settings-public` (verify_jwt = false).
-- `mem://security/turnstile-bot-protection` — note that gating is now driven by `security_settings`.
-- New memory `mem://security/mfa-enforcement-policy` — record policy semantics.
-
-## Standards mapping
-- NIST SP 800-63B AAL2 → `required_admins` minimum, optional remember-device window.
-- ISO 27001 A.9.4.2 → centrally managed authentication strength.
-- SOC 2 CC6.1 / CC7.2 → audit log of every toggle.
-- OWASP ASVS V2.8 (MFA) and V11 (bot defenses) → per-surface CAPTCHA control.
-- GDPR Art. 32 → administrative control surface for security measures.
-
-## Out of scope (callouts)
-- WebAuthn/passkey enrollment (TOTP only for now; schema leaves room).
-- Per-company overrides (single global policy this round; table is keyed so we can add later).
-- Supabase dashboard's own Turnstile setting still has to be toggled manually if you want the master kill switch to also disable Supabase-side captcha — surfaced in the UI as a reminder.
+## Out of scope
+- Disabling Supabase's project-level CAPTCHA setting (must be done in Supabase dashboard, not from app code).
+- MFA enforcement changes — unrelated to this fix.
