@@ -10,6 +10,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Loader2, CheckCircle, Eye, EyeOff } from 'lucide-react';
 import TurnstileWidget from '@/components/security/TurnstileWidget';
 import { useTurnstileSiteKey } from '@/hooks/useTurnstileSiteKey';
+import { useTurnstileEnabledFor } from '@/hooks/usePublicSecuritySettings';
 
 export default function Auth() {
   const [email, setEmail] = useState('');
@@ -18,6 +19,7 @@ export default function Auth() {
   const [showPassword, setShowPassword] = useState(false);
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
   const { data: turnstile } = useTurnstileSiteKey();
+  const turnstileEnabled = useTurnstileEnabledFor('auth');
   const { signIn, user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
