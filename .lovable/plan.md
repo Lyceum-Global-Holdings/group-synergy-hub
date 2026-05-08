@@ -1,80 +1,95 @@
-# Cloudflare Turnstile Integration
+# Security Settings Admin Console
 
-Add Cloudflare Turnstile (privacy-friendly, GDPR/WCAG-compliant CAPTCHA alternative) to all public, unauthenticated entry points and verify tokens server-side on every protected edge function.
+Add a single Administration page that lets super-admins toggle Cloudflare Turnstile and configure MFA enforcement, aligned with NIST SP 800-63B (AAL2), ISO 27001 A.9.4, and SOC 2 CC6.
 
-## Why Turnstile
-- No personal data collection (GDPR-friendly, no cookies for tracking).
-- WCAG 2.1 AA accessible (managed challenge auto-falls back to non-interactive).
-- Free, unlimited, with a clean React widget and standard `siteverify` REST API.
-- Supports invisible, managed, and non-interactive modes per international UX standards.
+## What the user gets
 
-## Scope (protected surfaces)
+New route: `/admin/security` (Administration → Security Settings), super-admin only.
 
-| Surface | File | Mode |
-|---|---|---|
-| Internal sign-in | `src/pages/Auth.tsx` | managed |
-| Supplier portal sign-in | `src/pages/portal/PortalLogin.tsx` | managed |
-| Supplier portal invite acceptance | `src/pages/portal/PortalAcceptInvite.tsx` | managed |
-| Public supplier registration | wherever `public-supplier-registration` is called from + the edge function | managed |
-| MFA challenge | `src/pages/auth/MfaChallenge.tsx` | invisible (only after N failed attempts — managed flag) |
+**Bot Protection (Cloudflare Turnstile)** — per-surface toggles:
+- Internal sign-in (`/auth`)
+- Portal sign-in (`/portal/login`)
+- Portal invite acceptance
+- Public supplier registration
+- Master kill switch
 
-All surfaces fail closed: if Turnstile is configured but the token is missing/invalid, the request is rejected with HTTP 400.
+Each toggle shows current site-key health (from `turnstile-config`) and last verification stats.
 
-## Secrets
+**Multi-Factor Authentication** — policy selector:
+- `disabled` — MFA hidden
+- `optional` — users may self-enroll (current behavior)
+- `required_admins` — admin / super_admin / moderator must enroll (NIST AAL2 for privileged users)
+- `required_all` — every user must enroll
 
-Two new secrets, requested via the secrets tool after user confirmation:
-- `TURNSTILE_SITE_KEY` — public, safe to expose. Stored as a runtime secret and surfaced to the client through a tiny helper edge function `turnstile-config` (so the key isn't hardcoded and can be rotated without a redeploy).
-- `TURNSTILE_SECRET_KEY` — server-only, used by edge functions to call `https://challenges.cloudflare.com/turnstile/v0/siteverify`.
+Plus: grace period (days) before unenrolled users are blocked, allowed factor types (TOTP always; WebAuthn reserved for later), and a "remember device" window (hours, default 0 per AAL2).
 
-A development fallback (`1x00000000000000000000AA` site key + `1x0000000000000000000000000000000AA` secret — Cloudflare's official always-passes test pair) is used when secrets are not set, so the app keeps working in preview.
+## How it works
 
-## Frontend implementation
+```text
+security_settings (singleton, id = 'global')
+  ├─ turnstile_enabled            bool
+  ├─ turnstile_surfaces           jsonb { auth, portal_login, portal_invite, public_registration }
+  ├─ mfa_policy                   enum  disabled|optional|required_admins|required_all
+  ├─ mfa_grace_period_days        int   default 7
+  ├─ mfa_remember_device_hours    int   default 0
+  ├─ updated_by, updated_at
+```
 
-1. New component `src/components/security/TurnstileWidget.tsx`:
-   - Lazy-loads `https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit` once.
-   - Renders the widget into a div, exposes `onVerify(token)`, `onExpire`, `onError`.
-   - Auto-detects theme (light/dark) from `document.documentElement.class`.
-   - Sets `data-language="auto"` for i18n; respects `prefers-reduced-motion`.
-   - Calls `turnstile.reset(widgetId)` on submit failure.
+- RLS: SELECT for any authenticated user (needed by gates), UPDATE/INSERT only via `is_super_admin()`.
+- Trigger writes every change to `security_audit_log` (who/when/before/after) — SOC 2 evidence.
+- `useSecuritySettings()` hook with React Query (`staleTime: 60s`).
+- Edge function `security-settings-public` returns the subset needed pre-auth (Turnstile flags) so the login pages can decide whether to render `<TurnstileWidget />`.
 
-2. New hook `src/hooks/useTurnstileSiteKey.ts`: fetches the site key once from `turnstile-config` edge function, caches in React Query (`staleTime: Infinity`).
+### Turnstile gating
+- `TurnstileWidget` and `verifyTurnstile()` become conditional: if the relevant surface flag is `false`, the widget is not rendered and the edge function skips verification (fail-open by config, never by missing token).
+- Master kill switch overrides per-surface flags.
 
-3. Wire the widget into the five forms above. Submit buttons stay disabled until a token is present. The token is included in the request payload (`turnstile_token`) for edge functions, or as `options.captchaToken` for `supabase.auth.signInWithPassword` / `signUp` / `verifyOtp` (Supabase has built-in Turnstile support — no extra plumbing needed for auth calls once the project's Auth → Bot Protection is enabled).
+### MFA enforcement
+- New gate component `MfaEnforcementGate` mounted inside `AppLayout` (after `AuthContext` resolves):
+  1. Fetch settings + `supabase.auth.mfa.listFactors()` + current user role.
+  2. Decide if user is in scope (`required_admins` vs `required_all`).
+  3. If in scope and no verified factor:
+     - Within grace period → show dismissible banner with CTA to `/auth/mfa-setup`.
+     - After grace period → hard redirect to `/auth/mfa-setup` and block app routes (allow only `/auth/*` and logout).
+- AAL2 step-up: when `mfa_policy != disabled` and a verified factor exists, require an MFA challenge once per `mfa_remember_device_hours` for sensitive routes (admin/*, finance/*). Implemented via a `useRequireAal2()` hook that calls `supabase.auth.mfa.getAuthenticatorAssuranceLevel()` and routes to `/auth/mfa-challenge` when `currentLevel !== 'aal2'`.
+- Existing `MfaSetup.tsx` and `MfaChallenge.tsx` are reused unchanged.
 
-## Backend implementation
+### Admin UI (`/admin/security`)
+- Two cards: "Bot Protection" and "Multi-Factor Authentication".
+- Each toggle is optimistic with a confirm dialog for destructive changes (e.g. turning Turnstile off, raising policy to `required_all`).
+- "Audit log" tab below pulls last 50 rows from `security_audit_log`.
+- Help copy cites the standard each control maps to (NIST AAL2, ISO 27001 A.9.4.2, OWASP ASVS V2).
 
-1. New shared verifier inlined per function (no shared dir per project conventions): `verifyTurnstile(token, ip)` → POSTs to `siteverify` with `secret`, `response`, `remoteip`. Returns `{ success, error_codes, hostname, action }`. Rejects if `success !== true` or if `hostname` is not in an allowlist (`stores.lgh.lk`, `*.lovable.app`, `localhost`).
+## Files to add / change
 
-2. Edge functions updated:
-   - `public-supplier-registration` — verify before rate-limit check.
-   - `supplier-invite` — verify on the public-accept path.
-   - `supplier-accept-invite` — verify before token consumption.
-   - New `turnstile-config` — returns `{ siteKey }` (public, no JWT).
+**New**
+- `supabase/migrations/<ts>_security_settings.sql` — table, enum, RLS, audit trigger, seed singleton row.
+- `supabase/functions/security-settings-public/index.ts` — unauthenticated read of Turnstile flags.
+- `src/hooks/useSecuritySettings.ts` — authenticated full settings.
+- `src/hooks/usePublicSecuritySettings.ts` — pre-auth Turnstile flags.
+- `src/hooks/useRequireAal2.ts` — step-up gate for sensitive routes.
+- `src/components/auth/MfaEnforcementGate.tsx`
+- `src/pages/admin/SecuritySettings.tsx`
 
-3. Supabase Auth: instruct the user (in chat) to enable Turnstile under Auth → Settings → Bot and Abuse Protection, pasting the same `TURNSTILE_SECRET_KEY`. Once enabled, Supabase enforces the captcha on `signInWithPassword`, `signUp`, `resetPasswordForEmail`, and `verifyOtp` automatically.
+**Edited**
+- `src/App.tsx` — register `/admin/security` route under `SuperAdminRoute`; mount `MfaEnforcementGate` inside `AppLayout`.
+- `src/constants/moduleConfig.ts` — add `security-settings` submodule under `administration`.
+- `src/components/security/TurnstileWidget.tsx` — accept `surface` prop and no-op when disabled.
+- `src/pages/Auth.tsx`, `src/pages/portal/PortalLogin.tsx`, `src/pages/portal/PortalAcceptInvite.tsx`, `src/pages/PublicSupplierRegistration.tsx` — pass `surface` to widget; allow submit when surface disabled.
+- `supabase/functions/_shared/turnstile.ts` — read flags via service-role client; skip verification when surface disabled (still log).
+- `supabase/functions/public-supplier-registration/index.ts`, `supplier-accept-invite/index.ts` — pass `surface` to verifier.
+- `supabase/config.toml` — register `security-settings-public` (verify_jwt = false).
+- `mem://security/turnstile-bot-protection` — note that gating is now driven by `security_settings`.
+- New memory `mem://security/mfa-enforcement-policy` — record policy semantics.
 
-## International / compliance standards
+## Standards mapping
+- NIST SP 800-63B AAL2 → `required_admins` minimum, optional remember-device window.
+- ISO 27001 A.9.4.2 → centrally managed authentication strength.
+- SOC 2 CC6.1 / CC7.2 → audit log of every toggle.
+- OWASP ASVS V2.8 (MFA) and V11 (bot defenses) → per-surface CAPTCHA control.
+- GDPR Art. 32 → administrative control surface for security measures.
 
-- **GDPR / ePrivacy**: Turnstile sets no tracking cookies; a one-line notice is added to the auth pages: "Protected by Cloudflare Turnstile — no personal data is collected."
-- **WCAG 2.1 AA**: managed mode passes most users without interaction; `aria-label` on the widget container; keyboard-focusable fallback.
-- **OWASP ASVS V11.1**: bot-resistance control on all unauthenticated endpoints.
-- **NIST SP 800-63B**: rate-limiting + bot challenge on authentication endpoints (combined with existing per-IP rate limit in `public-supplier-registration`).
-- **PCI-DSS 6.4.2** (only relevant if payments added later): documented anti-automation control.
-
-## Memory updates
-
-Add `mem://security/turnstile-bot-protection` documenting:
-- All public/auth surfaces must include `<TurnstileWidget />` and submit `turnstile_token`.
-- All public edge functions must call `verifyTurnstile()` and fail closed.
-- Allowed hostnames list lives in the verifier; update it whenever a new domain is published.
-- Add to `mem://index.md` Core: "Public/auth forms gated by Cloudflare Turnstile; edge functions must verify server-side."
-
-## Out of scope
-- Replacing existing in-app rate limiters (Turnstile augments, not replaces them).
-- Adding Turnstile to authenticated-only mutations (not needed; JWT + RLS already gate those).
-- Custom captcha analytics dashboard.
-
-## Confirmation needed
-1. Do you have a Cloudflare account with Turnstile site + secret keys ready to add to Lovable secrets, or should I start with Cloudflare's always-pass test keys and you'll swap them in later?
-2. Allowed hostnames — confirm the list: `stores.lgh.lk`, `*.lovable.app`, `localhost`. Anything else (custom staging domain)?
-3. Should the internal `/auth` sign-in also require Turnstile, or limit to public/portal surfaces only? (Recommend: yes, internal too — it's the highest-value target.)
+## Out of scope (callouts)
+- WebAuthn/passkey enrollment (TOTP only for now; schema leaves room).
+- Per-company overrides (single global policy this round; table is keyed so we can add later).
+- Supabase dashboard's own Turnstile setting still has to be toggled manually if you want the master kill switch to also disable Supabase-side captcha — surfaced in the UI as a reminder.
