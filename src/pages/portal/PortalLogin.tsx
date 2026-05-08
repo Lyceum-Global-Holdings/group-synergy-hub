@@ -51,7 +51,7 @@ export default function PortalLogin() {
               onChange={(e) => setEmail(e.target.value)} autoComplete="email" />
             <Input type="password" required placeholder="Password" value={password}
               onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" />
-            {turnstile?.siteKey && (
+            {turnstileEnabled !== false && turnstile?.siteKey && (
               <div className="flex justify-center">
                 <TurnstileWidget
                   siteKey={turnstile.siteKey}
@@ -65,7 +65,7 @@ export default function PortalLogin() {
             <Button
               type="submit"
               className="w-full"
-              disabled={busy || (!!turnstile?.siteKey && !captchaToken)}
+              disabled={busy || (turnstileEnabled !== false && !!turnstile?.siteKey && !captchaToken)}
             >
               {busy && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               Sign in
@@ -73,9 +73,11 @@ export default function PortalLogin() {
             <p className="text-xs text-muted-foreground text-center">
               Have an invitation? <Link to={`/portal/accept-invite${window.location.search}`} className="underline">Accept invite</Link>
             </p>
-            <p className="text-[10px] text-muted-foreground text-center">
-              Protected by Cloudflare Turnstile.
-            </p>
+            {turnstileEnabled !== false && turnstile?.siteKey && (
+              <p className="text-[10px] text-muted-foreground text-center">
+                Protected by Cloudflare Turnstile.
+              </p>
+            )}
           </form>
         </CardContent>
       </Card>
