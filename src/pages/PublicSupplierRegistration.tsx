@@ -12,6 +12,7 @@ import { invokeEdgeFunction } from "@/lib/edgeFunctionClient";
 import { toast } from "sonner";
 import TurnstileWidget from "@/components/security/TurnstileWidget";
 import { useTurnstileSiteKey } from "@/hooks/useTurnstileSiteKey";
+import { useTurnstileEnabledFor } from "@/hooks/usePublicSecuritySettings";
 
 export default function PublicSupplierRegistration() {
   const [isSubmitting, setIsSubmitting] = useState(false);
