@@ -45,9 +45,17 @@ export function useUpdateSecuritySettings() {
     mutationFn: async (patch: Partial<Omit<SecuritySettings, "id" | "updated_at" | "updated_by">>) => {
       const sanitized: typeof patch = { ...patch };
       if (sanitized.turnstile_surfaces) {
-        const next = { ...sanitized.turnstile_surfaces };
-        for (const k of LOCKED_TURNSTILE_SURFACES) delete (next as any)[k];
-        sanitized.turnstile_surfaces = next as SecuritySettings["turnstile_surfaces"];
+        // Re-fetch current locked values so they cannot be overwritten via a JSONB replace.
+        const { data: current } = await (supabase as any)
+          .from("security_settings")
+          .select("turnstile_surfaces")
+          .eq("id", "global")
+          .maybeSingle();
+        const merged = { ...sanitized.turnstile_surfaces } as Record<string, boolean>;
+        for (const k of LOCKED_TURNSTILE_SURFACES) {
+          merged[k] = current?.turnstile_surfaces?.[k] ?? true;
+        }
+        sanitized.turnstile_surfaces = merged as SecuritySettings["turnstile_surfaces"];
       }
       const { data, error } = await (supabase as any)
         .from("security_settings")
