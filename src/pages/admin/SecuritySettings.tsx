@@ -83,6 +83,26 @@ export default function SecuritySettings() {
     }
   };
 
+  const handleSurfaceToggle = (
+    key: keyof Settings["turnstile_surfaces"],
+    value: boolean,
+  ) => {
+    const surface = SURFACES.find((s) => s.key === key);
+    if (surface?.locked || (LOCKED_TURNSTILE_SURFACES as readonly string[]).includes(key as string)) {
+      toast({
+        variant: "destructive",
+        title: "Locked by Supabase Auth",
+        description:
+          surface?.lockReason ??
+          "This surface is enforced by Supabase Auth and cannot be changed here.",
+      });
+      return;
+    }
+    apply({
+      turnstile_surfaces: { ...settings.turnstile_surfaces, [key]: value },
+    });
+  };
+
   return (
     <div className="container mx-auto p-6 space-y-6 max-w-5xl">
       <header className="flex items-center gap-3">
