@@ -184,9 +184,11 @@ const ProtectedLayout = () => (
       <CompanyProvider>
         <LocationFilterProvider>
           <AppLayout>
-            <Suspense fallback={<PageLoader />}>
-              <Outlet />
-            </Suspense>
+            <MfaEnforcementGate>
+              <Suspense fallback={<PageLoader />}>
+                <Outlet />
+              </Suspense>
+            </MfaEnforcementGate>
           </AppLayout>
         </LocationFilterProvider>
       </CompanyProvider>
