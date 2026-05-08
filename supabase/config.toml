@@ -3,6 +3,9 @@ project_id = "ajsyvuozkgcnnvvefeed"
 [functions.public-supplier-registration]
 verify_jwt = false
 
+[functions.turnstile-config]
+verify_jwt = false
+
 [functions.public-asset-request]
 verify_jwt = false
 
