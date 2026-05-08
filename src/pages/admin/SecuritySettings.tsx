@@ -16,11 +16,10 @@ import {
 } from "@/components/ui/alert-dialog";
 import {
   useSecuritySettings, useUpdateSecuritySettings, useSecurityAuditLog,
-  LOCKED_TURNSTILE_SURFACES,
   type MfaPolicy,
 } from "@/hooks/useSecuritySettings";
 import { useToast } from "@/hooks/use-toast";
-import { ShieldCheck, Bot, KeyRound, History, Loader2, Info, Lock } from "lucide-react";
+import { ShieldCheck, Bot, KeyRound, History, Loader2, Info } from "lucide-react";
 
 const MFA_POLICIES: { value: MfaPolicy; label: string; help: string }[] = [
   { value: "disabled",        label: "Disabled",                 help: "MFA is hidden. Not recommended for production." },
@@ -33,23 +32,9 @@ const SURFACES: {
   key: keyof Settings["turnstile_surfaces"];
   label: string;
   help: string;
-  locked?: boolean;
-  lockReason?: string;
 }[] = [
-  {
-    key: "auth",
-    label: "Internal sign-in (/auth)",
-    help: "Bot challenge on the staff login page.",
-    locked: true,
-    lockReason: "Enforced by Supabase Auth — manage in the Supabase dashboard (Auth → Bot and Abuse Protection).",
-  },
-  {
-    key: "portal_login",
-    label: "Supplier portal sign-in",
-    help: "Bot challenge on /portal/login.",
-    locked: true,
-    lockReason: "Enforced by Supabase Auth — manage in the Supabase dashboard (Auth → Bot and Abuse Protection).",
-  },
+  { key: "auth",                 label: "Internal sign-in (/auth)",     help: "Bot challenge on the staff login page." },
+  { key: "portal_login",         label: "Supplier portal sign-in",      help: "Bot challenge on /portal/login." },
   { key: "portal_invite",        label: "Supplier invite acceptance",   help: "Bot challenge when accepting supplier invitations." },
   { key: "public_registration",  label: "Public supplier registration", help: "Bot challenge on the unauthenticated supplier registration form." },
 ];
@@ -87,17 +72,6 @@ export default function SecuritySettings() {
     key: keyof Settings["turnstile_surfaces"],
     value: boolean,
   ) => {
-    const surface = SURFACES.find((s) => s.key === key);
-    if (surface?.locked || (LOCKED_TURNSTILE_SURFACES as readonly string[]).includes(key as string)) {
-      toast({
-        variant: "destructive",
-        title: "Locked by Supabase Auth",
-        description:
-          surface?.lockReason ??
-          "This surface is enforced by Supabase Auth and cannot be changed here.",
-      });
-      return;
-    }
     apply({
       turnstile_surfaces: { ...settings.turnstile_surfaces, [key]: value },
     });
@@ -155,31 +129,21 @@ export default function SecuritySettings() {
               <div className="space-y-3">
                 <h3 className="text-sm font-semibold uppercase text-muted-foreground">Per-surface controls</h3>
                 <Alert>
-                  <Lock className="h-4 w-4" />
-                  <AlertTitle>Some surfaces are managed by Supabase Auth</AlertTitle>
+                  <Info className="h-4 w-4" />
+                  <AlertTitle>Sign-in surfaces also depend on Supabase</AlertTitle>
                   <AlertDescription>
-                    Internal sign-in and Supplier portal sign-in use Supabase's built-in CAPTCHA. Their toggles below are read-only — change them in the Supabase dashboard (Auth → Bot and Abuse Protection).
+                    Disabling Internal sign-in or Supplier portal sign-in below only removes the in-app Turnstile widget. Supabase's project-level CAPTCHA (Auth → Bot and Abuse Protection) is independent — if it stays on, sign-in will still require a token and fail. Turn it off there too to fully disable bot protection on sign-in.
                   </AlertDescription>
                 </Alert>
                 {SURFACES.map((s) => (
                   <div key={s.key} className="flex items-center justify-between p-3 border rounded-md">
                     <div className="pr-4">
-                      <div className="flex items-center gap-2">
-                        <Label>{s.label}</Label>
-                        {s.locked && (
-                          <Badge variant="secondary" className="text-[10px] gap-1">
-                            <Lock className="h-3 w-3" /> Locked
-                          </Badge>
-                        )}
-                      </div>
+                      <Label>{s.label}</Label>
                       <p className="text-xs text-muted-foreground">{s.help}</p>
-                      {s.locked && (
-                        <p className="text-xs text-muted-foreground mt-1 italic">{s.lockReason}</p>
-                      )}
                     </div>
                     <Switch
-                      disabled={!settings.turnstile_enabled || s.locked}
-                      checked={s.locked ? true : settings.turnstile_surfaces[s.key] !== false}
+                      disabled={!settings.turnstile_enabled}
+                      checked={settings.turnstile_surfaces[s.key] !== false}
                       onCheckedChange={(v) => handleSurfaceToggle(s.key, v)}
                     />
                   </div>
