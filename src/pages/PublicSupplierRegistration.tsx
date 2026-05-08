@@ -10,6 +10,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { SUPPLIER_TYPES, PAYMENT_TERMS } from "@/types/supplier";
 import { invokeEdgeFunction } from "@/lib/edgeFunctionClient";
 import { toast } from "sonner";
+import TurnstileWidget from "@/components/security/TurnstileWidget";
+import { useTurnstileSiteKey } from "@/hooks/useTurnstileSiteKey";
 
 export default function PublicSupplierRegistration() {
   const [isSubmitting, setIsSubmitting] = useState(false);
