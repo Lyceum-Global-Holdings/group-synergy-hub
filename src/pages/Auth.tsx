@@ -8,6 +8,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, CheckCircle, Eye, EyeOff } from 'lucide-react';
+import TurnstileWidget from '@/components/security/TurnstileWidget';
+import { useTurnstileSiteKey } from '@/hooks/useTurnstileSiteKey';
 
 export default function Auth() {
   const [email, setEmail] = useState('');
