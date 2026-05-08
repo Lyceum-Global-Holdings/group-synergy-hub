@@ -132,6 +132,7 @@ const SocialMediaNDA = lazy(() => import("./pages/social-media/NDACompliance"));
 const SocialMediaActivityLog = lazy(() => import("./pages/social-media/ActivityLog"));
 const TestEnvironmentPage = lazy(() => import("./pages/admin/test-environment/TestEnvironmentPage"));
 const PerformanceDashboard = lazy(() => import("./pages/admin/PerformanceDashboard"));
+const SecuritySettingsPage = lazy(() => import("./pages/admin/SecuritySettings"));
 
 // Supplier Portal pages
 const PortalLayout = lazy(() => import("./components/portal/PortalLayout").then((m) => ({ default: m.PortalLayout })));
