@@ -16,6 +16,8 @@ export default function Auth() {
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const { data: turnstile } = useTurnstileSiteKey();
   const { signIn, user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -52,7 +54,7 @@ export default function Auth() {
     e.preventDefault();
     setIsLoading(true);
     try {
-      const { error } = await signIn(email, password);
+      const { error } = await signIn(email, password, captchaToken ?? undefined);
       if (error) {
         console.error('Sign in error:', error);
         toast({
@@ -60,6 +62,7 @@ export default function Auth() {
           description: getErrorMessage(error),
           variant: "destructive"
         });
+        setCaptchaToken(null);
       } else {
         toast({
           title: "Welcome back!",
@@ -126,10 +129,24 @@ export default function Auth() {
                   </Button>
                 </div>
               </div>
+              {turnstile?.siteKey && (
+                <div className="flex justify-center">
+                  <TurnstileWidget
+                    siteKey={turnstile.siteKey}
+                    action="login"
+                    onVerify={setCaptchaToken}
+                    onExpire={() => setCaptchaToken(null)}
+                    onError={() => setCaptchaToken(null)}
+                  />
+                </div>
+              )}
               <Button type="submit" className="w-full" disabled={isLoading}>
                 {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Sign In
               </Button>
+              <p className="text-xs text-muted-foreground text-center">
+                Protected by Cloudflare Turnstile — no personal data is collected.
+              </p>
             </form>
           </CardContent>
         </Card>
