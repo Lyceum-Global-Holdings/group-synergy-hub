@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { useToast } from "@/hooks/use-toast";
 import TurnstileWidget from "@/components/security/TurnstileWidget";
 import { useTurnstileSiteKey } from "@/hooks/useTurnstileSiteKey";
+import { useTurnstileEnabledFor } from "@/hooks/usePublicSecuritySettings";
 
 export default function PortalLogin() {
   const { user, signIn } = useAuth();
@@ -20,6 +21,7 @@ export default function PortalLogin() {
   const [busy, setBusy] = useState(false);
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
   const { data: turnstile } = useTurnstileSiteKey();
+  const turnstileEnabled = useTurnstileEnabledFor('portal_login');
 
   useEffect(() => { if (user) navigate(next, { replace: true }); }, [user, next, navigate]);
 
@@ -49,7 +51,7 @@ export default function PortalLogin() {
               onChange={(e) => setEmail(e.target.value)} autoComplete="email" />
             <Input type="password" required placeholder="Password" value={password}
               onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" />
-            {turnstile?.siteKey && (
+            {turnstileEnabled && turnstile?.siteKey && (
               <div className="flex justify-center">
                 <TurnstileWidget
                   siteKey={turnstile.siteKey}

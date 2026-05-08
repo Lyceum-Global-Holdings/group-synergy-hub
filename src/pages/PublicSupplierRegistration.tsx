@@ -12,12 +12,14 @@ import { invokeEdgeFunction } from "@/lib/edgeFunctionClient";
 import { toast } from "sonner";
 import TurnstileWidget from "@/components/security/TurnstileWidget";
 import { useTurnstileSiteKey } from "@/hooks/useTurnstileSiteKey";
+import { useTurnstileEnabledFor } from "@/hooks/usePublicSecuritySettings";
 
 export default function PublicSupplierRegistration() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
   const { data: turnstile } = useTurnstileSiteKey();
+  const turnstileEnabled = useTurnstileEnabledFor('public_registration');
 
   const form = useForm({
     defaultValues: {
@@ -411,7 +413,7 @@ export default function PublicSupplierRegistration() {
                   </div>
                 </div>
 
-                {turnstile?.siteKey && (
+                {turnstileEnabled && turnstile?.siteKey && (
                   <div className="flex justify-center">
                     <TurnstileWidget
                       siteKey={turnstile.siteKey}
@@ -427,7 +429,7 @@ export default function PublicSupplierRegistration() {
                   type="submit" 
                   className="w-full" 
                   size="lg"
-                  disabled={isSubmitting || !captchaToken}
+                  disabled={isSubmitting || (turnstileEnabled && !captchaToken)}
                 >
                   {isSubmitting ? (
                     <>

@@ -15095,6 +15095,72 @@ export type Database = {
           },
         ]
       }
+      security_audit_log: {
+        Row: {
+          action: string
+          after_value: Json | null
+          before_value: Json | null
+          changed_at: string
+          changed_by: string | null
+          id: string
+        }
+        Insert: {
+          action: string
+          after_value?: Json | null
+          before_value?: Json | null
+          changed_at?: string
+          changed_by?: string | null
+          id?: string
+        }
+        Update: {
+          action?: string
+          after_value?: Json | null
+          before_value?: Json | null
+          changed_at?: string
+          changed_by?: string | null
+          id?: string
+        }
+        Relationships: []
+      }
+      security_settings: {
+        Row: {
+          allowed_mfa_factors: string[]
+          created_at: string
+          id: string
+          mfa_grace_period_days: number
+          mfa_policy: Database["public"]["Enums"]["mfa_policy"]
+          mfa_remember_device_hours: number
+          turnstile_enabled: boolean
+          turnstile_surfaces: Json
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          allowed_mfa_factors?: string[]
+          created_at?: string
+          id?: string
+          mfa_grace_period_days?: number
+          mfa_policy?: Database["public"]["Enums"]["mfa_policy"]
+          mfa_remember_device_hours?: number
+          turnstile_enabled?: boolean
+          turnstile_surfaces?: Json
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          allowed_mfa_factors?: string[]
+          created_at?: string
+          id?: string
+          mfa_grace_period_days?: number
+          mfa_policy?: Database["public"]["Enums"]["mfa_policy"]
+          mfa_remember_device_hours?: number
+          turnstile_enabled?: boolean
+          turnstile_surfaces?: Json
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       senior_finance_users: {
         Row: {
           company_id: string | null
@@ -22280,6 +22346,7 @@ export type Database = {
         | "issued"
         | "partially_received"
         | "completed"
+      mfa_policy: "disabled" | "optional" | "required_admins" | "required_all"
       normal_balance: "debit" | "credit"
       obligation_status:
         | "pending"
@@ -22785,6 +22852,7 @@ export const Constants = {
         "partially_received",
         "completed",
       ],
+      mfa_policy: ["disabled", "optional", "required_admins", "required_all"],
       normal_balance: ["debit", "credit"],
       obligation_status: [
         "pending",

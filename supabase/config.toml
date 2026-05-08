@@ -50,3 +50,6 @@ verify_jwt = false
 
 [functions.peppol-dsar-export]
 verify_jwt = false
+
+[functions.security-settings-public]
+verify_jwt = false

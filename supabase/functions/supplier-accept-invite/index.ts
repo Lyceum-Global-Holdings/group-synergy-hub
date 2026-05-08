@@ -59,7 +59,7 @@ serve(async (req) => {
     const { invitation_id, token, turnstile_token } = parsed.data;
 
     // Bot protection
-    const captcha = await verifyTurnstile(turnstile_token, getRequestIp(req), "supplier_accept_invite");
+    const captcha = await verifyTurnstile(turnstile_token, getRequestIp(req), "supplier_accept_invite", "portal_invite");
     if (!captcha.success) {
       return new Response(
         JSON.stringify({ error: "Bot protection check failed", code: captcha.error }),

@@ -44,6 +44,7 @@ import ProtectedRoute from "./components/common/ProtectedRoute";
 import { AdminRoute } from "./components/auth/AdminRoute";
 import { SuperAdminRoute } from "./components/auth/SuperAdminRoute";
 import AppLayout from "./components/layout/AppLayout";
+import MfaEnforcementGate from "./components/auth/MfaEnforcementGate";
 import { Loader2 } from "lucide-react";
 import { PerfOverlay } from "@/components/dev/PerfOverlay";
 import { markRouteChange } from "@/lib/perfTelemetry";
@@ -132,6 +133,7 @@ const SocialMediaNDA = lazy(() => import("./pages/social-media/NDACompliance"));
 const SocialMediaActivityLog = lazy(() => import("./pages/social-media/ActivityLog"));
 const TestEnvironmentPage = lazy(() => import("./pages/admin/test-environment/TestEnvironmentPage"));
 const PerformanceDashboard = lazy(() => import("./pages/admin/PerformanceDashboard"));
+const SecuritySettingsPage = lazy(() => import("./pages/admin/SecuritySettings"));
 
 // Supplier Portal pages
 const PortalLayout = lazy(() => import("./components/portal/PortalLayout").then((m) => ({ default: m.PortalLayout })));
@@ -183,9 +185,11 @@ const ProtectedLayout = () => (
       <CompanyProvider>
         <LocationFilterProvider>
           <AppLayout>
-            <Suspense fallback={<PageLoader />}>
-              <Outlet />
-            </Suspense>
+            <MfaEnforcementGate>
+              <Suspense fallback={<PageLoader />}>
+                <Outlet />
+              </Suspense>
+            </MfaEnforcementGate>
           </AppLayout>
         </LocationFilterProvider>
       </CompanyProvider>
@@ -261,6 +265,7 @@ function App() {
                 <Route path="/admin/backend" element={<SuperAdminRoute><BackendDashboard /></SuperAdminRoute>} />
                 <Route path="/admin/test-environment" element={<SuperAdminRoute><TestEnvironmentPage /></SuperAdminRoute>} />
                 <Route path="/admin/performance" element={<AdminRoute><PerformanceDashboard /></AdminRoute>} />
+                <Route path="/admin/security" element={<SuperAdminRoute><SecuritySettingsPage /></SuperAdminRoute>} />
                 <Route path="/admin/training" element={<Training />} />
                 <Route path="/admin/training/module-trainings" element={<ModuleTrainings />} />
                 <Route path="/admin/training/video-library" element={<VideoLibrary />} />

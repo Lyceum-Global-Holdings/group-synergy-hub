@@ -146,7 +146,8 @@ export const moduleConfig: Record<string, ModuleConfig> = {
       { key: 'module-allocation', name: 'Module Allocation', description: 'Assign modules to companies', url: '/admin/modules' },
       { key: 'warehouse-management', name: 'Warehouse Management', description: 'Configure warehouse settings', url: '/admin/warehouse-management' },
       { key: 'test-environment', name: 'Test Environment', description: 'Module testing dashboard (Super Admin)', url: '/admin/test-environment' },
-      { key: 'performance', name: 'Performance Dashboard', description: 'Web Vitals, slow queries, long tasks', url: '/admin/performance' }
+      { key: 'performance', name: 'Performance Dashboard', description: 'Web Vitals, slow queries, long tasks', url: '/admin/performance' },
+      { key: 'security-settings', name: 'Security Settings', description: 'Bot protection (Turnstile) and MFA enforcement policy', url: '/admin/security' }
     ]
   },
   production: {
