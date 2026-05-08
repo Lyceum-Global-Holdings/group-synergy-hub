@@ -44,6 +44,7 @@ import ProtectedRoute from "./components/common/ProtectedRoute";
 import { AdminRoute } from "./components/auth/AdminRoute";
 import { SuperAdminRoute } from "./components/auth/SuperAdminRoute";
 import AppLayout from "./components/layout/AppLayout";
+import MfaEnforcementGate from "./components/auth/MfaEnforcementGate";
 import { Loader2 } from "lucide-react";
 import { PerfOverlay } from "@/components/dev/PerfOverlay";
 import { markRouteChange } from "@/lib/perfTelemetry";
