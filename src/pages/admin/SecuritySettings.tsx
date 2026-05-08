@@ -154,12 +154,23 @@ export default function SecuritySettings() {
 
               <div className="space-y-3">
                 <h3 className="text-sm font-semibold uppercase text-muted-foreground">Per-surface controls</h3>
+                <Alert>
+                  <Lock className="h-4 w-4" />
+                  <AlertTitle>Some surfaces are managed by Supabase Auth</AlertTitle>
+                  <AlertDescription>
+                    Internal sign-in and Supplier portal sign-in use Supabase's built-in CAPTCHA. Their toggles below are read-only — change them in the Supabase dashboard (Auth → Bot and Abuse Protection).
+                  </AlertDescription>
+                </Alert>
                 {SURFACES.map((s) => (
                   <div key={s.key} className="flex items-center justify-between p-3 border rounded-md">
                     <div className="pr-4">
                       <div className="flex items-center gap-2">
                         <Label>{s.label}</Label>
-                        {s.locked && <Badge variant="secondary" className="text-[10px]">Locked</Badge>}
+                        {s.locked && (
+                          <Badge variant="secondary" className="text-[10px] gap-1">
+                            <Lock className="h-3 w-3" /> Locked
+                          </Badge>
+                        )}
                       </div>
                       <p className="text-xs text-muted-foreground">{s.help}</p>
                       {s.locked && (
@@ -169,11 +180,7 @@ export default function SecuritySettings() {
                     <Switch
                       disabled={!settings.turnstile_enabled || s.locked}
                       checked={s.locked ? true : settings.turnstile_surfaces[s.key] !== false}
-                      onCheckedChange={(v) =>
-                        apply({
-                          turnstile_surfaces: { ...settings.turnstile_surfaces, [s.key]: v },
-                        })
-                      }
+                      onCheckedChange={(v) => handleSurfaceToggle(s.key, v)}
                     />
                   </div>
                 ))}
