@@ -1,32 +1,42 @@
-## Goal
-Make it impossible for the admin console to persist changes to Turnstile surfaces that are enforced by Supabase Auth (`auth`, `portal_login`), and surface a clear, immediate warning if a toggle attempt is made.
+## Problem
+The user disabled Bot Protection at `/admin/security`, but `/auth` still blocks sign-in because:
 
-## Why
-Today the per-surface `Switch` is `disabled` for locked surfaces, but there is no second line of defence. If the disabled state is bypassed (devtools, future refactor, or master switch toggling state), the mutation would still write to `security_settings.turnstile_surfaces`. The toggles are also misleading — users get no feedback explaining why the setting cannot be changed.
+1. `Auth.tsx` and `PortalLogin.tsx` render `<TurnstileWidget>` and gate the submit button on `captchaToken` whenever a `siteKey` is present — they ignore the admin toggle entirely.
+2. The widget is currently failing with Cloudflare error `110200` (domain not allowed for the configured site key), so no token is ever produced and the button stays disabled forever.
+3. Previous decision locked the `auth` / `portal_login` surface toggles in the admin console because Supabase project-level CAPTCHA, when enabled, requires every sign-in to carry a `captchaToken`. That decision is wrong when Supabase's own CAPTCHA setting is OFF — which is the case here.
+
+The admin toggle has to actually take effect for these surfaces, with a clear warning to the operator that Supabase's own CAPTCHA setting (Auth → Bot and Abuse Protection) must also be off, otherwise sign-in will still be rejected by Supabase.
 
 ## Changes
 
-### 1. `src/pages/admin/SecuritySettings.tsx`
-- Extract a `LOCKED_SURFACES` set derived from the `SURFACES` array (`auth`, `portal_login`).
-- Add a guarded handler `handleSurfaceToggle(key, value)`:
-  - If `key` is in `LOCKED_SURFACES`, call `toast({ variant: "destructive", title: "Locked by Supabase Auth", description: <lockReason> })` and return — no mutation is dispatched.
-  - Otherwise, call `apply({ turnstile_surfaces: { ...settings.turnstile_surfaces, [key]: value } })`.
-- Wire the per-surface `Switch.onCheckedChange` to `handleSurfaceToggle`.
-- In `apply()`, sanitise any incoming `turnstile_surfaces` patch by deleting `auth` and `portal_login` keys before sending to the mutation, so even a programmatic call cannot persist them.
-- Keep the existing `disabled` + `Locked` badge + italic `lockReason` UI, and add a small inline warning icon (`Lock` from lucide) next to the badge for stronger visual cue.
-- Add a top-level `Alert` (variant `default`, `Info` icon) inside the Bot Protection card explaining: "Internal sign-in and Supplier portal sign-in are managed by Supabase Auth's built-in CAPTCHA. Toggles for these surfaces are read-only here — change them in the Supabase dashboard (Auth → Bot and Abuse Protection)."
+### 1. `src/pages/Auth.tsx`
+- Render `<TurnstileWidget>` only when `turnstileEnabled !== false && turnstile?.siteKey`.
+- Disable the submit button only when `isLoading || (turnstileEnabled !== false && !!turnstile?.siteKey && !captchaToken)`.
+- Pass `captchaToken ?? undefined` to `signIn` exactly as today (Supabase will accept it being undefined when project-level CAPTCHA is off).
+- Keep the "Protected by Cloudflare Turnstile" footnote conditional on the widget being shown.
 
-### 2. `src/hooks/useSecuritySettings.ts` (defence in depth)
-- In `useUpdateSecuritySettings`'s mutation function, before the `update` call, if `payload.turnstile_surfaces` is present, strip the locked keys (`auth`, `portal_login`) from the merged object so they can never be written from anywhere in the app. Add a one-line comment referencing the rule.
+### 2. `src/pages/portal/PortalLogin.tsx`
+- Same treatment: widget render and submit-disable both gated by `turnstileEnabled !== false`.
 
-### 3. Memory
-- Append a one-liner to `.lovable/memory/security/security-settings-console.md` confirming: "Locked surfaces (`auth`, `portal_login`) are blocked client-side in both the page handler and the shared hook; admin UI shows a destructive toast on attempted toggle."
+### 3. `src/pages/admin/SecuritySettings.tsx`
+- Remove the `locked: true` flags on `auth` and `portal_login` so the admin can toggle them.
+- Replace the "Locked by Supabase Auth" alert with a `default` warning alert: "Disabling these surfaces only removes the in-app bot challenge. If Supabase's project-level CAPTCHA (Auth → Bot and Abuse Protection in the Supabase dashboard) is still enabled, sign-in will continue to require a token and will fail. Turn that setting off as well to fully disable bot protection on sign-in."
+- Drop the `Lock` icon and `Locked` badge for these surfaces.
+- Remove the destructive-toast guard (`handleSurfaceToggle` lock branch).
+
+### 4. `src/hooks/useSecuritySettings.ts`
+- Remove the `LOCKED_TURNSTILE_SURFACES` re-merge in `useUpdateSecuritySettings` so the admin's intent for `auth` / `portal_login` is actually persisted. Keep the constant export for documentation purposes but stop using it to block writes.
+
+### 5. Memory
+- Update `.lovable/memory/security/security-settings-console.md` to flip the rule: "All four surfaces (`auth`, `portal_login`, `portal_invite`, `public_registration`) are admin-toggleable. Disabling `auth` / `portal_login` hides the widget and lifts the in-app token requirement, but the operator must also disable Supabase's project-level CAPTCHA (Supabase dashboard → Auth → Bot and Abuse Protection) for sign-in to succeed."
 
 ## Out of scope
-- No DB migration. The existing column accepts arbitrary JSONB; super_admin RLS still applies. (A DB-level CHECK could be added later, but it would require coordinating with seeded data and is unnecessary given the hook + UI guards.)
-- No change to `MfaEnforcementGate`, edge functions, or the master switch.
+- Fixing the underlying Cloudflare `110200` (site-key domain mismatch). That requires the operator to add the current preview/published domain to the Turnstile site-key allowlist in Cloudflare; not an app-code change.
+- Programmatic toggle of Supabase's own CAPTCHA setting — there is no API exposed for that.
 
 ## Verification
-- Open `/admin/security`: `auth` and `portal_login` switches are disabled, show `Locked` badge + lock icon, and the explanatory alert is visible.
-- Programmatically calling `apply({ turnstile_surfaces: { auth: false } })` from devtools writes no change (hook strips the key) and the next reload shows the previous value.
-- Attempting a toggle (if re-enabled in devtools) fires the destructive toast and dispatches no network request.
+1. Toggle `Internal sign-in (/auth)` OFF in `/admin/security`.
+2. Reload `/auth` — Turnstile widget no longer renders; Sign In button is enabled with valid email/password.
+3. Sign-in succeeds (assuming Supabase project-level CAPTCHA is also off).
+4. Toggle back ON — widget reappears, button gates on token as before.
+5. Same flow for `/portal/login`.
