@@ -411,11 +411,23 @@ export default function PublicSupplierRegistration() {
                   </div>
                 </div>
 
+                {turnstile?.siteKey && (
+                  <div className="flex justify-center">
+                    <TurnstileWidget
+                      siteKey={turnstile.siteKey}
+                      action="supplier_registration"
+                      onVerify={setCaptchaToken}
+                      onExpire={() => setCaptchaToken(null)}
+                      onError={() => setCaptchaToken(null)}
+                    />
+                  </div>
+                )}
+
                 <Button 
                   type="submit" 
                   className="w-full" 
                   size="lg"
-                  disabled={isSubmitting}
+                  disabled={isSubmitting || !captchaToken}
                 >
                   {isSubmitting ? (
                     <>
@@ -427,9 +439,9 @@ export default function PublicSupplierRegistration() {
                   )}
                 </Button>
 
-                <p className="text-sm text-muted-foreground text-center">
-                  By submitting this form, you agree to our terms and conditions. 
-                  Your information will be reviewed by our team.
+                <p className="text-xs text-muted-foreground text-center">
+                  Protected by Cloudflare Turnstile — no personal data is collected.
+                  By submitting this form, you agree to our terms and conditions.
                 </p>
               </form>
             </Form>
