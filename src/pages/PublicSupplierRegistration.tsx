@@ -413,7 +413,7 @@ export default function PublicSupplierRegistration() {
                   </div>
                 </div>
 
-                {turnstile?.siteKey && (
+                {turnstileEnabled && turnstile?.siteKey && (
                   <div className="flex justify-center">
                     <TurnstileWidget
                       siteKey={turnstile.siteKey}
@@ -429,7 +429,7 @@ export default function PublicSupplierRegistration() {
                   type="submit" 
                   className="w-full" 
                   size="lg"
-                  disabled={isSubmitting || !captchaToken}
+                  disabled={isSubmitting || (turnstileEnabled && !captchaToken)}
                 >
                   {isSubmitting ? (
                     <>
