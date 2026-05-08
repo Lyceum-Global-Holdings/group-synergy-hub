@@ -16,10 +16,11 @@ import {
 } from "@/components/ui/alert-dialog";
 import {
   useSecuritySettings, useUpdateSecuritySettings, useSecurityAuditLog,
+  LOCKED_TURNSTILE_SURFACES,
   type MfaPolicy,
 } from "@/hooks/useSecuritySettings";
 import { useToast } from "@/hooks/use-toast";
-import { ShieldCheck, Bot, KeyRound, History, Loader2, Info } from "lucide-react";
+import { ShieldCheck, Bot, KeyRound, History, Loader2, Info, Lock } from "lucide-react";
 
 const MFA_POLICIES: { value: MfaPolicy; label: string; help: string }[] = [
   { value: "disabled",        label: "Disabled",                 help: "MFA is hidden. Not recommended for production." },
