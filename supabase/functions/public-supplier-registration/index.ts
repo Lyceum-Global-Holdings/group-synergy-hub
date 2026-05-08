@@ -101,7 +101,7 @@ serve(async (req) => {
     const { supplier_data, turnstile_token } = body ?? {};
 
     // Verify Cloudflare Turnstile (bot protection)
-    const captcha = await verifyTurnstile(turnstile_token, ip, "supplier_registration");
+    const captcha = await verifyTurnstile(turnstile_token, ip, "supplier_registration", "public_registration");
     if (!captcha.success) {
       return new Response(
         JSON.stringify({ error: 'Bot protection check failed', code: captcha.error }),
