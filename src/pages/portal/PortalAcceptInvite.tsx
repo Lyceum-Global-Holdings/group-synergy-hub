@@ -8,6 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
+import TurnstileWidget from "@/components/security/TurnstileWidget";
+import { useTurnstileSiteKey } from "@/hooks/useTurnstileSiteKey";
 
 export default function PortalAcceptInvite() {
   const [params] = useSearchParams();
@@ -15,6 +17,7 @@ export default function PortalAcceptInvite() {
   const { toast } = useToast();
   const { user, loading: authLoading } = useAuth();
   const { refresh } = useSupplierContext();
+  const { data: turnstile } = useTurnstileSiteKey();
 
   const tokenFromUrl = params.get("token") ?? "";
   const idFromUrl = params.get("id") ?? "";
@@ -22,6 +25,7 @@ export default function PortalAcceptInvite() {
   const [invitationId, setInvitationId] = useState(idFromUrl);
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
 
   useEffect(() => { setToken(tokenFromUrl); setInvitationId(idFromUrl); }, [tokenFromUrl, idFromUrl]);
 
@@ -31,13 +35,18 @@ export default function PortalAcceptInvite() {
       navigate(`/portal/login?next=${encodeURIComponent(window.location.pathname + window.location.search)}`);
       return;
     }
+    if (user && !captchaToken) {
+      toast({ title: "Bot check required", description: "Please complete the challenge.", variant: "destructive" });
+      return;
+    }
     setBusy(true);
     const { data, error } = await supabase.functions.invoke("supplier-accept-invite", {
-      body: { invitation_id: invitationId, token },
+      body: { invitation_id: invitationId, token, turnstile_token: captchaToken },
     });
     setBusy(false);
     if (error || (data && (data as any).error)) {
       const msg = (data as any)?.error || error?.message || "Failed to accept invitation";
+      setCaptchaToken(null);
       toast({ title: "Could not accept invitation", description: String(msg), variant: "destructive" });
       return;
     }
@@ -67,7 +76,18 @@ export default function PortalAcceptInvite() {
                 onChange={(e) => setInvitationId(e.target.value)} required />
               <Input placeholder="Token" value={token}
                 onChange={(e) => setToken(e.target.value)} required />
-              <Button type="submit" className="w-full" disabled={busy || authLoading}>
+              {user && turnstile?.siteKey && (
+                <div className="flex justify-center">
+                  <TurnstileWidget
+                    siteKey={turnstile.siteKey}
+                    action="supplier_accept_invite"
+                    onVerify={setCaptchaToken}
+                    onExpire={() => setCaptchaToken(null)}
+                    onError={() => setCaptchaToken(null)}
+                  />
+                </div>
+              )}
+              <Button type="submit" className="w-full" disabled={busy || authLoading || (!!user && !captchaToken)}>
                 {busy && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                 {user ? "Accept invitation" : "Sign in to continue"}
               </Button>

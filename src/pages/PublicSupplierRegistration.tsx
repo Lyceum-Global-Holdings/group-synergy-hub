@@ -10,10 +10,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { SUPPLIER_TYPES, PAYMENT_TERMS } from "@/types/supplier";
 import { invokeEdgeFunction } from "@/lib/edgeFunctionClient";
 import { toast } from "sonner";
+import TurnstileWidget from "@/components/security/TurnstileWidget";
+import { useTurnstileSiteKey } from "@/hooks/useTurnstileSiteKey";
 
 export default function PublicSupplierRegistration() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const { data: turnstile } = useTurnstileSiteKey();
 
   const form = useForm({
     defaultValues: {
@@ -37,11 +41,14 @@ export default function PublicSupplierRegistration() {
   });
 
   const onSubmit = async (data: any) => {
+    if (!captchaToken) {
+      toast.error("Please complete the bot protection challenge.");
+      return;
+    }
     setIsSubmitting(true);
     try {
-      // Call edge function for public registration
       const { data: result, error, suggestion } = await invokeEdgeFunction('public-supplier-registration', {
-        body: { supplier_data: data }
+        body: { supplier_data: data, turnstile_token: captchaToken }
       });
 
       if (error) throw new Error(suggestion || error.message);
@@ -51,6 +58,7 @@ export default function PublicSupplierRegistration() {
     } catch (error: any) {
       console.error("Registration error:", error);
       toast.error(`Registration failed: ${error.message}`);
+      setCaptchaToken(null);
     } finally {
       setIsSubmitting(false);
     }
@@ -403,11 +411,23 @@ export default function PublicSupplierRegistration() {
                   </div>
                 </div>
 
+                {turnstile?.siteKey && (
+                  <div className="flex justify-center">
+                    <TurnstileWidget
+                      siteKey={turnstile.siteKey}
+                      action="supplier_registration"
+                      onVerify={setCaptchaToken}
+                      onExpire={() => setCaptchaToken(null)}
+                      onError={() => setCaptchaToken(null)}
+                    />
+                  </div>
+                )}
+
                 <Button 
                   type="submit" 
                   className="w-full" 
                   size="lg"
-                  disabled={isSubmitting}
+                  disabled={isSubmitting || !captchaToken}
                 >
                   {isSubmitting ? (
                     <>
@@ -419,9 +439,9 @@ export default function PublicSupplierRegistration() {
                   )}
                 </Button>
 
-                <p className="text-sm text-muted-foreground text-center">
-                  By submitting this form, you agree to our terms and conditions. 
-                  Your information will be reviewed by our team.
+                <p className="text-xs text-muted-foreground text-center">
+                  Protected by Cloudflare Turnstile — no personal data is collected.
+                  By submitting this form, you agree to our terms and conditions.
                 </p>
               </form>
             </Form>

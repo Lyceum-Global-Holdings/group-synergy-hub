@@ -4,6 +4,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.4";
 import { z } from "https://esm.sh/zod@3.23.8";
+import { verifyTurnstile, getRequestIp } from "../_shared/turnstile.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -13,6 +14,7 @@ const corsHeaders = {
 const BodySchema = z.object({
   invitation_id: z.string().uuid(),
   token: z.string().min(32).max(128),
+  turnstile_token: z.string().min(10).max(2048).optional(),
 });
 
 async function sha256Hex(input: string): Promise<string> {
@@ -54,7 +56,17 @@ serve(async (req) => {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-    const { invitation_id, token } = parsed.data;
+    const { invitation_id, token, turnstile_token } = parsed.data;
+
+    // Bot protection
+    const captcha = await verifyTurnstile(turnstile_token, getRequestIp(req), "supplier_accept_invite");
+    if (!captcha.success) {
+      return new Response(
+        JSON.stringify({ error: "Bot protection check failed", code: captcha.error }),
+        { status: captcha.status, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
     const tokenHash = await sha256Hex(token);
 
     const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {

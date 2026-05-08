@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.4';
 import { Resend } from 'https://esm.sh/resend@4.0.0';
 import { z } from 'https://deno.land/x/zod@v3.22.4/mod.ts';
+import { verifyTurnstile, getRequestIp } from "../_shared/turnstile.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -72,10 +73,8 @@ serve(async (req) => {
   }
 
   try {
-    // Extract IP for rate limiting
-    const ip = req.headers.get('x-forwarded-for')?.split(',')[0] || 
-               req.headers.get('x-real-ip') || 
-               'unknown';
+    // Extract IP for rate limiting + captcha
+    const ip = getRequestIp(req) || 'unknown';
 
     // Check rate limit
     const rateLimitCheck = checkRateLimit(ip);
@@ -98,7 +97,17 @@ serve(async (req) => {
       );
     }
 
-    const { supplier_data } = await req.json();
+    const body = await req.json();
+    const { supplier_data, turnstile_token } = body ?? {};
+
+    // Verify Cloudflare Turnstile (bot protection)
+    const captcha = await verifyTurnstile(turnstile_token, ip, "supplier_registration");
+    if (!captcha.success) {
+      return new Response(
+        JSON.stringify({ error: 'Bot protection check failed', code: captcha.error }),
+        { status: captcha.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
     // Validate input data
     const validationResult = supplierDataSchema.safeParse(supplier_data);
