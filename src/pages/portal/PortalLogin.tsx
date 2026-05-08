@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { useToast } from "@/hooks/use-toast";
 import TurnstileWidget from "@/components/security/TurnstileWidget";
 import { useTurnstileSiteKey } from "@/hooks/useTurnstileSiteKey";
+import { useTurnstileEnabledFor } from "@/hooks/usePublicSecuritySettings";
 
 export default function PortalLogin() {
   const { user, signIn } = useAuth();
