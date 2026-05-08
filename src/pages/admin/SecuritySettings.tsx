@@ -33,23 +33,9 @@ const SURFACES: {
   key: keyof Settings["turnstile_surfaces"];
   label: string;
   help: string;
-  locked?: boolean;
-  lockReason?: string;
 }[] = [
-  {
-    key: "auth",
-    label: "Internal sign-in (/auth)",
-    help: "Bot challenge on the staff login page.",
-    locked: true,
-    lockReason: "Enforced by Supabase Auth — manage in the Supabase dashboard (Auth → Bot and Abuse Protection).",
-  },
-  {
-    key: "portal_login",
-    label: "Supplier portal sign-in",
-    help: "Bot challenge on /portal/login.",
-    locked: true,
-    lockReason: "Enforced by Supabase Auth — manage in the Supabase dashboard (Auth → Bot and Abuse Protection).",
-  },
+  { key: "auth",                 label: "Internal sign-in (/auth)",     help: "Bot challenge on the staff login page." },
+  { key: "portal_login",         label: "Supplier portal sign-in",      help: "Bot challenge on /portal/login." },
   { key: "portal_invite",        label: "Supplier invite acceptance",   help: "Bot challenge when accepting supplier invitations." },
   { key: "public_registration",  label: "Public supplier registration", help: "Bot challenge on the unauthenticated supplier registration form." },
 ];
