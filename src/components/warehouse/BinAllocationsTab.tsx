@@ -14,12 +14,15 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Plus, AlertCircle, Trash2, Search, Undo2 } from 'lucide-react';
+import { Plus, AlertCircle, Trash2, Search, Undo2, QrCode, FileDown, Loader2 } from 'lucide-react';
 import { useWarehouseBinAllocations } from '@/hooks/useWarehouseBinAllocations';
 import { useCompany } from '@/contexts/CompanyContext';
 import { useIsAdminOrHigher } from '@/hooks/useIsAdminOrHigher';
 import { CreateBinAllocationDialog } from './CreateBinAllocationDialog';
 import { ReturnStockFromSublocationDialog } from './ReturnStockFromSublocationDialog';
+import { BinAllocationQRDialog } from './BinAllocationQRDialog';
+import { generateBulkBinQRCodePdf, downloadBulkBinQRCodePdf } from '@/utils/bulkBinQRCodePdf';
+import { toast } from 'sonner';
 import type { ColumnDef } from '@tanstack/react-table';
 import type { BinAllocationWithDetails } from '@/types/warehouseReservation';
 
@@ -28,7 +31,9 @@ export function BinAllocationsTab() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [returnDialogOpen, setReturnDialogOpen] = useState(false);
   const [allocationToDelete, setAllocationToDelete] = useState<string | null>(null);
+  const [qrAllocation, setQrAllocation] = useState<BinAllocationWithDetails | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [bulkPrinting, setBulkPrinting] = useState(false);
   const { binAllocations, isLoading, deleteAllocation, isDeleting } = useWarehouseBinAllocations();
 
   const filteredAllocations = useMemo(() => {
@@ -105,6 +110,20 @@ export function BinAllocationsTab() {
       header: 'Notes',
       cell: ({ row }) => row.original.notes || '-',
     },
+    {
+      id: 'qr',
+      header: 'QR',
+      cell: ({ row }: { row: { original: BinAllocationWithDetails } }) => (
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => setQrAllocation(row.original)}
+          title="Generate QR code"
+        >
+          <QrCode className="h-4 w-4" />
+        </Button>
+      ),
+    },
     ...(canDelete ? [{
       id: 'actions',
       header: 'Actions',
@@ -121,6 +140,34 @@ export function BinAllocationsTab() {
       ),
     }] as ColumnDef<BinAllocationWithDetails>[] : []),
   ];
+
+  const handleBulkPrint = async () => {
+    if (!filteredAllocations.length) {
+      toast.error('No allocations to print');
+      return;
+    }
+    setBulkPrinting(true);
+    try {
+      const blob = await generateBulkBinQRCodePdf(
+        filteredAllocations.map((a) => ({
+          id: a.id,
+          item_code: a.warehouse_item?.item_code,
+          item_name: a.warehouse_item?.name,
+          bin_code: a.warehouse_bin?.bin_code,
+          location_name: a.warehouse_bin?.warehouse_location?.name,
+          location_code: a.warehouse_bin?.warehouse_location?.location_code,
+          allocated_quantity: a.allocated_quantity,
+        }))
+      );
+      downloadBulkBinQRCodePdf(blob);
+      toast.success(`Generated ${filteredAllocations.length} QR labels`);
+    } catch (e) {
+      console.error(e);
+      toast.error('Failed to generate QR labels');
+    } finally {
+      setBulkPrinting(false);
+    }
+  };
 
   return (
     <Card>
@@ -141,6 +188,19 @@ export function BinAllocationsTab() {
               className="pl-8"
             />
           </div>
+          <Button
+            variant="outline"
+            onClick={handleBulkPrint}
+            disabled={bulkPrinting || !filteredAllocations.length}
+            title="Generate QR labels (PDF) for the filtered allocations"
+          >
+            {bulkPrinting ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <FileDown className="mr-2 h-4 w-4" />
+            )}
+            Bulk QR ({filteredAllocations.length})
+          </Button>
           <Button 
             variant="outline"
             onClick={() => setReturnDialogOpen(true)}
@@ -184,6 +244,12 @@ export function BinAllocationsTab() {
       <ReturnStockFromSublocationDialog
         open={returnDialogOpen}
         onOpenChange={setReturnDialogOpen}
+      />
+
+      <BinAllocationQRDialog
+        allocation={qrAllocation}
+        open={!!qrAllocation}
+        onOpenChange={(o) => !o && setQrAllocation(null)}
       />
 
       <AlertDialog open={!!allocationToDelete} onOpenChange={() => setAllocationToDelete(null)}>

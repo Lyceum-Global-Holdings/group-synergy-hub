@@ -117,6 +117,7 @@ export interface BinAllocationWithDetails extends WarehouseBinAllocation {
     warehouse_location?: {
       id: string;
       name: string;
+      location_code?: string | null;
     } | null;
   };
 }

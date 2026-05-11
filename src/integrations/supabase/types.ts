@@ -20891,6 +20891,7 @@ export type Database = {
         }[]
       }
       get_public_asset: { Args: { p_id: string }; Returns: Json }
+      get_public_bin_allocation_qr: { Args: { p_id: string }; Returns: Json }
       get_stock_bearing_locations_for_company: {
         Args: { p_company_id: string }
         Returns: {

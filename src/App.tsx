@@ -87,6 +87,7 @@ const GoodsReceiptNote = lazy(() => import("./pages/warehouse/GoodsReceiptNote")
 const InventoryValuation = lazy(() => import("./pages/warehouse/InventoryValuation"));
 const BatchManagement = lazy(() => import("./pages/warehouse/BatchManagement"));
 const PublicAssetView = lazy(() => import("./pages/PublicAssetView"));
+const PublicBinAllocation = lazy(() => import("./pages/PublicBinAllocation"));
 const ToolManagement = lazy(() => import("./pages/warehouse/ToolManagement"));
 const PoEmailApproval = lazy(() => import("./pages/procurement/PoEmailApproval"));
 const Accounting = lazy(() => import("./pages/Accounting"));
@@ -216,6 +217,7 @@ function App() {
                 </AuthProvider>
               } />
               <Route path="/asset/:assetId" element={<PublicAssetView />} />
+              <Route path="/b/:id" element={<PublicBinAllocation />} />
               <Route path="/register-supplier" element={<PublicSupplierRegistration />} />
               <Route path="/procurement/po-email-approval" element={<PoEmailApproval />} />
               <Route path="/auth/mfa" element={
