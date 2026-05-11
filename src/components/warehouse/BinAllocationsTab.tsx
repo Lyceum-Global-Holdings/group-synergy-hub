@@ -246,6 +246,12 @@ export function BinAllocationsTab() {
         onOpenChange={setReturnDialogOpen}
       />
 
+      <BinAllocationQRDialog
+        allocation={qrAllocation}
+        open={!!qrAllocation}
+        onOpenChange={(o) => !o && setQrAllocation(null)}
+      />
+
       <AlertDialog open={!!allocationToDelete} onOpenChange={() => setAllocationToDelete(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
