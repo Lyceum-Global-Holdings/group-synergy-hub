@@ -37,6 +37,7 @@ const SURFACES: {
   { key: "portal_login",         label: "Supplier portal sign-in",      help: "Bot challenge on /portal/login." },
   { key: "portal_invite",        label: "Supplier invite acceptance",   help: "Bot challenge when accepting supplier invitations." },
   { key: "public_registration",  label: "Public supplier registration", help: "Bot challenge on the unauthenticated supplier registration form." },
+  { key: "public_qr",            label: "Public bin QR scans (/b/:id)", help: "Require a bot challenge before resolving public bin allocation QR codes." },
 ];
 
 type Settings = NonNullable<ReturnType<typeof useSecuritySettings>["data"]>;
