@@ -31,7 +31,9 @@ export function BinAllocationsTab() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [returnDialogOpen, setReturnDialogOpen] = useState(false);
   const [allocationToDelete, setAllocationToDelete] = useState<string | null>(null);
+  const [qrAllocation, setQrAllocation] = useState<BinAllocationWithDetails | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [bulkPrinting, setBulkPrinting] = useState(false);
   const { binAllocations, isLoading, deleteAllocation, isDeleting } = useWarehouseBinAllocations();
 
   const filteredAllocations = useMemo(() => {
