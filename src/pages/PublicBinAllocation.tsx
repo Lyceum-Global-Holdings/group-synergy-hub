@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Loader2, MapPin, Package, Building2, Boxes, AlertCircle } from 'lucide-react';
 
@@ -18,6 +17,12 @@ interface BinQR {
   updated_at: string | null;
 }
 
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string;
+
 export default function PublicBinAllocation() {
   const { id } = useParams<{ id: string }>();
   const [data, setData] = useState<BinQR | null>(null);
@@ -25,19 +30,67 @@ export default function PublicBinAllocation() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!id) return;
     document.title = 'Bin Allocation · Lyceum Global Holdings';
-    (async () => {
-      const { data, error } = await supabase.rpc('get_public_bin_allocation_qr', { p_id: id });
-      if (error) {
-        setError(error.message);
-      } else if (!data) {
-        setError('Bin allocation not found.');
-      } else {
-        setData(data as unknown as BinQR);
-      }
+    // No-index per-asset public route
+    let meta = document.querySelector('meta[name="robots"]') as HTMLMetaElement | null;
+    if (!meta) {
+      meta = document.createElement('meta');
+      meta.name = 'robots';
+      document.head.appendChild(meta);
+    }
+    const prev = meta.content;
+    meta.content = 'noindex,nofollow';
+    return () => {
+      meta!.content = prev;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!id) {
+      setError('Bin allocation not found.');
       setLoading(false);
+      return;
+    }
+    // Canonical validation BEFORE any network call.
+    if (!UUID_RE.test(id)) {
+      setError('Bin allocation not found.');
+      setLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(
+          `${SUPABASE_URL}/functions/v1/public-bin-qr?id=${encodeURIComponent(id)}`,
+          {
+            method: 'GET',
+            headers: {
+              apikey: SUPABASE_ANON_KEY,
+              Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+            },
+          },
+        );
+        if (cancelled) return;
+        if (res.status === 404) {
+          setError('Bin allocation not found.');
+        } else if (!res.ok) {
+          setError('Unable to load bin allocation.');
+        } else {
+          const body = (await res.json()) as BinQR;
+          setData(body);
+        }
+      } catch (e) {
+        console.debug('public-bin-qr fetch failed', e);
+        if (!cancelled) setError('Unable to load bin allocation.');
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
     })();
+
+    return () => {
+      cancelled = true;
+    };
   }, [id]);
 
   return (

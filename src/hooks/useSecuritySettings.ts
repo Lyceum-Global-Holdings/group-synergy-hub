@@ -11,6 +11,7 @@ export interface SecuritySettings {
     portal_login: boolean;
     portal_invite: boolean;
     public_registration: boolean;
+    public_qr?: boolean;
   };
   mfa_policy: MfaPolicy;
   mfa_grace_period_days: number;
