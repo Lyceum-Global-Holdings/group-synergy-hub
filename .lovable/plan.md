@@ -1,53 +1,50 @@
-## Bin-Item QR Code Generation
+## Goal
+Harden the public `/b/:id` QR route so only canonical, allow-listed allocation data is exposed, and abuse is mitigated without violating the project's no-backend-rate-limiting policy.
 
-Generate a scannable QR code for every (item × bin × location) allocation in `warehouse_bin_allocations`, following international standards (ISO/IEC 18004 QR Code + GS1 Digital Link URI syntax) and reusing the existing public-asset QR pattern.
+## Changes
 
-### What you get
+### 1. Canonical UUID validation (frontend)
+`src/pages/PublicBinAllocation.tsx`
+- Validate `:id` against a strict UUID v4/RFC 4122 regex before calling the RPC.
+- If invalid → show generic "Bin allocation not found." (never echo `id` or backend error text).
+- Collapse Supabase error to a generic message; log details only to `console.debug`.
+- Add `<meta name="robots" content="noindex,nofollow" />` via `document.head` (route is per-asset, must not be indexed).
+- Add `Cache-Control` hint via `<meta http-equiv>` (best-effort) and ensure no PII enters `document.title`.
 
-1. **Per-row "QR" button** on `ItemBinMaster` — opens a dialog with the rendered QR + Download PNG + Print 2×1″ label.
-2. **"Bulk QR" button** with filters (location, bin, item, status) — generates a multi-page PDF of 2×1″ labels (one per allocation) and an A4 grid PNG sheet.
-3. **Public scan target** `https://stores.lgh.lk/b/{allocation_id}` — opens a no-login page showing item code/name, bin code, location, company, current allocated qty, last-updated time. Sensitive fields (cost, supplier, customers) are never exposed.
+### 2. Move public access behind a hardened edge function
+New `supabase/functions/public-bin-qr/index.ts` (`verify_jwt = false`):
+- Accepts `GET /public-bin-qr?id=<uuid>`.
+- Zod-validates `id` as UUID; rejects with 400 otherwise.
+- Calls the RPC with the service role internally and returns a strict allow-listed JSON projection (drops any future columns the RPC might gain).
+- Optional Turnstile gate using `useTurnstileEnabledFor('public_qr')` pattern: if enabled in `security_settings`, require `cf-turnstile-token` header and `verifyTurnstile()`; otherwise allow.
+- Adds short edge cache header `Cache-Control: public, max-age=60, s-maxage=60` so repeat scans don't re-hit the DB (acts as a soft abuse buffer).
+- Returns 404 (not 500) when allocation is missing; never leaks DB error messages.
+- No backend rate-limiting code is added — per project policy. The Turnstile gate plus edge cache is the abuse mitigation we ship.
 
-### Standards applied
+Frontend page updated to call the edge function via `supabase.functions.invoke('public-bin-qr', { method: 'GET' })` instead of the RPC directly.
 
-- **ISO/IEC 18004** QR Code, error-correction level **M** (15%), quiet zone 4 modules, byte mode UTF-8 — same as existing `AssetQRCode`.
-- **GS1 Digital Link URI Syntax v1.4** — payload is a resolvable HTTPS URL so it works in any standard QR scanner, GS1 scanner, or camera app (no custom-app required).
-- **GS1 Application Identifiers** embedded as query parameters for offline readability:
-  - `01` = item GTIN (falls back to internal `item_code` when no GTIN is registered)
-  - `254` = bin code (GLN extension)
-  - `91` = company internal code
-  - Example: `https://stores.lgh.lk/b/{uuid}?01={item_code}&254={bin_code}&91={company_code}`
-- **Print spec**: 2″×1″ landscape label at 300 DPI (matches existing asset labels for printer compatibility).
+### 3. Tighten the RPC (defense in depth)
+New migration:
+- Add `is_active` / `deleted_at` filter (if columns exist) so soft-deleted allocations never resolve.
+- Re-issue the function as `STRICT SECURITY DEFINER`, return `NULL` for unknown id (already true) and explicitly `REVOKE EXECUTE ... FROM anon` once the edge function fronts it. `authenticated` keeps direct access for the in-app dialog.
+- Add `SET row_security = on` and keep the explicit allow-listed `jsonb_build_object` (safe filter).
 
-### Technical sections
+### 4. QR payload alignment
+`src/utils/binQRPayload.ts` — point the canonical URL at the new edge endpoint path on the custom domain (`https://stores.lgh.lk/b/{id}`); the React route stays the source of truth and the page calls the hardened edge function.
 
-**Database (1 migration)**
+### 5. Security memory + Turnstile surface
+- Register `public_qr` in the Turnstile surfaces list (memory + `security_settings` defaults documented).
+- Update `.lovable/memory/features/warehouse/bin-allocation-qr.md` and `mem://security/turnstile-bot-protection` to record the new surface and the canonical/allow-list rules.
 
-- `public.get_public_bin_allocation_qr(p_id uuid) returns jsonb` — `SECURITY DEFINER`, `search_path = public`, returns only safe fields by joining `warehouse_bin_allocations → warehouse_items → warehouse_bins → warehouse_locations → companies`. `GRANT EXECUTE TO anon, authenticated`. Mirrors the existing `Public Asset QR` pattern from memory.
-- Index `idx_warehouse_bin_allocations_company_bin (company_id, bin_id)` to keep bulk queries fast.
+## Out of scope
+- Backend rate limiting (forbidden by project policy — Turnstile + edge cache substitute).
+- Changing what fields are visible on the public page (already minimal).
+- Auth changes for the in-app dialog (still uses `authenticated` RPC).
 
-**Frontend**
-
-- `src/utils/binQRPayload.ts` — builds the GS1 Digital Link URL.
-- `src/utils/bulkBinQRCodePdf.ts` — mirrors `bulkQRCodePdf.ts`; renders QR + 3-line label (item code, bin code, location code) per page.
-- `src/utils/bulkBinQRCodePng.ts` — A4 grid sheet (4 cols × 10 rows) for sticker paper.
-- `src/components/warehouse/BinItemQRCode.tsx` — single-allocation dialog (download/print).
-- `src/components/warehouse/BulkBinQRDialog.tsx` — filter form + preview + generate.
-- `src/pages/warehouse/ItemBinMaster.tsx` — add per-row QR action and top-bar "Bulk QR" button.
-- `src/pages/PublicBinAllocation.tsx` + route `/b/:id` in `src/App.tsx` (public, no `ProtectedRoute`). Calls the new RPC via the anon Supabase client.
-
-**Hook**
-
-- `src/hooks/warehouse/useBulkBinQR.ts` — fetches allocations honoring filters, batches in 1000-row pages (per memory `warehouse-data-batching-limit`).
-
-### Out of scope (ask later if needed)
-
-- ZPL/EPL native printer streams (current PDF works on any printer).
-- Real GS1 GTIN registration / company prefix licensing — we fall back to internal codes.
-- Cycle-count scanning workflow (QR is read-only resolver here).
-
-### Verification
-
-- Scan generated QR with iPhone/Android camera → opens public page with correct item/bin/location.
-- Bulk PDF for 50 allocations renders 50 pages, each with sharp QR (no blur at 100% print).
-- Public page returns 404 for non-existent UUID and never leaks cross-tenant data.
+## Verification
+1. `/b/not-a-uuid` → generic "not found", no network call.
+2. `/b/<random-uuid>` → 404 from edge function, generic UI message.
+3. `/b/<real-uuid>` → renders item/bin/location/company + qty only; response JSON contains exactly the 11 allow-listed keys.
+4. With Turnstile enabled for `public_qr` surface, requests without a token → 401; with token → 200.
+5. Repeat scan within 60 s → served from edge cache (verify `cf-cache-status` / response time).
+6. Direct `supabase.rpc('get_public_bin_allocation_qr', …)` from anon key → permission denied after REVOKE.
