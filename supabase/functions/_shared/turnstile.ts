@@ -26,7 +26,12 @@ export interface VerifyResult {
   action?: string;
 }
 
-type Surface = "auth" | "portal_login" | "portal_invite" | "public_registration";
+type Surface =
+  | "auth"
+  | "portal_login"
+  | "portal_invite"
+  | "public_registration"
+  | "public_qr";
 
 async function isSurfaceEnabled(surface?: Surface): Promise<boolean> {
   if (!surface) return true;
