@@ -50,16 +50,12 @@ export async function generateBulkBinQRCodePdf(allocations: BinAllocationForQR[]
 
     doc.setFont('courier', 'bold');
     doc.setFontSize(9);
-    doc.text(truncate(a.item_code ?? '—', 14), textX, 0.22);
+    doc.text(truncate(a.item_code ?? '—', 14), textX, 0.32);
 
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(7);
-    doc.text(`Item: ${truncate(a.item_name ?? '', 18)}`, textX, 0.4);
-    doc.text(`Bin:  ${truncate(a.bin_code ?? '—', 18)}`, textX, 0.55);
-    doc.text(`Loc:  ${truncate(a.location_name ?? '—', 18)}`, textX, 0.7);
-    if (typeof a.allocated_quantity === 'number') {
-      doc.text(`Qty:  ${a.allocated_quantity}`, textX, 0.85);
-    }
+    doc.text(truncate(a.item_name ?? '', 22), textX, 0.52);
+    doc.text(`Bin: ${truncate(a.bin_code ?? '—', 18)}`, textX, 0.72);
   }
 
   return doc.output('blob');
