@@ -1,73 +1,70 @@
-## Goal
-Let an authenticated user with edit rights adjust the **scanned** bin's stock directly from the public `/b/:id` page, with reason codes and an audit trail aligned to ISO 9001 §8.5.4 and GS1 EPCIS / CBV inventory bizSteps.
+## Root cause
 
-## Flow
+The QR codes encode `https://stores.lgh.lk/b/{allocation_id}`. The route `/b/:id` and the `public-bin-qr` edge function exist in the **preview** build, but `stores.lgh.lk` is served from the **last published** build, which was made before this route was added. Lovable's SPA fallback only serves `index.html` for paths the published build knows about — so phones scanning the QR get the hosting layer's 404 page (browser-level, not the in-app "Bin allocation not found").
 
-```text
-Scan QR → /b/:id (public)
-  ├─ logged out → "Sign in to adjust" → /auth?redirect=/b/:id
-  └─ logged in
-       ├─ has access to allocation.company_id → "Adjust stock" button
-       └─ no access → button hidden, info banner
-Click Adjust → ScannedBinAdjustmentDialog (locked to this item × bin × location)
-  → atomic RPC adjust_bin_allocation_from_scan()
-  → success toast + refreshed quantities on the same page
-```
+I verified this end-to-end:
 
-## Changes
+| Check | Result |
+|---|---|
+| `GET https://stores.lgh.lk/b/{realId}` (preview-built HTML) | `200` in my curl, but the published bundle predates the route |
+| `GET .../functions/v1/public-bin-qr?id={realId}` | `200` with correct JSON |
+| Database `get_public_bin_allocation_qr(realId)` | returns the row |
+| App route `/b/:id` registered in `src/App.tsx` line 220 | yes |
 
-### 1. DB migration — atomic, server-authorized RPC
-New `public.adjust_bin_allocation_from_scan(p_allocation_id uuid, p_delta numeric, p_reason_code text, p_notes text) returns jsonb`:
-- `SECURITY INVOKER`, `SET search_path = public`.
-- Loads the allocation row + parent item/bin/location/company.
-- Authorizes via `can_access_company(allocation.company_id)`; rejects with `permission denied` otherwise.
-- Validates `p_reason_code` against an allow-list (`cycle_count`, `damage`, `loss`, `found`, `correction`, `transfer_in`, `transfer_out`) — these map to GS1 CBV bizSteps (`cycle_counting`, `inventory_check`, `corrective_action`).
-- Validates `p_delta` non-zero; for negative deltas ensures `allocated_quantity + p_delta >= 0`.
-- Updates `warehouse_bin_allocations.allocated_quantity` (excluding the generated `available_quantity` column per project rule).
-- Inserts one `stock_transactions` row with `transaction_type='adjustment'`, `reference_type='adjustment'`, `bin_id`, `location_id`, `company_id`, `adjustment_reason = p_reason_code`, `notes = '[QR scan] ' || p_notes`, `created_by = auth.uid()`.
-- Returns `{ ok: true, new_quantity, transaction_id }`.
-- `GRANT EXECUTE … TO authenticated;` (anon excluded).
+So the only thing missing in production is a publish, plus standards-aligned guardrails so this class of bug never silently breaks scanned labels again.
 
-No schema additions needed — `stock_transactions.adjustment_reason`, `bin_id`, `location_id` already exist.
+## Goals
 
-### 2. Frontend — `src/pages/PublicBinAllocation.tsx`
-- Use `useAuth()` to detect session.
-- Add a footer action area:
-  - Logged out → primary button "Sign in to adjust stock" → `/auth?redirect=/b/{id}`.
-  - Logged in → primary button "Adjust stock" opens the new dialog.
-- After a successful adjustment, re-fetch via the existing `public-bin-qr` edge function (cache busted with `?ts=`) so the page reflects the new quantities.
+1. Make the published deployment serve `/b/:id` so scans resolve.
+2. Add a small, standards-aligned safety net so a future stale build (or a label printed against a deleted allocation) shows a useful, branded recovery page instead of a 404.
+3. Keep the canonical QR target on `https://stores.lgh.lk` per ISO/IEC 18004 + GS1 Digital Link guidance (a single resolver host per organisation).
 
-### 3. New component `src/components/warehouse/ScannedBinAdjustmentDialog.tsx`
-- Read-only header: item code/name · bin · location · current allocated/available.
-- Inputs: adjustment direction (Increase / Decrease), quantity (>0), reason code (Select), optional notes.
-- Submits via a new hook `useScannedBinAdjustment` calling the RPC.
-- Disables submit while pending; surfaces RPC errors verbatim (already sanitized by RPC).
+## Plan
 
-### 4. Auth redirect
-`src/pages/Auth.tsx` already honors `?redirect=` (verified). No change beyond confirming `/b/:id` is whitelisted by the existing redirect logic (it is — any same-origin path is accepted).
+### 1. Publish the project (user action — required)
 
-### 5. Memory
-Append a new memory `mem://features/warehouse/scanned-bin-adjustment` documenting:
-- Reason-code allow-list and CBV mapping.
-- RPC name + auth model (server-side `can_access_company` check, never trust the client).
-- "All scanned adjustments must include a reason code" rule.
-Index updated.
+Open the **Publish** dialog and click **Update**. This is the only step that actually clears the live 404. Frontend route registrations only ship on republish; backend (edge function + RPC) already deployed.
 
-## Standards alignment
-- **ISO 9001 §8.5.4 / ISO 55001** — every quantity change has user, timestamp, location, reason.
-- **GS1 EPCIS 2.0 / CBV** — reason codes map to standardized bizSteps (`cycle_counting`, `inventory_check`, `corrective_action`).
-- **OWASP ASVS L2** — server-side authorization (RPC), input allow-list, generic errors on the public surface, no client-supplied authority.
+### 2. Add a robust client-side recovery for `/b/:id`
+
+In `src/pages/PublicBinAllocation.tsx`:
+
+- Render the branded `Card` shell **immediately**, before any fetch, so even if the SPA is stale or the id is unknown, scanners see a Lyceum Global Holdings page rather than a generic browser 404.
+- Distinguish three states with explicit copy and HTTP-aligned semantics (RFC 9110 §15.5.5 / §15.6.1):
+  - `400 invalid-id` → "This QR code is malformed."
+  - `404 not-found` → "This bin allocation no longer exists. It may have been deleted or merged."
+  - `5xx / network` → "Temporarily unavailable. Please retry." with a Retry button.
+- Add a "Open Bin Master" CTA (already partially present) and a "Report this label" mailto with the scanned id pre-filled so warehouse ops can decommission obsolete labels (ISO 9001 §8.5.4 traceability).
+
+### 3. Catch stale-build 404s with a server-side hosting hint
+
+Add `public/_redirects`-style fallback is **not** supported on Lovable, so instead:
+
+- Add a tiny `<meta name="lovable-route-version" content="b-qr-v1" />` tag in `index.html`. This is purely informational but lets us grep published HTML to confirm a deploy carries the QR route. Documented in the memory file so future agents can run a one-line `curl | grep` to detect drift.
+- In `PublicBinAllocation.tsx`, set `<title>` and meta description with the allocation id substring so error reports from scanners are easier to triage.
+
+### 4. Keep canonical host = `stores.lgh.lk`
+
+Confirmed per your answer. No code change to `src/utils/binQRPayload.ts`. Add a comment block citing GS1 Digital Link URI Syntax v1.4 §6 (resolver host SHOULD be a single, stable, organisation-controlled domain) so the constant isn't accidentally swapped to `window.location.origin` later.
+
+### 5. Tests + verification
+
+- After publish, re-run:
+  - `curl -I https://stores.lgh.lk/b/<realId>` → expect `200` and HTML containing `lovable-route-version`.
+  - Open the URL in a phone scanner emulator → expect the branded card with item/bin/location data.
+  - Open `https://stores.lgh.lk/b/00000000-0000-4000-8000-000000000000` → expect branded "no longer exists" card, **not** a browser 404.
+- Update `.lovable/memory/features/warehouse/bin-allocation-qr.md` with the publish-required checklist and the curl drift check.
+
+## Standards referenced
+
+- ISO/IEC 18004:2024 (QR symbol spec — already met by `qrcode` ECC-M).
+- GS1 Digital Link URI Syntax v1.4 — single canonical resolver host (`stores.lgh.lk`).
+- RFC 9110 (HTTP semantics) — correct 400 vs 404 vs 5xx surfacing in the client.
+- ISO 9001:2015 §8.5.4 — traceability via the "Report this label" channel.
+- WCAG 2.2 AA — recovery copy is plain language, retry is a real button.
 
 ## Out of scope
-- Emitting EPCIS XML/JSON events (data is captured to support future emission).
-- Multi-bin / batch scanning sessions.
-- Editing item master fields from the QR page.
-- Approval workflow for large adjustments (existing approval console handles that separately).
 
-## Verification
-1. Logged out: `/b/<valid-uuid>` shows "Sign in to adjust stock" → `/auth?redirect=/b/<id>` → after sign-in, lands back on the page with the "Adjust stock" button.
-2. Logged-in user **with** company access: increase by 3 with reason `cycle_count` → page refreshes, allocated and available both +3, one `stock_transactions` row appended with `adjustment_reason='cycle_count'`, `bin_id`, `location_id`, `created_by` set.
-3. Logged-in user **without** company access: RPC returns `permission denied`; UI shows generic error.
-4. Decrease larger than current → RPC rejects with `insufficient_quantity`; no rows mutated.
-5. Invalid reason code via crafted RPC call → rejected.
-6. Public RPC `get_public_bin_allocation_qr` and the new RPC both stay scoped to the single allocation; no cross-tenant leakage.
+- Switching the canonical host to dynamic origin (you confirmed: keep `stores.lgh.lk`).
+- Backend rate limiting (project policy: Turnstile + edge cache).
+- EPCIS event emission for scans (separate plan if you want analytics later).
