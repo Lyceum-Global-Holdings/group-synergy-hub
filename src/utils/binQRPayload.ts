@@ -5,6 +5,9 @@
 // - 91  = Company-internal AI (used here for location code)
 // Reference: GS1 Digital Link URI Syntax v1.4
 
+// IMPORTANT: per GS1 Digital Link URI Syntax v1.4 §6, the resolver host SHOULD be a single,
+// stable, organisation-controlled domain. Do NOT swap this for `window.location.origin` —
+// printed labels live for years and must keep resolving even from preview/staging hosts.
 const PUBLIC_BASE_URL = 'https://stores.lgh.lk';
 
 export interface BinQRPayloadInput {
