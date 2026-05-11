@@ -1,7 +1,10 @@
-import { useEffect, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useEffect, useState, useCallback } from 'react';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Loader2, MapPin, Package, Building2, Boxes, AlertCircle } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Loader2, MapPin, Package, Building2, Boxes, AlertCircle, LogIn, Pencil } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
+import { ScannedBinAdjustmentDialog } from '@/components/warehouse/ScannedBinAdjustmentDialog';
 
 interface BinQR {
   id: string;
@@ -25,13 +28,15 @@ const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as strin
 
 export default function PublicBinAllocation() {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+  const { user, loading: authLoading } = useAuth();
   const [data, setData] = useState<BinQR | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [adjustOpen, setAdjustOpen] = useState(false);
 
   useEffect(() => {
     document.title = 'Bin Allocation · Lyceum Global Holdings';
-    // No-index per-asset public route
     let meta = document.querySelector('meta[name="robots"]') as HTMLMetaElement | null;
     if (!meta) {
       meta = document.createElement('meta');
@@ -40,58 +45,46 @@ export default function PublicBinAllocation() {
     }
     const prev = meta.content;
     meta.content = 'noindex,nofollow';
-    return () => {
-      meta!.content = prev;
-    };
+    return () => { meta!.content = prev; };
   }, []);
 
-  useEffect(() => {
-    if (!id) {
+  const fetchData = useCallback(async () => {
+    if (!id || !UUID_RE.test(id)) {
       setError('Bin allocation not found.');
       setLoading(false);
       return;
     }
-    // Canonical validation BEFORE any network call.
-    if (!UUID_RE.test(id)) {
-      setError('Bin allocation not found.');
-      setLoading(false);
-      return;
-    }
-
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await fetch(
-          `${SUPABASE_URL}/functions/v1/public-bin-qr?id=${encodeURIComponent(id)}`,
-          {
-            method: 'GET',
-            headers: {
-              apikey: SUPABASE_ANON_KEY,
-              Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-            },
+    setLoading(true);
+    try {
+      const res = await fetch(
+        `${SUPABASE_URL}/functions/v1/public-bin-qr?id=${encodeURIComponent(id)}&ts=${Date.now()}`,
+        {
+          method: 'GET',
+          headers: {
+            apikey: SUPABASE_ANON_KEY,
+            Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
           },
-        );
-        if (cancelled) return;
-        if (res.status === 404) {
-          setError('Bin allocation not found.');
-        } else if (!res.ok) {
-          setError('Unable to load bin allocation.');
-        } else {
-          const body = (await res.json()) as BinQR;
-          setData(body);
-        }
-      } catch (e) {
-        console.debug('public-bin-qr fetch failed', e);
-        if (!cancelled) setError('Unable to load bin allocation.');
-      } finally {
-        if (!cancelled) setLoading(false);
+        },
+      );
+      if (res.status === 404) setError('Bin allocation not found.');
+      else if (!res.ok) setError('Unable to load bin allocation.');
+      else {
+        setData((await res.json()) as BinQR);
+        setError(null);
       }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
+    } catch (e) {
+      console.debug('public-bin-qr fetch failed', e);
+      setError('Unable to load bin allocation.');
+    } finally {
+      setLoading(false);
+    }
   }, [id]);
+
+  useEffect(() => { fetchData(); }, [fetchData]);
+
+  const handleSignIn = () => {
+    navigate(`/auth?redirect=${encodeURIComponent(`/b/${id}`)}`);
+  };
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
@@ -155,11 +148,47 @@ export default function PublicBinAllocation() {
             </dl>
           )}
 
-          <div className="mt-6 pt-4 border-t text-xs text-muted-foreground">
-            <Link to="/" className="text-primary hover:underline">Sign in</Link> to manage this allocation.
-          </div>
+          {!loading && data && (
+            <div className="mt-6 pt-4 border-t space-y-2">
+              {authLoading ? null : user ? (
+                <Button className="w-full" onClick={() => setAdjustOpen(true)}>
+                  <Pencil className="h-4 w-4 mr-2" />
+                  Adjust stock
+                </Button>
+              ) : (
+                <Button className="w-full" onClick={handleSignIn}>
+                  <LogIn className="h-4 w-4 mr-2" />
+                  Sign in to adjust stock
+                </Button>
+              )}
+              <div className="text-xs text-muted-foreground text-center">
+                {user ? (
+                  <Link to="/warehouse/item-bin-master" className="text-primary hover:underline">
+                    Open Bin Master
+                  </Link>
+                ) : (
+                  <>Adjustments require company access.</>
+                )}
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
+
+      {data && (
+        <ScannedBinAdjustmentDialog
+          open={adjustOpen}
+          onOpenChange={setAdjustOpen}
+          allocationId={data.id}
+          itemCode={data.item_code}
+          itemName={data.item_name}
+          binCode={data.bin_code}
+          locationName={data.location_name}
+          allocatedQuantity={data.allocated_quantity ?? 0}
+          availableQuantity={data.available_quantity ?? 0}
+          onAdjusted={fetchData}
+        />
+      )}
     </div>
   );
 }
