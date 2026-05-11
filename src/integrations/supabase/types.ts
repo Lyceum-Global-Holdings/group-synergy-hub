@@ -20420,6 +20420,15 @@ export type Database = {
       }
     }
     Functions: {
+      adjust_bin_allocation_from_scan: {
+        Args: {
+          p_allocation_id: string
+          p_delta: number
+          p_notes?: string
+          p_reason_code: string
+        }
+        Returns: Json
+      }
       bootstrap_admin: {
         Args: { _role_name?: string; _user_id: string }
         Returns: undefined
