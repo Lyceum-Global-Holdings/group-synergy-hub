@@ -110,6 +110,20 @@ export function BinAllocationsTab() {
       header: 'Notes',
       cell: ({ row }) => row.original.notes || '-',
     },
+    {
+      id: 'qr',
+      header: 'QR',
+      cell: ({ row }: { row: { original: BinAllocationWithDetails } }) => (
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => setQrAllocation(row.original)}
+          title="Generate QR code"
+        >
+          <QrCode className="h-4 w-4" />
+        </Button>
+      ),
+    },
     ...(canDelete ? [{
       id: 'actions',
       header: 'Actions',
@@ -126,6 +140,34 @@ export function BinAllocationsTab() {
       ),
     }] as ColumnDef<BinAllocationWithDetails>[] : []),
   ];
+
+  const handleBulkPrint = async () => {
+    if (!filteredAllocations.length) {
+      toast.error('No allocations to print');
+      return;
+    }
+    setBulkPrinting(true);
+    try {
+      const blob = await generateBulkBinQRCodePdf(
+        filteredAllocations.map((a) => ({
+          id: a.id,
+          item_code: a.warehouse_item?.item_code,
+          item_name: a.warehouse_item?.name,
+          bin_code: a.warehouse_bin?.bin_code,
+          location_name: a.warehouse_bin?.warehouse_location?.name,
+          location_code: a.warehouse_bin?.warehouse_location?.location_code,
+          allocated_quantity: a.allocated_quantity,
+        }))
+      );
+      downloadBulkBinQRCodePdf(blob);
+      toast.success(`Generated ${filteredAllocations.length} QR labels`);
+    } catch (e) {
+      console.error(e);
+      toast.error('Failed to generate QR labels');
+    } finally {
+      setBulkPrinting(false);
+    }
+  };
 
   return (
     <Card>
