@@ -2,7 +2,18 @@ import { useEffect, useState, useCallback } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Loader2, MapPin, Package, Building2, Boxes, AlertCircle, LogIn, Pencil } from 'lucide-react';
+import {
+  Loader2,
+  MapPin,
+  Package,
+  Building2,
+  Boxes,
+  AlertCircle,
+  LogIn,
+  Pencil,
+  RefreshCw,
+  Mail,
+} from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { ScannedBinAdjustmentDialog } from '@/components/warehouse/ScannedBinAdjustmentDialog';
 
@@ -20,11 +31,16 @@ interface BinQR {
   updated_at: string | null;
 }
 
+// RFC 4122 canonical UUID (versions 1–8).
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string;
+const SUPPORT_EMAIL = 'support@lyceumglobal.co';
+
+// HTTP-aligned error kinds (RFC 9110 §15.5/§15.6).
+type ErrKind = 'invalid' | 'not_found' | 'unavailable';
 
 export default function PublicBinAllocation() {
   const { id } = useParams<{ id: string }>();
@@ -32,29 +48,36 @@ export default function PublicBinAllocation() {
   const { user, loading: authLoading } = useAuth();
   const [data, setData] = useState<BinQR | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [errKind, setErrKind] = useState<ErrKind | null>(null);
   const [adjustOpen, setAdjustOpen] = useState(false);
 
+  const shortId = id ? `${id.slice(0, 8)}…` : '';
+
   useEffect(() => {
-    document.title = 'Bin Allocation · Lyceum Global Holdings';
-    let meta = document.querySelector('meta[name="robots"]') as HTMLMetaElement | null;
-    if (!meta) {
-      meta = document.createElement('meta');
-      meta.name = 'robots';
-      document.head.appendChild(meta);
+    document.title = id
+      ? `Bin ${shortId} · Lyceum Global Holdings`
+      : 'Bin Allocation · Lyceum Global Holdings';
+    let robots = document.querySelector('meta[name="robots"]') as HTMLMetaElement | null;
+    if (!robots) {
+      robots = document.createElement('meta');
+      robots.name = 'robots';
+      document.head.appendChild(robots);
     }
-    const prev = meta.content;
-    meta.content = 'noindex,nofollow';
-    return () => { meta!.content = prev; };
-  }, []);
+    const prev = robots.content;
+    robots.content = 'noindex,nofollow';
+    return () => {
+      robots!.content = prev;
+    };
+  }, [id, shortId]);
 
   const fetchData = useCallback(async () => {
     if (!id || !UUID_RE.test(id)) {
-      setError('Bin allocation not found.');
+      setErrKind('invalid');
       setLoading(false);
       return;
     }
     setLoading(true);
+    setErrKind(null);
     try {
       const res = await fetch(
         `${SUPABASE_URL}/functions/v1/public-bin-qr?id=${encodeURIComponent(id)}&ts=${Date.now()}`,
@@ -66,24 +89,35 @@ export default function PublicBinAllocation() {
           },
         },
       );
-      if (res.status === 404) setError('Bin allocation not found.');
-      else if (!res.ok) setError('Unable to load bin allocation.');
+      if (res.status === 400) setErrKind('invalid');
+      else if (res.status === 404) setErrKind('not_found');
+      else if (!res.ok) setErrKind('unavailable');
       else {
         setData((await res.json()) as BinQR);
-        setError(null);
+        setErrKind(null);
       }
     } catch (e) {
       console.debug('public-bin-qr fetch failed', e);
-      setError('Unable to load bin allocation.');
+      setErrKind('unavailable');
     } finally {
       setLoading(false);
     }
   }, [id]);
 
-  useEffect(() => { fetchData(); }, [fetchData]);
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
   const handleSignIn = () => {
     navigate(`/auth?redirect=${encodeURIComponent(`/b/${id}`)}`);
+  };
+
+  const reportMailto = () => {
+    const subject = encodeURIComponent(`Obsolete bin QR label: ${id ?? '(missing)'}`);
+    const body = encodeURIComponent(
+      `Hello Warehouse Ops,\n\nI scanned a bin QR label that no longer resolves.\n\nAllocation ID: ${id ?? '(missing)'}\nScanned at: ${new Date().toISOString()}\nURL: ${window.location.href}\n\nPlease decommission the printed label.\n`,
+    );
+    window.location.href = `mailto:${SUPPORT_EMAIL}?subject=${subject}&body=${body}`;
   };
 
   return (
@@ -103,13 +137,16 @@ export default function PublicBinAllocation() {
             </div>
           )}
 
-          {!loading && error && (
-            <div className="flex items-center gap-2 text-destructive">
-              <AlertCircle className="h-4 w-4" /> {error}
-            </div>
+          {!loading && errKind && (
+            <ErrorState
+              kind={errKind}
+              shortId={shortId}
+              onRetry={fetchData}
+              onReport={reportMailto}
+            />
           )}
 
-          {!loading && data && (
+          {!loading && !errKind && data && (
             <dl className="space-y-3 text-sm">
               <Row icon={<Package className="h-4 w-4" />} label="Item">
                 <div className="font-mono font-semibold">{data.item_code ?? '—'}</div>
@@ -122,7 +159,9 @@ export default function PublicBinAllocation() {
               <Row icon={<MapPin className="h-4 w-4" />} label="Location">
                 <div>{data.location_name ?? '—'}</div>
                 {data.location_code && (
-                  <div className="font-mono text-xs text-muted-foreground">{data.location_code}</div>
+                  <div className="font-mono text-xs text-muted-foreground">
+                    {data.location_code}
+                  </div>
                 )}
               </Row>
               <Row icon={<Building2 className="h-4 w-4" />} label="Company">
@@ -148,7 +187,7 @@ export default function PublicBinAllocation() {
             </dl>
           )}
 
-          {!loading && data && (
+          {!loading && !errKind && data && (
             <div className="mt-6 pt-4 border-t space-y-2">
               {authLoading ? null : user ? (
                 <Button className="w-full" onClick={() => setAdjustOpen(true)}>
@@ -163,7 +202,10 @@ export default function PublicBinAllocation() {
               )}
               <div className="text-xs text-muted-foreground text-center">
                 {user ? (
-                  <Link to="/warehouse/item-bin-master" className="text-primary hover:underline">
+                  <Link
+                    to="/warehouse/item-bin-master"
+                    className="text-primary hover:underline"
+                  >
                     Open Bin Master
                   </Link>
                 ) : (
@@ -193,7 +235,74 @@ export default function PublicBinAllocation() {
   );
 }
 
-function Row({ icon, label, children }: { icon: React.ReactNode; label: string; children: React.ReactNode }) {
+function ErrorState({
+  kind,
+  shortId,
+  onRetry,
+  onReport,
+}: {
+  kind: ErrKind;
+  shortId: string;
+  onRetry: () => void;
+  onReport: () => void;
+}) {
+  const copy = {
+    invalid: {
+      title: 'This QR code is malformed',
+      body: 'The link inside this QR code does not match the expected format. The label may be damaged or counterfeit.',
+    },
+    not_found: {
+      title: 'This bin allocation no longer exists',
+      body: `Allocation ${shortId} was not found. It may have been deleted, merged, or moved to another bin. Please retire this printed label.`,
+    },
+    unavailable: {
+      title: 'Temporarily unavailable',
+      body: 'We could not reach the warehouse service. Check your connection and try again in a moment.',
+    },
+  }[kind];
+
+  return (
+    <div className="space-y-4">
+      <div className="flex gap-3">
+        <AlertCircle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
+        <div>
+          <div className="font-semibold">{copy.title}</div>
+          <p className="text-sm text-muted-foreground mt-1">{copy.body}</p>
+        </div>
+      </div>
+      <div className="flex flex-col gap-2 pt-2 border-t">
+        {kind === 'unavailable' && (
+          <Button variant="default" onClick={onRetry} className="w-full">
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Retry
+          </Button>
+        )}
+        {kind === 'not_found' && (
+          <Button variant="outline" onClick={onReport} className="w-full">
+            <Mail className="h-4 w-4 mr-2" />
+            Report this label
+          </Button>
+        )}
+        <Link
+          to="/warehouse/item-bin-master"
+          className="text-xs text-center text-muted-foreground hover:text-primary hover:underline"
+        >
+          Open Bin Master (sign-in required)
+        </Link>
+      </div>
+    </div>
+  );
+}
+
+function Row({
+  icon,
+  label,
+  children,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  children: React.ReactNode;
+}) {
   return (
     <div className="flex gap-3">
       <div className="text-muted-foreground mt-0.5">{icon}</div>
