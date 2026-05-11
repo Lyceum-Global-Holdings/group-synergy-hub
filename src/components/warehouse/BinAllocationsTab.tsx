@@ -14,12 +14,15 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Plus, AlertCircle, Trash2, Search, Undo2 } from 'lucide-react';
+import { Plus, AlertCircle, Trash2, Search, Undo2, QrCode, FileDown, Loader2 } from 'lucide-react';
 import { useWarehouseBinAllocations } from '@/hooks/useWarehouseBinAllocations';
 import { useCompany } from '@/contexts/CompanyContext';
 import { useIsAdminOrHigher } from '@/hooks/useIsAdminOrHigher';
 import { CreateBinAllocationDialog } from './CreateBinAllocationDialog';
 import { ReturnStockFromSublocationDialog } from './ReturnStockFromSublocationDialog';
+import { BinAllocationQRDialog } from './BinAllocationQRDialog';
+import { generateBulkBinQRCodePdf, downloadBulkBinQRCodePdf } from '@/utils/bulkBinQRCodePdf';
+import { toast } from 'sonner';
 import type { ColumnDef } from '@tanstack/react-table';
 import type { BinAllocationWithDetails } from '@/types/warehouseReservation';
 
