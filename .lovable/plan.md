@@ -1,19 +1,17 @@
-# Simplify Bin QR Label Text
+Plan:
 
-Update the printed/downloaded bin QR label so the text block next to the QR shows only three lines:
+1. Update the single bin QR download flow in `BinAllocationQRDialog`.
+   - Replace the current QR-only PNG download with a generated label image.
+   - The downloaded image will show the QR code with only these fields next to it:
+     - Item code
+     - Item name
+     - Bin name/code
 
-1. **Item Code** (bold, monospace)
-2. **Item Name**
-3. **Bin**
+2. Keep the on-screen dialog preview unchanged unless needed for consistency.
+   - The QR payload stays the same.
+   - No location or quantity will be added to the downloaded label text.
 
-Remove the **Location** and **Qty** lines from the label. The QR payload (GS1 Digital Link with item/bin/location codes) is unchanged — only the human-readable text block is trimmed.
-
-## File to change
-
-- `src/utils/bulkBinQRCodePdf.ts` — remove the `Loc:` and `Qty:` `doc.text(...)` calls; rebalance vertical spacing of the remaining three lines so they sit nicely centered next to the 0.9" QR.
-
-## Out of scope
-
-- QR payload contents (still encodes item/bin/location codes per GS1).
-- Other QR generators (`bulkQRCodePdf.ts`, `bulkQRCodePng.ts`, `printQRCodeLabels.ts`) — only the bin allocation label was requested.
-- Label dimensions (still 2"×1" landscape).
+3. Match the existing bulk label format.
+   - Use a 2" × 1" landscape label layout.
+   - QR on the left, required item/bin text on the right.
+   - Ensure the PNG download is the label, not just the QR matrix.
