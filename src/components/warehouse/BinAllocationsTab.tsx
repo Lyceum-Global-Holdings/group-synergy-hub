@@ -188,6 +188,19 @@ export function BinAllocationsTab() {
               className="pl-8"
             />
           </div>
+          <Button
+            variant="outline"
+            onClick={handleBulkPrint}
+            disabled={bulkPrinting || !filteredAllocations.length}
+            title="Generate QR labels (PDF) for the filtered allocations"
+          >
+            {bulkPrinting ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <FileDown className="mr-2 h-4 w-4" />
+            )}
+            Bulk QR ({filteredAllocations.length})
+          </Button>
           <Button 
             variant="outline"
             onClick={() => setReturnDialogOpen(true)}
