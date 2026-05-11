@@ -76,6 +76,12 @@ export default function PublicBinAllocation() {
       setLoading(false);
       return;
     }
+    if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+      console.error('public-bin-qr: missing Supabase env config');
+      setErrKind('unavailable');
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     setErrKind(null);
     try {
@@ -89,7 +95,15 @@ export default function PublicBinAllocation() {
           },
         },
       );
-      if (res.status === 400) setErrKind('invalid');
+      if (res.status === 400) {
+        // Distinguish malformed id from captcha-required (Turnstile gate).
+        let kind: ErrKind = 'invalid';
+        try {
+          const body = await res.clone().json();
+          if (body?.error === 'captcha-required') kind = 'unavailable';
+        } catch { /* ignore */ }
+        setErrKind(kind);
+      } else if (res.status === 403) setErrKind('unavailable');
       else if (res.status === 404) setErrKind('not_found');
       else if (!res.ok) setErrKind('unavailable');
       else {

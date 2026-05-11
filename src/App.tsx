@@ -217,7 +217,11 @@ function App() {
                 </AuthProvider>
               } />
               <Route path="/asset/:assetId" element={<PublicAssetView />} />
-              <Route path="/b/:id" element={<PublicBinAllocation />} />
+              <Route path="/b/:id" element={
+                <AuthProvider>
+                  <PublicBinAllocation />
+                </AuthProvider>
+              } />
               <Route path="/register-supplier" element={<PublicSupplierRegistration />} />
               <Route path="/procurement/po-email-approval" element={<PoEmailApproval />} />
               <Route path="/auth/mfa" element={
