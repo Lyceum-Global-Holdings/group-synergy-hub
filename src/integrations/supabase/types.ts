@@ -15745,6 +15745,45 @@ export type Database = {
         }
         Relationships: []
       }
+      stock_ledger_backfill_audit: {
+        Row: {
+          bin_id: string | null
+          created_at: string
+          drift: number | null
+          expected_latest_after: number | null
+          id: string
+          item_id: string | null
+          location_id: string | null
+          observed_latest_after: number | null
+          rows_touched: number | null
+          scope: string
+        }
+        Insert: {
+          bin_id?: string | null
+          created_at?: string
+          drift?: number | null
+          expected_latest_after?: number | null
+          id?: string
+          item_id?: string | null
+          location_id?: string | null
+          observed_latest_after?: number | null
+          rows_touched?: number | null
+          scope: string
+        }
+        Update: {
+          bin_id?: string | null
+          created_at?: string
+          drift?: number | null
+          expected_latest_after?: number | null
+          id?: string
+          item_id?: string | null
+          location_id?: string | null
+          observed_latest_after?: number | null
+          rows_touched?: number | null
+          scope?: string
+        }
+        Relationships: []
+      }
       stock_transactions: {
         Row: {
           adjustment_reason: string | null
