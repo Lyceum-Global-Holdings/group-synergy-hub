@@ -1,50 +1,73 @@
 ## Goal
-Harden the public `/b/:id` QR route so only canonical, allow-listed allocation data is exposed, and abuse is mitigated without violating the project's no-backend-rate-limiting policy.
+Let an authenticated user with edit rights adjust the **scanned** bin's stock directly from the public `/b/:id` page, with reason codes and an audit trail aligned to ISO 9001 §8.5.4 and GS1 EPCIS / CBV inventory bizSteps.
+
+## Flow
+
+```text
+Scan QR → /b/:id (public)
+  ├─ logged out → "Sign in to adjust" → /auth?redirect=/b/:id
+  └─ logged in
+       ├─ has access to allocation.company_id → "Adjust stock" button
+       └─ no access → button hidden, info banner
+Click Adjust → ScannedBinAdjustmentDialog (locked to this item × bin × location)
+  → atomic RPC adjust_bin_allocation_from_scan()
+  → success toast + refreshed quantities on the same page
+```
 
 ## Changes
 
-### 1. Canonical UUID validation (frontend)
-`src/pages/PublicBinAllocation.tsx`
-- Validate `:id` against a strict UUID v4/RFC 4122 regex before calling the RPC.
-- If invalid → show generic "Bin allocation not found." (never echo `id` or backend error text).
-- Collapse Supabase error to a generic message; log details only to `console.debug`.
-- Add `<meta name="robots" content="noindex,nofollow" />` via `document.head` (route is per-asset, must not be indexed).
-- Add `Cache-Control` hint via `<meta http-equiv>` (best-effort) and ensure no PII enters `document.title`.
+### 1. DB migration — atomic, server-authorized RPC
+New `public.adjust_bin_allocation_from_scan(p_allocation_id uuid, p_delta numeric, p_reason_code text, p_notes text) returns jsonb`:
+- `SECURITY INVOKER`, `SET search_path = public`.
+- Loads the allocation row + parent item/bin/location/company.
+- Authorizes via `can_access_company(allocation.company_id)`; rejects with `permission denied` otherwise.
+- Validates `p_reason_code` against an allow-list (`cycle_count`, `damage`, `loss`, `found`, `correction`, `transfer_in`, `transfer_out`) — these map to GS1 CBV bizSteps (`cycle_counting`, `inventory_check`, `corrective_action`).
+- Validates `p_delta` non-zero; for negative deltas ensures `allocated_quantity + p_delta >= 0`.
+- Updates `warehouse_bin_allocations.allocated_quantity` (excluding the generated `available_quantity` column per project rule).
+- Inserts one `stock_transactions` row with `transaction_type='adjustment'`, `reference_type='adjustment'`, `bin_id`, `location_id`, `company_id`, `adjustment_reason = p_reason_code`, `notes = '[QR scan] ' || p_notes`, `created_by = auth.uid()`.
+- Returns `{ ok: true, new_quantity, transaction_id }`.
+- `GRANT EXECUTE … TO authenticated;` (anon excluded).
 
-### 2. Move public access behind a hardened edge function
-New `supabase/functions/public-bin-qr/index.ts` (`verify_jwt = false`):
-- Accepts `GET /public-bin-qr?id=<uuid>`.
-- Zod-validates `id` as UUID; rejects with 400 otherwise.
-- Calls the RPC with the service role internally and returns a strict allow-listed JSON projection (drops any future columns the RPC might gain).
-- Optional Turnstile gate using `useTurnstileEnabledFor('public_qr')` pattern: if enabled in `security_settings`, require `cf-turnstile-token` header and `verifyTurnstile()`; otherwise allow.
-- Adds short edge cache header `Cache-Control: public, max-age=60, s-maxage=60` so repeat scans don't re-hit the DB (acts as a soft abuse buffer).
-- Returns 404 (not 500) when allocation is missing; never leaks DB error messages.
-- No backend rate-limiting code is added — per project policy. The Turnstile gate plus edge cache is the abuse mitigation we ship.
+No schema additions needed — `stock_transactions.adjustment_reason`, `bin_id`, `location_id` already exist.
 
-Frontend page updated to call the edge function via `supabase.functions.invoke('public-bin-qr', { method: 'GET' })` instead of the RPC directly.
+### 2. Frontend — `src/pages/PublicBinAllocation.tsx`
+- Use `useAuth()` to detect session.
+- Add a footer action area:
+  - Logged out → primary button "Sign in to adjust stock" → `/auth?redirect=/b/{id}`.
+  - Logged in → primary button "Adjust stock" opens the new dialog.
+- After a successful adjustment, re-fetch via the existing `public-bin-qr` edge function (cache busted with `?ts=`) so the page reflects the new quantities.
 
-### 3. Tighten the RPC (defense in depth)
-New migration:
-- Add `is_active` / `deleted_at` filter (if columns exist) so soft-deleted allocations never resolve.
-- Re-issue the function as `STRICT SECURITY DEFINER`, return `NULL` for unknown id (already true) and explicitly `REVOKE EXECUTE ... FROM anon` once the edge function fronts it. `authenticated` keeps direct access for the in-app dialog.
-- Add `SET row_security = on` and keep the explicit allow-listed `jsonb_build_object` (safe filter).
+### 3. New component `src/components/warehouse/ScannedBinAdjustmentDialog.tsx`
+- Read-only header: item code/name · bin · location · current allocated/available.
+- Inputs: adjustment direction (Increase / Decrease), quantity (>0), reason code (Select), optional notes.
+- Submits via a new hook `useScannedBinAdjustment` calling the RPC.
+- Disables submit while pending; surfaces RPC errors verbatim (already sanitized by RPC).
 
-### 4. QR payload alignment
-`src/utils/binQRPayload.ts` — point the canonical URL at the new edge endpoint path on the custom domain (`https://stores.lgh.lk/b/{id}`); the React route stays the source of truth and the page calls the hardened edge function.
+### 4. Auth redirect
+`src/pages/Auth.tsx` already honors `?redirect=` (verified). No change beyond confirming `/b/:id` is whitelisted by the existing redirect logic (it is — any same-origin path is accepted).
 
-### 5. Security memory + Turnstile surface
-- Register `public_qr` in the Turnstile surfaces list (memory + `security_settings` defaults documented).
-- Update `.lovable/memory/features/warehouse/bin-allocation-qr.md` and `mem://security/turnstile-bot-protection` to record the new surface and the canonical/allow-list rules.
+### 5. Memory
+Append a new memory `mem://features/warehouse/scanned-bin-adjustment` documenting:
+- Reason-code allow-list and CBV mapping.
+- RPC name + auth model (server-side `can_access_company` check, never trust the client).
+- "All scanned adjustments must include a reason code" rule.
+Index updated.
+
+## Standards alignment
+- **ISO 9001 §8.5.4 / ISO 55001** — every quantity change has user, timestamp, location, reason.
+- **GS1 EPCIS 2.0 / CBV** — reason codes map to standardized bizSteps (`cycle_counting`, `inventory_check`, `corrective_action`).
+- **OWASP ASVS L2** — server-side authorization (RPC), input allow-list, generic errors on the public surface, no client-supplied authority.
 
 ## Out of scope
-- Backend rate limiting (forbidden by project policy — Turnstile + edge cache substitute).
-- Changing what fields are visible on the public page (already minimal).
-- Auth changes for the in-app dialog (still uses `authenticated` RPC).
+- Emitting EPCIS XML/JSON events (data is captured to support future emission).
+- Multi-bin / batch scanning sessions.
+- Editing item master fields from the QR page.
+- Approval workflow for large adjustments (existing approval console handles that separately).
 
 ## Verification
-1. `/b/not-a-uuid` → generic "not found", no network call.
-2. `/b/<random-uuid>` → 404 from edge function, generic UI message.
-3. `/b/<real-uuid>` → renders item/bin/location/company + qty only; response JSON contains exactly the 11 allow-listed keys.
-4. With Turnstile enabled for `public_qr` surface, requests without a token → 401; with token → 200.
-5. Repeat scan within 60 s → served from edge cache (verify `cf-cache-status` / response time).
-6. Direct `supabase.rpc('get_public_bin_allocation_qr', …)` from anon key → permission denied after REVOKE.
+1. Logged out: `/b/<valid-uuid>` shows "Sign in to adjust stock" → `/auth?redirect=/b/<id>` → after sign-in, lands back on the page with the "Adjust stock" button.
+2. Logged-in user **with** company access: increase by 3 with reason `cycle_count` → page refreshes, allocated and available both +3, one `stock_transactions` row appended with `adjustment_reason='cycle_count'`, `bin_id`, `location_id`, `created_by` set.
+3. Logged-in user **without** company access: RPC returns `permission denied`; UI shows generic error.
+4. Decrease larger than current → RPC rejects with `insufficient_quantity`; no rows mutated.
+5. Invalid reason code via crafted RPC call → rejected.
+6. Public RPC `get_public_bin_allocation_qr` and the new RPC both stay scoped to the single allocation; no cross-tenant leakage.
