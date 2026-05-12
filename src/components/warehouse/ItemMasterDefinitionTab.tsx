@@ -32,9 +32,6 @@ const AddItemsDialog = lazy(() =>
 const StockMovementDialog = lazy(() =>
   import('@/components/warehouse/StockMovementDialog').then(m => ({ default: m.StockMovementDialog }))
 );
-const StockMovementChart = lazy(() =>
-  import('@/components/warehouse/StockMovementChart').then(m => ({ default: m.StockMovementChart }))
-);
 const DeleteItemConfirmationDialog = lazy(() =>
   import('@/components/warehouse/DeleteItemConfirmationDialog').then(m => ({ default: m.DeleteItemConfirmationDialog }))
 );
@@ -259,7 +256,6 @@ export function ItemMasterDefinitionTab({ onNavigateToInventory, onNavigateToBin
 
   return (
     <div className="space-y-4">
-      <Suspense fallback={null}><StockMovementChart /></Suspense>
 
       <div className="flex flex-col gap-3">
         <div className="flex items-center justify-between">

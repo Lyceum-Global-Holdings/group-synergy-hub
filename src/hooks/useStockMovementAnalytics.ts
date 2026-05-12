@@ -11,11 +11,11 @@ export interface DailyMovement {
   adjustment: number;
 }
 
-export function useStockMovementAnalytics(itemId?: string) {
+export function useStockMovementAnalytics(itemId?: string, locationId?: string | null) {
   const { selectedCompany, isViewingAllCompanies } = useCompany();
 
   return useQuery({
-    queryKey: ['stock-movement-analytics', selectedCompany?.id, isViewingAllCompanies, itemId],
+    queryKey: ['stock-movement-analytics', selectedCompany?.id, isViewingAllCompanies, itemId, locationId ?? null],
     queryFn: async (): Promise<DailyMovement[]> => {
       const startDate = subDays(new Date(), 30);
 
@@ -31,6 +31,10 @@ export function useStockMovementAnalytics(itemId?: string) {
 
       if (itemId) {
         query = query.eq('item_id', itemId);
+      }
+
+      if (locationId) {
+        query = query.eq('location_id', locationId);
       }
 
       const { data, error } = await query;
