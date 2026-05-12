@@ -36,17 +36,50 @@ export function BinAllocationsTab() {
   const [bulkPrinting, setBulkPrinting] = useState(false);
   const { binAllocations, isLoading, deleteAllocation, isDeleting } = useWarehouseBinAllocations();
 
+  // Normalize parent (PostgREST self-FK can return array or object) into a flat
+  // hierarchical "Parent › Child" path. Follows WMS standard of showing the
+  // full storage hierarchy (Site/Warehouse › Zone/Sub-location › Bin).
+  const getLocationPath = (allocation: BinAllocationWithDetails) => {
+    const loc = allocation.warehouse_bin?.warehouse_location;
+    if (!loc) return { parent: null, child: null, path: '' };
+    const parentRaw = loc.parent;
+    const parent = Array.isArray(parentRaw) ? parentRaw[0] ?? null : parentRaw ?? null;
+    const fmt = (n?: string | null, c?: string | null) =>
+      c ? `${n} (${c})` : n ?? '';
+    const child = fmt(loc.name, loc.location_code);
+    if (parent) {
+      return {
+        parent: fmt(parent.name, parent.location_code),
+        child,
+        path: `${fmt(parent.name, parent.location_code)} › ${child}`,
+      };
+    }
+    return { parent: null, child, path: child };
+  };
+
   const filteredAllocations = useMemo(() => {
-    if (!searchTerm.trim()) return binAllocations || [];
-    
-    const term = searchTerm.toLowerCase();
-    return (binAllocations || []).filter((allocation) => 
-      allocation.warehouse_item?.item_code?.toLowerCase().includes(term) ||
-      allocation.warehouse_item?.name?.toLowerCase().includes(term) ||
-      allocation.warehouse_bin?.bin_code?.toLowerCase().includes(term) ||
-      allocation.warehouse_bin?.name?.toLowerCase().includes(term) ||
-      allocation.warehouse_bin?.warehouse_location?.name?.toLowerCase().includes(term)
-    );
+    const base = !searchTerm.trim()
+      ? binAllocations || []
+      : (binAllocations || []).filter((allocation) => {
+          const term = searchTerm.toLowerCase();
+          return (
+            allocation.warehouse_item?.item_code?.toLowerCase().includes(term) ||
+            allocation.warehouse_item?.name?.toLowerCase().includes(term) ||
+            allocation.warehouse_bin?.bin_code?.toLowerCase().includes(term) ||
+            allocation.warehouse_bin?.name?.toLowerCase().includes(term) ||
+            getLocationPath(allocation).path.toLowerCase().includes(term)
+          );
+        });
+    // Group by location path → bin code → item code for predictable WMS layout
+    return [...base].sort((a, b) => {
+      const pa = getLocationPath(a).path;
+      const pb = getLocationPath(b).path;
+      if (pa !== pb) return pa.localeCompare(pb);
+      const ba = a.warehouse_bin?.bin_code ?? '';
+      const bb = b.warehouse_bin?.bin_code ?? '';
+      if (ba !== bb) return ba.localeCompare(bb);
+      return (a.warehouse_item?.item_code ?? '').localeCompare(b.warehouse_item?.item_code ?? '');
+    });
   }, [binAllocations, searchTerm]);
   const { canDelete } = useIsAdminOrHigher();
 
