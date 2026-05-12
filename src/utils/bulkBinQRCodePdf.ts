@@ -131,31 +131,21 @@ function renderTextBlocks(
     doc.setFont(b.font, b.style);
     doc.setFontSize(size);
 
-    // Key on first line
-    const keyW = doc.getTextWidth(b.key + ' ');
-    const valX = textX + keyW;
-    const valMaxW = textRight - valX;
+    const valMaxW = textRight - textX;
     const lines: string[] = doc.splitTextToSize(b.value, valMaxW);
 
-    // Capacity check for this block
+    // Capacity check
     const remaining = bottom - y;
-    let maxLines = Math.max(1, Math.floor(remaining / lh));
+    const maxLines = Math.max(1, Math.floor(remaining / lh));
     let toRender = lines;
     if (lines.length > maxLines) {
       toRender = lines.slice(0, maxLines);
-      // Ellipsise last visible line
       const last = toRender[toRender.length - 1];
       toRender[toRender.length - 1] = ellipsiseToWidth(doc, last, valMaxW);
     }
 
-    // First line: key + first value line
-    doc.text(b.key, textX, y + lh - 0.6);
-    doc.text(toRender[0] ?? '', valX, y + lh - 0.6);
-    y += lh + KEY_GAP;
-
-    // Continuation lines aligned under value column
-    for (let li = 1; li < toRender.length; li++) {
-      doc.text(toRender[li], valX, y + lh - 0.6);
+    for (let li = 0; li < toRender.length; li++) {
+      doc.text(toRender[li], textX, y + lh - 0.6);
       y += lh;
     }
 
@@ -179,11 +169,10 @@ function computeLayout(
     const lh = size * 0.353 + 0.6;
     doc.setFont(b.font, b.style);
     doc.setFontSize(size);
-    const keyW = doc.getTextWidth(b.key + ' ');
-    const valMaxW = textRight - (textX + keyW);
+    const valMaxW = textRight - textX;
     const lines: string[] = doc.splitTextToSize(b.value, valMaxW);
     lineCounts.push(lines.length);
-    totalH += lh * lines.length + KEY_GAP + BLOCK_GAP;
+    totalH += lh * lines.length + BLOCK_GAP;
   }
   return { totalH, lineCounts };
 }
