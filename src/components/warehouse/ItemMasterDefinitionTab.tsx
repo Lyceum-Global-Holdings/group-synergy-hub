@@ -32,9 +32,6 @@ const AddItemsDialog = lazy(() =>
 const StockMovementDialog = lazy(() =>
   import('@/components/warehouse/StockMovementDialog').then(m => ({ default: m.StockMovementDialog }))
 );
-const StockMovementChart = lazy(() =>
-  import('@/components/warehouse/StockMovementChart').then(m => ({ default: m.StockMovementChart }))
-);
 const DeleteItemConfirmationDialog = lazy(() =>
   import('@/components/warehouse/DeleteItemConfirmationDialog').then(m => ({ default: m.DeleteItemConfirmationDialog }))
 );
