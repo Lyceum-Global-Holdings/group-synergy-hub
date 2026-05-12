@@ -1,28 +1,54 @@
+# Resize Bin Allocation QR Labels
+
 ## Goal
+Change the downloadable bin-allocation QR PDF so each label is **102 × 51 mm** outer (page/border) with a **96 × 48 mm** printable content area inside — i.e. a uniform **3 mm border margin** on all sides (102−96 = 6 → 3 mm/side; 51−48 = 3 → 1.5 mm/side).
 
-Scope the Bin Allocations tab to the warehouse/location selected in the global header location filter, matching the same UX already used by Stock Movement Trends on the Inventory page.
+To keep the border equal on all sides and match the user's "border 102×51, content 96×48" request literally, the cleanest interpretation is a symmetric **3 mm margin** between page edge and the inner content rectangle. The page itself is the 102×51 mm sheet; the printed border line sits at the inner rectangle.
 
-## Behavior
+## Standards applied
+- **ISO/IEC 18004** — QR Code symbology, ECC level M (~15% recovery), quiet zone ≥ 4 modules.
+- **ISO/IEC 15415** — print quality: keep margin ≥ 4 modules (the `margin: 4` qrcode option).
+- **GS1 Digital Link** — payload format already produced by `buildBinQRPayload` (no change).
+- **ISO 216 / label trade practice** — sizes specified in millimetres, landscape orientation, symmetric margins for die-cut tolerance.
 
-- **Global location selector = "All locations"** → show every allocation the user can see (current behavior).
-- **Selected = a parent warehouse** → show allocations whose bin's location is that warehouse OR any sub-location below it (descendant set).
-- **Selected = a sub-location** → show only allocations bound to that exact sub-location.
+## Layout (mm, landscape 102 × 51)
 
-This matches how WMS hierarchy filters typically work (selecting a node includes its subtree).
+```text
+┌────────────────────────────────────────────────────┐  page 102 × 51
+│  ┌──────────────────────────────────────────────┐  │  border at 3mm inset
+│  │ ┌──────────┐  ITEM_CODE                      │  │  → inner 96 × 48
+│  │ │          │  Item name (truncated)          │  │
+│  │ │   QR     │  Bin: BIN_CODE                  │  │
+│  │ │  45×45   │  Loc: LOCATION_CODE             │  │
+│  │ └──────────┘                                 │  │
+│  └──────────────────────────────────────────────┘  │
+└────────────────────────────────────────────────────┘
+```
 
-## Implementation
+- QR module: 45 × 45 mm, positioned at x=4.5, y=3 mm (1.5 mm gap inside the border).
+- Text column starts at x≈53 mm; rows at y≈14 / 24 / 32 / 40 mm.
+- Font sizes: item code 11 pt bold mono (Courier), name 9 pt, bin/loc 8 pt.
+- Border: 0.3 mm stroke at the 96×48 inner rectangle (3 mm inset from page edge).
+- Background: white fill across full page.
 
-Single file: `src/components/warehouse/BinAllocationsTab.tsx`.
+## Technical changes
 
-1. Read `globalLocationId` via `useLocationFilter()`.
-2. Pull all locations via `useWarehouseLocations()` (already cached, lightweight).
-3. Build a `descendantIds(rootId)` memo: walk `parent_id` graph once, return `Set<string>` containing root + all descendants.
-4. Extend the existing `filteredAllocations` `useMemo` to also filter by `allocation.warehouse_bin?.warehouse_location?.id ∈ descendantIds`.
-5. Show a small inline scope indicator in the card header — e.g. `Scope: {locationName}` with a hint icon — only when `globalLocationId` is set, so users can see the active filter without leaving the page. No new selector control (the global header already drives this).
-6. Update the bulk-QR count + button label to keep using `filteredAllocations.length` (already does).
+Single file: `src/utils/bulkBinQRCodePdf.ts`
+
+1. `new jsPDF({ orientation: 'landscape', unit: 'mm', format: [102, 51] })` (was inches, 2×1).
+2. `doc.addPage([102, 51], 'landscape')` for subsequent allocations.
+3. Replace all coordinates with the mm values above.
+4. Bump `QRCode.toDataURL` width to ~600 px and `margin: 4` (ISO/IEC 15415 quiet zone). ECC stays `'M'`.
+5. Add a `Loc:` line so the location/sub-location code is visible on the label (the tab already shows the full path; the QR itself still resolves to it via GS1 Digital Link).
+6. Adjust `truncate` call sites for the wider text column (item code ≤ 18, name ≤ 28, bin ≤ 22, loc ≤ 22).
+
+No changes to:
+- `BinAllocationsTab.tsx` (it just calls `generateBulkBinQRCodePdf` / `downloadBulkBinQRCodePdf`).
+- `buildBinQRPayload` (GS1 Digital Link payload unchanged).
+- Public resolver page or the `/b/:id` route.
+- Any DB / RLS / hook code.
 
 ## Out of scope
-
-- No DB / RLS / hook signature changes — `useWarehouseBinAllocations` keeps fetching the user's full visible set; filtering stays client-side, consistent with how the search box already works on this tab.
-- No change to the global header location selector itself.
-- No change to `useWarehouseLocations` or its query key.
+- Asset (non-bin) QR PDF in `bulkQRCodePdf.ts` — separate label stock, not requested.
+- PNG export (`bulkQRCodePng.ts`) — separate format.
+- Print preview UI changes.
