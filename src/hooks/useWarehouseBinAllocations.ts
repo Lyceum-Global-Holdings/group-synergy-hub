@@ -32,7 +32,13 @@ export function useWarehouseBinAllocations(options?: { disableFetch?: boolean })
             warehouse_location:warehouse_locations!warehouse_bins_location_id_fkey(
               id,
               name,
-              location_code
+              location_code,
+              parent_id,
+              parent:warehouse_locations!warehouse_locations_parent_id_fkey(
+                id,
+                name,
+                location_code
+              )
             )
           )
         `)
