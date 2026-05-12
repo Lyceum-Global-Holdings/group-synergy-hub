@@ -36,7 +36,7 @@ const QR_SIZE = 45;
 
 const TEXT_PAD = 1.5;            // padding inside inner rectangle for text
 const BLOCK_GAP = 1.6;           // gap between blocks
-const FLOOR = { item: 9.0, name: 7.5, bin: 7.0 };
+const FLOOR = { item: 9.0, name: 9.0, bin: 7.0 };
 
 type Block = {
   value: string;
@@ -87,7 +87,7 @@ export async function generateBulkBinQRCodePdf(allocations: BinAllocationForQR[]
 
     const blocks: Block[] = [
       { value: a.item_code ?? '—', font: 'courier',   style: 'bold',   startSize: 14, floor: FLOOR.item, singleLine: true },
-      { value: a.item_name ?? '—', font: 'helvetica', style: 'normal', startSize: 11, floor: FLOOR.name },
+      { value: a.item_name ?? '—', font: 'helvetica', style: 'normal', startSize: 13, floor: FLOOR.name },
       { value: a.bin_code  ?? '—', font: 'helvetica', style: 'bold',   startSize: 9,  floor: FLOOR.bin  },
     ];
 
