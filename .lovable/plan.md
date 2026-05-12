@@ -1,38 +1,36 @@
-# Move Bin Allocations under Warehouse
-
-Today, Bin Allocations lives as a tab inside `/warehouse/item-bin-master` alongside Item Master, Bin Master, Categories, and Units. Bin Allocations is operationally distinct (item-to-bin mapping with stock quantities, QR labels, scoping by warehouse/location) and is used by warehouse operators rather than master-data maintainers. Aligning with WMS conventions (SAP EWM "Storage Bin / Product Assignment", Oracle WMS "Item-Locator", Manhattan "Slotting & Bin Item") it deserves its own navigable module.
+## Goal
+Update bulk bin-QR labels (102×51 mm with 96×48 mm bordered content) to drop the Quantity line and instead always show the **full** Item Code, **full** Item Name, and **full** Bin code, wrapping across multiple lines when they exceed the available text-column width.
 
 ## Scope
+Single file: `src/utils/bulkBinQRCodePdf.ts`. No changes to payload (`binQRPayload.ts`), single-label flow, RPC, RLS, or UI.
 
-Move the Bin Allocations functionality out of the Item & Bin Master tab group into its own route and sidebar entry under Warehouse. No business logic changes.
+## Label layout (unchanged geometry)
+- Page: 102 × 51 mm landscape, 1.5 mm vertical / 3 mm horizontal margins → 96 × 48 mm inner content with a 0.3 mm border.
+- QR: 45 × 45 mm, vertically centred on the left (ISO/IEC 18004, ECC level M, 4-module quiet zone per ISO/IEC 15415).
+- Text column: starts at ~52.5 mm, width ≈ 46 mm available to the inner border.
 
-## Changes
+## Text content rules
+1. **Remove** the `Qty:` line entirely (and the `allocated_quantity` rendering).
+2. Render three labelled blocks in this order, each wrapping to multiple lines as needed:
+   - `Item:` — full `item_code` (Courier bold 10 pt for scanability; GS1 General Specifications recommend mono for human-readable interpretation/HRI).
+   - `Name:` — full `item_name` (Helvetica 8.5 pt).
+   - `Bin:` — full `bin_code` (Helvetica bold 9 pt).
+3. **No truncation.** Use `jsPDF.splitTextToSize(value, maxWidth)` to wrap long values. The label key (`Item:` / `Name:` / `Bin:`) is printed once on the first wrapped line; continuation lines are indented to the value column.
+4. **Location line is dropped** to free vertical space (location is already encoded in the GS1 Digital Link payload and visible after scanning); this keeps the label readable when item names or bin paths are long. Confirm in the question below if you'd prefer to keep it.
 
-1. **New route**: `/warehouse/bin-allocations` rendering a thin page wrapper around the existing `BinAllocationsTab` component (kept as-is to preserve the warehouse/location scoping, search, bulk QR, and delete behavior already shipped).
-   - Add `src/pages/warehouse/BinAllocations.tsx` with header (title + description) and `<BinAllocationsTab />` body.
-   - Register lazy route in `src/App.tsx` next to other `/warehouse/*` routes.
+## Vertical fit strategy
+- Available text height ≈ 45 mm (inner 48 mm minus 1.5 mm top/bottom padding).
+- Line heights: Item 4.4 mm, Name 3.6 mm, Bin 4.0 mm; 1.5 mm gap between blocks.
+- Worst-case budget: Item 2 lines + Name 4 lines + Bin 2 lines ≈ 35 mm, fits comfortably.
+- If a value still overflows the remaining height, progressively shrink that block's font size by 0.5 pt (down to a 6.5 pt floor, ISO 15416 minimum legible HRI), then as a last resort ellipsise the **last visible line only** so the QR (which carries the canonical data) remains the source of truth.
 
-2. **Sidebar registration**: In `src/constants/moduleConfig.ts`, add a new submodule under `warehouse.subModules` immediately after `item-bin-master`:
-   - `{ key: 'bin-allocations', name: 'Bin Allocations', description: 'Item-to-bin assignments and quantities', url: '/warehouse/bin-allocations' }`
-
-3. **Remove the tab** from `src/pages/warehouse/ItemBinMaster.tsx`:
-   - Drop the `BinAllocationsTab` lazy import, the `TabsTrigger`, and the `TabsContent` block.
-   - Reduce `TabsList` from `grid-cols-5` to `grid-cols-4`.
-   - Update the `onNavigateToBins` handler passed to `ItemMasterDefinitionTab` to `navigate('/warehouse/bin-allocations')` instead of switching local tab state, so existing "View bins" affordances continue to work.
-
-4. **RBAC / access**: The new submodule key `bin-allocations` will need to be granted to roles. Out of the box it inherits the same access surface as Item & Bin Master via the module registration; admins can refine via `/admin/module-allocation`. No DB migration required (RBAC is keyed by submodule key in `rbacConfig`/role grants UI).
-
-5. **Backwards compatibility**: Keep the deep-link behavior intact. Anyone bookmarked to `/warehouse/item-bin-master` and clicking the (now removed) Allocations tab won't crash — the tab simply no longer exists, and the new sidebar entry is the discoverable path. No redirect needed since the old tab was internal state, not a URL.
+## Standards referenced
+- ISO/IEC 18004 (QR symbology, ECC M ≈ 15% recovery)
+- ISO/IEC 15415 / 15416 (print quality, quiet zone, HRI legibility)
+- GS1 General Specifications §4.14 (HRI rendering: monospace for code, mixed case for descriptive text)
+- GS1 Digital Link (payload format, unchanged)
 
 ## Out of scope
-
-- No changes to `BinAllocationsTab.tsx` internals (search, scoping badge, bulk QR PDF, delete dialog).
-- No changes to `bulkBinQRCodePdf.ts`, `binQRPayload.ts`, public bin QR resolver, or DB/RPC.
-- No changes to other tabs (Item Master, Bin Master, Categories, Units).
-- No rename of the existing `item-bin-master` route or page title.
-
-## Technical notes
-
-- Lazy-load the new page via `lazy(() => import('@/pages/warehouse/BinAllocations'))` consistent with sibling warehouse routes.
-- Memory `mem://architecture/module-registration-config` requires registering new modules in `moduleConfig.ts` — covered in step 2.
-- The `BinAllocationsTab` component already consumes `useLocationFilter` for global header scoping, so it works identically when rendered as a standalone page.
+- Single-allocation download path
+- Payload structure
+- Any DB / RPC / RLS / route changes
