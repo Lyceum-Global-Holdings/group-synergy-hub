@@ -260,10 +260,20 @@ export function BinAllocationsTab() {
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between gap-4">
-        <div>
-          <CardTitle>Bin Allocations</CardTitle>
+        <div className="space-y-1">
+          <div className="flex items-center gap-2">
+            <CardTitle>Bin Allocations</CardTitle>
+            {scope && (
+              <Badge variant="secondary" className="gap-1 font-normal">
+                <MapPin className="h-3 w-3" />
+                {scope.label}
+              </Badge>
+            )}
+          </div>
           <CardDescription>
-            Manage item-to-bin allocations and track reserved quantities
+            {scope
+              ? 'Showing allocations for the selected warehouse and its sub-locations (set via the header location filter).'
+              : 'Manage item-to-bin allocations and track reserved quantities'}
           </CardDescription>
         </div>
         <div className="flex items-center gap-4">
