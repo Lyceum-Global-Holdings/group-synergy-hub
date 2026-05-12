@@ -1,40 +1,24 @@
 ## Goal
+Force the **item code** to render as a single line (no wrapping) in both bulk PDF and individual PNG bin QR labels. Item name and bin can still wrap as today.
 
-On bin-allocation QR stickers (both bulk PDF and individual PNG download), drop the `Item:`, `Name:`, `Bin:` labels and render the values only. Make the item code and item name visibly larger; keep the bin value present but smaller/secondary.
+## Bulk PDF — `src/utils/bulkBinQRCodePdf.ts`
+- Add a per-block `singleLine: boolean` flag on `Block`. Set `true` on the item-code block only.
+- In `computeLayout` and `renderTextBlocks`, for single-line blocks:
+  - Skip `splitTextToSize`; treat as exactly 1 line.
+  - At the chosen font size, if `doc.getTextWidth(value) > valMaxW`, shrink that block's font further (independent of the uniform shrink loop) down to its `FLOOR.item` (9.0 pt).
+  - If still wider than the column at the floor, ellipsise with existing `ellipsiseToWidth` so it stays one line.
+- Keep the existing uniform shrink loop for vertical fit; single-line block contributes `lh × 1` to total height.
+- Item name and bin keep current multi-line wrap + ellipsise behaviour.
 
-## Files
-
-1. **`src/utils/bulkBinQRCodePdf.ts`** (bulk 96×48 mm PDF)
-2. **`src/components/warehouse/BinAllocationQRDialog.tsx`** (individual 2"×1" PNG)
-
-## Bulk PDF changes (`bulkBinQRCodePdf.ts`)
-
-- Remove `key` from rendering — render value-only blocks.
-- Update `Block` shape: drop `key`; render value with `splitTextToSize` across full text-column width (`textRight - textX`).
-- New typography hierarchy (start sizes, ISO 15416 ≥6.5 pt floor):
-  - Item code: Courier bold, **14 pt** (floor 9 pt)
-  - Item name: Helvetica normal, **11 pt** (floor 7.5 pt)
-  - Bin code: Helvetica bold, **9 pt** (floor 7 pt)  ← unchanged in role, kept as supporting line
-- Adaptive shrink loop unchanged (uniform −0.5 pt until fits or floors hit), then ellipsise last visible line of last block if still overflowing.
-- Slightly increase `BLOCK_GAP` (1.2 → 1.6 mm) so the larger type breathes.
-
-## Individual PNG changes (`BinAllocationQRDialog.tsx`)
-
-In `handleDownload` canvas composition (600×300 @ 300 dpi):
-- Drop `Bin: ` prefix; render bin value alone.
-- Resize text:
-  - Item code: `bold 40px "Courier New", monospace` (was 28 px), wrap to 2 lines if needed using a small word/char-wrap helper.
-  - Item name: `28px Helvetica, Arial, sans-serif` (was 20 px), wrap to up to 2 lines.
-  - Bin: `22px bold Helvetica, Arial, sans-serif` (was 20 px normal with prefix).
-- Vertical layout recomputed top-down from `PAD` with line heights matching font size × 1.15; ellipsise last line of each block if it still exceeds the text column.
-- Keep existing `truncateForCanvas` as the per-line ellipsis helper; add a tiny `wrapLines(ctx, text, maxWidth, maxLines)` helper for multi-line wrapping.
+## Individual PNG — `src/components/warehouse/BinAllocationQRDialog.tsx`
+- Change the item-code block to `maxLines: 1`.
+- Before render, auto-shrink the item-code font from 40 px down to a floor of 24 px (≈ ISO 15416 HRI minimum at 300 dpi for 2"×1" label) until `ctx.measureText(itemCode).width <= textMaxW`.
+- If still overflowing at the floor, single-line ellipsise via existing `truncateForCanvas`.
+- Item name (`maxLines: 2`) and bin (`maxLines: 1`) unchanged.
+- Recompute `wrapped`/`totalH` after the shrink so vertical centring stays correct.
 
 ## Out of scope
+QR payload, dialog metadata panel, routes/RPC/RLS, `binQRPayload.ts`, asset/non-bin bulk QR generator (`bulkQRCodePdf.ts`).
 
-- QR payload, dialog metadata panel (`Item: code — name` summary stays as-is for screen reading), routes, RPC, RLS, or `binQRPayload.ts`.
-- The asset (non-bin) bulk QR generator in `bulkQRCodePdf.ts`.
-
-## Standards
-
-- ISO/IEC 18004 (QR, ECC M) and ISO/IEC 15415/15416 (HRI minimum size, quiet zone) preserved.
-- GS1 Gen Specs §4.14: HRI uses monospace for the identifier (item code) and proportional for descriptive text — labels are optional and removed here for density.
+## Standards preserved
+ISO/IEC 18004 (QR, ECC M), ISO/IEC 15415/15416 (HRI minimum size, quiet zone), GS1 Gen Specs §4.14 (monospace identifier, proportional descriptive text).

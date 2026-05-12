@@ -43,6 +43,8 @@ type Block = {
   font: 'courier' | 'helvetica';
   style: 'bold' | 'normal';
   startSize: number;
+  floor: number;
+  singleLine?: boolean;
 };
 
 export async function generateBulkBinQRCodePdf(allocations: BinAllocationForQR[]): Promise<Blob> {
