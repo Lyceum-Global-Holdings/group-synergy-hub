@@ -256,7 +256,6 @@ export function ItemMasterDefinitionTab({ onNavigateToInventory, onNavigateToBin
 
   return (
     <div className="space-y-4">
-      <Suspense fallback={null}><StockMovementChart /></Suspense>
 
       <div className="flex flex-col gap-3">
         <div className="flex items-center justify-between">
