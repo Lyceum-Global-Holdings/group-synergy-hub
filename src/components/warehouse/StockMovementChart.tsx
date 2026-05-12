@@ -1,26 +1,39 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { useStockMovementAnalytics } from '@/hooks/useStockMovementAnalytics';
 import { useWarehouseItems } from '@/hooks/useWarehouseItems';
+import { useWarehouseLocations } from '@/hooks/useWarehouseLocations';
+import { useLocationFilter } from '@/contexts/LocationFilterContext';
 import { Loader2, TrendingUp } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 
 export function StockMovementChart() {
   const [selectedItemId, setSelectedItemId] = useState<string>('all');
   const { items } = useWarehouseItems();
+  const { locations } = useWarehouseLocations();
+  const { globalLocationId } = useLocationFilter();
   const { data: movements = [], isLoading } = useStockMovementAnalytics(
-    selectedItemId === 'all' ? undefined : selectedItemId
+    selectedItemId === 'all' ? undefined : selectedItemId,
+    globalLocationId
   );
+
+  const activeWarehouseName = useMemo(() => {
+    if (!globalLocationId) return 'All Warehouses';
+    return locations.find(l => l.id === globalLocationId)?.name ?? 'Selected Warehouse';
+  }, [globalLocationId, locations]);
 
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between pb-2">
-        <CardTitle className="flex items-center gap-2 text-base">
-          <TrendingUp className="h-4 w-4" />
-          Stock Movement Trends (30 Days)
-        </CardTitle>
+        <div>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <TrendingUp className="h-4 w-4" />
+            Stock Movement Trends (30 Days)
+          </CardTitle>
+          <p className="text-xs text-muted-foreground mt-1">{activeWarehouseName}</p>
+        </div>
         <Select value={selectedItemId} onValueChange={setSelectedItemId}>
           <SelectTrigger className="w-[220px]">
             <SelectValue placeholder="All Items" />
