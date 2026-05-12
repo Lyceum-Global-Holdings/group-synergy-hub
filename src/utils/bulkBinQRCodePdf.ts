@@ -35,13 +35,10 @@ const INNER_H = PAGE_H - MARGIN_Y * 2; // 48
 const QR_SIZE = 45;
 
 const TEXT_PAD = 1.5;            // padding inside inner rectangle for text
-const KEY_GAP = 0.5;             // gap (mm) below a key/value first line
-const BLOCK_GAP = 1.2;           // gap between blocks
-const MIN_FONT = 6.5;            // ISO 15416 minimum legible HRI
-const FLOOR = { item: 7.5, name: 6.5, bin: 7.0 };
+const BLOCK_GAP = 1.6;           // gap between blocks
+const FLOOR = { item: 9.0, name: 7.5, bin: 7.0 };
 
 type Block = {
-  key: string;
   value: string;
   font: 'courier' | 'helvetica';
   style: 'bold' | 'normal';
@@ -87,9 +84,9 @@ export async function generateBulkBinQRCodePdf(allocations: BinAllocationForQR[]
     const textBottom = MARGIN_Y + INNER_H - TEXT_PAD;
 
     const blocks: Block[] = [
-      { key: 'Item:', value: a.item_code ?? '—', font: 'courier',   style: 'bold',   startSize: 10   },
-      { key: 'Name:', value: a.item_name ?? '—', font: 'helvetica', style: 'normal', startSize: 8.5  },
-      { key: 'Bin:',  value: a.bin_code  ?? '—', font: 'helvetica', style: 'bold',   startSize: 9    },
+      { value: a.item_code ?? '—', font: 'courier',   style: 'bold',   startSize: 14   },
+      { value: a.item_name ?? '—', font: 'helvetica', style: 'normal', startSize: 11   },
+      { value: a.bin_code  ?? '—', font: 'helvetica', style: 'bold',   startSize: 9    },
     ];
 
     renderTextBlocks(doc, blocks, {
@@ -134,31 +131,21 @@ function renderTextBlocks(
     doc.setFont(b.font, b.style);
     doc.setFontSize(size);
 
-    // Key on first line
-    const keyW = doc.getTextWidth(b.key + ' ');
-    const valX = textX + keyW;
-    const valMaxW = textRight - valX;
+    const valMaxW = textRight - textX;
     const lines: string[] = doc.splitTextToSize(b.value, valMaxW);
 
-    // Capacity check for this block
+    // Capacity check
     const remaining = bottom - y;
-    let maxLines = Math.max(1, Math.floor(remaining / lh));
+    const maxLines = Math.max(1, Math.floor(remaining / lh));
     let toRender = lines;
     if (lines.length > maxLines) {
       toRender = lines.slice(0, maxLines);
-      // Ellipsise last visible line
       const last = toRender[toRender.length - 1];
       toRender[toRender.length - 1] = ellipsiseToWidth(doc, last, valMaxW);
     }
 
-    // First line: key + first value line
-    doc.text(b.key, textX, y + lh - 0.6);
-    doc.text(toRender[0] ?? '', valX, y + lh - 0.6);
-    y += lh + KEY_GAP;
-
-    // Continuation lines aligned under value column
-    for (let li = 1; li < toRender.length; li++) {
-      doc.text(toRender[li], valX, y + lh - 0.6);
+    for (let li = 0; li < toRender.length; li++) {
+      doc.text(toRender[li], textX, y + lh - 0.6);
       y += lh;
     }
 
@@ -182,11 +169,10 @@ function computeLayout(
     const lh = size * 0.353 + 0.6;
     doc.setFont(b.font, b.style);
     doc.setFontSize(size);
-    const keyW = doc.getTextWidth(b.key + ' ');
-    const valMaxW = textRight - (textX + keyW);
+    const valMaxW = textRight - textX;
     const lines: string[] = doc.splitTextToSize(b.value, valMaxW);
     lineCounts.push(lines.length);
-    totalH += lh * lines.length + KEY_GAP + BLOCK_GAP;
+    totalH += lh * lines.length + BLOCK_GAP;
   }
   return { totalH, lineCounts };
 }

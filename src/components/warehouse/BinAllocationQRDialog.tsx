@@ -37,7 +37,7 @@ export function BinAllocationQRDialog({ allocation, open, onOpenChange }: Props)
   const handleDownload = async () => {
     if (!allocation) return;
     try {
-      // Compose a 2"x1" landscape label @ 300dpi (600x300 px): QR on left, text on right.
+      // 2"x1" landscape label @ 300dpi (600x300 px): QR on left, text on right.
       const W = 600, H = 300, PAD = 12, QR_SIZE = 276;
       const canvas = document.createElement('canvas');
       canvas.width = W;
@@ -60,6 +60,7 @@ export function BinAllocationQRDialog({ allocation, open, onOpenChange }: Props)
       ctx.drawImage(img, PAD, PAD, QR_SIZE, QR_SIZE);
 
       const textX = PAD + QR_SIZE + 16;
+      const textMaxW = W - textX - PAD;
       const itemCode = allocation.warehouse_item?.item_code ?? '—';
       const itemName = allocation.warehouse_item?.name ?? '';
       const binName =
@@ -70,18 +71,34 @@ export function BinAllocationQRDialog({ allocation, open, onOpenChange }: Props)
       ctx.fillStyle = '#000000';
       ctx.textBaseline = 'top';
 
-      ctx.font = 'bold 28px "Courier New", monospace';
-      ctx.fillText(truncateForCanvas(ctx, itemCode, W - textX - PAD), textX, 96);
+      type Block = { text: string; font: string; size: number; maxLines: number };
+      const blocks: Block[] = [
+        { text: itemCode, font: 'bold {SIZE}px "Courier New", monospace', size: 40, maxLines: 2 },
+        { text: itemName, font: '{SIZE}px Helvetica, Arial, sans-serif', size: 28, maxLines: 2 },
+        { text: binName,  font: 'bold {SIZE}px Helvetica, Arial, sans-serif', size: 22, maxLines: 1 },
+      ];
 
-      ctx.font = '20px Helvetica, Arial, sans-serif';
-      ctx.fillText(truncateForCanvas(ctx, itemName, W - textX - PAD), textX, 138);
+      // Compute total height and shift to vertically center within the text column.
+      const lineHeights = blocks.map(b => Math.round(b.size * 1.15));
+      const blockGap = 8;
+      const wrapped = blocks.map((b, i) => {
+        ctx.font = b.font.replace('{SIZE}', String(b.size));
+        return wrapLines(ctx, b.text, textMaxW, b.maxLines);
+      });
+      const totalH =
+        wrapped.reduce((sum, lines, i) => sum + lines.length * lineHeights[i], 0) +
+        blockGap * (blocks.length - 1);
+      let y = Math.max(PAD, Math.round((H - totalH) / 2));
 
-      ctx.font = '20px Helvetica, Arial, sans-serif';
-      ctx.fillText(
-        truncateForCanvas(ctx, `Bin: ${binName}`, W - textX - PAD),
-        textX,
-        178,
-      );
+      for (let i = 0; i < blocks.length; i++) {
+        const b = blocks[i];
+        ctx.font = b.font.replace('{SIZE}', String(b.size));
+        for (const line of wrapped[i]) {
+          ctx.fillText(line, textX, y);
+          y += lineHeights[i];
+        }
+        y += blockGap;
+      }
 
       const labelUrl = canvas.toDataURL('image/png');
       const link = document.createElement('a');
@@ -95,6 +112,53 @@ export function BinAllocationQRDialog({ allocation, open, onOpenChange }: Props)
       toast.error('Failed to generate QR label');
     }
   };
+
+  function wrapLines(
+    ctx: CanvasRenderingContext2D,
+    text: string,
+    maxWidth: number,
+    maxLines: number,
+  ): string[] {
+    if (!text) return [''];
+    const words = text.split(/(\s+)/); // keep whitespace tokens
+    const lines: string[] = [];
+    let current = '';
+    for (const w of words) {
+      const candidate = current + w;
+      if (ctx.measureText(candidate).width <= maxWidth) {
+        current = candidate;
+      } else {
+        if (current.trim()) lines.push(current.trimEnd());
+        // word itself longer than line — hard-break by chars
+        if (ctx.measureText(w).width > maxWidth) {
+          let chunk = '';
+          for (const ch of w) {
+            if (ctx.measureText(chunk + ch).width <= maxWidth) chunk += ch;
+            else { lines.push(chunk); chunk = ch; }
+            if (lines.length >= maxLines) break;
+          }
+          current = chunk;
+        } else {
+          current = w.trimStart();
+        }
+        if (lines.length >= maxLines) break;
+      }
+    }
+    if (current.trim() && lines.length < maxLines) lines.push(current.trimEnd());
+    if (lines.length > maxLines) lines.length = maxLines;
+    // Ellipsise last line if there's overflow text
+    const joined = lines.join(' ').replace(/\s+/g, ' ').trim();
+    const orig = text.replace(/\s+/g, ' ').trim();
+    if (joined.length < orig.length && lines.length > 0) {
+      const i = lines.length - 1;
+      let last = lines[i];
+      while (last.length > 1 && ctx.measureText(last + '…').width > maxWidth) {
+        last = last.slice(0, -1);
+      }
+      lines[i] = last + '…';
+    }
+    return lines;
+  }
 
   function truncateForCanvas(ctx: CanvasRenderingContext2D, text: string, maxWidth: number) {
     if (ctx.measureText(text).width <= maxWidth) return text;
