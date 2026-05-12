@@ -118,6 +118,16 @@ export interface BinAllocationWithDetails extends WarehouseBinAllocation {
       id: string;
       name: string;
       location_code?: string | null;
+      parent_id?: string | null;
+      parent?: {
+        id: string;
+        name: string;
+        location_code?: string | null;
+      } | Array<{
+        id: string;
+        name: string;
+        location_code?: string | null;
+      }> | null;
     } | null;
   };
 }
