@@ -43,6 +43,8 @@ type Block = {
   font: 'courier' | 'helvetica';
   style: 'bold' | 'normal';
   startSize: number;
+  floor: number;
+  singleLine?: boolean;
 };
 
 export async function generateBulkBinQRCodePdf(allocations: BinAllocationForQR[]): Promise<Blob> {
@@ -84,9 +86,9 @@ export async function generateBulkBinQRCodePdf(allocations: BinAllocationForQR[]
     const textBottom = MARGIN_Y + INNER_H - TEXT_PAD;
 
     const blocks: Block[] = [
-      { value: a.item_code ?? '—', font: 'courier',   style: 'bold',   startSize: 14   },
-      { value: a.item_name ?? '—', font: 'helvetica', style: 'normal', startSize: 11   },
-      { value: a.bin_code  ?? '—', font: 'helvetica', style: 'bold',   startSize: 9    },
+      { value: a.item_code ?? '—', font: 'courier',   style: 'bold',   startSize: 14, floor: FLOOR.item, singleLine: true },
+      { value: a.item_name ?? '—', font: 'helvetica', style: 'normal', startSize: 11, floor: FLOOR.name },
+      { value: a.bin_code  ?? '—', font: 'helvetica', style: 'bold',   startSize: 9,  floor: FLOOR.bin  },
     ];
 
     renderTextBlocks(doc, blocks, {
@@ -107,41 +109,47 @@ function renderTextBlocks(
 ) {
   const { textX, textRight, top, bottom } = bounds;
   const available = bottom - top;
-  const floors = [FLOOR.item, FLOOR.name, FLOOR.bin];
+  const valMaxW = textRight - textX;
 
-  // Try start sizes, shrink uniformly until total fits or floors hit.
-  let sizes = blocks.map((b) => b.startSize);
-  let layout = computeLayout(doc, blocks, sizes, textX, textRight);
+  // Per-block sizing. Single-line blocks shrink independently to fit width.
+  let sizes = blocks.map((b) => {
+    if (!b.singleLine) return b.startSize;
+    return fitSingleLineSize(doc, b, valMaxW);
+  });
 
+  let layout = computeLayout(doc, blocks, sizes, valMaxW);
+
+  // Uniform vertical shrink for any block still above its floor.
   while (layout.totalH > available) {
-    const canShrink = sizes.some((s, i) => s - 0.5 >= floors[i]);
+    const canShrink = sizes.some((s, i) => s - 0.5 >= blocks[i].floor);
     if (!canShrink) break;
-    sizes = sizes.map((s, i) => (s - 0.5 >= floors[i] ? s - 0.5 : s));
-    layout = computeLayout(doc, blocks, sizes, textX, textRight);
+    sizes = sizes.map((s, i) => (s - 0.5 >= blocks[i].floor ? s - 0.5 : s));
+    layout = computeLayout(doc, blocks, sizes, valMaxW);
   }
 
-  // Render. If still overflowing, allow last block to ellipsise its tail line.
   let y = top;
   doc.setTextColor(0, 0, 0);
 
   for (let bi = 0; bi < blocks.length; bi++) {
     const b = blocks[bi];
     const size = sizes[bi];
-    const lh = size * 0.353 + 0.6; // pt -> mm-ish line height
+    const lh = size * 0.353 + 0.6;
     doc.setFont(b.font, b.style);
     doc.setFontSize(size);
 
-    const valMaxW = textRight - textX;
-    const lines: string[] = doc.splitTextToSize(b.value, valMaxW);
-
-    // Capacity check
-    const remaining = bottom - y;
-    const maxLines = Math.max(1, Math.floor(remaining / lh));
-    let toRender = lines;
-    if (lines.length > maxLines) {
-      toRender = lines.slice(0, maxLines);
-      const last = toRender[toRender.length - 1];
-      toRender[toRender.length - 1] = ellipsiseToWidth(doc, last, valMaxW);
+    let toRender: string[];
+    if (b.singleLine) {
+      toRender = [ellipsiseToWidth(doc, b.value, valMaxW)];
+    } else {
+      const lines: string[] = doc.splitTextToSize(b.value, valMaxW);
+      const remaining = bottom - y;
+      const maxLines = Math.max(1, Math.floor(remaining / lh));
+      toRender = lines;
+      if (lines.length > maxLines) {
+        toRender = lines.slice(0, maxLines);
+        const last = toRender[toRender.length - 1];
+        toRender[toRender.length - 1] = ellipsiseToWidth(doc, last, valMaxW);
+      }
     }
 
     for (let li = 0; li < toRender.length; li++) {
@@ -154,12 +162,22 @@ function renderTextBlocks(
   }
 }
 
+function fitSingleLineSize(doc: jsPDF, b: Block, maxW: number): number {
+  let size = b.startSize;
+  doc.setFont(b.font, b.style);
+  doc.setFontSize(size);
+  while (doc.getTextWidth(b.value) > maxW && size - 0.5 >= b.floor) {
+    size -= 0.5;
+    doc.setFontSize(size);
+  }
+  return size;
+}
+
 function computeLayout(
   doc: jsPDF,
   blocks: Block[],
   sizes: number[],
-  textX: number,
-  textRight: number,
+  valMaxW: number,
 ) {
   let totalH = 0;
   const lineCounts: number[] = [];
@@ -169,10 +187,11 @@ function computeLayout(
     const lh = size * 0.353 + 0.6;
     doc.setFont(b.font, b.style);
     doc.setFontSize(size);
-    const valMaxW = textRight - textX;
-    const lines: string[] = doc.splitTextToSize(b.value, valMaxW);
-    lineCounts.push(lines.length);
-    totalH += lh * lines.length + BLOCK_GAP;
+    const lineCount = b.singleLine
+      ? 1
+      : (doc.splitTextToSize(b.value, valMaxW) as string[]).length;
+    lineCounts.push(lineCount);
+    totalH += lh * lineCount + BLOCK_GAP;
   }
   return { totalH, lineCounts };
 }

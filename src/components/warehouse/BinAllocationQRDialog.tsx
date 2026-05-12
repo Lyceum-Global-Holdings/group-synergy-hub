@@ -71,18 +71,30 @@ export function BinAllocationQRDialog({ allocation, open, onOpenChange }: Props)
       ctx.fillStyle = '#000000';
       ctx.textBaseline = 'top';
 
-      type Block = { text: string; font: string; size: number; maxLines: number };
+      type Block = { text: string; font: string; size: number; maxLines: number; singleLine?: boolean; floor?: number };
       const blocks: Block[] = [
-        { text: itemCode, font: 'bold {SIZE}px "Courier New", monospace', size: 40, maxLines: 2 },
+        { text: itemCode, font: 'bold {SIZE}px "Courier New", monospace', size: 40, maxLines: 1, singleLine: true, floor: 24 },
         { text: itemName, font: '{SIZE}px Helvetica, Arial, sans-serif', size: 28, maxLines: 2 },
         { text: binName,  font: 'bold {SIZE}px Helvetica, Arial, sans-serif', size: 22, maxLines: 1 },
       ];
+
+      // Auto-shrink single-line blocks (item code) to fit on one line.
+      for (const b of blocks) {
+        if (!b.singleLine) continue;
+        const floor = b.floor ?? 12;
+        while (b.size > floor) {
+          ctx.font = b.font.replace('{SIZE}', String(b.size));
+          if (ctx.measureText(b.text).width <= textMaxW) break;
+          b.size -= 1;
+        }
+      }
 
       // Compute total height and shift to vertically center within the text column.
       const lineHeights = blocks.map(b => Math.round(b.size * 1.15));
       const blockGap = 8;
       const wrapped = blocks.map((b, i) => {
         ctx.font = b.font.replace('{SIZE}', String(b.size));
+        if (b.singleLine) return [truncateForCanvas(ctx, b.text, textMaxW)];
         return wrapLines(ctx, b.text, textMaxW, b.maxLines);
       });
       const totalH =
