@@ -1,16 +1,12 @@
 import { Suspense, lazy, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Package, MapPin, Tag, Ruler, Grid3x3, ShieldAlert, ClipboardList, Loader2 } from 'lucide-react';
+import { MapPin, Tag, Ruler, Grid3x3, ClipboardList, Loader2 } from 'lucide-react';
 import { useRealtimeStockUpdates } from '@/hooks/useRealtimeStockUpdates';
 
 // Lazy-load every tab so only the active tab's chunk + data fetches load.
-// Each tab pulls in dozens of dialog components; deferring them shrinks the
-// initial route chunk dramatically.
 const ItemMasterDefinitionTab = lazy(() =>
   import('@/components/warehouse/ItemMasterDefinitionTab').then(m => ({ default: m.ItemMasterDefinitionTab }))
-);
-const ItemMasterTab = lazy(() =>
-  import('@/components/warehouse/ItemMasterTab').then(m => ({ default: m.ItemMasterTab }))
 );
 const BinMasterTab = lazy(() =>
   import('@/components/warehouse/BinMasterTab').then(m => ({ default: m.BinMasterTab }))
@@ -24,9 +20,6 @@ const ItemCategoriesTab = lazy(() =>
 const ItemUnitsTab = lazy(() =>
   import('@/components/warehouse/ItemUnitsTab').then(m => ({ default: m.ItemUnitsTab }))
 );
-const StockAuditTab = lazy(() =>
-  import('@/components/warehouse/StockAuditTab').then(m => ({ default: m.StockAuditTab }))
-);
 
 function TabFallback() {
   return (
@@ -39,28 +32,25 @@ function TabFallback() {
 
 export default function ItemBinMaster() {
   useRealtimeStockUpdates();
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('item-master');
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Warehouse Management</h1>
+          <h1 className="text-3xl font-bold">Item &amp; Bin Master</h1>
           <p className="text-muted-foreground">
-            Manage item catalog, inventory, storage bins, categories, and units
+            Manage item catalog, storage bins, categories, and units
           </p>
         </div>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList className="grid w-full grid-cols-7">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="item-master" className="flex items-center gap-2">
             <ClipboardList className="h-4 w-4" />
             Item Master
-          </TabsTrigger>
-          <TabsTrigger value="inventory" className="flex items-center gap-2">
-            <Package className="h-4 w-4" />
-            Inventory
           </TabsTrigger>
           <TabsTrigger value="bins" className="flex items-center gap-2">
             <MapPin className="h-4 w-4" />
@@ -78,27 +68,15 @@ export default function ItemBinMaster() {
             <Ruler className="h-4 w-4" />
             Units
           </TabsTrigger>
-          <TabsTrigger value="audit" className="flex items-center gap-2">
-            <ShieldAlert className="h-4 w-4" />
-            Stock Audit
-          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="item-master">
           <Suspense fallback={<TabFallback />}>
             {activeTab === 'item-master' && (
               <ItemMasterDefinitionTab
-                onNavigateToInventory={() => setActiveTab('inventory')}
+                onNavigateToInventory={() => navigate('/warehouse/inventory')}
                 onNavigateToBins={() => setActiveTab('allocations')}
               />
-            )}
-          </Suspense>
-        </TabsContent>
-
-        <TabsContent value="inventory">
-          <Suspense fallback={<TabFallback />}>
-            {activeTab === 'inventory' && (
-              <ItemMasterTab onGoToAudit={() => setActiveTab('audit')} />
             )}
           </Suspense>
         </TabsContent>
@@ -124,12 +102,6 @@ export default function ItemBinMaster() {
         <TabsContent value="units">
           <Suspense fallback={<TabFallback />}>
             {activeTab === 'units' && <ItemUnitsTab />}
-          </Suspense>
-        </TabsContent>
-
-        <TabsContent value="audit">
-          <Suspense fallback={<TabFallback />}>
-            {activeTab === 'audit' && <StockAuditTab />}
           </Suspense>
         </TabsContent>
       </Tabs>

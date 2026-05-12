@@ -52,6 +52,8 @@ export const moduleConfig: Record<string, ModuleConfig> = {
     icon: Package,
     subModules: [
       { key: 'item-bin-master', name: 'Item & Bin Master', description: 'Item and location management', url: '/warehouse/item-bin-master' },
+      { key: 'inventory', name: 'Inventory', description: 'On-hand stock by item, location and bin', url: '/warehouse/inventory' },
+      { key: 'stock-audit', name: 'Stock Audit', description: 'Reconcile on-hand vs ledger', url: '/warehouse/stock-audit' },
       { key: 'grn', name: 'Goods Receipt Note', description: 'Receive goods into inventory', url: '/warehouse/grn' },
       { key: 'putaway', name: 'Putaway / Bin Transfer', description: 'Move items to storage locations', url: '/warehouse/putaway' },
       { key: 'pick-pack', name: 'Pick / Pack / Dispatch', description: 'Order fulfillment process', url: '/warehouse/pick-pack' },
