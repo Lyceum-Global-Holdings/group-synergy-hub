@@ -84,9 +84,9 @@ export async function generateBulkBinQRCodePdf(allocations: BinAllocationForQR[]
     const textBottom = MARGIN_Y + INNER_H - TEXT_PAD;
 
     const blocks: Block[] = [
-      { key: 'Item:', value: a.item_code ?? '—', font: 'courier',   style: 'bold',   startSize: 10   },
-      { key: 'Name:', value: a.item_name ?? '—', font: 'helvetica', style: 'normal', startSize: 8.5  },
-      { key: 'Bin:',  value: a.bin_code  ?? '—', font: 'helvetica', style: 'bold',   startSize: 9    },
+      { value: a.item_code ?? '—', font: 'courier',   style: 'bold',   startSize: 14   },
+      { value: a.item_name ?? '—', font: 'helvetica', style: 'normal', startSize: 11   },
+      { value: a.bin_code  ?? '—', font: 'helvetica', style: 'bold',   startSize: 9    },
     ];
 
     renderTextBlocks(doc, blocks, {
