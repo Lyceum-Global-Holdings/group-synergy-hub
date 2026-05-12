@@ -1,36 +1,40 @@
 ## Goal
-Update bulk bin-QR labels (102×51 mm with 96×48 mm bordered content) to drop the Quantity line and instead always show the **full** Item Code, **full** Item Name, and **full** Bin code, wrapping across multiple lines when they exceed the available text-column width.
 
-## Scope
-Single file: `src/utils/bulkBinQRCodePdf.ts`. No changes to payload (`binQRPayload.ts`), single-label flow, RPC, RLS, or UI.
+On bin-allocation QR stickers (both bulk PDF and individual PNG download), drop the `Item:`, `Name:`, `Bin:` labels and render the values only. Make the item code and item name visibly larger; keep the bin value present but smaller/secondary.
 
-## Label layout (unchanged geometry)
-- Page: 102 × 51 mm landscape, 1.5 mm vertical / 3 mm horizontal margins → 96 × 48 mm inner content with a 0.3 mm border.
-- QR: 45 × 45 mm, vertically centred on the left (ISO/IEC 18004, ECC level M, 4-module quiet zone per ISO/IEC 15415).
-- Text column: starts at ~52.5 mm, width ≈ 46 mm available to the inner border.
+## Files
 
-## Text content rules
-1. **Remove** the `Qty:` line entirely (and the `allocated_quantity` rendering).
-2. Render three labelled blocks in this order, each wrapping to multiple lines as needed:
-   - `Item:` — full `item_code` (Courier bold 10 pt for scanability; GS1 General Specifications recommend mono for human-readable interpretation/HRI).
-   - `Name:` — full `item_name` (Helvetica 8.5 pt).
-   - `Bin:` — full `bin_code` (Helvetica bold 9 pt).
-3. **No truncation.** Use `jsPDF.splitTextToSize(value, maxWidth)` to wrap long values. The label key (`Item:` / `Name:` / `Bin:`) is printed once on the first wrapped line; continuation lines are indented to the value column.
-4. **Location line is dropped** to free vertical space (location is already encoded in the GS1 Digital Link payload and visible after scanning); this keeps the label readable when item names or bin paths are long. Confirm in the question below if you'd prefer to keep it.
+1. **`src/utils/bulkBinQRCodePdf.ts`** (bulk 96×48 mm PDF)
+2. **`src/components/warehouse/BinAllocationQRDialog.tsx`** (individual 2"×1" PNG)
 
-## Vertical fit strategy
-- Available text height ≈ 45 mm (inner 48 mm minus 1.5 mm top/bottom padding).
-- Line heights: Item 4.4 mm, Name 3.6 mm, Bin 4.0 mm; 1.5 mm gap between blocks.
-- Worst-case budget: Item 2 lines + Name 4 lines + Bin 2 lines ≈ 35 mm, fits comfortably.
-- If a value still overflows the remaining height, progressively shrink that block's font size by 0.5 pt (down to a 6.5 pt floor, ISO 15416 minimum legible HRI), then as a last resort ellipsise the **last visible line only** so the QR (which carries the canonical data) remains the source of truth.
+## Bulk PDF changes (`bulkBinQRCodePdf.ts`)
 
-## Standards referenced
-- ISO/IEC 18004 (QR symbology, ECC M ≈ 15% recovery)
-- ISO/IEC 15415 / 15416 (print quality, quiet zone, HRI legibility)
-- GS1 General Specifications §4.14 (HRI rendering: monospace for code, mixed case for descriptive text)
-- GS1 Digital Link (payload format, unchanged)
+- Remove `key` from rendering — render value-only blocks.
+- Update `Block` shape: drop `key`; render value with `splitTextToSize` across full text-column width (`textRight - textX`).
+- New typography hierarchy (start sizes, ISO 15416 ≥6.5 pt floor):
+  - Item code: Courier bold, **14 pt** (floor 9 pt)
+  - Item name: Helvetica normal, **11 pt** (floor 7.5 pt)
+  - Bin code: Helvetica bold, **9 pt** (floor 7 pt)  ← unchanged in role, kept as supporting line
+- Adaptive shrink loop unchanged (uniform −0.5 pt until fits or floors hit), then ellipsise last visible line of last block if still overflowing.
+- Slightly increase `BLOCK_GAP` (1.2 → 1.6 mm) so the larger type breathes.
+
+## Individual PNG changes (`BinAllocationQRDialog.tsx`)
+
+In `handleDownload` canvas composition (600×300 @ 300 dpi):
+- Drop `Bin: ` prefix; render bin value alone.
+- Resize text:
+  - Item code: `bold 40px "Courier New", monospace` (was 28 px), wrap to 2 lines if needed using a small word/char-wrap helper.
+  - Item name: `28px Helvetica, Arial, sans-serif` (was 20 px), wrap to up to 2 lines.
+  - Bin: `22px bold Helvetica, Arial, sans-serif` (was 20 px normal with prefix).
+- Vertical layout recomputed top-down from `PAD` with line heights matching font size × 1.15; ellipsise last line of each block if it still exceeds the text column.
+- Keep existing `truncateForCanvas` as the per-line ellipsis helper; add a tiny `wrapLines(ctx, text, maxWidth, maxLines)` helper for multi-line wrapping.
 
 ## Out of scope
-- Single-allocation download path
-- Payload structure
-- Any DB / RPC / RLS / route changes
+
+- QR payload, dialog metadata panel (`Item: code — name` summary stays as-is for screen reading), routes, RPC, RLS, or `binQRPayload.ts`.
+- The asset (non-bin) bulk QR generator in `bulkQRCodePdf.ts`.
+
+## Standards
+
+- ISO/IEC 18004 (QR, ECC M) and ISO/IEC 15415/15416 (HRI minimum size, quiet zone) preserved.
+- GS1 Gen Specs §4.14: HRI uses monospace for the identifier (item code) and proportional for descriptive text — labels are optional and removed here for density.

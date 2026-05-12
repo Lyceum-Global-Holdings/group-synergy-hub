@@ -35,13 +35,10 @@ const INNER_H = PAGE_H - MARGIN_Y * 2; // 48
 const QR_SIZE = 45;
 
 const TEXT_PAD = 1.5;            // padding inside inner rectangle for text
-const KEY_GAP = 0.5;             // gap (mm) below a key/value first line
-const BLOCK_GAP = 1.2;           // gap between blocks
-const MIN_FONT = 6.5;            // ISO 15416 minimum legible HRI
-const FLOOR = { item: 7.5, name: 6.5, bin: 7.0 };
+const BLOCK_GAP = 1.6;           // gap between blocks
+const FLOOR = { item: 9.0, name: 7.5, bin: 7.0 };
 
 type Block = {
-  key: string;
   value: string;
   font: 'courier' | 'helvetica';
   style: 'bold' | 'normal';
