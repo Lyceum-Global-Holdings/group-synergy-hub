@@ -38,6 +38,43 @@ export function BinAllocationsTab() {
   const [searchTerm, setSearchTerm] = useState('');
   const [bulkPrinting, setBulkPrinting] = useState(false);
   const { binAllocations, isLoading, deleteAllocation, isDeleting } = useWarehouseBinAllocations();
+  const { globalLocationId } = useLocationFilter();
+  const { locations } = useWarehouseLocations();
+
+  // Build descendant set for the selected location (root + every sub-location).
+  // Selecting a parent warehouse includes its full subtree, matching standard
+  // WMS hierarchy filter semantics.
+  const scope = useMemo(() => {
+    if (!globalLocationId) return null;
+    const childrenByParent = new Map<string, string[]>();
+    for (const l of locations || []) {
+      if (l.parent_id) {
+        const arr = childrenByParent.get(l.parent_id) ?? [];
+        arr.push(l.id);
+        childrenByParent.set(l.parent_id, arr);
+      }
+    }
+    const ids = new Set<string>([globalLocationId]);
+    const stack = [globalLocationId];
+    while (stack.length) {
+      const id = stack.pop()!;
+      for (const child of childrenByParent.get(id) ?? []) {
+        if (!ids.has(child)) {
+          ids.add(child);
+          stack.push(child);
+        }
+      }
+    }
+    const root = (locations || []).find((l) => l.id === globalLocationId);
+    return {
+      ids,
+      label: root
+        ? root.location_code
+          ? `${root.name} (${root.location_code})`
+          : root.name
+        : 'Selected location',
+    };
+  }, [globalLocationId, locations]);
 
   // Normalize parent (PostgREST self-FK can return array or object) into a flat
   // hierarchical "Parent › Child" path. Follows WMS standard of showing the
@@ -61,18 +98,23 @@ export function BinAllocationsTab() {
   };
 
   const filteredAllocations = useMemo(() => {
-    const base = !searchTerm.trim()
-      ? binAllocations || []
-      : (binAllocations || []).filter((allocation) => {
-          const term = searchTerm.toLowerCase();
-          return (
-            allocation.warehouse_item?.item_code?.toLowerCase().includes(term) ||
-            allocation.warehouse_item?.name?.toLowerCase().includes(term) ||
-            allocation.warehouse_bin?.bin_code?.toLowerCase().includes(term) ||
-            allocation.warehouse_bin?.name?.toLowerCase().includes(term) ||
-            getLocationPath(allocation).path.toLowerCase().includes(term)
-          );
-        });
+    const term = searchTerm.trim().toLowerCase();
+    const base = (binAllocations || []).filter((allocation) => {
+      // Warehouse / sub-location scope
+      if (scope) {
+        const locId = allocation.warehouse_bin?.warehouse_location?.id;
+        if (!locId || !scope.ids.has(locId)) return false;
+      }
+      // Free-text search
+      if (!term) return true;
+      return (
+        allocation.warehouse_item?.item_code?.toLowerCase().includes(term) ||
+        allocation.warehouse_item?.name?.toLowerCase().includes(term) ||
+        allocation.warehouse_bin?.bin_code?.toLowerCase().includes(term) ||
+        allocation.warehouse_bin?.name?.toLowerCase().includes(term) ||
+        getLocationPath(allocation).path.toLowerCase().includes(term)
+      );
+    });
     // Group by location path → bin code → item code for predictable WMS layout
     return [...base].sort((a, b) => {
       const pa = getLocationPath(a).path;
@@ -83,7 +125,7 @@ export function BinAllocationsTab() {
       if (ba !== bb) return ba.localeCompare(bb);
       return (a.warehouse_item?.item_code ?? '').localeCompare(b.warehouse_item?.item_code ?? '');
     });
-  }, [binAllocations, searchTerm]);
+  }, [binAllocations, searchTerm, scope]);
   const { canDelete } = useIsAdminOrHigher();
 
   const handleDelete = () => {
