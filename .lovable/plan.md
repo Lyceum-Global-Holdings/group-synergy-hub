@@ -1,33 +1,28 @@
-## Problem
+## Goal
 
-The Bin Allocations tab now shows "No results." The query in `useWarehouseBinAllocations` is failing with:
+Scope the Bin Allocations tab to the warehouse/location selected in the global header location filter, matching the same UX already used by Stock Movement Trends on the Inventory page.
 
-```
-PGRST200 — Could not find a relationship between 'warehouse_locations' and 'warehouse_locations'
-using the hint 'warehouse_locations_parent_id_fkey'
-```
+## Behavior
 
-PostgREST does not resolve self-referencing foreign keys by constraint name; it needs the **column name** as the disambiguation hint. The whole `select` is rejected, so React Query receives an error and renders an empty table.
+- **Global location selector = "All locations"** → show every allocation the user can see (current behavior).
+- **Selected = a parent warehouse** → show allocations whose bin's location is that warehouse OR any sub-location below it (descendant set).
+- **Selected = a sub-location** → show only allocations bound to that exact sub-location.
 
-## Fix
+This matches how WMS hierarchy filters typically work (selecting a node includes its subtree).
 
-Single one-line change in `src/hooks/useWarehouseBinAllocations.ts`:
+## Implementation
 
-Replace
-```ts
-parent:warehouse_locations!warehouse_locations_parent_id_fkey(
-  id, name, location_code
-)
-```
-with
-```ts
-parent:warehouse_locations!parent_id(
-  id, name, location_code
-)
-```
+Single file: `src/components/warehouse/BinAllocationsTab.tsx`.
 
-Verified the corrected embed returns 200 from PostgREST. No other files need changes — the type already accepts `parent` as object or array, and `BinAllocationsTab.getLocationPath` already normalizes both shapes.
+1. Read `globalLocationId` via `useLocationFilter()`.
+2. Pull all locations via `useWarehouseLocations()` (already cached, lightweight).
+3. Build a `descendantIds(rootId)` memo: walk `parent_id` graph once, return `Set<string>` containing root + all descendants.
+4. Extend the existing `filteredAllocations` `useMemo` to also filter by `allocation.warehouse_bin?.warehouse_location?.id ∈ descendantIds`.
+5. Show a small inline scope indicator in the card header — e.g. `Scope: {locationName}` with a hint icon — only when `globalLocationId` is set, so users can see the active filter without leaving the page. No new selector control (the global header already drives this).
+6. Update the bulk-QR count + button label to keep using `filteredAllocations.length` (already does).
 
 ## Out of scope
-- No DB / RLS / type changes.
-- No UI changes — display logic for "Location › Sub-location" stays as-is.
+
+- No DB / RLS / hook signature changes — `useWarehouseBinAllocations` keeps fetching the user's full visible set; filtering stays client-side, consistent with how the search box already works on this tab.
+- No change to the global header location selector itself.
+- No change to `useWarehouseLocations` or its query key.
