@@ -101,11 +101,21 @@ export function BinAllocationsTab() {
     },
     {
       id: 'location',
-      header: 'Location',
-      cell: ({ row }) =>
-        row.original.warehouse_bin?.warehouse_location?.name ?? (
-          <span className="text-muted-foreground italic">Unassigned</span>
-        ),
+      header: 'Location › Sub-location',
+      cell: ({ row }) => {
+        const { parent, child } = getLocationPath(row.original);
+        if (!child) {
+          return <span className="text-muted-foreground italic">Unassigned</span>;
+        }
+        return (
+          <div className="flex flex-col leading-tight">
+            {parent && (
+              <span className="text-xs text-muted-foreground">{parent}</span>
+            )}
+            <span className="font-medium">{child}</span>
+          </div>
+        );
+      },
     },
     {
       accessorKey: 'warehouse_bin.bin_code',
