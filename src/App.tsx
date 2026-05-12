@@ -76,6 +76,7 @@ const Contracts = lazy(() => import("./pages/sourcing/Contracts"));
 const SupplierBlacklist = lazy(() => import("./pages/sourcing/SupplierBlacklist"));
 const AssetManagement = lazy(() => import("./pages/warehouse/AssetManagement"));
 const ItemBinMaster = lazy(() => import("./pages/warehouse/ItemBinMaster"));
+const BinAllocations = lazy(() => import("./pages/warehouse/BinAllocations"));
 const Inventory = lazy(() => import("./pages/warehouse/Inventory"));
 const StockAudit = lazy(() => import("./pages/warehouse/StockAudit"));
 const MaterialIssueReturn = lazy(() => import("./pages/warehouse/MaterialIssueReturn"));
@@ -301,6 +302,7 @@ function App() {
                 <Route path="/warehouse/asset-management" element={<AssetManagement />} />
                 <Route path="/warehouse/tool-management" element={<ToolManagement />} />
                 <Route path="/warehouse/item-bin-master" element={<ItemBinMaster />} />
+                <Route path="/warehouse/bin-allocations" element={<BinAllocations />} />
                 <Route path="/warehouse/inventory" element={<Inventory />} />
                 <Route path="/warehouse/stock-audit" element={<StockAudit />} />
                 <Route path="/warehouse/material-issue" element={<MaterialIssueReturn />} />
