@@ -3,6 +3,10 @@ import { Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useRealtimeStockUpdates } from '@/hooks/useRealtimeStockUpdates';
 
+const StockMovementChart = lazy(() =>
+  import('@/components/warehouse/StockMovementChart').then(m => ({ default: m.StockMovementChart }))
+);
+
 const ItemMasterTab = lazy(() =>
   import('@/components/warehouse/ItemMasterTab').then(m => ({ default: m.ItemMasterTab }))
 );
@@ -28,6 +32,7 @@ export default function Inventory() {
           </div>
         }
       >
+        <StockMovementChart />
         <ItemMasterTab onGoToAudit={() => navigate('/warehouse/stock-audit')} />
       </Suspense>
     </div>
