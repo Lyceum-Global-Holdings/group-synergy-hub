@@ -74,7 +74,7 @@ export function BinAllocationQRDialog({ allocation, open, onOpenChange }: Props)
       type Block = { text: string; font: string; size: number; maxLines: number; singleLine?: boolean; floor?: number };
       const blocks: Block[] = [
         { text: itemCode, font: 'bold {SIZE}px "Courier New", monospace', size: 40, maxLines: 1, singleLine: true, floor: 24 },
-        { text: itemName, font: '{SIZE}px Helvetica, Arial, sans-serif', size: 28, maxLines: 2 },
+        { text: itemName, font: '{SIZE}px Helvetica, Arial, sans-serif', size: 34, maxLines: 2 },
         { text: binName,  font: 'bold {SIZE}px Helvetica, Arial, sans-serif', size: 22, maxLines: 1 },
       ];
 
