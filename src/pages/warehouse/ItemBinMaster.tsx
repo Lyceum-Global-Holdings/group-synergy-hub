@@ -1,7 +1,7 @@
 import { Suspense, lazy, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { MapPin, Tag, Ruler, Grid3x3, ClipboardList, Loader2 } from 'lucide-react';
+import { MapPin, Tag, Ruler, ClipboardList, Loader2 } from 'lucide-react';
 import { useRealtimeStockUpdates } from '@/hooks/useRealtimeStockUpdates';
 
 // Lazy-load every tab so only the active tab's chunk + data fetches load.
@@ -10,9 +10,6 @@ const ItemMasterDefinitionTab = lazy(() =>
 );
 const BinMasterTab = lazy(() =>
   import('@/components/warehouse/BinMasterTab').then(m => ({ default: m.BinMasterTab }))
-);
-const BinAllocationsTab = lazy(() =>
-  import('@/components/warehouse/BinAllocationsTab').then(m => ({ default: m.BinAllocationsTab }))
 );
 const ItemCategoriesTab = lazy(() =>
   import('@/components/warehouse/ItemCategoriesTab').then(m => ({ default: m.ItemCategoriesTab }))
@@ -47,7 +44,7 @@ export default function ItemBinMaster() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="item-master" className="flex items-center gap-2">
             <ClipboardList className="h-4 w-4" />
             Item Master
@@ -55,10 +52,6 @@ export default function ItemBinMaster() {
           <TabsTrigger value="bins" className="flex items-center gap-2">
             <MapPin className="h-4 w-4" />
             Bin Master
-          </TabsTrigger>
-          <TabsTrigger value="allocations" className="flex items-center gap-2">
-            <Grid3x3 className="h-4 w-4" />
-            Bin Allocations
           </TabsTrigger>
           <TabsTrigger value="categories" className="flex items-center gap-2">
             <Tag className="h-4 w-4" />
@@ -75,7 +68,7 @@ export default function ItemBinMaster() {
             {activeTab === 'item-master' && (
               <ItemMasterDefinitionTab
                 onNavigateToInventory={() => navigate('/warehouse/inventory')}
-                onNavigateToBins={() => setActiveTab('allocations')}
+                onNavigateToBins={() => navigate('/warehouse/bin-allocations')}
               />
             )}
           </Suspense>
@@ -84,12 +77,6 @@ export default function ItemBinMaster() {
         <TabsContent value="bins">
           <Suspense fallback={<TabFallback />}>
             {activeTab === 'bins' && <BinMasterTab />}
-          </Suspense>
-        </TabsContent>
-
-        <TabsContent value="allocations">
-          <Suspense fallback={<TabFallback />}>
-            {activeTab === 'allocations' && <BinAllocationsTab />}
           </Suspense>
         </TabsContent>
 

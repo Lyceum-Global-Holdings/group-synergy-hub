@@ -1,54 +1,38 @@
-# Resize Bin Allocation QR Labels
+# Move Bin Allocations under Warehouse
 
-## Goal
-Change the downloadable bin-allocation QR PDF so each label is **102 × 51 mm** outer (page/border) with a **96 × 48 mm** printable content area inside — i.e. a uniform **3 mm border margin** on all sides (102−96 = 6 → 3 mm/side; 51−48 = 3 → 1.5 mm/side).
+Today, Bin Allocations lives as a tab inside `/warehouse/item-bin-master` alongside Item Master, Bin Master, Categories, and Units. Bin Allocations is operationally distinct (item-to-bin mapping with stock quantities, QR labels, scoping by warehouse/location) and is used by warehouse operators rather than master-data maintainers. Aligning with WMS conventions (SAP EWM "Storage Bin / Product Assignment", Oracle WMS "Item-Locator", Manhattan "Slotting & Bin Item") it deserves its own navigable module.
 
-To keep the border equal on all sides and match the user's "border 102×51, content 96×48" request literally, the cleanest interpretation is a symmetric **3 mm margin** between page edge and the inner content rectangle. The page itself is the 102×51 mm sheet; the printed border line sits at the inner rectangle.
+## Scope
 
-## Standards applied
-- **ISO/IEC 18004** — QR Code symbology, ECC level M (~15% recovery), quiet zone ≥ 4 modules.
-- **ISO/IEC 15415** — print quality: keep margin ≥ 4 modules (the `margin: 4` qrcode option).
-- **GS1 Digital Link** — payload format already produced by `buildBinQRPayload` (no change).
-- **ISO 216 / label trade practice** — sizes specified in millimetres, landscape orientation, symmetric margins for die-cut tolerance.
+Move the Bin Allocations functionality out of the Item & Bin Master tab group into its own route and sidebar entry under Warehouse. No business logic changes.
 
-## Layout (mm, landscape 102 × 51)
+## Changes
 
-```text
-┌────────────────────────────────────────────────────┐  page 102 × 51
-│  ┌──────────────────────────────────────────────┐  │  border at 3mm inset
-│  │ ┌──────────┐  ITEM_CODE                      │  │  → inner 96 × 48
-│  │ │          │  Item name (truncated)          │  │
-│  │ │   QR     │  Bin: BIN_CODE                  │  │
-│  │ │  45×45   │  Loc: LOCATION_CODE             │  │
-│  │ └──────────┘                                 │  │
-│  └──────────────────────────────────────────────┘  │
-└────────────────────────────────────────────────────┘
-```
+1. **New route**: `/warehouse/bin-allocations` rendering a thin page wrapper around the existing `BinAllocationsTab` component (kept as-is to preserve the warehouse/location scoping, search, bulk QR, and delete behavior already shipped).
+   - Add `src/pages/warehouse/BinAllocations.tsx` with header (title + description) and `<BinAllocationsTab />` body.
+   - Register lazy route in `src/App.tsx` next to other `/warehouse/*` routes.
 
-- QR module: 45 × 45 mm, positioned at x=4.5, y=3 mm (1.5 mm gap inside the border).
-- Text column starts at x≈53 mm; rows at y≈14 / 24 / 32 / 40 mm.
-- Font sizes: item code 11 pt bold mono (Courier), name 9 pt, bin/loc 8 pt.
-- Border: 0.3 mm stroke at the 96×48 inner rectangle (3 mm inset from page edge).
-- Background: white fill across full page.
+2. **Sidebar registration**: In `src/constants/moduleConfig.ts`, add a new submodule under `warehouse.subModules` immediately after `item-bin-master`:
+   - `{ key: 'bin-allocations', name: 'Bin Allocations', description: 'Item-to-bin assignments and quantities', url: '/warehouse/bin-allocations' }`
 
-## Technical changes
+3. **Remove the tab** from `src/pages/warehouse/ItemBinMaster.tsx`:
+   - Drop the `BinAllocationsTab` lazy import, the `TabsTrigger`, and the `TabsContent` block.
+   - Reduce `TabsList` from `grid-cols-5` to `grid-cols-4`.
+   - Update the `onNavigateToBins` handler passed to `ItemMasterDefinitionTab` to `navigate('/warehouse/bin-allocations')` instead of switching local tab state, so existing "View bins" affordances continue to work.
 
-Single file: `src/utils/bulkBinQRCodePdf.ts`
+4. **RBAC / access**: The new submodule key `bin-allocations` will need to be granted to roles. Out of the box it inherits the same access surface as Item & Bin Master via the module registration; admins can refine via `/admin/module-allocation`. No DB migration required (RBAC is keyed by submodule key in `rbacConfig`/role grants UI).
 
-1. `new jsPDF({ orientation: 'landscape', unit: 'mm', format: [102, 51] })` (was inches, 2×1).
-2. `doc.addPage([102, 51], 'landscape')` for subsequent allocations.
-3. Replace all coordinates with the mm values above.
-4. Bump `QRCode.toDataURL` width to ~600 px and `margin: 4` (ISO/IEC 15415 quiet zone). ECC stays `'M'`.
-5. Add a `Loc:` line so the location/sub-location code is visible on the label (the tab already shows the full path; the QR itself still resolves to it via GS1 Digital Link).
-6. Adjust `truncate` call sites for the wider text column (item code ≤ 18, name ≤ 28, bin ≤ 22, loc ≤ 22).
-
-No changes to:
-- `BinAllocationsTab.tsx` (it just calls `generateBulkBinQRCodePdf` / `downloadBulkBinQRCodePdf`).
-- `buildBinQRPayload` (GS1 Digital Link payload unchanged).
-- Public resolver page or the `/b/:id` route.
-- Any DB / RLS / hook code.
+5. **Backwards compatibility**: Keep the deep-link behavior intact. Anyone bookmarked to `/warehouse/item-bin-master` and clicking the (now removed) Allocations tab won't crash — the tab simply no longer exists, and the new sidebar entry is the discoverable path. No redirect needed since the old tab was internal state, not a URL.
 
 ## Out of scope
-- Asset (non-bin) QR PDF in `bulkQRCodePdf.ts` — separate label stock, not requested.
-- PNG export (`bulkQRCodePng.ts`) — separate format.
-- Print preview UI changes.
+
+- No changes to `BinAllocationsTab.tsx` internals (search, scoping badge, bulk QR PDF, delete dialog).
+- No changes to `bulkBinQRCodePdf.ts`, `binQRPayload.ts`, public bin QR resolver, or DB/RPC.
+- No changes to other tabs (Item Master, Bin Master, Categories, Units).
+- No rename of the existing `item-bin-master` route or page title.
+
+## Technical notes
+
+- Lazy-load the new page via `lazy(() => import('@/pages/warehouse/BinAllocations'))` consistent with sibling warehouse routes.
+- Memory `mem://architecture/module-registration-config` requires registering new modules in `moduleConfig.ts` — covered in step 2.
+- The `BinAllocationsTab` component already consumes `useLocationFilter` for global header scoping, so it works identically when rendered as a standalone page.
