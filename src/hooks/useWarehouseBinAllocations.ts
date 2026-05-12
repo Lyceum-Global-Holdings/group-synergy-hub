@@ -34,7 +34,7 @@ export function useWarehouseBinAllocations(options?: { disableFetch?: boolean })
               name,
               location_code,
               parent_id,
-              parent:warehouse_locations!warehouse_locations_parent_id_fkey(
+              parent:warehouse_locations!parent_id(
                 id,
                 name,
                 location_code
