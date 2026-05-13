@@ -333,6 +333,7 @@ type DepartmentCollapsibleProps = {
   currentPath: string;
   isViewingAllCompanies: boolean;
   selectedCompany: Company | null;
+  pinTargetCompany: Company | null;
   isItemPinned: (moduleKey: string, submoduleKey: string) => boolean;
   isActive: (path: string) => boolean;
   isGroupActive: (items: { url: string }[]) => boolean;
@@ -343,6 +344,7 @@ function DepartmentCollapsible({
   currentPath,
   isViewingAllCompanies,
   selectedCompany,
+  pinTargetCompany,
   isItemPinned,
   isActive,
   isGroupActive,
