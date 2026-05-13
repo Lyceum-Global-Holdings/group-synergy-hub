@@ -197,14 +197,18 @@ export function CompanySidebar() {
         .filter((p) => p.company_id === selectedCompany?.id)
         .sort((a, b) => a.position - b.position);
 
-  const isItemPinned = (moduleKey: string, submoduleKey: string) =>
-    !!selectedCompany &&
-    visiblePinsAll.some(
+  const pinTargetCompany: Company | null = selectedCompany ?? companies[0] ?? null;
+
+  const isItemPinned = (moduleKey: string, submoduleKey: string) => {
+    const pinCompanyId = selectedCompany?.id ?? pinTargetCompany?.id;
+    if (!pinCompanyId) return false;
+    return visiblePinsAll.some(
       (p) =>
-        p.company_id === selectedCompany.id &&
+        p.company_id === pinCompanyId &&
         p.module_key === moduleKey &&
         p.submodule_key === submoduleKey
     );
+  };
 
   return (
     <TooltipProvider delayDuration={300}>
@@ -305,6 +309,7 @@ export function CompanySidebar() {
                     currentPath={currentPath}
                     isViewingAllCompanies={isViewingAllCompanies}
                     selectedCompany={selectedCompany}
+                    pinTargetCompany={pinTargetCompany}
                     isItemPinned={isItemPinned}
                     isActive={isActive}
                     isGroupActive={isGroupActive}
@@ -328,6 +333,7 @@ type DepartmentCollapsibleProps = {
   currentPath: string;
   isViewingAllCompanies: boolean;
   selectedCompany: Company | null;
+  pinTargetCompany: Company | null;
   isItemPinned: (moduleKey: string, submoduleKey: string) => boolean;
   isActive: (path: string) => boolean;
   isGroupActive: (items: { url: string }[]) => boolean;
@@ -338,6 +344,7 @@ function DepartmentCollapsible({
   currentPath,
   isViewingAllCompanies,
   selectedCompany,
+  pinTargetCompany,
   isItemPinned,
   isActive,
   isGroupActive,
@@ -376,6 +383,7 @@ function DepartmentCollapsible({
                   deptKey={dept.key}
                   isViewingAllCompanies={isViewingAllCompanies}
                   selectedCompany={selectedCompany}
+                  pinTargetCompany={pinTargetCompany}
                   isItemPinned={isItemPinned}
                 />
               ) : (
@@ -388,11 +396,11 @@ function DepartmentCollapsible({
                     >
                       <NavLink to={item.url}>{item.title}</NavLink>
                     </SidebarMenuSubButton>
-                    {!isViewingAllCompanies && selectedCompany && (
+                    {pinTargetCompany && (
                       <span className="relative z-[2]">
                         <SidebarPinButton
                           isPinned={isItemPinned(dept.key, item.key)}
-                          companyId={selectedCompany.id}
+                          companyId={pinTargetCompany.id}
                           moduleKey={dept.key}
                           submoduleKey={item.key}
                           submoduleUrl={item.url}
@@ -432,6 +440,7 @@ type NestedSubItemProps = {
   deptKey: string;
   isViewingAllCompanies: boolean;
   selectedCompany: Company | null;
+  pinTargetCompany: Company | null;
   isItemPinned: (moduleKey: string, submoduleKey: string) => boolean;
 };
 
@@ -442,6 +451,7 @@ function NestedSubItem({
   deptKey,
   isViewingAllCompanies,
   selectedCompany,
+  pinTargetCompany,
   isItemPinned,
 }: NestedSubItemProps) {
   const childActive = !!item.children?.some((c) => currentPath.startsWith(c.url));
@@ -475,11 +485,11 @@ function NestedSubItem({
                 >
                   {child.name}
                 </NavLink>
-                {!isViewingAllCompanies && selectedCompany && (
+                {pinTargetCompany && (
                   <span className="relative z-[2]">
                     <SidebarPinButton
                       isPinned={isItemPinned(deptKey, child.key)}
-                      companyId={selectedCompany.id}
+                      companyId={pinTargetCompany.id}
                       moduleKey={deptKey}
                       submoduleKey={child.key}
                       submoduleUrl={child.url}

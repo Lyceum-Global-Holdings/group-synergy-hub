@@ -1,32 +1,37 @@
 ## Problem
 
-In the left sidebar (`src/components/layout/CompanySidebar.tsx`):
+In the current `CompanySidebar.tsx`, two pieces of UI only render when a single company is selected (`!isViewingAllCompanies && selectedCompany`):
 
-- Clicking a top-level module (Finance, Warehouse, …) does not expand its sub-list.
-- Nested groups (e.g. Construction → Resource Allocation → Labour/Inventory/Subcontractor) do not toggle.
-- Some sub-items don't navigate when clicked.
+1. **Pin (star) buttons** next to each leaf submodule and each nested child.
+2. There is no separate issue with chevrons themselves, but in all-companies view the lack of pin buttons makes the row look "flat". For nested items (e.g. Construction → Resource Allocation → Labour/Inventory/Subcontractor), the expand chevron is rendered, but the children are also gated behind pin/visibility logic that hides UI affordances.
 
-Root cause is the way Radix `Collapsible` is wired into the shadcn sidebar primitives:
-
-1. The top-level `<CollapsibleTrigger asChild>` wraps `<SidebarMenuButton>`. SidebarMenuButton renders an inner `<button>` and the `Slot` merge silently drops the trigger's `onClick` in some renders because the button also receives `isActive` / className overrides at the same time.
-2. The nested `<Collapsible>` is rendered as a direct child of `<SidebarMenuSub>` (a `<ul>`), with `<SidebarMenuSubItem>` (an `<li>`) inside the Collapsible — invalid `ul > div > li` markup that breaks click bubbling on some browsers.
-3. The leaf row wraps `<SidebarMenuSubButton asChild>` around a `<NavLink>` inside a flex container alongside the pin button; the pin button's hover-only opacity layer (`group-hover/pin-row`) sometimes sits on top of the NavLink hit area.
+Super admin defaults to "All Companies" view, so both toggles disappear.
 
 ## Fix
 
 Edit only `src/components/layout/CompanySidebar.tsx`:
 
-1. Convert both Collapsibles to **controlled** state with `useState` keyed by module/sub-item, initialised from `isGroupActive(...)`. This removes reliance on `defaultOpen` re-evaluation and makes toggling deterministic.
-2. Replace `<CollapsibleTrigger asChild><SidebarMenuButton>…</SidebarMenuButton></CollapsibleTrigger>` with a plain `<SidebarMenuButton onClick={() => setOpen(!open)}>` (no asChild). Render `<CollapsibleContent>` as a sibling. Same pattern for the nested group.
-3. Restructure the nested block so the `<Collapsible>` lives **inside** `<SidebarMenuSubItem>`, producing valid `ul > li > div` markup.
-4. Wrap the leaf row's NavLink + pin button in a `relative` container, give the NavLink `relative z-[1]`, and the pin button `relative z-[2]` so neither layer steals clicks from the other while keeping the hover-reveal behavior.
-5. Keep the existing chevron rotation by toggling a class based on the controlled `open` state instead of `data-state` on the parent.
+1. **Resolve a target company for pinning in all-companies view.**
+   - Add `pinTargetCompany = selectedCompany ?? companies[0] ?? null`.
+   - Pass it down to `DepartmentCollapsible` and `NestedSubItem` as a new prop `pinTargetCompany`.
 
-No changes to routing, `moduleConfig`, pinning logic, RBAC filtering, or styles outside this file.
+2. **Always render `SidebarPinButton` when `pinTargetCompany` exists**, regardless of `isViewingAllCompanies`.
+   - Replace the `!isViewingAllCompanies && selectedCompany` guard around both pin button blocks (leaf row and nested child row) with `pinTargetCompany &&`.
+   - Use `pinTargetCompany.id` as the `companyId` prop.
+
+3. **Update `isItemPinned`** to also accept the all-companies case: when `selectedCompany` is null, check pins against `pinTargetCompany.id` instead. Implementation: `const pinCompanyId = selectedCompany?.id ?? pinTargetCompany?.id` inside the helper.
+
+4. **Nested chevron reliability.** Confirm `NestedSubItem`'s `Collapsible` uses controlled `open` state — it already does. No structural change needed; just make sure the chevron click target (`SidebarMenuSubButton` with `onClick`) is not overlapped. Add `relative z-[1]` to the trigger button and keep the children list at default stacking so clicks always reach the toggle.
+
+5. Keep all other behavior (badges, "Used by:" company chips in all-companies view) unchanged.
+
+## Out of scope
+
+- `moduleConfig`, routing, RBAC, pin persistence logic (`useSidebarPins`), `SidebarPinButton` internals.
+- Any other sidebar component or page.
 
 ## Verification
 
-- Sign in, confirm each department in `Modules` expands/collapses on click.
-- Expand Construction → Resource Allocation → click Labour, Inventory, Subcontractor; confirm navigation and active highlight.
-- Confirm the pin (📌) icon still toggles without expanding/collapsing the row.
-- Confirm the active-route auto-expansion still works on a hard refresh of a deep URL (e.g. `/warehouse/inventory`).
+- Super admin in "All Companies" view: each submodule row shows a pin star on hover; clicking pins to the first accessible company.
+- Construction → Resource Allocation chevron expands/collapses Labour, Inventory, Subcontractor.
+- Selecting a single company still pins to that company (existing behavior preserved).
