@@ -309,6 +309,7 @@ export function CompanySidebar() {
                     currentPath={currentPath}
                     isViewingAllCompanies={isViewingAllCompanies}
                     selectedCompany={selectedCompany}
+                    pinTargetCompany={pinTargetCompany}
                     isItemPinned={isItemPinned}
                     isActive={isActive}
                     isGroupActive={isGroupActive}
