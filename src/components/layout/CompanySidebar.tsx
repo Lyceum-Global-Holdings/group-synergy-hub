@@ -383,6 +383,7 @@ function DepartmentCollapsible({
                   deptKey={dept.key}
                   isViewingAllCompanies={isViewingAllCompanies}
                   selectedCompany={selectedCompany}
+                  pinTargetCompany={pinTargetCompany}
                   isItemPinned={isItemPinned}
                 />
               ) : (
@@ -395,11 +396,11 @@ function DepartmentCollapsible({
                     >
                       <NavLink to={item.url}>{item.title}</NavLink>
                     </SidebarMenuSubButton>
-                    {!isViewingAllCompanies && selectedCompany && (
+                    {pinTargetCompany && (
                       <span className="relative z-[2]">
                         <SidebarPinButton
                           isPinned={isItemPinned(dept.key, item.key)}
-                          companyId={selectedCompany.id}
+                          companyId={pinTargetCompany.id}
                           moduleKey={dept.key}
                           submoduleKey={item.key}
                           submoduleUrl={item.url}
