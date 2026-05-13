@@ -485,11 +485,11 @@ function NestedSubItem({
                 >
                   {child.name}
                 </NavLink>
-                {!isViewingAllCompanies && selectedCompany && (
+                {pinTargetCompany && (
                   <span className="relative z-[2]">
                     <SidebarPinButton
                       isPinned={isItemPinned(deptKey, child.key)}
-                      companyId={selectedCompany.id}
+                      companyId={pinTargetCompany.id}
                       moduleKey={deptKey}
                       submoduleKey={child.key}
                       submoduleUrl={child.url}
