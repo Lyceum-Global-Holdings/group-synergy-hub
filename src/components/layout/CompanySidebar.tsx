@@ -197,14 +197,18 @@ export function CompanySidebar() {
         .filter((p) => p.company_id === selectedCompany?.id)
         .sort((a, b) => a.position - b.position);
 
-  const isItemPinned = (moduleKey: string, submoduleKey: string) =>
-    !!selectedCompany &&
-    visiblePinsAll.some(
+  const pinTargetCompany: Company | null = selectedCompany ?? companies[0] ?? null;
+
+  const isItemPinned = (moduleKey: string, submoduleKey: string) => {
+    const pinCompanyId = selectedCompany?.id ?? pinTargetCompany?.id;
+    if (!pinCompanyId) return false;
+    return visiblePinsAll.some(
       (p) =>
-        p.company_id === selectedCompany.id &&
+        p.company_id === pinCompanyId &&
         p.module_key === moduleKey &&
         p.submodule_key === submoduleKey
     );
+  };
 
   return (
     <TooltipProvider delayDuration={300}>
