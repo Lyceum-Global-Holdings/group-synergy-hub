@@ -299,123 +299,16 @@ export function CompanySidebar() {
             <SidebarGroupContent>
               <SidebarMenu>
                 {departments.map((dept) => (
-                  <Collapsible
+                  <DepartmentCollapsible
                     key={dept.title}
-                    defaultOpen={isGroupActive(dept.items)}
-                    className="group/collapsible"
-                  >
-                    <SidebarMenuItem>
-                      <CollapsibleTrigger asChild>
-                        <SidebarMenuButton
-                          isActive={isGroupActive(dept.items)}
-                          className={`w-full ${isGroupActive(dept.items) ? "border-l-[3px] border-l-sidebar-primary bg-sidebar-accent/40 text-sidebar-accent-foreground" : "border-l-[3px] border-l-transparent"}`}
-                        >
-                          <dept.icon className="h-[18px] w-[18px]" />
-                          <div className="flex-1 flex items-center justify-between">
-                            <span className="text-sm">{dept.title}</span>
-                            {isViewingAllCompanies && dept.companiesUsing && (
-                              <Badge variant="outline" className="text-[10px] ml-2 border-sidebar-border text-sidebar-muted">
-                                {dept.companiesUsing.length}
-                              </Badge>
-                            )}
-                          </div>
-                          <ChevronDown className="ml-auto h-3.5 w-3.5 text-sidebar-muted transition-transform duration-200 group-data-[state=open]/collapsible:rotate-180" />
-                        </SidebarMenuButton>
-                      </CollapsibleTrigger>
-                      <CollapsibleContent>
-                        <SidebarMenuSub>
-                          {dept.items.map((item) => (
-                            item.children && item.children.length > 0 ? (
-                              <Collapsible
-                                key={item.url}
-                                defaultOpen={item.children.some(child => currentPath.startsWith(child.url))}
-                                className="group/nested"
-                              >
-                                <SidebarMenuSubItem>
-                                  <CollapsibleTrigger asChild>
-                                    <SidebarMenuSubButton
-                                      className="w-full justify-between cursor-pointer"
-                                      isActive={isActive(item.url) || item.children.some(child => currentPath.startsWith(child.url))}
-                                    >
-                                      <span>{item.title}</span>
-                                      <ChevronDown className="h-3 w-3 transition-transform duration-200 group-data-[state=open]/nested:rotate-180" />
-                                    </SidebarMenuSubButton>
-                                  </CollapsibleTrigger>
-                                  <CollapsibleContent>
-                                    <div className="ml-4 mt-1 space-y-0.5 border-l border-sidebar-border pl-2">
-                                      {item.children.map((child) => (
-                                        <div
-                                          key={child.url}
-                                          className="group/pin-row flex items-center gap-1 pr-1"
-                                        >
-                                          <NavLink
-                                            to={child.url}
-                                            className={`flex-1 block text-xs py-1.5 px-2 rounded-sm transition-colors ${
-                                              isActive(child.url)
-                                                ? 'bg-sidebar-primary/15 text-sidebar-primary font-medium'
-                                                : 'text-sidebar-muted hover:text-sidebar-accent-foreground hover:bg-sidebar-accent/40'
-                                            }`}
-                                          >
-                                            {child.name}
-                                          </NavLink>
-                                          {!isViewingAllCompanies && selectedCompany && (
-                                            <SidebarPinButton
-                                              isPinned={isItemPinned(dept.key, child.key)}
-                                              companyId={selectedCompany.id}
-                                              moduleKey={dept.key}
-                                              submoduleKey={child.key}
-                                              submoduleUrl={child.url}
-                                              submoduleTitle={child.name}
-                                            />
-                                          )}
-                                        </div>
-                                      ))}
-                                    </div>
-                                  </CollapsibleContent>
-                                </SidebarMenuSubItem>
-                              </Collapsible>
-                            ) : (
-                              <SidebarMenuSubItem key={item.url} className="group/pin-row">
-                                <div className="flex items-center gap-1 pr-1">
-                                  <SidebarMenuSubButton
-                                    asChild
-                                    isActive={isActive(item.url)}
-                                    className="flex-1"
-                                  >
-                                    <NavLink to={item.url}>{item.title}</NavLink>
-                                  </SidebarMenuSubButton>
-                                  {!isViewingAllCompanies && selectedCompany && (
-                                    <SidebarPinButton
-                                      isPinned={isItemPinned(dept.key, item.key)}
-                                      companyId={selectedCompany.id}
-                                      moduleKey={dept.key}
-                                      submoduleKey={item.key}
-                                      submoduleUrl={item.url}
-                                      submoduleTitle={item.title}
-                                    />
-                                  )}
-                                </div>
-                              </SidebarMenuSubItem>
-                            )
-                          ))}
-                          {isViewingAllCompanies && dept.companiesUsing && dept.companiesUsing.length > 0 && (
-                            <SidebarMenuSubItem>
-                              <div className="px-3 py-1.5">
-                                <div className="text-[10px] text-sidebar-muted mb-1 uppercase tracking-wider">Used by:</div>
-                                <div className="flex flex-wrap gap-1">
-                                  {dept.companiesUsing.map((company) => (
-                                    <Badge key={company.id} variant="secondary" className="text-[10px] bg-sidebar-accent text-sidebar-accent-foreground border-0">
-                                      {company.code}
-                                    </Badge>
-                                  ))}
-                                </div>
-                              </div>
-                            </SidebarMenuSubItem>
-                          )}
-                        </SidebarMenuSub>
-                      </CollapsibleContent>
-                    </SidebarMenuItem>
-                  </Collapsible>
+                    dept={dept}
+                    currentPath={currentPath}
+                    isViewingAllCompanies={isViewingAllCompanies}
+                    selectedCompany={selectedCompany}
+                    isItemPinned={isItemPinned}
+                    isActive={isActive}
+                    isGroupActive={isGroupActive}
+                  />
                 ))}
               </SidebarMenu>
             </SidebarGroupContent>
