@@ -440,6 +440,7 @@ type NestedSubItemProps = {
   deptKey: string;
   isViewingAllCompanies: boolean;
   selectedCompany: Company | null;
+  pinTargetCompany: Company | null;
   isItemPinned: (moduleKey: string, submoduleKey: string) => boolean;
 };
 
@@ -450,6 +451,7 @@ function NestedSubItem({
   deptKey,
   isViewingAllCompanies,
   selectedCompany,
+  pinTargetCompany,
   isItemPinned,
 }: NestedSubItemProps) {
   const childActive = !!item.children?.some((c) => currentPath.startsWith(c.url));
