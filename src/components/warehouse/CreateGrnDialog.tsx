@@ -193,6 +193,27 @@ export function CreateGrnDialog({ open, onOpenChange, poId }: CreateGrnDialogPro
         }) || [];
 
       setItems(poItems);
+
+      // Auto-generate batch numbers for batch-tracked items
+      if (selectedCompany?.id) {
+        const updates = await Promise.all(
+          poItems.map(async (it) => {
+            if (it.is_batch_tracked && it.warehouse_item_id) {
+              try {
+                const code = await generateBatch.mutateAsync({
+                  companyId: selectedCompany.id,
+                  warehouseItemId: it.warehouse_item_id,
+                });
+                return { ...it, batch_number: code };
+              } catch {
+                return it;
+              }
+            }
+            return it;
+          })
+        );
+        setItems(updates);
+      }
     };
 
     loadPoWithPendingQuantities();
