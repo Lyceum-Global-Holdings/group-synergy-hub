@@ -17182,6 +17182,41 @@ export type Database = {
         }
         Relationships: []
       }
+      supplier_portal_settings: {
+        Row: {
+          company_id: string
+          created_at: string
+          is_active: boolean
+          public_base_url: string | null
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          is_active?: boolean
+          public_base_url?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          is_active?: boolean
+          public_base_url?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "supplier_portal_settings_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: true
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       supplier_profiles_extended: {
         Row: {
           bank_account_name: string | null
@@ -17447,6 +17482,47 @@ export type Database = {
             columns: ["supplier_id"]
             isOneToOne: false
             referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      supplier_registration_form_config: {
+        Row: {
+          company_id: string
+          created_at: string
+          id: string
+          is_published: boolean
+          schema: Json
+          updated_at: string
+          updated_by: string | null
+          version: number
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          id?: string
+          is_published?: boolean
+          schema?: Json
+          updated_at?: string
+          updated_by?: string | null
+          version?: number
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          id?: string
+          is_published?: boolean
+          schema?: Json
+          updated_at?: string
+          updated_by?: string | null
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "supplier_registration_form_config_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
             referencedColumns: ["id"]
           },
         ]
@@ -20992,6 +21068,15 @@ export type Database = {
       }
       get_public_asset: { Args: { p_id: string }; Returns: Json }
       get_public_bin_allocation_qr: { Args: { p_id: string }; Returns: Json }
+      get_published_supplier_form: {
+        Args: { _slug: string }
+        Returns: {
+          company_id: string
+          company_name: string
+          schema: Json
+          version: number
+        }[]
+      }
       get_stock_bearing_locations_for_company: {
         Args: { p_company_id: string }
         Returns: {
@@ -22111,6 +22196,15 @@ export type Database = {
           opening_balance: number
           period_credit: number
           period_debit: number
+        }[]
+      }
+      resolve_public_portal_company: {
+        Args: { _slug: string }
+        Returns: {
+          code: string
+          id: string
+          logo_url: string
+          name: string
         }[]
       }
       return_tool_to_bin: {

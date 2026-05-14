@@ -1,89 +1,93 @@
-## Goal
-Extend the Material Issue / Material Return flow to capture and persist a **secondary quantity** (e.g. pieces) alongside the canonical base quantity, but only for items flagged `track_secondary_quantity = true`. Stock transactions and bin allocations must reflect both.
+# Supplier Registration: Public Link + Editable Form
 
-## Scope
-- Material Issue (MIN): create flow + stock RPC + `IssueItemsDialog` reuse path
-- Material Return (MRN): create flow + stock RPC
-- Existing items without dual tracking are unaffected
+Two improvements to `/sourcing/supplier-registration`, designed to align with international supplier-onboarding standards (ISO 20022 supplier onboarding data, PEPPOL/EN 16931 party identifiers, ISO 20022 IBAN/BIC banking, GDPR consent, GS1 GLN where applicable).
 
-## Schema changes (migration)
-Add nullable secondary columns so historical rows keep working:
+---
 
-```sql
-alter table public.material_issue_items
-  add column if not exists secondary_quantity_issued numeric,
-  add column if not exists secondary_uom text;
+## 1. Domain-aware public registration link
 
-alter table public.material_return_items
-  add column if not exists secondary_quantity_returned numeric,
-  add column if not exists secondary_uom text;
+Today the link is `${window.location.origin}/n`, so an admin on the preview/staging domain copies a non-canonical URL.
+
+**Approach**
+- Store a per-company canonical public portal base URL in a new table `supplier_portal_settings` (`company_id`, `public_base_url`, `is_active`, audit cols). Super admin / company admin can edit.
+- Resolution order on the page: `supplier_portal_settings.public_base_url` → project custom domain (`stores.lgh.lk`) → `window.location.origin`. Always rendered as `${base}/n?c=${companySlug}` so the public portal can scope the submission to the correct company.
+- Public route `/n` reads `?c=` and resolves the company server-side via a SECURITY DEFINER RPC (`resolve_public_portal_company(slug)`), avoiding RLS leaks.
+- Add a "Configure public URL" dialog next to Copy/Preview, with HTTPS validation and live preview.
+- Optional QR code (reuse existing QR utilities) for printed onboarding packs.
+
+**Why standards-aligned**: a stable canonical URL is required for PEPPOL/Tungsten-style supplier directory listings and for embedding in tenders/RFx invitations.
+
+---
+
+## 2. Admin-editable registration form
+
+Replace the hard-coded steps (`BasicInfoStep`, `BusinessDetailsStep`, `BankingDetailsStep`, `ReviewStep`) with a config-driven renderer.
+
+**Schema**
+- New table `supplier_registration_form_config` (`company_id`, `version`, `is_published`, `schema jsonb`, audit cols). Only one published version per company; older versions retained for audit (regulator requirement under GDPR Art. 30).
+- `schema` shape (JSON Schema-inspired, kept small):
+  ```
+  { sections: [{ id, title, order, fields: [{
+      key, label, type, required, visible, editable,
+      group: 'identity'|'tax'|'banking'|'compliance'|'custom',
+      validation: { pattern, min, max, options },
+      help, sensitive  // sensitive => masked + audit-logged
+  }]}]}
+  ```
+- Seed with the **international baseline** (cannot be removed, only toggled required/visible):
+  - **Identity**: legal name, trading name, supplier type, country (ISO 3166-1 alpha-2), LEI (ISO 17442), DUNS, GS1 GLN, PEPPOL participant ID (`scheme::value`).
+  - **Tax**: VAT/GST number with country-aware regex (EU VIES format, GCC TRN, etc.), tax residency.
+  - **Contact**: primary contact, email, E.164 phone.
+  - **Banking** (ISO 20022): account holder, IBAN (mod-97 check), BIC/SWIFT (ISO 9362), bank name, currency (ISO 4217), intermediary bank optional.
+  - **Compliance**: sanctions self-declaration, beneficial owner (UBO) >25%, GDPR consent checkbox + timestamp, code-of-conduct acknowledgement.
+- Admins can additionally add **custom fields** (text, number, date, select, multiselect, file). Custom answers stored in `supplier_data.custom_fields` jsonb.
+
+**Form Builder UI** (new tab "Form Builder" on the page)
+- List sections, drag to reorder, toggle visible/required/editable per field.
+- Add custom field dialog with type, options, validation, help text.
+- "Preview" renders the public form exactly as suppliers will see it.
+- "Publish" bumps version and flips `is_published`; previous versions stay queryable.
+
+**Renderer**
+- New `DynamicSupplierForm` component used by both the internal wizard and the public `/n` page. Reads the published config via a public RPC `get_published_supplier_form(company_slug)` (no auth, returns only the published schema — no PII).
+- Validation centralised in `src/lib/supplierFormValidation.ts` (IBAN, BIC, LEI, PEPPOL ID, VAT regex per country).
+- Existing typed columns (`email`, `tax_id`, etc.) continue to be written from baseline fields; custom fields land in `supplier_data.custom_fields`.
+
+**Security**
+- Form config edits restricted by RLS to admins of the owning company; public RPC returns only published, non-sensitive metadata.
+- Turnstile remains on the public form (existing memory rule); edge function `public-supplier-registration` validates submissions against the published schema server-side to prevent field tampering.
+
+---
+
+## Technical changes
+
+```text
+DB (single migration)
+├── supplier_portal_settings              (new)
+├── supplier_registration_form_config     (new, jsonb schema, versioned)
+├── companies.slug                        (add if missing, unique)
+├── RPC resolve_public_portal_company(slug)
+├── RPC get_published_supplier_form(slug)
+└── RLS: admin-only writes, public read of published config only
+
+Frontend
+├── src/pages/sourcing/SupplierRegistration.tsx     (URL resolver + Configure dialog + Form Builder tab)
+├── src/components/sourcing/registration/FormBuilder.tsx                (new)
+├── src/components/sourcing/registration/DynamicSupplierForm.tsx        (new, replaces step components for rendering)
+├── src/components/sourcing/SupplierRegistrationWizard.tsx              (use DynamicSupplierForm)
+├── src/pages/PublicSupplierRegistration.tsx                            (use DynamicSupplierForm + ?c= slug)
+├── src/lib/supplierFormValidation.ts                                   (new: IBAN/BIC/LEI/VAT/PEPPOL)
+├── src/hooks/useSupplierFormConfig.ts                                  (new)
+└── src/hooks/useSupplierPortalSettings.ts                              (new)
+
+Edge function
+└── supabase/functions/public-supplier-registration/index.ts            (validate against published schema)
 ```
 
-(`stock_transactions.secondary_quantity_change/_before/_after`, `warehouse_bin_allocations.secondary_quantity`, and the trigger that stamps before/after already exist from the dual-tracking migration.)
-
-## RPC changes (migration)
-
-### `process_material_issue_stock_update`
-Add new param `p_secondary_quantity_issued numeric default null`.
-- When non-null and the item has `track_secondary_quantity`, **prorate** the secondary quantity across the FIFO base-quantity slices: `sec_take = round(secondary_total * (v_take / p_quantity_issued), 4)`. Track running remainder so the last slice absorbs rounding drift.
-- Insert each `stock_transactions` row with `secondary_quantity_change = -sec_take` and `secondary_uom` snapshot from `warehouse_items.secondary_uom`. Trigger fills `secondary_quantity_before/after`.
-- `update warehouse_bin_allocations set secondary_quantity = greatest(0, coalesce(secondary_quantity,0) - sec_take)`.
-- Validate available secondary at the location matches what the user typed (raise if shortage).
-- Backwards-compatible: if the parameter is null, behave exactly as today.
-
-### `process_material_return_stock_update`
-Add `p_secondary_quantity_returned numeric default null`.
-- Insert `stock_transactions` with `secondary_quantity_change = +p_secondary_quantity_returned`.
-- `update warehouse_bin_allocations set secondary_quantity = coalesce(secondary_quantity,0) + p_secondary_quantity_returned` for the chosen/derived bin.
-- No-op when null.
-
-Both RPCs keep `SECURITY DEFINER` and `set search_path = public`.
-
-## Type changes
-- `src/types/materialIssueReturn.ts`
-  - `CreateMaterialIssueItemData`: add `secondary_quantity_issued?: number; secondary_uom?: string | null;`
-  - `MaterialReturnItem` + `CreateMaterialReturnItemData`: add `secondary_quantity_returned?: number; secondary_uom?: string | null;`
-
-## Hook changes
-- `src/hooks/useMaterialIssueItems.ts` — pass `p_secondary_quantity_issued: item.secondary_quantity_issued ?? null` to the RPC.
-- `src/hooks/useMaterialReturns.ts` — pass `p_secondary_quantity_returned: item.secondary_quantity_returned ?? null` (read it from the inserted return-items row before calling the RPC).
-- `src/components/warehouse/IssueItemsDialog.tsx` — same RPC call site updated to forward secondary qty when present.
-
-## UI changes
-Reuse the existing `DualQuantityInput` component.
-
-### `CreateMaterialIssueDialog.tsx`
-- Extend `IssueItem` row type with `secondary_quantity_issued?: number`, plus cached `track_secondary_quantity`, `secondary_uom`, and `available_secondary_stock` fetched alongside available base stock.
-- Render an inline `DualQuantityInput` next to the quantity field for rows whose item has `track_secondary_quantity`. Show "available pcs" hint mirroring the existing available-stock helper.
-- Validate: if secondary tracked, both base and secondary must be > 0; secondary cannot exceed `available_secondary_stock`.
-- Pass `secondary_quantity_issued` + `secondary_uom` into `createItems(...)`.
-
-### `CreateMaterialReturnDialog.tsx`
-- Extend `ReturnItem` with `secondary_quantity_returned?: number`, `track_secondary_quantity`, `secondary_uom` (load from item lookup in `handleItemSelect`).
-- Render `DualQuantityInput` next to the qty field when tracked.
-- Persist via the updated `CreateMaterialReturnItemData`.
-
-### Display surfaces (read-only, low-effort)
-- `MaterialIssueDetailsDialog.tsx` and `MaterialReturnDetailsDialog.tsx` — show the secondary quantity using `formatDualQty` when present. (Existing ledger views already render secondary balances after the earlier dual-tracking work.)
-
-## Validation rules
-- Secondary inputs accept positive numbers only; zero or empty disables secondary writes for that line.
-- For tracked items, refuse submit when secondary is missing while base > 0 (toast: "Pieces required for dual-tracked item X").
-- Issue: client guard against `secondary > available_secondary_stock`; server raises authoritative error.
-
 ## Out of scope
-- Backfilling secondary_quantity for legacy bin allocations or historical transactions.
-- Changing valuation: base UOM remains the money/cost unit.
-- Stock transfers, adjustments, cycle counts, reservations — separate follow-ups (mirrors the GRN-only rollout pattern).
-- Per-piece variable dimensions (serial-style length per piece).
+- Multi-language form translations (can follow once the schema is in place).
+- Supplier self-service updates after approval.
+- Migrating historical submissions to the new schema (old records keep current shape; renderer handles both).
 
-## Files touched
-- New migration: alter tables + new versions of both RPCs
-- `src/types/materialIssueReturn.ts`
-- `src/hooks/useMaterialIssueItems.ts`
-- `src/hooks/useMaterialReturns.ts`
-- `src/components/warehouse/CreateMaterialIssueDialog.tsx`
-- `src/components/warehouse/IssueItemsDialog.tsx`
-- `src/components/warehouse/CreateMaterialReturnDialog.tsx`
-- `src/components/warehouse/MaterialIssueDetailsDialog.tsx`
-- `src/components/warehouse/MaterialReturnDetailsDialog.tsx`
+## Open question
+Should the public link be **per-company** (one link per legal entity, recommended for multi-tenant cleanliness) or **global with company picker on the form**? The plan above assumes per-company; tell me if you'd prefer global.
