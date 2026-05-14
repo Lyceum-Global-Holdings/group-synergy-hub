@@ -240,6 +240,8 @@ export function CreateGrnDialog({ open, onOpenChange, poId }: CreateGrnDialogPro
         newItems[index].item_name = selectedItem.name;
         newItems[index].is_batch_tracked = selectedItem.is_batch_tracked || false;
         newItems[index].is_serialized = selectedItem.is_serialized || false;
+        newItems[index].track_secondary_quantity = (selectedItem as any).track_secondary_quantity || false;
+        newItems[index].secondary_uom = (selectedItem as any).secondary_uom || '';
         if (selectedItem.unit_cost) {
           newItems[index].unit_price = Number(selectedItem.unit_cost);
         }
