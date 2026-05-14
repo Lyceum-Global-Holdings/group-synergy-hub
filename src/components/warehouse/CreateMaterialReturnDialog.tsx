@@ -23,6 +23,9 @@ interface ReturnItem {
   condition: 'good' | 'damaged' | 'expired';
   unit_cost: number;
   notes?: string;
+  track_secondary_quantity?: boolean;
+  secondary_uom?: string | null;
+  secondary_quantity_returned?: number;
 }
 
 interface CreateMaterialReturnDialogProps {
