@@ -176,6 +176,15 @@
     overflow: hidden;
   }
 
+  /* Public page scroll override — opt-in via <html class="public-page-scroll"> */
+  html.public-page-scroll,
+  html.public-page-scroll body,
+  html.public-page-scroll #root {
+    height: auto !important;
+    min-height: 100% !important;
+    overflow: auto !important;
+  }
+
   body {
     @apply bg-background text-foreground antialiased;
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
