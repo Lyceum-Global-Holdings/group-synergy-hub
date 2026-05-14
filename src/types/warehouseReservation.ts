@@ -68,6 +68,7 @@ export interface CreateBinAllocationData {
   warehouse_item_id: string;
   bin_id: string;
   allocated_quantity: number;
+  secondary_quantity?: number;
   notes?: string;
   company_id?: string;
 }
