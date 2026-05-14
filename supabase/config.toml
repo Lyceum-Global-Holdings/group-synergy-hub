@@ -53,3 +53,6 @@ verify_jwt = false
 
 [functions.security-settings-public]
 verify_jwt = false
+
+[functions.supplier-upload-sign]
+verify_jwt = false

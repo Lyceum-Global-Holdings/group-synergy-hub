@@ -35,6 +35,14 @@ const FIELD_TYPES: { label: string; value: SupplierFieldType }[] = [
   { label: "Long text", value: "textarea" },
   { label: "Select", value: "select" },
   { label: "Checkbox", value: "checkbox" },
+  { label: "File upload", value: "file" },
+];
+
+const FILE_ACCEPT_PRESETS: { label: string; mimes: string[] }[] = [
+  { label: "PDF", mimes: ["application/pdf"] },
+  { label: "Image (JPG/PNG)", mimes: ["image/jpeg", "image/png"] },
+  { label: "Word (DOC/DOCX)", mimes: ["application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"] },
+  { label: "Excel (XLS/XLSX)", mimes: ["application/vnd.ms-excel", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"] },
 ];
 
 export default function FormBuilder({ companyId }: FormBuilderProps) {
@@ -228,16 +236,35 @@ function AddFieldDialog({
   const [type, setType] = useState<SupplierFieldType>("text");
   const [required, setRequired] = useState(false);
   const [optionsText, setOptionsText] = useState("");
+  const [accept, setAccept] = useState<string[]>(["application/pdf", "image/jpeg", "image/png"]);
+  const [maxSizeMB, setMaxSizeMB] = useState(10);
+  const [multiple, setMultiple] = useState(false);
+  const [maxFiles, setMaxFiles] = useState(1);
 
-  const reset = () => { setLabel(""); setType("text"); setRequired(false); setOptionsText(""); };
+  const reset = () => {
+    setLabel(""); setType("text"); setRequired(false); setOptionsText("");
+    setAccept(["application/pdf", "image/jpeg", "image/png"]);
+    setMaxSizeMB(10); setMultiple(false); setMaxFiles(1);
+  };
+
+  const togglePreset = (mimes: string[]) => {
+    const allOn = mimes.every((m) => accept.includes(m));
+    setAccept((prev) =>
+      allOn ? prev.filter((m) => !mimes.includes(m)) : Array.from(new Set([...prev, ...mimes])),
+    );
+  };
 
   const submit = () => {
     if (!label.trim()) { toast.error("Label is required"); return; }
+    if (type === "file" && accept.length === 0) { toast.error("Pick at least one allowed file type"); return; }
     const key = `custom_${label.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "")}_${Date.now().toString(36)}`;
     const options =
       type === "select"
         ? optionsText.split(",").map((s) => s.trim()).filter(Boolean).map((v) => ({ label: v, value: v }))
         : undefined;
+    const fileProps = type === "file"
+      ? { accept, maxSizeMB, multiple, maxFiles: multiple ? Math.max(1, maxFiles) : 1 }
+      : {};
     onAdd({
       key,
       label: label.trim(),
@@ -246,6 +273,7 @@ function AddFieldDialog({
       required,
       visible: true,
       options,
+      ...fileProps,
     });
     reset();
   };
@@ -257,7 +285,7 @@ function AddFieldDialog({
         <div className="space-y-4">
           <div>
             <Label>Label</Label>
-            <Input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="e.g. ISO 9001 certificate number" />
+            <Input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="e.g. Business Registration Certificate" />
           </div>
           <div>
             <Label>Type</Label>
@@ -274,6 +302,41 @@ function AddFieldDialog({
             <div>
               <Label>Options (comma-separated)</Label>
               <Input value={optionsText} onChange={(e) => setOptionsText(e.target.value)} placeholder="Small, Medium, Large" />
+            </div>
+          )}
+          {type === "file" && (
+            <div className="space-y-3 rounded-md border p-3">
+              <div>
+                <Label className="text-xs">Allowed file types</Label>
+                <div className="flex flex-wrap gap-2 mt-1">
+                  {FILE_ACCEPT_PRESETS.map((p) => {
+                    const on = p.mimes.every((m) => accept.includes(m));
+                    return (
+                      <Button key={p.label} type="button" size="sm"
+                        variant={on ? "default" : "outline"}
+                        onClick={() => togglePreset(p.mimes)}>
+                        {p.label}
+                      </Button>
+                    );
+                  })}
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label className="text-xs">Max size (MB)</Label>
+                  <Input type="number" min={1} max={50} value={maxSizeMB}
+                    onChange={(e) => setMaxSizeMB(Math.max(1, Math.min(50, Number(e.target.value) || 10)))} />
+                </div>
+                <div>
+                  <Label className="text-xs">Max files</Label>
+                  <Input type="number" min={1} max={10} value={maxFiles} disabled={!multiple}
+                    onChange={(e) => setMaxFiles(Math.max(1, Math.min(10, Number(e.target.value) || 1)))} />
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <Switch checked={multiple} onCheckedChange={setMultiple} />
+                <Label className="text-xs">Allow multiple files</Label>
+              </div>
             </div>
           )}
           <Separator />

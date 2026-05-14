@@ -1,44 +1,63 @@
 ## Goal
-Force normal document scrolling on `/register-supplier` by adding a CSS-based override (instead of relying solely on inline-style mutations in `useEffect`), so the public registration form is fully scrollable regardless of the global app-shell `overflow: hidden` lock.
 
-## Why CSS over JS
-The current `useEffect` in `PublicSupplierRegistration.tsx` mutates `style.overflow`/`style.height` on `html`, `body`, and `#root`, but inline styles can be re-asserted or overridden by stylesheet rules with higher specificity (e.g. `html, body, #root { ... }` in `src/index.css`). A CSS class with `!important` always wins, and toggling it on/off via `useEffect` is the standard, robust pattern.
+Let admins add **File Upload** fields to the public Supplier Registration form via the Form Builder, and let suppliers attach documents (BR, tax certs, ISO certs, bank letters, etc.) when registering.
+
+## Industry-standard approach
+
+- Direct-to-storage upload from the public form using a **short-lived signed upload URL** (no service-role key in the browser, no oversized base64 in JSON payloads).
+- **Server-side validation** of MIME, size, and extension against a whitelist (PDF, JPG, PNG, DOCX, XLSX) before finalizing the registration.
+- **Anti-virus / abuse protection**: enforce per-file size cap (10 MB) and per-submission count cap (max 10 files), reuse existing Turnstile + rate limiter on `public-supplier-registration`.
+- Files stored in the existing **private `supplier-documents` bucket** under `pending/{registration_id}/{field_key}/{uuid}-{filename}`. Approval moves/links them to the supplier record (already supported by `supplier_documents` table).
+- Schema captures file metadata (`{ path, name, size, mime, uploaded_at }`) inside `supplier_data[field_key]` so it survives the existing JSONB pipeline without DB migrations.
+- Multiple files supported per field (configurable: single vs multi).
 
 ## Changes
 
-### 1. `src/index.css`
-Add a scoped escape-hatch class that the public page can opt into:
+### 1. Schema (`src/lib/supplierFormSchema.ts`)
+- Add `"file"` to `SupplierFieldType`.
+- Extend `SupplierField` with optional `accept?: string[]` (mime whitelist), `maxSizeMB?: number`, `multiple?: boolean`, `maxFiles?: number`.
+- Defaults: `accept = ["application/pdf","image/jpeg","image/png"]`, `maxSizeMB = 10`, `multiple = false`, `maxFiles = 1`.
 
-```css
-/* Public page scroll override — used by /register-supplier */
-html.public-page-scroll,
-html.public-page-scroll body,
-html.public-page-scroll #root {
-  height: auto !important;
-  min-height: 100% !important;
-  overflow: auto !important;
-}
+### 2. Form Builder (`src/components/sourcing/registration/FormBuilder.tsx`)
+- Add **"File upload"** to `FIELD_TYPES`.
+- In `AddFieldDialog`, when `type === "file"` show: allowed types (multi-select chips: PDF, Image, Word, Excel), max size (number, default 10 MB), allow multiple (switch), max files (number, default 1).
+
+### 3. Renderer (`src/components/sourcing/registration/DynamicSupplierForm.tsx`)
+- New `FileUploadField` subcomponent:
+  - Uses shadcn Input `type="file"` styled as a drop zone with file list, remove button, progress bar.
+  - Client-side validates MIME + size before upload, shows inline error.
+  - Calls new edge function `supplier-upload-sign` to get a signed upload URL, then `PUT`s file directly to Supabase Storage.
+  - Stores returned `{ path, name, size, mime }` in form state.
+- In preview mode, the field is read-only (no actual upload).
+
+### 4. New edge function `supplier-upload-sign`
+- Public (`verify_jwt = false`), Turnstile-verified, rate-limited (e.g. 30 sign requests / hour / IP).
+- Input (zod): `company_slug`, `field_key`, `filename`, `mime`, `size`.
+- Validates: company exists (via `resolve_public_portal_company`), field exists in published schema and is type `file`, mime in field's `accept`, size ≤ field's `maxSizeMB`.
+- Generates path `pending/{uuid}/{field_key}/{uuid}-{safeName}` and returns `supabase.storage.from('supplier-documents').createSignedUploadUrl(path)` plus the final path.
+- Uses service-role key (server only).
+
+### 5. Edge function `public-supplier-registration` (existing)
+- Extend `supplierDataSchema`: allow file values shaped as `{ path: string, name: string, size: number, mime: string }` or arrays thereof.
+- After validation, for every file value: HEAD-check object exists in `supplier-documents` and insert a row into `supplier_documents` (document_type = field_key, file_url = path, file_size, file_name) linked to the new `registration_request_id`.
+- Reject submission if any referenced object is missing.
+
+### 6. Storage policy (`supplier-documents` bucket)
+Migration to add anon INSERT only via signed URL (already the case) and tighten:
+```sql
+-- Anyone with a signed upload URL can upload to pending/* (signed URL already gates this)
+-- Ensure no anon SELECT; only authenticated company users can read via existing policies.
 ```
-
-### 2. `src/pages/PublicSupplierRegistration.tsx`
-Replace the inline-style `useEffect` with a class toggle on `<html>`:
-
-```tsx
-useEffect(() => {
-  document.documentElement.classList.add("public-page-scroll");
-  return () => {
-    document.documentElement.classList.remove("public-page-scroll");
-  };
-}, []);
-```
-
-Keep the existing `min-h-screen` wrappers on the form / submitted / not-found views — no further markup changes required.
+Confirm bucket stays private. Add `allowed_mime_types` and `file_size_limit = 10485760` to the bucket if not already set.
 
 ## Out of scope
-- Global `html/body/#root` lock in `index.css` stays intact (Fiori-style app shell behavior preserved for authenticated routes).
-- No route-config or `App.tsx` changes — the override is page-mounted.
-- No changes to `DynamicSupplierForm`, schemas, or edge function.
+- Virus scanning (note in docs; can be added via a follow-up edge trigger).
+- Migrating files from `pending/` to a per-supplier folder on approval (existing approval flow already references `supplier_documents` rows; a small follow-up can rename if needed).
+- Changes to authenticated internal supplier creation wizard.
 
 ## Verification
-1. Open `/register-supplier?c=<slug>` in preview, confirm the page scrolls top-to-bottom and the submit button is reachable.
-2. Navigate from `/register-supplier` to an authenticated route and confirm the app shell is still locked (no double scrollbars, sidebar/main scroll behavior unchanged).
+1. In Form Builder, add a "Business Registration Certificate" file field (PDF/JPG/PNG, 10 MB, single).
+2. Publish, open `/register-supplier?c=<slug>`, upload a PDF, submit.
+3. Confirm `supplier_registration_requests.supplier_data` contains `{ path, name, size, mime }`, and a row exists in `supplier_documents` pointing to that path.
+4. Try uploading a 20 MB file → rejected client-side and server-side.
+5. Try uploading `.exe` → rejected.

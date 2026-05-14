@@ -13,7 +13,16 @@ export type SupplierFieldType =
   | "select"
   | "multiselect"
   | "textarea"
-  | "checkbox";
+  | "checkbox"
+  | "file";
+
+export interface SupplierFileValue {
+  path: string;
+  name: string;
+  size: number;
+  mime: string;
+  uploaded_at?: string;
+}
 
 export type SupplierFieldGroup =
   | "identity"
@@ -46,6 +55,11 @@ export interface SupplierField {
   patternMessage?: string;
   min?: number;
   max?: number;
+  /** File upload constraints (only used when type === "file"). */
+  accept?: string[];
+  maxSizeMB?: number;
+  multiple?: boolean;
+  maxFiles?: number;
 }
 
 export interface SupplierSection {
