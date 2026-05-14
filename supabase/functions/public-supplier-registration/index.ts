@@ -187,6 +187,37 @@ serve(async (req) => {
 
     if (regError) throw regError;
 
+    // Persist any uploaded files referenced in supplier_data into supplier_documents.
+    // Recognized shape: { path, name, size, mime } or arrays of that shape.
+    try {
+      const docRows: any[] = [];
+      const isFileVal = (v: any) => v && typeof v === 'object' && typeof v.path === 'string' && typeof v.name === 'string';
+      for (const [key, val] of Object.entries(validatedData as Record<string, any>)) {
+        const arr = Array.isArray(val) ? val : [val];
+        for (const f of arr) {
+          if (!isFileVal(f)) continue;
+          if (!f.path.startsWith('pending/')) continue; // only accept signed-upload paths
+          // Confirm object actually exists in storage to prevent fake refs.
+          const { data: head } = await supabaseAdmin.storage.from('supplier-documents')
+            .createSignedUrl(f.path, 60);
+          if (!head?.signedUrl) continue;
+          docRows.push({
+            registration_request_id: registration.id,
+            document_type: key,
+            file_name: f.name,
+            file_url: f.path,
+            file_size: typeof f.size === 'number' ? f.size : null,
+          });
+        }
+      }
+      if (docRows.length > 0) {
+        const { error: docErr } = await supabaseAdmin.from('supplier_documents').insert(docRows);
+        if (docErr) console.error('supplier_documents insert error', docErr);
+      }
+    } catch (e) {
+      console.error('document persistence error', e);
+    }
+
     // Create initial workflow entry
     await supabaseAdmin
       .from('supplier_approval_workflow')
