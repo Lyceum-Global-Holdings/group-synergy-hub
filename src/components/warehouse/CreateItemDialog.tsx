@@ -63,10 +63,13 @@ export function CreateItemDialog({ open, onOpenChange, editingItem }: CreateItem
     status: 'active' as 'active' | 'inactive' | 'discontinued',
     is_serialized: false,
     is_batch_tracked: false,
+    track_secondary_quantity: false,
+    secondary_uom: '',
     notes: '',
     image_url: '',
   });
   const [initialStock, setInitialStock] = useState('');
+  const [initialStockSecondary, setInitialStockSecondary] = useState('');
   const [initialBinId, setInitialBinId] = useState('');
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
