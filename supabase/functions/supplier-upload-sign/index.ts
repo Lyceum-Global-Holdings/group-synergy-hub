@@ -78,12 +78,10 @@ serve(async (req) => {
     }
     const { company_slug, field_key, filename, mime, size, turnstile_token } = parsed.data;
 
-    const captcha = await verifyTurnstile(turnstile_token ?? null, ip, "supplier_upload", "public_registration");
-    if (!captcha.success) {
-      return new Response(JSON.stringify({ error: "Bot protection check failed", code: captcha.error }), {
-        status: captcha.status, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+    // Note: Turnstile is verified at form submit. Uploads are constrained by
+    // rate-limiting + strict mime/size/field validation against the published
+    // schema, plus paths are scoped to pending/<company_id>/<field_key>/.
+    void turnstile_token;
 
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
