@@ -9380,6 +9380,7 @@ export type Database = {
       grn_items: {
         Row: {
           batch_number: string | null
+          conversion_note: string | null
           created_at: string
           description: string | null
           expiry_date: string | null
@@ -9393,6 +9394,8 @@ export type Database = {
           quantity_ordered: number | null
           quantity_received: number
           remarks: string | null
+          secondary_quantity_received: number | null
+          secondary_uom: string | null
           total_cost: number | null
           unit_of_measure: string
           unit_price: number | null
@@ -9401,6 +9404,7 @@ export type Database = {
         }
         Insert: {
           batch_number?: string | null
+          conversion_note?: string | null
           created_at?: string
           description?: string | null
           expiry_date?: string | null
@@ -9414,6 +9418,8 @@ export type Database = {
           quantity_ordered?: number | null
           quantity_received: number
           remarks?: string | null
+          secondary_quantity_received?: number | null
+          secondary_uom?: string | null
           total_cost?: number | null
           unit_of_measure?: string
           unit_price?: number | null
@@ -9422,6 +9428,7 @@ export type Database = {
         }
         Update: {
           batch_number?: string | null
+          conversion_note?: string | null
           created_at?: string
           description?: string | null
           expiry_date?: string | null
@@ -9435,6 +9442,8 @@ export type Database = {
           quantity_ordered?: number | null
           quantity_received?: number
           remarks?: string | null
+          secondary_quantity_received?: number | null
+          secondary_uom?: string | null
           total_cost?: number | null
           unit_of_measure?: string
           unit_price?: number | null
@@ -15804,6 +15813,10 @@ export type Database = {
           quantity_change: number
           reference_id: string | null
           reference_type: Database["public"]["Enums"]["stock_reference_type"]
+          secondary_quantity_after: number | null
+          secondary_quantity_before: number | null
+          secondary_quantity_change: number | null
+          secondary_uom: string | null
           total_value: number | null
           transaction_type: Database["public"]["Enums"]["stock_transaction_type"]
           unit_cost: number | null
@@ -15828,6 +15841,10 @@ export type Database = {
           quantity_change: number
           reference_id?: string | null
           reference_type: Database["public"]["Enums"]["stock_reference_type"]
+          secondary_quantity_after?: number | null
+          secondary_quantity_before?: number | null
+          secondary_quantity_change?: number | null
+          secondary_uom?: string | null
           total_value?: number | null
           transaction_type: Database["public"]["Enums"]["stock_transaction_type"]
           unit_cost?: number | null
@@ -15852,6 +15869,10 @@ export type Database = {
           quantity_change?: number
           reference_id?: string | null
           reference_type?: Database["public"]["Enums"]["stock_reference_type"]
+          secondary_quantity_after?: number | null
+          secondary_quantity_before?: number | null
+          secondary_quantity_change?: number | null
+          secondary_uom?: string | null
           total_value?: number | null
           transaction_type?: Database["public"]["Enums"]["stock_transaction_type"]
           unit_cost?: number | null
@@ -19070,6 +19091,7 @@ export type Database = {
           id: string
           notes: string | null
           reserved_quantity: number
+          secondary_quantity: number | null
           updated_at: string
           warehouse_item_id: string
         }
@@ -19083,6 +19105,7 @@ export type Database = {
           id?: string
           notes?: string | null
           reserved_quantity?: number
+          secondary_quantity?: number | null
           updated_at?: string
           warehouse_item_id: string
         }
@@ -19096,6 +19119,7 @@ export type Database = {
           id?: string
           notes?: string | null
           reserved_quantity?: number
+          secondary_quantity?: number | null
           updated_at?: string
           warehouse_item_id?: string
         }
@@ -19460,6 +19484,7 @@ export type Database = {
         Row: {
           available_quantity: number | null
           barcode: string | null
+          base_uom: string | null
           brand: string | null
           catalog_item_id: string | null
           category_id: string | null
@@ -19481,10 +19506,12 @@ export type Database = {
           notes: string | null
           reorder_level: number | null
           reserved_quantity: number | null
+          secondary_uom: string | null
           selling_price: number | null
           sku: string | null
           status: string
           supplier_id: string | null
+          track_secondary_quantity: boolean
           unit_cost: number | null
           unit_id: string | null
           updated_at: string
@@ -19492,6 +19519,7 @@ export type Database = {
         Insert: {
           available_quantity?: number | null
           barcode?: string | null
+          base_uom?: string | null
           brand?: string | null
           catalog_item_id?: string | null
           category_id?: string | null
@@ -19513,10 +19541,12 @@ export type Database = {
           notes?: string | null
           reorder_level?: number | null
           reserved_quantity?: number | null
+          secondary_uom?: string | null
           selling_price?: number | null
           sku?: string | null
           status?: string
           supplier_id?: string | null
+          track_secondary_quantity?: boolean
           unit_cost?: number | null
           unit_id?: string | null
           updated_at?: string
@@ -19524,6 +19554,7 @@ export type Database = {
         Update: {
           available_quantity?: number | null
           barcode?: string | null
+          base_uom?: string | null
           brand?: string | null
           catalog_item_id?: string | null
           category_id?: string | null
@@ -19545,10 +19576,12 @@ export type Database = {
           notes?: string | null
           reorder_level?: number | null
           reserved_quantity?: number | null
+          secondary_uom?: string | null
           selling_price?: number | null
           sku?: string | null
           status?: string
           supplier_id?: string | null
+          track_secondary_quantity?: boolean
           unit_cost?: number | null
           unit_id?: string | null
           updated_at?: string
@@ -20813,6 +20846,7 @@ export type Database = {
         Returns: {
           available_quantity: number | null
           barcode: string | null
+          base_uom: string | null
           brand: string | null
           catalog_item_id: string | null
           category_id: string | null
@@ -20834,10 +20868,12 @@ export type Database = {
           notes: string | null
           reorder_level: number | null
           reserved_quantity: number | null
+          secondary_uom: string | null
           selling_price: number | null
           sku: string | null
           status: string
           supplier_id: string | null
+          track_secondary_quantity: boolean
           unit_cost: number | null
           unit_id: string | null
           updated_at: string
