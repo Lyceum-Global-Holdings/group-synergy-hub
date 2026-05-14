@@ -262,6 +262,10 @@ export function CreateItemDialog({ open, onOpenChange, editingItem }: CreateItem
       company_id: formData.company_id || null,
       sku: formData.sku.trim() || null,
       barcode: formData.barcode.trim() || null,
+      track_secondary_quantity: formData.track_secondary_quantity,
+      secondary_uom: formData.track_secondary_quantity
+        ? (formData.secondary_uom.trim() || null)
+        : null,
     };
 
     if (editingItem) {
@@ -281,8 +285,11 @@ export function CreateItemDialog({ open, onOpenChange, editingItem }: CreateItem
 
         if (initialStock && parseFloat(initialStock) > 0) {
           const stockQuantity = parseFloat(initialStock);
+          const secondaryQty = formData.track_secondary_quantity && initialStockSecondary
+            ? parseFloat(initialStockSecondary)
+            : undefined;
           const unitCostValue = formData.unit_cost ? parseFloat(formData.unit_cost) : 0;
-          
+
           createTransaction({
             item_id: result.item.id,
             transaction_type: 'opening_stock',
@@ -293,6 +300,7 @@ export function CreateItemDialog({ open, onOpenChange, editingItem }: CreateItem
             unit_cost: unitCostValue > 0 ? unitCostValue : undefined,
             total_value: unitCostValue > 0 ? unitCostValue * stockQuantity : undefined,
             notes: 'Opening stock balance',
+            ...(secondaryQty !== undefined ? { secondary_quantity_change: secondaryQty } : {}),
           });
 
           // Create bin allocation if a bin is selected
@@ -302,10 +310,11 @@ export function CreateItemDialog({ open, onOpenChange, editingItem }: CreateItem
               bin_id: initialBinId,
               allocated_quantity: stockQuantity,
               notes: 'Opening stock allocation',
+              ...(secondaryQty !== undefined ? { secondary_quantity: secondaryQty } : {}),
             });
           }
         }
-        
+
         onOpenChange(false);
       } catch (error) {
         console.error('Error creating item:', error);
