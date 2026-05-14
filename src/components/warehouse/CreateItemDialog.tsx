@@ -634,6 +634,24 @@ export function CreateItemDialog({ open, onOpenChange, editingItem }: CreateItem
                 </p>
               </div>
 
+              {formData.track_secondary_quantity && (
+                <div className="space-y-2">
+                  <Label htmlFor="initial_stock_secondary">
+                    Initial Pieces {formData.secondary_uom ? `(${formData.secondary_uom})` : ''}
+                  </Label>
+                  <Input
+                    id="initial_stock_secondary"
+                    type="number"
+                    step={QTY_STEP}
+                    min={QTY_MIN}
+                    inputMode="decimal"
+                    placeholder="e.g. 18"
+                    value={initialStockSecondary}
+                    onChange={(e) => setInitialStockSecondary(e.target.value)}
+                  />
+                </div>
+              )}
+
               {initialStock && parseFloat(initialStock) > 0 && (
                 <div className="space-y-2">
                   <Label htmlFor="initial_bin_id">Allocate Initial Stock to Bin</Label>
