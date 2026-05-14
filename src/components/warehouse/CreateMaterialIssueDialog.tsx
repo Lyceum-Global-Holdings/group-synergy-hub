@@ -254,6 +254,20 @@ export function CreateMaterialIssueDialog({ open, onOpenChange }: MaterialIssueD
       setCurrentTab('header');
       return;
     }
+
+    // Dual-tracked items must have a positive secondary quantity
+    const missingSecondary = items.find(
+      (it) => it.track_secondary_quantity && (!it.secondary_quantity_issued || it.secondary_quantity_issued <= 0)
+    );
+    if (missingSecondary) {
+      toast({
+        title: 'Pieces required',
+        description: `Enter the piece count (${missingSecondary.secondary_uom || 'pcs'}) for ${missingSecondary.item_code || missingSecondary.description}.`,
+        variant: 'destructive',
+      });
+      setCurrentTab('items');
+      return;
+    }
     if (!selectedCompany?.id) {
       toast({
         title: 'Company Required',
