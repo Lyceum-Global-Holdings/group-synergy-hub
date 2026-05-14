@@ -77,10 +77,18 @@ export function CreateMaterialReturnDialog({
   };
 
   const handleItemSelect = (index: number, itemId: string, itemCode: string, itemName: string, unitCost: number) => {
-    handleItemChange(index, 'warehouse_item_id', itemId);
-    handleItemChange(index, 'item_code', itemCode);
-    handleItemChange(index, 'item_name', itemName);
-    handleItemChange(index, 'unit_cost', unitCost);
+    const wi: any = warehouseItemsList.find((w: any) => w.id === itemId) || {};
+    const newItems = [...items];
+    newItems[index] = {
+      ...newItems[index],
+      warehouse_item_id: itemId,
+      item_code: itemCode,
+      item_name: itemName,
+      unit_cost: unitCost,
+      track_secondary_quantity: !!wi.track_secondary_quantity,
+      secondary_uom: wi.secondary_uom || null,
+    };
+    setItems(newItems);
   };
 
   const handleSubmit = async () => {
