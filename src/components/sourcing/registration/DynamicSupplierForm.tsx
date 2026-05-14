@@ -40,7 +40,15 @@ function defaultsFromSchema(schema: SupplierFormSchema): Record<string, any> {
 
 function buildRules(field: SupplierField) {
   const rules: any = {};
-  if (field.required) rules.required = `${field.label} is required`;
+  if (field.required) {
+    rules.required = `${field.label} is required`;
+    if (field.type === "file") {
+      rules.validate = (v: any) => {
+        if (field.multiple) return (Array.isArray(v) && v.length > 0) || `${field.label} is required`;
+        return (v && (v as SupplierFileValue).path) ? true : `${field.label} is required`;
+      };
+    }
+  }
   if (field.pattern) {
     try {
       rules.pattern = { value: new RegExp(field.pattern), message: field.patternMessage || `Invalid ${field.label}` };
@@ -54,7 +62,138 @@ function buildRules(field: SupplierField) {
   return rules;
 }
 
-function FieldRenderer({ field, form }: { field: SupplierField; form: UseFormReturn<any> }) {
+function FileUploadField({
+  field,
+  value,
+  onChange,
+  companySlug,
+  preview,
+}: {
+  field: SupplierField;
+  value: SupplierFileValue | SupplierFileValue[] | null;
+  onChange: (v: SupplierFileValue | SupplierFileValue[] | null) => void;
+  companySlug?: string;
+  preview?: boolean;
+}) {
+  const [uploading, setUploading] = useState(false);
+  const accept = field.accept || ["application/pdf", "image/jpeg", "image/png"];
+  const maxSizeMB = field.maxSizeMB ?? 10;
+  const multiple = !!field.multiple;
+  const maxFiles = multiple ? Math.max(1, field.maxFiles ?? 1) : 1;
+  const items: SupplierFileValue[] = multiple
+    ? (Array.isArray(value) ? value : [])
+    : (value && !Array.isArray(value) ? [value as SupplierFileValue] : []);
+
+  const handleFiles = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    if (preview) { toast.info("Uploads are disabled in preview mode."); return; }
+    if (!companySlug) { toast.error("Company context missing — cannot upload."); return; }
+
+    const remaining = maxFiles - items.length;
+    const picked = Array.from(files).slice(0, remaining);
+    if (picked.length === 0) { toast.error(`You can upload at most ${maxFiles} file(s).`); return; }
+
+    setUploading(true);
+    const uploaded: SupplierFileValue[] = [];
+    try {
+      for (const file of picked) {
+        if (!accept.includes(file.type)) { toast.error(`${file.name}: file type not allowed`); continue; }
+        if (file.size > maxSizeMB * 1024 * 1024) { toast.error(`${file.name}: exceeds ${maxSizeMB} MB`); continue; }
+
+        const { data: signed, error } = await invokeEdgeFunction("supplier-upload-sign", {
+          body: {
+            company_slug: companySlug,
+            field_key: field.key,
+            filename: file.name,
+            mime: file.type,
+            size: file.size,
+          },
+        });
+        if (error || !signed?.signed_url || !signed?.path) {
+          toast.error(`${file.name}: ${error?.message || "could not get upload URL"}`);
+          continue;
+        }
+
+        const putRes = await fetch(signed.signed_url, {
+          method: "PUT",
+          headers: { "Content-Type": file.type, "x-upsert": "false" },
+          body: file,
+        });
+        if (!putRes.ok) {
+          toast.error(`${file.name}: upload failed (${putRes.status})`);
+          continue;
+        }
+
+        uploaded.push({
+          path: signed.path,
+          name: file.name,
+          size: file.size,
+          mime: file.type,
+          uploaded_at: new Date().toISOString(),
+        });
+      }
+
+      if (uploaded.length > 0) {
+        if (multiple) onChange([...items, ...uploaded]);
+        else onChange(uploaded[0]);
+        toast.success(`${uploaded.length} file(s) uploaded`);
+      }
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const removeAt = (idx: number) => {
+    const next = items.filter((_, i) => i !== idx);
+    onChange(multiple ? next : (next[0] || null));
+  };
+
+  return (
+    <div className="space-y-2">
+      <label className="flex items-center justify-center gap-2 rounded-md border-2 border-dashed border-input px-4 py-6 text-sm text-muted-foreground cursor-pointer hover:bg-accent/30 transition-colors">
+        {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+        <span>
+          {uploading
+            ? "Uploading..."
+            : items.length >= maxFiles
+              ? `Maximum ${maxFiles} file(s) reached`
+              : `Click to upload ${multiple ? `(up to ${maxFiles})` : ""}`}
+        </span>
+        <input
+          type="file"
+          className="hidden"
+          accept={accept.join(",")}
+          multiple={multiple}
+          disabled={uploading || items.length >= maxFiles}
+          onChange={(e) => { handleFiles(e.target.files); e.currentTarget.value = ""; }}
+        />
+      </label>
+      <p className="text-xs text-muted-foreground">
+        Allowed: {accept.map((m) => m.split("/")[1]?.toUpperCase()).join(", ")} • Max {maxSizeMB} MB
+      </p>
+      {items.length > 0 && (
+        <ul className="space-y-1">
+          {items.map((it, i) => (
+            <li key={`${it.path}-${i}`} className="flex items-center justify-between rounded border bg-muted/30 px-2 py-1 text-sm">
+              <div className="flex items-center gap-2 min-w-0">
+                <FileIcon className="w-4 h-4 shrink-0" />
+                <span className="truncate">{it.name}</span>
+                <span className="text-xs text-muted-foreground shrink-0">
+                  ({(it.size / 1024).toFixed(0)} KB)
+                </span>
+              </div>
+              <Button type="button" variant="ghost" size="icon" className="h-7 w-7" onClick={() => removeAt(i)}>
+                <X className="w-4 h-4" />
+              </Button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+function FieldRenderer({ field, form, companySlug, preview }: { field: SupplierField; form: UseFormReturn<any>; companySlug?: string; preview?: boolean }) {
   return (
     <FormField
       control={form.control}
