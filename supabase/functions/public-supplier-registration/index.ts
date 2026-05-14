@@ -90,7 +90,7 @@ serve(async (req) => {
     }
 
     const body = await req.json();
-    const { supplier_data, turnstile_token } = body ?? {};
+    const { supplier_data, turnstile_token, company_slug, company_id } = body ?? {};
 
     // Verify Cloudflare Turnstile (bot protection)
     const captcha = await verifyTurnstile(turnstile_token, ip, "supplier_registration", "public_registration");
