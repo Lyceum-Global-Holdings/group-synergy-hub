@@ -682,7 +682,7 @@ export function CreateGrnDialog({ open, onOpenChange, poId }: CreateGrnDialogPro
                             size="sm"
                             className="h-8 px-2 text-xs"
                             title="Auto-generate batch number"
-                            onClick={() => handleItemChange(index, 'batch_number', generateBatchNumber(item, index))}
+                            onClick={() => fillBatchNumber(index)}
                           >
                             Gen
                           </Button>
