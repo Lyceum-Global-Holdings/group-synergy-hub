@@ -278,12 +278,24 @@ export function CreateGrnDialog({ open, onOpenChange, poId }: CreateGrnDialogPro
     return { label: 'Pending', variant: 'secondary' };
   };
 
-  const generateBatchNumber = (item: CreateGrnItemData, index: number) => {
-    const dateStr = format(new Date(), 'yyyyMMdd');
-    const code = item.item_code || item.item_name?.substring(0, 6).toUpperCase().replace(/\s/g, '') || 'ITEM';
-    const seq = String(index + 1).padStart(2, '0');
-    return `${code}-${dateStr}-${seq}`;
+  // GS1 AI(10) compatible batch/lot code, generated server-side for uniqueness.
+  const fillBatchNumber = async (index: number) => {
+    const item = items[index];
+    if (!selectedCompany?.id || !item?.warehouse_item_id) {
+      toast.error('Select a warehouse item before generating a batch number');
+      return;
+    }
+    try {
+      const code = await generateBatch.mutateAsync({
+        companyId: selectedCompany.id,
+        warehouseItemId: item.warehouse_item_id,
+      });
+      handleItemChange(index, 'batch_number', code);
+    } catch (err: any) {
+      toast.error(err?.message || 'Failed to generate batch number');
+    }
   };
+
 
   const handleSubmit = async (status: 'draft' | 'submitted') => {
     const values = form.getValues();
