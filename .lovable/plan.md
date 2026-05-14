@@ -1,37 +1,112 @@
-## Problem
+## Goal
 
-In the current `CompanySidebar.tsx`, two pieces of UI only render when a single company is selected (`!isViewingAllCompanies && selectedCompany`):
+Add **dual-quantity tracking** to inventory so users can receive stock as "X pieces × Y length" (or any secondary unit), while the system keeps a single canonical base-quantity ledger for valuation and FIFO.
 
-1. **Pin (star) buttons** next to each leaf submodule and each nested child.
-2. There is no separate issue with chevrons themselves, but in all-companies view the lack of pin buttons makes the row look "flat". For nested items (e.g. Construction → Resource Allocation → Labour/Inventory/Subcontractor), the expand chevron is rendered, but the children are also gated behind pin/visibility logic that hides UI affordances.
+Each receipt captures its own conversion — no fixed factor on the item master — so variable cut sizes (e.g. 200 m delivered as 18 pieces of varying length) are preserved.
 
-Super admin defaults to "All Companies" view, so both toggles disappear.
+---
 
-## Fix
+## Schema changes
 
-Edit only `src/components/layout/CompanySidebar.tsx`:
+### `warehouse_items`
+- `base_uom text` — canonical unit (e.g. `m`, `kg`, `L`). Defaults to existing `unit_of_measure`.
+- `secondary_uom text NULL` — counted unit (e.g. `pcs`, `roll`, `bag`). Optional.
+- `track_secondary_quantity boolean default false` — opt-in flag per item.
 
-1. **Resolve a target company for pinning in all-companies view.**
-   - Add `pinTargetCompany = selectedCompany ?? companies[0] ?? null`.
-   - Pass it down to `DepartmentCollapsible` and `NestedSubItem` as a new prop `pinTargetCompany`.
+`current_stock` and all valuation logic remain in **base UOM** (no breaking change).
 
-2. **Always render `SidebarPinButton` when `pinTargetCompany` exists**, regardless of `isViewingAllCompanies`.
-   - Replace the `!isViewingAllCompanies && selectedCompany` guard around both pin button blocks (leaf row and nested child row) with `pinTargetCompany &&`.
-   - Use `pinTargetCompany.id` as the `companyId` prop.
+### `warehouse_bin_allocations`
+- `secondary_quantity numeric NULL` — running pieces in this bin.
 
-3. **Update `isItemPinned`** to also accept the all-companies case: when `selectedCompany` is null, check pins against `pinTargetCompany.id` instead. Implementation: `const pinCompanyId = selectedCompany?.id ?? pinTargetCompany?.id` inside the helper.
+### `stock_transactions`
+- `secondary_quantity_change numeric NULL`
+- `secondary_quantity_before numeric NULL`
+- `secondary_quantity_after numeric NULL`
+- `secondary_uom text NULL` (snapshot)
 
-4. **Nested chevron reliability.** Confirm `NestedSubItem`'s `Collapsible` uses controlled `open` state — it already does. No structural change needed; just make sure the chevron click target (`SidebarMenuSubButton` with `onClick`) is not overlapped. Add `relative z-[1]` to the trigger button and keep the children list at default stacking so clicks always reach the toggle.
+Trigger `set_stock_transaction_balances` extended to also compute `secondary_quantity_before/after` from `warehouse_bin_allocations.secondary_quantity` when the item has `track_secondary_quantity = true`. Same authoritative pattern as base quantity.
 
-5. Keep all other behavior (badges, "Used by:" company chips in all-companies view) unchanged.
+### `grn_items`
+- `secondary_quantity_received numeric NULL`
+- `secondary_uom text NULL`
+- `conversion_note text NULL` — free text e.g. "18 pcs averaging 11.1 m"
+
+### `warehouse_batches` (if used for FIFO)
+- `secondary_quantity_remaining numeric NULL`
+- `secondary_uom text NULL`
+
+### Backfill
+- Set `base_uom = unit_of_measure` for all existing rows.
+- Leave `secondary_*` NULL — items behave exactly as today until enabled.
+
+---
+
+## RPC / function updates
+
+- `set_stock_transaction_balances` trigger — also reads/writes secondary qty when present.
+- Bin allocation upsert helpers (`adjust_bin_allocation_from_scan`, GRN allocation, issue, transfer) — accept and apply `secondary_quantity_delta` alongside base delta.
+- `list_warehouse_inventory` RPC — return `secondary_quantity` and `secondary_uom` columns.
+- `get_bin_scoped_stock_movements` — return secondary balances verbatim.
+
+No change to FIFO ordering — base UOM continues to drive valuation and consumption.
+
+---
+
+## UI changes
+
+### Item master (`CreateItemDialog`, `EditItem...`)
+- New section "Dual quantity tracking" (collapsed by default).
+  - Toggle: *Track pieces separately from base unit*
+  - When on: `Base UOM` (locked to existing UOM), `Secondary UOM` (e.g. pcs).
+
+### GRN entry (`CreateGrnDialog`, `GrnBinAllocationDialog`)
+For items with `track_secondary_quantity`:
+- Two inputs side-by-side:
+  - **Pieces** (`secondary_quantity_received`)
+  - **Total length / weight** (`quantity_received`, base UOM)
+- Optional note "avg per piece" auto-computed for display only.
+
+### Material Issue / Transfer / Adjustment
+- Same dual input pattern. User can enter either pieces or base qty; the other can be left blank when not tracked at issue time (e.g. issuing 5 m off a coil — pieces unchanged).
+- Validation: at least one of (base, secondary) must be provided; if both, both apply.
+
+### Inventory list / Item details / Bin allocation views
+- Show "120 m (8 pcs)" formatted via `formatQty` helper extended to render dual values.
+- Stock movements ledger — extra columns for secondary before/change/after, hidden when item doesn't track it.
+
+### Bin QR adjust screen (`/b/:id`)
+- Same dual input when scanned bin's item tracks secondary.
+
+---
+
+## Files to add / change
+
+**New**
+- `src/lib/dualQuantity.ts` — formatter, parser, validation helpers.
+- `src/components/warehouse/DualQuantityInput.tsx` — reusable input pair.
+
+**Edit (high-level)**
+- `src/components/warehouse/CreateItemDialog.tsx`, `ItemMasterTab.tsx`
+- `src/components/warehouse/CreateGrnDialog.tsx`, `GrnBinAllocationDialog.tsx`, `GrnDetailsDialog.tsx`
+- `src/components/warehouse/CreateMaterialIssueDialog.tsx`, `IssueItemsDialog.tsx`
+- `src/components/warehouse/CreateStockTransferDialog.tsx`
+- `src/components/warehouse/BulkAdjustmentDialog.tsx`
+- `src/pages/warehouse/Inventory.tsx`, `BinAllocations.tsx`, `MaterialIssueReturn.tsx`
+- `src/pages/PublicBinAllocation.tsx` (scanned adjust)
+- `src/types/warehouse.ts`, `src/types/stockTransaction.ts`, `src/types/grn.ts`
+- Memory note: add `mem://architecture/dual-quantity-tracking`
+
+---
+
+## Rollout
+
+1. Migration (schema + trigger update + backfill `base_uom`). Existing items unchanged.
+2. Ship UI behind item-level `track_secondary_quantity` toggle — opt in per item, no forced migration of existing stock.
+3. Optional follow-up: bulk-enable tracking for a category and seed `secondary_quantity` from physical count.
+
+---
 
 ## Out of scope
 
-- `moduleConfig`, routing, RBAC, pin persistence logic (`useSidebarPins`), `SidebarPinButton` internals.
-- Any other sidebar component or page.
-
-## Verification
-
-- Super admin in "All Companies" view: each submodule row shows a pin star on hover; clicking pins to the first accessible company.
-- Construction → Resource Allocation chevron expands/collapses Labour, Inventory, Subcontractor.
-- Selecting a single company still pins to that company (existing behavior preserved).
+- Variable per-piece dimensions (length-per-piece records). If you later need to know "piece #3 was 12.4 m", that's a separate `warehouse_item_serials`-style table. The current plan stores totals per receipt/bin only.
+- Changing valuation to piece-based — base UOM stays the money unit.
