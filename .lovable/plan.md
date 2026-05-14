@@ -1,112 +1,67 @@
 ## Goal
+Auto-generate batch (lot) codes when receiving stock via GRN, following international standards so the codes are globally unique, traceable, and GS1-compatible.
 
-Add **dual-quantity tracking** to inventory so users can receive stock as "X pieces × Y length" (or any secondary unit), while the system keeps a single canonical base-quantity ledger for valuation and FIFO.
+## Standard chosen
+**GS1 Application Identifier (10) — Batch/Lot Number**
+- Up to 20 chars, alphanumeric (A–Z, 0–9, plus `-` `/` `.`)
+- Must be unique within a given GTIN/item
+- Recommended structure also aligns with **ISO 22005** (traceability) and **FDA 21 CFR 211.130** (lot identification): supplier + date + sequence
 
-Each receipt captures its own conversion — no fixed factor on the item master — so variable cut sizes (e.g. 200 m delivered as 18 pieces of varying length) are preserved.
+### Format
+```
+LOT-{ITEMCODE}-{YYJJJ}-{NNNN}
+```
+- `LOT` — fixed prefix (clear human label)
+- `ITEMCODE` — item's `item_code` (already GS1-derived, e.g. `INV-RAW-001`); collapsed to alphanumeric
+- `YYJJJ` — 2-digit year + Julian day (ISO 8601 ordinal date, 5 chars, sortable, compact)
+- `NNNN` — zero-padded daily sequence per (company, item, day)
 
----
+Example: `LOT-INVRAW001-26134-0007` (24 chars total — within GS1 20-char limit when item code is short; we trim ITEMCODE to keep total ≤ 20 when needed by hashing the tail).
 
-## Schema changes
+### Why this format
+- **Unique per item** (satisfies GS1 AI 10 rule).
+- **Sortable & human-readable** (date embedded).
+- **Deterministic regeneration impossible** without server — prevents collisions across concurrent GRNs.
+- **Audit-friendly** — date and sequence are visible.
 
-### `warehouse_items`
-- `base_uom text` — canonical unit (e.g. `m`, `kg`, `L`). Defaults to existing `unit_of_measure`.
-- `secondary_uom text NULL` — counted unit (e.g. `pcs`, `roll`, `bag`). Optional.
-- `track_secondary_quantity boolean default false` — opt-in flag per item.
+## Implementation
 
-`current_stock` and all valuation logic remain in **base UOM** (no breaking change).
+### 1. Database (migration)
+Create `generate_batch_number(_company_id uuid, _item_id uuid, _item_code text)` RPC:
+- `SECURITY DEFINER`, `search_path = public`
+- Computes `YYJJJ` from `now()` at company timezone (fallback UTC)
+- Locks per (company_id, item_id, day) using advisory lock to serialize sequence allocation
+- Reads max existing `NNNN` from `warehouse_batches.batch_code` matching prefix → returns next
+- If `ITEMCODE` would push total > 20 chars, truncates to 8 + 3-char base36 hash
 
-### `warehouse_bin_allocations`
-- `secondary_quantity numeric NULL` — running pieces in this bin.
+Add unique index:
+```sql
+create unique index if not exists warehouse_batches_company_item_code_uk
+  on public.warehouse_batches (company_id, item_id, batch_code);
+```
+(no-op if it already exists; verify column names against current schema before applying).
 
-### `stock_transactions`
-- `secondary_quantity_change numeric NULL`
-- `secondary_quantity_before numeric NULL`
-- `secondary_quantity_after numeric NULL`
-- `secondary_uom text NULL` (snapshot)
+### 2. GRN dialog (`CreateGrnDialog.tsx`)
+- Replace local `generateBatchNumber()` with an async call to the new RPC.
+- Auto-fill `batch_number` on row add for batch-tracked items (so user sees it immediately, can override).
+- Keep the "regenerate" button but route it through the RPC.
+- Read-only styling + tooltip: "Auto-generated GS1-compatible lot code. Edit only if supplier provides their own."
 
-Trigger `set_stock_transaction_balances` extended to also compute `secondary_quantity_before/after` from `warehouse_bin_allocations.secondary_quantity` when the item has `track_secondary_quantity = true`. Same authoritative pattern as base quantity.
+### 3. GRN approval (`useGoodsReceiptNotes.ts`)
+- On approval, if `batch_number` is still empty for a batch-tracked item, call RPC server-side fallback before insert into `warehouse_batches` / `stock_transactions`.
+- Persist supplier-provided lot codes verbatim (don't overwrite user input).
 
-### `grn_items`
-- `secondary_quantity_received numeric NULL`
-- `secondary_uom text NULL`
-- `conversion_note text NULL` — free text e.g. "18 pcs averaging 11.1 m"
-
-### `warehouse_batches` (if used for FIFO)
-- `secondary_quantity_remaining numeric NULL`
-- `secondary_uom text NULL`
-
-### Backfill
-- Set `base_uom = unit_of_measure` for all existing rows.
-- Leave `secondary_*` NULL — items behave exactly as today until enabled.
-
----
-
-## RPC / function updates
-
-- `set_stock_transaction_balances` trigger — also reads/writes secondary qty when present.
-- Bin allocation upsert helpers (`adjust_bin_allocation_from_scan`, GRN allocation, issue, transfer) — accept and apply `secondary_quantity_delta` alongside base delta.
-- `list_warehouse_inventory` RPC — return `secondary_quantity` and `secondary_uom` columns.
-- `get_bin_scoped_stock_movements` — return secondary balances verbatim.
-
-No change to FIFO ordering — base UOM continues to drive valuation and consumption.
-
----
-
-## UI changes
-
-### Item master (`CreateItemDialog`, `EditItem...`)
-- New section "Dual quantity tracking" (collapsed by default).
-  - Toggle: *Track pieces separately from base unit*
-  - When on: `Base UOM` (locked to existing UOM), `Secondary UOM` (e.g. pcs).
-
-### GRN entry (`CreateGrnDialog`, `GrnBinAllocationDialog`)
-For items with `track_secondary_quantity`:
-- Two inputs side-by-side:
-  - **Pieces** (`secondary_quantity_received`)
-  - **Total length / weight** (`quantity_received`, base UOM)
-- Optional note "avg per piece" auto-computed for display only.
-
-### Material Issue / Transfer / Adjustment
-- Same dual input pattern. User can enter either pieces or base qty; the other can be left blank when not tracked at issue time (e.g. issuing 5 m off a coil — pieces unchanged).
-- Validation: at least one of (base, secondary) must be provided; if both, both apply.
-
-### Inventory list / Item details / Bin allocation views
-- Show "120 m (8 pcs)" formatted via `formatQty` helper extended to render dual values.
-- Stock movements ledger — extra columns for secondary before/change/after, hidden when item doesn't track it.
-
-### Bin QR adjust screen (`/b/:id`)
-- Same dual input when scanned bin's item tracks secondary.
-
----
-
-## Files to add / change
-
-**New**
-- `src/lib/dualQuantity.ts` — formatter, parser, validation helpers.
-- `src/components/warehouse/DualQuantityInput.tsx` — reusable input pair.
-
-**Edit (high-level)**
-- `src/components/warehouse/CreateItemDialog.tsx`, `ItemMasterTab.tsx`
-- `src/components/warehouse/CreateGrnDialog.tsx`, `GrnBinAllocationDialog.tsx`, `GrnDetailsDialog.tsx`
-- `src/components/warehouse/CreateMaterialIssueDialog.tsx`, `IssueItemsDialog.tsx`
-- `src/components/warehouse/CreateStockTransferDialog.tsx`
-- `src/components/warehouse/BulkAdjustmentDialog.tsx`
-- `src/pages/warehouse/Inventory.tsx`, `BinAllocations.tsx`, `MaterialIssueReturn.tsx`
-- `src/pages/PublicBinAllocation.tsx` (scanned adjust)
-- `src/types/warehouse.ts`, `src/types/stockTransaction.ts`, `src/types/grn.ts`
-- Memory note: add `mem://architecture/dual-quantity-tracking`
-
----
-
-## Rollout
-
-1. Migration (schema + trigger update + backfill `base_uom`). Existing items unchanged.
-2. Ship UI behind item-level `track_secondary_quantity` toggle — opt in per item, no forced migration of existing stock.
-3. Optional follow-up: bulk-enable tracking for a category and seed `secondary_quantity` from physical count.
-
----
+### 4. Validation
+- Client regex: `^[A-Z0-9./-]{1,20}$` (GS1 AI 10 character set).
+- Show inline error if user-edited code violates the rule.
 
 ## Out of scope
+- Migrating existing batch codes (legacy codes remain as-is).
+- Printing GS1-128 / DataMatrix labels with AI (10) — separate label-printing work.
+- Per-supplier lot-code overrides workflow.
 
-- Variable per-piece dimensions (length-per-piece records). If you later need to know "piece #3 was 12.4 m", that's a separate `warehouse_item_serials`-style table. The current plan stores totals per receipt/bin only.
-- Changing valuation to piece-based — base UOM stays the money unit.
+## Files to touch
+- New migration: `generate_batch_number` RPC + unique index
+- `src/components/warehouse/CreateGrnDialog.tsx` — async generator, auto-fill, validation
+- `src/hooks/useGoodsReceiptNotes.ts` — server-side fallback on approval
+- New: `src/hooks/useGenerateBatchNumber.ts` (mutation wrapper, mirrors `useSrnNumber.ts`)
