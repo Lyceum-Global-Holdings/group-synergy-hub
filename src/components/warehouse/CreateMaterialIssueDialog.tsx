@@ -17,6 +17,7 @@ import { Plus, Trash2, Package, ListPlus, AlertTriangle } from 'lucide-react';
 import { useMaterialIssues } from '@/hooks/useMaterialIssues';
 import { useMaterialIssueItems } from '@/hooks/useMaterialIssueItems';
 import { ItemSelector } from '@/components/common/ItemSelector';
+import { DualQuantityInput } from '@/components/warehouse/DualQuantityInput';
 import { SrnNumberField } from '@/components/warehouse/SrnNumberField';
 import { SrnDocumentUploadField } from '@/components/warehouse/SrnDocumentUploadField';
 import { useWarehouseItems } from '@/hooks/useWarehouseItems';
@@ -59,6 +60,10 @@ interface IssueItem {
   reserved_quantity?: number;
   bin_location?: string;
   available_stock?: number;
+  // Dual quantity tracking (per-item opt-in)
+  track_secondary_quantity?: boolean;
+  secondary_uom?: string | null;
+  secondary_quantity_issued?: number;
 }
 
 export function CreateMaterialIssueDialog({ open, onOpenChange }: MaterialIssueDialogProps) {
@@ -186,6 +191,7 @@ export function CreateMaterialIssueDialog({ open, onOpenChange }: MaterialIssueD
 
   const handleItemSelect = (item: any) => {
     if (item && item.id) {
+      const wi: any = warehouseItems.find((w: any) => w.id === item.id) || {};
       setCurrentItem({
         item_id: item.id,
         item_code: item.item_code,
@@ -194,6 +200,9 @@ export function CreateMaterialIssueDialog({ open, onOpenChange }: MaterialIssueD
         quantity_required: 1,
         purpose: '',
         available_stock: item.current_stock || 0,
+        track_secondary_quantity: !!wi.track_secondary_quantity,
+        secondary_uom: wi.secondary_uom || null,
+        secondary_quantity_issued: undefined,
       });
     }
   };
@@ -208,19 +217,24 @@ export function CreateMaterialIssueDialog({ open, onOpenChange }: MaterialIssueD
   const handleAddAllReservedItems = () => {
     const newItems: IssueItem[] = reservedItems
       .filter(res => res.warehouse_item && res.quantity_remaining > 0)
-      .map(res => ({
-        item_id: res.warehouse_item.id,
-        item_code: res.warehouse_item.item_code,
-        description: res.warehouse_item.name,
-        unit_of_measure: res.warehouse_item.unit_of_measure,
-        quantity_required: res.quantity_remaining,
-        purpose: `Reserved for CPO ${formData.cpo_number}`,
-        reservation_id: res.id,
-        from_reservation: true,
-        reserved_quantity: res.reserved_quantity,
-        bin_location: res.bin_allocation?.bin?.bin_code || 'N/A',
-        available_stock: res.warehouse_item.current_stock || 0,
-      }));
+      .map(res => {
+        const wi: any = warehouseItems.find((w: any) => w.id === res.warehouse_item.id) || {};
+        return {
+          item_id: res.warehouse_item.id,
+          item_code: res.warehouse_item.item_code,
+          description: res.warehouse_item.name,
+          unit_of_measure: res.warehouse_item.unit_of_measure,
+          quantity_required: res.quantity_remaining,
+          purpose: `Reserved for CPO ${formData.cpo_number}`,
+          reservation_id: res.id,
+          from_reservation: true,
+          reserved_quantity: res.reserved_quantity,
+          bin_location: res.bin_allocation?.bin?.bin_code || 'N/A',
+          available_stock: res.warehouse_item.current_stock || 0,
+          track_secondary_quantity: !!wi.track_secondary_quantity,
+          secondary_uom: wi.secondary_uom || null,
+        };
+      });
 
     setItems(prev => [...prev, ...newItems]);
   };
@@ -238,6 +252,20 @@ export function CreateMaterialIssueDialog({ open, onOpenChange }: MaterialIssueD
         variant: 'destructive',
       });
       setCurrentTab('header');
+      return;
+    }
+
+    // Dual-tracked items must have a positive secondary quantity
+    const missingSecondary = items.find(
+      (it) => it.track_secondary_quantity && (!it.secondary_quantity_issued || it.secondary_quantity_issued <= 0)
+    );
+    if (missingSecondary) {
+      toast({
+        title: 'Pieces required',
+        description: `Enter the piece count (${missingSecondary.secondary_uom || 'pcs'}) for ${missingSecondary.item_code || missingSecondary.description}.`,
+        variant: 'destructive',
+      });
+      setCurrentTab('items');
       return;
     }
     if (!selectedCompany?.id) {
@@ -301,6 +329,10 @@ export function CreateMaterialIssueDialog({ open, onOpenChange }: MaterialIssueD
         purpose: item.purpose || undefined,
         reservation_id: item.reservation_id,
         from_reservation: item.from_reservation || false,
+        secondary_quantity_issued: item.track_secondary_quantity
+          ? (item.secondary_quantity_issued ?? null)
+          : null,
+        secondary_uom: item.track_secondary_quantity ? (item.secondary_uom ?? null) : null,
       }));
 
       await createItems(itemsToCreate);
@@ -570,6 +602,22 @@ export function CreateMaterialIssueDialog({ open, onOpenChange }: MaterialIssueD
                   />
                 </div>
               </div>
+
+              {currentItem.track_secondary_quantity && (
+                <div className="rounded-md border bg-muted/30 p-3">
+                  <DualQuantityInput
+                    baseValue={String(currentItem.quantity_required ?? '')}
+                    secondaryValue={String(currentItem.secondary_quantity_issued ?? '')}
+                    onBaseChange={(v) => setCurrentItem({ ...currentItem, quantity_required: parseFloat(v) || 0 })}
+                    onSecondaryChange={(v) => setCurrentItem({ ...currentItem, secondary_quantity_issued: parseFloat(v) || 0 })}
+                    baseUom={currentItem.unit_of_measure}
+                    secondaryUom={currentItem.secondary_uom || 'pcs'}
+                    baseLabel="Qty issued"
+                    secondaryLabel="Pieces issued"
+                    required
+                  />
+                </div>
+              )}
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">

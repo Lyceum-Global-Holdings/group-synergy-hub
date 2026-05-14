@@ -258,7 +258,8 @@ export function IssueItemsDialog({ open, onOpenChange, issueId, onSuccess }: Iss
           p_bin_allocation_id: null,
           p_min_id: issueId,
           p_min_number: issueNote.min_number || null,
-        });
+          p_secondary_quantity_issued: (item as any).secondary_quantity_issued ?? null,
+        } as any);
 
         if (deductErr) {
           throw new Error(`Stock deduction failed for ${item.item_code || item.item_id}: ${deductErr.message}`);

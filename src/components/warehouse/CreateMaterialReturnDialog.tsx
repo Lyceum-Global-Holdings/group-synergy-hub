@@ -9,8 +9,10 @@ import { Plus, Trash2 } from "lucide-react";
 import { useMaterialReturns } from "@/hooks/useMaterialReturns";
 import { useMaterialReturnItems } from "@/hooks/useMaterialReturnItems";
 import { ItemSelector } from "@/components/common/ItemSelector";
+import { DualQuantityInput } from "@/components/warehouse/DualQuantityInput";
 import { SrnNumberField } from "@/components/warehouse/SrnNumberField";
 import { useCompany } from "@/contexts/CompanyContext";
+import { useWarehouseItems } from "@/hooks/useWarehouseItems";
 import { format } from "date-fns";
 
 interface ReturnItem {
@@ -21,6 +23,9 @@ interface ReturnItem {
   condition: 'good' | 'damaged' | 'expired';
   unit_cost: number;
   notes?: string;
+  track_secondary_quantity?: boolean;
+  secondary_uom?: string | null;
+  secondary_quantity_returned?: number;
 }
 
 interface CreateMaterialReturnDialogProps {
@@ -39,6 +44,7 @@ export function CreateMaterialReturnDialog({
   const { selectedCompany } = useCompany();
   const { createMaterialReturnAsync, isCreating } = useMaterialReturns();
   const { createItems } = useMaterialReturnItems();
+  const { items: warehouseItemsList } = useWarehouseItems();
 
   const [returnDate, setReturnDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [returnedBy, setReturnedBy] = useState('');
@@ -71,10 +77,18 @@ export function CreateMaterialReturnDialog({
   };
 
   const handleItemSelect = (index: number, itemId: string, itemCode: string, itemName: string, unitCost: number) => {
-    handleItemChange(index, 'warehouse_item_id', itemId);
-    handleItemChange(index, 'item_code', itemCode);
-    handleItemChange(index, 'item_name', itemName);
-    handleItemChange(index, 'unit_cost', unitCost);
+    const wi: any = warehouseItemsList.find((w: any) => w.id === itemId) || {};
+    const newItems = [...items];
+    newItems[index] = {
+      ...newItems[index],
+      warehouse_item_id: itemId,
+      item_code: itemCode,
+      item_name: itemName,
+      unit_cost: unitCost,
+      track_secondary_quantity: !!wi.track_secondary_quantity,
+      secondary_uom: wi.secondary_uom || null,
+    };
+    setItems(newItems);
   };
 
   const handleSubmit = async () => {
@@ -93,14 +107,18 @@ export function CreateMaterialReturnDialog({
         srn_number: srnNumber || undefined,
       });
 
-      const returnItems = items.map((item, idx) => ({
+      const returnItems = items.map((item) => ({
         mrn_id: newReturn.id,
         item_id: item.warehouse_item_id,
         quantity_returned: item.quantity_returned,
         condition: item.condition,
         unit_cost: item.unit_cost,
         total_cost: item.quantity_returned * item.unit_cost,
-        notes: item.notes
+        notes: item.notes,
+        secondary_quantity_returned: item.track_secondary_quantity
+          ? (item.secondary_quantity_returned ?? null)
+          : null,
+        secondary_uom: item.track_secondary_quantity ? (item.secondary_uom ?? null) : null,
       }));
 
       await createItems(returnItems);
@@ -250,6 +268,21 @@ export function CreateMaterialReturnDialog({
                         />
                       </div>
                     </div>
+
+                    {item.track_secondary_quantity && (
+                      <div className="rounded-md border bg-muted/30 p-3">
+                        <DualQuantityInput
+                          baseValue={String(item.quantity_returned ?? '')}
+                          secondaryValue={String(item.secondary_quantity_returned ?? '')}
+                          onBaseChange={(v) => handleItemChange(index, 'quantity_returned', parseFloat(v) || 0)}
+                          onSecondaryChange={(v) => handleItemChange(index, 'secondary_quantity_returned', parseFloat(v) || 0)}
+                          baseLabel="Qty returned"
+                          secondaryLabel="Pieces returned"
+                          secondaryUom={item.secondary_uom || 'pcs'}
+                          required
+                        />
+                      </div>
+                    )}
 
                     <div>
                       <Label>Notes</Label>
