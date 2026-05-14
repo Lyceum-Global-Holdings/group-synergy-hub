@@ -45,6 +45,8 @@ import { useCompany } from '@/contexts/CompanyContext';
 import { usePurchaseOrders } from '@/hooks/usePurchaseOrders';
 import { useCreateGoodsReceiptNote } from '@/hooks/useGoodsReceiptNotes';
 import { useWarehouseItems } from '@/hooks/useWarehouseItems';
+import { useGenerateBatchNumber, BATCH_NUMBER_REGEX } from '@/hooks/useGenerateBatchNumber';
+import { toast } from 'sonner';
 import { CreateGrnItemData, QualityStatus } from '@/types/grn';
 import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
@@ -74,6 +76,7 @@ export function CreateGrnDialog({ open, onOpenChange, poId }: CreateGrnDialogPro
   const { data: pos = [] } = usePurchaseOrders();
   const createGrn = useCreateGoodsReceiptNote();
   const { items: warehouseItems = [] } = useWarehouseItems();
+  const generateBatch = useGenerateBatchNumber();
 
   const [items, setItems] = useState<CreateGrnItemData[]>([]);
   const [selectedPoId, setSelectedPoId] = useState<string>(poId || '');
@@ -190,6 +193,27 @@ export function CreateGrnDialog({ open, onOpenChange, poId }: CreateGrnDialogPro
         }) || [];
 
       setItems(poItems);
+
+      // Auto-generate batch numbers for batch-tracked items
+      if (selectedCompany?.id) {
+        const updates = await Promise.all(
+          poItems.map(async (it) => {
+            if (it.is_batch_tracked && it.warehouse_item_id) {
+              try {
+                const code = await generateBatch.mutateAsync({
+                  companyId: selectedCompany.id,
+                  warehouseItemId: it.warehouse_item_id,
+                });
+                return { ...it, batch_number: code };
+              } catch {
+                return it;
+              }
+            }
+            return it;
+          })
+        );
+        setItems(updates);
+      }
     };
 
     loadPoWithPendingQuantities();
@@ -251,6 +275,13 @@ export function CreateGrnDialog({ open, onOpenChange, poId }: CreateGrnDialogPro
         if (selectedItem.unit_cost) {
           newItems[index].unit_price = Number(selectedItem.unit_cost);
         }
+        // Auto-generate batch number for batch-tracked items
+        if (selectedItem.is_batch_tracked && selectedCompany?.id && !newItems[index].batch_number) {
+          generateBatch
+            .mutateAsync({ companyId: selectedCompany.id, warehouseItemId: value })
+            .then((code) => handleItemChange(index, 'batch_number', code))
+            .catch(() => { /* user can click Gen to retry */ });
+        }
       }
     }
 
@@ -275,12 +306,24 @@ export function CreateGrnDialog({ open, onOpenChange, poId }: CreateGrnDialogPro
     return { label: 'Pending', variant: 'secondary' };
   };
 
-  const generateBatchNumber = (item: CreateGrnItemData, index: number) => {
-    const dateStr = format(new Date(), 'yyyyMMdd');
-    const code = item.item_code || item.item_name?.substring(0, 6).toUpperCase().replace(/\s/g, '') || 'ITEM';
-    const seq = String(index + 1).padStart(2, '0');
-    return `${code}-${dateStr}-${seq}`;
+  // GS1 AI(10) compatible batch/lot code, generated server-side for uniqueness.
+  const fillBatchNumber = async (index: number) => {
+    const item = items[index];
+    if (!selectedCompany?.id || !item?.warehouse_item_id) {
+      toast.error('Select a warehouse item before generating a batch number');
+      return;
+    }
+    try {
+      const code = await generateBatch.mutateAsync({
+        companyId: selectedCompany.id,
+        warehouseItemId: item.warehouse_item_id,
+      });
+      handleItemChange(index, 'batch_number', code);
+    } catch (err: any) {
+      toast.error(err?.message || 'Failed to generate batch number');
+    }
   };
+
 
   const handleSubmit = async (status: 'draft' | 'submitted') => {
     const values = form.getValues();
@@ -303,7 +346,15 @@ export function CreateGrnDialog({ open, onOpenChange, poId }: CreateGrnDialogPro
       return;
     }
 
-    // Warn about missing dates (don't block)
+    // Validate batch number format (GS1 AI(10) — up to 20 chars [A-Z0-9./-])
+    const badBatch = validItems.filter(
+      (item) => item.is_batch_tracked && item.batch_number && !BATCH_NUMBER_REGEX.test(item.batch_number.trim())
+    );
+    if (badBatch.length > 0) {
+      const names = badBatch.map((i) => `${i.item_name} (${i.batch_number})`).join(', ');
+      alert(`Invalid batch number format. Use up to 20 characters from A-Z, 0-9, '.', '/', '-': ${names}`);
+      return;
+    }
     const missingDates = validItems.filter(
       (item) => item.is_batch_tracked && (!item.manufacturing_date || !item.expiry_date)
     );
@@ -667,7 +718,7 @@ export function CreateGrnDialog({ open, onOpenChange, poId }: CreateGrnDialogPro
                             size="sm"
                             className="h-8 px-2 text-xs"
                             title="Auto-generate batch number"
-                            onClick={() => handleItemChange(index, 'batch_number', generateBatchNumber(item, index))}
+                            onClick={() => fillBatchNumber(index)}
                           >
                             Gen
                           </Button>
