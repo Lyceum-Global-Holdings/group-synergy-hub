@@ -269,6 +269,21 @@ export function CreateMaterialReturnDialog({
                       </div>
                     </div>
 
+                    {item.track_secondary_quantity && (
+                      <div className="rounded-md border bg-muted/30 p-3">
+                        <DualQuantityInput
+                          baseValue={String(item.quantity_returned ?? '')}
+                          secondaryValue={String(item.secondary_quantity_returned ?? '')}
+                          onBaseChange={(v) => handleItemChange(index, 'quantity_returned', parseFloat(v) || 0)}
+                          onSecondaryChange={(v) => handleItemChange(index, 'secondary_quantity_returned', parseFloat(v) || 0)}
+                          baseLabel="Qty returned"
+                          secondaryLabel="Pieces returned"
+                          secondaryUom={item.secondary_uom || 'pcs'}
+                          required
+                        />
+                      </div>
+                    )}
+
                     <div>
                       <Label>Notes</Label>
                       <Input
