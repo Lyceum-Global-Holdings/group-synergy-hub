@@ -139,10 +139,13 @@ export function CreateItemDialog({ open, onOpenChange, editingItem }: CreateItem
         status: editingItem.status,
         is_serialized: editingItem.is_serialized,
         is_batch_tracked: editingItem.is_batch_tracked,
+        track_secondary_quantity: editingItem.track_secondary_quantity ?? false,
+        secondary_uom: editingItem.secondary_uom ?? '',
         notes: editingItem.notes || '',
         image_url: editingItem.image_url || '',
       });
       setInitialStock('');
+      setInitialStockSecondary('');
       setInitialBinId('');
       setImagePreview(editingItem.image_url || null);
       setImageFile(null);
