@@ -581,6 +581,27 @@ export function CreateGrnDialog({ open, onOpenChange, poId }: CreateGrnDialogPro
                         }
                         className="w-24"
                       />
+                      {item.track_secondary_quantity && (
+                        <div className="mt-1">
+                          <Input
+                            type="number"
+                            step="0.001"
+                            min="0"
+                            inputMode="decimal"
+                            value={item.secondary_quantity_received ?? ''}
+                            onChange={(e) =>
+                              handleItemChange(
+                                index,
+                                'secondary_quantity_received' as keyof CreateGrnItemData,
+                                parseFloat(e.target.value) || 0
+                              )
+                            }
+                            placeholder={item.secondary_uom || 'pcs'}
+                            title={`Pieces (${item.secondary_uom || 'pcs'})`}
+                            className="w-24 h-7 text-xs"
+                          />
+                        </div>
+                      )}
                     </TableCell>
                     <TableCell>
                       <Input
