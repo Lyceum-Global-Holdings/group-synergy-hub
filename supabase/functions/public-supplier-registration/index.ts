@@ -16,22 +16,14 @@ const RATE_LIMIT_WINDOW = 60 * 60 * 1000; // 1 hour in milliseconds
 const MAX_REQUESTS_PER_WINDOW = 5; // Max 5 submissions per hour per IP
 const rateLimitStore = new Map<string, { count: number; resetTime: number }>();
 
-// Input validation schema
+// Input validation: keep core fields strict, allow any additional configured/custom fields.
 const supplierDataSchema = z.object({
   supplier_name: z.string().trim().min(2, "Supplier name must be at least 2 characters").max(200, "Supplier name too long"),
   email: z.string().trim().email("Invalid email address").max(255, "Email too long"),
-  phone: z.string().trim().min(8, "Phone number must be at least 8 characters").max(20, "Phone number too long"),
+  phone: z.string().trim().min(8, "Phone number must be at least 8 characters").max(20, "Phone number too long").optional(),
   tax_id: z.string().trim().max(50, "Tax ID too long").optional(),
-  address_line1: z.string().trim().max(255, "Address too long").optional(),
-  address_line2: z.string().trim().max(255, "Address too long").optional(),
-  city: z.string().trim().max(100, "City name too long").optional(),
-  state: z.string().trim().max(100, "State name too long").optional(),
-  postal_code: z.string().trim().max(20, "Postal code too long").optional(),
-  country: z.string().trim().max(100, "Country name too long").optional(),
   website: z.string().trim().url("Invalid website URL").max(255, "Website URL too long").optional().or(z.literal('')),
-  business_nature: z.string().trim().max(500, "Business nature description too long").optional(),
-  year_established: z.number().int().min(1800).max(new Date().getFullYear()).optional(),
-});
+}).passthrough();
 
 // Rate limiting function
 function checkRateLimit(ip: string): { allowed: boolean; resetTime?: number } {
