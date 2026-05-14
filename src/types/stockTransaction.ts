@@ -53,6 +53,8 @@ export interface CreateStockTransactionData {
   notes?: string;
   company_id?: string;
   issued_to_location_id?: string;
+  secondary_quantity_change?: number;
+  secondary_uom?: string;
 }
 
 export interface MaterialReturnNote {

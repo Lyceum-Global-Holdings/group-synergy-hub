@@ -198,6 +198,10 @@ export const useCreateGoodsReceiptNote = () => {
             batch_number: item.batch_number || null,
             manufacturing_date: item.manufacturing_date || null,
             expiry_date: item.expiry_date || null,
+            // Dual quantity tracking
+            secondary_quantity_received: item.secondary_quantity_received ?? null,
+            secondary_uom: item.secondary_uom || null,
+            conversion_note: item.conversion_note || null,
           };
         })
       );
@@ -319,7 +323,7 @@ export const useApproveGoodsReceiptNote = () => {
       // Get the GRN with items and grn_number
       const { data: grn, error: grnFetchError } = await supabase
         .from('goods_receipt_notes')
-        .select('company_id, grn_number, grn_items(id, warehouse_item_id, quantity_received, unit_price, total_cost, item_name)')
+        .select('company_id, grn_number, grn_items(id, warehouse_item_id, quantity_received, unit_price, total_cost, item_name, secondary_quantity_received, secondary_uom)')
         .eq('id', id)
         .single();
 
@@ -333,6 +337,8 @@ export const useApproveGoodsReceiptNote = () => {
         total_cost: number;
         item_name: string;
         quantity_before: number;
+        secondary_quantity_received: number | null;
+        secondary_uom: string | null;
       }> = [];
 
       const grnItems = (grn as any).grn_items || [];
@@ -351,6 +357,8 @@ export const useApproveGoodsReceiptNote = () => {
           total_cost: item.total_cost || 0,
           item_name: item.item_name || '',
           quantity_before: whItem?.current_stock || 0,
+          secondary_quantity_received: item.secondary_quantity_received ?? null,
+          secondary_uom: item.secondary_uom ?? null,
         });
       }
 
@@ -382,6 +390,8 @@ export const useApproveGoodsReceiptNote = () => {
           notes: `GRN ${(grn as any).grn_number} - ${item.item_name}`,
           company_id: grn.company_id,
           created_by: user.id,
+          secondary_quantity_change: item.secondary_quantity_received,
+          secondary_uom: item.secondary_uom,
         }));
 
         const { error: txError } = await supabase
@@ -392,34 +402,58 @@ export const useApproveGoodsReceiptNote = () => {
       }
 
       // Process bin allocations using upsert (unique constraint on item+bin+company)
+      // Pre-compute totals per item so we can prorate secondary qty across bins.
+      const totalsByItem = binAllocations.reduce((acc, a) => {
+        acc[a.warehouse_item_id] = (acc[a.warehouse_item_id] || 0) + (a.quantity || 0);
+        return acc;
+      }, {} as Record<string, number>);
+      const secondaryByItem = itemsWithStock.reduce((acc, it) => {
+        if (it.secondary_quantity_received != null) {
+          acc[it.warehouse_item_id] = it.secondary_quantity_received;
+        }
+        return acc;
+      }, {} as Record<string, number>);
+
       for (const alloc of binAllocations) {
+        const totalForItem = totalsByItem[alloc.warehouse_item_id] || 0;
+        const totalSec = secondaryByItem[alloc.warehouse_item_id];
+        const secondaryDelta = totalSec != null && totalForItem > 0
+          ? (totalSec * (alloc.quantity || 0)) / totalForItem
+          : null;
+
         const { data: existing } = await supabase
           .from('warehouse_bin_allocations')
-          .select('id, allocated_quantity')
+          .select('id, allocated_quantity, secondary_quantity')
           .eq('warehouse_item_id', alloc.warehouse_item_id)
           .eq('bin_id', alloc.bin_id)
           .eq('company_id', grn.company_id)
           .maybeSingle();
 
         if (existing) {
+          const updates: any = {
+            allocated_quantity: (existing.allocated_quantity || 0) + alloc.quantity,
+            updated_at: new Date().toISOString(),
+          };
+          if (secondaryDelta != null) {
+            updates.secondary_quantity = ((existing as any).secondary_quantity || 0) + secondaryDelta;
+          }
           const { error: updateError } = await supabase
             .from('warehouse_bin_allocations')
-            .update({
-              allocated_quantity: (existing.allocated_quantity || 0) + alloc.quantity,
-              updated_at: new Date().toISOString(),
-            })
+            .update(updates)
             .eq('id', existing.id);
           if (updateError) throw updateError;
         } else {
+          const insertPayload: any = {
+            warehouse_item_id: alloc.warehouse_item_id,
+            bin_id: alloc.bin_id,
+            allocated_quantity: alloc.quantity,
+            company_id: grn.company_id,
+            created_by: user.id,
+          };
+          if (secondaryDelta != null) insertPayload.secondary_quantity = secondaryDelta;
           const { error: insertError } = await supabase
             .from('warehouse_bin_allocations')
-            .insert({
-              warehouse_item_id: alloc.warehouse_item_id,
-              bin_id: alloc.bin_id,
-              allocated_quantity: alloc.quantity,
-              company_id: grn.company_id,
-              created_by: user.id,
-            });
+            .insert(insertPayload);
           if (insertError) throw insertError;
         }
 

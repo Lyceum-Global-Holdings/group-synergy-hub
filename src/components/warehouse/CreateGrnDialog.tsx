@@ -140,20 +140,22 @@ export function CreateGrnDialog({ open, onOpenChange, poId }: CreateGrnDialogPro
         ?.filter((item: any) => item.warehouse_item_id)
         .map((item: any) => item.warehouse_item_id) || [];
       
-      let trackingFlags: Record<string, { is_batch_tracked: boolean; is_serialized: boolean }> = {};
+      let trackingFlags: Record<string, { is_batch_tracked: boolean; is_serialized: boolean; track_secondary_quantity: boolean; secondary_uom: string | null }> = {};
       if (warehouseItemIds.length > 0) {
         const { data: warehouseItems } = await supabase
           .from('warehouse_items')
-          .select('id, is_batch_tracked, is_serialized')
+          .select('id, is_batch_tracked, is_serialized, track_secondary_quantity, secondary_uom')
           .in('id', warehouseItemIds);
-        
-        trackingFlags = (warehouseItems || []).reduce((acc, item) => {
-          acc[item.id] = { 
-            is_batch_tracked: item.is_batch_tracked || false, 
-            is_serialized: item.is_serialized || false 
+
+        trackingFlags = (warehouseItems || []).reduce((acc, item: any) => {
+          acc[item.id] = {
+            is_batch_tracked: item.is_batch_tracked || false,
+            is_serialized: item.is_serialized || false,
+            track_secondary_quantity: item.track_secondary_quantity || false,
+            secondary_uom: item.secondary_uom || null,
           };
           return acc;
-        }, {} as Record<string, { is_batch_tracked: boolean; is_serialized: boolean }>);
+        }, {} as Record<string, { is_batch_tracked: boolean; is_serialized: boolean; track_secondary_quantity: boolean; secondary_uom: string | null }>);
       }
 
       const poItems: CreateGrnItemData[] =
@@ -180,6 +182,10 @@ export function CreateGrnDialog({ open, onOpenChange, poId }: CreateGrnDialogPro
             expiry_date: '',
             manufacturing_date: '',
             serial_numbers: [],
+            // Dual quantity tracking
+            track_secondary_quantity: flags?.track_secondary_quantity || false,
+            secondary_uom: flags?.secondary_uom || '',
+            secondary_quantity_received: 0,
           };
         }) || [];
 
@@ -240,6 +246,8 @@ export function CreateGrnDialog({ open, onOpenChange, poId }: CreateGrnDialogPro
         newItems[index].item_name = selectedItem.name;
         newItems[index].is_batch_tracked = selectedItem.is_batch_tracked || false;
         newItems[index].is_serialized = selectedItem.is_serialized || false;
+        newItems[index].track_secondary_quantity = (selectedItem as any).track_secondary_quantity || false;
+        newItems[index].secondary_uom = (selectedItem as any).secondary_uom || '';
         if (selectedItem.unit_cost) {
           newItems[index].unit_price = Number(selectedItem.unit_cost);
         }
@@ -573,6 +581,27 @@ export function CreateGrnDialog({ open, onOpenChange, poId }: CreateGrnDialogPro
                         }
                         className="w-24"
                       />
+                      {item.track_secondary_quantity && (
+                        <div className="mt-1">
+                          <Input
+                            type="number"
+                            step="0.001"
+                            min="0"
+                            inputMode="decimal"
+                            value={item.secondary_quantity_received ?? ''}
+                            onChange={(e) =>
+                              handleItemChange(
+                                index,
+                                'secondary_quantity_received' as keyof CreateGrnItemData,
+                                parseFloat(e.target.value) || 0
+                              )
+                            }
+                            placeholder={item.secondary_uom || 'pcs'}
+                            title={`Pieces (${item.secondary_uom || 'pcs'})`}
+                            className="w-24 h-7 text-xs"
+                          />
+                        </div>
+                      )}
                     </TableCell>
                     <TableCell>
                       <Input

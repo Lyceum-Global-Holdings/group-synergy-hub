@@ -109,6 +109,11 @@ export interface CreateGrnItemData {
   // Item tracking flags (from warehouse_items)
   is_batch_tracked?: boolean;
   is_serialized?: boolean;
+  // Dual quantity tracking
+  track_secondary_quantity?: boolean;
+  secondary_uom?: string;
+  secondary_quantity_received?: number;
+  conversion_note?: string;
 }
 
 export interface GrnSummary {

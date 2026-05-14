@@ -83,6 +83,9 @@ export interface WarehouseItem {
   notes: string | null;
   image_url: string | null;
   company_id: string | null;
+  base_uom: string | null;
+  secondary_uom: string | null;
+  track_secondary_quantity: boolean;
   created_at: string;
   updated_at: string;
   created_by: string | null;
@@ -143,6 +146,9 @@ export interface CreateWarehouseItemData {
   notes?: string;
   image_url?: string;
   company_id?: string;
+  base_uom?: string;
+  secondary_uom?: string;
+  track_secondary_quantity?: boolean;
 }
 
 export interface CatalogItem {

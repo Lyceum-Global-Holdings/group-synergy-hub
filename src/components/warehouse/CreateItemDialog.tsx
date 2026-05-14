@@ -63,10 +63,13 @@ export function CreateItemDialog({ open, onOpenChange, editingItem }: CreateItem
     status: 'active' as 'active' | 'inactive' | 'discontinued',
     is_serialized: false,
     is_batch_tracked: false,
+    track_secondary_quantity: false,
+    secondary_uom: '',
     notes: '',
     image_url: '',
   });
   const [initialStock, setInitialStock] = useState('');
+  const [initialStockSecondary, setInitialStockSecondary] = useState('');
   const [initialBinId, setInitialBinId] = useState('');
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
@@ -136,10 +139,13 @@ export function CreateItemDialog({ open, onOpenChange, editingItem }: CreateItem
         status: editingItem.status,
         is_serialized: editingItem.is_serialized,
         is_batch_tracked: editingItem.is_batch_tracked,
+        track_secondary_quantity: editingItem.track_secondary_quantity ?? false,
+        secondary_uom: editingItem.secondary_uom ?? '',
         notes: editingItem.notes || '',
         image_url: editingItem.image_url || '',
       });
       setInitialStock('');
+      setInitialStockSecondary('');
       setInitialBinId('');
       setImagePreview(editingItem.image_url || null);
       setImageFile(null);
@@ -165,10 +171,13 @@ export function CreateItemDialog({ open, onOpenChange, editingItem }: CreateItem
         status: 'active',
         is_serialized: false,
         is_batch_tracked: false,
+        track_secondary_quantity: false,
+        secondary_uom: '',
         notes: '',
         image_url: '',
       });
       setInitialStock('');
+      setInitialStockSecondary('');
       setInitialBinId('');
       setImagePreview(null);
       setImageFile(null);
@@ -253,6 +262,10 @@ export function CreateItemDialog({ open, onOpenChange, editingItem }: CreateItem
       company_id: formData.company_id || null,
       sku: formData.sku.trim() || null,
       barcode: formData.barcode.trim() || null,
+      track_secondary_quantity: formData.track_secondary_quantity,
+      secondary_uom: formData.track_secondary_quantity
+        ? (formData.secondary_uom.trim() || null)
+        : null,
     };
 
     if (editingItem) {
@@ -272,8 +285,11 @@ export function CreateItemDialog({ open, onOpenChange, editingItem }: CreateItem
 
         if (initialStock && parseFloat(initialStock) > 0) {
           const stockQuantity = parseFloat(initialStock);
+          const secondaryQty = formData.track_secondary_quantity && initialStockSecondary
+            ? parseFloat(initialStockSecondary)
+            : undefined;
           const unitCostValue = formData.unit_cost ? parseFloat(formData.unit_cost) : 0;
-          
+
           createTransaction({
             item_id: result.item.id,
             transaction_type: 'opening_stock',
@@ -284,6 +300,7 @@ export function CreateItemDialog({ open, onOpenChange, editingItem }: CreateItem
             unit_cost: unitCostValue > 0 ? unitCostValue : undefined,
             total_value: unitCostValue > 0 ? unitCostValue * stockQuantity : undefined,
             notes: 'Opening stock balance',
+            ...(secondaryQty !== undefined ? { secondary_quantity_change: secondaryQty } : {}),
           });
 
           // Create bin allocation if a bin is selected
@@ -293,10 +310,11 @@ export function CreateItemDialog({ open, onOpenChange, editingItem }: CreateItem
               bin_id: initialBinId,
               allocated_quantity: stockQuantity,
               notes: 'Opening stock allocation',
+              ...(secondaryQty !== undefined ? { secondary_quantity: secondaryQty } : {}),
             });
           }
         }
-        
+
         onOpenChange(false);
       } catch (error) {
         console.error('Error creating item:', error);
@@ -616,6 +634,24 @@ export function CreateItemDialog({ open, onOpenChange, editingItem }: CreateItem
                 </p>
               </div>
 
+              {formData.track_secondary_quantity && (
+                <div className="space-y-2">
+                  <Label htmlFor="initial_stock_secondary">
+                    Initial Pieces {formData.secondary_uom ? `(${formData.secondary_uom})` : ''}
+                  </Label>
+                  <Input
+                    id="initial_stock_secondary"
+                    type="number"
+                    step={QTY_STEP}
+                    min={QTY_MIN}
+                    inputMode="decimal"
+                    placeholder="e.g. 18"
+                    value={initialStockSecondary}
+                    onChange={(e) => setInitialStockSecondary(e.target.value)}
+                  />
+                </div>
+              )}
+
               {initialStock && parseFloat(initialStock) > 0 && (
                 <div className="space-y-2">
                   <Label htmlFor="initial_bin_id">Allocate Initial Stock to Bin</Label>
@@ -674,6 +710,47 @@ export function CreateItemDialog({ open, onOpenChange, editingItem }: CreateItem
               />
               <Label htmlFor="is_batch_tracked">Batch Tracked</Label>
             </div>
+          </div>
+
+          <div className="rounded-md border border-border p-4 space-y-3">
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="track_secondary_quantity"
+                checked={formData.track_secondary_quantity}
+                onCheckedChange={(checked) => setFormData({ ...formData, track_secondary_quantity: !!checked })}
+              />
+              <Label htmlFor="track_secondary_quantity" className="font-medium">
+                Track pieces separately from base unit
+              </Label>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Use when items are received in a counted unit (e.g. pieces, rolls, bags) but
+              valued in a different base unit (e.g. metres, kg). Conversion is captured
+              per receipt — no fixed factor needed.
+            </p>
+            {formData.track_secondary_quantity && (
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <Label className="text-xs">Base UOM</Label>
+                  <Input
+                    value={units.find(u => u.id === formData.unit_id)?.abbreviation || ''}
+                    placeholder="Set Unit of Measure above"
+                    readOnly
+                    className="bg-muted"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="secondary_uom" className="text-xs">Secondary UOM *</Label>
+                  <Input
+                    id="secondary_uom"
+                    value={formData.secondary_uom}
+                    onChange={(e) => setFormData({ ...formData, secondary_uom: e.target.value })}
+                    placeholder="e.g. pcs, roll, bag"
+                    required={formData.track_secondary_quantity}
+                  />
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="space-y-2">
