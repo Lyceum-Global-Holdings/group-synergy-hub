@@ -67,8 +67,9 @@ export const useMaterialIssueItems = () => {
             p_location_id: minData.location_id,
             p_bin_allocation_id: binAllocationId,
             p_min_id: item.min_id,
-            p_min_number: minData?.min_number || null
-          });
+            p_min_number: minData?.min_number || null,
+            p_secondary_quantity_issued: (item as any).secondary_quantity_issued ?? null,
+          } as any);
           
           if (stockError) {
             console.error('Error updating stock:', stockError);
