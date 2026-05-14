@@ -323,7 +323,7 @@ export const useApproveGoodsReceiptNote = () => {
       // Get the GRN with items and grn_number
       const { data: grn, error: grnFetchError } = await supabase
         .from('goods_receipt_notes')
-        .select('company_id, grn_number, grn_items(id, warehouse_item_id, quantity_received, unit_price, total_cost, item_name)')
+        .select('company_id, grn_number, grn_items(id, warehouse_item_id, quantity_received, unit_price, total_cost, item_name, secondary_quantity_received, secondary_uom)')
         .eq('id', id)
         .single();
 
