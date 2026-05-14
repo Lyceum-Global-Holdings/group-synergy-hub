@@ -402,34 +402,58 @@ export const useApproveGoodsReceiptNote = () => {
       }
 
       // Process bin allocations using upsert (unique constraint on item+bin+company)
+      // Pre-compute totals per item so we can prorate secondary qty across bins.
+      const totalsByItem = binAllocations.reduce((acc, a) => {
+        acc[a.warehouse_item_id] = (acc[a.warehouse_item_id] || 0) + (a.quantity || 0);
+        return acc;
+      }, {} as Record<string, number>);
+      const secondaryByItem = itemsWithStock.reduce((acc, it) => {
+        if (it.secondary_quantity_received != null) {
+          acc[it.warehouse_item_id] = it.secondary_quantity_received;
+        }
+        return acc;
+      }, {} as Record<string, number>);
+
       for (const alloc of binAllocations) {
+        const totalForItem = totalsByItem[alloc.warehouse_item_id] || 0;
+        const totalSec = secondaryByItem[alloc.warehouse_item_id];
+        const secondaryDelta = totalSec != null && totalForItem > 0
+          ? (totalSec * (alloc.quantity || 0)) / totalForItem
+          : null;
+
         const { data: existing } = await supabase
           .from('warehouse_bin_allocations')
-          .select('id, allocated_quantity')
+          .select('id, allocated_quantity, secondary_quantity')
           .eq('warehouse_item_id', alloc.warehouse_item_id)
           .eq('bin_id', alloc.bin_id)
           .eq('company_id', grn.company_id)
           .maybeSingle();
 
         if (existing) {
+          const updates: any = {
+            allocated_quantity: (existing.allocated_quantity || 0) + alloc.quantity,
+            updated_at: new Date().toISOString(),
+          };
+          if (secondaryDelta != null) {
+            updates.secondary_quantity = ((existing as any).secondary_quantity || 0) + secondaryDelta;
+          }
           const { error: updateError } = await supabase
             .from('warehouse_bin_allocations')
-            .update({
-              allocated_quantity: (existing.allocated_quantity || 0) + alloc.quantity,
-              updated_at: new Date().toISOString(),
-            })
+            .update(updates)
             .eq('id', existing.id);
           if (updateError) throw updateError;
         } else {
+          const insertPayload: any = {
+            warehouse_item_id: alloc.warehouse_item_id,
+            bin_id: alloc.bin_id,
+            allocated_quantity: alloc.quantity,
+            company_id: grn.company_id,
+            created_by: user.id,
+          };
+          if (secondaryDelta != null) insertPayload.secondary_quantity = secondaryDelta;
           const { error: insertError } = await supabase
             .from('warehouse_bin_allocations')
-            .insert({
-              warehouse_item_id: alloc.warehouse_item_id,
-              bin_id: alloc.bin_id,
-              allocated_quantity: alloc.quantity,
-              company_id: grn.company_id,
-              created_by: user.id,
-            });
+            .insert(insertPayload);
           if (insertError) throw insertError;
         }
 
