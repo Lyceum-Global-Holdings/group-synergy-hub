@@ -44,6 +44,7 @@ export function CreateMaterialReturnDialog({
   const { selectedCompany } = useCompany();
   const { createMaterialReturnAsync, isCreating } = useMaterialReturns();
   const { createItems } = useMaterialReturnItems();
+  const { items: warehouseItemsList } = useWarehouseItems();
 
   const [returnDate, setReturnDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [returnedBy, setReturnedBy] = useState('');
