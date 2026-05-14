@@ -79,7 +79,7 @@ export default function PublicSupplierRegistration() {
 
   if (isSubmitted) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 to-secondary/5 p-4">
+      <div className="h-screen overflow-y-auto flex items-center justify-center bg-gradient-to-br from-primary/5 to-secondary/5 p-4">
         <Card className="max-w-md w-full">
           <CardContent className="pt-6 text-center">
             <div className="mb-4 flex justify-center">
@@ -98,7 +98,7 @@ export default function PublicSupplierRegistration() {
 
   if (notFound) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-4">
+      <div className="h-screen overflow-y-auto flex items-center justify-center p-4">
         <Card className="max-w-md w-full">
           <CardContent className="pt-6 text-center">
             <h2 className="text-xl font-semibold">Registration link is invalid</h2>
@@ -110,7 +110,7 @@ export default function PublicSupplierRegistration() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary/5 to-secondary/5 py-12 px-4">
+    <div className="h-screen overflow-y-auto bg-gradient-to-br from-primary/5 to-secondary/5 py-12 px-4">
       <div className="max-w-4xl mx-auto">
         <div className="text-center mb-8">
           <h1 className="text-4xl font-bold mb-2">Supplier Registration</h1>
