@@ -146,6 +146,9 @@ export interface CreateWarehouseItemData {
   notes?: string;
   image_url?: string;
   company_id?: string;
+  base_uom?: string;
+  secondary_uom?: string;
+  track_secondary_quantity?: boolean;
 }
 
 export interface CatalogItem {
