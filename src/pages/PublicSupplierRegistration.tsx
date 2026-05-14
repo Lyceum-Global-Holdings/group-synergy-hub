@@ -28,34 +28,9 @@ export default function PublicSupplierRegistration() {
   const turnstileEnabled = useTurnstileEnabledFor("public_registration");
 
   useEffect(() => {
-    const root = document.getElementById("root");
-    const previous = {
-      htmlOverflow: document.documentElement.style.overflow,
-      htmlHeight: document.documentElement.style.height,
-      bodyOverflow: document.body.style.overflow,
-      bodyHeight: document.body.style.height,
-      rootOverflow: root?.style.overflow,
-      rootHeight: root?.style.height,
-    };
-
-    document.documentElement.style.overflow = "auto";
-    document.documentElement.style.height = "auto";
-    document.body.style.overflow = "auto";
-    document.body.style.height = "auto";
-    if (root) {
-      root.style.overflow = "visible";
-      root.style.height = "auto";
-    }
-
+    document.documentElement.classList.add("public-page-scroll");
     return () => {
-      document.documentElement.style.overflow = previous.htmlOverflow;
-      document.documentElement.style.height = previous.htmlHeight;
-      document.body.style.overflow = previous.bodyOverflow;
-      document.body.style.height = previous.bodyHeight;
-      if (root) {
-        root.style.overflow = previous.rootOverflow || "";
-        root.style.height = previous.rootHeight || "";
-      }
+      document.documentElement.classList.remove("public-page-scroll");
     };
   }, []);
 

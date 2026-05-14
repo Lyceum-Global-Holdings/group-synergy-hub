@@ -1,31 +1,44 @@
-## Root cause
+## Goal
+Force normal document scrolling on `/register-supplier` by adding a CSS-based override (instead of relying solely on inline-style mutations in `useEffect`), so the public registration form is fully scrollable regardless of the global app-shell `overflow: hidden` lock.
 
-`src/index.css` globally locks the document to the viewport so the app shell can use a single named scroll region:
+## Why CSS over JS
+The current `useEffect` in `PublicSupplierRegistration.tsx` mutates `style.overflow`/`style.height` on `html`, `body`, and `#root`, but inline styles can be re-asserted or overridden by stylesheet rules with higher specificity (e.g. `html, body, #root { ... }` in `src/index.css`). A CSS class with `!important` always wins, and toggling it on/off via `useEffect` is the standard, robust pattern.
+
+## Changes
+
+### 1. `src/index.css`
+Add a scoped escape-hatch class that the public page can opt into:
 
 ```css
-html, body, #root { height: 100%; overflow: hidden; }
+/* Public page scroll override — used by /register-supplier */
+html.public-page-scroll,
+html.public-page-scroll body,
+html.public-page-scroll #root {
+  height: auto !important;
+  min-height: 100% !important;
+  overflow: auto !important;
+}
 ```
 
-That works for `/sourcing/...` because `AppLayout` provides its own `overflow-auto` `<main>`. But `/register-supplier` (the public supplier portal) renders **outside** `AppLayout`, and its outer wrapper is only `min-h-screen ... py-12 px-4` — no internal scroll container. So once the form is taller than the viewport, the content is clipped and the page can't be scrolled.
-
-## Fix
-
-Make the public registration page (and the success / not-found states) own its scroll, instead of relying on `body`.
-
-In `src/pages/PublicSupplierRegistration.tsx`, replace the three `min-h-screen ...` wrappers with `h-screen overflow-y-auto ...` so the page itself becomes the scroll container:
+### 2. `src/pages/PublicSupplierRegistration.tsx`
+Replace the inline-style `useEffect` with a class toggle on `<html>`:
 
 ```tsx
-<div className="h-screen overflow-y-auto bg-gradient-to-br from-primary/5 to-secondary/5 py-12 px-4">
-  ...
-</div>
+useEffect(() => {
+  document.documentElement.classList.add("public-page-scroll");
+  return () => {
+    document.documentElement.classList.remove("public-page-scroll");
+  };
+}, []);
 ```
 
-No other surfaces are touched — the app-shell scroll behavior, dialogs, and the in-app New Registration wizard continue to work as today.
+Keep the existing `min-h-screen` wrappers on the form / submitted / not-found views — no further markup changes required.
 
-## Why not change the global CSS
+## Out of scope
+- Global `html/body/#root` lock in `index.css` stays intact (Fiori-style app shell behavior preserved for authenticated routes).
+- No route-config or `App.tsx` changes — the override is page-mounted.
+- No changes to `DynamicSupplierForm`, schemas, or edge function.
 
-Removing the `html/body/#root { overflow: hidden }` lock would re-introduce double scrollbars across the entire authenticated app shell (it's an intentional Fiori-style pattern). Scoping the fix to the public route is safer and keeps the enterprise shell behavior intact.
-
-## Files to edit
-
-- `src/pages/PublicSupplierRegistration.tsx` — swap `min-h-screen` for `h-screen overflow-y-auto` on the three top-level wrappers (form view, submitted view, not-found view).
+## Verification
+1. Open `/register-supplier?c=<slug>` in preview, confirm the page scrolls top-to-bottom and the submit button is reachable.
+2. Navigate from `/register-supplier` to an authenticated route and confirm the app shell is still locked (no double scrollbars, sidebar/main scroll behavior unchanged).
