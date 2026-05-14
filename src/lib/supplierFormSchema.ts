@@ -55,6 +55,11 @@ export interface SupplierField {
   patternMessage?: string;
   min?: number;
   max?: number;
+  /** File upload constraints (only used when type === "file"). */
+  accept?: string[];
+  maxSizeMB?: number;
+  multiple?: boolean;
+  maxFiles?: number;
 }
 
 export interface SupplierSection {
