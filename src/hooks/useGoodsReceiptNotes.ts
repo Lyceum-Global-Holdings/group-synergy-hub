@@ -337,6 +337,8 @@ export const useApproveGoodsReceiptNote = () => {
         total_cost: number;
         item_name: string;
         quantity_before: number;
+        secondary_quantity_received: number | null;
+        secondary_uom: string | null;
       }> = [];
 
       const grnItems = (grn as any).grn_items || [];
@@ -355,6 +357,8 @@ export const useApproveGoodsReceiptNote = () => {
           total_cost: item.total_cost || 0,
           item_name: item.item_name || '',
           quantity_before: whItem?.current_stock || 0,
+          secondary_quantity_received: item.secondary_quantity_received ?? null,
+          secondary_uom: item.secondary_uom ?? null,
         });
       }
 
