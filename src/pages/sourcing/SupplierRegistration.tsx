@@ -48,7 +48,7 @@ export default function SupplierRegistration() {
       PROJECT_PUBLISHED_DOMAIN ||
       window.location.origin;
     const slugQs = companySlug ? `?c=${encodeURIComponent(companySlug)}` : "";
-    return `${base}/n${slugQs}`;
+    return `${base}/register-supplier${slugQs}`;
   }, [portalSettings?.public_base_url, companySlug]);
 
   const copyToClipboard = async () => {
@@ -310,7 +310,7 @@ export default function SupplierRegistration() {
               placeholder="https://stores.lgh.lk"
             />
             <p className="text-xs text-muted-foreground">
-              Resulting link: <code>{(draftBaseUrl || PROJECT_PUBLISHED_DOMAIN).replace(/\/+$/, "")}/n{companySlug ? `?c=${companySlug}` : ""}</code>
+              Resulting link: <code>{(draftBaseUrl || PROJECT_PUBLISHED_DOMAIN).replace(/\/+$/, "")}/register-supplier{companySlug ? `?c=${companySlug}` : ""}</code>
             </p>
           </div>
           <DialogFooter>
