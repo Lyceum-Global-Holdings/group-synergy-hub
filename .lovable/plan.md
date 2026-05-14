@@ -1,67 +1,89 @@
 ## Goal
-Auto-generate batch (lot) codes when receiving stock via GRN, following international standards so the codes are globally unique, traceable, and GS1-compatible.
+Extend the Material Issue / Material Return flow to capture and persist a **secondary quantity** (e.g. pieces) alongside the canonical base quantity, but only for items flagged `track_secondary_quantity = true`. Stock transactions and bin allocations must reflect both.
 
-## Standard chosen
-**GS1 Application Identifier (10) — Batch/Lot Number**
-- Up to 20 chars, alphanumeric (A–Z, 0–9, plus `-` `/` `.`)
-- Must be unique within a given GTIN/item
-- Recommended structure also aligns with **ISO 22005** (traceability) and **FDA 21 CFR 211.130** (lot identification): supplier + date + sequence
+## Scope
+- Material Issue (MIN): create flow + stock RPC + `IssueItemsDialog` reuse path
+- Material Return (MRN): create flow + stock RPC
+- Existing items without dual tracking are unaffected
 
-### Format
-```
-LOT-{ITEMCODE}-{YYJJJ}-{NNNN}
-```
-- `LOT` — fixed prefix (clear human label)
-- `ITEMCODE` — item's `item_code` (already GS1-derived, e.g. `INV-RAW-001`); collapsed to alphanumeric
-- `YYJJJ` — 2-digit year + Julian day (ISO 8601 ordinal date, 5 chars, sortable, compact)
-- `NNNN` — zero-padded daily sequence per (company, item, day)
+## Schema changes (migration)
+Add nullable secondary columns so historical rows keep working:
 
-Example: `LOT-INVRAW001-26134-0007` (24 chars total — within GS1 20-char limit when item code is short; we trim ITEMCODE to keep total ≤ 20 when needed by hashing the tail).
-
-### Why this format
-- **Unique per item** (satisfies GS1 AI 10 rule).
-- **Sortable & human-readable** (date embedded).
-- **Deterministic regeneration impossible** without server — prevents collisions across concurrent GRNs.
-- **Audit-friendly** — date and sequence are visible.
-
-## Implementation
-
-### 1. Database (migration)
-Create `generate_batch_number(_company_id uuid, _item_id uuid, _item_code text)` RPC:
-- `SECURITY DEFINER`, `search_path = public`
-- Computes `YYJJJ` from `now()` at company timezone (fallback UTC)
-- Locks per (company_id, item_id, day) using advisory lock to serialize sequence allocation
-- Reads max existing `NNNN` from `warehouse_batches.batch_code` matching prefix → returns next
-- If `ITEMCODE` would push total > 20 chars, truncates to 8 + 3-char base36 hash
-
-Add unique index:
 ```sql
-create unique index if not exists warehouse_batches_company_item_code_uk
-  on public.warehouse_batches (company_id, item_id, batch_code);
+alter table public.material_issue_items
+  add column if not exists secondary_quantity_issued numeric,
+  add column if not exists secondary_uom text;
+
+alter table public.material_return_items
+  add column if not exists secondary_quantity_returned numeric,
+  add column if not exists secondary_uom text;
 ```
-(no-op if it already exists; verify column names against current schema before applying).
 
-### 2. GRN dialog (`CreateGrnDialog.tsx`)
-- Replace local `generateBatchNumber()` with an async call to the new RPC.
-- Auto-fill `batch_number` on row add for batch-tracked items (so user sees it immediately, can override).
-- Keep the "regenerate" button but route it through the RPC.
-- Read-only styling + tooltip: "Auto-generated GS1-compatible lot code. Edit only if supplier provides their own."
+(`stock_transactions.secondary_quantity_change/_before/_after`, `warehouse_bin_allocations.secondary_quantity`, and the trigger that stamps before/after already exist from the dual-tracking migration.)
 
-### 3. GRN approval (`useGoodsReceiptNotes.ts`)
-- On approval, if `batch_number` is still empty for a batch-tracked item, call RPC server-side fallback before insert into `warehouse_batches` / `stock_transactions`.
-- Persist supplier-provided lot codes verbatim (don't overwrite user input).
+## RPC changes (migration)
 
-### 4. Validation
-- Client regex: `^[A-Z0-9./-]{1,20}$` (GS1 AI 10 character set).
-- Show inline error if user-edited code violates the rule.
+### `process_material_issue_stock_update`
+Add new param `p_secondary_quantity_issued numeric default null`.
+- When non-null and the item has `track_secondary_quantity`, **prorate** the secondary quantity across the FIFO base-quantity slices: `sec_take = round(secondary_total * (v_take / p_quantity_issued), 4)`. Track running remainder so the last slice absorbs rounding drift.
+- Insert each `stock_transactions` row with `secondary_quantity_change = -sec_take` and `secondary_uom` snapshot from `warehouse_items.secondary_uom`. Trigger fills `secondary_quantity_before/after`.
+- `update warehouse_bin_allocations set secondary_quantity = greatest(0, coalesce(secondary_quantity,0) - sec_take)`.
+- Validate available secondary at the location matches what the user typed (raise if shortage).
+- Backwards-compatible: if the parameter is null, behave exactly as today.
+
+### `process_material_return_stock_update`
+Add `p_secondary_quantity_returned numeric default null`.
+- Insert `stock_transactions` with `secondary_quantity_change = +p_secondary_quantity_returned`.
+- `update warehouse_bin_allocations set secondary_quantity = coalesce(secondary_quantity,0) + p_secondary_quantity_returned` for the chosen/derived bin.
+- No-op when null.
+
+Both RPCs keep `SECURITY DEFINER` and `set search_path = public`.
+
+## Type changes
+- `src/types/materialIssueReturn.ts`
+  - `CreateMaterialIssueItemData`: add `secondary_quantity_issued?: number; secondary_uom?: string | null;`
+  - `MaterialReturnItem` + `CreateMaterialReturnItemData`: add `secondary_quantity_returned?: number; secondary_uom?: string | null;`
+
+## Hook changes
+- `src/hooks/useMaterialIssueItems.ts` — pass `p_secondary_quantity_issued: item.secondary_quantity_issued ?? null` to the RPC.
+- `src/hooks/useMaterialReturns.ts` — pass `p_secondary_quantity_returned: item.secondary_quantity_returned ?? null` (read it from the inserted return-items row before calling the RPC).
+- `src/components/warehouse/IssueItemsDialog.tsx` — same RPC call site updated to forward secondary qty when present.
+
+## UI changes
+Reuse the existing `DualQuantityInput` component.
+
+### `CreateMaterialIssueDialog.tsx`
+- Extend `IssueItem` row type with `secondary_quantity_issued?: number`, plus cached `track_secondary_quantity`, `secondary_uom`, and `available_secondary_stock` fetched alongside available base stock.
+- Render an inline `DualQuantityInput` next to the quantity field for rows whose item has `track_secondary_quantity`. Show "available pcs" hint mirroring the existing available-stock helper.
+- Validate: if secondary tracked, both base and secondary must be > 0; secondary cannot exceed `available_secondary_stock`.
+- Pass `secondary_quantity_issued` + `secondary_uom` into `createItems(...)`.
+
+### `CreateMaterialReturnDialog.tsx`
+- Extend `ReturnItem` with `secondary_quantity_returned?: number`, `track_secondary_quantity`, `secondary_uom` (load from item lookup in `handleItemSelect`).
+- Render `DualQuantityInput` next to the qty field when tracked.
+- Persist via the updated `CreateMaterialReturnItemData`.
+
+### Display surfaces (read-only, low-effort)
+- `MaterialIssueDetailsDialog.tsx` and `MaterialReturnDetailsDialog.tsx` — show the secondary quantity using `formatDualQty` when present. (Existing ledger views already render secondary balances after the earlier dual-tracking work.)
+
+## Validation rules
+- Secondary inputs accept positive numbers only; zero or empty disables secondary writes for that line.
+- For tracked items, refuse submit when secondary is missing while base > 0 (toast: "Pieces required for dual-tracked item X").
+- Issue: client guard against `secondary > available_secondary_stock`; server raises authoritative error.
 
 ## Out of scope
-- Migrating existing batch codes (legacy codes remain as-is).
-- Printing GS1-128 / DataMatrix labels with AI (10) — separate label-printing work.
-- Per-supplier lot-code overrides workflow.
+- Backfilling secondary_quantity for legacy bin allocations or historical transactions.
+- Changing valuation: base UOM remains the money/cost unit.
+- Stock transfers, adjustments, cycle counts, reservations — separate follow-ups (mirrors the GRN-only rollout pattern).
+- Per-piece variable dimensions (serial-style length per piece).
 
-## Files to touch
-- New migration: `generate_batch_number` RPC + unique index
-- `src/components/warehouse/CreateGrnDialog.tsx` — async generator, auto-fill, validation
-- `src/hooks/useGoodsReceiptNotes.ts` — server-side fallback on approval
-- New: `src/hooks/useGenerateBatchNumber.ts` (mutation wrapper, mirrors `useSrnNumber.ts`)
+## Files touched
+- New migration: alter tables + new versions of both RPCs
+- `src/types/materialIssueReturn.ts`
+- `src/hooks/useMaterialIssueItems.ts`
+- `src/hooks/useMaterialReturns.ts`
+- `src/components/warehouse/CreateMaterialIssueDialog.tsx`
+- `src/components/warehouse/IssueItemsDialog.tsx`
+- `src/components/warehouse/CreateMaterialReturnDialog.tsx`
+- `src/components/warehouse/MaterialIssueDetailsDialog.tsx`
+- `src/components/warehouse/MaterialReturnDetailsDialog.tsx`
