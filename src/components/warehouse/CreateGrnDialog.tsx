@@ -140,20 +140,22 @@ export function CreateGrnDialog({ open, onOpenChange, poId }: CreateGrnDialogPro
         ?.filter((item: any) => item.warehouse_item_id)
         .map((item: any) => item.warehouse_item_id) || [];
       
-      let trackingFlags: Record<string, { is_batch_tracked: boolean; is_serialized: boolean }> = {};
+      let trackingFlags: Record<string, { is_batch_tracked: boolean; is_serialized: boolean; track_secondary_quantity: boolean; secondary_uom: string | null }> = {};
       if (warehouseItemIds.length > 0) {
         const { data: warehouseItems } = await supabase
           .from('warehouse_items')
-          .select('id, is_batch_tracked, is_serialized')
+          .select('id, is_batch_tracked, is_serialized, track_secondary_quantity, secondary_uom')
           .in('id', warehouseItemIds);
-        
-        trackingFlags = (warehouseItems || []).reduce((acc, item) => {
-          acc[item.id] = { 
-            is_batch_tracked: item.is_batch_tracked || false, 
-            is_serialized: item.is_serialized || false 
+
+        trackingFlags = (warehouseItems || []).reduce((acc, item: any) => {
+          acc[item.id] = {
+            is_batch_tracked: item.is_batch_tracked || false,
+            is_serialized: item.is_serialized || false,
+            track_secondary_quantity: item.track_secondary_quantity || false,
+            secondary_uom: item.secondary_uom || null,
           };
           return acc;
-        }, {} as Record<string, { is_batch_tracked: boolean; is_serialized: boolean }>);
+        }, {} as Record<string, { is_batch_tracked: boolean; is_serialized: boolean; track_secondary_quantity: boolean; secondary_uom: string | null }>);
       }
 
       const poItems: CreateGrnItemData[] =
@@ -180,6 +182,10 @@ export function CreateGrnDialog({ open, onOpenChange, poId }: CreateGrnDialogPro
             expiry_date: '',
             manufacturing_date: '',
             serial_numbers: [],
+            // Dual quantity tracking
+            track_secondary_quantity: flags?.track_secondary_quantity || false,
+            secondary_uom: flags?.secondary_uom || '',
+            secondary_quantity_received: 0,
           };
         }) || [];
 
