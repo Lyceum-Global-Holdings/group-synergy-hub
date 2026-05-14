@@ -9,8 +9,10 @@ import { Plus, Trash2 } from "lucide-react";
 import { useMaterialReturns } from "@/hooks/useMaterialReturns";
 import { useMaterialReturnItems } from "@/hooks/useMaterialReturnItems";
 import { ItemSelector } from "@/components/common/ItemSelector";
+import { DualQuantityInput } from "@/components/warehouse/DualQuantityInput";
 import { SrnNumberField } from "@/components/warehouse/SrnNumberField";
 import { useCompany } from "@/contexts/CompanyContext";
+import { useWarehouseItems } from "@/hooks/useWarehouseItems";
 import { format } from "date-fns";
 
 interface ReturnItem {
