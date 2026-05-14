@@ -35,6 +35,14 @@ const FIELD_TYPES: { label: string; value: SupplierFieldType }[] = [
   { label: "Long text", value: "textarea" },
   { label: "Select", value: "select" },
   { label: "Checkbox", value: "checkbox" },
+  { label: "File upload", value: "file" },
+];
+
+const FILE_ACCEPT_PRESETS: { label: string; mimes: string[] }[] = [
+  { label: "PDF", mimes: ["application/pdf"] },
+  { label: "Image (JPG/PNG)", mimes: ["image/jpeg", "image/png"] },
+  { label: "Word (DOC/DOCX)", mimes: ["application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"] },
+  { label: "Excel (XLS/XLSX)", mimes: ["application/vnd.ms-excel", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"] },
 ];
 
 export default function FormBuilder({ companyId }: FormBuilderProps) {
