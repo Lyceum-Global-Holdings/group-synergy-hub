@@ -183,8 +183,9 @@ export const useMaterialReturns = () => {
           p_bin_allocation_id: binAllocation?.id || null,
           p_mrn_id: id,
           p_mrn_number: mrnNumber,
-          p_company_id: mrnCompanyId || null
-        });
+          p_company_id: mrnCompanyId || null,
+          p_secondary_quantity_returned: (item as any).secondary_quantity_returned ?? null,
+        } as any);
 
         if (rpcError) {
           console.error('[MaterialReturn] RPC ERROR for item:', item.item_id);
