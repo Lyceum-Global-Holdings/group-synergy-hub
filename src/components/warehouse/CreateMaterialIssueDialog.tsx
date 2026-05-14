@@ -603,6 +603,22 @@ export function CreateMaterialIssueDialog({ open, onOpenChange }: MaterialIssueD
                 </div>
               </div>
 
+              {currentItem.track_secondary_quantity && (
+                <div className="rounded-md border bg-muted/30 p-3">
+                  <DualQuantityInput
+                    baseValue={String(currentItem.quantity_required ?? '')}
+                    secondaryValue={String(currentItem.secondary_quantity_issued ?? '')}
+                    onBaseChange={(v) => setCurrentItem({ ...currentItem, quantity_required: parseFloat(v) || 0 })}
+                    onSecondaryChange={(v) => setCurrentItem({ ...currentItem, secondary_quantity_issued: parseFloat(v) || 0 })}
+                    baseUom={currentItem.unit_of_measure}
+                    secondaryUom={currentItem.secondary_uom || 'pcs'}
+                    baseLabel="Qty issued"
+                    secondaryLabel="Pieces issued"
+                    required
+                  />
+                </div>
+              )}
+
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Item Code</Label>
