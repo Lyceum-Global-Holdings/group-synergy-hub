@@ -198,6 +198,10 @@ export const useCreateGoodsReceiptNote = () => {
             batch_number: item.batch_number || null,
             manufacturing_date: item.manufacturing_date || null,
             expiry_date: item.expiry_date || null,
+            // Dual quantity tracking
+            secondary_quantity_received: item.secondary_quantity_received ?? null,
+            secondary_uom: item.secondary_uom || null,
+            conversion_note: item.conversion_note || null,
           };
         })
       );
