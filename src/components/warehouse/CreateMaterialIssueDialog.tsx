@@ -59,6 +59,10 @@ interface IssueItem {
   reserved_quantity?: number;
   bin_location?: string;
   available_stock?: number;
+  // Dual quantity tracking (per-item opt-in)
+  track_secondary_quantity?: boolean;
+  secondary_uom?: string | null;
+  secondary_quantity_issued?: number;
 }
 
 export function CreateMaterialIssueDialog({ open, onOpenChange }: MaterialIssueDialogProps) {
