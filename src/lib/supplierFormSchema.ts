@@ -13,7 +13,16 @@ export type SupplierFieldType =
   | "select"
   | "multiselect"
   | "textarea"
-  | "checkbox";
+  | "checkbox"
+  | "file";
+
+export interface SupplierFileValue {
+  path: string;
+  name: string;
+  size: number;
+  mime: string;
+  uploaded_at?: string;
+}
 
 export type SupplierFieldGroup =
   | "identity"
