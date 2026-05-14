@@ -76,6 +76,7 @@ export function CreateGrnDialog({ open, onOpenChange, poId }: CreateGrnDialogPro
   const { data: pos = [] } = usePurchaseOrders();
   const createGrn = useCreateGoodsReceiptNote();
   const { items: warehouseItems = [] } = useWarehouseItems();
+  const generateBatch = useGenerateBatchNumber();
 
   const [items, setItems] = useState<CreateGrnItemData[]>([]);
   const [selectedPoId, setSelectedPoId] = useState<string>(poId || '');
