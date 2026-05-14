@@ -262,6 +262,7 @@ export default function DynamicSupplierForm({
   submitLabel = "Submit",
   footer,
   preview,
+  companySlug,
 }: DynamicSupplierFormProps) {
   const form = useForm({ defaultValues: { ...defaultsFromSchema(schema), ...(initialValues || {}) } });
 
