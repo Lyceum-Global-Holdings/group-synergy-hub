@@ -1,12 +1,15 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useForm, UseFormReturn } from "react-hook-form";
+import { Upload, X, Loader2, FileIcon } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { SupplierField, SupplierFormSchema } from "@/lib/supplierFormSchema";
+import { toast } from "sonner";
+import { invokeEdgeFunction } from "@/lib/edgeFunctionClient";
+import { SupplierField, SupplierFileValue, SupplierFormSchema } from "@/lib/supplierFormSchema";
 
 interface DynamicSupplierFormProps {
   schema: SupplierFormSchema;
