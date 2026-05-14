@@ -329,6 +329,10 @@ export function CreateMaterialIssueDialog({ open, onOpenChange }: MaterialIssueD
         purpose: item.purpose || undefined,
         reservation_id: item.reservation_id,
         from_reservation: item.from_reservation || false,
+        secondary_quantity_issued: item.track_secondary_quantity
+          ? (item.secondary_quantity_issued ?? null)
+          : null,
+        secondary_uom: item.track_secondary_quantity ? (item.secondary_uom ?? null) : null,
       }));
 
       await createItems(itemsToCreate);
