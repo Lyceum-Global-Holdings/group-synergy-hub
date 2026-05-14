@@ -20660,6 +20660,10 @@ export type Database = {
         Returns: string
       }
       generate_asset_request_number: { Args: never; Returns: string }
+      generate_batch_number: {
+        Args: { _company_id: string; _warehouse_item_id: string }
+        Returns: string
+      }
       generate_bom_number: { Args: never; Returns: string }
       generate_bpo_number: { Args: never; Returns: string }
       generate_construction_document_number: { Args: never; Returns: string }
