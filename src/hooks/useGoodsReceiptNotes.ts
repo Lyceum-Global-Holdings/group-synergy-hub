@@ -390,6 +390,8 @@ export const useApproveGoodsReceiptNote = () => {
           notes: `GRN ${(grn as any).grn_number} - ${item.item_name}`,
           company_id: grn.company_id,
           created_by: user.id,
+          secondary_quantity_change: item.secondary_quantity_received,
+          secondary_uom: item.secondary_uom,
         }));
 
         const { error: txError } = await supabase
