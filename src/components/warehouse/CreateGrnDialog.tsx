@@ -346,7 +346,15 @@ export function CreateGrnDialog({ open, onOpenChange, poId }: CreateGrnDialogPro
       return;
     }
 
-    // Warn about missing dates (don't block)
+    // Validate batch number format (GS1 AI(10) — up to 20 chars [A-Z0-9./-])
+    const badBatch = validItems.filter(
+      (item) => item.is_batch_tracked && item.batch_number && !BATCH_NUMBER_REGEX.test(item.batch_number.trim())
+    );
+    if (badBatch.length > 0) {
+      const names = badBatch.map((i) => `${i.item_name} (${i.batch_number})`).join(', ');
+      alert(`Invalid batch number format. Use up to 20 characters from A-Z, 0-9, '.', '/', '-': ${names}`);
+      return;
+    }
     const missingDates = validItems.filter(
       (item) => item.is_batch_tracked && (!item.manufacturing_date || !item.expiry_date)
     );
