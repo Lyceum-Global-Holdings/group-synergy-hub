@@ -217,19 +217,24 @@ export function CreateMaterialIssueDialog({ open, onOpenChange }: MaterialIssueD
   const handleAddAllReservedItems = () => {
     const newItems: IssueItem[] = reservedItems
       .filter(res => res.warehouse_item && res.quantity_remaining > 0)
-      .map(res => ({
-        item_id: res.warehouse_item.id,
-        item_code: res.warehouse_item.item_code,
-        description: res.warehouse_item.name,
-        unit_of_measure: res.warehouse_item.unit_of_measure,
-        quantity_required: res.quantity_remaining,
-        purpose: `Reserved for CPO ${formData.cpo_number}`,
-        reservation_id: res.id,
-        from_reservation: true,
-        reserved_quantity: res.reserved_quantity,
-        bin_location: res.bin_allocation?.bin?.bin_code || 'N/A',
-        available_stock: res.warehouse_item.current_stock || 0,
-      }));
+      .map(res => {
+        const wi: any = warehouseItems.find((w: any) => w.id === res.warehouse_item.id) || {};
+        return {
+          item_id: res.warehouse_item.id,
+          item_code: res.warehouse_item.item_code,
+          description: res.warehouse_item.name,
+          unit_of_measure: res.warehouse_item.unit_of_measure,
+          quantity_required: res.quantity_remaining,
+          purpose: `Reserved for CPO ${formData.cpo_number}`,
+          reservation_id: res.id,
+          from_reservation: true,
+          reserved_quantity: res.reserved_quantity,
+          bin_location: res.bin_allocation?.bin?.bin_code || 'N/A',
+          available_stock: res.warehouse_item.current_stock || 0,
+          track_secondary_quantity: !!wi.track_secondary_quantity,
+          secondary_uom: wi.secondary_uom || null,
+        };
+      });
 
     setItems(prev => [...prev, ...newItems]);
   };
