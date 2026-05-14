@@ -121,6 +121,8 @@ export interface CreateMaterialIssueItemData {
   notes?: string;
   reservation_id?: string;
   from_reservation?: boolean;
+  secondary_quantity_issued?: number | null;
+  secondary_uom?: string | null;
 }
 
 export interface MaterialReturnNote {
