@@ -158,6 +158,20 @@ serve(async (req) => {
       );
     }
 
+    // Resolve company by slug if provided (and slug not bypassed by trusted company_id)
+    let resolvedCompanyId: string | null = null;
+    if (company_slug) {
+      const { data: companyRow } = await supabaseAdmin.rpc('resolve_public_portal_company', { _slug: company_slug });
+      if (companyRow && companyRow.length > 0) {
+        resolvedCompanyId = companyRow[0].id;
+      }
+    }
+    if (!resolvedCompanyId && typeof company_id === 'string') {
+      // Verify supplied company_id actually maps to an active company
+      const { data: c } = await supabaseAdmin.from('companies').select('id').eq('id', company_id).eq('status', 'active').maybeSingle();
+      if (c) resolvedCompanyId = c.id;
+    }
+
     // Create registration request
     const { data: registration, error: regError } = await supabaseAdmin
       .from('supplier_registration_requests')
@@ -165,6 +179,7 @@ serve(async (req) => {
         request_type: 'self_service',
         status: 'pending_approval',
         supplier_data: validatedData,
+        company_id: resolvedCompanyId,
         submitted_at: new Date().toISOString(),
       })
       .select()
