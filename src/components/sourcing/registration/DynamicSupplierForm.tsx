@@ -20,6 +20,8 @@ interface DynamicSupplierFormProps {
   footer?: React.ReactNode;
   /** When true, render the form inputs but do not include a submit button (for previews). */
   preview?: boolean;
+  /** Public portal slug for uploads (required when form has file fields and is not preview). */
+  companySlug?: string;
 }
 
 function defaultsFromSchema(schema: SupplierFormSchema): Record<string, any> {
@@ -27,7 +29,10 @@ function defaultsFromSchema(schema: SupplierFormSchema): Record<string, any> {
   schema.sections.forEach((s) =>
     s.fields.forEach((f) => {
       if (!f.visible) return;
-      out[f.key] = f.type === "checkbox" ? false : f.type === "multiselect" ? [] : "";
+      if (f.type === "checkbox") out[f.key] = false;
+      else if (f.type === "multiselect") out[f.key] = [];
+      else if (f.type === "file") out[f.key] = f.multiple ? [] : null;
+      else out[f.key] = "";
     }),
   );
   return out;
