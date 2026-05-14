@@ -10332,6 +10332,8 @@ export type Database = {
           received_at: string | null
           recipient_signature: string | null
           reservation_id: string | null
+          secondary_quantity_issued: number | null
+          secondary_uom: string | null
           srn_number: string | null
           total_cost: number | null
           unit_cost: number | null
@@ -10357,6 +10359,8 @@ export type Database = {
           received_at?: string | null
           recipient_signature?: string | null
           reservation_id?: string | null
+          secondary_quantity_issued?: number | null
+          secondary_uom?: string | null
           srn_number?: string | null
           total_cost?: number | null
           unit_cost?: number | null
@@ -10382,6 +10386,8 @@ export type Database = {
           received_at?: string | null
           recipient_signature?: string | null
           reservation_id?: string | null
+          secondary_quantity_issued?: number | null
+          secondary_uom?: string | null
           srn_number?: string | null
           total_cost?: number | null
           unit_cost?: number | null
@@ -10794,6 +10800,8 @@ export type Database = {
           mrn_id: string
           notes: string | null
           quantity_returned: number
+          secondary_quantity_returned: number | null
+          secondary_uom: string | null
           total_cost: number | null
           unit_cost: number | null
           updated_at: string
@@ -10806,6 +10814,8 @@ export type Database = {
           mrn_id: string
           notes?: string | null
           quantity_returned: number
+          secondary_quantity_returned?: number | null
+          secondary_uom?: string | null
           total_cost?: number | null
           unit_cost?: number | null
           updated_at?: string
@@ -10818,6 +10828,8 @@ export type Database = {
           mrn_id?: string
           notes?: string | null
           quantity_returned?: number
+          secondary_quantity_returned?: number | null
+          secondary_uom?: string | null
           total_cost?: number | null
           unit_cost?: number | null
           updated_at?: string
@@ -21306,17 +21318,30 @@ export type Database = {
         }
         Returns: undefined
       }
-      process_material_issue_stock_update: {
-        Args: {
-          p_bin_allocation_id?: string
-          p_item_id: string
-          p_location_id: string
-          p_min_id?: string
-          p_min_number?: string
-          p_quantity_issued: number
-        }
-        Returns: undefined
-      }
+      process_material_issue_stock_update:
+        | {
+            Args: {
+              p_bin_allocation_id?: string
+              p_item_id: string
+              p_location_id: string
+              p_min_id?: string
+              p_min_number?: string
+              p_quantity_issued: number
+            }
+            Returns: undefined
+          }
+        | {
+            Args: {
+              p_bin_allocation_id?: string
+              p_item_id: string
+              p_location_id: string
+              p_min_id?: string
+              p_min_number?: string
+              p_quantity_issued: number
+              p_secondary_quantity_issued?: number
+            }
+            Returns: undefined
+          }
       process_material_return_stock_update:
         | {
             Args: {
@@ -21336,6 +21361,18 @@ export type Database = {
               p_mrn_id?: string
               p_mrn_number?: string
               p_quantity_returned: number
+            }
+            Returns: undefined
+          }
+        | {
+            Args: {
+              p_bin_allocation_id?: string
+              p_company_id?: string
+              p_item_id: string
+              p_mrn_id?: string
+              p_mrn_number?: string
+              p_quantity_returned: number
+              p_secondary_quantity_returned?: number
             }
             Returns: undefined
           }
