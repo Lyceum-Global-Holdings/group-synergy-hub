@@ -138,7 +138,7 @@ serve(async (req) => {
     const { data: duplicates, error: dupError } = await supabaseAdmin.rpc('check_duplicate_supplier', {
       p_supplier_name: validatedData.supplier_name,
       p_email: validatedData.email,
-      p_phone: validatedData.phone,
+      p_phone: validatedData.phone || '',
       p_tax_id: validatedData.tax_id || null,
     });
 
