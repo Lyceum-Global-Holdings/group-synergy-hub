@@ -254,6 +254,13 @@ export function CreateGrnDialog({ open, onOpenChange, poId }: CreateGrnDialogPro
         if (selectedItem.unit_cost) {
           newItems[index].unit_price = Number(selectedItem.unit_cost);
         }
+        // Auto-generate batch number for batch-tracked items
+        if (selectedItem.is_batch_tracked && selectedCompany?.id && !newItems[index].batch_number) {
+          generateBatch
+            .mutateAsync({ companyId: selectedCompany.id, warehouseItemId: value })
+            .then((code) => handleItemChange(index, 'batch_number', code))
+            .catch(() => { /* user can click Gen to retry */ });
+        }
       }
     }
 
