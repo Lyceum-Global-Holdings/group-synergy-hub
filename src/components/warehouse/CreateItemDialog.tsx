@@ -694,6 +694,47 @@ export function CreateItemDialog({ open, onOpenChange, editingItem }: CreateItem
             </div>
           </div>
 
+          <div className="rounded-md border border-border p-4 space-y-3">
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="track_secondary_quantity"
+                checked={formData.track_secondary_quantity}
+                onCheckedChange={(checked) => setFormData({ ...formData, track_secondary_quantity: !!checked })}
+              />
+              <Label htmlFor="track_secondary_quantity" className="font-medium">
+                Track pieces separately from base unit
+              </Label>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Use when items are received in a counted unit (e.g. pieces, rolls, bags) but
+              valued in a different base unit (e.g. metres, kg). Conversion is captured
+              per receipt — no fixed factor needed.
+            </p>
+            {formData.track_secondary_quantity && (
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <Label className="text-xs">Base UOM</Label>
+                  <Input
+                    value={units.find(u => u.id === formData.unit_id)?.abbreviation || ''}
+                    placeholder="Set Unit of Measure above"
+                    readOnly
+                    className="bg-muted"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="secondary_uom" className="text-xs">Secondary UOM *</Label>
+                  <Input
+                    id="secondary_uom"
+                    value={formData.secondary_uom}
+                    onChange={(e) => setFormData({ ...formData, secondary_uom: e.target.value })}
+                    placeholder="e.g. pcs, roll, bag"
+                    required={formData.track_secondary_quantity}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
           <div className="space-y-2">
             <Label htmlFor="notes">Notes</Label>
             <Textarea
