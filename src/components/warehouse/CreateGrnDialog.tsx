@@ -45,6 +45,8 @@ import { useCompany } from '@/contexts/CompanyContext';
 import { usePurchaseOrders } from '@/hooks/usePurchaseOrders';
 import { useCreateGoodsReceiptNote } from '@/hooks/useGoodsReceiptNotes';
 import { useWarehouseItems } from '@/hooks/useWarehouseItems';
+import { useGenerateBatchNumber, BATCH_NUMBER_REGEX } from '@/hooks/useGenerateBatchNumber';
+import { toast } from 'sonner';
 import { CreateGrnItemData, QualityStatus } from '@/types/grn';
 import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
