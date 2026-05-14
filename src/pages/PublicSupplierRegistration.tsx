@@ -142,6 +142,7 @@ export default function PublicSupplierRegistration() {
                 submitting={isSubmitting}
                 submitLabel="Submit Registration"
                 onSubmit={onSubmit}
+                companySlug={slug || undefined}
                 footer={
                   turnstileEnabled && turnstile?.siteKey ? (
                     <div className="flex justify-center">
