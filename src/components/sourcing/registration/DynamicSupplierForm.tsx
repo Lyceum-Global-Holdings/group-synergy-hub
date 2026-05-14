@@ -300,7 +300,7 @@ export default function DynamicSupplierForm({
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {fields.map((f) => (
-                  <FieldRenderer key={f.key} field={f} form={form} />
+                  <FieldRenderer key={f.key} field={f} form={form} companySlug={companySlug} preview={preview} />
                 ))}
               </div>
             </div>
