@@ -171,10 +171,13 @@ export function CreateItemDialog({ open, onOpenChange, editingItem }: CreateItem
         status: 'active',
         is_serialized: false,
         is_batch_tracked: false,
+        track_secondary_quantity: false,
+        secondary_uom: '',
         notes: '',
         image_url: '',
       });
       setInitialStock('');
+      setInitialStockSecondary('');
       setInitialBinId('');
       setImagePreview(null);
       setImageFile(null);
