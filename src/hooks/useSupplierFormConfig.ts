@@ -75,7 +75,7 @@ export function useSupplierFormConfig(companyId: string | undefined) {
       if (!data) return null;
       return {
         ...(data as any),
-        schema: mergeWithBaseline(data.schema as SupplierFormSchema),
+        schema: mergeWithBaseline(data.schema as unknown as SupplierFormSchema),
       };
     },
   });
