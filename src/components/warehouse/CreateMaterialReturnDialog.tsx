@@ -107,14 +107,18 @@ export function CreateMaterialReturnDialog({
         srn_number: srnNumber || undefined,
       });
 
-      const returnItems = items.map((item, idx) => ({
+      const returnItems = items.map((item) => ({
         mrn_id: newReturn.id,
         item_id: item.warehouse_item_id,
         quantity_returned: item.quantity_returned,
         condition: item.condition,
         unit_cost: item.unit_cost,
         total_cost: item.quantity_returned * item.unit_cost,
-        notes: item.notes
+        notes: item.notes,
+        secondary_quantity_returned: item.track_secondary_quantity
+          ? (item.secondary_quantity_returned ?? null)
+          : null,
+        secondary_uom: item.track_secondary_quantity ? (item.secondary_uom ?? null) : null,
       }));
 
       await createItems(returnItems);
