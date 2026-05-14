@@ -200,7 +200,7 @@ function FieldRenderer({ field, form, companySlug, preview }: { field: SupplierF
       name={field.key}
       rules={buildRules(field)}
       render={({ field: rhf }) => (
-        <FormItem className={field.type === "textarea" || field.type === "checkbox" ? "md:col-span-2" : ""}>
+        <FormItem className={field.type === "textarea" || field.type === "checkbox" || field.type === "file" ? "md:col-span-2" : ""}>
           {field.type !== "checkbox" && (
             <FormLabel>
               {field.label}
@@ -229,6 +229,14 @@ function FieldRenderer({ field, form, companySlug, preview }: { field: SupplierF
                   {field.required && " *"}
                 </span>
               </label>
+            ) : field.type === "file" ? (
+              <FileUploadField
+                field={field}
+                value={rhf.value ?? (field.multiple ? [] : null)}
+                onChange={rhf.onChange}
+                companySlug={companySlug}
+                preview={preview}
+              />
             ) : (
               <Input
                 type={field.type === "number" ? "number" : field.type === "date" ? "date" : field.type === "tel" ? "tel" : field.type === "url" ? "url" : field.type === "email" ? "email" : "text"}
