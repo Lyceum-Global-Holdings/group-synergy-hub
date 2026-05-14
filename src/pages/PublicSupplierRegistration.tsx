@@ -28,6 +28,38 @@ export default function PublicSupplierRegistration() {
   const turnstileEnabled = useTurnstileEnabledFor("public_registration");
 
   useEffect(() => {
+    const root = document.getElementById("root");
+    const previous = {
+      htmlOverflow: document.documentElement.style.overflow,
+      htmlHeight: document.documentElement.style.height,
+      bodyOverflow: document.body.style.overflow,
+      bodyHeight: document.body.style.height,
+      rootOverflow: root?.style.overflow,
+      rootHeight: root?.style.height,
+    };
+
+    document.documentElement.style.overflow = "auto";
+    document.documentElement.style.height = "auto";
+    document.body.style.overflow = "auto";
+    document.body.style.height = "auto";
+    if (root) {
+      root.style.overflow = "visible";
+      root.style.height = "auto";
+    }
+
+    return () => {
+      document.documentElement.style.overflow = previous.htmlOverflow;
+      document.documentElement.style.height = previous.htmlHeight;
+      document.body.style.overflow = previous.bodyOverflow;
+      document.body.style.height = previous.bodyHeight;
+      if (root) {
+        root.style.overflow = previous.rootOverflow || "";
+        root.style.height = previous.rootHeight || "";
+      }
+    };
+  }, []);
+
+  useEffect(() => {
     let active = true;
     (async () => {
       setLoadingSchema(true);
@@ -79,7 +111,7 @@ export default function PublicSupplierRegistration() {
 
   if (isSubmitted) {
     return (
-      <div className="h-screen overflow-y-auto flex items-center justify-center bg-gradient-to-br from-primary/5 to-secondary/5 p-4">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 to-secondary/5 p-4">
         <Card className="max-w-md w-full">
           <CardContent className="pt-6 text-center">
             <div className="mb-4 flex justify-center">
@@ -98,7 +130,7 @@ export default function PublicSupplierRegistration() {
 
   if (notFound) {
     return (
-      <div className="h-screen overflow-y-auto flex items-center justify-center p-4">
+      <div className="min-h-screen flex items-center justify-center p-4">
         <Card className="max-w-md w-full">
           <CardContent className="pt-6 text-center">
             <h2 className="text-xl font-semibold">Registration link is invalid</h2>
@@ -110,7 +142,7 @@ export default function PublicSupplierRegistration() {
   }
 
   return (
-    <div className="h-screen overflow-y-auto bg-gradient-to-br from-primary/5 to-secondary/5 py-12 px-4">
+    <div className="min-h-screen bg-gradient-to-br from-primary/5 to-secondary/5 py-12 px-4">
       <div className="max-w-4xl mx-auto">
         <div className="text-center mb-8">
           <h1 className="text-4xl font-bold mb-2">Supplier Registration</h1>
