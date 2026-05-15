@@ -26,6 +26,7 @@ interface BinOption {
   id: string;
   bin_code: string;
   name: string;
+  inherited_from_location_name?: string | null;
 }
 
 interface ItemAssignment {
