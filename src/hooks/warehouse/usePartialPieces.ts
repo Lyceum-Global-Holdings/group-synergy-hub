@@ -65,7 +65,7 @@ export function useCreatePartialPiece() {
   return useMutation({
     mutationFn: async (input: CreatePartialPieceInput) => {
       const { data, error } = await supabase.rpc("create_partial_piece", {
-        p_payload: input as unknown as Record<string, unknown>,
+        p_payload: input as never,
       });
       if (error) throw error;
       return data as string;
@@ -80,7 +80,7 @@ export function useUpdatePartialPiece() {
     mutationFn: async (input: { id: string; payload: Record<string, unknown> }) => {
       const { error } = await supabase.rpc("update_partial_piece", {
         p_id: input.id,
-        p_payload: input.payload,
+        p_payload: input.payload as never,
       });
       if (error) throw error;
     },
@@ -149,7 +149,7 @@ export function useImportPartialPieces() {
     mutationFn: async (input: { company_id: string; rows: Record<string, unknown>[] }) => {
       const { data, error } = await supabase.rpc("import_partial_pieces", {
         p_company_id: input.company_id,
-        p_rows: input.rows as unknown as Record<string, unknown>[],
+        p_rows: input.rows as never,
       });
       if (error) throw error;
       return data as { inserted: number; errors: Array<{ row: number; error: string; data: unknown }> };
