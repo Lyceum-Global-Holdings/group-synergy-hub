@@ -320,6 +320,7 @@ function App() {
                 <Route path="/warehouse/delivery-order" element={<DeliveryOrder />} />
                 <Route path="/warehouse/inventory-valuation" element={<InventoryValuation />} />
                 <Route path="/warehouse/batch-management" element={<BatchManagement />} />
+                <Route path="/warehouse/partial-quantities" element={<PartialQuantities />} />
                 <Route path="/finance" element={<Accounting />} />
                 <Route path="/finance/*" element={<Accounting />} />
                 <Route path="/management/dashboards" element={<DashboardsKPIs />} />
