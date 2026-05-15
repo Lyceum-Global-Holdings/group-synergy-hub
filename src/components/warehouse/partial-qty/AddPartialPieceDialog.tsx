@@ -47,6 +47,7 @@ export function AddPartialPieceDialog({ open, onOpenChange }: Props) {
   const { toast } = useToast();
   const { locations } = useWarehouseLocations();
   const { items } = useWarehouseItems();
+  const { units } = useItemUnits();
   const create = useCreatePartialPiece();
   const createBulk = useCreatePartialPiecesBulk();
 
