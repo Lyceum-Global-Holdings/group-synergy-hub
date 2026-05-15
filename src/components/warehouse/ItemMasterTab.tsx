@@ -146,6 +146,7 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
   const [binFilter, setBinFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [supplierFilter, setSupplierFilter] = useState<string>("all");
+  const [stockMode, setStockMode] = useState<'all' | 'in_stock' | 'zero' | 'low'>("all");
   const [previewImage, setPreviewImage] = useState<{ url: string; name: string } | null>(null);
 
   const toggleColumn = (key: InvColumnKey) => {
@@ -175,6 +176,7 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
     status: statusFilter,
     supplierId: supplierFilter,
     locationId: globalLocationId,
+    stockMode,
   });
 
   // Keep mutations via the old hook with fetching disabled
@@ -364,13 +366,14 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
     return Array.from(suppliers).sort();
   }, [allItems]);
 
-  const hasActiveFilters = categoryFilter !== "all" || binFilter !== "all" || statusFilter !== "all" || supplierFilter !== "all";
+  const hasActiveFilters = categoryFilter !== "all" || binFilter !== "all" || statusFilter !== "all" || supplierFilter !== "all" || stockMode !== "all";
 
   const clearFilters = () => {
     setCategoryFilter("all");
     setBinFilter("all");
     setStatusFilter("all");
     setSupplierFilter("all");
+    setStockMode("all");
   };
 
   // Selection helpers
@@ -507,6 +510,18 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
                 <SelectItem value="active">Active</SelectItem>
                 <SelectItem value="inactive">Inactive</SelectItem>
                 <SelectItem value="discontinued">Discontinued</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Select value={stockMode} onValueChange={(v) => setStockMode(v as typeof stockMode)}>
+              <SelectTrigger className="w-[140px]">
+                <SelectValue placeholder="Stock" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Stock</SelectItem>
+                <SelectItem value="in_stock">In Stock (&gt; 0)</SelectItem>
+                <SelectItem value="zero">Zero Stock</SelectItem>
+                <SelectItem value="low">Low Stock (≤ Reorder)</SelectItem>
               </SelectContent>
             </Select>
 

@@ -9,6 +9,8 @@ interface Cursor {
   id: string;
 }
 
+export type StockMode = 'all' | 'in_stock' | 'zero' | 'low';
+
 interface UseWarehouseItemsLazyInventoryOptions {
   pageSize?: number;
   search?: string;
@@ -16,6 +18,7 @@ interface UseWarehouseItemsLazyInventoryOptions {
   status?: string;
   supplierId?: string;
   locationId?: string | null;
+  stockMode?: StockMode;
 }
 
 const MAX_ITEMS = 20000;
@@ -39,6 +42,7 @@ export function useWarehouseItemsLazyInventory({
   status,
   supplierId,
   locationId,
+  stockMode = 'all',
 }: UseWarehouseItemsLazyInventoryOptions) {
   const { selectedCompany, isViewingAllCompanies } = useCompany();
   const { data: permissions } = useCurrentUserLocationPermissions();
@@ -58,6 +62,7 @@ export function useWarehouseItemsLazyInventory({
       categoryId,
       status,
       supplierId,
+      stockMode,
     ],
     queryFn: async ({ pageParam }: { pageParam: Cursor | null }) => {
       let rawItems: any[] = [];
@@ -125,16 +130,27 @@ export function useWarehouseItemsLazyInventory({
         if (supplierId && supplierId !== 'all') {
           rawItems = rawItems.filter((it) => it.supplier_id === supplierId);
         }
+        if (stockMode === 'in_stock') {
+          rawItems = rawItems.filter((it) => Number(it.current_stock || 0) > 0);
+        } else if (stockMode === 'zero') {
+          rawItems = rawItems.filter((it) => Number(it.current_stock || 0) === 0);
+        } else if (stockMode === 'low') {
+          rawItems = rawItems.filter((it) => Number(it.current_stock || 0) <= Number(it.reorder_level || 0));
+        }
       } else {
-        // Original paginated path — unchanged behavior
+        // Item Master path (SAP MM03 semantics): list every master record
+        // regardless of on-hand stock. Stock-based narrowing is an explicit
+        // user choice via `stockMode` (MMBE-style filter), applied below.
         let query = supabase
           .from('warehouse_items')
-          .select(`*, supplier:suppliers(id, name)`)
-          .gt('current_stock', 0);
+          .select(`*, supplier:suppliers(id, name)`);
 
         if (!isViewingAllCompanies && selectedCompany?.id) {
           query = query.eq('company_id', selectedCompany.id);
         }
+
+        if (stockMode === 'in_stock') query = query.gt('current_stock', 0);
+        else if (stockMode === 'zero') query = query.eq('current_stock', 0);
 
         const searchOr = search?.trim()
           ? (() => {
@@ -170,6 +186,9 @@ export function useWarehouseItemsLazyInventory({
         const { data, error } = await query;
         if (error) throw error;
         rawItems = (data || []) as any[];
+        if (stockMode === 'low') {
+          rawItems = rawItems.filter((it) => Number(it.current_stock || 0) <= Number(it.reorder_level || 0));
+        }
       }
 
       // Enrich with bin allocation data
