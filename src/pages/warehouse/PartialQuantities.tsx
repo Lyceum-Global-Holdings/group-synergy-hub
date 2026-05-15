@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { VirtualTable, type DataTableColumn } from "@/components/shared/VirtualTable";
 import { Download, Pencil, PackageMinus, Scissors, Search, Upload, Plus } from "lucide-react";
-import { usePartialPieces } from "@/hooks/warehouse/usePartialPieces";
+import { usePartialPieces, usePartialPieceItems } from "@/hooks/warehouse/usePartialPieces";
 import { PIECE_STATUS_OPTIONS, type PartialPieceRow, type PartialPieceStatus } from "@/types/partialPiece";
 import { AddPartialPieceDialog } from "@/components/warehouse/partial-qty/AddPartialPieceDialog";
 import { EditPartialPieceDialog } from "@/components/warehouse/partial-qty/EditPartialPieceDialog";
