@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCompany } from "@/contexts/CompanyContext";
+import { useLocationFilter } from "@/contexts/LocationFilterContext";
 import { useWarehouseLocations } from "@/hooks/useWarehouseLocations";
 import { useWarehouseItems } from "@/hooks/useWarehouseItems";
 import { ItemSelector } from "@/components/common/ItemSelector";
@@ -13,6 +14,7 @@ import { useCreatePartialPiece } from "@/hooks/warehouse/usePartialPieces";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
+import { Lock } from "lucide-react";
 
 interface Props {
   open: boolean;
@@ -21,6 +23,7 @@ interface Props {
 
 export function AddPartialPieceDialog({ open, onOpenChange }: Props) {
   const { selectedCompany } = useCompany();
+  const { globalLocationId } = useLocationFilter();
   const { toast } = useToast();
   const { locations } = useWarehouseLocations();
   const { items } = useWarehouseItems();
@@ -50,6 +53,25 @@ export function AddPartialPieceDialog({ open, onOpenChange }: Props) {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [parentItemId]);
+
+  // Inherit the active global location filter (SAP EWM / Oracle WMS pattern):
+  // pieces must be created in the same scope the user is viewing, otherwise
+  // the new row is invisible behind the active filter.
+  useEffect(() => {
+    if (!open) return;
+    if (globalLocationId) {
+      setLocationId(globalLocationId);
+      setBinId("");
+    }
+  }, [open, globalLocationId]);
+
+  const lockedLocation = !!globalLocationId;
+  const lockedLocationName = useMemo(() => {
+    if (!globalLocationId) return null;
+    const l = (locations as Array<{ id: string; name?: string; location_code?: string }>)
+      .find(x => x.id === globalLocationId);
+    return l?.name || l?.location_code || null;
+  }, [globalLocationId, locations]);
 
   const { data: bins = [] } = useQuery({
     queryKey: ["bins-for-location", locationId],
@@ -128,8 +150,14 @@ export function AddPartialPieceDialog({ open, onOpenChange }: Props) {
             <Input value={sizeUom} onChange={(e) => setSizeUom(e.target.value)} placeholder="m, mm, kg, m²…" />
           </div>
           <div>
-            <Label>Location *</Label>
-            <Select value={locationId} onValueChange={(v) => { setLocationId(v); setBinId(""); }}>
+            <Label className="flex items-center gap-1">
+              Location * {lockedLocation && <Lock className="h-3 w-3 text-muted-foreground" />}
+            </Label>
+            <Select
+              value={locationId}
+              onValueChange={(v) => { setLocationId(v); setBinId(""); }}
+              disabled={lockedLocation}
+            >
               <SelectTrigger><SelectValue placeholder="Select location" /></SelectTrigger>
               <SelectContent>
                 {(locations as Array<{ id: string; location_code: string; name?: string }>).map(l => (
@@ -137,6 +165,11 @@ export function AddPartialPieceDialog({ open, onOpenChange }: Props) {
                 ))}
               </SelectContent>
             </Select>
+            {lockedLocation && (
+              <p className="text-xs text-muted-foreground mt-1">
+                Scoped by header filter{lockedLocationName ? `: ${lockedLocationName}` : ""}. Clear the global location filter to add elsewhere.
+              </p>
+            )}
           </div>
           <div>
             <Label>Bin</Label>

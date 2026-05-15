@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { VirtualTable, type DataTableColumn } from "@/components/shared/VirtualTable";
-import { Download, Pencil, PackageMinus, Scissors, Search, Upload, Plus } from "lucide-react";
+import { Download, Pencil, PackageMinus, Scissors, Search, Upload, Plus, X } from "lucide-react";
 import { usePartialPieces, usePartialPieceItems } from "@/hooks/warehouse/usePartialPieces";
 import { PIECE_STATUS_OPTIONS, type PartialPieceRow, type PartialPieceStatus } from "@/types/partialPiece";
 import { AddPartialPieceDialog } from "@/components/warehouse/partial-qty/AddPartialPieceDialog";
@@ -13,6 +13,8 @@ import { EditPartialPieceDialog } from "@/components/warehouse/partial-qty/EditP
 import { ConsumePartialPieceDialog } from "@/components/warehouse/partial-qty/ConsumePartialPieceDialog";
 import { SplitPartialPieceDialog } from "@/components/warehouse/partial-qty/SplitPartialPieceDialog";
 import { ImportPartialPiecesDialog } from "@/components/warehouse/partial-qty/ImportPartialPiecesDialog";
+import { useLocationFilter } from "@/contexts/LocationFilterContext";
+import { useWarehouseLocations } from "@/hooks/useWarehouseLocations";
 
 const STATUS_VARIANT: Record<PartialPieceStatus, "default" | "secondary" | "outline" | "destructive"> = {
   available: "default",
@@ -36,6 +38,13 @@ export default function PartialQuantities() {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<string>("available");
   const [parentItemId, setParentItemId] = useState<string>("all");
+  const { globalLocationId, setGlobalLocationId } = useLocationFilter();
+  const { locations } = useWarehouseLocations();
+  const activeLocationName = useMemo(() => {
+    if (!globalLocationId) return null;
+    const l = (locations as Array<{ id: string; name?: string; location_code?: string }>).find(x => x.id === globalLocationId);
+    return l?.name || l?.location_code || null;
+  }, [globalLocationId, locations]);
   const { data: rows = [], isLoading } = usePartialPieces({
     search,
     status,
@@ -156,12 +165,32 @@ export default function PartialQuantities() {
             </span>
           </div>
 
+          {globalLocationId && (
+            <div className="mb-3 flex items-center gap-2 rounded-md border border-dashed bg-muted/40 px-3 py-2 text-sm">
+              <Badge variant="secondary">Showing</Badge>
+              <span className="text-muted-foreground">Filtered by location:</span>
+              <span className="font-medium">{activeLocationName ?? "Selected location"}</span>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="ml-auto h-7 px-2"
+                onClick={() => setGlobalLocationId(null)}
+              >
+                <X className="mr-1 h-3 w-3" /> Clear filter
+              </Button>
+            </div>
+          )}
+
           <VirtualTable<PartialPieceRow>
             data={rows}
             columns={columns}
             getRowId={(r) => r.id}
             isLoading={isLoading}
-            emptyMessage="No partial pieces yet. Use “Add piece” or “Import” to register offcuts."
+            emptyMessage={
+              globalLocationId
+                ? `No partial pieces at ${activeLocationName ?? "this location"}. Clear the filter to see other locations, or use "Add piece" to register one here.`
+                : "No partial pieces yet. Use “Add piece” or “Import” to register offcuts."
+            }
           />
         </CardContent>
       </Card>
