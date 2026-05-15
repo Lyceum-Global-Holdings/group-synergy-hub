@@ -1,123 +1,87 @@
-## Partial Quantity Manager (Warehouse submodule)
+# Partial Quantities — Import Holdings
 
-A new warehouse submodule that surfaces every **open partial quantity** for every item — one row per `(item, location, bin, batch)` — in a fast, Excel-like grid, with a per-row **Issue** action that posts a properly scoped stock movement.
+## Goal
+Allow users to bulk-import partial-quantity holdings into the Partial Quantities module via CSV/Excel, creating or topping-up bin allocations (and batches when applicable) with one row per (item × location × bin × batch). Aligns with SAP EWM putaway and GS1 CBV inventory event semantics.
 
-This is the SAP EWM / Oracle WMS / Manhattan WMS pattern: the atomic unit of stock is the bin/batch holding, not the item total. An item code with 3 open holdings = 3 rows.
+## UX
 
-### Where it lives
-
-- Route: `/warehouse/partial-quantities`
-- File: `src/pages/warehouse/PartialQuantities.tsx`
-- Registered in `src/constants/moduleConfig.ts` under `warehouse.subModules` as `{ key: 'partial-quantities', name: 'Partial Quantities', description: 'Excel-style view of open bin/batch holdings with per-row issue' }`
-- Wired into `src/App.tsx` lazy routes alongside other warehouse pages.
-
-### Data source (no schema change)
-
-The "partial quantities" view is a **read projection** over existing tables — no new domain entities needed:
-
-- `warehouse_bin_allocations` → one row per open holding (allocated_quantity > 0)
-- `warehouse_batches` → batch_id, batch_no, expiry, received_at (for FIFO ordering)
-- `warehouse_items` → item_code, description, base_uom, secondary_uom, track_secondary_quantity
-- `warehouse_locations`, `warehouse_bins` → location/bin display
-- Respects existing RLS (company-scoped) and the global location filter from `LocationFilterContext`.
-
-A new `SECURITY INVOKER` RPC `list_partial_quantities(p_company_id, p_location_id, p_search, p_limit, p_offset, p_cursor)` returns the flat denormalized rows in keyset-paginated form (per `list-rpc-pattern` + `keyset-pagination-uniqueness` memory rules). Cursor: `(received_at DESC, allocation_id)`.
-
-Returned columns per row:
+Add an **Import** button next to **Export CSV** on `/warehouse/partial-quantities` that opens `ImportPartialQuantitiesDialog`. Five-step wizard reusing the existing bulk-import shell:
 
 ```text
-item_id, item_code, item_name, base_uom,
-secondary_uom, track_secondary_quantity, secondary_quantity,
-location_id, location_name,
-bin_id, bin_code,
-batch_id, batch_no, expiry_date, received_at,
-allocated_quantity, reserved_quantity, available_quantity,
-unit_cost, total_value
+1. Download template  →  2. Upload file  →  3. Validate & preview  →  4. Confirm  →  5. Result summary
 ```
 
-### UI: Excel-style grid
+- Template button generates a CSV (and XLSX) with columns + 2 sample rows + an inline instructions sheet.
+- Drag-and-drop area; CSV via existing `parseCSV` (`src/lib/bulkImport/csvParser.ts`), XLSX via existing `xlsx` skill path used by other importers.
+- Preview shows per-row status badges (`ok`, `new bin`, `new batch`, `item not found`, `bin not found`, `qty invalid`, `duplicate row`) with inline error text.
+- Filter chips: All / Errors only / Warnings only. Disable **Confirm Import** while any row is in error.
+- Honors the global Location filter: if a row omits `location_code`, the active location is used; mismatch with global filter is flagged as a warning, not blocked.
 
-Built on the existing `src/components/shared/VirtualTable.tsx` (per `virtual-table-pattern` memory — required for ≥200 rows). Layout:
+## Template columns
 
-```text
-┌──────────────────────────────────────────────────────────────────────────┐
-│ [Search item code/name]  [Location filter]  [Batch only ☐] [Export CSV] │
-├──────────┬─────────┬──────┬──────┬───────┬──────────┬────────┬─────────┤
-│ Item Code│ Name    │ Loc  │ Bin  │ Batch │ Available│ Sec Qty│ Action  │
-├──────────┼─────────┼──────┼──────┼───────┼──────────┼────────┼─────────┤
-│ ITM-001  │ Bolt M8 │ WH-A │ A-01 │ B0091 │   42.000 │ 12 pcs │ [Issue] │
-│ ITM-001  │ Bolt M8 │ WH-A │ A-02 │ B0103 │   18.500 │  5 pcs │ [Issue] │
-│ ITM-001  │ Bolt M8 │ WH-B │ B-11 │ —     │    7.000 │   —    │ [Issue] │
-│ ITM-002  │ Cable…  │ WH-A │ C-04 │ B0205 │  120.000 │   —    │ [Issue] │
-└──────────┴─────────┴──────┴──────┴───────┴──────────┴────────┴─────────┘
-```
+Required marked *. Order tolerant (header-based).
 
-Row is highlighted in FIFO order per item: oldest `received_at` carries an "Issue First (FIFO)" pill (per `warehouse-batch-fifo-logic` memory).
+| Column | Type | Notes |
+|---|---|---|
+| `item_code` * | text | Resolved against `warehouse_items` for the company |
+| `location_code` * | text | Resolved against `warehouse_locations`; leaf-level only |
+| `bin_code` * | text | Resolved within the location; auto-create allowed via opt-in checkbox |
+| `quantity` * | numeric ≥ 0 | Base UoM, up to 4 decimals |
+| `secondary_quantity` | numeric | Required only when item has `track_secondary_quantity` |
+| `batch_number` | text | Required when item `is_batch_tracked` |
+| `manufacture_date` | ISO 8601 (YYYY-MM-DD) | GS1 AI (11) |
+| `expiry_date` | ISO 8601 (YYYY-MM-DD) | GS1 AI (17); required if item enforces shelf life |
+| `unit_cost` | numeric | Optional; defaults to item master cost |
+| `received_at` | ISO 8601 datetime | Used for FIFO ordering; default `now()` |
+| `reference` | text | e.g. GRN/ASN/PO; copied to ledger |
+| `notes` | text | Free text; copied to ledger |
+| `mode` | `add` \| `set` | Per-row: top-up the holding or set absolute on-hand. Default `add` |
 
-Editable cells: none. Issuing through a controlled dialog is safer than inline edits and matches the existing MIR audit trail. (Inline-edit "Excel feel" preserved via fixed-row heights, sticky header, frozen first 2 columns, keyboard nav, copy-to-clipboard, CSV export.)
+## Validation rules
+- Trim, case-insensitive code matching; reject ambiguous matches.
+- Quantity > 0 for `add`; ≥ 0 for `set` (set 0 effectively zero-outs that bin/batch row).
+- Composite uniqueness within the file: collapse duplicate (item, location, bin, batch) rows with a warning showing the merged total.
+- Item flags enforced: batch-tracked → batch_number required; serialized items rejected (use Putaway, not partial qty).
+- Reject negative inventory results.
+- Date sanity: `manufacture_date ≤ received_at ≤ expiry_date`.
+- RBAC: requires `warehouse.material_receipt.create` (or `warehouse.bin_allocation.write`); per-location grants enforced.
 
-### Per-row Issue action
+## Backend
 
-Clicking **Issue** opens `IssuePartialQuantityDialog`:
+One new SECURITY INVOKER RPC (matches `list-rpc-pattern` and reuses ledger triggers):
 
-- Pre-fills item, location, bin, batch (locked — never silently merge bins, per `stock-transactions-location-scope` memory).
-- Inputs: `quantity_to_issue` (≤ available), optional `secondary_quantity_to_issue` if `track_secondary_quantity`, `purpose` (cost center / project / construction site / free text), `reason_code` (GS1 CBV-aligned: `CONSUMPTION`, `INTERNAL_TRANSFER`, `SAMPLE`, `WASTE`, `RETURN_TO_VENDOR`), `reference_no`, `notes`.
-- On submit, calls a new edge-style RPC `issue_partial_quantity(p_allocation_id, p_quantity, p_secondary_quantity, p_reason_code, p_reference, p_notes)` which:
-  1. Re-validates available qty under row lock (`SELECT … FOR UPDATE`).
-  2. Decrements `warehouse_bin_allocations.allocated_quantity` for the exact bin/batch.
-  3. Decrements `warehouse_batches.quantity_remaining` if batch-tracked.
-  4. Inserts a `stock_transactions` row with `type='ISSUE'`, `bin_id`, `batch_id`, `reason_code`, `reference_no`. The DB trigger `set_stock_transaction_balances` stamps `quantity_before/after` from the live bin allocation (per `stock-ledger-immutable-balances` memory) — never set client-side.
-  5. Returns the new transaction id + remaining qty.
-- React Query invalidates `partial-quantities`, `warehouse-inventory`, `bin-allocations`, `stock-ledger`.
-- Toast with link to the resulting movement.
+`import_partial_quantities(p_company_id uuid, p_rows jsonb)` returns `jsonb` with `{ inserted, updated, batches_created, errors[] }`.
 
-Bulk Issue (phase 1 stretch, low risk): multi-select rows → "Issue Selected" creates one MIR header (`material_issues`) with N lines, one per selected row, then posts each line through the same RPC. Reuses the existing `material_issues` schema so it shows up in MIR history.
+Per row, in a single transaction:
+1. Resolve `warehouse_item_id`, `location_id`, `bin_id` (auto-create bin only if `p_allow_create_bin = true`, audited).
+2. If batch_tracked: upsert into `warehouse_batches` keyed by `(warehouse_item_id, batch_number, location_id)`.
+3. Upsert `warehouse_bin_allocations` row keyed by `(warehouse_item_id, location_id, bin_id, batch_id)`.
+   - `mode='add'`: `allocated_quantity = allocated_quantity + p_qty`.
+   - `mode='set'`: `allocated_quantity = p_qty` (delta computed for ledger).
+4. Insert one `stock_transactions` row per delta with `transaction_type='receipt'` (positive) or `'adjustment'` (when `set` decreases stock), reason `import`, GS1 CBV event `ObjectEvent / ADD` or `DELETE`. Trigger `set_stock_transaction_balances` writes qty before/after.
+5. RAISE EXCEPTION on first hard error to roll back the whole import — returns the failing row index in the response.
 
-### International standards alignment
+Response is surfaced to the dialog summary (counts + downloadable error CSV that mirrors the input plus an `error` column).
 
-- **GS1 CBV reason codes** for movement disposition (same set already used in `scanned-bin-adjustment`).
-- **WMS atomic SKU = (item, location, bin, batch)** — SAP EWM / Oracle WMS / Manhattan WMS convention.
-- **FIFO by `received_at`** — IFRS-aligned cost flow; matches `warehouse-batch-fifo-logic` memory.
-- **Immutable ledger**: `stock_transactions` write-once; balances stamped by trigger; full audit (`created_by`, `reason_code`, `reference_no`).
-- **ISO 8601** timestamps; quantities at item's `base_uom` precision; secondary qty optional per `dual-quantity-tracking` memory.
-- **RLS company isolation** preserved end-to-end (per Core memory).
+## Files
 
-### Permissions
+New
+- `src/components/warehouse/partial-qty/ImportPartialQuantitiesDialog.tsx`
+- `src/components/warehouse/partial-qty/importTemplate.ts` (CSV/XLSX template + column defs)
+- `src/hooks/warehouse/useImportPartialQuantities.ts`
+- `supabase/migrations/<ts>_import_partial_quantities.sql` (RPC + audit columns if needed)
 
-- Read: anyone with `warehouse.view`.
-- Issue: `warehouse.material_issue.create` (existing MIR permission). Reuses RBAC, no new role.
-- Respects per-location grants (per `hierarchical-location-permissions` memory).
+Edited
+- `src/pages/warehouse/PartialQuantities.tsx` — add **Import** button + dialog mount + invalidation on success.
 
-### Performance
+## International standards alignment
+- **GS1 CBV** event types and AIs (10 batch, 11 mfg, 17 expiry, 310n qty) drive column semantics and ledger reason codes.
+- **SAP EWM / Oracle WMS** putaway grain: holdings keyed by item × storage bin × batch.
+- **ISO 8601** for all dates; **ISO 4217** unaffected (cost stays in company currency).
+- **Immutable ledger** via existing `stock_transactions` triggers (per `stock-ledger-immutable-balances` memory); no direct edits to balances.
+- **RLS** preserved — RPC is SECURITY INVOKER and respects company + location scoping.
 
-- `list_partial_quantities` RPC + composite index `(company_id, item_id, received_at DESC, id)` on `warehouse_bin_allocations` (partial: `WHERE allocated_quantity > 0`).
-- Server-side pagination (200 rows/page), keyset cursor.
-- VirtualTable with row virtualization; React Query `staleTime: 0` on this hook (live stock surface, per Core memory).
-- Realtime subscription via `useRealtimeChannel` on `warehouse_bin_allocations` + `stock_transactions` for the active company/location, debounced invalidation (per `realtime-bus-pattern` memory).
-
-### Out of scope (phase 1)
-
-- True inline-edit of allocations (would bypass the ledger). Deferred — adjustments must continue to flow through Stock Adjustment / Cycle Count.
-- Receipts / putaway from this screen (use GRN / Putaway).
-- Cross-company moves (use Stock Transfer).
-
-### Files to add / change
-
-```text
-src/pages/warehouse/PartialQuantities.tsx                 (new)
-src/components/warehouse/partial-qty/PartialQtyGrid.tsx   (new, VirtualTable wrapper)
-src/components/warehouse/partial-qty/IssuePartialQuantityDialog.tsx (new)
-src/components/warehouse/partial-qty/columns.tsx          (new)
-src/hooks/warehouse/usePartialQuantities.ts               (new, RQ + realtime)
-src/hooks/warehouse/useIssuePartialQuantity.ts            (new mutation)
-src/constants/moduleConfig.ts                             (add submodule)
-src/App.tsx                                               (lazy route)
-supabase/migrations/<ts>_partial_quantities.sql           (RPCs + index, no schema change)
-```
-
-### Migration (SQL summary)
-
-- `CREATE INDEX warehouse_bin_allocations_open_idx ON warehouse_bin_allocations (company_id, item_id, received_at DESC NULLS LAST, id) WHERE allocated_quantity > 0;` (joined to batch for received_at)
-- `CREATE OR REPLACE FUNCTION list_partial_quantities(...)` — SECURITY INVOKER, returns `SETOF record`.
-- `CREATE OR REPLACE FUNCTION issue_partial_quantity(...)` — SECURITY INVOKER, atomic with row lock.
-- No table or column added.
+## Out of scope (phase 1)
+- Serial number capture (route those items through Putaway).
+- ASN / EDI ingestion.
+- Auto-create of items or locations (bins are opt-in only).
