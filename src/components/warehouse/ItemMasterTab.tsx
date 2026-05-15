@@ -366,13 +366,14 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
     return Array.from(suppliers).sort();
   }, [allItems]);
 
-  const hasActiveFilters = categoryFilter !== "all" || binFilter !== "all" || statusFilter !== "all" || supplierFilter !== "all";
+  const hasActiveFilters = categoryFilter !== "all" || binFilter !== "all" || statusFilter !== "all" || supplierFilter !== "all" || stockMode !== "all";
 
   const clearFilters = () => {
     setCategoryFilter("all");
     setBinFilter("all");
     setStatusFilter("all");
     setSupplierFilter("all");
+    setStockMode("all");
   };
 
   // Selection helpers
