@@ -48,23 +48,33 @@ export const useWarehouseBins = (options: UseWarehouseBinsOptions = {}) => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User not authenticated');
 
+      const { location_ids, location_id, is_global_template, ...rest } = binData;
+      const targets = location_ids && location_ids.length > 0 ? location_ids : [location_id];
+      const rows = targets
+        .filter((id): id is string => !!id)
+        .map((lid) => ({
+          ...rest,
+          location_id: lid,
+          is_global_template: !!is_global_template || (location_ids?.length ?? 0) > 1,
+          created_by: user.id,
+        }));
+
+      if (rows.length === 0) throw new Error('At least one location is required');
+
       const { data, error } = await supabase
         .from('warehouse_bins')
-        .insert({
-          ...binData,
-          created_by: user.id
-        })
-        .select()
-        .single();
+        .insert(rows)
+        .select();
 
       if (error) throw error;
       return data;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['warehouse-bins'] });
+      const count = Array.isArray(data) ? data.length : 1;
       toast({
         title: "Success",
-        description: "Bin created successfully",
+        description: count > 1 ? `${count} bins created across locations` : "Bin created successfully",
       });
     },
     onError: (error) => {
