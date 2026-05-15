@@ -60,6 +60,8 @@ export interface SupplierField {
   maxSizeMB?: number;
   multiple?: boolean;
   maxFiles?: number;
+  /** Optional display order within section (lower = earlier). */
+  order?: number;
 }
 
 export interface SupplierSection {
