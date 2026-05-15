@@ -157,10 +157,11 @@ export function BulkItemImportContent({ onSuccess, onCancel }: BulkItemImportCon
               break;
             case 'location':
               if (value) {
-                const warehouseLocations = locations.filter(l => l.type === 'location');
-                const location = warehouseLocations.find(l =>
-                  l.name.toLowerCase() === value.toLowerCase() ||
-                  l.location_code?.toLowerCase() === value.toLowerCase()
+                const location = locations.find(l =>
+                  (['location', 'sublocation', 'department'].includes(l.type ?? 'location')) && (
+                    l.name.toLowerCase() === value.toLowerCase() ||
+                    l.location_code?.toLowerCase() === value.toLowerCase()
+                  )
                 );
                 if (location) item.location_id = location.id;
                 else item.warnings.push(`Warehouse location "${value}" not found`);
