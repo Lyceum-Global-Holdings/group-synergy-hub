@@ -81,7 +81,7 @@ export function SingleItemForm({ editingItem, onSuccess, onCancel, mode = 'inven
   const { bins } = useWarehouseBins();
   const { createAllocation } = useWarehouseBinAllocations();
 
-  const warehouseLocations = locations.filter(loc => loc.type === 'location');
+  const locationOptions = useMemo(() => buildLocationOptions(locations), [locations]);
   const categoryOptions = useMemo(() => {
     const level0 = categories.filter(c => !c.parent_id);
     const result: Array<{ category: typeof categories[number]; depth: 0 | 1 }> = [];
