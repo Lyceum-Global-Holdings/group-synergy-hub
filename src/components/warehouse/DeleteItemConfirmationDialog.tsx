@@ -227,24 +227,23 @@ export function DeleteItemConfirmationDialog({
                 </div>
               )}
 
-              {!hasReferences && !isInactive && (
-                <Button variant="destructive" onClick={handleSafeDelete} disabled={isLoading} className="w-full">
-                  <Trash2 className="mr-2 h-4 w-4" />
-                  Delete Item
-                </Button>
-              )}
-
-              {!hasReferences && isInactive && (
+              {!hasReferences && (
                 <>
-                  <Button
-                    variant="destructive"
-                    onClick={() => setShowPurge(true)}
-                    disabled={!eligibleForPurge}
-                    className="w-full"
-                  >
-                    <Trash2 className="mr-2 h-4 w-4" />
-                    Permanently Delete…
-                  </Button>
+                  {eligibleForPurge ? (
+                    <Button
+                      variant="destructive"
+                      onClick={() => setShowPurge(true)}
+                      className="w-full"
+                    >
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      Permanently Delete…
+                    </Button>
+                  ) : !isInactive ? (
+                    <Button variant="default" onClick={handleMarkInactive} disabled={isLoading} className="w-full">
+                      <Archive className="mr-2 h-4 w-4" />
+                      Mark Inactive
+                    </Button>
+                  ) : null}
                   {!isAdminOrHigher && (
                     <p className="text-xs text-muted-foreground text-center">
                       Admin role required for permanent deletion.
