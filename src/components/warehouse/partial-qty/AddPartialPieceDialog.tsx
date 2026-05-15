@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useCompany } from "@/contexts/CompanyContext";
 import { useWarehouseLocations } from "@/hooks/useWarehouseLocations";
 import { useWarehouseItems } from "@/hooks/useWarehouseItems";
+import { ItemSelector } from "@/components/common/ItemSelector";
 import { useCreatePartialPiece } from "@/hooks/warehouse/usePartialPieces";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
