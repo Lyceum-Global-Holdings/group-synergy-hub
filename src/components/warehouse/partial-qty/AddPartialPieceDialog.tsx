@@ -54,6 +54,25 @@ export function AddPartialPieceDialog({ open, onOpenChange }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [parentItemId]);
 
+  // Inherit the active global location filter (SAP EWM / Oracle WMS pattern):
+  // pieces must be created in the same scope the user is viewing, otherwise
+  // the new row is invisible behind the active filter.
+  useEffect(() => {
+    if (!open) return;
+    if (globalLocationId) {
+      setLocationId(globalLocationId);
+      setBinId("");
+    }
+  }, [open, globalLocationId]);
+
+  const lockedLocation = !!globalLocationId;
+  const lockedLocationName = useMemo(() => {
+    if (!globalLocationId) return null;
+    const l = (locations as Array<{ id: string; name?: string; location_code?: string }>)
+      .find(x => x.id === globalLocationId);
+    return l?.name || l?.location_code || null;
+  }, [globalLocationId, locations]);
+
   const { data: bins = [] } = useQuery({
     queryKey: ["bins-for-location", locationId],
     enabled: !!locationId,
