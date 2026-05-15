@@ -169,16 +169,14 @@ export function DeleteItemConfirmationDialog({
                   </AlertDescription>
                 </Alert>
               </div>
-            ) : isInactive && isAdminOrHigher ? (
+            ) : isAdminOrHigher && !hasReferences ? (
               <Alert>
                 <AlertDescription>
-                  {eligibleForPurge ? (
-                    <>This item has been Inactive for {inactiveSinceDays} days and has no references — it can be permanently deleted.</>
+                  {currentStock > 0 ? (
+                    <>This item has stock ({currentStock}). Reduce stock to zero before permanent deletion, or mark Inactive to preserve history.</>
                   ) : (
-                    <>
-                      Items must be Inactive for at least {MIN_INACTIVE_DAYS} days before they can be permanently deleted.
-                      {inactiveSinceDays !== null && <> (Currently {inactiveSinceDays} days.)</>}
-                    </>
+                    <>No stock and no references — this item can be permanently deleted.{' '}
+                    {!isInactive && <em>It will be auto-marked Inactive as part of the deletion.</em>}</>
                   )}
                 </AlertDescription>
               </Alert>
