@@ -160,7 +160,7 @@ export default function PartialQuantities() {
             emptyMessage="No open holdings for this scope."
             estimatedRowHeight={44}
             maxHeight={680}
-            getRowId={(r) => r.allocation_id}
+            getRowId={(r) => String(r.allocation_id)}
           />
         </CardContent>
       </Card>
