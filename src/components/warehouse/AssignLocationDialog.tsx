@@ -83,14 +83,20 @@ export function AssignLocationDialog({ items, open, onOpenChange, onComplete, co
   const fetchBinsForLocation = async (locationId: string) => {
     if (binsByLocation.has(locationId)) return;
     
-    const { data } = await supabase
-      .from('warehouse_bins')
-      .select('id, bin_code, name')
-      .eq('location_id', locationId)
-      .eq('status', 'active')
-      .order('bin_code');
-    
-    setBinsByLocation(prev => new Map(prev).set(locationId, (data || []) as BinOption[]));
+    const { data } = await supabase.rpc(
+      "list_bins_for_location_inherited",
+      { p_location_id: locationId },
+    );
+    const filtered = (data || [])
+      .filter((b: any) => (b.status ?? "active") === "active")
+      .map((b: any) => ({
+        id: b.id,
+        bin_code: b.bin_code,
+        name: b.name,
+        inherited_from_location_name: b.inherited_from_location_name,
+      })) as BinOption[];
+
+    setBinsByLocation(prev => new Map(prev).set(locationId, filtered));
   };
 
   const updateLocation = (itemId: string, locationId: string) => {
