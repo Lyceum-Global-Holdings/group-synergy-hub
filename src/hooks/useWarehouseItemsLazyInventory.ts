@@ -130,6 +130,13 @@ export function useWarehouseItemsLazyInventory({
         if (supplierId && supplierId !== 'all') {
           rawItems = rawItems.filter((it) => it.supplier_id === supplierId);
         }
+        if (stockMode === 'in_stock') {
+          rawItems = rawItems.filter((it) => Number(it.current_stock || 0) > 0);
+        } else if (stockMode === 'zero') {
+          rawItems = rawItems.filter((it) => Number(it.current_stock || 0) === 0);
+        } else if (stockMode === 'low') {
+          rawItems = rawItems.filter((it) => Number(it.current_stock || 0) <= Number(it.reorder_level || 0));
+        }
       } else {
         // Item Master path (SAP MM03 semantics): list every master record
         // regardless of on-hand stock. Stock-based narrowing is an explicit
