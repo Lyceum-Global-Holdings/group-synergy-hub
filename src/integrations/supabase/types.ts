@@ -21554,6 +21554,7 @@ export type Database = {
           _location_ids?: string[]
           _search?: string
           _status?: string
+          _stock_mode?: string
         }
         Returns: {
           available_quantity: number
