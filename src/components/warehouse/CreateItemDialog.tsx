@@ -88,8 +88,9 @@ export function CreateItemDialog({ open, onOpenChange, editingItem }: CreateItem
   const { bins } = useWarehouseBins();
   const { createAllocation } = useWarehouseBinAllocations();
 
-  // Filter locations to only show warehouses (type='location')
-  const warehouseLocations = locations.filter(loc => loc.type === 'location');
+  // Hierarchical option list (location → sublocation → department) so users
+  // can target the exact storage level they intend.
+  const locationOptions = useMemo(() => buildLocationOptions(locations), [locations]);
   const topLevelCategories = useMemo(() => categories.filter(c => !c.parent_id), [categories]);
 
   const selectedCategory = useMemo(() => 
