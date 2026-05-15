@@ -1,51 +1,32 @@
-# Bin Code Scoping — Location-specific vs Global
+## Root cause
+The list on `/warehouse/partial-quantities` is filtered by the **global header location filter** (`globalLocationId`) via the `list_partial_pieces` RPC. The **Add Partial Piece** dialog ignores that filter — it shows every location, defaults to none, and lets the user save the piece against a different location (often the parent location, since bins live there). Result: the row is saved correctly but is hidden by the active sub-location filter, so it looks like nothing was added.
 
-## Goal
-When creating a bin, the user picks a scope:
-- **Location-specific** — bin exists only in one chosen location (current behavior).
-- **Global (shared code)** — the same `bin_code` is provisioned across one or more selected locations, so e.g. `A-01-01` can exist in both Lyceum Anuradhapura and LNPE without conflict.
+## Fix — align Add dialog with the active location context
+Standard WMS practice (SAP EWM / Oracle WMS / Manhattan): when the operator is working in a scoped storage location, transactional create screens must inherit that scope and not let the user write outside it without an explicit override.
 
-This matches international WMS practice (SAP EWM "storage bin" per "storage type/location"; Oracle WMS "locator" per "subinventory"; GS1 SSCC/GLN logical scoping). A bin code is a **logical label**; the **physical bin** is `(location, bin_code)`. Globally shared codes are modeled as multiple physical bins sharing one code, not one row pointing at many locations — this preserves stock isolation per location and keeps QR labels unambiguous.
+### `src/components/warehouse/partial-qty/AddPartialPieceDialog.tsx`
+1. Read `globalLocationId` via `useLocationFilter()`.
+2. When the dialog opens, prefill the Location field with `globalLocationId` (when set) and keep it in sync if the user changes the global filter.
+3. When `globalLocationId` is set:
+   - Lock the Location `<Select>` to that value (`disabled`) and render a small inline note: "Scoped by header filter: {location name}. Clear the global filter to add elsewhere."
+   - Restrict the Bin dropdown to bins of that location (already the case via `bins-for-location` query) — also include bins of any descendant sub-locations is **out of scope**; one location at a time.
+4. When `globalLocationId` is null, keep the current free choice.
+5. On successful save, invalidation already includes `partial-pieces` and `partial-piece-items` — no change needed.
 
-## Database (current state — no schema change required)
-`warehouse_bins` already has:
-- `location_id uuid NULL`
-- `UNIQUE (bin_code, location_id)`
+### `src/pages/warehouse/PartialQuantities.tsx`
+1. When `globalLocationId` is set, surface the active scope in the page header as a small badge ("Showing: {location}") with a clear-filter button. This makes the empty-after-add scenario visually obvious for users who didn't realise a filter was active.
+2. When the list is empty AND a global filter is active, change the empty state to: "No partial pieces at {location}. Clear the filter to see other locations or use Add piece to register one here."
 
-This already permits the same `bin_code` across different locations. We will:
-1. Add a small `is_global_template boolean DEFAULT false` flag on `warehouse_bins` so users can later see/manage which bins were provisioned as part of a global rollout (purely informational; does not affect stock).
-2. Add a partial unique index to prevent two "global template definitions" from colliding per company:
-   `CREATE UNIQUE INDEX warehouse_bins_global_code_uniq ON warehouse_bins (company_id, bin_code) WHERE is_global_template = true AND location_id IS NULL;`
-   (Optional — only used if we keep a "template row" with NULL location.)
-3. Keep stock, allocations, and QR codes scoped to the concrete `(location_id, bin_code)` row, unchanged.
-
-We will **not** introduce a many-to-many bin↔location table. Stock ledgers, FIFO, and bin-allocation memory rules all assume one bin = one physical place.
-
-## UI changes — `CreateBinDialog.tsx`
-1. Add a **Scope** radio group at the top:
-   - `Location-specific` (default)
-   - `Global (apply to multiple locations)`
-2. When **Location-specific**: show single `Location` Select (current behavior).
-3. When **Global**: replace single Select with a multi-select location picker (checkbox list grouped by parent location, reusing `LocationSelector` styling). On submit, the dialog calls `createBin` once per selected location — each row gets the same `bin_code`, `name`, `capacity`, `status`, plus `is_global_template = true`. Failures on individual locations are reported per-row in a toast summary.
-4. Edit mode keeps single-location editing (you edit the concrete physical bin, not the template).
-
-## Hook changes — `useWarehouseBins.ts`
-- Extend the `createBin` mutation to accept either a single payload or `{ locationIds: string[], ...rest }` and fan out inserts in a single Supabase call (`insert([...])`). Surface partial-failure errors.
-- No change to `updateBin` / `deleteBin`.
-
-## Validation rules
-- Bin code: required; trimmed; uppercased; pattern `^[A-Z0-9][A-Z0-9\-]*$` (GS1-friendly, no spaces).
-- Global scope must select ≥ 1 location.
-- Per `(location_id, bin_code)` collisions are caught by the existing unique constraint and reported per row.
-
-## Out of scope
-- No migration of existing bins.
-- No changes to QR labels, allocations, or stock movement logic.
-- No cross-location stock pooling — global only means the **code** is shared, not the inventory.
+### Out of scope
+- No DB / RLS / RPC change — `list_partial_pieces` already filters by `p_location_id` correctly.
+- No changes to Edit / Consume / Split / Import dialogs.
+- No hierarchical "include children" behaviour — staying with a single location matches how the list already filters.
 
 ## Files to touch
-- `supabase/migrations/<new>.sql` — add `is_global_template` column + partial unique index.
-- `src/components/warehouse/CreateBinDialog.tsx` — scope toggle + multi-location picker.
-- `src/hooks/useWarehouseBins.ts` — bulk create support.
-- `src/types/itemBin.ts` — add `is_global_template?: boolean`.
-- `src/components/warehouse/BinMasterTab.tsx` — optional badge "Global" on rows where `is_global_template`.
+- `src/components/warehouse/partial-qty/AddPartialPieceDialog.tsx`
+- `src/pages/warehouse/PartialQuantities.tsx`
+
+## Validation
+- With a sub-location selected globally → open Add piece → Location field is pre-filled and locked → save → row appears immediately in the list at that sub-location.
+- With no global filter → behaviour unchanged; user picks any location.
+- Switching global filter while dialog is open updates the locked location.

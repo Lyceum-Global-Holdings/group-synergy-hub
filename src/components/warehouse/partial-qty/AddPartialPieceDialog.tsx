@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCompany } from "@/contexts/CompanyContext";
+import { useLocationFilter } from "@/contexts/LocationFilterContext";
 import { useWarehouseLocations } from "@/hooks/useWarehouseLocations";
 import { useWarehouseItems } from "@/hooks/useWarehouseItems";
 import { ItemSelector } from "@/components/common/ItemSelector";
@@ -13,6 +14,7 @@ import { useCreatePartialPiece } from "@/hooks/warehouse/usePartialPieces";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
+import { Lock } from "lucide-react";
 
 interface Props {
   open: boolean;
@@ -21,6 +23,7 @@ interface Props {
 
 export function AddPartialPieceDialog({ open, onOpenChange }: Props) {
   const { selectedCompany } = useCompany();
+  const { globalLocationId } = useLocationFilter();
   const { toast } = useToast();
   const { locations } = useWarehouseLocations();
   const { items } = useWarehouseItems();
