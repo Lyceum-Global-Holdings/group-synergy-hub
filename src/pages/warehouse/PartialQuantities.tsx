@@ -126,14 +126,6 @@ export default function PartialQuantities() {
 
   return (
     <div className="space-y-6">
-      <Helmet>
-        <title>Partial Quantities | Warehouse</title>
-        <meta
-          name="description"
-          content="Excel-style view of every open bin holding with per-row issue."
-        />
-      </Helmet>
-
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <h1 className="text-3xl font-bold">Partial Quantities</h1>
