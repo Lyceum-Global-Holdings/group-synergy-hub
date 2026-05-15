@@ -49,20 +49,13 @@ export function DeleteItemConfirmationDialog({
 
   const hasReferences = references.length > 0;
   const isInactive = (item as WarehouseItem | null)?.status === 'inactive';
+  const currentStock = (item as WarehouseItem | null)?.current_stock ?? 0;
 
-  const inactiveSinceDays = useMemo(() => {
-    const ts = (item as { updated_at?: string | null } | null)?.updated_at
-      ?? (item as { created_at?: string | null } | null)?.created_at;
-    if (!ts) return null;
-    return Math.floor((Date.now() - new Date(ts).getTime()) / (1000 * 60 * 60 * 24));
-  }, [item]);
-
+  // SAP MM06 / Oracle "Delete Items" pattern: an item can be permanently
+  // deleted as soon as it has zero stock and zero historical references.
+  // The function will auto-flag it Inactive in the same transaction.
   const eligibleForPurge =
-    isInactive &&
-    !hasReferences &&
-    isAdminOrHigher &&
-    inactiveSinceDays !== null &&
-    inactiveSinceDays >= MIN_INACTIVE_DAYS;
+    isAdminOrHigher && !hasReferences && currentStock === 0;
 
   useEffect(() => {
     if (!open) {
