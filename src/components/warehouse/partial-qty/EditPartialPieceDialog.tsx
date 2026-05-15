@@ -108,7 +108,25 @@ export function EditPartialPieceDialog({ open, onOpenChange, piece }: Props) {
             </div>
             <div>
               <Label>UOM</Label>
-              <Input value={sizeUom} onChange={(e) => setSizeUom(e.target.value)} disabled={!editable} />
+              <Select value={sizeUom} onValueChange={setSizeUom} disabled={!editable}>
+                <SelectTrigger><SelectValue placeholder="Select unit" /></SelectTrigger>
+                <SelectContent>
+                  {(() => {
+                    const list = units as Array<{ id: string; name: string; abbreviation: string }>;
+                    const known = list.some(u => u.abbreviation === sizeUom);
+                    return (
+                      <>
+                        {!known && sizeUom && (
+                          <SelectItem value={sizeUom}>{sizeUom} (legacy)</SelectItem>
+                        )}
+                        {list.map(u => (
+                          <SelectItem key={u.id} value={u.abbreviation}>{u.name} ({u.abbreviation})</SelectItem>
+                        ))}
+                      </>
+                    );
+                  })()}
+                </SelectContent>
+              </Select>
             </div>
             <div>
               <Label>Location</Label>
