@@ -41,9 +41,13 @@ export function resolveUnitId(value: string, units: UnitLike[]): string | null {
 }
 
 export function resolveLocationId(value: string, locations: NamedWithCode[]): string | null {
-  const warehouseLocations = locations.filter((l) => l.type === 'location' || l.type === undefined);
+  // Accept any storage level (location / sublocation / department) so CSV imports
+  // can target the exact node the user named.
+  const candidates = locations.filter(
+    (l) => l.type === undefined || ['location', 'sublocation', 'department'].includes(l.type as string),
+  );
   return (
-    warehouseLocations.find((l) => eq(l.name, value) || eq(l.location_code ?? '', value))?.id ?? null
+    candidates.find((l) => eq(l.name, value) || eq(l.location_code ?? '', value))?.id ?? null
   );
 }
 
