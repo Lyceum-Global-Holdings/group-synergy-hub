@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Plus, Search, Edit, Trash2 } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Plus, Search, Edit, Trash2, Layers } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -15,6 +16,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle } from 'lucide-react';
 import { useWarehouseBins } from '@/hooks/useWarehouseBins';
 import { CreateBinDialog } from '@/components/warehouse/CreateBinDialog';
+import { BulkBinScopeDialog } from '@/components/warehouse/BulkBinScopeDialog';
 import { WarehouseBin } from '@/types/itemBin';
 import { useIsAdminOrHigher } from '@/hooks/useIsAdminOrHigher';
 
@@ -22,14 +24,26 @@ export function BinMasterTab() {
   const [searchTerm, setSearchTerm] = useState('');
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [editingBin, setEditingBin] = useState<WarehouseBin | null>(null);
-  
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [isBulkScopeOpen, setIsBulkScopeOpen] = useState(false);
+
   const { bins, isLoading, deleteBin, isDeleting } = useWarehouseBins();
-  const { canDelete } = useIsAdminOrHigher();
+  const { canDelete, isAdminOrHigher } = useIsAdminOrHigher();
 
   const filteredBins = bins.filter(bin =>
     bin.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     bin.bin_code.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  const allFilteredSelected = filteredBins.length > 0 && filteredBins.every((b) => selectedIds.includes(b.id));
+  const toggleAll = (checked: boolean) => {
+    if (checked) setSelectedIds(Array.from(new Set([...selectedIds, ...filteredBins.map((b) => b.id)])));
+    else setSelectedIds(selectedIds.filter((id) => !filteredBins.some((b) => b.id === id)));
+  };
+  const toggleOne = (id: string, checked: boolean) => {
+    setSelectedIds((prev) => (checked ? [...prev, id] : prev.filter((x) => x !== id)));
+  };
+  const selectedBins = bins.filter((b) => selectedIds.includes(b.id));
 
   const getStatusColor = (status: string) => {
     switch (status) {
