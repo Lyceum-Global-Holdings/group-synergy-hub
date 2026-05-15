@@ -70,10 +70,18 @@ export function BinMasterTab() {
             />
           </div>
         </div>
-        <Button onClick={() => setIsCreateDialogOpen(true)}>
-          <Plus className="mr-2 h-4 w-4" />
-          Add Bin
-        </Button>
+        <div className="flex items-center gap-2">
+          {isAdminOrHigher && selectedBins.length > 0 && (
+            <Button variant="outline" onClick={() => setIsBulkScopeOpen(true)}>
+              <Layers className="mr-2 h-4 w-4" />
+              Change scope ({selectedBins.length})
+            </Button>
+          )}
+          <Button onClick={() => setIsCreateDialogOpen(true)}>
+            <Plus className="mr-2 h-4 w-4" />
+            Add Bin
+          </Button>
+        </div>
       </div>
 
       <Alert>
