@@ -1,63 +1,59 @@
-## Goal
+# Fix: sidebar module switch feels like a full page refresh
 
-Let admins add **File Upload** fields to the public Supplier Registration form via the Form Builder, and let suppliers attach documents (BR, tax certs, ISO certs, bank letters, etc.) when registering.
+## What's actually happening
 
-## Industry-standard approach
+The sidebar links (`CompanySidebar` → `NavLink to=...`) are correct SPA links — there is no real browser reload, no auth loss, no `window.location` redirect.
 
-- Direct-to-storage upload from the public form using a **short-lived signed upload URL** (no service-role key in the browser, no oversized base64 in JSON payloads).
-- **Server-side validation** of MIME, size, and extension against a whitelist (PDF, JPG, PNG, DOCX, XLSX) before finalizing the registration.
-- **Anti-virus / abuse protection**: enforce per-file size cap (10 MB) and per-submission count cap (max 10 files), reuse existing Turnstile + rate limiter on `public-supplier-registration`.
-- Files stored in the existing **private `supplier-documents` bucket** under `pending/{registration_id}/{field_key}/{uuid}-{filename}`. Approval moves/links them to the supplier record (already supported by `supplier_documents` table).
-- Schema captures file metadata (`{ path, name, size, mime, uploaded_at }`) inside `supplier_data[field_key]` so it survives the existing JSONB pipeline without DB migrations.
-- Multiple files supported per field (configurable: single vs multi).
+What the user perceives as "the system gets refreshed" is this:
 
-## Changes
+1. Almost every route in `src/App.tsx` is wrapped with `React.lazy(() => import(...))`.
+2. The inner Suspense in `ProtectedLayout` uses `PageLoader`, which is a **full-viewport** spinner:
+   ```tsx
+   <div className="flex items-center justify-center min-h-screen">
+     <Loader2 className="animate-spin" />
+   </div>
+   ```
+3. When you click a module/submodule, React Router commits the URL change synchronously, the lazy chunk for the next page suspends, and Suspense **replaces the entire content area** with that `min-h-screen` spinner until the chunk finishes downloading. That blank-white-with-spinner frame is exactly the "white flash + URL changes" symptom.
 
-### 1. Schema (`src/lib/supplierFormSchema.ts`)
-- Add `"file"` to `SupplierFieldType`.
-- Extend `SupplierField` with optional `accept?: string[]` (mime whitelist), `maxSizeMB?: number`, `multiple?: boolean`, `maxFiles?: number`.
-- Defaults: `accept = ["application/pdf","image/jpeg","image/png"]`, `maxSizeMB = 10`, `multiple = false`, `maxFiles = 1`.
+The console also confirms it: React Router is warning about `v7_startTransition`. Without that flag, route transitions are not wrapped in `startTransition`, so Suspense throws the fallback immediately instead of keeping the previous screen visible while the next chunk loads.
 
-### 2. Form Builder (`src/components/sourcing/registration/FormBuilder.tsx`)
-- Add **"File upload"** to `FIELD_TYPES`.
-- In `AddFieldDialog`, when `type === "file"` show: allowed types (multi-select chips: PDF, Image, Word, Excel), max size (number, default 10 MB), allow multiple (switch), max files (number, default 1).
+## Fix (frontend only, scoped to `src/App.tsx`)
 
-### 3. Renderer (`src/components/sourcing/registration/DynamicSupplierForm.tsx`)
-- New `FileUploadField` subcomponent:
-  - Uses shadcn Input `type="file"` styled as a drop zone with file list, remove button, progress bar.
-  - Client-side validates MIME + size before upload, shows inline error.
-  - Calls new edge function `supplier-upload-sign` to get a signed upload URL, then `PUT`s file directly to Supabase Storage.
-  - Stores returned `{ path, name, size, mime }` in form state.
-- In preview mode, the field is read-only (no actual upload).
+### 1. Opt into React Router's `startTransition` for navigations
 
-### 4. New edge function `supplier-upload-sign`
-- Public (`verify_jwt = false`), Turnstile-verified, rate-limited (e.g. 30 sign requests / hour / IP).
-- Input (zod): `company_slug`, `field_key`, `filename`, `mime`, `size`.
-- Validates: company exists (via `resolve_public_portal_company`), field exists in published schema and is type `file`, mime in field's `accept`, size ≤ field's `maxSizeMB`.
-- Generates path `pending/{uuid}/{field_key}/{uuid}-{safeName}` and returns `supabase.storage.from('supplier-documents').createSignedUploadUrl(path)` plus the final path.
-- Uses service-role key (server only).
-
-### 5. Edge function `public-supplier-registration` (existing)
-- Extend `supplierDataSchema`: allow file values shaped as `{ path: string, name: string, size: number, mime: string }` or arrays thereof.
-- After validation, for every file value: HEAD-check object exists in `supplier-documents` and insert a row into `supplier_documents` (document_type = field_key, file_url = path, file_size, file_name) linked to the new `registration_request_id`.
-- Reject submission if any referenced object is missing.
-
-### 6. Storage policy (`supplier-documents` bucket)
-Migration to add anon INSERT only via signed URL (already the case) and tighten:
-```sql
--- Anyone with a signed upload URL can upload to pending/* (signed URL already gates this)
--- Ensure no anon SELECT; only authenticated company users can read via existing policies.
+```tsx
+<BrowserRouter
+  future={{
+    v7_startTransition: true,
+    v7_relativeSplatPath: true,
+  }}
+>
 ```
-Confirm bucket stays private. Add `allowed_mime_types` and `file_size_limit = 10485760` to the bucket if not already set.
+
+With this flag, every `NavLink`/`navigate(...)` is wrapped in `React.startTransition`. Combined with Suspense, React keeps the **previous route mounted and visible** while the new lazy chunk loads. No more full-screen wipe.
+
+### 2. Replace the inner page-level fallback with a non-blocking indicator
+
+The outer `Suspense` (around `<Routes>`) can keep `PageLoader` for cold start. The inner one inside `ProtectedLayout` is what causes the wipe on every navigation. Change it so it does **not** replace the whole content:
+
+- Use `null` as the inner Suspense fallback (preferred when paired with `v7_startTransition`, because the previous page stays visible during the transition), **or**
+- Render a thin top progress strip (e.g. a 2px `bg-primary` bar absolutely positioned at the top of the content area) that overlays without unmounting the current page.
+
+Recommended: `<Suspense fallback={null}>` for the inner one, since the outer Suspense already covers first paint and the transition flag handles in-app navigation.
+
+### 3. (Optional, small win) Prefetch lazy chunks on hover
+
+In `CompanySidebar`, on `onMouseEnter`/`onFocus` of each `NavLink`, call the matching `import('./pages/...')`. This is a follow-up and not required for the fix.
 
 ## Out of scope
-- Virus scanning (note in docs; can be added via a follow-up edge trigger).
-- Migrating files from `pending/` to a per-supplier folder on approval (existing approval flow already references `supplier_documents` rows; a small follow-up can rename if needed).
-- Changes to authenticated internal supplier creation wizard.
+
+- No changes to auth, queries, routing structure, or any business logic.
+- No changes to `CompanySidebar` link behavior — `NavLink` is already correct.
+- The unrelated `validateDOMNesting` warning from `FormBuilder.tsx` (Badge `<div>` inside `<p>`) is a separate cosmetic warning and not addressed here.
 
 ## Verification
-1. In Form Builder, add a "Business Registration Certificate" file field (PDF/JPG/PNG, 10 MB, single).
-2. Publish, open `/register-supplier?c=<slug>`, upload a PDF, submit.
-3. Confirm `supplier_registration_requests.supplier_data` contains `{ path, name, size, mime }`, and a row exists in `supplier_documents` pointing to that path.
-4. Try uploading a 20 MB file → rejected client-side and server-side.
-5. Try uploading `.exe` → rejected.
+
+1. Open the app, click between `Sourcing → Supplier Registration`, `Warehouse → Inventory`, `Finance → Payments`, etc.
+2. Confirm the URL updates and the new page renders **without** the previous content disappearing into a blank white frame.
+3. First-ever navigation to a not-yet-downloaded chunk may still show a brief inline indicator, but the layout/sidebar/header stay mounted — no full refresh feel.
+4. Console no longer prints the `v7_startTransition` future-flag warning.
