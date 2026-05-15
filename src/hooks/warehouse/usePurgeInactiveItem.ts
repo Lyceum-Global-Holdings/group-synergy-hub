@@ -1,4 +1,4 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -18,12 +18,36 @@ interface BulkRow {
   message: string | null;
 }
 
+export interface PurgeEligibilityRow {
+  id: string;
+  item_code: string;
+  eligible: boolean;
+  current_stock: number;
+  blocking_refs: string[] | null;
+}
+
 function invalidateInventoryQueries(qc: ReturnType<typeof useQueryClient>) {
   qc.invalidateQueries({ queryKey: ["warehouse-items-inventory"] });
   qc.invalidateQueries({ queryKey: ["warehouse-items"] });
   qc.invalidateQueries({ queryKey: ["warehouse-inventory-page"] });
   qc.invalidateQueries({ queryKey: ["warehouse-items-catalog-ids"] });
   qc.invalidateQueries({ queryKey: ["warehouse-bin-allocations"] });
+}
+
+export function useCheckPurgeEligibility(itemIds: string[], enabled = true) {
+  return useQuery({
+    queryKey: ["purge-eligibility", [...itemIds].sort().join(",")],
+    enabled: enabled && itemIds.length > 0,
+    staleTime: 0,
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc(
+        "check_inventory_purge_eligibility" as never,
+        { p_item_ids: itemIds } as never,
+      );
+      if (error) throw error;
+      return (data ?? []) as PurgeEligibilityRow[];
+    },
+  });
 }
 
 export function usePurgeInactiveItem() {
