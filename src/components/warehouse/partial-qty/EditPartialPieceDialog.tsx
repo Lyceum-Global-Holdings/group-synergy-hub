@@ -49,17 +49,7 @@ export function EditPartialPieceDialog({ open, onOpenChange, piece }: Props) {
     }
   }, [piece]);
 
-  const { data: bins = [] } = useQuery({
-    queryKey: ["bins-for-location", locationId],
-    enabled: !!locationId,
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("warehouse_bins").select("id, bin_code")
-        .eq("location_id", locationId).order("bin_code");
-      if (error) throw error;
-      return data as Array<{ id: string; bin_code: string }>;
-    },
-  });
+  const { data: bins = [] } = useBinsForLocation(locationId);
 
   const editable = useMemo(() => piece?.status === "available" || piece?.status === "reserved", [piece]);
 
