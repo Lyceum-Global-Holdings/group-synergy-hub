@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useUpdatePartialPiece, useDeletePartialPiece } from "@/hooks/warehouse/usePartialPieces";
 import { useWarehouseLocations } from "@/hooks/useWarehouseLocations";
+import { useItemUnits } from "@/hooks/useItemUnits";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 import { useBinsForLocation } from "@/hooks/warehouse/useBinsForLocation";
@@ -24,6 +25,7 @@ export function EditPartialPieceDialog({ open, onOpenChange, piece }: Props) {
   const update = useUpdatePartialPiece();
   const del = useDeletePartialPiece();
   const { locations } = useWarehouseLocations();
+  const { units } = useItemUnits();
 
   const [sizeValue, setSizeValue] = useState("");
   const [sizeUom, setSizeUom] = useState("");
@@ -106,7 +108,25 @@ export function EditPartialPieceDialog({ open, onOpenChange, piece }: Props) {
             </div>
             <div>
               <Label>UOM</Label>
-              <Input value={sizeUom} onChange={(e) => setSizeUom(e.target.value)} disabled={!editable} />
+              <Select value={sizeUom} onValueChange={setSizeUom} disabled={!editable}>
+                <SelectTrigger><SelectValue placeholder="Select unit" /></SelectTrigger>
+                <SelectContent>
+                  {(() => {
+                    const list = units as Array<{ id: string; name: string; abbreviation: string }>;
+                    const known = list.some(u => u.abbreviation === sizeUom);
+                    return (
+                      <>
+                        {!known && sizeUom && (
+                          <SelectItem value={sizeUom}>{sizeUom} (legacy)</SelectItem>
+                        )}
+                        {list.map(u => (
+                          <SelectItem key={u.id} value={u.abbreviation}>{u.name} ({u.abbreviation})</SelectItem>
+                        ))}
+                      </>
+                    );
+                  })()}
+                </SelectContent>
+              </Select>
             </div>
             <div>
               <Label>Location</Label>

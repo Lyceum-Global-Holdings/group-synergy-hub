@@ -10,6 +10,7 @@ import { useCompany } from "@/contexts/CompanyContext";
 import { useLocationFilter } from "@/contexts/LocationFilterContext";
 import { useWarehouseLocations } from "@/hooks/useWarehouseLocations";
 import { useWarehouseItems } from "@/hooks/useWarehouseItems";
+import { useItemUnits } from "@/hooks/useItemUnits";
 import { ItemSelector } from "@/components/common/ItemSelector";
 import {
   useCreatePartialPiece,
@@ -46,6 +47,7 @@ export function AddPartialPieceDialog({ open, onOpenChange }: Props) {
   const { toast } = useToast();
   const { locations } = useWarehouseLocations();
   const { items } = useWarehouseItems();
+  const { units } = useItemUnits();
   const create = useCreatePartialPiece();
   const createBulk = useCreatePartialPiecesBulk();
 
@@ -78,11 +80,15 @@ export function AddPartialPieceDialog({ open, onOpenChange }: Props) {
 
   useEffect(() => {
     if (item) {
-      if (!sizeUom) setSizeUom(item.secondary_uom || item.base_uom || "");
+      if (!sizeUom) {
+        const candidate = item.secondary_uom || item.base_uom || "";
+        const abbrs = (units as Array<{ abbreviation: string }>).map(u => u.abbreviation);
+        if (candidate && abbrs.includes(candidate)) setSizeUom(candidate);
+      }
       if (!unitCost && item.unit_cost != null) setUnitCost(String(item.unit_cost));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [parentItemId]);
+  }, [parentItemId, units]);
 
   // Inherit the active global location filter (SAP EWM / Oracle WMS pattern).
   useEffect(() => {
@@ -292,7 +298,14 @@ export function AddPartialPieceDialog({ open, onOpenChange }: Props) {
             </div>
             <div>
               <Label>UOM *</Label>
-              <Input value={sizeUom} onChange={(e) => setSizeUom(e.target.value)} placeholder="m, mm, kg, m²…" />
+              <Select value={sizeUom} onValueChange={setSizeUom}>
+                <SelectTrigger><SelectValue placeholder="Select unit" /></SelectTrigger>
+                <SelectContent>
+                  {(units as Array<{ id: string; name: string; abbreviation: string }>).map(u => (
+                    <SelectItem key={u.id} value={u.abbreviation}>{u.name} ({u.abbreviation})</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div>
               <Label className="flex items-center gap-1">
