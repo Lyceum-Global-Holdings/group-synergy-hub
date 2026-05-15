@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   AlertDialog,
   AlertDialogContent,
@@ -28,7 +28,7 @@ interface DeleteItemConfirmationDialogProps {
   isLoading: boolean;
 }
 
-const MIN_INACTIVE_DAYS = 30;
+
 
 export function DeleteItemConfirmationDialog({
   open,
@@ -49,20 +49,13 @@ export function DeleteItemConfirmationDialog({
 
   const hasReferences = references.length > 0;
   const isInactive = (item as WarehouseItem | null)?.status === 'inactive';
+  const currentStock = (item as WarehouseItem | null)?.current_stock ?? 0;
 
-  const inactiveSinceDays = useMemo(() => {
-    const ts = (item as { updated_at?: string | null } | null)?.updated_at
-      ?? (item as { created_at?: string | null } | null)?.created_at;
-    if (!ts) return null;
-    return Math.floor((Date.now() - new Date(ts).getTime()) / (1000 * 60 * 60 * 24));
-  }, [item]);
-
+  // SAP MM06 / Oracle "Delete Items" pattern: an item can be permanently
+  // deleted as soon as it has zero stock and zero historical references.
+  // The function will auto-flag it Inactive in the same transaction.
   const eligibleForPurge =
-    isInactive &&
-    !hasReferences &&
-    isAdminOrHigher &&
-    inactiveSinceDays !== null &&
-    inactiveSinceDays >= MIN_INACTIVE_DAYS;
+    isAdminOrHigher && !hasReferences && currentStock === 0;
 
   useEffect(() => {
     if (!open) {
@@ -77,11 +70,6 @@ export function DeleteItemConfirmationDialog({
 
   const handleMarkInactive = () => {
     onMarkInactive(item.id);
-    onOpenChange(false);
-  };
-
-  const handleSafeDelete = () => {
-    onConfirmDelete(item.id, false);
     onOpenChange(false);
   };
 
@@ -176,16 +164,14 @@ export function DeleteItemConfirmationDialog({
                   </AlertDescription>
                 </Alert>
               </div>
-            ) : isInactive && isAdminOrHigher ? (
+            ) : isAdminOrHigher && !hasReferences ? (
               <Alert>
                 <AlertDescription>
-                  {eligibleForPurge ? (
-                    <>This item has been Inactive for {inactiveSinceDays} days and has no references — it can be permanently deleted.</>
+                  {currentStock > 0 ? (
+                    <>This item has stock ({currentStock}). Reduce stock to zero before permanent deletion, or mark Inactive to preserve history.</>
                   ) : (
-                    <>
-                      Items must be Inactive for at least {MIN_INACTIVE_DAYS} days before they can be permanently deleted.
-                      {inactiveSinceDays !== null && <> (Currently {inactiveSinceDays} days.)</>}
-                    </>
+                    <>No stock and no references — this item can be permanently deleted.{' '}
+                    {!isInactive && <em>It will be auto-marked Inactive as part of the deletion.</em>}</>
                   )}
                 </AlertDescription>
               </Alert>
@@ -236,24 +222,23 @@ export function DeleteItemConfirmationDialog({
                 </div>
               )}
 
-              {!hasReferences && !isInactive && (
-                <Button variant="destructive" onClick={handleSafeDelete} disabled={isLoading} className="w-full">
-                  <Trash2 className="mr-2 h-4 w-4" />
-                  Delete Item
-                </Button>
-              )}
-
-              {!hasReferences && isInactive && (
+              {!hasReferences && (
                 <>
-                  <Button
-                    variant="destructive"
-                    onClick={() => setShowPurge(true)}
-                    disabled={!eligibleForPurge}
-                    className="w-full"
-                  >
-                    <Trash2 className="mr-2 h-4 w-4" />
-                    Permanently Delete…
-                  </Button>
+                  {eligibleForPurge ? (
+                    <Button
+                      variant="destructive"
+                      onClick={() => setShowPurge(true)}
+                      className="w-full"
+                    >
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      Permanently Delete…
+                    </Button>
+                  ) : !isInactive ? (
+                    <Button variant="default" onClick={handleMarkInactive} disabled={isLoading} className="w-full">
+                      <Archive className="mr-2 h-4 w-4" />
+                      Mark Inactive
+                    </Button>
+                  ) : null}
                   {!isAdminOrHigher && (
                     <p className="text-xs text-muted-foreground text-center">
                       Admin role required for permanent deletion.

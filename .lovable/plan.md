@@ -1,83 +1,56 @@
-## Goal
+# Fix: Bulk Delete in Inventory
 
-Add a controlled **"Permanently delete"** action that purges an inventory item from the database — but only after it has been marked **Inactive** and only when no historical references would be orphaned. This implements the standard two-step *archive → purge* lifecycle used by SAP MM (`MM06` deletion flag → archive run), Oracle Inventory (Inactive Date → purge concurrent program), and ISO 9001 §7.5.3 record-control rules.
+## Why bulk delete appears broken today
 
-## Background — what exists today
+The current `BulkInventoryDeleteDialog` only offers two paths:
 
-- `DeleteItemConfirmationDialog.tsx` already offers **Mark Inactive** vs **Force Delete** with a reference check via `useItemReferences`.
-- `BulkInventoryDeleteDialog.tsx` zero-stock items go through `remove_item_from_inventory` — but that RPC only zeros stock and wipes allocations + ledger; it **does not delete the item row**.
-- There is no path to actually remove an inactive item from `warehouse_items` / `warehouse_catalog`.
-- Inactive items keep showing in inventory queries (filtered by status) and in pickers, cluttering masters indefinitely.
+1. **Mark Inactive** — for active or in-stock items.
+2. **Permanently Delete** — only available for items that are **already Inactive AND inactive ≥ 30 days**.
 
-## What we'll build
+Result: on a freshly selected set of items, the "Permanently Delete N…" button never appears, so users perceive bulk delete as broken. The 30-day cooling rule is also enforced server-side in `purge_inactive_inventory_item`, blocking any attempt by admins to clean up newly created or recently deactivated rows.
 
-### 1. New SQL: `purge_inactive_inventory_item(p_item_id, p_reason)`
+International ERP precedent (SAP MM06 *Flag for Deletion* → archive run, Oracle "Delete Items" concurrent program, ISO 9001 §7.5.3) only requires:
 
-Admin-only `SECURITY DEFINER` RPC with these guardrails (fail closed):
+- A **zero-transactional-reference** check.
+- An **immutable audit trail** of who deleted what and why.
+- **Role-based authorization**.
 
-1. Caller must be `admin` or `super_admin` (via `has_role`).
-2. Caller must have access to the item's `company_id` (`can_access_company`).
-3. Item must currently be `status = 'inactive'` **and** at least 30 days in that state (configurable via a settings row; default 30 days — matches SAP archive retention default). *Rationale: prevents accidental same-day archive+purge.*
-4. **Zero-reference check** across every FK that points to the item — `stock_transactions`, `warehouse_bin_allocations`, `warehouse_batches`, `partial_pieces`, `grn_items`, `purchase_order_items`, `material_demand_items`, `bom_components`, `production_orders`, `stock_audit_lines`, `cycle_count_lines`, `material_issue_items`, `stock_transfer_items`, `pick_pack_items`, `delivery_order_items`, `inventory_valuation_lines`, `warehouse_reservations`, `tool_assignments`, etc. If any row exists → raise with the table list (the UI surfaces it).
-5. Delete from `warehouse_items` (and `warehouse_catalog` row if it has no other companies referencing it).
-6. Insert an `audit_logs` entry: `action='purge_item'`, `entity_id`, `entity_code`, `reason`, `actor_id`, `company_id`, `payload` snapshot of the deleted row.
+The 30-day waiting period is an internal policy convenience, not a standard. We will keep it as a *soft* recommendation but unblock immediate purge when the item carries no historical references.
 
-Companion RPC `purge_inactive_inventory_items_bulk(p_ids uuid[], p_reason text)` returns per-item `{id, status, message}` so the UI can show partial successes.
+## Plan
 
-### 2. New hook: `usePurgeInactiveItem`
+### 1. Database (migration)
 
-`src/hooks/warehouse/usePurgeInactiveItem.ts` — wraps both RPCs, invalidates `warehouse-inventory-page`, `warehouse-items-inventory`, `warehouse-items-catalog-ids`.
+Update `purge_inactive_inventory_item` and `purge_inactive_inventory_items_bulk`:
 
-### 3. UI — Single item
+- **Drop** the hard 30-day inactive requirement.
+- **Drop** the "must already be Inactive" precondition. If an item is `active`/`discontinued`, the function flips it to `inactive` in the same transaction before deletion (still inside the audit snapshot).
+- **Keep** all existing guards: admin/super_admin only, company access, ≥5-char reason, full zero-reference check across all 24 FK tables, `current_stock = 0`, snapshot to `security_audit_log`.
+- Add a new helper RPC `check_inventory_purge_eligibility(p_item_ids uuid[])` that returns one row per item with `{ id, eligible, blocking_refs[], current_stock }` so the UI can classify selections accurately (instead of guessing from `status` + `updated_at`).
 
-Extend `DeleteItemConfirmationDialog.tsx`:
+### 2. Frontend — `BulkInventoryDeleteDialog.tsx`
 
-- When `item.status === 'inactive'` **and** caller is admin **and** `references.length === 0`, swap the existing "Force Delete" button for a clearer **"Permanently Delete"** flow:
-  - Type-to-confirm input — user must type the `item_code` (NIST 800-53 / GitHub-style destructive-action pattern).
-  - Required **reason** textarea (logged in `audit_logs`).
-  - Calls `purge_inactive_inventory_item`.
-- When `item.status !== 'inactive'`, show a banner: *"Items must be marked Inactive before they can be permanently deleted."* with a **Mark Inactive** shortcut.
-- When references exist, keep the current "Cannot delete — referenced in N records" view and hide the permanent-delete option entirely.
+- On open, call `check_inventory_purge_eligibility` for the selected ids.
+- Re-bucket results server-truthfully:
+  - **Purgeable now** — `eligible = true` (zero stock, zero references). Admin sees a single "Permanently Delete N" flow with type-to-confirm `PERMANENTLY DELETE` + reason ≥ 5 chars.
+  - **Must archive** — has stock or references. "Mark Inactive" preserves history (unchanged).
+- Remove the misleading "Inactive too recent" bucket. Keep a small note when items are blocked by references, listing the top 2 blocking tables (e.g. *"3 items have stock_transactions and cannot be deleted"*).
+- Keep a single confirmation step; no 30-day messaging.
 
-### 4. UI — Bulk
+### 3. Frontend — `DeleteItemConfirmationDialog.tsx`
 
-Extend `BulkInventoryDeleteDialog.tsx` with a third bucket:
+- Same simplification for the single-item flow: if eligible (zero stock, zero refs, admin), show type-to-confirm purge directly. Otherwise offer "Mark Inactive". Drop the 30-day gate and the "must mark Inactive first" two-step.
 
-- `inactiveZeroStock` (status=inactive, current_stock=0, no references) → **Permanently delete** via bulk RPC.
-- `withStock` → mark inactive (existing).
-- `zeroStockActive` → mark inactive (changed from current "remove" call, which was misleading).
+### 4. Out of scope
 
-Add an admin-gated **"Purge selected inactive items"** action on the `ItemMasterTab` Inactive filter view.
-
-### 5. Audit + telemetry
-
-- Surface a row in `/admin/audit-logs` for every purge.
-- Toast shows the count purged + count blocked-by-reference with a link to the audit log.
+- No changes to non-admin roles (still cannot purge).
+- No cascade deletion of historical transactions — items with refs still cannot be purged.
+- No restore: purge remains permanent (snapshot only).
+- The unrelated React DevTools "Maximum call stack size exceeded" warning is not addressed here.
 
 ## Files
 
-**New**
-- `supabase/migrations/<ts>_purge_inactive_items.sql` — both RPCs + grants.
-- `src/hooks/warehouse/usePurgeInactiveItem.ts`
-
-**Modified**
-- `src/components/warehouse/DeleteItemConfirmationDialog.tsx` — type-to-confirm + reason + admin gate.
-- `src/components/warehouse/BulkInventoryDeleteDialog.tsx` — three-bucket flow.
-- `src/components/warehouse/ItemMasterTab.tsx` — wire purge action when status filter = Inactive.
-- `src/components/warehouse/ItemMasterDefinitionTab.tsx` — same.
-
-## International-standards mapping
-
-| Concern | Standard | How we honour it |
-|---|---|---|
-| Archive-then-purge lifecycle | SAP MM `MM06`, Oracle Inv `INVPURGE` | Status must be Inactive ≥30d before purge |
-| Audit trail for destructive actions | ISO 9001 §7.5.3, SOX §404, GxP §11.10(e) | Every purge writes to `audit_logs` with reason + actor + payload snapshot |
-| Two-person / typed-confirmation | NIST 800-53 AC-3(2) | Type item_code + admin role required |
-| No orphaned history | GS1 EPCIS traceability | Hard FK pre-check blocks purge if any movement exists |
-| Privilege of destructive ops | Principle of Least Privilege | RPC is `SECURITY DEFINER`, gated to admin/super_admin |
-
-## Out of scope
-
-- Cascading delete of historical transactions (forbidden — destroys traceability).
-- Auto-purge cron jobs.
-- Restoring a purged item (true delete is permanent; users should rely on the audit-log payload snapshot if recovery is needed).
+- New migration: relax `purge_inactive_inventory_item`, `purge_inactive_inventory_items_bulk`; add `check_inventory_purge_eligibility`.
+- `src/hooks/warehouse/usePurgeInactiveItem.ts` — add `useCheckPurgeEligibility` query.
+- `src/components/warehouse/BulkInventoryDeleteDialog.tsx` — re-bucket via RPC, remove 30-day UI.
+- `src/components/warehouse/DeleteItemConfirmationDialog.tsx` — single-step purge for eligible items.

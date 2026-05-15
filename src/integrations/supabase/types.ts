@@ -20813,6 +20813,16 @@ export type Database = {
           tax_id: string
         }[]
       }
+      check_inventory_purge_eligibility: {
+        Args: { p_item_ids: string[] }
+        Returns: {
+          blocking_refs: string[]
+          current_stock: number
+          eligible: boolean
+          id: string
+          item_code: string
+        }[]
+      }
       consume_mfa_recovery_code: { Args: { p_code: string }; Returns: boolean }
       consume_partial_piece: {
         Args: {
