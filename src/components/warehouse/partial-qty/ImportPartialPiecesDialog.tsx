@@ -103,7 +103,7 @@ export function ImportPartialPiecesDialog({ open, onOpenChange }: Props) {
                 </div>
               )}
               {result && (
-                <div className="mt-2 text-success">Inserted {result.inserted} pieces.</div>
+                <div className="mt-2 text-primary">Inserted {result.inserted} pieces.</div>
               )}
             </div>
           )}
