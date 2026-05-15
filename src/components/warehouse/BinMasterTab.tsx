@@ -95,6 +95,15 @@ export function BinMasterTab() {
         <Table>
           <TableHeader>
             <TableRow>
+              {isAdminOrHigher && (
+                <TableHead className="w-[40px]">
+                  <Checkbox
+                    checked={allFilteredSelected}
+                    onCheckedChange={(v) => toggleAll(!!v)}
+                    aria-label="Select all bins"
+                  />
+                </TableHead>
+              )}
               <TableHead>Bin Code</TableHead>
               <TableHead>Name</TableHead>
               <TableHead>Capacity</TableHead>
@@ -106,19 +115,28 @@ export function BinMasterTab() {
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center py-8">
+                <TableCell colSpan={isAdminOrHigher ? 7 : 6} className="text-center py-8">
                   Loading bins...
                 </TableCell>
               </TableRow>
             ) : filteredBins.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={isAdminOrHigher ? 7 : 6} className="text-center py-8 text-muted-foreground">
                   No bins found. Create your first bin to get started.
                 </TableCell>
               </TableRow>
             ) : (
               filteredBins.map((bin) => (
-                <TableRow key={bin.id}>
+                <TableRow key={bin.id} data-state={selectedIds.includes(bin.id) ? 'selected' : undefined}>
+                  {isAdminOrHigher && (
+                    <TableCell>
+                      <Checkbox
+                        checked={selectedIds.includes(bin.id)}
+                        onCheckedChange={(v) => toggleOne(bin.id, !!v)}
+                        aria-label={`Select ${bin.bin_code}`}
+                      />
+                    </TableCell>
+                  )}
                   <TableCell className="font-medium">
                     <div className="flex items-center gap-2">
                       <span>{bin.bin_code}</span>
