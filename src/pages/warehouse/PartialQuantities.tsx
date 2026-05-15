@@ -31,7 +31,7 @@ const VIEW_KEY = "partial-pieces-view-mode";
 
 type ViewMode = "grouped" | "flat";
 
-interface GroupRow {
+interface GroupRow extends Record<string, unknown> {
   rowType: "group";
   id: string;
   parent_item_id: string;
