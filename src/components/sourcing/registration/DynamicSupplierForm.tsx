@@ -439,7 +439,7 @@ function FileUploadField({
   );
 }
 
-function FieldRenderer({ field, form, companySlug, preview }: { field: SupplierField; form: UseFormReturn<any>; companySlug?: string; preview?: boolean }) {
+function FieldRenderer({ field, form, companySlug, preview, onActiveChange }: { field: SupplierField; form: UseFormReturn<any>; companySlug?: string; preview?: boolean; onActiveChange?: (fieldKey: string, active: boolean) => void }) {
   return (
     <FormField
       control={form.control}
@@ -482,6 +482,7 @@ function FieldRenderer({ field, form, companySlug, preview }: { field: SupplierF
                 onChange={rhf.onChange}
                 companySlug={companySlug}
                 preview={preview}
+                onActiveChange={onActiveChange}
               />
             ) : (
               <Input
