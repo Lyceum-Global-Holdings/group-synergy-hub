@@ -26,6 +26,7 @@ import { Lock, Plus, Trash2, Copy, ClipboardPaste } from "lucide-react";
 interface Props {
   open: boolean;
   onOpenChange: (v: boolean) => void;
+  defaultParentItemId?: string;
 }
 
 const MAX_BULK_ROWS = 200;
@@ -41,7 +42,7 @@ function emptyRow(): BulkRowState {
   return { key: crypto.randomUUID(), size_value: "", piece_code: "", label_suffix: "" };
 }
 
-export function AddPartialPieceDialog({ open, onOpenChange }: Props) {
+export function AddPartialPieceDialog({ open, onOpenChange, defaultParentItemId }: Props) {
   const { selectedCompany } = useCompany();
   const { globalLocationId } = useLocationFilter();
   const { toast } = useToast();
@@ -98,6 +99,11 @@ export function AddPartialPieceDialog({ open, onOpenChange }: Props) {
       setBinId("");
     }
   }, [open, globalLocationId]);
+
+  // Pre-select parent item when invoked from a grouped parent row.
+  useEffect(() => {
+    if (open && defaultParentItemId) setParentItemId(defaultParentItemId);
+  }, [open, defaultParentItemId]);
 
   const lockedLocation = !!globalLocationId;
   const lockedLocationName = useMemo(() => {

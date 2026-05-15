@@ -1,26 +1,50 @@
 ## Goal
-Replace the free-text "UOM" input in the partial-pieces dialogs with a dropdown sourced from the same `item_units` master used by Item Master and Bin Master, so operators pick a standard unit instead of typing it.
+On the Partial Pieces page, group rows that share the same parent item code into a single collapsible parent row showing aggregated totals, while keeping each individual piece accessible (expand to see, and all per-piece actions still work). This matches GS1 / WMS practice where a logistic unit (item / SKU) is the natural roll-up for its sub-units (offcut pieces).
+
+## Why this approach (international standards)
+- **GS1 hierarchy** — Each partial piece is a sub-unit of a parent trade item (GTIN / item code). Aggregating sub-units under their parent trade item is the standard "aggregation event" view in EPCIS / GS1 logistics.
+- **WMS convention (SAP EWM, Oracle WMS, Manhattan)** — "Handling unit" or "remnant" lists show one row per material with totals (count + summed quantity per UoM), and drill down to individual pieces / serial numbers. We mirror that.
+- **No data merging** — Pieces stay physically distinct rows in `partial_pieces` (each remnant has its own piece_code, location, bin, batch, cost, age). Combining only happens in the UI as a presentational roll-up. This preserves traceability, FIFO, and audit trail — required by ISO 9001 / GS1 EPCIS. We do **not** physically merge pieces (that would destroy lot/serial traceability, which is the whole point of remnant tracking).
 
 ## Scope
-Frontend only. No DB / RLS / RPC changes. `partial_pieces.size_uom` continues to store the abbreviation string (e.g. `m`, `kg`), keeping all existing data and the bulk RPC payload compatible.
+Frontend only. No DB / RPC / RLS changes. `usePartialPieces` keeps returning flat rows; grouping happens in `PartialQuantities.tsx`.
 
 ## Changes
 
-**1. `src/components/warehouse/partial-qty/AddPartialPieceDialog.tsx`**
-- Import `useItemUnits` and shadcn `Select`.
-- Replace the UOM `<Input>` (line ~294) with a `<Select>` whose options are `units.map(u => u.abbreviation)` (label `"{name} ({abbreviation})"`), value bound to `sizeUom`.
-- Auto-default behaviour preserved: when a parent item is picked, prefill `sizeUom` from `item.secondary_uom || item.base_uom` if that abbreviation exists in `units`; otherwise leave blank so the user must select.
-- Applies to both **Single piece** and **Multiple rows** modes (UOM is in the shared header, so one change covers both).
+### 1. `src/pages/warehouse/PartialQuantities.tsx`
+- Add a **view toggle** in the toolbar: `Grouped by item` (default) ↔ `Flat list`. Persist choice in `localStorage` (`partial-pieces-view-mode`).
+- Build groups in a `useMemo` keyed by `parent_item_id`:
+  - `parent_item_code`, `parent_item_name`, `base_uom`
+  - `piece_count`
+  - `totals_by_uom`: `Record<uom, number>` — sum of `size_value` per `size_uom` (different UoMs are kept separate; never silently summed across incompatible units — ISO 80000 / GS1 rule)
+  - `available_count`, `reserved_count`, `consumed_count`, `scrapped_count`
+  - `locations`: distinct count of `location_id`
+  - `oldest_age_days`: max age (FIFO indicator)
+  - `pieces`: the original `PartialPieceRow[]`
+- Render with the existing `VirtualTable` in two modes:
+  - **Grouped mode**: render parent rows. Each parent row uses a chevron button to toggle expansion; expanded rows render the original child columns (Piece Code, Size, Location/Bin, Status, Source, Age, Actions) inline beneath. Track expanded set in component state (`Set<string>` of parent_item_id), with "Expand all / Collapse all" buttons.
+  - **Flat mode**: current behaviour, unchanged.
+- Parent-row columns:
+  1. Chevron + Parent Item (code mono + name)
+  2. Pieces (count, with status mini-breakdown e.g. "12 (10 avail · 2 res)")
+  3. Total quantity — rendered as `"125.40 m, 3.00 kg"` when multiple UoMs are present (each on its own line); single-UoM items show one value
+  4. Locations (distinct count)
+  5. Oldest age (days) — FIFO hint
+  6. Actions on parent: `Add piece` (opens `AddPartialPieceDialog` pre-filled with this parent item)
+- Search and the existing status / parent-item / location filters apply **before** grouping, so a filtered result regroups naturally.
+- Export CSV stays per-piece (auditable raw data). Add a second export option `Export summary` only in grouped mode — one row per parent item with totals per UoM serialized as `"125.40 m; 3.00 kg"`.
 
-**2. `src/components/warehouse/partial-qty/EditPartialPieceDialog.tsx`**
-- Same replacement (line ~108–109). If the existing piece's `size_uom` isn't in the master list, render it as a disabled "legacy" option so the value stays visible and editable without data loss.
+### 2. `AddPartialPieceDialog.tsx` — minor
+Accept an optional `defaultParentItemId` prop so the parent-row "Add piece" action can pre-select the item. No behaviour change when prop is omitted.
 
 ## Out of scope
-- `ConsumePartialPieceDialog`, `SplitPartialPieceDialog` — they display UOM read-only, no input to convert.
-- Bulk import template / CSV — already accepts free text; leaving as-is to avoid breaking existing templates.
-- No schema changes to `partial_pieces` or the `create_partial_pieces_bulk` RPC.
+- DB-level merging of pieces (would destroy lot / serial traceability — explicitly avoided).
+- Cross-UoM unit conversion (e.g. mm → m). Standard practice is to display each UoM separately; conversion belongs in a dedicated UoM-conversion service, not in a list view.
+- Changes to Add / Edit / Consume / Split / Import dialogs beyond the one optional prop above.
 
 ## Validation
-- Add dialog: pick an item with `base_uom = "m"` → UOM auto-selects `m`; user can change via dropdown; submit succeeds.
-- Multiple-rows mode: UOM dropdown in shared header drives all rows.
-- Edit dialog on a legacy piece with non-master UOM (e.g. `m²`): value remains selected and saveable.
+- Three pieces of `WIRE-001` (2.5 m, 3.0 m, 1.2 m) → one parent row "WIRE-001 · 3 pieces · 6.70 m". Expand → see each piece with its own code, bin, age, actions.
+- Mixed-UoM item (2 pieces in `m`, 1 piece in `kg`) → parent total renders both lines: `"5.00 m"` and `"3.00 kg"`. No silent summing.
+- Filter status = `available` → groups recompute from the filtered set; counts reflect only available pieces.
+- Toggle to Flat mode → original table renders identically to today.
+- Per-piece Edit / Consume / Split actions inside an expanded group still open the same dialogs and refresh the list.
