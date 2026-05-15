@@ -9,6 +9,7 @@ import { useUpdatePartialPiece, useDeletePartialPiece } from "@/hooks/warehouse/
 import { useWarehouseLocations } from "@/hooks/useWarehouseLocations";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
+import { useBinsForLocation } from "@/hooks/warehouse/useBinsForLocation";
 import type { PartialPieceRow } from "@/types/partialPiece";
 import { useToast } from "@/hooks/use-toast";
 
