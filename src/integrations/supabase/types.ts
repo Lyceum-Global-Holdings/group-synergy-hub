@@ -19267,6 +19267,7 @@ export type Database = {
           current_quantity: number | null
           description: string | null
           id: string
+          is_global_template: boolean
           location_id: string | null
           name: string
           notes: string | null
@@ -19283,6 +19284,7 @@ export type Database = {
           current_quantity?: number | null
           description?: string | null
           id?: string
+          is_global_template?: boolean
           location_id?: string | null
           name: string
           notes?: string | null
@@ -19299,6 +19301,7 @@ export type Database = {
           current_quantity?: number | null
           description?: string | null
           id?: string
+          is_global_template?: boolean
           location_id?: string | null
           name?: string
           notes?: string | null

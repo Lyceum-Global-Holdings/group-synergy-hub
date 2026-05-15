@@ -1,0 +1,1 @@
+ALTER TABLE public.warehouse_bins ADD COLUMN IF NOT EXISTS is_global_template boolean NOT NULL DEFAULT false;
