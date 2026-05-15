@@ -28,6 +28,7 @@ import { toast } from 'sonner';
 import { QuickCreateSupplierDialog } from './QuickCreateSupplierDialog';
 import { useWarehouseItemCatalog } from '@/hooks/useWarehouseItemCatalog';
 import { useNextWarehouseItemCode } from '@/hooks/warehouse/useNextWarehouseItemCode';
+import { buildLocationOptions, locationTypeLabel } from '@/lib/warehouse/locationHierarchy';
 
 interface SingleItemFormProps {
   editingItem?: WarehouseItem | CatalogItem | null;
@@ -80,7 +81,7 @@ export function SingleItemForm({ editingItem, onSuccess, onCancel, mode = 'inven
   const { bins } = useWarehouseBins();
   const { createAllocation } = useWarehouseBinAllocations();
 
-  const warehouseLocations = locations.filter(loc => loc.type === 'location');
+  const locationOptions = useMemo(() => buildLocationOptions(locations), [locations]);
   const categoryOptions = useMemo(() => {
     const level0 = categories.filter(c => !c.parent_id);
     const result: Array<{ category: typeof categories[number]; depth: 0 | 1 }> = [];
@@ -508,9 +509,13 @@ export function SingleItemForm({ editingItem, onSuccess, onCancel, mode = 'inven
             </SelectTrigger>
             <SelectContent className="bg-background border z-50">
               <SelectItem value="none">No Warehouse</SelectItem>
-              {warehouseLocations.map((location) => (
+              {locationOptions.map(({ location, depth, breadcrumb }) => (
                 <SelectItem key={location.id} value={location.id}>
-                  {location.name} {location.location_code ? `(${location.location_code})` : ''}
+                  <span style={{ paddingLeft: `${depth * 12}px` }}>
+                    {depth > 0 ? '└ ' : ''}
+                    {breadcrumb}
+                    <span className="ml-2 text-xs text-muted-foreground">[{locationTypeLabel(location.type)}]</span>
+                  </span>
                 </SelectItem>
               ))}
             </SelectContent>

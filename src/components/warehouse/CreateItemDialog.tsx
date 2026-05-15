@@ -28,6 +28,7 @@ import { useWarehouseLocations } from '@/hooks/useWarehouseLocations';
 import { useWarehouseBins } from '@/hooks/useWarehouseBins';
 import { useWarehouseBinAllocations } from '@/hooks/useWarehouseBinAllocations';
 import { useCompany } from '@/contexts/CompanyContext';
+import { buildLocationOptions, locationTypeLabel } from '@/lib/warehouse/locationHierarchy';
 import { WarehouseItem } from '@/types/itemBin';
 import { supabase } from '@/integrations/supabase/client';
 import { Upload, X, Plus } from 'lucide-react';
@@ -87,8 +88,9 @@ export function CreateItemDialog({ open, onOpenChange, editingItem }: CreateItem
   const { bins } = useWarehouseBins();
   const { createAllocation } = useWarehouseBinAllocations();
 
-  // Filter locations to only show warehouses (type='location')
-  const warehouseLocations = locations.filter(loc => loc.type === 'location');
+  // Hierarchical option list (location → sublocation → department) so users
+  // can target the exact storage level they intend.
+  const locationOptions = useMemo(() => buildLocationOptions(locations), [locations]);
   const topLevelCategories = useMemo(() => categories.filter(c => !c.parent_id), [categories]);
 
   const selectedCategory = useMemo(() => 
@@ -493,9 +495,13 @@ export function CreateItemDialog({ open, onOpenChange, editingItem }: CreateItem
                 </SelectTrigger>
                 <SelectContent className="bg-background border z-50">
                   <SelectItem value="none">No Warehouse</SelectItem>
-                  {warehouseLocations.map((location) => (
+                  {locationOptions.map(({ location, depth, breadcrumb }) => (
                     <SelectItem key={location.id} value={location.id}>
-                      {location.name} {location.location_code ? `(${location.location_code})` : ''}
+                      <span style={{ paddingLeft: `${depth * 12}px` }}>
+                        {depth > 0 ? '└ ' : ''}
+                        {breadcrumb}
+                        <span className="ml-2 text-xs text-muted-foreground">[{locationTypeLabel(location.type)}]</span>
+                      </span>
                     </SelectItem>
                   ))}
                 </SelectContent>
