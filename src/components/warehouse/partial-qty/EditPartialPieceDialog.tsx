@@ -25,6 +25,7 @@ export function EditPartialPieceDialog({ open, onOpenChange, piece }: Props) {
   const update = useUpdatePartialPiece();
   const del = useDeletePartialPiece();
   const { locations } = useWarehouseLocations();
+  const { units } = useItemUnits();
 
   const [sizeValue, setSizeValue] = useState("");
   const [sizeUom, setSizeUom] = useState("");
