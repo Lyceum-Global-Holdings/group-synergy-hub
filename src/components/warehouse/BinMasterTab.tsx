@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Plus, Search, Edit, Trash2 } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Plus, Search, Edit, Trash2, Layers } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -15,6 +16,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle } from 'lucide-react';
 import { useWarehouseBins } from '@/hooks/useWarehouseBins';
 import { CreateBinDialog } from '@/components/warehouse/CreateBinDialog';
+import { BulkBinScopeDialog } from '@/components/warehouse/BulkBinScopeDialog';
 import { WarehouseBin } from '@/types/itemBin';
 import { useIsAdminOrHigher } from '@/hooks/useIsAdminOrHigher';
 
@@ -22,14 +24,27 @@ export function BinMasterTab() {
   const [searchTerm, setSearchTerm] = useState('');
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [editingBin, setEditingBin] = useState<WarehouseBin | null>(null);
-  
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [isBulkScopeOpen, setIsBulkScopeOpen] = useState(false);
+
   const { bins, isLoading, deleteBin, isDeleting } = useWarehouseBins();
   const { canDelete } = useIsAdminOrHigher();
+  const isAdminOrHigher = canDelete;
 
   const filteredBins = bins.filter(bin =>
     bin.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     bin.bin_code.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  const allFilteredSelected = filteredBins.length > 0 && filteredBins.every((b) => selectedIds.includes(b.id));
+  const toggleAll = (checked: boolean) => {
+    if (checked) setSelectedIds(Array.from(new Set([...selectedIds, ...filteredBins.map((b) => b.id)])));
+    else setSelectedIds(selectedIds.filter((id) => !filteredBins.some((b) => b.id === id)));
+  };
+  const toggleOne = (id: string, checked: boolean) => {
+    setSelectedIds((prev) => (checked ? [...prev, id] : prev.filter((x) => x !== id)));
+  };
+  const selectedBins = bins.filter((b) => selectedIds.includes(b.id));
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -55,10 +70,18 @@ export function BinMasterTab() {
             />
           </div>
         </div>
-        <Button onClick={() => setIsCreateDialogOpen(true)}>
-          <Plus className="mr-2 h-4 w-4" />
-          Add Bin
-        </Button>
+        <div className="flex items-center gap-2">
+          {isAdminOrHigher && selectedBins.length > 0 && (
+            <Button variant="outline" onClick={() => setIsBulkScopeOpen(true)}>
+              <Layers className="mr-2 h-4 w-4" />
+              Change scope ({selectedBins.length})
+            </Button>
+          )}
+          <Button onClick={() => setIsCreateDialogOpen(true)}>
+            <Plus className="mr-2 h-4 w-4" />
+            Add Bin
+          </Button>
+        </div>
       </div>
 
       <Alert>
@@ -72,6 +95,15 @@ export function BinMasterTab() {
         <Table>
           <TableHeader>
             <TableRow>
+              {isAdminOrHigher && (
+                <TableHead className="w-[40px]">
+                  <Checkbox
+                    checked={allFilteredSelected}
+                    onCheckedChange={(v) => toggleAll(!!v)}
+                    aria-label="Select all bins"
+                  />
+                </TableHead>
+              )}
               <TableHead>Bin Code</TableHead>
               <TableHead>Name</TableHead>
               <TableHead>Capacity</TableHead>
@@ -83,19 +115,28 @@ export function BinMasterTab() {
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center py-8">
+                <TableCell colSpan={isAdminOrHigher ? 7 : 6} className="text-center py-8">
                   Loading bins...
                 </TableCell>
               </TableRow>
             ) : filteredBins.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={isAdminOrHigher ? 7 : 6} className="text-center py-8 text-muted-foreground">
                   No bins found. Create your first bin to get started.
                 </TableCell>
               </TableRow>
             ) : (
               filteredBins.map((bin) => (
-                <TableRow key={bin.id}>
+                <TableRow key={bin.id} data-state={selectedIds.includes(bin.id) ? 'selected' : undefined}>
+                  {isAdminOrHigher && (
+                    <TableCell>
+                      <Checkbox
+                        checked={selectedIds.includes(bin.id)}
+                        onCheckedChange={(v) => toggleOne(bin.id, !!v)}
+                        aria-label={`Select ${bin.bin_code}`}
+                      />
+                    </TableCell>
+                  )}
                   <TableCell className="font-medium">
                     <div className="flex items-center gap-2">
                       <span>{bin.bin_code}</span>
@@ -147,6 +188,12 @@ export function BinMasterTab() {
           if (!open) setEditingBin(null);
         }}
         editingBin={editingBin}
+      />
+
+      <BulkBinScopeDialog
+        open={isBulkScopeOpen}
+        onOpenChange={setIsBulkScopeOpen}
+        bins={selectedBins}
       />
     </div>
   );

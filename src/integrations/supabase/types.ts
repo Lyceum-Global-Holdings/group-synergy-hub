@@ -20707,6 +20707,16 @@ export type Database = {
         Args: { _role_name?: string; _user_id: string }
         Returns: undefined
       }
+      bulk_clone_bin_scope: {
+        Args: {
+          _bin_ids: string[]
+          _company_ids: string[]
+          _global?: boolean
+          _location_ids: string[]
+          _mode?: string
+        }
+        Returns: Json
+      }
       calculate_aging_buckets: {
         Args: {
           p_as_of_date: string
