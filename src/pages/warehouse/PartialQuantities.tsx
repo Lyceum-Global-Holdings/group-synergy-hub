@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { VirtualTable, type DataTableColumn } from "@/components/shared/VirtualTable";
-import { Download, Pencil, PackageMinus, Scissors, Search, Upload, Plus } from "lucide-react";
+import { Download, Pencil, PackageMinus, Scissors, Search, Upload, Plus, X } from "lucide-react";
 import { usePartialPieces, usePartialPieceItems } from "@/hooks/warehouse/usePartialPieces";
 import { PIECE_STATUS_OPTIONS, type PartialPieceRow, type PartialPieceStatus } from "@/types/partialPiece";
 import { AddPartialPieceDialog } from "@/components/warehouse/partial-qty/AddPartialPieceDialog";
@@ -13,6 +13,8 @@ import { EditPartialPieceDialog } from "@/components/warehouse/partial-qty/EditP
 import { ConsumePartialPieceDialog } from "@/components/warehouse/partial-qty/ConsumePartialPieceDialog";
 import { SplitPartialPieceDialog } from "@/components/warehouse/partial-qty/SplitPartialPieceDialog";
 import { ImportPartialPiecesDialog } from "@/components/warehouse/partial-qty/ImportPartialPiecesDialog";
+import { useLocationFilter } from "@/contexts/LocationFilterContext";
+import { useWarehouseLocations } from "@/hooks/useWarehouseLocations";
 
 const STATUS_VARIANT: Record<PartialPieceStatus, "default" | "secondary" | "outline" | "destructive"> = {
   available: "default",
