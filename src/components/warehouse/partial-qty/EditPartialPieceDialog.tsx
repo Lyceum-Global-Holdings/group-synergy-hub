@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useUpdatePartialPiece, useDeletePartialPiece } from "@/hooks/warehouse/usePartialPieces";
 import { useWarehouseLocations } from "@/hooks/useWarehouseLocations";
+import { useItemUnits } from "@/hooks/useItemUnits";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 import { useBinsForLocation } from "@/hooks/warehouse/useBinsForLocation";
