@@ -28,7 +28,7 @@ interface DeleteItemConfirmationDialogProps {
   isLoading: boolean;
 }
 
-const MIN_INACTIVE_DAYS = 30;
+
 
 export function DeleteItemConfirmationDialog({
   open,
