@@ -21306,6 +21306,17 @@ export type Database = {
       is_super_admin: { Args: { _user_id: string }; Returns: boolean }
       is_supplier_member: { Args: { _supplier_id: string }; Returns: boolean }
       is_supplier_owner: { Args: { _supplier_id: string }; Returns: boolean }
+      issue_partial_quantity: {
+        Args: {
+          p_allocation_id: string
+          p_notes?: string
+          p_quantity: number
+          p_reason_code?: string
+          p_reference?: string
+          p_secondary_quantity?: number
+        }
+        Returns: Json
+      }
       issue_tool_from_bin: {
         Args: {
           p_bin_id: string
@@ -21325,6 +21336,37 @@ export type Database = {
       journal_entry_has_sensitive_accounts: {
         Args: { je_id: string }
         Returns: boolean
+      }
+      list_partial_quantities: {
+        Args: {
+          p_company_id: string
+          p_limit?: number
+          p_location_id?: string
+          p_offset?: number
+          p_search?: string
+        }
+        Returns: {
+          allocated_quantity: number
+          allocation_id: string
+          available_quantity: number
+          base_uom: string
+          bin_code: string
+          bin_id: string
+          fifo_rank: number
+          is_batch_tracked: boolean
+          item_code: string
+          item_id: string
+          item_name: string
+          location_id: string
+          location_name: string
+          reserved_quantity: number
+          secondary_quantity: number
+          secondary_uom: string
+          total_value: number
+          track_secondary_quantity: boolean
+          unit_cost: number
+          updated_at: string
+        }[]
       }
       list_warehouse_inventory: {
         Args: {
