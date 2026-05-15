@@ -1,66 +1,39 @@
-# Fix: Item Master shows all items regardless of stock
+## Problem
 
-## Why items appear "missing"
+When a user tries to add an item to a sub-location (e.g. `LNNB → 9th Floor`, or `LNQ → LNQ-2F`), the item ends up attached to the parent location instead.
 
-Confirmed for the example `INV-ELC-000-0878`:
+**Root cause:** The "Warehouse Location" dropdown in the Add/Edit Item flows hard-filters `locations` to only rows where `type === 'location'`. Sub-locations (`type='sublocation'`) and departments (`type='department'`) are excluded from the picker entirely, so the only selectable target is the parent location.
 
-| Source | Present? | Stock | Status |
-|---|---|---|---|
-| `warehouse_items` (the master) | Yes | 0 | inactive |
-| `warehouse_item_catalog` (global catalog) | Yes | — | — |
+Verified in DB: 10 `location` rows, 30 `sublocation` rows, 29 `department` rows — none of the latter two appear in the picker today.
 
-The item was **never deleted**. It is hidden by a hard filter in the Inventory tab's data hook:
+## Fix (UI only — no schema/business-logic changes)
 
-```ts
-// src/hooks/useWarehouseItemsLazyInventory.ts (line ~134)
-let query = supabase
-  .from('warehouse_items')
-  .select(`*, supplier:suppliers(id, name)`)
-  .gt('current_stock', 0);   // ← silently excludes every zero-stock item
-```
+Replace the "main locations only" filter with a hierarchical, indented option list that includes sub-locations and departments, so the chosen `location_id` is exactly what the user picked. International WMS standards (SAP EWM storage-types, GS1 sub-GLNs) treat sub-locations as first-class storage targets — this matches that model.
 
-When a global location is also selected, the alternate RPC `get_company_inventory_at_location` is used, which only returns items physically present at that location — same symptom.
+### Files to update
 
-This violates the SAP MM standard separation:
+1. **`src/components/warehouse/SingleItemForm.tsx`** (line 83 + dropdown at lines 499–517)
+   - Build `locationOptions` as a flat tree: parent (`location`) → child (`sublocation`) → grandchild (`department`), sorted by parent then name.
+   - Render each option with a depth-based indent + a small badge (`Location` / `Sub-location` / `Department`) so the selection target is unambiguous.
+   - Bin filter (`filteredBins`) already keys off `bin.location_id` — keep as-is so bins shown match the exact level chosen.
 
-- **Material Master display (MM03 / Item Master)** must list **every** item record regardless of stock or location.
-- **Stock Overview (MMBE)** is the screen that filters by on-hand quantity / location.
+2. **`src/components/warehouse/BulkItemImportContent.tsx`** (line 160) and **`src/components/warehouse/BulkItemImportDialog.tsx`** (line 194)
+   - Same change for the CSV "Default Location" picker so bulk imports can target sub-locations.
 
-The page `/warehouse/inventory` exposes the **Item Master** tab — it should behave like MM03, not like MMBE.
+3. **`src/lib/bulkImport/lookups.ts`** (line 44)
+   - Allow the location lookup used by CSV resolver to match `sublocation` and `department` rows by code/name (not just `type='location'`). Keeps backward compat for legacy CSVs that name a parent.
 
-## Plan
+4. **`src/components/warehouse/CreateItemDialog.tsx`** (line 91)
+   - Same hierarchical dropdown change as `SingleItemForm` for consistency.
 
-### 1. Lift the implicit stock filter — `useWarehouseItemsLazyInventory.ts`
+### Out of scope (intentionally untouched)
 
-- Remove the unconditional `.gt('current_stock', 0)` clause from the standard paginated path.
-- Keep the existing optional filters (`status`, `category_id`, `supplier_id`, `search`) intact.
-- The location-scoped RPC path is left for the explicit "view stock at this location" use case (when the user sets a global location). Document this branch in a code comment so it isn't mistaken for a bug.
+- `WarehouseAssetReportDialog`, `AssetAnalytics`, `CapacityPlanningTab`, `StockAdjustmentDialog`, `LabourAllocationDialog`, construction DSR, `LocationManagementDialog`, `LocationHierarchyTab` — these legitimately operate at the parent-location level (reporting rollups, capacity planning, hierarchy admin) and do not match the user complaint.
+- DB schema, RLS, and bin-allocation logic — sub-locations are already first-class in `warehouse_locations` and bins inherit through `list_bins_for_location_inherited`. No migration needed.
 
-### 2. Add an explicit Stock filter — `ItemMasterTab.tsx`
+## Verification
 
-Add a new toolbar `Select` next to the existing Status filter, default **"All stock"**:
-
-| Option | Behavior |
-|---|---|
-| All stock *(default)* | No client filter — full master list |
-| In stock (> 0) | `current_stock > 0` |
-| Zero stock | `current_stock = 0` |
-| Low stock (≤ reorder level) | `current_stock <= reorder_level` |
-
-Filter is applied client-side over the loaded page (consistent with the existing `supplierId` / `status` filtering pattern). This gives operators the SAP-style choice while preserving the master view as default.
-
-### 3. Backend RPC parity — `list_warehouse_inventory`
-
-- Add an optional `_stock_mode text` parameter (`null | 'in_stock' | 'zero' | 'low'`) so the future server-paginated path can apply the same filter at SQL level. No behavior change when the parameter is omitted.
-
-### 4. Out of scope
-
-- Permanent purge / delete logic (already shipped in the previous turn — verified `INV-ELC-000-0878` row still exists, no deletion regression).
-- The `get_company_inventory_at_location` RPC keeps its location-scoped semantic; the user simply must clear the global location to see the full master.
-- The unrelated React DevTools "Maximum call stack size exceeded" warning.
-
-## Files
-
-- `src/hooks/useWarehouseItemsLazyInventory.ts` — drop `.gt('current_stock', 0)`; add `stockMode` parameter.
-- `src/components/warehouse/ItemMasterTab.tsx` — wire new Stock filter Select; pass `stockMode` to the hook.
-- New migration — add optional `_stock_mode` parameter to `list_warehouse_inventory` (no-op when null).
+After implementation:
+1. Open Inventory → Add Item, expand the Warehouse Location dropdown — should show parents, indented sub-locations, and departments with type badges.
+2. Pick `LNNB → 9th Floor`, save, then verify in DB that `warehouse_items.location_id` equals the 9th-Floor UUID (`cc8a3954-…`), not the LNNB UUID.
+3. Confirm the Bin dropdown filters down to bins owned by 9th Floor (plus any inherited from LNNB via the existing `useBinsForLocation` RPC).
