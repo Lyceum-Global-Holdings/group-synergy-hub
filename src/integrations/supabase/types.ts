@@ -21178,6 +21178,12 @@ export type Database = {
           inheritance_source_name: string
         }[]
       }
+      get_location_with_ancestors: {
+        Args: { p_location_id: string }
+        Returns: {
+          location_id: string
+        }[]
+      }
       get_pending_sap_sync_items: {
         Args: { _company_id: string; _limit?: number; _table_name: string }
         Returns: Json[]
@@ -21467,6 +21473,23 @@ export type Database = {
       journal_entry_has_sensitive_accounts: {
         Args: { je_id: string }
         Returns: boolean
+      }
+      list_bins_for_location_inherited: {
+        Args: { p_location_id: string }
+        Returns: {
+          bin_code: string
+          bin_type_id: string
+          capacity: number
+          company_id: string
+          current_quantity: number
+          id: string
+          inherited_from_location_id: string
+          inherited_from_location_name: string
+          is_global_template: boolean
+          location_id: string
+          name: string
+          status: string
+        }[]
       }
       list_partial_piece_items: {
         Args: { p_company_id: string; p_location_id?: string }
