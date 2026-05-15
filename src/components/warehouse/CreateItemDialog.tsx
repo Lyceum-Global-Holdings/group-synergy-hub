@@ -495,9 +495,13 @@ export function CreateItemDialog({ open, onOpenChange, editingItem }: CreateItem
                 </SelectTrigger>
                 <SelectContent className="bg-background border z-50">
                   <SelectItem value="none">No Warehouse</SelectItem>
-                  {warehouseLocations.map((location) => (
+                  {locationOptions.map(({ location, depth, breadcrumb }) => (
                     <SelectItem key={location.id} value={location.id}>
-                      {location.name} {location.location_code ? `(${location.location_code})` : ''}
+                      <span style={{ paddingLeft: `${depth * 12}px` }}>
+                        {depth > 0 ? '└ ' : ''}
+                        {breadcrumb}
+                        <span className="ml-2 text-xs text-muted-foreground">[{locationTypeLabel(location.type)}]</span>
+                      </span>
                     </SelectItem>
                   ))}
                 </SelectContent>
