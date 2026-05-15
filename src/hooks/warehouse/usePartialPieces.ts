@@ -59,6 +59,7 @@ function useInvalidate() {
   const qc = useQueryClient();
   return () => {
     qc.invalidateQueries({ queryKey: [KEY] });
+    qc.invalidateQueries({ queryKey: ["partial-piece-items"] });
     qc.invalidateQueries({ queryKey: ["warehouse-items"] });
     qc.invalidateQueries({ queryKey: ["all-items-location-stock"] });
   };
