@@ -3,184 +3,155 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { VirtualTable, type DataTableColumn } from "@/components/shared/VirtualTable";
-import { Download, PackageMinus, Search, Upload } from "lucide-react";
-import {
-  usePartialQuantities,
-  type PartialQuantityRow,
-} from "@/hooks/warehouse/usePartialQuantities";
-import { IssuePartialQuantityDialog } from "@/components/warehouse/partial-qty/IssuePartialQuantityDialog";
-import { ImportPartialQuantitiesDialog } from "@/components/warehouse/partial-qty/ImportPartialQuantitiesDialog";
+import { Download, Pencil, PackageMinus, Scissors, Search, Upload, Plus } from "lucide-react";
+import { usePartialPieces } from "@/hooks/warehouse/usePartialPieces";
+import { PIECE_STATUS_OPTIONS, type PartialPieceRow, type PartialPieceStatus } from "@/types/partialPiece";
+import { AddPartialPieceDialog } from "@/components/warehouse/partial-qty/AddPartialPieceDialog";
+import { EditPartialPieceDialog } from "@/components/warehouse/partial-qty/EditPartialPieceDialog";
+import { ConsumePartialPieceDialog } from "@/components/warehouse/partial-qty/ConsumePartialPieceDialog";
+import { SplitPartialPieceDialog } from "@/components/warehouse/partial-qty/SplitPartialPieceDialog";
+import { ImportPartialPiecesDialog } from "@/components/warehouse/partial-qty/ImportPartialPiecesDialog";
 
-function toCsv(rows: PartialQuantityRow[]): string {
-  const head = [
-    "item_code", "item_name", "location", "bin", "uom",
-    "allocated_qty", "reserved_qty", "available_qty",
-    "secondary_qty", "secondary_uom", "unit_cost", "total_value", "fifo_rank",
-  ];
-  const body = rows.map((r) => [
-    r.item_code, r.item_name, r.location_name ?? "", r.bin_code, r.base_uom ?? "",
-    r.allocated_quantity, r.reserved_quantity, r.available_quantity,
-    r.secondary_quantity ?? "", r.secondary_uom ?? "",
-    r.unit_cost ?? "", r.total_value ?? "", r.fifo_rank,
-  ]
-    .map((v) => `"${String(v ?? "").replace(/"/g, '""')}"`)
-    .join(","));
+const STATUS_VARIANT: Record<PartialPieceStatus, "default" | "secondary" | "outline" | "destructive"> = {
+  available: "default",
+  reserved: "secondary",
+  consumed: "outline",
+  scrapped: "destructive",
+};
+
+function toCsv(rows: PartialPieceRow[]): string {
+  const head = ["piece_code","parent_item_code","parent_item_name","size_value","size_uom","location","bin","status","source_ref","batch_number","unit_cost","label","age_days","created_at"];
+  const body = rows.map(r => [
+    r.piece_code, r.parent_item_code, r.parent_item_name,
+    r.size_value, r.size_uom, r.location_name, r.bin_code ?? "",
+    r.status, r.source_ref ?? "", r.batch_number ?? "",
+    r.unit_cost ?? "", r.label ?? "", r.age_days, r.created_at,
+  ].map(v => `"${String(v ?? "").replace(/"/g, '""')}"`).join(","));
   return [head.join(","), ...body].join("\n");
 }
 
 export default function PartialQuantities() {
   const [search, setSearch] = useState("");
-  const { data: rows = [], isLoading } = usePartialQuantities(search);
-  const [active, setActive] = useState<PartialQuantityRow | null>(null);
-  const [dialogOpen, setDialogOpen] = useState(false);
+  const [status, setStatus] = useState<string>("available");
+  const { data: rows = [], isLoading } = usePartialPieces({ search, status });
+
+  const [addOpen, setAddOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
+  const [editPiece, setEditPiece] = useState<PartialPieceRow | null>(null);
+  const [consumePiece, setConsumePiece] = useState<PartialPieceRow | null>(null);
+  const [splitPiece, setSplitPiece] = useState<PartialPieceRow | null>(null);
 
-  const columns = useMemo<DataTableColumn<PartialQuantityRow>[]>(
-    () => [
-      {
-        key: "item_code",
-        header: "Item Code",
-        className: "font-mono whitespace-nowrap",
-        render: (r) => (
-          <div className="flex items-center gap-2">
-            <span>{r.item_code}</span>
-            {r.fifo_rank === 1 && (
-              <Badge variant="secondary" className="text-[10px]">FIFO</Badge>
-            )}
-          </div>
-        ),
-      },
-      { key: "item_name", header: "Description", render: (r) => r.item_name },
-      { key: "location", header: "Location", render: (r) => r.location_name ?? "—" },
-      { key: "bin", header: "Bin", className: "font-mono", render: (r) => r.bin_code },
-      {
-        key: "allocated",
-        header: "On Hand",
-        className: "text-right tabular-nums",
-        render: (r) => (
-          <span>
-            {Number(r.allocated_quantity).toLocaleString(undefined, { maximumFractionDigits: 4 })}{" "}
-            <span className="text-muted-foreground">{r.base_uom}</span>
-          </span>
-        ),
-      },
-      {
-        key: "reserved",
-        header: "Reserved",
-        className: "text-right tabular-nums text-muted-foreground",
-        render: (r) => Number(r.reserved_quantity ?? 0).toLocaleString(undefined, { maximumFractionDigits: 4 }),
-      },
-      {
-        key: "available",
-        header: "Available",
-        className: "text-right tabular-nums font-medium",
-        render: (r) => Number(r.available_quantity ?? 0).toLocaleString(undefined, { maximumFractionDigits: 4 }),
-      },
-      {
-        key: "secondary",
-        header: "Secondary",
-        className: "text-right tabular-nums",
-        render: (r) =>
-          r.track_secondary_quantity
-            ? `${Number(r.secondary_quantity ?? 0)} ${r.secondary_uom ?? ""}`
-            : "—",
-      },
-      {
-        key: "value",
-        header: "Value",
-        className: "text-right tabular-nums",
-        render: (r) =>
-          r.total_value != null
-            ? Number(r.total_value).toLocaleString(undefined, { maximumFractionDigits: 2 })
-            : "—",
-      },
-      {
-        key: "action",
-        header: "",
-        className: "text-right",
-        render: (r) => (
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => {
-              setActive(r);
-              setDialogOpen(true);
-            }}
-          >
-            <PackageMinus className="h-4 w-4 mr-1" /> Issue
+  const columns = useMemo<DataTableColumn<PartialPieceRow>[]>(() => [
+    { key: "piece_code", header: "Piece Code", className: "font-mono whitespace-nowrap",
+      render: (r) => r.piece_code },
+    { key: "parent", header: "Parent Item", render: (r) => (
+        <div className="flex flex-col">
+          <span className="font-mono text-xs">{r.parent_item_code}</span>
+          <span className="text-xs text-muted-foreground truncate max-w-[260px]">{r.parent_item_name}</span>
+        </div>
+      ) },
+    { key: "size", header: "Size", className: "text-right tabular-nums whitespace-nowrap",
+      render: (r) => `${Number(r.size_value).toLocaleString(undefined, { maximumFractionDigits: 4 })} ${r.size_uom}` },
+    { key: "location", header: "Location / Bin", render: (r) => (
+        <div className="flex flex-col">
+          <span>{r.location_name}</span>
+          <span className="text-xs text-muted-foreground font-mono">{r.bin_code ?? "—"}</span>
+        </div>
+      ) },
+    { key: "status", header: "Status",
+      render: (r) => <Badge variant={STATUS_VARIANT[r.status]} className="capitalize">{r.status}</Badge> },
+    { key: "source", header: "Source", render: (r) => r.source_ref ?? "—" },
+    { key: "age", header: "Age", className: "text-right tabular-nums",
+      render: (r) => `${r.age_days}d` },
+    { key: "actions", header: "Actions", render: (r) => (
+        <div className="flex gap-1">
+          <Button size="icon" variant="ghost" onClick={() => setEditPiece(r)} title="Edit">
+            <Pencil className="h-4 w-4" />
           </Button>
-        ),
-      },
-    ],
-    [],
-  );
+          <Button size="icon" variant="ghost"
+            disabled={r.status !== "available" && r.status !== "reserved"}
+            onClick={() => setConsumePiece(r)} title="Consume">
+            <PackageMinus className="h-4 w-4" />
+          </Button>
+          <Button size="icon" variant="ghost"
+            disabled={r.status !== "available"}
+            onClick={() => setSplitPiece(r)} title="Split">
+            <Scissors className="h-4 w-4" />
+          </Button>
+        </div>
+      ) },
+  ], []);
 
-  const exportCsv = () => {
-    const blob = new Blob([toCsv(rows)], { type: "text/csv;charset=utf-8;" });
+  function exportCsv() {
+    const csv = toCsv(rows);
+    const blob = new Blob([csv], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
-    a.href = url;
-    a.download = `partial-quantities-${new Date().toISOString().slice(0, 10)}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
+    a.href = url; a.download = `partial-pieces-${new Date().toISOString().slice(0,10)}.csv`;
+    a.click(); URL.revokeObjectURL(url);
+  }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-start justify-between gap-4 flex-wrap">
-        <div>
-          <h1 className="text-3xl font-bold">Partial Quantities</h1>
-          <p className="text-muted-foreground">
-            One row per (item × location × bin) holding. Issue directly from any row.
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={() => setImportOpen(true)}>
-            <Upload className="h-4 w-4 mr-2" /> Import
-          </Button>
-          <Button variant="outline" onClick={exportCsv} disabled={!rows.length}>
-            <Download className="h-4 w-4 mr-2" /> Export CSV
-          </Button>
-        </div>
-      </div>
-      <ImportPartialQuantitiesDialog open={importOpen} onOpenChange={setImportOpen} />
-
+    <div className="space-y-4 p-6">
       <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base">Open holdings</CardTitle>
-          <div className="relative max-w-sm pt-2">
-            <Search className="absolute left-2.5 top-4.5 h-4 w-4 text-muted-foreground" />
-            <Input
-              className="pl-8"
-              placeholder="Search item code, name, or bin…"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
+        <CardHeader>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <CardTitle>Partial Pieces (Remnants)</CardTitle>
+              <p className="text-sm text-muted-foreground mt-1">
+                Track individual offcuts and cut pieces of items (e.g. wire lengths) — independent of inventory bin stock.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline" onClick={exportCsv}>
+                <Download className="mr-2 h-4 w-4" /> Export
+              </Button>
+              <Button variant="outline" onClick={() => setImportOpen(true)}>
+                <Upload className="mr-2 h-4 w-4" /> Import
+              </Button>
+              <Button onClick={() => setAddOpen(true)}>
+                <Plus className="mr-2 h-4 w-4" /> Add piece
+              </Button>
+            </div>
           </div>
         </CardHeader>
         <CardContent>
-          <VirtualTable
-            columns={columns}
+          <div className="flex flex-wrap items-center gap-2 mb-3">
+            <div className="relative flex-1 min-w-[240px] max-w-md">
+              <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input className="pl-8" placeholder="Search piece, item, label, source…"
+                value={search} onChange={(e) => setSearch(e.target.value)} />
+            </div>
+            <Select value={status} onValueChange={setStatus}>
+              <SelectTrigger className="w-[180px]"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {PIECE_STATUS_OPTIONS.map(o => (
+                  <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <span className="text-sm text-muted-foreground ml-auto">
+              {isLoading ? "Loading…" : `${rows.length} pieces`}
+            </span>
+          </div>
+
+          <VirtualTable<PartialPieceRow>
             data={rows}
+            columns={columns}
+            getRowId={(r) => r.id}
             isLoading={isLoading}
-            ariaLabel="Partial quantities"
-            emptyMessage="No open holdings for this scope."
-            estimatedRowHeight={44}
-            maxHeight={680}
-            getRowId={(r) => String(r.allocation_id)}
+            emptyMessage="No partial pieces yet. Use “Add piece” or “Import” to register offcuts."
           />
         </CardContent>
       </Card>
 
-      <IssuePartialQuantityDialog
-        row={active}
-        open={dialogOpen}
-        onOpenChange={(o) => {
-          setDialogOpen(o);
-          if (!o) setActive(null);
-        }}
-      />
+      <AddPartialPieceDialog open={addOpen} onOpenChange={setAddOpen} />
+      <ImportPartialPiecesDialog open={importOpen} onOpenChange={setImportOpen} />
+      <EditPartialPieceDialog open={!!editPiece} piece={editPiece} onOpenChange={(v) => !v && setEditPiece(null)} />
+      <ConsumePartialPieceDialog open={!!consumePiece} piece={consumePiece} onOpenChange={(v) => !v && setConsumePiece(null)} />
+      <SplitPartialPieceDialog open={!!splitPiece} piece={splitPiece} onOpenChange={(v) => !v && setSplitPiece(null)} />
     </div>
   );
 }
