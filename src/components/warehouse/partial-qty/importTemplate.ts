@@ -1,66 +1,36 @@
 import { downloadCSV } from "@/lib/bulkImport/csvParser";
 
-export const PARTIAL_IMPORT_COLUMNS = [
-  "item_code",
+export const PARTIAL_PIECE_COLUMNS = [
+  "piece_code",
+  "parent_item_code",
+  "size_value",
+  "size_uom",
   "location_code",
   "bin_code",
-  "quantity",
-  "secondary_quantity",
+  "source_ref",
   "batch_number",
-  "manufacture_date",
-  "expiry_date",
   "unit_cost",
-  "received_at",
-  "reference",
+  "label",
   "notes",
-  "mode",
 ] as const;
 
-export type PartialImportColumn = (typeof PARTIAL_IMPORT_COLUMNS)[number];
+export type PartialPieceColumn = (typeof PARTIAL_PIECE_COLUMNS)[number];
 
-export const REQUIRED_COLUMNS: PartialImportColumn[] = [
-  "item_code",
+export const REQUIRED_COLUMNS: PartialPieceColumn[] = [
+  "parent_item_code",
+  "size_value",
   "location_code",
-  "bin_code",
-  "quantity",
 ];
 
-export function downloadPartialQtyTemplate() {
+export function downloadPartialPieceTemplate() {
   const sample = [
-    [
-      "ITM-0001",
-      "WH-MAIN",
-      "A-01-01",
-      "10",
-      "",
-      "",
-      "",
-      "",
-      "12.50",
-      new Date().toISOString().slice(0, 10),
-      "GRN-2025-001",
-      "Initial seed",
-      "add",
-    ],
-    [
-      "ITM-0002",
-      "WH-MAIN",
-      "A-02-03",
-      "100",
-      "",
-      "BATCH-A",
-      "2025-01-01",
-      "2027-01-01",
-      "",
-      "",
-      "ASN-9912",
-      "",
-      "add",
-    ],
+    ["", "WIRE-CU-2.5", "2.30", "m", "WH-MAIN", "A-01-01", "GRN-2025-001", "", "1.20", "Reel-A offcut", "Leftover from cut"],
+    ["", "WIRE-CU-2.5", "4.75", "m", "WH-MAIN", "A-01-01", "GRN-2025-001", "", "1.20", "Reel-A offcut", ""],
+    ["PQ-MANUAL-01", "STEEL-PLT-3", "0.85", "m2", "WH-MAIN", "B-02-01", "Job-77", "B-2025-09", "45.00", "Plate offcut", ""],
   ];
   downloadCSV(
-    "partial-quantities-template.csv",
-    PARTIAL_IMPORT_COLUMNS as unknown as string[],
+    "partial-pieces-template.csv",
+    PARTIAL_PIECE_COLUMNS as unknown as string[],
     sample,
   );
 }

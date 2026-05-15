@@ -67,7 +67,7 @@ export const moduleConfig: Record<string, ModuleConfig> = {
       { key: 'asset-management', name: 'Asset Management', description: 'Track and manage assets', url: '/warehouse/asset-management' },
       { key: 'tool-management', name: 'Tool Management', description: 'Issue and return tools', url: '/warehouse/tool-management' },
       { key: 'batch-management', name: 'Batch Management', description: 'Track and manage item batches with FIFO', url: '/warehouse/batch-management' },
-      { key: 'partial-quantities', name: 'Partial Quantities', description: 'Excel-style view of open bin holdings with per-row issue', url: '/warehouse/partial-quantities' }
+      { key: 'partial-quantities', name: 'Partial Pieces', description: 'Track offcuts/cut pieces of items in secondary UOM (wire lengths, plate sizes)', url: '/warehouse/partial-quantities' }
     ]
   },
   sourcing: {
