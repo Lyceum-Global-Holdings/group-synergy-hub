@@ -19822,6 +19822,117 @@ export type Database = {
           },
         ]
       }
+      warehouse_partial_pieces: {
+        Row: {
+          batch_number: string | null
+          bin_id: string | null
+          company_id: string
+          consumed_at: string | null
+          consumed_by: string | null
+          consumed_qty: number | null
+          consumed_reason: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          label: string | null
+          location_id: string
+          notes: string | null
+          parent_item_id: string
+          parent_piece_id: string | null
+          piece_code: string
+          size_uom: string
+          size_value: number
+          source_ref: string | null
+          status: Database["public"]["Enums"]["partial_piece_status"]
+          unit_cost: number | null
+          updated_at: string
+        }
+        Insert: {
+          batch_number?: string | null
+          bin_id?: string | null
+          company_id: string
+          consumed_at?: string | null
+          consumed_by?: string | null
+          consumed_qty?: number | null
+          consumed_reason?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          label?: string | null
+          location_id: string
+          notes?: string | null
+          parent_item_id: string
+          parent_piece_id?: string | null
+          piece_code: string
+          size_uom: string
+          size_value: number
+          source_ref?: string | null
+          status?: Database["public"]["Enums"]["partial_piece_status"]
+          unit_cost?: number | null
+          updated_at?: string
+        }
+        Update: {
+          batch_number?: string | null
+          bin_id?: string | null
+          company_id?: string
+          consumed_at?: string | null
+          consumed_by?: string | null
+          consumed_qty?: number | null
+          consumed_reason?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          label?: string | null
+          location_id?: string
+          notes?: string | null
+          parent_item_id?: string
+          parent_piece_id?: string | null
+          piece_code?: string
+          size_uom?: string
+          size_value?: number
+          source_ref?: string | null
+          status?: Database["public"]["Enums"]["partial_piece_status"]
+          unit_cost?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "warehouse_partial_pieces_bin_id_fkey"
+            columns: ["bin_id"]
+            isOneToOne: false
+            referencedRelation: "warehouse_bins"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "warehouse_partial_pieces_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "warehouse_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "warehouse_partial_pieces_parent_item_id_fkey"
+            columns: ["parent_item_id"]
+            isOneToOne: false
+            referencedRelation: "v_adjustment_summary_by_item"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "warehouse_partial_pieces_parent_item_id_fkey"
+            columns: ["parent_item_id"]
+            isOneToOne: false
+            referencedRelation: "warehouse_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "warehouse_partial_pieces_parent_piece_id_fkey"
+            columns: ["parent_piece_id"]
+            isOneToOne: false
+            referencedRelation: "warehouse_partial_pieces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       warehouse_stock_audit_logs: {
         Row: {
           company_id: string
@@ -20700,6 +20811,17 @@ export type Database = {
         }[]
       }
       consume_mfa_recovery_code: { Args: { p_code: string }; Returns: boolean }
+      consume_partial_piece: {
+        Args: {
+          p_id: string
+          p_notes?: string
+          p_post_to_stock?: boolean
+          p_quantity: number
+          p_reason: string
+          p_reference?: string
+        }
+        Returns: Json
+      }
       create_assets_from_request: {
         Args: { p_request_id: string }
         Returns: {
@@ -20707,6 +20829,7 @@ export type Database = {
           asset_id: string
         }[]
       }
+      create_partial_piece: { Args: { p_payload: Json }; Returns: string }
       create_tool_with_initial_bin: {
         Args: { p_bin_id: string; p_quantity: number; p_tool_data: Json }
         Returns: string
@@ -20722,6 +20845,7 @@ export type Database = {
         Returns: Json
       }
       current_supplier_ids: { Args: never; Returns: string[] }
+      delete_partial_piece: { Args: { p_id: string }; Returns: undefined }
       escalate_pending_approvals: { Args: never; Returns: undefined }
       find_catalog_item_by_code: {
         Args: { p_code: string; p_target_company_id?: string }
@@ -21293,12 +21417,8 @@ export type Database = {
         Returns: boolean
       }
       has_warehouse_access: { Args: { _user_id: string }; Returns: boolean }
-      import_partial_quantities: {
-        Args: {
-          p_allow_create_bin?: boolean
-          p_company_id: string
-          p_rows: Json
-        }
+      import_partial_pieces: {
+        Args: { p_company_id: string; p_rows: Json }
         Returns: Json
       }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
@@ -21314,17 +21434,6 @@ export type Database = {
       is_super_admin: { Args: { _user_id: string }; Returns: boolean }
       is_supplier_member: { Args: { _supplier_id: string }; Returns: boolean }
       is_supplier_owner: { Args: { _supplier_id: string }; Returns: boolean }
-      issue_partial_quantity: {
-        Args: {
-          p_allocation_id: string
-          p_notes?: string
-          p_quantity: number
-          p_reason_code?: string
-          p_reference?: string
-          p_secondary_quantity?: number
-        }
-        Returns: Json
-      }
       issue_tool_from_bin: {
         Args: {
           p_bin_id: string
@@ -21345,33 +21454,36 @@ export type Database = {
         Args: { je_id: string }
         Returns: boolean
       }
-      list_partial_quantities: {
+      list_partial_pieces: {
         Args: {
           p_company_id: string
           p_limit?: number
           p_location_id?: string
           p_offset?: number
+          p_parent_item_id?: string
           p_search?: string
+          p_status?: string
         }
         Returns: {
-          allocated_quantity: number
-          allocation_id: string
-          available_quantity: number
+          age_days: number
           base_uom: string
+          batch_number: string
           bin_code: string
           bin_id: string
-          fifo_rank: number
-          is_batch_tracked: boolean
-          item_code: string
-          item_id: string
-          item_name: string
+          created_at: string
+          id: string
+          label: string
           location_id: string
           location_name: string
-          reserved_quantity: number
-          secondary_quantity: number
-          secondary_uom: string
-          total_value: number
-          track_secondary_quantity: boolean
+          notes: string
+          parent_item_code: string
+          parent_item_id: string
+          parent_item_name: string
+          piece_code: string
+          size_uom: string
+          size_value: number
+          source_ref: string
+          status: string
           unit_cost: number
           updated_at: string
         }[]
@@ -21442,6 +21554,10 @@ export type Database = {
       }
       next_catalog_item_code: {
         Args: { p_category_code: string }
+        Returns: string
+      }
+      next_partial_piece_code: {
+        Args: { p_company_id: string }
         Returns: string
       }
       process_fifo_batch_issue: {
@@ -22304,6 +22420,10 @@ export type Database = {
         }
         Returns: undefined
       }
+      split_partial_piece: {
+        Args: { p_first_size: number; p_id: string; p_second_size: number }
+        Returns: Json
+      }
       srn_number_exists: {
         Args: { _company_id: string; _exclude_id?: string; _srn_number: string }
         Returns: boolean
@@ -22350,6 +22470,10 @@ export type Database = {
           p_user_id: string
         }
         Returns: Json
+      }
+      update_partial_piece: {
+        Args: { p_id: string; p_payload: Json }
+        Returns: undefined
       }
       update_reservation_on_issue: {
         Args: { p_quantity_issued: number; p_reservation_id: string }
@@ -22634,6 +22758,7 @@ export type Database = {
         | "reporting"
         | "renewal_action"
         | "inspection"
+      partial_piece_status: "available" | "reserved" | "consumed" | "scrapped"
       peppol_environment: "sandbox" | "live"
       period_status: "open" | "closed" | "locked"
       permission_level: "view" | "edit" | "admin"
@@ -23142,6 +23267,7 @@ export const Constants = {
         "renewal_action",
         "inspection",
       ],
+      partial_piece_status: ["available", "reserved", "consumed", "scrapped"],
       peppol_environment: ["sandbox", "live"],
       period_status: ["open", "closed", "locked"],
       permission_level: ["view", "edit", "admin"],
