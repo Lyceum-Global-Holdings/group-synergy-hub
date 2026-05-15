@@ -186,6 +186,9 @@ export function useWarehouseItemsLazyInventory({
         const { data, error } = await query;
         if (error) throw error;
         rawItems = (data || []) as any[];
+        if (stockMode === 'low') {
+          rawItems = rawItems.filter((it) => Number(it.current_stock || 0) <= Number(it.reorder_level || 0));
+        }
       }
 
       // Enrich with bin allocation data
