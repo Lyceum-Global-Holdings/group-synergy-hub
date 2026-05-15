@@ -165,12 +165,32 @@ export default function PartialQuantities() {
             </span>
           </div>
 
+          {globalLocationId && (
+            <div className="mb-3 flex items-center gap-2 rounded-md border border-dashed bg-muted/40 px-3 py-2 text-sm">
+              <Badge variant="secondary">Showing</Badge>
+              <span className="text-muted-foreground">Filtered by location:</span>
+              <span className="font-medium">{activeLocationName ?? "Selected location"}</span>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="ml-auto h-7 px-2"
+                onClick={() => setGlobalLocationId(null)}
+              >
+                <X className="mr-1 h-3 w-3" /> Clear filter
+              </Button>
+            </div>
+          )}
+
           <VirtualTable<PartialPieceRow>
             data={rows}
             columns={columns}
             getRowId={(r) => r.id}
             isLoading={isLoading}
-            emptyMessage="No partial pieces yet. Use “Add piece” or “Import” to register offcuts."
+            emptyMessage={
+              globalLocationId
+                ? `No partial pieces at ${activeLocationName ?? "this location"}. Clear the filter to see other locations, or use "Add piece" to register one here.`
+                : "No partial pieces yet. Use “Add piece” or “Import” to register offcuts."
+            }
           />
         </CardContent>
       </Card>
