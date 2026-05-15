@@ -10,6 +10,7 @@ import { useCompany } from "@/contexts/CompanyContext";
 import { useLocationFilter } from "@/contexts/LocationFilterContext";
 import { useWarehouseLocations } from "@/hooks/useWarehouseLocations";
 import { useWarehouseItems } from "@/hooks/useWarehouseItems";
+import { useItemUnits } from "@/hooks/useItemUnits";
 import { ItemSelector } from "@/components/common/ItemSelector";
 import {
   useCreatePartialPiece,
