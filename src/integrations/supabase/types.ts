@@ -21677,6 +21677,18 @@ export type Database = {
             }
             Returns: undefined
           }
+      purge_inactive_inventory_item: {
+        Args: { p_item_id: string; p_reason: string }
+        Returns: Json
+      }
+      purge_inactive_inventory_items_bulk: {
+        Args: { p_item_ids: string[]; p_reason: string }
+        Returns: {
+          id: string
+          message: string
+          status: string
+        }[]
+      }
       recompute_item_primary_location: {
         Args: { p_item_id: string }
         Returns: undefined
