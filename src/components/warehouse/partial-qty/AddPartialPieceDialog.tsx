@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useCompany } from "@/contexts/CompanyContext";
 import { useWarehouseLocations } from "@/hooks/useWarehouseLocations";
 import { useWarehouseItems } from "@/hooks/useWarehouseItems";
+import { ItemSelector } from "@/components/common/ItemSelector";
 import { useCreatePartialPiece } from "@/hooks/warehouse/usePartialPieces";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
@@ -108,14 +109,15 @@ export function AddPartialPieceDialog({ open, onOpenChange }: Props) {
         <div className="grid grid-cols-2 gap-4">
           <div className="col-span-2">
             <Label>Parent Item *</Label>
-            <Select value={parentItemId} onValueChange={setParentItemId}>
-              <SelectTrigger><SelectValue placeholder="Select item" /></SelectTrigger>
-              <SelectContent>
-                {(items as Array<{ id: string; item_code: string; name: string }>).map(i => (
-                  <SelectItem key={i.id} value={i.id}>{i.item_code} — {i.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <ItemSelector
+              value={parentItemId}
+              onSelect={(it) => setParentItemId(it?.id ?? "")}
+              placeholder="Search by item code or name…"
+              className="w-full"
+            />
+            <p className="text-xs text-muted-foreground mt-1">
+              Auto piece code: <span className="font-mono">{(items as Array<{ id: string; item_code: string }>).find(i => i.id === parentItemId)?.item_code ?? "ITEM-CODE"}/PQ-NNNN</span>
+            </p>
           </div>
           <div>
             <Label>Size *</Label>

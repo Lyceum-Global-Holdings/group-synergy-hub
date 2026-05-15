@@ -4,6 +4,25 @@ import { useCompany } from "@/contexts/CompanyContext";
 import { useLocationFilter } from "@/contexts/LocationFilterContext";
 import type { PartialPieceRow } from "@/types/partialPiece";
 
+export function usePartialPieceItems() {
+  const { selectedCompany } = useCompany();
+  const { globalLocationId } = useLocationFilter();
+  const companyId = selectedCompany?.id ?? null;
+  return useQuery({
+    queryKey: ["partial-piece-items", companyId, globalLocationId],
+    enabled: !!companyId,
+    staleTime: 30_000,
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("list_partial_piece_items", {
+        p_company_id: companyId!,
+        p_location_id: globalLocationId,
+      });
+      if (error) throw error;
+      return (data ?? []) as Array<{ parent_item_id: string; item_code: string; item_name: string; piece_count: number }>;
+    },
+  });
+}
+
 const KEY = "partial-pieces";
 
 export function usePartialPieces(params: {
@@ -40,6 +59,7 @@ function useInvalidate() {
   const qc = useQueryClient();
   return () => {
     qc.invalidateQueries({ queryKey: [KEY] });
+    qc.invalidateQueries({ queryKey: ["partial-piece-items"] });
     qc.invalidateQueries({ queryKey: ["warehouse-items"] });
     qc.invalidateQueries({ queryKey: ["all-items-location-stock"] });
   };

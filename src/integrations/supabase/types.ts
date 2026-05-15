@@ -21454,6 +21454,15 @@ export type Database = {
         Args: { je_id: string }
         Returns: boolean
       }
+      list_partial_piece_items: {
+        Args: { p_company_id: string; p_location_id?: string }
+        Returns: {
+          item_code: string
+          item_name: string
+          parent_item_id: string
+          piece_count: number
+        }[]
+      }
       list_partial_pieces: {
         Args: {
           p_company_id: string
@@ -21558,6 +21567,10 @@ export type Database = {
       }
       next_partial_piece_code: {
         Args: { p_company_id: string }
+        Returns: string
+      }
+      next_partial_piece_code_for_item: {
+        Args: { p_company_id: string; p_parent_item_id: string }
         Returns: string
       }
       process_fifo_batch_issue: {

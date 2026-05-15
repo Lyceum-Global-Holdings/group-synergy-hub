@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { VirtualTable, type DataTableColumn } from "@/components/shared/VirtualTable";
 import { Download, Pencil, PackageMinus, Scissors, Search, Upload, Plus } from "lucide-react";
-import { usePartialPieces } from "@/hooks/warehouse/usePartialPieces";
+import { usePartialPieces, usePartialPieceItems } from "@/hooks/warehouse/usePartialPieces";
 import { PIECE_STATUS_OPTIONS, type PartialPieceRow, type PartialPieceStatus } from "@/types/partialPiece";
 import { AddPartialPieceDialog } from "@/components/warehouse/partial-qty/AddPartialPieceDialog";
 import { EditPartialPieceDialog } from "@/components/warehouse/partial-qty/EditPartialPieceDialog";
@@ -35,7 +35,13 @@ function toCsv(rows: PartialPieceRow[]): string {
 export default function PartialQuantities() {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<string>("available");
-  const { data: rows = [], isLoading } = usePartialPieces({ search, status });
+  const [parentItemId, setParentItemId] = useState<string>("all");
+  const { data: rows = [], isLoading } = usePartialPieces({
+    search,
+    status,
+    parentItemId: parentItemId === "all" ? null : parentItemId,
+  });
+  const { data: itemOptions = [] } = usePartialPieceItems();
 
   const [addOpen, setAddOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
@@ -129,6 +135,19 @@ export default function PartialQuantities() {
               <SelectContent>
                 {PIECE_STATUS_OPTIONS.map(o => (
                   <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={parentItemId} onValueChange={setParentItemId}>
+              <SelectTrigger className="w-[260px]"><SelectValue placeholder="All items" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All items</SelectItem>
+                {itemOptions.map(o => (
+                  <SelectItem key={o.parent_item_id} value={o.parent_item_id}>
+                    <span className="font-mono text-xs mr-2">{o.item_code}</span>
+                    <span className="text-xs text-muted-foreground">{o.item_name}</span>
+                    <span className="ml-2 text-xs text-muted-foreground">({o.piece_count})</span>
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
