@@ -1,91 +1,81 @@
-## Goal
+# Link Partial Pieces with Item Code
 
-Replace the current "Partial Quantities = bin allocations view" with a true **Remnant Registry** (a.k.a. cut-piece / offcut management — SAP IS-Mill, GS1 CBV "Variable Measure Trade Item" pattern). Each row = one physical leftover piece of a parent item, sized in a secondary UOM (e.g. wire 2.30 m, 4.75 m, 1.10 m all from item `WIRE-CU-2.5`).
+Refactor Partial Pieces so the parent **item_code** drives identification, search, and auto-numbering — aligning with GS1 Variable Measure Trade Item conventions.
 
-Inventory `warehouse_bin_allocations` and `current_stock` are **not** touched by this module's CRUD. Only consumption optionally posts a parent-stock adjustment (configurable per action), and that goes through the existing `stock_transactions` ledger so audit stays unified.
+## 1. Auto piece-code format (GS1-aligned)
 
-## Data model
+Replace `PQ-YYYYMMDD-NNNN` with a code derived from the parent item:
 
-New table `warehouse_partial_pieces` (company-scoped, RLS):
+```text
+{ITEM_CODE}/PQ-{NNNN}
+```
 
-| column | notes |
-|---|---|
-| `id` uuid PK | |
-| `company_id` uuid NOT NULL | tenant scope |
-| `piece_code` text NOT NULL | auto `PQ-YYYYMMDD-NNNN` if user leaves blank; UNIQUE per company |
-| `parent_item_id` uuid → `warehouse_items` | the master item the offcut came from |
-| `size_value` numeric(14,4) NOT NULL CHECK > 0 | the piece dimension |
-| `size_uom` text NOT NULL | secondary UOM (m, mm, kg, m², …) — defaults from item's `secondary_uom` |
-| `location_id` uuid → `warehouse_locations` | required |
-| `bin_id` uuid → `warehouse_bins` NULL | optional storage bin |
-| `status` enum `available\|reserved\|consumed\|scrapped` default `available` |
-| `source_ref` text NULL | "GRN-123 / WO-77 / Issue-9" — where the remnant came from |
-| `batch_number` text NULL | optional carry-over for traceability |
-| `unit_cost` numeric(14,4) NULL | inherited from parent for valuation |
-| `label` text NULL | free-text tag ("Reel-A offcut") |
-| `notes` text NULL | |
-| `created_by`, `created_at`, `updated_at` | standard |
-| `consumed_at`, `consumed_by`, `consumed_qty`, `consumed_reason` | filled when status moves to consumed/scrapped |
+- `NNNN` = zero-padded next sequence per `(company_id, parent_item_id)`.
+- Example: parent `WIRE-CU-2.5` → first piece `WIRE-CU-2.5/PQ-0001`.
+- Manual `piece_code` still allowed; uniqueness stays `(company_id, piece_code)`.
+- Splits/residuals derive from the same parent item code, continuing the per-item sequence.
+- Rationale: mirrors GS1 CBV "variable measure trade item" (parent GTIN + serialized suffix) and SAP IS-Mill remnant numbering.
 
-Constraints & indexes:
-- `(company_id, piece_code)` unique
-- partial index on `(company_id, parent_item_id) WHERE status = 'available'` for fast pickers
-- `(company_id, location_id, status)` index for the grid
+## 2. Item picker (type-ahead) for dialogs
 
-## RPCs (SECURITY INVOKER, company-scoped)
+Replace the plain `Select` of warehouse items in **Add / Edit / Split / Consume** dialogs with a searchable combobox:
 
-1. `list_partial_pieces(p_company_id, p_location_id, p_status, p_search, p_limit, p_offset)` — flat rows with parent item code/name, location/bin name, size + UOM, status, age days.
-2. `create_partial_piece(p_payload jsonb)` — single insert, auto piece_code if null, defaults UOM/cost from parent item.
-3. `update_partial_piece(p_id, p_payload jsonb)` — edit only when `status = 'available'`; immutable fields once consumed.
-4. `delete_partial_piece(p_id)` — soft block if `status != 'available'`.
-5. `consume_partial_piece(p_id, p_quantity, p_reason, p_post_to_stock bool, p_reference, p_notes)` — flips status (full vs. partial: if partial we split — see below), and **optionally** writes one `stock_transactions` row (`transaction_type='issue'`, negative `quantity_change`) against the parent item/location so the parent's on-hand reflects consumption.
-6. `split_partial_piece(p_id, p_first_size, p_second_size)` — physical re-cut; archives original as consumed, creates two new pieces summing to original size.
-7. `import_partial_pieces(p_company_id, p_rows jsonb)` — bulk add; same atomic pattern already used in current import.
+- Searches both `item_code` and `item_name` server-side via the existing `list_warehouse_inventory` RPC (debounced, capped page size).
+- Displays `ITEM_CODE — Item Name (UOM / Secondary UOM)`.
+- Default `size_uom` from selected item's `secondary_uom` (existing behaviour preserved).
+- Reuses the project's hybrid Picker UX pattern (memory: Picker UX Hybrid Strategy).
 
-Partial consumption: if `p_quantity < size_value`, the RPC marks the original consumed and auto-creates one residual piece of `size_value − p_quantity` with a new auto code, linked via `source_ref`.
+## 3. Toolbar item filter
 
-## UI
+Add an **Item** filter dropdown next to the existing Status filter:
 
-Route stays `/warehouse/partial-quantities`. Page rebuilt:
+- Populated only with items that already have at least one partial piece (distinct `parent_item_id` from `list_partial_pieces`).
+- Sorted by item_code; shows `code — name`.
+- "All items" default. Filter is applied server-side in `list_partial_pieces` (new optional `p_parent_item_id` arg).
 
-- **Header**: title "Partial Pieces (Remnants)", filters (parent item picker, location, status), Search, Add Piece, Import, Export.
-- **Grid** (VirtualTable): `Piece Code | Parent Item | Size × UOM | Location / Bin | Status | Age | Source | Actions(Edit, Consume, Split, Delete)`.
-- **AddPartialPieceDialog**: parent item picker (defaults UOM from item.secondary_uom), size input with UOM dropdown, location/bin, source ref, batch, optional piece_code & label.
-- **EditPartialPieceDialog**: same fields, locked when not available.
-- **ConsumePartialPieceDialog**: quantity (≤ size), reason (GS1 CBV codes — `consumption`, `scrap`, `sample`, `production`), checkbox "Also reduce parent stock", reference, notes.
-- **SplitPartialPieceDialog**: two size inputs, validated to sum = original.
-- Import/Export templates updated to the new schema (`piece_code, parent_item_code, size_value, size_uom, location_code, bin_code, source_ref, batch_number, unit_cost, label, notes`).
+## 4. Item code visibility everywhere
+
+- Grid: add **Item Code** column (left of Item Name); make it monospace + bold, sortable.
+- Search box: searches `piece_code`, `label`, `item_code`, `item_name`.
+- Detail dialogs: show item_code prominently above name.
+- CSV export & import template: add `item_code` column. On import, accept either `item_code` (preferred) or `parent_item_id`; resolve to UUID server-side, error if both missing or conflicting.
+
+## 5. Backend changes
+
+New migration:
+
+- `generate_partial_piece_code(p_company_id, p_parent_item_id) RETURNS text` — atomic per-item sequence using `SELECT ... FOR UPDATE` on a new helper table `partial_piece_sequences(company_id, parent_item_id, last_seq)` (or `MAX(seq)` derived; sequence table is safer under concurrency).
+- Update `create_partial_piece` & `split_partial_piece` to call the new generator when `piece_code` is blank.
+- Update `list_partial_pieces` to accept optional `p_parent_item_id` filter and return `item_code` (already returned — verify) for the grid.
+- Update `import_partial_pieces` to resolve `item_code → parent_item_id` per row.
+
+## 6. Frontend changes
+
+- New `ItemCodePicker` component (or reuse existing inventory picker) wired to `list_warehouse_inventory`.
+- Update `AddPartialPieceDialog`, `EditPartialPieceDialog`, `SplitPartialPieceDialog`, `ConsumePartialPieceDialog` to use the picker.
+- Update `PartialQuantities.tsx` grid columns, toolbar filter, search predicate, CSV export.
+- Update `importTemplate.ts` & `ImportPartialPiecesDialog.tsx` to expect `item_code`.
+- `usePartialPieces.ts`: add `parent_item_id` filter param.
+
+## Out of scope
+
+- Changing existing piece codes already in the database (new format applies forward only).
+- Barcode/GS1-128 label printing (separate feature).
+- Cross-company item references.
 
 ## Files
 
-New:
-- `supabase/migrations/<ts>_partial_pieces.sql` (table, RLS, RPCs, indexes; drops old `list_partial_quantities` / `issue_partial_quantity` / `import_partial_quantities`)
-- `src/types/partialPiece.ts`
-- `src/hooks/warehouse/usePartialPieces.ts` (list, create, update, delete, consume, split, import)
+**New**
+- `src/components/warehouse/partial-qty/ItemCodePicker.tsx`
+- One new SQL migration (sequence table, generator, RPC updates)
+
+**Edited**
+- `src/pages/warehouse/PartialQuantities.tsx`
 - `src/components/warehouse/partial-qty/AddPartialPieceDialog.tsx`
 - `src/components/warehouse/partial-qty/EditPartialPieceDialog.tsx`
-- `src/components/warehouse/partial-qty/ConsumePartialPieceDialog.tsx`
 - `src/components/warehouse/partial-qty/SplitPartialPieceDialog.tsx`
-- `src/components/warehouse/partial-qty/importTemplate.ts` (rewritten)
-- `src/components/warehouse/partial-qty/ImportPartialPiecesDialog.tsx` (rewritten)
-
-Edited:
-- `src/pages/warehouse/PartialQuantities.tsx` — full rewrite to new model
-- `src/constants/moduleConfig.ts` — submodule label "Partial Pieces"
-- `src/integrations/supabase/types.ts` — regenerated post-migration
-
-Deleted:
-- `src/components/warehouse/partial-qty/IssuePartialQuantityDialog.tsx`
-- `src/components/warehouse/partial-qty/ImportPartialQuantitiesDialog.tsx` (replaced)
-- old hook `usePartialQuantities.ts`
-
-## Standards alignment
-
-- **GS1 CBV**: piece = "Variable Measure Trade Item"; reason codes (`consumption`, `scrap`, `sample`) mirror the bin-adjustment RPC.
-- **SAP IS-Mill / EWM "remnant management"**: parent material + size attribute + status lifecycle (available → reserved → consumed/scrapped) + split operation.
-- **Audit trail**: consumption optionally writes one `stock_transactions` row (existing trigger stamps qty before/after) — keeps a single ledger of truth.
-- **RLS**: full company-scoped; `warehouse.partial_piece.{view,create,edit,delete,consume}` RBAC keys (mirrors existing convention).
-
-## Out of scope (phase 1)
-
-Reservations workflow against sales/work orders, multi-dimensional pieces (length × width), barcode label printing — can come in phase 2.
+- `src/components/warehouse/partial-qty/ConsumePartialPieceDialog.tsx`
+- `src/components/warehouse/partial-qty/ImportPartialPiecesDialog.tsx`
+- `src/components/warehouse/partial-qty/importTemplate.ts`
+- `src/hooks/warehouse/usePartialPieces.ts`
+- `src/integrations/supabase/types.ts` (auto)
