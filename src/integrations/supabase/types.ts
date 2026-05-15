@@ -21293,6 +21293,14 @@ export type Database = {
         Returns: boolean
       }
       has_warehouse_access: { Args: { _user_id: string }; Returns: boolean }
+      import_partial_quantities: {
+        Args: {
+          p_allow_create_bin?: boolean
+          p_company_id: string
+          p_rows: Json
+        }
+        Returns: Json
+      }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
       is_company_hod: {
         Args: { p_company_id: string; p_user_id: string }
