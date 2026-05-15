@@ -20,6 +20,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 import { useBinsForLocation } from "@/hooks/warehouse/useBinsForLocation";
+import { UomConversionHint } from "@/components/warehouse/partial-qty/UomConversionHint";
 import { useToast } from "@/hooks/use-toast";
 import { Lock, Plus, Trash2, Copy, ClipboardPaste } from "lucide-react";
 
@@ -74,7 +75,7 @@ export function AddPartialPieceDialog({ open, onOpenChange, defaultParentItemId 
 
   const item = useMemo(
     () =>
-      (items as Array<{ id: string; secondary_uom: string | null; base_uom: string | null; unit_cost: number | null; item_code: string }>)
+      (items as Array<{ id: string; secondary_uom: string | null; base_uom: string | null; track_secondary_quantity?: boolean; unit_cost: number | null; item_code: string }>)
         .find(i => i.id === parentItemId),
     [items, parentItemId],
   );
@@ -312,6 +313,12 @@ export function AddPartialPieceDialog({ open, onOpenChange, defaultParentItemId 
                   ))}
                 </SelectContent>
               </Select>
+              <UomConversionHint
+                selectedUom={sizeUom}
+                baseUom={item?.base_uom}
+                secondaryUom={item?.secondary_uom}
+                trackSecondary={item?.track_secondary_quantity}
+              />
             </div>
             <div>
               <Label className="flex items-center gap-1">

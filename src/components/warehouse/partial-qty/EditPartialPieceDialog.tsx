@@ -11,6 +11,7 @@ import { useItemUnits } from "@/hooks/useItemUnits";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 import { useBinsForLocation } from "@/hooks/warehouse/useBinsForLocation";
+import { UomConversionHint } from "@/components/warehouse/partial-qty/UomConversionHint";
 import type { PartialPieceRow } from "@/types/partialPiece";
 import { useToast } from "@/hooks/use-toast";
 
@@ -127,6 +128,7 @@ export function EditPartialPieceDialog({ open, onOpenChange, piece }: Props) {
                   })()}
                 </SelectContent>
               </Select>
+              <UomConversionHint selectedUom={sizeUom} baseUom={piece?.base_uom} />
             </div>
             <div>
               <Label>Location</Label>
