@@ -73,11 +73,6 @@ export function DeleteItemConfirmationDialog({
     onOpenChange(false);
   };
 
-  const handleSafeDelete = () => {
-    onConfirmDelete(item.id, false);
-    onOpenChange(false);
-  };
-
   const handleForceDelete = () => {
     onConfirmDelete(item.id, true);
     onOpenChange(false);
