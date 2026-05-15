@@ -69,6 +69,31 @@ export function LocationSelector() {
     return (companyLocations as EffectiveLocation[]).filter((loc) => permittedIdSet.has(loc.id));
   }, [companyLocations, permissions, permissionsLoading, canViewAll, permittedIdSet]);
 
+  // Tree-ordered, depth-aware list for hierarchical rendering (SAP Fiori / Material tree picker convention).
+  const orderedLocations = useMemo(() => {
+    const visibleIds = new Set(locations.map((l) => l.id));
+    const childrenByParent = new Map<string | null, EffectiveLocation[]>();
+    for (const loc of locations) {
+      const key = loc.parent_id && visibleIds.has(loc.parent_id) ? loc.parent_id : null;
+      const arr = childrenByParent.get(key) ?? [];
+      arr.push(loc);
+      childrenByParent.set(key, arr);
+    }
+    for (const arr of childrenByParent.values()) {
+      arr.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
+    }
+    const out: Array<{ loc: EffectiveLocation; depth: number }> = [];
+    const walk = (parentKey: string | null, depth: number) => {
+      const kids = childrenByParent.get(parentKey) ?? [];
+      for (const k of kids) {
+        out.push({ loc: k, depth: typeof k.depth === "number" ? k.depth : depth });
+        walk(k.id, depth + 1);
+      }
+    };
+    walk(null, 0);
+    return out;
+  }, [locations]);
+
   const showAllOption =
     canViewAll ||
     (permissions &&
@@ -120,7 +145,7 @@ export function LocationSelector() {
         <SelectTrigger className="w-[200px] shrink-0">
           <SelectValue placeholder={placeholder} />
         </SelectTrigger>
-        <SelectContent>
+        <SelectContent className="min-w-[260px]">
           {locationsError && (
             <SelectItem value="__error" disabled>
               Failed to load locations
@@ -134,9 +159,15 @@ export function LocationSelector() {
           {showAllOption && locations.length > 0 && (
             <SelectItem value="all">All Locations</SelectItem>
           )}
-          {locations.map((loc) => (
-            <SelectItem key={loc.id} value={loc.id}>
-              {loc.parent_id ? `↳ ${loc.name}` : loc.name}
+          {orderedLocations.map(({ loc, depth }) => (
+            <SelectItem key={loc.id} value={loc.id} className="pr-2">
+              <span
+                className="block truncate"
+                style={{ paddingInlineStart: `${depth * 16}px` }}
+                title={loc.name}
+              >
+                {loc.name}
+              </span>
             </SelectItem>
           ))}
         </SelectContent>
