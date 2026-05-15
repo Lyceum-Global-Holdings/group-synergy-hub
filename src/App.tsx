@@ -89,6 +89,7 @@ const DeliveryOrder = lazy(() => import("./pages/warehouse/DeliveryOrder"));
 const GoodsReceiptNote = lazy(() => import("./pages/warehouse/GoodsReceiptNote"));
 const InventoryValuation = lazy(() => import("./pages/warehouse/InventoryValuation"));
 const BatchManagement = lazy(() => import("./pages/warehouse/BatchManagement"));
+const PartialQuantities = lazy(() => import("./pages/warehouse/PartialQuantities"));
 const PublicAssetView = lazy(() => import("./pages/PublicAssetView"));
 const PublicBinAllocation = lazy(() => import("./pages/PublicBinAllocation"));
 const ToolManagement = lazy(() => import("./pages/warehouse/ToolManagement"));
