@@ -1,103 +1,56 @@
-# Upload progress + retry/error handling for supplier form file uploads
+# Edit & delete fields in the Form Builder
 
 ## Scope
 
-Frontend-only enhancement to `FileUploadField` in `src/components/sourcing/registration/DynamicSupplierForm.tsx`. No edge function or schema changes — the existing `supplier-upload-sign` flow already returns a signed PUT URL that supports `XMLHttpRequest` upload progress events.
+Frontend-only enhancement to `src/components/sourcing/registration/FormBuilder.tsx`. No schema changes — `SupplierField` already supports everything we need (`label`, `help`, `placeholder`, `options`, `accept`, `maxSizeMB`, `multiple`, `maxFiles`, `pattern`, `patternMessage`).
 
-## Changes
+The split between **baseline** fields (international standards: PEPPOL, ISO 20022, GS1, ISO 17442 LEI, ISO 9362 BIC, ISO 4217 currency, etc.) and **custom** fields drives what is editable. We keep the standards-compliant `key` + `type` of baseline fields locked so submitted data continues to map cleanly to PEPPOL / ISO 20022 / SAP, and only allow safe presentation tweaks. Custom fields are fully editable, can be safely deleted, and can be reordered.
 
-### 1. Per-file upload state
+## What changes
 
-Replace the single boolean `uploading` flag with a `Map<id, UploadTask>` (kept in component state):
+### 1. Edit dialog (replaces inline-only controls for power users)
 
-```ts
-type UploadStatus = "queued" | "signing" | "uploading" | "success" | "error" | "canceled";
-type UploadTask = {
-  id: string;            // local uuid
-  file: File;
-  progress: number;      // 0–100
-  status: UploadStatus;
-  error?: string;
-  attempt: number;       // 1-based
-  xhr?: XMLHttpRequest;  // for cancel
-};
-```
+- **Pencil icon** next to every field row in `SectionEditor` opens an `EditFieldDialog`.
+- Reuses the same form layout as `AddFieldDialog`, refactored into one shared `FieldFormFields` subcomponent that takes initial values and emits a partial `SupplierField`.
+- Behavior:
+  - **Custom field** (`baseline !== true`): everything editable — label, type, required, help text, placeholder, select options, file constraints (accept presets, max size, multiple, max files), regex pattern + message. Changing `type` resets type-specific config (options/file props).
+  - **Baseline field** (`baseline === true`): `key` and `type` are **read-only** (locked with a small "Standards-compliant — key/type locked" hint). Editable: `label`, `help`, `placeholder`, `required`, `visible`. This preserves PEPPOL/ISO field semantics while letting admins localize wording.
+- Validation surfaced inline (label required; for `select` at least one option; for `file` at least one MIME).
 
-This lets the UI show one row per in-flight file with its own progress bar, status, and action buttons.
+### 2. Delete with confirmation
 
-### 2. Switch from `fetch` to `XMLHttpRequest` for the PUT
+- Custom-field rows get a **trash** icon (already there) wrapped in an `AlertDialog` confirm: *"Delete '{label}'? Submitted data for this field on existing draft requests will become orphaned."*
+- Baseline fields **cannot** be deleted (already enforced); the Trash icon is hidden for them. Admins who don't want a baseline field simply toggle **Visible off** (existing behavior). The card description is updated to make this discoverable: *"Baseline fields can be hidden but not deleted to preserve compliance with PEPPOL / ISO 20022 / GS1 standards."*
+- A separate **"Restore defaults"** button on the section header re-applies that section's baseline definitions (label/help/visible/required) without touching custom fields. Useful if an admin breaks something in the editor.
 
-`fetch` has no upload progress in browsers. Use `xhr.upload.onprogress` to drive a real percentage. Wrap in a small promise helper:
+### 3. Reorder fields within a section
 
-```ts
-function putWithProgress(url, file, onProgress, signal): Promise<{ ok: boolean; status: number }> {
-  return new Promise((resolve, reject) => {
-    const xhr = new XMLHttpRequest();
-    xhr.open("PUT", url);
-    xhr.setRequestHeader("Content-Type", file.type);
-    xhr.setRequestHeader("x-upsert", "false");
-    xhr.upload.onprogress = (e) => e.lengthComputable && onProgress(Math.round((e.loaded / e.total) * 100));
-    xhr.onload = () => resolve({ ok: xhr.status >= 200 && xhr.status < 300, status: xhr.status });
-    xhr.onerror = () => reject(new Error("Network error"));
-    xhr.ontimeout = () => reject(new Error("Upload timed out"));
-    xhr.timeout = 5 * 60 * 1000; // 5 min ceiling per file
-    signal?.addEventListener("abort", () => xhr.abort());
-    xhr.send(file);
-    return xhr;
-  });
-}
-```
+- Tiny up/down arrow buttons on each field row to move the field up/down inside its section. Persisted as a new optional `order: number` per field; `SectionEditor` sorts by `order ?? index` so existing schemas keep working without a migration. (No DB change — `form_config.schema` is JSON.)
 
-### 3. Retry with exponential backoff
+### 4. Key collision & safety
 
-- Auto-retry on transient failures (network error, timeout, HTTP 408/429/5xx) up to **3 attempts total** with backoff `500ms → 1.5s → 4s` plus small jitter.
-- Do NOT retry on 4xx other than 408/429 (those are signing/permission/MIME/size problems — surface and stop).
-- Each retry re-calls `supplier-upload-sign` to get a fresh signed URL (signed URLs are short-lived).
-- Track `attempt` so the UI can show "Retrying… (2/3)".
+- When adding/editing custom fields, the key is auto-derived from the label and de-duplicated within the schema (`custom_<slug>_<n>`). Key is not user-editable to prevent breaking historical submissions. Editing label does **not** rename the key.
+- Type changes on a custom field that has been published trigger a soft warning toast: *"Changing field type may invalidate previously collected values for this field."*
 
-### 4. UI per file row
+### 5. UX polish
 
-Replace the single dashed dropzone "Uploading…" label with a list that, while in flight, shows for each task:
-
-- File name + size
-- A `<Progress />` bar (shadcn) bound to `task.progress`
-- Status text: `Signing…` / `Uploading 42%` / `Retrying (2/3)…` / `Failed: <reason>` / `Done`
-- **Cancel** button (X) while `uploading` → calls `xhr.abort()`, marks `canceled`
-- **Retry** button when `status === "error"` → resets `attempt = 1`, restarts the pipeline for that file only
-- **Remove** button on completed files (keeps existing remove behavior)
-
-The dashed dropzone label stays, but its disabled state is driven by `items.length + activeUploads >= maxFiles` instead of the old global `uploading` flag — so users can keep queueing within the cap.
-
-### 5. Drag-and-drop (small UX add)
-
-Add `onDragOver` / `onDrop` handlers to the dashed label so users can drop files. Same `handleFiles(...)` path. Honors the same accept / size / count guards.
-
-### 6. Aggregate behavior
-
-- The form-level `onChange(...)` for the field is only called when a task reaches `success` (so partially failed batches still commit the successes).
-- A submit-time guard already exists via react-hook-form `required`. Add a soft block: while any task is `uploading` / `signing` / `queued`, disable the form's submit button. Achieved via a `useUploadGuard()`-style ref counter exposed through props (or by lifting "are any uploads in flight?" into the parent via a callback prop on `FileUploadField`).
-  - Minimal version: add `onActiveChange?: (active: boolean) => void` to `FileUploadField` and let the parent (`DynamicSupplierForm`) aggregate across fields and disable submit while any are active.
-
-### 7. Validation + error messages
-
-Keep existing client-side checks (MIME whitelist, max size, max count) but display them inline inside the failed row (red text + Retry hidden for permanent errors) instead of toast-only. Toasts remain for completion summary ("3 of 4 files uploaded — 1 failed").
-
-### 8. Cleanup
-
-- On component unmount, abort all in-flight `xhr`s.
-- On successful upload of all queued files, prune `success` rows from the in-flight list after a short delay (they're already rendered as committed items below).
+- Replace the row's right-side cluster with a compact action bar: `Visible` toggle, `Required` toggle, `↑` `↓`, `Edit`, `Delete` (custom only).
+- Edit/Delete/Reorder actions all flow through the existing `update(...)` reducer so the existing "Save draft / Publish" flow captures them as a single staged change set — no auto-save, no partial state.
 
 ## Out of scope
 
-- No edge function changes (`supplier-upload-sign` and `public-supplier-registration` stay as-is).
-- No storage policy changes.
-- No virus scanning, chunked/resumable uploads, or background-resume across page reloads. (Multipart/TUS would be a separate, larger change — happy to follow up if you want it.)
-- No changes to other file-upload surfaces in the app (warehouse, contracts, GRN, etc.).
+- No DB migration. `supplier_form_configs.schema` is already JSON.
+- No drag-and-drop reorder library (keyboard-friendly arrow buttons are sufficient and lighter). Can revisit with `@dnd-kit` later if requested.
+- No reordering of sections themselves.
+- No field-level conditional visibility ("show X if Y") — separate, larger feature.
+- No retroactive rewriting of already-submitted `supplier_registration_requests.supplier_data`.
 
 ## Verification
 
-1. Upload a 5–10 MB PDF on a throttled "Slow 3G" profile → progress bar advances smoothly 0→100%, then row turns green "Done".
-2. Mid-upload, click Cancel → request aborts, row shows "Canceled" with Retry button; clicking Retry re-signs and restarts.
-3. Toggle DevTools "Offline" briefly during upload → row shows "Retrying (2/3)…" with backoff, then succeeds when back online; if 3 attempts fail it stops on "Failed: Network error" with Retry available.
-4. Try a 20 MB file or `.exe` → rejected client-side with inline error, no network call.
-5. Queue 3 files at once → 3 independent rows with independent progress; submit button stays disabled until all settle.
+1. Open `/sourcing/supplier-registration` → Form Builder tab.
+2. Add a custom **Select** field "Industry" with 3 options → click pencil → change a label and add an option → Save → Preview shows updated options.
+3. Edit a baseline field (e.g. "Email"): only label/help/placeholder/required/visible enabled; key + type are read-only. Save and preview reflects the new label.
+4. Try to delete a custom field → confirm dialog → row disappears; Cancel keeps it.
+5. Use ↑/↓ to reorder two fields within a section → preview reflects new order.
+6. Click "Restore defaults" on a section → baseline fields revert; custom fields remain.
+7. Save draft, then Publish → fetch `useSupplierFormConfig` returns the new schema; public `/register-supplier?c=…` form renders the changes.
