@@ -313,6 +313,12 @@ export function AddPartialPieceDialog({ open, onOpenChange, defaultParentItemId 
                   ))}
                 </SelectContent>
               </Select>
+              <UomConversionHint
+                selectedUom={sizeUom}
+                baseUom={item?.base_uom}
+                secondaryUom={item?.secondary_uom}
+                trackSecondary={item?.track_secondary_quantity}
+              />
             </div>
             <div>
               <Label className="flex items-center gap-1">
