@@ -48,7 +48,7 @@ interface ParsedRow extends PartialImportRow {
 function validate(row: PartialImportRow): string[] {
   const errs: string[] = [];
   for (const col of REQUIRED_COLUMNS) {
-    const v = (row as Record<string, unknown>)[col];
+    const v = (row as unknown as Record<string, unknown>)[col];
     if (v === undefined || v === null || String(v).trim() === "") {
       errs.push(`${col} required`);
     }
@@ -128,7 +128,7 @@ export function ImportPartialQuantitiesDialog({ open, onOpenChange }: Props) {
       "partial-quantities-errors.csv",
       [...PARTIAL_IMPORT_COLUMNS, "error"],
       errored.map((r) => [
-        ...PARTIAL_IMPORT_COLUMNS.map((c) => String((r as Record<string, unknown>)[c] ?? "")),
+        ...PARTIAL_IMPORT_COLUMNS.map((c) => String((r as unknown as Record<string, unknown>)[c] ?? "")),
         r.errors.join("; "),
       ]),
     );
