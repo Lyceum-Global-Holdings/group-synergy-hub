@@ -55,14 +55,12 @@ export function MoveToolBetweenBinsDialog({
     queryKey: ["bins-for-location", tool?.location_id],
     enabled: open && !!tool?.location_id,
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("warehouse_bins")
-        .select("id, bin_code, name, location_id, status")
-        .eq("location_id", tool!.location_id!)
-        .eq("status", "active")
-        .order("bin_code");
+      const { data, error } = await supabase.rpc(
+        "list_bins_for_location_inherited",
+        { p_location_id: tool!.location_id! },
+      );
       if (error) throw error;
-      return data || [];
+      return (data || []).filter((b: any) => (b.status ?? "active") === "active");
     },
   });
 
