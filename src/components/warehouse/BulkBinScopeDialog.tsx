@@ -30,7 +30,7 @@ interface Props {
 
 export function BulkBinScopeDialog({ open, onOpenChange, bins }: Props) {
   const { companies = [] } = useCompanies();
-  const { data: locations = [] } = useWarehouseLocations();
+  const { locations = [] } = useWarehouseLocations();
   const { mutateAsync, isPending } = useBulkBinScope();
 
   const [companyIds, setCompanyIds] = useState<string[]>([]);
