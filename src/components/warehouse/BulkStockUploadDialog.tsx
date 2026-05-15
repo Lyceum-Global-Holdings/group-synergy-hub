@@ -111,16 +111,22 @@ export function BulkStockUploadDialog({ open, onOpenChange }: BulkStockUploadDia
 
   // Fetch bins for the selected location
   const { data: locationBins = [] } = useQuery({
-    queryKey: ['warehouse-bins-for-location', effectiveLocationId],
-    queryFn: async (): Promise<{ id: string; bin_code: string; description: string | null }[]> => {
+    queryKey: ['warehouse-bins-for-location-inherited', effectiveLocationId],
+    queryFn: async (): Promise<{ id: string; bin_code: string; description: string | null; inherited_from_location_name: string | null }[]> => {
       if (!effectiveLocationId) return [];
-      let query: any = supabase
-        .from('warehouse_bins')
-        .select('id, bin_code, description');
-      query = query.eq('location_id', effectiveLocationId).eq('status', 'active').order('bin_code');
-      const { data, error } = await query;
+      const { data, error } = await supabase.rpc(
+        'list_bins_for_location_inherited',
+        { p_location_id: effectiveLocationId },
+      );
       if (error) throw error;
-      return (data || []) as { id: string; bin_code: string; description: string | null }[];
+      return ((data || []) as any[])
+        .filter(b => (b.status ?? 'active') === 'active')
+        .map(b => ({
+          id: b.id,
+          bin_code: b.bin_code,
+          description: b.name ?? null,
+          inherited_from_location_name: b.inherited_from_location_name ?? null,
+        }));
     },
     enabled: !!effectiveLocationId,
   });
