@@ -38,6 +38,13 @@ export default function PartialQuantities() {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<string>("available");
   const [parentItemId, setParentItemId] = useState<string>("all");
+  const { globalLocationId, setGlobalLocationId } = useLocationFilter();
+  const { locations } = useWarehouseLocations();
+  const activeLocationName = useMemo(() => {
+    if (!globalLocationId) return null;
+    const l = (locations as Array<{ id: string; name?: string; location_code?: string }>).find(x => x.id === globalLocationId);
+    return l?.name || l?.location_code || null;
+  }, [globalLocationId, locations]);
   const { data: rows = [], isLoading } = usePartialPieces({
     search,
     status,
