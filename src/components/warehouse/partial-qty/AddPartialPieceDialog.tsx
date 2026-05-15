@@ -18,6 +18,7 @@ import {
 } from "@/hooks/warehouse/usePartialPieces";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
+import { useBinsForLocation } from "@/hooks/warehouse/useBinsForLocation";
 import { useToast } from "@/hooks/use-toast";
 import { Lock, Plus, Trash2, Copy, ClipboardPaste } from "lucide-react";
 
@@ -100,19 +101,7 @@ export function AddPartialPieceDialog({ open, onOpenChange }: Props) {
     return l?.name || l?.location_code || null;
   }, [globalLocationId, locations]);
 
-  const { data: bins = [] } = useQuery({
-    queryKey: ["bins-for-location", locationId],
-    enabled: !!locationId,
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("warehouse_bins")
-        .select("id, bin_code")
-        .eq("location_id", locationId)
-        .order("bin_code");
-      if (error) throw error;
-      return data as Array<{ id: string; bin_code: string }>;
-    },
-  });
+  const { data: bins = [] } = useBinsForLocation(locationId);
 
   function reset() {
     setMode("single");
@@ -332,7 +321,16 @@ export function AddPartialPieceDialog({ open, onOpenChange }: Props) {
               <Select value={binId} onValueChange={setBinId} disabled={!locationId}>
                 <SelectTrigger><SelectValue placeholder="(optional)" /></SelectTrigger>
                 <SelectContent>
-                  {bins.map(b => <SelectItem key={b.id} value={b.id}>{b.bin_code}</SelectItem>)}
+                  {bins.map(b => (
+                    <SelectItem key={b.id} value={b.id}>
+                      {b.bin_code}
+                      {b.inherited_from_location_name && (
+                        <span className="text-xs text-muted-foreground ml-2">
+                          · inherited from {b.inherited_from_location_name}
+                        </span>
+                      )}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>

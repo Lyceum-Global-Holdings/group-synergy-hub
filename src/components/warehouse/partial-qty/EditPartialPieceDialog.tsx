@@ -9,6 +9,7 @@ import { useUpdatePartialPiece, useDeletePartialPiece } from "@/hooks/warehouse/
 import { useWarehouseLocations } from "@/hooks/useWarehouseLocations";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
+import { useBinsForLocation } from "@/hooks/warehouse/useBinsForLocation";
 import type { PartialPieceRow } from "@/types/partialPiece";
 import { useToast } from "@/hooks/use-toast";
 
@@ -48,17 +49,7 @@ export function EditPartialPieceDialog({ open, onOpenChange, piece }: Props) {
     }
   }, [piece]);
 
-  const { data: bins = [] } = useQuery({
-    queryKey: ["bins-for-location", locationId],
-    enabled: !!locationId,
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("warehouse_bins").select("id, bin_code")
-        .eq("location_id", locationId).order("bin_code");
-      if (error) throw error;
-      return data as Array<{ id: string; bin_code: string }>;
-    },
-  });
+  const { data: bins = [] } = useBinsForLocation(locationId);
 
   const editable = useMemo(() => piece?.status === "available" || piece?.status === "reserved", [piece]);
 
@@ -133,7 +124,16 @@ export function EditPartialPieceDialog({ open, onOpenChange, piece }: Props) {
               <Select value={binId} onValueChange={setBinId} disabled={!editable || !locationId}>
                 <SelectTrigger><SelectValue placeholder="(none)" /></SelectTrigger>
                 <SelectContent>
-                  {bins.map(b => <SelectItem key={b.id} value={b.id}>{b.bin_code}</SelectItem>)}
+                  {bins.map(b => (
+                    <SelectItem key={b.id} value={b.id}>
+                      {b.bin_code}
+                      {b.inherited_from_location_name && (
+                        <span className="text-xs text-muted-foreground ml-2">
+                          · inherited from {b.inherited_from_location_name}
+                        </span>
+                      )}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>

@@ -26,6 +26,7 @@ interface BinOption {
   id: string;
   bin_code: string;
   name: string;
+  inherited_from_location_name?: string | null;
 }
 
 interface ItemAssignment {
@@ -82,14 +83,20 @@ export function AssignLocationDialog({ items, open, onOpenChange, onComplete, co
   const fetchBinsForLocation = async (locationId: string) => {
     if (binsByLocation.has(locationId)) return;
     
-    const { data } = await supabase
-      .from('warehouse_bins')
-      .select('id, bin_code, name')
-      .eq('location_id', locationId)
-      .eq('status', 'active')
-      .order('bin_code');
-    
-    setBinsByLocation(prev => new Map(prev).set(locationId, (data || []) as BinOption[]));
+    const { data } = await supabase.rpc(
+      "list_bins_for_location_inherited",
+      { p_location_id: locationId },
+    );
+    const filtered = (data || [])
+      .filter((b: any) => (b.status ?? "active") === "active")
+      .map((b: any) => ({
+        id: b.id,
+        bin_code: b.bin_code,
+        name: b.name,
+        inherited_from_location_name: b.inherited_from_location_name,
+      })) as BinOption[];
+
+    setBinsByLocation(prev => new Map(prev).set(locationId, filtered));
   };
 
   const updateLocation = (itemId: string, locationId: string) => {
@@ -205,7 +212,14 @@ export function AssignLocationDialog({ items, open, onOpenChange, onComplete, co
                     </SelectTrigger>
                     <SelectContent>
                       {bins.map((bin) => (
-                        <SelectItem key={bin.id} value={bin.id}>{bin.bin_code} — {bin.name}</SelectItem>
+                        <SelectItem key={bin.id} value={bin.id}>
+                          {bin.bin_code} — {bin.name}
+                          {bin.inherited_from_location_name && (
+                            <span className="text-xs text-muted-foreground ml-2">
+                              · inherited from {bin.inherited_from_location_name}
+                            </span>
+                          )}
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>

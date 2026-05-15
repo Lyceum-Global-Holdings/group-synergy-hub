@@ -111,16 +111,22 @@ export function BulkStockUploadDialog({ open, onOpenChange }: BulkStockUploadDia
 
   // Fetch bins for the selected location
   const { data: locationBins = [] } = useQuery({
-    queryKey: ['warehouse-bins-for-location', effectiveLocationId],
-    queryFn: async (): Promise<{ id: string; bin_code: string; description: string | null }[]> => {
+    queryKey: ['warehouse-bins-for-location-inherited', effectiveLocationId],
+    queryFn: async (): Promise<{ id: string; bin_code: string; description: string | null; inherited_from_location_name: string | null }[]> => {
       if (!effectiveLocationId) return [];
-      let query: any = supabase
-        .from('warehouse_bins')
-        .select('id, bin_code, description');
-      query = query.eq('location_id', effectiveLocationId).eq('status', 'active').order('bin_code');
-      const { data, error } = await query;
+      const { data, error } = await supabase.rpc(
+        'list_bins_for_location_inherited',
+        { p_location_id: effectiveLocationId },
+      );
       if (error) throw error;
-      return (data || []) as { id: string; bin_code: string; description: string | null }[];
+      return ((data || []) as any[])
+        .filter(b => (b.status ?? 'active') === 'active')
+        .map(b => ({
+          id: b.id,
+          bin_code: b.bin_code,
+          description: b.name ?? null,
+          inherited_from_location_name: b.inherited_from_location_name ?? null,
+        }));
     },
     enabled: !!effectiveLocationId,
   });
@@ -296,17 +302,19 @@ export function BulkStockUploadDialog({ open, onOpenChange }: BulkStockUploadDia
       const binMap = new Map<string, string>();
       if (binMode === 'per-row') {
         const binCodesOriginal = [...new Set(dataRows.map(r => (r[binIdx] || '').trim()).filter(Boolean))];
-        for (let i = 0; i < binCodesOriginal.length; i += 500) {
-          const chunk = binCodesOriginal.slice(i, i + 500);
-          const { data } = await supabase
-            .from('warehouse_bins')
-            .select('id, bin_code')
-            .eq('location_id', effectiveLocationId)
-            .in('bin_code', chunk);
-          data?.forEach(bin => {
-            binMap.set((bin.bin_code || '').toLowerCase().trim(), bin.id);
-          });
-        }
+        // Pull inherited bin set for this location once, then resolve codes locally.
+        const { data: inheritedBins } = await supabase.rpc(
+          'list_bins_for_location_inherited',
+          { p_location_id: effectiveLocationId },
+        );
+        const lookup = new Map<string, string>();
+        ((inheritedBins || []) as any[]).forEach(b => {
+          lookup.set((b.bin_code || '').toLowerCase().trim(), b.id);
+        });
+        binCodesOriginal.forEach(code => {
+          const id = lookup.get(code.toLowerCase().trim());
+          if (id) binMap.set(code.toLowerCase().trim(), id);
+        });
       }
 
       // Parse and validate
@@ -708,6 +716,11 @@ export function BulkStockUploadDialog({ open, onOpenChange }: BulkStockUploadDia
                     {locationBins.map(bin => (
                       <SelectItem key={bin.id} value={bin.id}>
                         {bin.bin_code}{bin.description ? ` — ${bin.description}` : ''}
+                        {bin.inherited_from_location_name && (
+                          <span className="text-xs text-muted-foreground ml-2">
+                            · inherited from {bin.inherited_from_location_name}
+                          </span>
+                        )}
                       </SelectItem>
                     ))}
                   </SelectContent>

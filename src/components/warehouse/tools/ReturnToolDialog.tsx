@@ -67,14 +67,12 @@ export function ReturnToolDialog({ open, onOpenChange, activeIssues }: ReturnToo
         .eq("id", toolId!)
         .maybeSingle();
       if (!tool?.location_id) return [];
-      const { data, error } = await supabase
-        .from("warehouse_bins")
-        .select("id, bin_code, name, location_id, status")
-        .eq("location_id", tool.location_id)
-        .eq("status", "active")
-        .order("bin_code");
+      const { data, error } = await supabase.rpc(
+        "list_bins_for_location_inherited",
+        { p_location_id: tool.location_id },
+      );
       if (error) throw error;
-      return data || [];
+      return (data || []).filter((b: any) => (b.status ?? "active") === "active");
     },
   });
 
