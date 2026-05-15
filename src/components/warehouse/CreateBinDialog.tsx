@@ -1,9 +1,13 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Badge } from '@/components/ui/badge';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   Dialog,
   DialogContent,
@@ -21,7 +25,13 @@ interface CreateBinDialogProps {
   editingBin?: WarehouseBin | null;
 }
 
+type Scope = 'location' | 'global';
+
+const BIN_CODE_PATTERN = /^[A-Z0-9][A-Z0-9-]*$/;
+
 export function CreateBinDialog({ open, onOpenChange, editingBin }: CreateBinDialogProps) {
+  const [scope, setScope] = useState<Scope>('location');
+  const [selectedLocationIds, setSelectedLocationIds] = useState<string[]>([]);
   const [formData, setFormData] = useState({
     bin_code: '',
     name: '',
@@ -31,12 +41,15 @@ export function CreateBinDialog({ open, onOpenChange, editingBin }: CreateBinDia
     notes: '',
     status: 'active' as 'active' | 'inactive' | 'maintenance' | 'full'
   });
+  const [codeError, setCodeError] = useState<string | null>(null);
 
   const { createBin, updateBin, isCreating, isUpdating } = useWarehouseBins();
   const { locations } = useWarehouseLocations();
 
   useEffect(() => {
     if (editingBin) {
+      setScope('location');
+      setSelectedLocationIds([]);
       setFormData({
         bin_code: editingBin.bin_code,
         name: editingBin.name,
@@ -47,6 +60,8 @@ export function CreateBinDialog({ open, onOpenChange, editingBin }: CreateBinDia
         status: editingBin.status
       });
     } else {
+      setScope('location');
+      setSelectedLocationIds([]);
       setFormData({
         bin_code: '',
         name: '',
@@ -54,71 +69,125 @@ export function CreateBinDialog({ open, onOpenChange, editingBin }: CreateBinDia
         capacity: '',
         location_id: '',
         notes: '',
-        status: 'active' as 'active' | 'inactive' | 'maintenance' | 'full'
+        status: 'active'
       });
     }
+    setCodeError(null);
   }, [editingBin, open]);
+
+  const sortedLocations = useMemo(
+    () => [...locations].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })),
+    [locations]
+  );
+
+  const validateCode = (code: string) => {
+    const v = code.trim().toUpperCase();
+    if (!v) return 'Bin code is required';
+    if (!BIN_CODE_PATTERN.test(v)) return 'Use letters, numbers and dashes only (no spaces)';
+    return null;
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!formData.location_id) {
-      return;
-    }
 
-    const binData = {
-      bin_code: formData.bin_code,
-      name: formData.name,
-      description: formData.description || null,
-      capacity: formData.capacity ? Number(formData.capacity) : null,
-      location_id: formData.location_id,
-      notes: formData.notes || null,
-      status: formData.status as 'active' | 'inactive' | 'maintenance' | 'full'
+    const normalizedCode = formData.bin_code.trim().toUpperCase();
+    const err = validateCode(normalizedCode);
+    if (err) { setCodeError(err); return; }
+
+    const base = {
+      bin_code: normalizedCode,
+      name: formData.name.trim(),
+      description: formData.description || undefined,
+      capacity: formData.capacity ? Number(formData.capacity) : undefined,
+      notes: formData.notes || undefined,
+      status: formData.status,
     };
 
     if (editingBin) {
-      updateBin({ id: editingBin.id, ...binData });
-    } else {
-      createBin(binData);
+      if (!formData.location_id) return;
+      updateBin({ id: editingBin.id, ...base, location_id: formData.location_id });
+      onOpenChange(false);
+      return;
     }
-    
+
+    if (scope === 'global') {
+      if (selectedLocationIds.length === 0) return;
+      createBin({ ...base, location_ids: selectedLocationIds, is_global_template: true });
+    } else {
+      if (!formData.location_id) return;
+      createBin({ ...base, location_id: formData.location_id });
+    }
+
     onOpenChange(false);
   };
 
-  const handleChange = (field: string, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+  const toggleLocation = (id: string) => {
+    setSelectedLocationIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
   };
+
+  const allSelected = selectedLocationIds.length === sortedLocations.length && sortedLocations.length > 0;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>
-            {editingBin ? 'Edit Bin' : 'Create New Bin'}
-          </DialogTitle>
+          <DialogTitle>{editingBin ? 'Edit Bin' : 'Create New Bin'}</DialogTitle>
           <DialogDescription>
-            {editingBin ? 'Update bin information' : 'Add a new storage bin to the warehouse'}
+            {editingBin
+              ? 'Update bin information'
+              : 'Add a storage bin. Choose a single location, or apply the same code across multiple locations.'}
           </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          {!editingBin && (
+            <div className="space-y-2 rounded-md border p-3">
+              <Label>Scope</Label>
+              <RadioGroup value={scope} onValueChange={(v) => setScope(v as Scope)} className="flex gap-6">
+                <div className="flex items-center gap-2">
+                  <RadioGroupItem value="location" id="scope-location" />
+                  <Label htmlFor="scope-location" className="font-normal cursor-pointer">
+                    Location-specific
+                  </Label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <RadioGroupItem value="global" id="scope-global" />
+                  <Label htmlFor="scope-global" className="font-normal cursor-pointer">
+                    Global (apply same code to multiple locations)
+                  </Label>
+                </div>
+              </RadioGroup>
+              <p className="text-xs text-muted-foreground">
+                The same bin code can exist in multiple locations. Each location gets its own physical bin and
+                independent stock.
+              </p>
+            </div>
+          )}
+
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="bin_code">Bin Code *</Label>
               <Input
                 id="bin_code"
                 value={formData.bin_code}
-                onChange={(e) => handleChange('bin_code', e.target.value)}
+                onChange={(e) => {
+                  setFormData((p) => ({ ...p, bin_code: e.target.value.toUpperCase() }));
+                  setCodeError(null);
+                }}
                 placeholder="e.g., A-01-01"
                 required
+                aria-invalid={!!codeError}
               />
+              {codeError && <p className="text-xs text-destructive">{codeError}</p>}
             </div>
             <div className="space-y-2">
               <Label htmlFor="name">Name *</Label>
               <Input
                 id="name"
                 value={formData.name}
-                onChange={(e) => handleChange('name', e.target.value)}
+                onChange={(e) => setFormData((p) => ({ ...p, name: e.target.value }))}
                 placeholder="e.g., Aisle A Rack 1 Shelf 1"
                 required
               />
@@ -130,7 +199,7 @@ export function CreateBinDialog({ open, onOpenChange, editingBin }: CreateBinDia
             <Input
               id="description"
               value={formData.description}
-              onChange={(e) => handleChange('description', e.target.value)}
+              onChange={(e) => setFormData((p) => ({ ...p, description: e.target.value }))}
               placeholder="Brief description of the bin"
             />
           </div>
@@ -144,48 +213,117 @@ export function CreateBinDialog({ open, onOpenChange, editingBin }: CreateBinDia
                 min="0"
                 step="0.01"
                 value={formData.capacity}
-                onChange={(e) => handleChange('capacity', e.target.value)}
+                onChange={(e) => setFormData((p) => ({ ...p, capacity: e.target.value }))}
                 placeholder="Maximum capacity"
               />
             </div>
+
+            {(editingBin || scope === 'location') ? (
+              <div className="space-y-2">
+                <Label htmlFor="location_id">Location *</Label>
+                <Select
+                  value={formData.location_id}
+                  onValueChange={(value) => setFormData((p) => ({ ...p, location_id: value }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select location" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {sortedLocations.map((location) => (
+                      <SelectItem key={location.id} value={location.id}>
+                        {location.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <Label htmlFor="status">Status</Label>
+                <Select
+                  value={formData.status}
+                  onValueChange={(value) => setFormData((p) => ({ ...p, status: value as typeof formData.status }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="active">Active</SelectItem>
+                    <SelectItem value="inactive">Inactive</SelectItem>
+                    <SelectItem value="maintenance">Under Maintenance</SelectItem>
+                    <SelectItem value="full">Full</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+          </div>
+
+          {!editingBin && scope === 'global' && (
+            <div className="space-y-2 rounded-md border p-3">
+              <div className="flex items-center justify-between">
+                <Label>Locations *</Label>
+                <div className="flex items-center gap-3">
+                  <Badge variant="secondary">{selectedLocationIds.length} selected</Badge>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() =>
+                      setSelectedLocationIds(allSelected ? [] : sortedLocations.map((l) => l.id))
+                    }
+                  >
+                    {allSelected ? 'Clear all' : 'Select all'}
+                  </Button>
+                </div>
+              </div>
+              <ScrollArea className="h-56 rounded border">
+                <div className="p-2 space-y-1">
+                  {sortedLocations.map((loc) => {
+                    const checked = selectedLocationIds.includes(loc.id);
+                    return (
+                      <label
+                        key={loc.id}
+                        className="flex items-center gap-2 rounded px-2 py-1.5 hover:bg-muted cursor-pointer"
+                      >
+                        <Checkbox checked={checked} onCheckedChange={() => toggleLocation(loc.id)} />
+                        <span className="text-sm">{loc.name}</span>
+                      </label>
+                    );
+                  })}
+                  {sortedLocations.length === 0 && (
+                    <div className="text-sm text-muted-foreground p-2">No locations available.</div>
+                  )}
+                </div>
+              </ScrollArea>
+            </div>
+          )}
+
+          {(editingBin || scope === 'location') && (
             <div className="space-y-2">
-              <Label htmlFor="location_id">Location *</Label>
-              <Select value={formData.location_id} onValueChange={(value) => handleChange('location_id', value)}>
+              <Label htmlFor="status">Status</Label>
+              <Select
+                value={formData.status}
+                onValueChange={(value) => setFormData((p) => ({ ...p, status: value as typeof formData.status }))}
+              >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select location" />
+                  <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {locations.map((location) => (
-                    <SelectItem key={location.id} value={location.id}>
-                      {location.name}
-                    </SelectItem>
-                  ))}
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="inactive">Inactive</SelectItem>
+                  <SelectItem value="maintenance">Under Maintenance</SelectItem>
+                  <SelectItem value="full">Full</SelectItem>
                 </SelectContent>
               </Select>
             </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="status">Status</Label>
-            <Select value={formData.status} onValueChange={(value) => handleChange('status', value)}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="active">Active</SelectItem>
-                <SelectItem value="inactive">Inactive</SelectItem>
-                <SelectItem value="maintenance">Under Maintenance</SelectItem>
-                <SelectItem value="full">Full</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+          )}
 
           <div className="space-y-2">
             <Label htmlFor="notes">Notes</Label>
             <Textarea
               id="notes"
               value={formData.notes}
-              onChange={(e) => handleChange('notes', e.target.value)}
+              onChange={(e) => setFormData((p) => ({ ...p, notes: e.target.value }))}
               placeholder="Additional notes"
               rows={3}
             />
@@ -196,7 +334,11 @@ export function CreateBinDialog({ open, onOpenChange, editingBin }: CreateBinDia
               Cancel
             </Button>
             <Button type="submit" disabled={isCreating || isUpdating}>
-              {editingBin ? 'Update Bin' : 'Create Bin'}
+              {editingBin
+                ? 'Update Bin'
+                : scope === 'global'
+                  ? `Create ${selectedLocationIds.length || ''} Bin${selectedLocationIds.length === 1 ? '' : 's'}`.trim()
+                  : 'Create Bin'}
             </Button>
           </div>
         </form>
