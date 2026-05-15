@@ -4,7 +4,7 @@ import { useCompany } from "@/contexts/CompanyContext";
 import { useLocationFilter } from "@/contexts/LocationFilterContext";
 import { useRealtimeStockUpdates } from "@/hooks/useRealtimeStockUpdates";
 
-export interface PartialQuantityRow {
+export interface PartialQuantityRow extends Record<string, unknown> {
   allocation_id: string;
   item_id: string;
   item_code: string;
