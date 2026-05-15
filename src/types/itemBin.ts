@@ -43,6 +43,7 @@ export interface WarehouseBin {
   description: string | null;
   notes: string | null;
   company_id: string | null;
+  is_global_template?: boolean;
   created_at: string;
   updated_at: string;
   created_by: string | null;
@@ -117,6 +118,9 @@ export interface CreateWarehouseBinData {
   name: string;
   bin_type_id?: string;
   location_id?: string;
+  /** When provided (length >= 1), creates one bin row per location with the same code. */
+  location_ids?: string[];
+  is_global_template?: boolean;
   capacity?: number;
   status: 'active' | 'inactive' | 'maintenance' | 'full';
   description?: string;
