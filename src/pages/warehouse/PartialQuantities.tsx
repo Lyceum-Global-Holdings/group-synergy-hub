@@ -4,12 +4,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { VirtualTable, type DataTableColumn } from "@/components/shared/VirtualTable";
-import { Download, PackageMinus, Search } from "lucide-react";
+import { Download, PackageMinus, Search, Upload } from "lucide-react";
 import {
   usePartialQuantities,
   type PartialQuantityRow,
 } from "@/hooks/warehouse/usePartialQuantities";
 import { IssuePartialQuantityDialog } from "@/components/warehouse/partial-qty/IssuePartialQuantityDialog";
+import { ImportPartialQuantitiesDialog } from "@/components/warehouse/partial-qty/ImportPartialQuantitiesDialog";
 
 function toCsv(rows: PartialQuantityRow[]): string {
   const head = [
@@ -33,6 +34,7 @@ export default function PartialQuantities() {
   const { data: rows = [], isLoading } = usePartialQuantities(search);
   const [active, setActive] = useState<PartialQuantityRow | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
 
   const columns = useMemo<DataTableColumn<PartialQuantityRow>[]>(
     () => [
@@ -133,10 +135,16 @@ export default function PartialQuantities() {
             One row per (item × location × bin) holding. Issue directly from any row.
           </p>
         </div>
-        <Button variant="outline" onClick={exportCsv} disabled={!rows.length}>
-          <Download className="h-4 w-4 mr-2" /> Export CSV
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={() => setImportOpen(true)}>
+            <Upload className="h-4 w-4 mr-2" /> Import
+          </Button>
+          <Button variant="outline" onClick={exportCsv} disabled={!rows.length}>
+            <Download className="h-4 w-4 mr-2" /> Export CSV
+          </Button>
+        </div>
       </div>
+      <ImportPartialQuantitiesDialog open={importOpen} onOpenChange={setImportOpen} />
 
       <Card>
         <CardHeader className="pb-3">
