@@ -28,6 +28,7 @@ import { toast } from 'sonner';
 import { QuickCreateSupplierDialog } from './QuickCreateSupplierDialog';
 import { useWarehouseItemCatalog } from '@/hooks/useWarehouseItemCatalog';
 import { useNextWarehouseItemCode } from '@/hooks/warehouse/useNextWarehouseItemCode';
+import { buildLocationOptions, locationTypeLabel } from '@/lib/warehouse/locationHierarchy';
 
 interface SingleItemFormProps {
   editingItem?: WarehouseItem | CatalogItem | null;
