@@ -42,6 +42,7 @@ export function useWarehouseItemsLazyInventory({
   status,
   supplierId,
   locationId,
+  stockMode = 'all',
 }: UseWarehouseItemsLazyInventoryOptions) {
   const { selectedCompany, isViewingAllCompanies } = useCompany();
   const { data: permissions } = useCurrentUserLocationPermissions();
@@ -61,6 +62,7 @@ export function useWarehouseItemsLazyInventory({
       categoryId,
       status,
       supplierId,
+      stockMode,
     ],
     queryFn: async ({ pageParam }: { pageParam: Cursor | null }) => {
       let rawItems: any[] = [];
