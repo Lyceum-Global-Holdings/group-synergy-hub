@@ -28,7 +28,8 @@ export function BinMasterTab() {
   const [isBulkScopeOpen, setIsBulkScopeOpen] = useState(false);
 
   const { bins, isLoading, deleteBin, isDeleting } = useWarehouseBins();
-  const { canDelete, isAdminOrHigher } = useIsAdminOrHigher();
+  const { canDelete } = useIsAdminOrHigher();
+  const isAdminOrHigher = canDelete;
 
   const filteredBins = bins.filter(bin =>
     bin.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
