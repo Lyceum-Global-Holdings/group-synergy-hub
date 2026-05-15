@@ -126,15 +126,19 @@ export function useWarehouseItemsLazyInventory({
           rawItems = rawItems.filter((it) => it.supplier_id === supplierId);
         }
       } else {
-        // Original paginated path — unchanged behavior
+        // Item Master path (SAP MM03 semantics): list every master record
+        // regardless of on-hand stock. Stock-based narrowing is an explicit
+        // user choice via `stockMode` (MMBE-style filter), applied below.
         let query = supabase
           .from('warehouse_items')
-          .select(`*, supplier:suppliers(id, name)`)
-          .gt('current_stock', 0);
+          .select(`*, supplier:suppliers(id, name)`);
 
         if (!isViewingAllCompanies && selectedCompany?.id) {
           query = query.eq('company_id', selectedCompany.id);
         }
+
+        if (stockMode === 'in_stock') query = query.gt('current_stock', 0);
+        else if (stockMode === 'zero') query = query.eq('current_stock', 0);
 
         const searchOr = search?.trim()
           ? (() => {
