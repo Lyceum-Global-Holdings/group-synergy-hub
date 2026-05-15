@@ -35,7 +35,13 @@ function toCsv(rows: PartialPieceRow[]): string {
 export default function PartialQuantities() {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<string>("available");
-  const { data: rows = [], isLoading } = usePartialPieces({ search, status });
+  const [parentItemId, setParentItemId] = useState<string>("all");
+  const { data: rows = [], isLoading } = usePartialPieces({
+    search,
+    status,
+    parentItemId: parentItemId === "all" ? null : parentItemId,
+  });
+  const { data: itemOptions = [] } = usePartialPieceItems();
 
   const [addOpen, setAddOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
