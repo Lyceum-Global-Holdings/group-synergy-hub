@@ -44,7 +44,7 @@ export function DeleteItemConfirmationDialog({
   const [reason, setReason] = useState('');
 
   const { data: references = [], isLoading: isCheckingReferences } = useItemReferences(item?.id || '');
-  const { isAdminOrHigher } = useIsAdminOrHigher();
+  const { canDelete: isAdminOrHigher } = useIsAdminOrHigher();
   const { purgeItem, isPurging } = usePurgeInactiveItem();
 
   const hasReferences = references.length > 0;
