@@ -513,6 +513,18 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
               </SelectContent>
             </Select>
 
+            <Select value={stockMode} onValueChange={(v) => setStockMode(v as typeof stockMode)}>
+              <SelectTrigger className="w-[140px]">
+                <SelectValue placeholder="Stock" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Stock</SelectItem>
+                <SelectItem value="in_stock">In Stock (&gt; 0)</SelectItem>
+                <SelectItem value="zero">Zero Stock</SelectItem>
+                <SelectItem value="low">Low Stock (≤ Reorder)</SelectItem>
+              </SelectContent>
+            </Select>
+
             <Select value={supplierFilter} onValueChange={setSupplierFilter}>
               <SelectTrigger className="w-[140px]">
                 <SelectValue placeholder="Supplier" />
