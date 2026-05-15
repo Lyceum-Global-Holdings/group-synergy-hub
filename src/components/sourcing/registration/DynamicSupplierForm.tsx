@@ -512,6 +512,17 @@ export default function DynamicSupplierForm({
   companySlug,
 }: DynamicSupplierFormProps) {
   const form = useForm({ defaultValues: { ...defaultsFromSchema(schema), ...(initialValues || {}) } });
+  const [activeUploads, setActiveUploads] = useState<Record<string, boolean>>({});
+  const handleActiveChange = useCallback((key: string, active: boolean) => {
+    setActiveUploads((prev) => {
+      if (!!prev[key] === active) return prev;
+      const next = { ...prev };
+      if (active) next[key] = true;
+      else delete next[key];
+      return next;
+    });
+  }, []);
+  const uploadsInFlight = Object.keys(activeUploads).length > 0;
 
   // Re-sync defaults when schema changes (e.g. preview mode)
   useEffect(() => {
@@ -525,6 +536,10 @@ export default function DynamicSupplierForm({
     <Form {...form}>
       <form
         onSubmit={form.handleSubmit(async (values) => {
+          if (uploadsInFlight) {
+            toast.error("Please wait for file uploads to finish.");
+            return;
+          }
           // Strip empty strings to undefined for cleaner downstream handling.
           const clean: Record<string, any> = {};
           Object.entries(values).forEach(([k, v]) => {
@@ -547,7 +562,7 @@ export default function DynamicSupplierForm({
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {fields.map((f) => (
-                  <FieldRenderer key={f.key} field={f} form={form} companySlug={companySlug} preview={preview} />
+                  <FieldRenderer key={f.key} field={f} form={form} companySlug={companySlug} preview={preview} onActiveChange={handleActiveChange} />
                 ))}
               </div>
             </div>
@@ -558,8 +573,8 @@ export default function DynamicSupplierForm({
 
         {!preview && (
           <div className="flex justify-end">
-            <Button type="submit" disabled={submitting}>
-              {submitting ? "Submitting..." : submitLabel}
+            <Button type="submit" disabled={submitting || uploadsInFlight}>
+              {submitting ? "Submitting..." : uploadsInFlight ? "Waiting for uploads…" : submitLabel}
             </Button>
           </div>
         )}
