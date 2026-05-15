@@ -9,6 +9,8 @@ interface Cursor {
   id: string;
 }
 
+export type StockMode = 'all' | 'in_stock' | 'zero' | 'low';
+
 interface UseWarehouseItemsLazyInventoryOptions {
   pageSize?: number;
   search?: string;
@@ -16,6 +18,7 @@ interface UseWarehouseItemsLazyInventoryOptions {
   status?: string;
   supplierId?: string;
   locationId?: string | null;
+  stockMode?: StockMode;
 }
 
 const MAX_ITEMS = 20000;
