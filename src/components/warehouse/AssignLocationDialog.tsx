@@ -212,7 +212,14 @@ export function AssignLocationDialog({ items, open, onOpenChange, onComplete, co
                     </SelectTrigger>
                     <SelectContent>
                       {bins.map((bin) => (
-                        <SelectItem key={bin.id} value={bin.id}>{bin.bin_code} — {bin.name}</SelectItem>
+                        <SelectItem key={bin.id} value={bin.id}>
+                          {bin.bin_code} — {bin.name}
+                          {bin.inherited_from_location_name && (
+                            <span className="text-xs text-muted-foreground ml-2">
+                              · inherited from {bin.inherited_from_location_name}
+                            </span>
+                          )}
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
