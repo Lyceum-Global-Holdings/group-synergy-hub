@@ -80,11 +80,15 @@ export function AddPartialPieceDialog({ open, onOpenChange }: Props) {
 
   useEffect(() => {
     if (item) {
-      if (!sizeUom) setSizeUom(item.secondary_uom || item.base_uom || "");
+      if (!sizeUom) {
+        const candidate = item.secondary_uom || item.base_uom || "";
+        const abbrs = (units as Array<{ abbreviation: string }>).map(u => u.abbreviation);
+        if (candidate && abbrs.includes(candidate)) setSizeUom(candidate);
+      }
       if (!unitCost && item.unit_cost != null) setUnitCost(String(item.unit_cost));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [parentItemId]);
+  }, [parentItemId, units]);
 
   // Inherit the active global location filter (SAP EWM / Oracle WMS pattern).
   useEffect(() => {
