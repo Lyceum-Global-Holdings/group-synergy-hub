@@ -28,6 +28,7 @@ import { useWarehouseLocations } from '@/hooks/useWarehouseLocations';
 import { useWarehouseBins } from '@/hooks/useWarehouseBins';
 import { useWarehouseBinAllocations } from '@/hooks/useWarehouseBinAllocations';
 import { useCompany } from '@/contexts/CompanyContext';
+import { buildLocationOptions, locationTypeLabel } from '@/lib/warehouse/locationHierarchy';
 import { WarehouseItem } from '@/types/itemBin';
 import { supabase } from '@/integrations/supabase/client';
 import { Upload, X, Plus } from 'lucide-react';
