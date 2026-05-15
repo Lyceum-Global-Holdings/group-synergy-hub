@@ -298,7 +298,14 @@ export function AddPartialPieceDialog({ open, onOpenChange }: Props) {
             </div>
             <div>
               <Label>UOM *</Label>
-              <Input value={sizeUom} onChange={(e) => setSizeUom(e.target.value)} placeholder="m, mm, kg, m²…" />
+              <Select value={sizeUom} onValueChange={setSizeUom}>
+                <SelectTrigger><SelectValue placeholder="Select unit" /></SelectTrigger>
+                <SelectContent>
+                  {(units as Array<{ id: string; name: string; abbreviation: string }>).map(u => (
+                    <SelectItem key={u.id} value={u.abbreviation}>{u.name} ({u.abbreviation})</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div>
               <Label className="flex items-center gap-1">
