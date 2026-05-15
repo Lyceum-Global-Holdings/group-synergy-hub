@@ -138,6 +138,19 @@ export default function PartialQuantities() {
                 ))}
               </SelectContent>
             </Select>
+            <Select value={parentItemId} onValueChange={setParentItemId}>
+              <SelectTrigger className="w-[260px]"><SelectValue placeholder="All items" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All items</SelectItem>
+                {itemOptions.map(o => (
+                  <SelectItem key={o.parent_item_id} value={o.parent_item_id}>
+                    <span className="font-mono text-xs mr-2">{o.item_code}</span>
+                    <span className="text-xs text-muted-foreground">{o.item_name}</span>
+                    <span className="ml-2 text-xs text-muted-foreground">({o.piece_count})</span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <span className="text-sm text-muted-foreground ml-auto">
               {isLoading ? "Loading…" : `${rows.length} pieces`}
             </span>
