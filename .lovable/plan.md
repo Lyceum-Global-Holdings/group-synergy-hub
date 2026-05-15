@@ -1,32 +1,72 @@
-## Root cause
-The list on `/warehouse/partial-quantities` is filtered by the **global header location filter** (`globalLocationId`) via the `list_partial_pieces` RPC. The **Add Partial Piece** dialog ignores that filter — it shows every location, defaults to none, and lets the user save the piece against a different location (often the parent location, since bins live there). Result: the row is saved correctly but is hidden by the active sub-location filter, so it looks like nothing was added.
+## Goal
 
-## Fix — align Add dialog with the active location context
-Standard WMS practice (SAP EWM / Oracle WMS / Manhattan): when the operator is working in a scoped storage location, transactional create screens must inherit that scope and not let the user write outside it without an explicit override.
+Let users register many partial pieces (offcuts/remnants) for a single parent item in one action, instead of repeating the dialog per piece. This mirrors SAP EWM "Handling Unit – multi-create" and Oracle WMS "multi-LPN receipt": one header (item + location + shared attrs) plus N detail rows (size/UOM/optional piece code/label).
 
-### `src/components/warehouse/partial-qty/AddPartialPieceDialog.tsx`
-1. Read `globalLocationId` via `useLocationFilter()`.
-2. When the dialog opens, prefill the Location field with `globalLocationId` (when set) and keep it in sync if the user changes the global filter.
-3. When `globalLocationId` is set:
-   - Lock the Location `<Select>` to that value (`disabled`) and render a small inline note: "Scoped by header filter: {location name}. Clear the global filter to add elsewhere."
-   - Restrict the Bin dropdown to bins of that location (already the case via `bins-for-location` query) — also include bins of any descendant sub-locations is **out of scope**; one location at a time.
-4. When `globalLocationId` is null, keep the current free choice.
-5. On successful save, invalidation already includes `partial-pieces` and `partial-piece-items` — no change needed.
+## UX
 
-### `src/pages/warehouse/PartialQuantities.tsx`
-1. When `globalLocationId` is set, surface the active scope in the page header as a small badge ("Showing: {location}") with a clear-filter button. This makes the empty-after-add scenario visually obvious for users who didn't realise a filter was active.
-2. When the list is empty AND a global filter is active, change the empty state to: "No partial pieces at {location}. Clear the filter to see other locations or use Add piece to register one here."
+Extend the existing **Add Partial Piece** dialog with a tab/toggle:
 
-### Out of scope
-- No DB / RLS / RPC change — `list_partial_pieces` already filters by `p_location_id` correctly.
-- No changes to Edit / Consume / Split / Import dialogs.
-- No hierarchical "include children" behaviour — staying with a single location matches how the list already filters.
+- **Single** (default, current behaviour — unchanged)
+- **Multiple rows** (new)
 
-## Files to touch
-- `src/components/warehouse/partial-qty/AddPartialPieceDialog.tsx`
-- `src/pages/warehouse/PartialQuantities.tsx`
+In *Multiple rows* mode the dialog shows two zones:
+
+**Header (shared across all rows)**
+- Parent Item * (ItemSelector)
+- Location * (locked to global header filter when active, same rule as single mode)
+- Bin (optional, scoped to location)
+- UOM * (defaults from item's secondary/base UOM)
+- Unit cost, Source ref, Batch no., Label prefix, Notes — all optional, applied to every row
+
+**Rows table** — editable grid with columns:
+- # (auto)
+- Size * (number, step 0.0001)
+- Piece code (optional; blank = auto `ITEM-CODE/PQ-NNNN`)
+- Label suffix (optional; final label = `prefix + suffix` when both present)
+- Row actions: duplicate, remove
+
+Controls under the table:
+- "Add row" button
+- "Paste from clipboard" — accepts CSV/TSV `size,piece_code,label` so users can paste from Excel (matches the existing import template column order)
+- Row counter + sum of sizes (e.g. "12 rows · total 38.42 m")
+
+Footer:
+- Cancel
+- **Add N pieces** — disabled until header valid and ≥1 row has a positive size
+
+On submit: progress text "Saving 7 of 12…", then a single toast summarising successes / failures. On any failure the whole batch is rolled back (atomic — see Technical).
 
 ## Validation
-- With a sub-location selected globally → open Add piece → Location field is pre-filled and locked → save → row appears immediately in the list at that sub-location.
-- With no global filter → behaviour unchanged; user picks any location.
-- Switching global filter while dialog is open updates the locked location.
+
+- Header: parent item, location, UOM required.
+- Each row: `size > 0` required.
+- Piece codes within the batch must be unique (client-side check before submit).
+- Empty rows are silently dropped.
+- Max 200 rows per batch (UI guard) to keep the request bounded.
+
+## Out of scope
+
+- No changes to Edit / Consume / Split / CSV-Import dialogs.
+- No new columns on `warehouse_partial_pieces`.
+- No bulk edit / bulk delete.
+- Single-mode behaviour and validation stay byte-identical.
+
+## Files
+
+- `src/components/warehouse/partial-qty/AddPartialPieceDialog.tsx` — add mode toggle, rows grid, paste handler, batch submit loop.
+- `src/hooks/warehouse/usePartialPieces.ts` — add `useCreatePartialPiecesBulk` mutation that calls the new RPC and invalidates the same query keys as `useCreatePartialPiece`.
+- New migration: `create_partial_pieces_bulk(p_company_id uuid, p_parent_item_id uuid, p_location_id uuid, p_bin_id uuid, p_shared jsonb, p_rows jsonb) returns setof uuid` — SECURITY INVOKER, runs all inserts inside one transaction by looping over `p_rows` and calling the existing `create_partial_piece` logic. Returns the new piece ids. RLS is enforced naturally because it's INVOKER.
+
+## Technical notes
+
+- Atomicity: a single RPC ensures all rows commit or none — required so a mid-batch failure doesn't leave the user with a partial save and duplicate piece codes on retry.
+- Auto piece-code generation reuses the existing per-item sequence inside `create_partial_piece`; the bulk function calls that same code path so numbering stays gap-free per item.
+- Cache invalidation: bulk mutation invalidates `["partial-pieces"]` and `["partial-piece-items"]` once after the whole batch (not per row) to avoid N refetches.
+- Locked-location rule from the previous fix continues to apply — header location is pre-filled and disabled when the global filter is set, so all bulk rows land in the visible scope.
+
+## Validation
+
+1. Global filter cleared → open dialog → Multiple rows → add 3 sizes → save → 3 rows appear in the list under the same item code with sequential auto codes.
+2. Sub-location selected globally → open dialog → header location is locked → save 5 rows → all 5 appear in the filtered list.
+3. Paste `1.2\n2.4\n0.8` from Excel → 3 rows populated → save succeeds.
+4. Force one row to duplicate an existing piece code → entire batch rejected, no partial inserts, error toast names the offending code.

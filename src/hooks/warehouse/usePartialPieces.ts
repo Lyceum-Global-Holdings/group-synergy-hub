@@ -94,6 +94,47 @@ export function useCreatePartialPiece() {
   });
 }
 
+export interface BulkPartialPieceRow {
+  size_value: number;
+  piece_code?: string | null;
+  label?: string | null;
+}
+
+export interface CreatePartialPiecesBulkInput {
+  company_id: string;
+  parent_item_id: string;
+  location_id: string;
+  bin_id?: string | null;
+  shared: {
+    size_uom?: string | null;
+    source_ref?: string | null;
+    batch_number?: string | null;
+    unit_cost?: number | null;
+    label?: string | null;
+    notes?: string | null;
+  };
+  rows: BulkPartialPieceRow[];
+}
+
+export function useCreatePartialPiecesBulk() {
+  const invalidate = useInvalidate();
+  return useMutation({
+    mutationFn: async (input: CreatePartialPiecesBulkInput) => {
+      const { data, error } = await supabase.rpc("create_partial_pieces_bulk", {
+        p_company_id: input.company_id,
+        p_parent_item_id: input.parent_item_id,
+        p_location_id: input.location_id,
+        p_bin_id: input.bin_id ?? null,
+        p_shared: input.shared as never,
+        p_rows: input.rows as never,
+      });
+      if (error) throw error;
+      return (data ?? []) as string[];
+    },
+    onSuccess: invalidate,
+  });
+}
+
 export function useUpdatePartialPiece() {
   const invalidate = useInvalidate();
   return useMutation({
