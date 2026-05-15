@@ -150,8 +150,14 @@ export function AddPartialPieceDialog({ open, onOpenChange }: Props) {
             <Input value={sizeUom} onChange={(e) => setSizeUom(e.target.value)} placeholder="m, mm, kg, m²…" />
           </div>
           <div>
-            <Label>Location *</Label>
-            <Select value={locationId} onValueChange={(v) => { setLocationId(v); setBinId(""); }}>
+            <Label className="flex items-center gap-1">
+              Location * {lockedLocation && <Lock className="h-3 w-3 text-muted-foreground" />}
+            </Label>
+            <Select
+              value={locationId}
+              onValueChange={(v) => { setLocationId(v); setBinId(""); }}
+              disabled={lockedLocation}
+            >
               <SelectTrigger><SelectValue placeholder="Select location" /></SelectTrigger>
               <SelectContent>
                 {(locations as Array<{ id: string; location_code: string; name?: string }>).map(l => (
@@ -159,6 +165,11 @@ export function AddPartialPieceDialog({ open, onOpenChange }: Props) {
                 ))}
               </SelectContent>
             </Select>
+            {lockedLocation && (
+              <p className="text-xs text-muted-foreground mt-1">
+                Scoped by header filter{lockedLocationName ? `: ${lockedLocationName}` : ""}. Clear the global location filter to add elsewhere.
+              </p>
+            )}
           </div>
           <div>
             <Label>Bin</Label>
