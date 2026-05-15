@@ -321,7 +321,16 @@ export function AddPartialPieceDialog({ open, onOpenChange }: Props) {
               <Select value={binId} onValueChange={setBinId} disabled={!locationId}>
                 <SelectTrigger><SelectValue placeholder="(optional)" /></SelectTrigger>
                 <SelectContent>
-                  {bins.map(b => <SelectItem key={b.id} value={b.id}>{b.bin_code}</SelectItem>)}
+                  {bins.map(b => (
+                    <SelectItem key={b.id} value={b.id}>
+                      {b.bin_code}
+                      {b.inherited_from_location_name && (
+                        <span className="text-xs text-muted-foreground ml-2">
+                          · inherited from {b.inherited_from_location_name}
+                        </span>
+                      )}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
