@@ -18,6 +18,7 @@ import {
 } from "@/hooks/warehouse/usePartialPieces";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
+import { useBinsForLocation } from "@/hooks/warehouse/useBinsForLocation";
 import { useToast } from "@/hooks/use-toast";
 import { Lock, Plus, Trash2, Copy, ClipboardPaste } from "lucide-react";
 
