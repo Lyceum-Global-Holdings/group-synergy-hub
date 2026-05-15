@@ -20833,6 +20833,17 @@ export type Database = {
         }[]
       }
       create_partial_piece: { Args: { p_payload: Json }; Returns: string }
+      create_partial_pieces_bulk: {
+        Args: {
+          p_bin_id: string
+          p_company_id: string
+          p_location_id: string
+          p_parent_item_id: string
+          p_rows: Json
+          p_shared: Json
+        }
+        Returns: string[]
+      }
       create_tool_with_initial_bin: {
         Args: { p_bin_id: string; p_quantity: number; p_tool_data: Json }
         Returns: string
