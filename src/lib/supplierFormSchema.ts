@@ -194,7 +194,17 @@ export function mergeWithBaseline(saved: SupplierFormSchema | null | undefined):
     fields: s.fields.map((f) => {
       const base = baselineMap.get(f.key);
       if (base) baselineMap.delete(f.key);
-      return base ? { ...base, visible: f.visible, required: f.required, label: f.label || base.label, help: f.help ?? base.help } : f;
+      return base
+        ? {
+            ...base,
+            visible: f.visible,
+            required: f.required,
+            label: f.label || base.label,
+            help: f.help ?? base.help,
+            placeholder: f.placeholder ?? base.placeholder,
+            order: f.order,
+          }
+        : f;
     }),
   }));
   // Re-add any baseline fields that were missing.
