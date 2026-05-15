@@ -96,7 +96,14 @@ export function BinMasterTab() {
             ) : (
               filteredBins.map((bin) => (
                 <TableRow key={bin.id}>
-                  <TableCell className="font-medium">{bin.bin_code}</TableCell>
+                  <TableCell className="font-medium">
+                    <div className="flex items-center gap-2">
+                      <span>{bin.bin_code}</span>
+                      {bin.is_global_template && (
+                        <Badge variant="outline" className="text-xs">Global</Badge>
+                      )}
+                    </div>
+                  </TableCell>
                   <TableCell>{bin.name}</TableCell>
                   <TableCell>{bin.capacity || '-'}</TableCell>
                   <TableCell>{bin.current_quantity || 0}</TableCell>
