@@ -189,6 +189,12 @@ export function BinMasterTab() {
         }}
         editingBin={editingBin}
       />
+
+      <BulkBinScopeDialog
+        open={isBulkScopeOpen}
+        onOpenChange={setIsBulkScopeOpen}
+        bins={selectedBins}
+      />
     </div>
   );
 }
