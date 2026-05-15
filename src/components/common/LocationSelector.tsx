@@ -145,7 +145,7 @@ export function LocationSelector() {
         <SelectTrigger className="w-[200px] shrink-0">
           <SelectValue placeholder={placeholder} />
         </SelectTrigger>
-        <SelectContent>
+        <SelectContent className="min-w-[260px]">
           {locationsError && (
             <SelectItem value="__error" disabled>
               Failed to load locations
@@ -159,9 +159,15 @@ export function LocationSelector() {
           {showAllOption && locations.length > 0 && (
             <SelectItem value="all">All Locations</SelectItem>
           )}
-          {locations.map((loc) => (
-            <SelectItem key={loc.id} value={loc.id}>
-              {loc.parent_id ? `↳ ${loc.name}` : loc.name}
+          {orderedLocations.map(({ loc, depth }) => (
+            <SelectItem key={loc.id} value={loc.id} className="pr-2">
+              <span
+                className="block truncate"
+                style={{ paddingInlineStart: `${depth * 16}px` }}
+                title={loc.name}
+              >
+                {loc.name}
+              </span>
             </SelectItem>
           ))}
         </SelectContent>
