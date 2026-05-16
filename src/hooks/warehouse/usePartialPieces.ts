@@ -199,7 +199,43 @@ export function useConsumePartialPiece() {
   });
 }
 
-export function useSplitPartialPiece() {
+export interface ConsumePartialPiecePiecesInput {
+  id: string;
+  pieces: number;
+  residual_size: number;
+  reason: string;
+  post_to_stock?: boolean;
+  reference?: string | null;
+  notes?: string | null;
+}
+
+export function useConsumePartialPiecePieces() {
+  const invalidate = useInvalidate();
+  return useMutation({
+    mutationFn: async (input: ConsumePartialPiecePiecesInput) => {
+      const { data, error } = await supabase.rpc("consume_partial_piece_pieces", {
+        p_id: input.id,
+        p_pieces: input.pieces,
+        p_residual_size: input.residual_size,
+        p_reason: input.reason,
+        p_post_to_stock: input.post_to_stock ?? false,
+        p_reference: input.reference ?? null,
+        p_notes: input.notes ?? null,
+      });
+      if (error) throw error;
+      return data as {
+        ok: boolean;
+        pieces_consumed: number;
+        residual_size: number;
+        total_consumed: number;
+        remaining_pieces: number;
+        residual_id: string | null;
+        transaction_id: string | null;
+      };
+    },
+    onSuccess: invalidate,
+  });
+}
   const invalidate = useInvalidate();
   return useMutation({
     mutationFn: async (input: { id: string; first_size: number; second_size: number }) => {
