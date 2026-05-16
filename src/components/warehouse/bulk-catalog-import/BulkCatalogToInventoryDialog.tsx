@@ -269,7 +269,7 @@ function Row({ index, row, companies, locations, bins, defaultLocationId, onChan
           value={companyId ?? undefined}
           onValueChange={(v) => {
             // When company changes, keep default location if it belongs to new company; else clear
-            const keepLoc = defaultLocationId && locations.some((l) => l.id === defaultLocationId);
+            const keepLoc = defaultLocationId && locations.some((l) => l.location.id === defaultLocationId);
             onChange({ company_id: v, location_id: keepLoc ? defaultLocationId : null, bin_id: null });
           }}
         >
@@ -293,8 +293,10 @@ function Row({ index, row, companies, locations, bins, defaultLocationId, onChan
             <SelectValue placeholder="Select…" />
           </SelectTrigger>
           <SelectContent>
-            {locations.map((l) => (
-              <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>
+            {locations.map((opt: any) => (
+              <SelectItem key={opt.location.id} value={opt.location.id}>
+                <span style={{ paddingLeft: `${opt.depth * 12}px` }}>{opt.breadcrumb}</span>
+              </SelectItem>
             ))}
           </SelectContent>
         </Select>
