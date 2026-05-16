@@ -79,6 +79,7 @@ export interface CreatePartialPieceInput {
   parent_item_id: string;
   size_value: number;
   size_uom?: string | null;
+  piece_count?: number;
   location_id: string;
   bin_id?: string | null;
   piece_code?: string | null;
@@ -105,6 +106,7 @@ export function useCreatePartialPiece() {
 
 export interface BulkPartialPieceRow {
   size_value: number;
+  piece_count?: number;
   piece_code?: string | null;
   label?: string | null;
 }
