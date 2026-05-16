@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef, useEffect, useCallback, lazy, Suspense } from 'react';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Plus, Search, Edit, Trash2, History, Settings, Eye, ArrowLeftRight, MapPin, BarChart3, Wrench, Image as ImageIcon, X, Package, FileWarning, ChevronDown, Download, FileSpreadsheet, PackagePlus, Loader2, Columns3, Upload, CheckSquare } from 'lucide-react';
@@ -77,6 +77,7 @@ import { supabase } from '@/integrations/supabase/client';
 
 import { useLocationFilter } from '@/contexts/LocationFilterContext';
 import { useWarehouseBinAllocations } from '@/hooks/useWarehouseBinAllocations';
+import { useWarehouseLocations } from '@/hooks/useWarehouseLocations';
 import { useIsAdminOrHigher } from '@/hooks/useIsAdminOrHigher';
 import { writeExcelFromJSON } from '@/utils/excelUtils';
 import { format } from 'date-fns';
@@ -226,123 +227,26 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
     return () => observer.disconnect();
   }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
-  // Fetch all top-level warehouse locations
-  const { data: allLocations = [] } = useQuery({
-    queryKey: ['all-warehouse-locations'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('warehouse_locations')
-        .select('id, name')
-        .is('parent_id', null)
-        .order('name');
-      
-      if (error) throw error;
-      return data || [];
-    },
-  });
+  const { locations: allLocations = [] } = useWarehouseLocations();
+  const locationNameById = useMemo(
+    () => new Map(allLocations.map((location) => [location.id, location.name])),
+    [allLocations]
+  );
 
-  // Fetch stock by location — only after initial items have loaded
-  const locationStockEnabled = totalLoaded > 0;
-  const { data: itemLocationStock = {} } = useQuery<ItemLocationStockMap>({
-    queryKey: ['all-items-location-stock', globalLocationId],
-    queryFn: async () => {
-      let scopedLocationIds: Set<string> | null = null;
-      if (globalLocationId) {
-        const { data: scopeRows } = await supabase.rpc('get_location_subtree_ids' as any, {
-          p_location_id: globalLocationId,
-        } as any);
-        scopedLocationIds = new Set(((scopeRows || []) as any[]).map((row) => String(row)));
-        if (scopedLocationIds.size === 0) scopedLocationIds.add(globalLocationId);
-      }
+  // The inventory RPC already returns location-scoped stock for the selected
+  // location/subtree. Keep the UI summary derived from those canonical rows.
+  const itemLocationStock = useMemo<ItemLocationStockMap>(() => {
+    if (!globalLocationId) return {};
 
-      // Fetch allocations with cursor-based batching
-      const allocations: { warehouse_item_id: string; bin_id: string; location_id: string | null; available_quantity: number }[] = [];
-      let lastAllocId: string | null = null;
-      while (true) {
-        let q = supabase
-          .from('warehouse_bin_allocations')
-          .select('id, warehouse_item_id, bin_id, location_id, available_quantity')
-          .gt('available_quantity', 0)
-          .order('id')
-          .limit(1000);
-        if (lastAllocId) q = q.gt('id', lastAllocId);
-        const { data, error: allocError } = await q;
-        if (allocError) throw allocError;
-        if (!data || data.length === 0) break;
-        allocations.push(...data.filter((a) => !scopedLocationIds || scopedLocationIds.has(a.location_id || '')));
-        if (data.length < 1000) break;
-        lastAllocId = data[data.length - 1].id;
+    const locationName = locationNameById.get(globalLocationId) ?? 'Selected location';
+    return allItems.reduce<ItemLocationStockMap>((acc, item) => {
+      const stock = Number(item.current_stock || 0);
+      if (stock > 0) {
+        acc[item.id] = [{ locationId: globalLocationId, locationName, stock }];
       }
-
-      if (allocations.length === 0) return {};
-      
-      const binIds = [...new Set(allocations.map(a => a.bin_id).filter(Boolean))];
-      if (binIds.length === 0) return {};
-      
-      const bins: { id: string; location_id: string | null }[] = [];
-      for (let i = 0; i < binIds.length; i += 500) {
-        const chunk = binIds.slice(i, i + 500);
-        const { data, error: binsError } = await supabase
-          .from('warehouse_bins')
-          .select('id, location_id')
-          .in('id', chunk);
-        if (binsError) throw binsError;
-        if (data) bins.push(...data);
-      }
-      
-      if (bins.length === 0) return {};
-      
-      const locationIds = [...new Set([
-        ...allocations.map(a => a.location_id).filter(Boolean),
-        ...bins.map(b => b.location_id).filter(Boolean),
-      ])] as string[];
-      if (locationIds.length === 0) return {};
-      
-      const locations: { id: string; name: string }[] = [];
-      for (let i = 0; i < locationIds.length; i += 500) {
-        const chunk = locationIds.slice(i, i + 500);
-        const { data, error: locError } = await supabase
-          .from('warehouse_locations')
-          .select('id, name')
-          .in('id', chunk);
-        if (locError) throw locError;
-        if (data) locations.push(...data);
-      }
-      
-      const binLocationMap = new Map(bins.map(b => [b.id, b.location_id]));
-      const locationNameMap = new Map(locations?.map(l => [l.id, l.name]) || []);
-      
-      const grouped: ItemLocationStockMap = {};
-      
-      allocations.forEach((alloc) => {
-        const itemId = alloc.warehouse_item_id;
-        const binId = alloc.bin_id;
-        if (!binId) return;
-        
-        const locationId = alloc.location_id ?? binLocationMap.get(binId);
-        if (!locationId) return;
-        
-        const locationName = locationNameMap.get(locationId);
-        if (!locationName) return;
-        
-        if (!grouped[itemId]) grouped[itemId] = [];
-        
-        const existing = grouped[itemId].find(l => l.locationId === locationId);
-        if (existing) {
-          existing.stock += Number(alloc.available_quantity);
-        } else {
-          grouped[itemId].push({ 
-            locationId, 
-            locationName, 
-            stock: Number(alloc.available_quantity) 
-          });
-        }
-      });
-      
-      return grouped;
-    },
-    enabled: locationStockEnabled,
-  });
+      return acc;
+    }, {});
+  }, [allItems, globalLocationId, locationNameById]);
 
   // Extract unique bins from loaded items for client-side bin filter
   const uniqueBins = useMemo(() => {

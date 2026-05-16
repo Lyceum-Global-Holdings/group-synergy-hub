@@ -37,6 +37,7 @@ export interface WarehouseBin {
   name: string;
   bin_type_id: string | null;
   location_id: string | null;
+  root_location_id?: string | null;
   capacity: number | null;
   current_quantity: number;
   status: 'active' | 'inactive' | 'maintenance' | 'full';

@@ -1,75 +1,68 @@
-# Bin ↔ Location Hierarchy: Warehouse-Scoped Bins
+## Goal
+Make Inventory show stock correctly by selected Location and Sub-location permanently, without relying on the warehouse-level bin row as the physical stock location.
 
-## Problem
+## Root cause
+The current model now scopes `warehouse_bins` to the root warehouse, which is correct for shared bin codes. But several inventory reads and stock write paths still assume `warehouse_bins.location_id` is the physical stock location. That makes sub-location stock disappear or roll up incorrectly because the bin row points to the warehouse root, not the sub-location where stock actually sits.
 
-Today `warehouse_bins.location_id` points at one specific node (location, sub-location, or department). Uniqueness is `(bin_code, company_id, location_id)`, so the same physical bin (e.g. `A-01-01`) has to be re-created for every sub-location and department under the same warehouse. Stock operations at a sub-location can't see the parent warehouse's bins.
+## Permanent solution
 
-## International Standard (SAP EWM / Oracle WMS / GS1)
+1. **Canonicalize stock location at allocation level**
+   - Treat `warehouse_bin_allocations.location_id` as the source of truth for physical stock location.
+   - Keep `warehouse_bins.root_location_id/location_id` as the shared warehouse/bin master scope only.
+   - Ensure all new/updated allocation rows are written with the exact selected location/sub-location.
 
-A storage bin belongs to **one warehouse (root node)**. Zones, aisles, sub-locations and departments are *addressable areas inside that warehouse* and all share the warehouse's bin master. Bin codes are unique **per warehouse + company**, not per sub-node.
+2. **Replace Inventory’s split query logic with one canonical server RPC**
+   - Update/create `list_warehouse_inventory` so it returns:
+     - one item row per item,
+     - location-filtered `current_stock` derived from allocation sums,
+     - `bins` derived from allocations at the selected location/subtree,
+     - parent location totals including child sub-locations,
+     - sub-location totals showing only that sub-location subtree.
+   - Use `warehouse_bin_allocations.location_id` for stock filtering, with fallback to bin location only for legacy rows.
 
-We will adopt the same model:
+3. **Update frontend Inventory to use the canonical RPC**
+   - Refactor `useWarehouseItemsLazyInventory` to stop doing client-side bin/allocation enrichment.
+   - Pass selected company, selected location, search/filter params, and pagination to the RPC.
+   - Display `item.current_stock` as the selected location/sub-location stock total, not global item stock, when a location filter is active.
+   - Remove the separate `all-items-location-stock` client-side query from `ItemMasterTab`, because it is duplicating logic and causing inconsistent totals.
 
-```text
-Company
-└── Warehouse (root location)         ← bins live here
-    ├── Sub-location (zone/floor)     ← uses parent's bins
-    │   └── Department                ← uses parent's bins
-    └── Sub-location
-```
+4. **Fix all stock write paths that create/update allocations**
+   - Update these paths to include allocation `location_id` and lookup existing allocations by `(item, bin, company, location)`:
+     - Create item opening stock
+     - Add from catalog
+     - Bulk item import
+     - Bulk stock upload
+     - GRN bin allocation approval
+     - Manual bin allocation dialog
+     - Stock transfer destination allocation
+     - Returns/adjustments where applicable
+   - This prevents a sub-location receipt from merging into the same bin at the root warehouse.
 
-## Data Model Changes
+5. **Add database guardrails**
+   - Keep/complete the allocation trigger that validates allocation location belongs under the bin’s root warehouse.
+   - Add/verify a uniqueness rule on `(warehouse_item_id, bin_id, company_id, location_id)` for active allocation rows.
+   - Update stock transaction guard logic so ledger rows preserve the caller’s exact `location_id` when it is valid, rather than overwriting it with the bin root.
 
-1. **`warehouse_bins`**
-   - Add `root_location_id uuid` (the top-level warehouse). Required going forward.
-   - Backfill: walk `warehouse_locations.parent_id` up to the node whose `type = 'location'` (or whose `parent_id IS NULL`).
-   - Keep existing `location_id` for backward compatibility but treat it as legacy; new writes set both `location_id = root_location_id` and `root_location_id`.
-   - Replace unique index `warehouse_bins_code_company_location_uniq` with **`(bin_code, company_id, root_location_id)`** (partial, where both not null).
-   - Add index on `(company_id, root_location_id, bin_code)` for fast lookup.
+6. **Backfill existing data safely**
+   - For existing allocation rows, populate `warehouse_bin_allocations.location_id` from the best available source:
+     - exact stock transaction location for the item/bin,
+     - then item location,
+     - then bin root as last resort.
+   - Recompute item master totals from allocations after the location backfill.
 
-2. **Helper function** `public.get_root_location_id(_location_id uuid) RETURNS uuid` — recursive CTE up the `parent_id` chain, returns the topmost ancestor for the given node. `STABLE`, `SECURITY INVOKER`.
+7. **Verification**
+   - Query the DB to confirm positive allocations exist by sub-location.
+   - Verify the Inventory RPC returns those rows for:
+     - exact sub-location,
+     - parent warehouse including child stock,
+     - all locations.
+   - Verify the preview no longer throws the current `Maximum call stack size exceeded` runtime error.
+   - Confirm Inventory shows correct stock/bins after selecting a location and a sub-location.
 
-3. **Validation trigger** on `bin_allocations` (and any other table that pairs `bin_id` + `location_id`): ensure `get_root_location_id(NEW.location_id) = (SELECT root_location_id FROM warehouse_bins WHERE id = NEW.bin_id)`. Prevents allocating a bin to a sub-location of a different warehouse.
-
-4. **Backfill migration** safely:
-   - Compute `root_location_id` for every existing bin.
-   - Where collisions appear (same `bin_code` already exists at warehouse level for the same company), merge: keep the bin tied to the warehouse-root row, repoint `bin_allocations.bin_id`, then delete the duplicate.
-
-## Backend Surfaces
-
-- **`bulk_clone_bin_scope` RPC**: now operates on **root warehouses only**. Target picker excludes sub-locations and departments — replicating to a sub-location is meaningless under the new model.
-- Any RPC/view that lists bins for a location (`list_bins_for_location`, etc.) resolves the root and filters by `root_location_id`.
-
-## Frontend Changes
-
-- **`CreateBinDialog`**: location field shows only top-level warehouses (`type = 'location'`). Helper text: "Bin will be available in this warehouse and all its sub-locations / departments."
-- **`BinMasterTab`**: 
-  - "Location" column renamed "Warehouse"; shows root warehouse.
-  - New small "Used in" indicator listing sub-locations where the bin currently has allocations.
-  - Selection / bulk-scope dialog updated for warehouse-only targets.
-- **Stock operation pickers** (Putaway, GRN, Stock Transfer, Bin Allocation, Material Issue): when the user selects a sub-location, resolve its root via `buildLocationOptions` (extend with `rootId`) and load bins where `root_location_id = root`. Existing top-level location case continues to work unchanged.
-- **`locationHierarchy.ts`**: add `rootId` to each option for client-side root resolution without an extra query.
-
-## Migration / Rollout
-
-Single migration, executed in this order inside a transaction:
-1. Add nullable `root_location_id`, create `get_root_location_id()`.
-2. Backfill `root_location_id` for all bins.
-3. Detect duplicates per `(bin_code, company_id, root_location_id)`; merge allocations, delete duplicates, log to `security_audit_log` (`action: bin_warehouse_merge`).
-4. Set `root_location_id NOT NULL`, drop old unique index, create new one.
-5. Install validation trigger on `bin_allocations`.
-
-## Out of Scope
-
-- No change to `bin_allocations.quantity` or stock numbers — only the bin↔location relationship is restructured.
-- No QR re-print flow (existing QR payloads keep working; they reference `bin_id`).
-- No change to `warehouse_locations` table structure or hierarchy depth.
-- No change to RBAC, RLS policies, or company scoping rules.
-
-## Verification
-
-- Existing bins still resolve in Bin Master and show their warehouse.
-- Creating a bin at warehouse "Main DC" makes it pickable in Putaway when the user selects "Main DC › Floor 2 › Receiving Dept".
-- Trying to create a duplicate `A-01-01` in the same warehouse fails with a clear error; creating it in a different warehouse succeeds.
-- Bulk-scope dialog only lists warehouses, replication works across companies.
-- Allocating a bin against a sub-location of a different warehouse is blocked by the trigger.
+## Technical notes
+- Database structural changes will use migrations only.
+- Data backfill/corrections will be handled separately as data operations, not schema migrations.
+- The design follows SAP EWM/Oracle WMS style separation:
+  - Bin master = warehouse/root scoped storage identity.
+  - Allocation = exact physical stock location and quantity.
+  - Ledger = immutable movement history at exact location/bin granularity.

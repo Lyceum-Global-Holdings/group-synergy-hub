@@ -19,6 +19,7 @@ export interface WarehouseBinAllocation {
   allocated_quantity: number;
   reserved_quantity: number;
   available_quantity: number;
+  location_id: string | null;
   notes: string | null;
   company_id: string | null;
   created_by: string | null;
@@ -69,6 +70,7 @@ export interface CreateBinAllocationData {
   bin_id: string;
   allocated_quantity: number;
   secondary_quantity?: number;
+  location_id?: string;
   notes?: string;
   company_id?: string;
 }

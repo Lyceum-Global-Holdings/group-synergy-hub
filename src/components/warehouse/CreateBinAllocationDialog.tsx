@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,6 +9,7 @@ import { useWarehouseItems } from '@/hooks/useWarehouseItems';
 import { useWarehouseBins } from '@/hooks/useWarehouseBins';
 import { useWarehouseLocations } from '@/hooks/useWarehouseLocations';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { buildLocationOptions, getRootLocationId } from '@/lib/warehouse/locationHierarchy';
 
 interface CreateBinAllocationDialogProps {
   open: boolean;
@@ -21,13 +22,22 @@ export function CreateBinAllocationDialog({ open, onOpenChange }: CreateBinAlloc
   const { bins } = useWarehouseBins();
   const { locations } = useWarehouseLocations();
   const locationNameById = new Map((locations || []).map((l: any) => [l.id, l.name]));
+  const locationOptions = useMemo(() => buildLocationOptions(locations || [], { activeOnly: true }), [locations]);
   
   const [formData, setFormData] = useState({
     warehouse_item_id: '',
+    location_id: '',
     bin_id: '',
     allocated_quantity: '',
     notes: '',
   });
+  const selectedRootLocationId = useMemo(
+    () => getRootLocationId(locations || [], formData.location_id),
+    [locations, formData.location_id]
+  );
+  const filteredBins = formData.location_id
+    ? bins.filter((bin) => (bin.root_location_id ?? bin.location_id) === selectedRootLocationId)
+    : bins;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -36,12 +46,14 @@ export function CreateBinAllocationDialog({ open, onOpenChange }: CreateBinAlloc
       warehouse_item_id: formData.warehouse_item_id,
       bin_id: formData.bin_id,
       allocated_quantity: parseFloat(formData.allocated_quantity),
+      location_id: formData.location_id || undefined,
       notes: formData.notes || undefined,
     }, {
       onSuccess: () => {
         onOpenChange(false);
         setFormData({
           warehouse_item_id: '',
+          location_id: '',
           bin_id: '',
           allocated_quantity: '',
           notes: '',
@@ -82,17 +94,38 @@ export function CreateBinAllocationDialog({ open, onOpenChange }: CreateBinAlloc
           </div>
 
           <div className="space-y-2">
+            <Label htmlFor="location_id">Physical Location *</Label>
+            <Select
+              value={formData.location_id}
+              onValueChange={(value) => setFormData({ ...formData, location_id: value, bin_id: '' })}
+              required
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select stock location" />
+              </SelectTrigger>
+              <SelectContent>
+                {locationOptions.map(({ location, depth, breadcrumb }) => (
+                  <SelectItem key={location.id} value={location.id}>
+                    <span style={{ paddingInlineStart: `${depth * 12}px` }}>{breadcrumb}</span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
             <Label htmlFor="bin_id">Bin Location *</Label>
             <Select
               value={formData.bin_id}
               onValueChange={(value) => setFormData({ ...formData, bin_id: value })}
+              disabled={!formData.location_id}
               required
             >
               <SelectTrigger>
-                <SelectValue placeholder="Select bin" />
+                <SelectValue placeholder={formData.location_id ? 'Select bin' : 'Select location first'} />
               </SelectTrigger>
               <SelectContent>
-                {bins?.map((bin) => {
+                {filteredBins?.map((bin) => {
                   const locName = bin.location_id ? locationNameById.get(bin.location_id) : null;
                   return (
                     <SelectItem key={bin.id} value={bin.id}>

@@ -542,6 +542,7 @@ export function BulkStockUploadDialog({ open, onOpenChange }: BulkStockUploadDia
               .eq('warehouse_item_id', itemId)
               .eq('bin_id', row.bin_id!)
               .eq('company_id', selectedCompany!.id)
+                .eq('location_id', effectiveLocationId)
               .maybeSingle();
 
             const binQtyBefore = Number(existingAlloc?.allocated_quantity || 0);
@@ -561,6 +562,7 @@ export function BulkStockUploadDialog({ open, onOpenChange }: BulkStockUploadDia
                   bin_id: row.bin_id!,
                   allocated_quantity: row.quantity,
                   company_id: selectedCompany!.id,
+                  location_id: effectiveLocationId,
                   created_by: user!.id,
                 });
               if (insertErr) throw new Error(`Bin allocation insert failed: ${insertErr.message}`);
@@ -577,6 +579,7 @@ export function BulkStockUploadDialog({ open, onOpenChange }: BulkStockUploadDia
                 quantity_before: binQtyBefore,
                 quantity_after: binQtyBefore + row.quantity,
                 bin_id: row.bin_id ?? null,
+                location_id: effectiveLocationId,
                 notes: `Bulk stock upload - Bin: ${row.bin_code}`,
                 company_id: selectedCompany?.id,
                 created_by: user?.id,

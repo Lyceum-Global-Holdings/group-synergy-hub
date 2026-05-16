@@ -402,6 +402,7 @@ export function BulkItemImportDialog() {
         warehouse_item_id: string;
         bin_id: string;
         allocated_quantity: number;
+        location_id?: string;
         company_id?: string;
         created_by?: string;
       }> = [];
@@ -418,6 +419,7 @@ export function BulkItemImportDialog() {
             warehouse_item_id: createdItem.id,
             bin_id: originalItem.bin_id,
             allocated_quantity: originalItem.initial_stock,
+            location_id: originalItem.location_id,
             company_id: selectedCompany?.id,
             created_by: user.user?.id,
           });
