@@ -252,6 +252,7 @@ export function AddPartialPieceDialog({ open, onOpenChange, defaultParentItemId 
       const finalLabel = [labelPrefix, suffix].filter(Boolean).join(" ");
       return {
         size_value: Number(r.size_value),
+        piece_count: Math.max(1, Math.trunc(Number(r.piece_count) || 1)),
         piece_code: r.piece_code.trim() || null,
         label: finalLabel || null,
       };
