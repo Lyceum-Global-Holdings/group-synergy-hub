@@ -53,7 +53,7 @@ export function CreateMaterialRequestDialog({ open, onOpenChange }: CreateMateri
     srn_number: "",
     items_required_date: "",
     purpose: "",
-    priority: "medium" as MaterialRequestPriority,
+    priority: "medium" as unknown as MaterialRequestPriority,
     notes: "",
   });
   const [items, setItems] = useState<RequestItem[]>([]);
@@ -121,7 +121,7 @@ export function CreateMaterialRequestDialog({ open, onOpenChange }: CreateMateri
       .in('status', ['active', 'partially_issued']);
 
     if (!error && data) {
-      setCpoReservations(data as ReservationWithDetails[]);
+      setCpoReservations(data as unknown as ReservationWithDetails[]);
     }
   };
 
@@ -606,7 +606,7 @@ export function CreateMaterialRequestDialog({ open, onOpenChange }: CreateMateri
               </Button>
               <div className="flex gap-2">
                 <Button variant="outline" onClick={() => handleSubmit(false)} disabled={isCreating}>
-                  Save as Draft
+                  Save as unknown as Draft
                 </Button>
                 <Button onClick={() => handleSubmit(true)} disabled={isCreating}>
                   <CheckCircle className="mr-2 h-4 w-4" />

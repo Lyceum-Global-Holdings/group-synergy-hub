@@ -65,7 +65,7 @@ export const useSupplierAnalytics = () => {
         if (!supplierEvaluationsMap.has(supplierId)) {
           supplierEvaluationsMap.set(supplierId, []);
         }
-        supplierEvaluationsMap.get(supplierId)!.push(evaluation as SupplierEvaluation);
+        supplierEvaluationsMap.get(supplierId)!.push(evaluation as unknown as SupplierEvaluation);
       });
 
       // Calculate analytics for each supplier
@@ -132,7 +132,7 @@ export const useSupplierEvaluationsBySupplier = (supplierId: string | null) => {
         .order("evaluation_period_start", { ascending: false });
 
       if (error) throw error;
-      return data as SupplierEvaluation[];
+      return data as unknown as SupplierEvaluation[];
     },
     enabled: !!supplierId,
   });

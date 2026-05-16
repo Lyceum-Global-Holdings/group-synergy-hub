@@ -114,7 +114,7 @@ export function useFloorWiseStockAllocation(projectId: string | null) {
       if (floorsError) throw floorsError;
       if (!floorsData || floorsData.length === 0) return null;
 
-      const floors = floorsData as FloorRow[];
+      const floors = floorsData as unknown as FloorRow[];
       const floorIds = floors.map((f) => f.id);
 
       // Fetch all rooms for these floors
@@ -125,7 +125,7 @@ export function useFloorWiseStockAllocation(projectId: string | null) {
 
       if (roomsError) throw roomsError;
 
-      const rooms = (roomsData || []) as RoomRow[];
+      const rooms = (roomsData || []) as unknown as RoomRow[];
       const roomIds = rooms.map((r) => r.id);
 
       // Fetch all materials for these rooms
@@ -147,7 +147,7 @@ export function useFloorWiseStockAllocation(projectId: string | null) {
 
       if (materialsError) throw materialsError;
 
-      const materials = (materialsData || []) as unknown as MaterialRow[];
+      const materials = (materialsData || []) as unknown as unknown as MaterialRow[];
 
       // Fetch all transactions to calculate used/returned quantities
       const { data: transactionsData, error: transactionsError } = await supabase
@@ -160,7 +160,7 @@ export function useFloorWiseStockAllocation(projectId: string | null) {
 
       if (transactionsError) throw transactionsError;
 
-      const transactions = (transactionsData || []) as TransactionRow[];
+      const transactions = (transactionsData || []) as unknown as TransactionRow[];
 
       // Aggregate transactions by material
       const transactionsByMaterial: Record<

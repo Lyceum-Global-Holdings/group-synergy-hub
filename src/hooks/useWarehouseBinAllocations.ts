@@ -50,12 +50,12 @@ export function useWarehouseBinAllocations(options?: { disableFetch?: boolean })
       // Filter by warehouse item's company_id (not allocation's company_id)
       // This ensures allocations show if the item belongs to the selected company
       if (!isViewingAllCompanies && selectedCompany?.id) {
-        return (allAllocations as unknown as BinAllocationWithDetails[]).filter(
+        return (allAllocations as unknown as unknown as BinAllocationWithDetails[]).filter(
           (allocation) => (allocation.warehouse_item as { item_code: string; name: string; company_id: string | null })?.company_id === selectedCompany.id
         );
       }
 
-      return allAllocations as unknown as BinAllocationWithDetails[];
+      return allAllocations as unknown as unknown as BinAllocationWithDetails[];
     },
     enabled: !options?.disableFetch && !!(isViewingAllCompanies || selectedCompany?.id),
     // Live-critical: bin allocations drive available stock numbers.
@@ -79,7 +79,7 @@ export function useWarehouseBinAllocations(options?: { disableFetch?: boolean })
       .order('available_quantity', { ascending: false });
 
     if (error) throw error;
-    return data as BinAllocationWithDetails[];
+    return data as unknown as BinAllocationWithDetails[];
   };
 
   // Get allocations for a specific bin
@@ -97,7 +97,7 @@ export function useWarehouseBinAllocations(options?: { disableFetch?: boolean })
       .order('allocated_quantity', { ascending: false });
 
     if (error) throw error;
-    return data as BinAllocationWithDetails[];
+    return data as unknown as BinAllocationWithDetails[];
   };
 
   // Create bin allocation

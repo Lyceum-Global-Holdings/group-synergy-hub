@@ -25,7 +25,7 @@ export const useRoomMaterials = (roomId: string | null) => {
         .order('created_at', { ascending: true });
       
       if (error) throw error;
-      return data as unknown as FloorRoomMaterial[];
+      return data as unknown as unknown as FloorRoomMaterial[];
     },
     enabled: !!roomId,
   });
@@ -52,7 +52,7 @@ export const useCreateRoomMaterial = () => {
         .insert({
           ...data,
           total_cost,
-          status: 'planned' as RoomMaterialStatus,
+          status: 'planned' as unknown as RoomMaterialStatus,
         })
         .select()
         .single();

@@ -38,7 +38,7 @@ export function useWarehouseReservations() {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      return data as ReservationWithDetails[];
+      return data as unknown as ReservationWithDetails[];
     },
   });
 
@@ -244,7 +244,7 @@ export function useWarehouseReservations() {
       .eq('reference_id', referenceId);
 
     if (error) throw error;
-    return data as ReservationWithDetails[];
+    return data as unknown as ReservationWithDetails[];
   };
 
   return {

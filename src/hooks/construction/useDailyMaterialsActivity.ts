@@ -216,7 +216,7 @@ export function useDailyMaterialsActivity(startDate: string | null, endDate?: st
           profilesMap = profilesData.reduce((acc, profile) => {
             acc[profile.user_id] = profile.full_name || profile.email || 'Unknown';
             return acc;
-          }, {} as Record<string, string>);
+          }, {} as unknown as Record<string, string>);
         }
       }
 

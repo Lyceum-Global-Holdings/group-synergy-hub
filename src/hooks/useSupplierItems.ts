@@ -27,7 +27,7 @@ export const useSupplierItems = (supplierId?: string) => {
       const { data, error } = await query;
 
       if (error) throw error;
-      return data as SupplierItemWithDetails[];
+      return data as unknown as SupplierItemWithDetails[];
     },
     enabled: !!supplierId,
   });

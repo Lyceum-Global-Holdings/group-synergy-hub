@@ -209,7 +209,7 @@ export function CreateMaterialIssueDialog({ open, onOpenChange }: MaterialIssueD
 
   const addItem = () => {
     if (currentItem.item_id && currentItem.quantity_required) {
-      setItems([...items, currentItem as IssueItem]);
+      setItems([...items, currentItem as unknown as IssueItem]);
       setCurrentItem({});
     }
   };

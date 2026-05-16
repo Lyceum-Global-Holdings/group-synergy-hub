@@ -28,7 +28,7 @@ export const useCycleCounts = (status?: CycleCountStatus) => {
 
       const { data, error } = await query;
       if (error) throw error;
-      return data as CycleCount[];
+      return data as unknown as CycleCount[];
     },
   });
 };
@@ -47,7 +47,7 @@ export const useCycleCount = (countId: string | undefined) => {
         .single();
 
       if (error) throw error;
-      return data as CycleCount;
+      return data as unknown as CycleCount;
     },
     enabled: !!countId,
   });
@@ -99,7 +99,7 @@ export const useCycleCountSchedules = () => {
         .order("created_at", { ascending: false });
 
       if (error) throw error;
-      return data as CycleCountSchedule[];
+      return data as unknown as CycleCountSchedule[];
     },
   });
 };
@@ -125,7 +125,7 @@ export const useCreateCycleCount = () => {
         .single();
 
       if (error) throw error;
-      return cycleCount as CycleCount;
+      return cycleCount as unknown as CycleCount;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["cycle-counts"] });
@@ -159,7 +159,7 @@ export const useAddCycleCountItem = () => {
         .single();
 
       if (error) throw error;
-      return item as CycleCountItem;
+      return item as unknown as CycleCountItem;
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ["cycle-count-items", variables.cycle_count_id] });
