@@ -153,6 +153,9 @@ export function BinMasterTab() {
                     </div>
                   </TableCell>
                   <TableCell>{bin.name}</TableCell>
+                  <TableCell className="text-muted-foreground">
+                    {locationName((bin as any).root_location_id ?? bin.location_id)}
+                  </TableCell>
                   <TableCell>{bin.capacity || '-'}</TableCell>
                   <TableCell>{bin.current_quantity || 0}</TableCell>
                   <TableCell>
