@@ -48,7 +48,7 @@ export function AddPartialPieceDialog({ open, onOpenChange, defaultParentItemId 
   const { globalLocationId } = useLocationFilter();
   const { toast } = useToast();
   const { locations } = useWarehouseLocations();
-  const { items } = useWarehouseItems();
+  const { data: items = [] } = usePartialPieceItems();
   const { units } = useItemUnits();
   const create = useCreatePartialPiece();
   const createBulk = useCreatePartialPiecesBulk();
@@ -73,10 +73,8 @@ export function AddPartialPieceDialog({ open, onOpenChange, defaultParentItemId 
   // Bulk-mode rows
   const [rows, setRows] = useState<BulkRowState[]>([emptyRow(), emptyRow(), emptyRow()]);
 
-  const item = useMemo(
-    () =>
-      (items as Array<{ id: string; secondary_uom: string | null; base_uom: string | null; track_secondary_quantity?: boolean; unit_cost: number | null; item_code: string }>)
-        .find(i => i.id === parentItemId),
+  const item = useMemo<PartialPieceItemOption | undefined>(
+    () => items.find(i => i.parent_item_id === parentItemId),
     [items, parentItemId],
   );
 
