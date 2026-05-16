@@ -32,13 +32,17 @@ export function BulkInventoryUpdateDialog({ open, onOpenChange, selectedIds, onC
   const [isProcessing, setIsProcessing] = useState(false);
 
   const handleSubmit = async () => {
-    const updates: Record<string, any> = {};
-    if (categoryId) updates.category_id = categoryId;
-    if (unitId) updates.unit_id = unitId;
-    if (status) updates.status = status;
-    if (brand.trim()) updates.brand = brand.trim();
+    // Per-company updates (writable directly on warehouse_items)
+    const perCompany: Record<string, any> = {};
+    if (status) perCompany.status = status;
 
-    if (Object.keys(updates).length === 0) {
+    // Master updates (catalog-owned; propagate globally via update_warehouse_catalog_item)
+    const master: Record<string, any> = {};
+    if (categoryId) master.category_id = categoryId;
+    if (unitId) master.unit_id = unitId;
+    if (brand.trim()) master.brand = brand.trim();
+
+    if (Object.keys(perCompany).length === 0 && Object.keys(master).length === 0) {
       toast.error('Please select at least one field to update');
       return;
     }
@@ -47,23 +51,40 @@ export function BulkInventoryUpdateDialog({ open, onOpenChange, selectedIds, onC
     let successCount = 0;
     let errorCount = 0;
 
+    // Resolve catalog_item_id per selected inventory row when master fields change
+    let catalogIds: string[] = [];
+    if (Object.keys(master).length > 0) {
+      const { data: rows } = await supabase
+        .from('warehouse_items_full')
+        .select('catalog_item_id')
+        .in('id', Array.from(selectedIds));
+      catalogIds = Array.from(new Set((rows || []).map((r: any) => r.catalog_item_id).filter(Boolean)));
+    }
+
     for (const id of selectedIds) {
-      const { error } = await supabase.from('warehouse_items').update(updates).eq('id', id);
-      if (error) {
-        console.error('Bulk update error for', id, error);
-        errorCount++;
-      } else {
-        successCount++;
+      if (Object.keys(perCompany).length > 0) {
+        const { error } = await supabase.from('warehouse_items').update(perCompany).eq('id', id);
+        if (error) { console.error('Bulk update error for', id, error); errorCount++; continue; }
       }
+      successCount++;
+    }
+
+    // Apply master edits once per unique catalog item (changes propagate to every company)
+    for (const catalogId of catalogIds) {
+      const rpcArgs: Record<string, any> = { p_catalog_item_id: catalogId };
+      for (const [k, v] of Object.entries(master)) rpcArgs[`p_${k}`] = v;
+      const { error } = await supabase.rpc('update_warehouse_catalog_item', rpcArgs as any);
+      if (error) { console.error('Catalog master update error', catalogId, error); errorCount++; }
     }
 
     queryClient.invalidateQueries({ queryKey: ['warehouse-items-inventory'] });
     queryClient.invalidateQueries({ queryKey: ['warehouse-items'] });
+    queryClient.invalidateQueries({ queryKey: ['warehouse-item-catalog'] });
 
     if (errorCount === 0) {
       toast.success(`Updated ${successCount} items successfully`);
     } else {
-      toast.warning(`Updated ${successCount} items, ${errorCount} failed`);
+      toast.warning(`Updated ${successCount} items, ${errorCount} error(s)`);
     }
 
     setIsProcessing(false);
