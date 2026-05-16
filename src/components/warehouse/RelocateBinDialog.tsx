@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/dialog';
 import { useWarehouseLocations } from '@/hooks/useWarehouseLocations';
 import { useToast } from '@/hooks/use-toast';
+import { buildLocationOptions, getRootLocationId } from '@/lib/warehouse/locationHierarchy';
 import type { WarehouseBin } from '@/types/itemBin';
 
 type Mode = 'with_stock' | 'empty_only';
