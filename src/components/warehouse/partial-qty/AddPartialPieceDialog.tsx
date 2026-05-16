@@ -395,16 +395,32 @@ export function AddPartialPieceDialog({ open, onOpenChange, defaultParentItemId 
           </div>
 
           <TabsContent value="single" className="mt-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-3 gap-4">
               <div>
                 <Label>Size *</Label>
-                <Input type="number" step="0.0001" value={sizeValue} onChange={(e) => setSizeValue(e.target.value)} />
+                <Input type="number" step="0.0001" min={0} value={sizeValue} onChange={(e) => setSizeValue(e.target.value)} />
+              </div>
+              <div>
+                <Label>Qty (pieces) *</Label>
+                <Input
+                  type="number"
+                  step="1"
+                  min={1}
+                  value={pieceQty}
+                  onChange={(e) => setPieceQty(e.target.value.replace(/[^\d]/g, ""))}
+                />
               </div>
               <div>
                 <Label>Piece Code</Label>
                 <Input value={pieceCode} onChange={(e) => setPieceCode(e.target.value)} placeholder="auto-generated if blank" />
               </div>
             </div>
+            {sizeValue && Number(sizeValue) > 0 && Number(pieceQty) > 0 && (
+              <p className="text-xs text-muted-foreground mt-2 tabular-nums">
+                Total: {(Number(sizeValue) * Math.trunc(Number(pieceQty) || 0)).toLocaleString(undefined, { maximumFractionDigits: 4 })} {sizeUom}
+                {" "}({pieceQty} × {sizeValue} {sizeUom})
+              </p>
+            )}
           </TabsContent>
 
           <TabsContent value="bulk" className="mt-4">
