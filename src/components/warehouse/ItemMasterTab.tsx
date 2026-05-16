@@ -690,8 +690,8 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
                   )}
                   {col('company') && (
                     <TableCell>
-                      {item.company_id 
-                        ? companies.find(c => c.id === item.company_id)?.name || '-'
+                      {item.company_id
+                        ? companyById.get(item.company_id)?.name || '-'
                         : 'All Companies'
                       }
                     </TableCell>
