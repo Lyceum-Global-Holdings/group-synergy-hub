@@ -75,15 +75,19 @@ export function CreateBinDialog({ open, onOpenChange, editingBin }: CreateBinDia
     setCodeError(null);
   }, [editingBin, open]);
 
-  // Bins live at the warehouse (root) level. Sub-locations and departments
-  // automatically inherit access — matches SAP EWM / Oracle WMS storage-bin model.
-  const sortedLocations = useMemo(
-    () =>
-      [...locations]
-        .filter((l) => !l.parent_id)
-        .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })),
-    [locations]
-  );
+  // Bins can attach to either a top-level warehouse OR a sub-location/department.
+  // Matches SAP EWM / Oracle WMS bin model: storage bin → physical node (warehouse OR zone).
+  const sortedLocations = useMemo(() => {
+    const byId = new Map(locations.map((l) => [l.id, l] as const));
+    const labelFor = (l: typeof locations[number]) => {
+      if (!l.parent_id) return l.name;
+      const parent = byId.get(l.parent_id);
+      return parent ? `${parent.name} › ${l.name}` : l.name;
+    };
+    return [...locations]
+      .map((l) => ({ ...l, _label: labelFor(l), _isSub: !!l.parent_id }))
+      .sort((a, b) => a._label.localeCompare(b._label, undefined, { sensitivity: 'base' }));
+  }, [locations]);
 
   const validateCode = (code: string) => {
     const v = code.trim().toUpperCase();
@@ -231,18 +235,19 @@ export function CreateBinDialog({ open, onOpenChange, editingBin }: CreateBinDia
                   onValueChange={(value) => setFormData((p) => ({ ...p, location_id: value }))}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Select warehouse" />
+                    <SelectValue placeholder="Select warehouse or sub-location" />
                   </SelectTrigger>
                   <SelectContent>
                     {sortedLocations.map((location) => (
                       <SelectItem key={location.id} value={location.id}>
-                        {location.name}
+                        {location._isSub ? `↳ ${location._label}` : location._label}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
                 <p className="text-xs text-muted-foreground">
-                  Bin is shared across every sub-location and department under this warehouse.
+                  Attach the bin to a warehouse to share it across every sub-location, or to a
+                  specific sub-location/department for narrower scope.
                 </p>
               </div>
             ) : (
@@ -294,7 +299,7 @@ export function CreateBinDialog({ open, onOpenChange, editingBin }: CreateBinDia
                         className="flex items-center gap-2 rounded px-2 py-1.5 hover:bg-muted cursor-pointer"
                       >
                         <Checkbox checked={checked} onCheckedChange={() => toggleLocation(loc.id)} />
-                        <span className="text-sm">{loc.name}</span>
+                        <span className="text-sm">{loc._isSub ? `↳ ${loc._label}` : loc._label}</span>
                       </label>
                     );
                   })}

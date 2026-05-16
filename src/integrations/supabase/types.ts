@@ -21208,6 +21208,17 @@ export type Database = {
           type: string
         }[]
       }
+      get_location_ancestors: {
+        Args: { _location_id: string }
+        Returns: {
+          company_id: string
+          depth: number
+          id: string
+          name: string
+          parent_id: string
+          type: string
+        }[]
+      }
       get_location_company_assignments_admin: {
         Args: { p_location_id: string }
         Returns: {
@@ -21218,6 +21229,7 @@ export type Database = {
           inheritance_source_name: string
         }[]
       }
+      get_location_hierarchy: { Args: { _company_id?: string }; Returns: Json }
       get_location_subtree_ids: {
         Args: { p_location_id: string }
         Returns: string[]
