@@ -159,6 +159,14 @@ export default function PartialQuantities() {
   });
   const { data: itemOptions = [] } = usePartialPieceItems();
 
+  // Cross-tab sync: when Item Master changes anywhere, refresh partial pieces.
+  const qc = useQueryClient();
+  const onItemsChange = useCallback(() => {
+    scheduleInvalidate(qc, ["partial-pieces"]);
+    scheduleInvalidate(qc, ["partial-piece-items"]);
+  }, [qc]);
+  useRealtimeChannel("warehouse_items", onItemsChange);
+
   const [view, setView] = useState<ViewMode>(() => {
     if (typeof window === "undefined") return "grouped";
     return (localStorage.getItem(VIEW_KEY) as ViewMode) || "grouped";
