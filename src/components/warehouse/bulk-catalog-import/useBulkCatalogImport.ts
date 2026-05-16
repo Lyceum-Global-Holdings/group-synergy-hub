@@ -33,7 +33,7 @@ export function useBulkCatalogImport() {
 
     const { data, error } = await supabase
       .from('warehouse_item_catalog')
-      .select('id, item_code, name, barcode, sku, unit:units(abbreviation)')
+      .select('id, item_code, name, barcode, sku, unit:item_units(abbreviation)')
       .or(
         `item_code.in.(${cleaned.map((c) => `"${c}"`).join(',')}),barcode.in.(${cleaned
           .map((c) => `"${c}"`)
