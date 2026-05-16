@@ -119,7 +119,7 @@ export function AddPartialPieceDialog({ open, onOpenChange, defaultParentItemId 
   function reset() {
     setMode("single");
     setParentItemId(""); setLocationId(""); setBinId("");
-    setSizeValue(""); setSizeUom(""); setPieceCode("");
+    setSizeValue(""); setPieceQty("1"); setSizeUom(""); setPieceCode("");
     setSourceRef(""); setBatchNumber(""); setUnitCost(""); setLabel(""); setNotes("");
     setRows([emptyRow(), emptyRow(), emptyRow()]);
   }
