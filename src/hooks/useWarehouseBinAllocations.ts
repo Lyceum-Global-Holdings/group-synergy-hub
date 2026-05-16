@@ -1,9 +1,9 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { flattenCatalog } from '@/lib/flattenWarehouseItem';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useCompany } from '@/contexts/CompanyContext';
 import type { 
-import { flattenCatalog } from '@/lib/flattenWarehouseItem';
   WarehouseBinAllocation, 
   CreateBinAllocationData,
   BinAllocationWithDetails 

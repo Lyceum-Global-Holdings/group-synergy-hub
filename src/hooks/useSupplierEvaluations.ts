@@ -1,8 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { flattenCatalog } from '@/lib/flattenWarehouseItem';
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import {
-import { flattenCatalog } from '@/lib/flattenWarehouseItem';
   SupplierEvaluation,
   SupplierEvaluationEntry,
   CreateSupplierEvaluationData,
