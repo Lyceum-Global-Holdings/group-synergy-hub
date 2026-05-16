@@ -110,13 +110,17 @@ function flattenGroups(groups: GroupRow[], expanded: Set<string>): AnyRow[] {
 }
 
 function toCsv(rows: PartialPieceRow[]): string {
-  const head = ["piece_code","parent_item_code","parent_item_name","size_value","size_uom","location","bin","status","source_ref","batch_number","unit_cost","label","age_days","created_at"];
-  const body = rows.map(r => [
-    r.piece_code, r.parent_item_code, r.parent_item_name,
-    r.size_value, r.size_uom, r.location_name, r.bin_code ?? "",
-    r.status, r.source_ref ?? "", r.batch_number ?? "",
-    r.unit_cost ?? "", r.label ?? "", r.age_days, r.created_at,
-  ].map(v => `"${String(v ?? "").replace(/"/g, '""')}"`).join(","));
+  const head = ["piece_code","parent_item_code","parent_item_name","size_value","quantity","total_size","size_uom","location","bin","status","source_ref","batch_number","unit_cost","label","age_days","created_at"];
+  const body = rows.map(r => {
+    const qty = Math.max(1, Math.trunc(Number(r.piece_count) || 1));
+    return [
+      r.piece_code, r.parent_item_code, r.parent_item_name,
+      r.size_value, qty, Number(r.size_value) * qty,
+      r.size_uom, r.location_name, r.bin_code ?? "",
+      r.status, r.source_ref ?? "", r.batch_number ?? "",
+      r.unit_cost ?? "", r.label ?? "", r.age_days, r.created_at,
+    ].map(v => `"${String(v ?? "").replace(/"/g, '""')}"`).join(",");
+  });
   return [head.join(","), ...body].join("\n");
 }
 
