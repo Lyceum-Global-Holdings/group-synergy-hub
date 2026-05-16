@@ -37,11 +37,6 @@ export function CompanySelector() {
           const company = companies.find(c => c.id === value);
           setSelectedCompany(company || null);
         }
-        
-        // Navigate to dashboard to refresh with new company context
-        if (location.pathname !== '/') {
-          navigate('/');
-        }
       }}>
         <SelectTrigger className="w-[200px]">
           <SelectValue placeholder="Select company">
