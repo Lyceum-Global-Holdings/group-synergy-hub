@@ -194,7 +194,13 @@ export function AppSidebar() {
                               asChild
                               isActive={isActive(item.url)}
                             >
-                              <NavLink to={item.url}>{item.title}</NavLink>
+                              <NavLink
+                                to={item.url}
+                                onMouseEnter={() => preloadRoute(item.url)}
+                                onFocus={() => preloadRoute(item.url)}
+                              >
+                                {item.title}
+                              </NavLink>
                             </SidebarMenuSubButton>
                           </SidebarMenuSubItem>
                         ))}
