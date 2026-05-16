@@ -22,7 +22,7 @@ type Loader = () => Promise<unknown>;
 const PRELOADERS: Array<[string, Loader]> = [
   ["/warehouse/inventory", () => import("@/pages/warehouse/Inventory")],
   ["/warehouse/bin-allocations", () => import("@/pages/warehouse/BinAllocations")],
-  ["/warehouse/grn", () => import("@/pages/warehouse/GRN")],
+  ["/warehouse/grn", () => import("@/pages/warehouse/GoodsReceiptNote")],
   ["/warehouse/item-bin-master", () => import("@/pages/warehouse/ItemBinMaster")],
   ["/warehouse/batch-management", () => import("@/pages/warehouse/BatchManagement")],
   ["/warehouse/stock-audit", () => import("@/pages/warehouse/StockAudit")],
