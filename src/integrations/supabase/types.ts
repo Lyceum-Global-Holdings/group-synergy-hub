@@ -21210,9 +21210,7 @@ export type Database = {
       }
       get_location_subtree_ids: {
         Args: { p_location_id: string }
-        Returns: {
-          location_id: string
-        }[]
+        Returns: string[]
       }
       get_location_with_ancestors: {
         Args: { p_location_id: string }
