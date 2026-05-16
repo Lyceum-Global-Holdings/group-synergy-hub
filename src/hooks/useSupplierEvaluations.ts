@@ -100,7 +100,7 @@ export const useCreateSupplierEvaluation = () => {
         .single();
 
       if (error) throw error;
-      return evaluation;
+      return flattenWarehouseItem(evaluation as any) as SupplierEvaluation;
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["supplier-evaluations"] });
