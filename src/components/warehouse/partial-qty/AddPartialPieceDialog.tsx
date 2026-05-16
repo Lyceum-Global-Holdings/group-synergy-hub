@@ -272,7 +272,7 @@ export function AddPartialPieceDialog({ open, onOpenChange, defaultParentItemId 
   }
 
   const isSaving = create.isPending || createBulk.isPending;
-  const itemCode = (items as Array<{ id: string; item_code: string }>).find(i => i.id === parentItemId)?.item_code ?? "ITEM-CODE";
+  const itemCode = item?.item_code ?? "ITEM-CODE";
 
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v) reset(); onOpenChange(v); }}>
@@ -291,9 +291,9 @@ export function AddPartialPieceDialog({ open, onOpenChange, defaultParentItemId 
           <div className="grid grid-cols-2 gap-4 mt-4">
             <div className="col-span-2">
               <Label>Parent Item *</Label>
-              <ItemSelector
+              <PartialPieceItemPicker
                 value={parentItemId}
-                onSelect={(it) => setParentItemId(it?.id ?? "")}
+                onSelect={(it) => setParentItemId(it?.parent_item_id ?? "")}
                 placeholder="Search by item code or name…"
                 className="w-full"
               />
