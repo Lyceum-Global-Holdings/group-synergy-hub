@@ -233,6 +233,20 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
     [allLocations]
   );
 
+  // O(1) lookup maps — replaces O(n*m) .find() calls in the render loop
+  const categoryById = useMemo(
+    () => new Map(categories.map((c) => [c.id, c])),
+    [categories]
+  );
+  const unitById = useMemo(
+    () => new Map(units.map((u) => [u.id, u])),
+    [units]
+  );
+  const companyById = useMemo(
+    () => new Map(companies.map((c) => [c.id, c])),
+    [companies]
+  );
+
   // The inventory RPC already returns location-scoped stock for the selected
   // location/subtree. Keep the UI summary derived from those canonical rows.
   const itemLocationStock = useMemo<ItemLocationStockMap>(() => {
