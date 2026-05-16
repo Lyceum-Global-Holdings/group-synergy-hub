@@ -21638,6 +21638,8 @@ export type Database = {
           parent_item_id: string
           piece_count: number
           secondary_uom: string
+          track_secondary_quantity: boolean
+          unit_cost: number
         }[]
       }
       list_partial_pieces: {

@@ -18,7 +18,16 @@ export function usePartialPieceItems() {
         p_location_id: globalLocationId,
       });
       if (error) throw error;
-      return (data ?? []) as Array<{ parent_item_id: string; item_code: string; item_name: string; piece_count: number }>;
+      return (data ?? []) as Array<{
+        parent_item_id: string;
+        item_code: string;
+        item_name: string;
+        base_uom: string | null;
+        secondary_uom: string | null;
+        unit_cost: number | null;
+        track_secondary_quantity: boolean | null;
+        piece_count: number;
+      }>;
     },
   });
 }

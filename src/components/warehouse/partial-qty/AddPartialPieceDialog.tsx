@@ -9,9 +9,9 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useLocationFilter } from "@/contexts/LocationFilterContext";
 import { useWarehouseLocations } from "@/hooks/useWarehouseLocations";
-import { useWarehouseItems } from "@/hooks/useWarehouseItems";
 import { useItemUnits } from "@/hooks/useItemUnits";
-import { ItemSelector } from "@/components/common/ItemSelector";
+import { PartialPieceItemPicker, type PartialPieceItemOption } from "@/components/warehouse/partial-qty/PartialPieceItemPicker";
+import { usePartialPieceItems } from "@/hooks/warehouse/usePartialPieces";
 import {
   useCreatePartialPiece,
   useCreatePartialPiecesBulk,
@@ -48,7 +48,7 @@ export function AddPartialPieceDialog({ open, onOpenChange, defaultParentItemId 
   const { globalLocationId } = useLocationFilter();
   const { toast } = useToast();
   const { locations } = useWarehouseLocations();
-  const { items } = useWarehouseItems();
+  const { data: items = [] } = usePartialPieceItems();
   const { units } = useItemUnits();
   const create = useCreatePartialPiece();
   const createBulk = useCreatePartialPiecesBulk();
@@ -73,10 +73,8 @@ export function AddPartialPieceDialog({ open, onOpenChange, defaultParentItemId 
   // Bulk-mode rows
   const [rows, setRows] = useState<BulkRowState[]>([emptyRow(), emptyRow(), emptyRow()]);
 
-  const item = useMemo(
-    () =>
-      (items as Array<{ id: string; secondary_uom: string | null; base_uom: string | null; track_secondary_quantity?: boolean; unit_cost: number | null; item_code: string }>)
-        .find(i => i.id === parentItemId),
+  const item = useMemo<PartialPieceItemOption | undefined>(
+    () => items.find(i => i.parent_item_id === parentItemId),
     [items, parentItemId],
   );
 
@@ -274,7 +272,7 @@ export function AddPartialPieceDialog({ open, onOpenChange, defaultParentItemId 
   }
 
   const isSaving = create.isPending || createBulk.isPending;
-  const itemCode = (items as Array<{ id: string; item_code: string }>).find(i => i.id === parentItemId)?.item_code ?? "ITEM-CODE";
+  const itemCode = item?.item_code ?? "ITEM-CODE";
 
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v) reset(); onOpenChange(v); }}>
@@ -293,9 +291,9 @@ export function AddPartialPieceDialog({ open, onOpenChange, defaultParentItemId 
           <div className="grid grid-cols-2 gap-4 mt-4">
             <div className="col-span-2">
               <Label>Parent Item *</Label>
-              <ItemSelector
+              <PartialPieceItemPicker
                 value={parentItemId}
-                onSelect={(it) => setParentItemId(it?.id ?? "")}
+                onSelect={(it) => setParentItemId(it?.parent_item_id ?? "")}
                 placeholder="Search by item code or name…"
                 className="w-full"
               />
