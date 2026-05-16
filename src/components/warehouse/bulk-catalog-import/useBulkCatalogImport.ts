@@ -1,18 +1,52 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { BulkCatalogRow, ImportResultRow, newRow } from './types';
 
-export function useBulkCatalogImport() {
-  const [rows, setRows] = useState<BulkCatalogRow[]>(() => [newRow(), newRow(), newRow()]);
+export interface BulkCatalogDefaults {
+  company_id: string | null;
+  location_id: string | null;
+}
+
+export function useBulkCatalogImport(defaults: BulkCatalogDefaults = { company_id: null, location_id: null }) {
+  const defaultsRef = useRef(defaults);
+  defaultsRef.current = defaults;
+
+  const makeRow = useCallback(
+    (extra: Partial<BulkCatalogRow> = {}) =>
+      newRow({
+        company_id: defaultsRef.current.company_id,
+        location_id: defaultsRef.current.location_id,
+        ...extra,
+      }),
+    [],
+  );
+
+  const [rows, setRows] = useState<BulkCatalogRow[]>(() => [makeRow(), makeRow(), makeRow()]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Backfill blank/pending rows when defaults change (don't overwrite user edits or imported rows)
+  useEffect(() => {
+    setRows((rs) =>
+      rs.map((r) => {
+        if (r.status === 'imported') return r;
+        const patch: Partial<BulkCatalogRow> = {};
+        if (!r.company_id && defaults.company_id) patch.company_id = defaults.company_id;
+        if (!r.location_id && defaults.location_id) patch.location_id = defaults.location_id;
+        return Object.keys(patch).length ? { ...r, ...patch } : r;
+      }),
+    );
+  }, [defaults.company_id, defaults.location_id]);
 
   const setRow = useCallback((rowId: string, patch: Partial<BulkCatalogRow>) => {
     setRows((rs) => rs.map((r) => (r.rowId === rowId ? { ...r, ...patch, status: 'pending', message: null } : r)));
   }, []);
 
-  const addRows = useCallback((n = 1) => {
-    setRows((rs) => [...rs, ...Array.from({ length: n }, () => newRow())]);
-  }, []);
+  const addRows = useCallback(
+    (n = 1) => {
+      setRows((rs) => [...rs, ...Array.from({ length: n }, () => makeRow())]);
+    },
+    [makeRow],
+  );
 
   const removeRow = useCallback((rowId: string) => {
     setRows((rs) => rs.filter((r) => r.rowId !== rowId));
@@ -23,8 +57,9 @@ export function useBulkCatalogImport() {
   }, []);
 
   const resetAll = useCallback(() => {
-    setRows([newRow(), newRow(), newRow()]);
-  }, []);
+    setRows([makeRow(), makeRow(), makeRow()]);
+  }, [makeRow]);
+
 
   /** Append rows by item codes (paste-to-resolve). Resolves catalog in one query. */
   const seedFromCodes = useCallback(async (codes: string[]) => {
