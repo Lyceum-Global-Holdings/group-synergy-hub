@@ -641,16 +641,16 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
                   </TableCell>
                   {col('category') && (
                     <TableCell>
-                      {item.category_id 
-                        ? categories.find(c => c.id === item.category_id)?.name || '-'
+                      {item.category_id
+                        ? categoryById.get(item.category_id)?.name || '-'
                         : '-'
                       }
                     </TableCell>
                   )}
                   {col('unit') && (
                     <TableCell>
-                      {item.unit_id 
-                        ? units.find(u => u.id === item.unit_id)?.abbreviation || '-'
+                      {item.unit_id
+                        ? unitById.get(item.unit_id)?.abbreviation || '-'
                         : '-'
                       }
                     </TableCell>
