@@ -90,3 +90,6 @@ Bins are already snapped to root by the existing trigger. Allocations reference 
 Verification performed:
 - Confirmed `get_location_subtree_ids()` returns multiple scoped locations for a sample sub-location.
 - Confirmed `get_subtree_bin_ids()` returns warehouse bins when called with a sub-location.
+- Hardened `get_company_inventory_at_location` so positive bin allocation stock is visible even when item-master `current_stock` is stale.
+- Revoked default PUBLIC/anonymous execution from the new inventory helper RPCs; authenticated users retain access through the app.
+- Fixed large-warehouse bin scoping by chunking scoped bin IDs instead of only querying the first 500 bins.
