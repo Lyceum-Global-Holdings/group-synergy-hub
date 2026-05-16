@@ -58,27 +58,30 @@ export function RelocateBinDialog({ open, onOpenChange, bin }: Props) {
     },
   });
 
-  // Destination candidates: same company, not the current location
+  // Resolve the bin's effective company. Falls back to the root location's
+  // company_id when bin.company_id is null (legacy / template bins).
+  const effectiveCompanyId = useMemo(() => {
+    if (!bin) return null;
+    if (bin.company_id) return bin.company_id;
+    const rootId = getRootLocationId(locations, bin.location_id);
+    return locations.find((l) => l.id === rootId)?.company_id ?? null;
+  }, [bin, locations]);
+
+  // Full hierarchy of warehouse → sub-location → department, indented.
   const destinations = useMemo(() => {
     if (!bin) return [];
-    const byId = new Map(locations.map((l) => [l.id, l] as const));
-    return locations
-      .filter((l) => l.company_id === bin.company_id && l.id !== bin.location_id)
-      .map((l) => {
-        const parent = l.parent_id ? byId.get(l.parent_id) : null;
-        const label = parent ? `${parent.name} › ${l.name}` : l.name;
-        return { id: l.id, label, isSub: !!l.parent_id };
-      })
-      .sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: 'base' }));
-  }, [locations, bin]);
+    const all = buildLocationOptions(locations, { activeOnly: true });
+    return all.filter((opt) => {
+      if (opt.location.id === bin.location_id) return false;
+      if (effectiveCompanyId) return opt.location.company_id === effectiveCompanyId;
+      return true; // fallback: show all when we cannot resolve a company
+    });
+  }, [locations, bin, effectiveCompanyId]);
 
   const currentName = useMemo(() => {
     if (!bin?.location_id) return '—';
-    const byId = new Map(locations.map((l) => [l.id, l] as const));
-    const cur = byId.get(bin.location_id);
-    if (!cur) return '—';
-    const parent = cur.parent_id ? byId.get(cur.parent_id) : null;
-    return parent ? `${parent.name} › ${cur.name}` : cur.name;
+    const all = buildLocationOptions(locations);
+    return all.find((o) => o.location.id === bin.location_id)?.breadcrumb ?? '—';
   }, [bin, locations]);
 
   const blockedByStock = mode === 'empty_only' && (stockSummary?.totalQty ?? 0) > 0;
