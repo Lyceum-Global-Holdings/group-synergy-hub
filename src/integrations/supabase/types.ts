@@ -21142,6 +21142,10 @@ export type Database = {
       }
       current_supplier_ids: { Args: never; Returns: string[] }
       delete_partial_piece: { Args: { p_id: string }; Returns: undefined }
+      ensure_partial_piece_parent_item: {
+        Args: { p_catalog_item_id: string; p_company_id: string }
+        Returns: string
+      }
       escalate_pending_approvals: { Args: never; Returns: undefined }
       find_catalog_item_by_code: {
         Args: { p_code: string; p_target_company_id?: string }
@@ -21802,6 +21806,8 @@ export type Database = {
         Args: { p_company_id: string; p_location_id?: string }
         Returns: {
           base_uom: string
+          catalog_item_id: string
+          has_inventory_row: boolean
           item_code: string
           item_name: string
           parent_item_id: string

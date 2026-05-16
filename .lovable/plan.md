@@ -1,39 +1,41 @@
-## Problem
+## Goal
+Make **Add Piece → Parent Item** load the full Item Master, not only the subset that already has a `warehouse_items` inventory row for the selected company.
 
-On `/warehouse/partial-quantities`, "Add Partial Piece" shows "No active items found." The item-master picker is empty because Stage 6b dropped `item_code` and `name` from `warehouse_items` (they now live only on `warehouse_item_catalog`), but four Partial-Pieces RPCs still read those columns from `warehouse_items` and silently fail / return zero rows.
+## Findings
+- Current picker RPC returns `14041` active company inventory rows.
+- Item Master has `15016` active catalog rows.
+- `972` active catalog items do not yet have a company-scoped `warehouse_items` row, so they are invisible in Add Piece.
+- This is a Stage 6b source-of-truth issue: master attributes live in `warehouse_item_catalog`, while `warehouse_items` is now only per-company inventory state.
 
-Affected RPCs:
+## Plan
+1. **Replace the picker source**
+   - Update `list_partial_piece_items` to start from `warehouse_item_catalog`.
+   - LEFT JOIN the current company’s `warehouse_items` row when it exists.
+   - Return all active catalog items, with `parent_item_id` set to the existing inventory row id when present.
+   - Include `catalog_item_id` and a `has_inventory_row` flag so the UI can distinguish provisioned vs not-yet-provisioned items.
 
-| RPC | Broken reference |
-|---|---|
-| `list_partial_piece_items` | `i.item_code`, `i.name` from `warehouse_items` |
-| `list_partial_pieces` | `i.item_code`, `i.name`, search predicates on both |
-| `next_partial_piece_code_for_item` | `SELECT item_code FROM warehouse_items` |
-| `import_partial_pieces` | `lower(item_code)` lookup on `warehouse_items` |
+2. **Create international-standard parent linkage**
+   - Add an RPC like `ensure_partial_piece_parent_item(p_company_id, p_catalog_item_id)`.
+   - It will call/use the existing `upsert_warehouse_inventory` pattern to create the per-company `warehouse_items` row only when the user actually selects a catalog item for partial-piece creation.
+   - This preserves ERP/WMS separation: Global Item Master stays global; company inventory rows are created on demand for transactions.
 
-`create_partial_piece` and the propagation trigger only read columns that still exist (`base_uom`, `secondary_uom`, `unit_cost`) — no change needed.
+3. **Update Add Piece UI flow**
+   - Extend `PartialPieceItemPicker` / `usePartialPieceItems` types to support `catalog_item_id` and nullable `parent_item_id`.
+   - When a selected catalog item has no `parent_item_id`, call the new ensure RPC, then use the returned `warehouse_items.id` as the actual `parent_item_id` for create/bulk create.
+   - Keep existing behavior unchanged for items that already have inventory rows.
 
-## Fix (single migration)
+4. **Keep list/filter behavior stable**
+   - The page-level parent filter can use the same enriched picker list.
+   - Existing partial piece listing remains tied to real `warehouse_partial_pieces.parent_item_id`, so only created pieces appear in the table.
 
-Rewrite each RPC above to join `warehouse_item_catalog c ON c.id = i.catalog_item_id` and source `item_code` / `name` from `c`. Keep all per-company columns (`base_uom`, `secondary_uom`, `unit_cost`, `track_secondary_quantity`, `status`) on `warehouse_items`. This matches the Stage 6 contract: catalog is the source of truth for master attributes, `warehouse_items` owns per-company inventory state.
+5. **Verification**
+   - Confirm picker count matches active Item Master count.
+   - Select one of the previously missing 972 catalog items and create a partial piece.
+   - Confirm a company inventory row is created on demand and the new partial piece appears with catalog code/name.
 
-Specifically:
-
-1. **`list_partial_piece_items`** — `FROM warehouse_items i JOIN warehouse_item_catalog c ON c.id = i.catalog_item_id`, select `c.item_code`, `c.name`, group by `c.item_code, c.name` too.
-2. **`list_partial_pieces`** — same join, select/search on `c.item_code`, `c.name`.
-3. **`next_partial_piece_code_for_item`** — read `c.item_code` via join on the catalog.
-4. **`import_partial_pieces`** — lookup item by `lower(c.item_code)` for the given company.
-
-No frontend changes; `PartialPieceItemPicker` and `usePartialPieceItems` already consume the existing RPC shape.
-
-## Verification
-
-- Reload `/warehouse/partial-quantities`, open Add Partial Piece → picker lists active items with code + name.
-- Search by item code and by name in both the picker and the main list.
-- Add a piece, then split/consume to confirm `next_partial_piece_code_for_item` works.
-- Run the bulk Import flow with a known item code.
-
-## Out of scope
-
-- Other modules that may still reference dropped columns inside DB functions — separate audit pass (will surface on use).
-- Any UI changes to the Partial Quantities page.
+## Files/areas to change
+- Supabase migration for the picker RPC + ensure-parent RPC.
+- `src/hooks/warehouse/usePartialPieces.ts`
+- `src/components/warehouse/partial-qty/PartialPieceItemPicker.tsx`
+- `src/components/warehouse/partial-qty/AddPartialPieceDialog.tsx`
+- `src/pages/warehouse/PartialQuantities.tsx` if needed for the filter type.
