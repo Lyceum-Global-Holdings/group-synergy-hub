@@ -22,6 +22,7 @@ import { CatalogItemCell } from './CatalogItemCell';
 import { PasteCodesDialog } from './PasteCodesDialog';
 import { useBulkCatalogImport } from './useBulkCatalogImport';
 import type { BulkCatalogRow } from './types';
+import { buildLocationOptions } from '@/lib/warehouse/locationHierarchy';
 import { cn } from '@/lib/utils';
 
 interface Props {
@@ -66,8 +67,10 @@ export function BulkCatalogToInventoryDialog({ open, onOpenChange }: Props) {
 
   const locationsByCompany = useMemo(() => {
     return (companyId: string | null) => {
-      if (!companyId) return locations;
-      return locations.filter((l) => !l.company_id || l.company_id === companyId);
+      const scoped = !companyId
+        ? locations
+        : locations.filter((l) => !l.company_id || l.company_id === companyId);
+      return buildLocationOptions(scoped, { activeOnly: true });
     };
   }, [locations]);
 
@@ -91,6 +94,9 @@ export function BulkCatalogToInventoryDialog({ open, onOpenChange }: Props) {
       if (ok > 0) {
         qc.invalidateQueries({ queryKey: ['warehouse-inventory'] });
         qc.invalidateQueries({ queryKey: ['warehouse-items'] });
+        qc.invalidateQueries({ queryKey: ['warehouse-items-inventory'] });
+        qc.invalidateQueries({ queryKey: ['warehouse-bin-allocations'] });
+        qc.invalidateQueries({ queryKey: ['warehouse-bins'] });
       }
     } catch (e: any) {
       toast({ title: 'Import failed', description: e.message, variant: 'destructive' });
@@ -266,7 +272,7 @@ function Row({ index, row, companies, locations, bins, defaultLocationId, onChan
           value={companyId ?? undefined}
           onValueChange={(v) => {
             // When company changes, keep default location if it belongs to new company; else clear
-            const keepLoc = defaultLocationId && locations.some((l) => l.id === defaultLocationId);
+            const keepLoc = defaultLocationId && locations.some((l) => l.location.id === defaultLocationId);
             onChange({ company_id: v, location_id: keepLoc ? defaultLocationId : null, bin_id: null });
           }}
         >
@@ -290,8 +296,10 @@ function Row({ index, row, companies, locations, bins, defaultLocationId, onChan
             <SelectValue placeholder="Select…" />
           </SelectTrigger>
           <SelectContent>
-            {locations.map((l) => (
-              <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>
+            {locations.map((opt: any) => (
+              <SelectItem key={opt.location.id} value={opt.location.id}>
+                <span style={{ paddingLeft: `${opt.depth * 12}px` }}>{opt.breadcrumb}</span>
+              </SelectItem>
             ))}
           </SelectContent>
         </Select>

@@ -1,47 +1,32 @@
-# Fix: Bulk catalog import — default Location/Company from global selection
+## Plan: Fix Bulk add from Catalog location/bin posting
 
-## Problem
+### Problem to fix
+Bulk add from Catalog currently sends `location_id` and `bin_id`, but the backend only creates/updates the inventory item and inserts a stock transaction. It does not explicitly create/increment the matching `warehouse_bin_allocations` row for the selected exact physical node, so stock can appear under the item/default location or fail to show in the selected bin.
 
-In `BulkCatalogToInventoryDialog`, the Company dropdown *displays* the active company via a fallback (`row.company_id ?? defaultCompanyId`) but the row's actual `company_id` stays `null`. Location is never pre-filled at all. Validation requires real values on the row:
+### Changes
+1. **Backend RPC: `bulk_provision_inventory_from_catalog`**
+   - Update the RPC to treat the selected bin as the source of truth for physical placement.
+   - Validate that:
+     - company is accessible,
+     - location exists,
+     - bin exists,
+     - if a bin is selected, its exact `warehouse_bins.location_id` matches the selected location/sub-location.
+   - Provision/find the per-company inventory row via `upsert_warehouse_inventory`.
+   - For opening stock rows, explicitly upsert `warehouse_bin_allocations` on:
+     - `warehouse_item_id`,
+     - `bin_id`,
+     - `company_id`,
+     - `location_id`.
+   - Increment `allocated_quantity` when the same item/bin/location already exists instead of creating duplicates.
+   - Then insert the stock transaction for audit/ledger with the same `location_id` and `bin_id`.
 
-- `!r.company_id` → "Company required"
-- `qty > 0 && !r.location_id` → "Location required when qty > 0"
+2. **Frontend row picker: exact location/sub-location and bin safety**
+   - Use the existing hierarchy label helper so the Location dropdown clearly shows parent → sub-location paths.
+   - Keep the Bin dropdown filtered to bins attached to the selected exact location/sub-location only.
+   - Add client-side validation that rejects any stale row where `bin_id` no longer belongs to the selected `location_id` before calling the RPC.
 
-So every row shows defaults visually, but is marked **Invalid** and the Import button stays disabled / nothing gets added. The user expects the row's Location to mirror the location chosen in the global header dropdown (`LocationFilterContext.globalLocationId`), same as the rest of the warehouse pages.
-
-## Solution
-
-Persist the global Company + Location into each row's state (not just as a display fallback), and keep them in sync when the user changes the global selectors or adds rows.
-
-### Files to change (frontend only)
-
-1. **`src/components/warehouse/bulk-catalog-import/useBulkCatalogImport.ts`**
-   - Accept `defaults: { company_id, location_id }` as a hook arg.
-   - `newRow()` seeded with these defaults.
-   - Initial state uses defaults.
-   - `seedFromCodes` and any new-row creation use defaults.
-   - `useEffect` backfills `company_id` / `location_id` on existing rows that are still blank when defaults change (don't overwrite user-edited values or imported rows).
-
-2. **`src/components/warehouse/bulk-catalog-import/BulkCatalogToInventoryDialog.tsx`**
-   - Pull `globalLocationId` from `useLocationFilter()` and `selectedCompany` from `useCompany()`.
-   - Pass `{ company_id: selectedCompany?.id, location_id: globalLocationId }` to the hook.
-   - Remove the cosmetic `row.company_id ?? defaultCompanyId` fallback — the row now holds the real value.
-   - When user picks a Company on a row, default `location_id` to `globalLocationId` if that location belongs to the chosen company (else clear).
-
-3. **`src/components/warehouse/bulk-catalog-import/types.ts`** (if needed)
-   - `newRow(overrides)` already accepts overrides — extend default factory to take a `defaults` arg.
-
-### Validation / UX
-
-- A small info chip above the grid: "Defaults: {Company} · {Location ?? 'All locations'}" with a "Clear defaults on rows" button (clears only blank/pending rows) — makes the auto-fill visible and reversible.
-- If `globalLocationId` is null, only `company_id` is auto-filled; user picks location per row as today.
-- Bin remains optional and gated by location.
-
-### Out of scope
-
-- No backend / RPC changes. The `bulk_provision_inventory_from_catalog` RPC and RLS are unchanged.
-- No change to catalog picker or paste-to-resolve flow beyond inheriting the defaults.
+3. **Cache refresh after import**
+   - After successful import, invalidate inventory and bin allocation queries so the selected location/sub-location and bin reflect the new stock immediately.
 
 ### Expected result
-
-Opening the "Bulk add from catalog" dialog with a company + location selected in the header pre-fills every row → rows go straight to **Valid** once an item and qty are picked → "Import N rows" works and items appear in inventory.
+When a row is imported with `Location/Sub-location = X` and `Bin = Y`, stock is added to `warehouse_bin_allocations` for exactly `(item, company, X, Y)`, inventory filtering by that location/sub-location shows the item, and the selected bin shows the added quantity.
