@@ -411,11 +411,15 @@ export function AddFromCatalogDialog({ open, onOpenChange }: AddFromCatalogDialo
                     <SelectValue placeholder={effectiveLocationId ? 'Select a bin' : 'Select location first'} />
                   </SelectTrigger>
                   <SelectContent>
-                    {filteredBins.map(bin => (
-                      <SelectItem key={bin.id} value={bin.id}>
-                        {bin.bin_code} {bin.name ? `- ${bin.name}` : ''}
-                      </SelectItem>
-                    ))}
+                    {filteredBins.map(bin => {
+                      const showName = bin.name && bin.name.toLowerCase() !== bin.bin_code.toLowerCase();
+                      return (
+                        <SelectItem key={bin.id} value={bin.id}>
+                          <span className="font-mono">{bin.bin_code}</span>
+                          {showName ? <span className="text-muted-foreground"> · {bin.name}</span> : null}
+                        </SelectItem>
+                      );
+                    })}
                   </SelectContent>
                 </Select>
               </div>

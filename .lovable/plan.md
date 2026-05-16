@@ -1,54 +1,60 @@
 ## Problem
 
-When filtering Inventory by **Lyceum Fulfilment Centre (LFC)**, the item `INV-ELC-000-0185` (Conduit Bend) shows bin **LNQ (50)** — even though that bin physically lives in **Lyceum Nugegoda Quarters (LNQ)**, a completely separate top-level location, not a child of LFC.
+The "Assign to Bin" dropdown shows every bin twice (e.g. `1-B-2-1 - 1-B-2-1` appears two times in a row) and there is no search/quantity context, so users cannot tell which row to pick.
 
-### Root cause
+Root cause (verified in DB):
 
-`warehouse_bin_allocations` rows have a `location_id` that is **out of sync** with their bin's home `warehouse_bins.location_id`:
+- `warehouse_bins` has **157 rows** but only **90 unique (bin_code, location_id)** combinations — **67 duplicate groups**.
+- For every real bin there is a shadow row with `company_id = NULL` (legacy "global template" rows). The dropdown lists both.
+- All **1,155 allocations live on the `company_id = NULL` rows**; the 68 `company_id`‑scoped duplicates are empty shells.
+- There is no DB uniqueness on `(location_id, bin_code)`, and the UI label is just `bin_code - name` (which are identical), so duplicates are invisible to the eye.
 
-| bin_code | bin's actual location | allocation.location_id | qty |
-|---|---|---|---|
-| LNQ | Lyceum Nugegoda Quarters | **Lyceum Fulfilment Centre** ❌ | 50 |
-| LNQ-BOX | Lyceum Nugegoda Quarters | LNQ ✓ | 7 |
-| LNPE | LNPE | LNPE ✓ | 80 |
+International WMS practice (SAP EWM, Manhattan, Oracle WMS, GS1 Logistics Interoperability): a storage bin is a **single physical address** with one unique code inside its parent storage location, and pickers search/scan it with full breadcrumb + on‑hand qty.
 
-There are **80 such mismatched allocation rows** across the system today. The `list_warehouse_inventory` RPC scopes by `a.location_id` (the allocation row) instead of `wb.location_id` (the bin's home), so a bin physically in LNQ leaks into LFC's view whenever its allocation row was written with the wrong location.
+## Plan
 
-This matches the same class of data-integrity bug fixed earlier for the NWS-VEB bin (wrong `location_id` + missing `company_id`).
+### 1. Database cleanup (migration)
 
-## International-standards solution
+1. **Re‑home the live bins to the correct sub‑location.** For every `company_id IS NULL` bin currently parked on the LFC root (`de0c4bd9…`) that should sit under VEB, move it to the VEB sub‑location id (`0630cfec…`). The existing parity trigger will cascade `warehouse_bin_allocations.location_id`. (Limited to the LFC→VEB set; other sites stay put.)
+2. **Adopt the live bins into the company.** For each `company_id IS NULL` bin that has at least one allocation, set `company_id = '1c918a89…'` (NCG Warehouse Solutions). These are the real, in‑use bins.
+3. **Delete the empty duplicate shells.** Remove the `company_id IS NOT NULL` rows whose `(bin_code, location_id)` now matches a freshly adopted bin and which carry zero allocations. Verified: 0 allocations point to them, so this is non‑destructive.
+4. **Add uniqueness + index** to stop the problem coming back:
+   - `CREATE UNIQUE INDEX warehouse_bins_code_per_location_uidx ON warehouse_bins (location_id, lower(bin_code)) WHERE deleted_at IS NULL;`
+   - Keep the existing `enforce_bin_allocation_location_parity` trigger.
+5. **Verification queries** (must all return 0 before commit):
+   - duplicate `(bin_code, location_id)` groups
+   - bins with `company_id IS NULL` that have allocations
+   - allocations whose `location_id` ≠ `bins.location_id`
 
-In every reference WMS (SAP EWM, Oracle WMS, Manhattan, Blue Yonder), a **bin has exactly one home storage location**, and stock balances per (item, bin) inherit that location — they are never allowed to drift. We will enforce the same invariant.
+### 2. Bin picker UX (frontend only, no behaviour change to writes)
 
-### Steps
+Replace the plain `<Select>` in `AddFromCatalogDialog`, `CreateItemDialog`, `SingleItemForm`, `AllocateToolToBinDialog` (and the scanned-bin adjust dialog) with a single reusable **`BinCombobox`** that follows international WMS picker conventions:
 
-1. **Reconcile data (one-off migration)**
-   - For every `warehouse_bin_allocations` row where `a.location_id <> wb.location_id`, set `a.location_id = wb.location_id`.
-   - Same for `a.company_id` where it disagrees with the bin's `company_id` (defence in depth).
+- **Searchable** (Command/Combobox) — type any part of bin code, aisle, bay, level, or location name.
+- **Breadcrumb label**: `LFC › VEB · 1‑B‑2‑3` (storage type → section → bin) — matches SAP EWM `Warehouse / Storage Type / Section / Bin` display.
+- **Secondary line per row**: current on‑hand for the item being placed (`12 pcs in this bin`) and bin capacity if set, dimmed when empty. Lets the picker pick the consolidating bin first (FIFO/consolidation rule).
+- **Group by parent location** with sticky headers when the location filter is broad.
+- **Dedupe defensively** by `id` and by `(location_id, lower(bin_code))` in the hook, so a stale cache cannot resurrect the duplicate display.
+- **Recent bins** chip row (last 5 the user picked) for one‑tap re‑selection — standard in Manhattan / Blue Yonder pickers.
+- **Empty state** with a "Create bin here" shortcut scoped to the selected sub‑location.
+- Keyboard: ↑/↓ to move, Enter to pick, `/` to focus search — meets WCAG combobox pattern.
 
-2. **Enforce parity going forward**
-   - Add a trigger `enforce_bin_allocation_location_parity` on `warehouse_bin_allocations` (BEFORE INSERT OR UPDATE) that:
-     - Looks up the bin's `location_id` and `company_id`.
-     - Forces `NEW.location_id` and `NEW.company_id` to match the bin (write-through), so callers cannot create drift even by accident.
-   - Add a trigger on `warehouse_bins` (AFTER UPDATE OF location_id) that cascades the new home into all child allocations, so moving a bin moves its stock with it (matches WMS bin-relocation semantics).
+Hook change: in `useWarehouseBins`, return `bins` already deduped by id and sorted by `location_id, bin_code` using a stable natural sort (`1-B-2-2` before `1-B-2-10`).
 
-3. **Make the RPC trust the bin, not the allocation row**
-   - In `list_warehouse_inventory`, change `scoped_alloc_full` to join `warehouse_bins` and filter/aggregate by `wb.location_id` (and use `wb.location_id` in the `bins` JSONb's `location_id` / `location_name`). Allocation row's `location_id` becomes a denormalised mirror only.
-   - Apply the same change to any sister RPC that scopes stock by location (`list_warehouse_bin_stock`, audit/reconciliation helpers) — quick audit first.
+### 3. Memory
 
-4. **Update memory**
-   - Add a Core memory rule: *"Bin home location is the source of truth; `warehouse_bin_allocations.location_id` must always equal `warehouse_bins.location_id` for the same bin (DB trigger enforced). Location-scoped reads filter by `wb.location_id`."*
+Add a Core rule:
+
+> Bin uniqueness: one bin per `(company_id, location_id, lower(bin_code))`, enforced by a unique index. Pickers must dedupe by id and display `Location › Sub‑location · BinCode` with on‑hand qty.
 
 ### Out of scope
 
-- No UI changes — the Inventory table will simply stop showing irrelevant bins once the data and RPC are corrected.
-- No FIFO / ledger / write-path changes beyond the parity trigger.
-- No changes to the location hierarchy itself (LNQ stays a top-level location; it just won't appear under LFC anymore).
+No changes to FIFO, ledger, RLS, or write paths beyond the trigger already in place. No bin renaming. No location hierarchy changes other than the targeted LFC→VEB re‑home for the duplicate set.
 
-## Verification
+### Files to touch
 
-After the migration:
-- `SELECT COUNT(*) FROM warehouse_bin_allocations a JOIN warehouse_bins wb ON wb.id=a.bin_id WHERE a.location_id <> wb.location_id;` → must return **0**.
-- Re-open Inventory filtered by LFC → `INV-ELC-000-0185` no longer shows the LNQ bin.
-- Filter by LNQ → both LNQ and LNQ-BOX bins appear with correct totals.
-- Attempt to insert an allocation with a mismatched `location_id` → trigger silently corrects it (or raises, depending on chosen mode; recommend silent write-through to stay backward compatible with existing write paths).
+- New migration: dedupe + re‑home + unique index.
+- New `src/components/warehouse/BinCombobox.tsx`.
+- `src/hooks/useWarehouseBins.ts` — dedupe + natural sort.
+- Swap `<Select>` for `<BinCombobox>` in `AddFromCatalogDialog.tsx`, `CreateItemDialog.tsx`, `SingleItemForm.tsx`, `AllocateToolToBinDialog.tsx`, scanned bin adjust dialog.
+- `.lovable/memory/index.md` + new memory file `architecture/bin-uniqueness.md`.

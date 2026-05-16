@@ -39,7 +39,25 @@ export const useWarehouseBins = (options: UseWarehouseBinsOptions = {}) => {
       const { data, error } = await query;
 
       if (error) throw error;
-      return data as WarehouseBin[];
+
+      // Defensive dedupe: one bin per (location_id, lower(bin_code)).
+      // DB now enforces this with a unique index, but we dedupe client-side
+      // too in case of stale cache or in-flight writes.
+      const seen = new Map<string, WarehouseBin>();
+      for (const b of (data ?? []) as WarehouseBin[]) {
+        const key = `${b.location_id ?? ''}::${(b.bin_code ?? '').toLowerCase()}`;
+        const existing = seen.get(key);
+        // Prefer the company-scoped row over a NULL-company template.
+        if (!existing || (!existing.company_id && b.company_id)) {
+          seen.set(key, b);
+        }
+      }
+
+      // Natural sort: "1-B-2-2" comes before "1-B-2-10".
+      const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
+      return Array.from(seen.values()).sort((a, b) =>
+        collator.compare(a.bin_code ?? '', b.bin_code ?? '')
+      );
     },
   });
 
