@@ -1,28 +1,25 @@
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { useStockMovementAnalytics } from '@/hooks/useStockMovementAnalytics';
-import { useWarehouseItems } from '@/hooks/useWarehouseItems';
-import { useWarehouseLocations } from '@/hooks/useWarehouseLocations';
 import { useLocationFilter } from '@/contexts/LocationFilterContext';
+import { useWarehouseLocationName } from '@/hooks/useWarehouseLocationName';
+import { ItemSearchCombobox } from '@/components/warehouse/ItemSearchCombobox';
 import { Loader2, TrendingUp } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 
 export function StockMovementChart() {
   const [selectedItemId, setSelectedItemId] = useState<string>('all');
-  const { items } = useWarehouseItems();
-  const { locations } = useWarehouseLocations();
   const { globalLocationId } = useLocationFilter();
+  const { data: locationName } = useWarehouseLocationName(globalLocationId);
   const { data: movements = [], isLoading } = useStockMovementAnalytics(
     selectedItemId === 'all' ? undefined : selectedItemId,
     globalLocationId
   );
 
-  const activeWarehouseName = useMemo(() => {
-    if (!globalLocationId) return 'All Warehouses';
-    return locations.find(l => l.id === globalLocationId)?.name ?? 'Selected Warehouse';
-  }, [globalLocationId, locations]);
+  const activeWarehouseName = !globalLocationId
+    ? 'All Warehouses'
+    : locationName ?? 'Selected Warehouse';
 
   return (
     <Card>
