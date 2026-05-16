@@ -22,6 +22,7 @@ import { CatalogItemCell } from './CatalogItemCell';
 import { PasteCodesDialog } from './PasteCodesDialog';
 import { useBulkCatalogImport } from './useBulkCatalogImport';
 import type { BulkCatalogRow } from './types';
+import { buildLocationOptions } from '@/lib/warehouse/locationHierarchy';
 import { cn } from '@/lib/utils';
 
 interface Props {
