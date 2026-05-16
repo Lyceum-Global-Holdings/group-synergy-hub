@@ -228,14 +228,15 @@ export function useWarehouseItemsLazyInventory({
             .select('id, bin_code, name, location_id');
 
           if (permissions && !permissions.viewAllLocations) {
-          const permittedLocationIds = [
-            ...new Set([
-              ...permissions.viewLocationIds,
-              ...permissions.editLocationIds,
-            ]),
-          ];
-          if (permittedLocationIds.length > 0) {
-            binsQuery = binsQuery.in('location_id', permittedLocationIds);
+            const permittedLocationIds = [
+              ...new Set([
+                ...permissions.viewLocationIds,
+                ...permissions.editLocationIds,
+              ]),
+            ];
+            if (permittedLocationIds.length > 0) {
+              binsQuery = binsQuery.in('location_id', permittedLocationIds);
+            }
           }
         }
 
