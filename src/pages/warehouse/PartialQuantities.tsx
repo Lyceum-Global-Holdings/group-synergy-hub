@@ -277,9 +277,12 @@ export default function PartialQuantities() {
             </div>
           );
         }
+        const qty = Math.max(1, Math.trunc(Number(r.piece_count) || 1));
         return (
           <span className="tabular-nums">
-            {fmtNum(Number(r.size_value))} {r.size_uom}
+            {qty > 1
+              ? `${qty} × ${fmtNum(Number(r.size_value))} ${r.size_uom} = ${fmtNum(qty * Number(r.size_value))} ${r.size_uom}`
+              : `${fmtNum(Number(r.size_value))} ${r.size_uom}`}
           </span>
         );
       },
