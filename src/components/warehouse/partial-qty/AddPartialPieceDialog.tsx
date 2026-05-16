@@ -195,11 +195,13 @@ export function AddPartialPieceDialog({ open, onOpenChange, defaultParentItemId 
   async function submitSingle() {
     if (!selectedCompany?.id) return;
     const qtyNum = Math.trunc(Number(pieceQty) || 0);
-    if (!parentItemId || !locationId || !sizeValue || !sizeUom || qtyNum < 1) {
+    if (!catalogItemId || !locationId || !sizeValue || !sizeUom || qtyNum < 1) {
       toast({ title: "Missing required fields", description: "Size, Qty (≥1), UOM, item and location are required.", variant: "destructive" });
       return;
     }
     try {
+      const parentItemId = item?.parent_item_id
+        ?? await ensurePartialPieceParentItem(selectedCompany.id, catalogItemId);
       await create.mutateAsync({
         company_id: selectedCompany.id,
         parent_item_id: parentItemId,
