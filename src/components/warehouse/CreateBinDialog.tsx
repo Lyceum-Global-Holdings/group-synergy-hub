@@ -235,18 +235,19 @@ export function CreateBinDialog({ open, onOpenChange, editingBin }: CreateBinDia
                   onValueChange={(value) => setFormData((p) => ({ ...p, location_id: value }))}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Select warehouse" />
+                    <SelectValue placeholder="Select warehouse or sub-location" />
                   </SelectTrigger>
                   <SelectContent>
                     {sortedLocations.map((location) => (
                       <SelectItem key={location.id} value={location.id}>
-                        {location.name}
+                        {location._isSub ? `↳ ${location._label}` : location._label}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
                 <p className="text-xs text-muted-foreground">
-                  Bin is shared across every sub-location and department under this warehouse.
+                  Attach the bin to a warehouse to share it across every sub-location, or to a
+                  specific sub-location/department for narrower scope.
                 </p>
               </div>
             ) : (
