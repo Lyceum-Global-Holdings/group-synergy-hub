@@ -589,7 +589,7 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
                 <TableCell colSpan={visibleCount + 1} className="text-center py-8 text-muted-foreground">
                   {globalLocationId && selectedCompany?.name
                     ? `No inventory for ${selectedCompany.name} at ${
-                        allLocations.find((l: any) => l.id === globalLocationId)?.name ?? 'this location'
+                        locationNameById.get(globalLocationId) ?? 'this location'
                       }.`
                     : 'No items found. Create your first item to get started.'}
                 </TableCell>
