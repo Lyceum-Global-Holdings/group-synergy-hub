@@ -10,11 +10,11 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useCompany } from '@/contexts/CompanyContext';
-import { useWarehouseBins } from '@/hooks/useWarehouseBins';
+import { useBinsAtLocation } from '@/hooks/warehouse/useBinsAtLocation';
 import { useWarehouseLocations } from '@/hooks/useWarehouseLocations';
 import { useItemCategories } from '@/hooks/useItemCategories';
 import { useLocationFilter } from '@/contexts/LocationFilterContext';
-import { buildLocationOptions, getRootLocationId } from '@/lib/warehouse/locationHierarchy';
+import { buildLocationOptions } from '@/lib/warehouse/locationHierarchy';
 import { toast } from 'sonner';
 import { CatalogItem } from '@/types/itemBin';
 import { QTY_STEP, QTY_MIN, parseQty } from '@/lib/quantityInput';
@@ -26,7 +26,6 @@ interface AddFromCatalogDialogProps {
 
 export function AddFromCatalogDialog({ open, onOpenChange }: AddFromCatalogDialogProps) {
   const { selectedCompany } = useCompany();
-  const { bins } = useWarehouseBins();
   const { locations } = useWarehouseLocations();
   const { globalLocationId } = useLocationFilter();
   const { categories } = useItemCategories(selectedCompany?.id);
@@ -41,13 +40,8 @@ export function AddFromCatalogDialog({ open, onOpenChange }: AddFromCatalogDialo
 
   const locationOptions = useMemo(() => buildLocationOptions(locations, { activeOnly: true }), [locations]);
   const effectiveLocationId = selectedLocationId || globalLocationId || '';
-  const selectedRootLocationId = useMemo(
-    () => getRootLocationId(locations, effectiveLocationId),
-    [locations, effectiveLocationId]
-  );
-  const filteredBins = effectiveLocationId
-    ? bins.filter((bin) => (bin.root_location_id ?? bin.location_id) === selectedRootLocationId)
-    : bins;
+  // Exact-node bins only (SAP EWM Storage Bin discipline) — no ancestor inheritance.
+  const { data: filteredBins = [] } = useBinsAtLocation(effectiveLocationId || null);
 
   // Fetch all catalog items using cursor-based batching to bypass 1,000-row limit
   const { data: catalogItems = [], isLoading: isLoadingCatalog } = useQuery({
@@ -406,9 +400,15 @@ export function AddFromCatalogDialog({ open, onOpenChange }: AddFromCatalogDialo
               </div>
               <div className="space-y-2">
                 <Label htmlFor="bin">Assign to Bin *</Label>
-                <Select value={selectedBinId} onValueChange={setSelectedBinId} disabled={!effectiveLocationId}>
+                <Select value={selectedBinId} onValueChange={setSelectedBinId} disabled={!effectiveLocationId || filteredBins.length === 0}>
                   <SelectTrigger>
-                    <SelectValue placeholder={effectiveLocationId ? 'Select a bin' : 'Select location first'} />
+                    <SelectValue placeholder={
+                      !effectiveLocationId
+                        ? 'Select location first'
+                        : filteredBins.length === 0
+                          ? 'No bins at this location — create one in Bin Master'
+                          : 'Select a bin'
+                    } />
                   </SelectTrigger>
                   <SelectContent>
                     {filteredBins.map(bin => {
@@ -422,6 +422,9 @@ export function AddFromCatalogDialog({ open, onOpenChange }: AddFromCatalogDialo
                     })}
                   </SelectContent>
                 </Select>
+                <p className="text-xs text-muted-foreground">
+                  Showing bins that physically belong to the selected location only.
+                </p>
               </div>
             </div>
           </div>

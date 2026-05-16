@@ -109,24 +109,23 @@ export function BulkStockUploadDialog({ open, onOpenChange }: BulkStockUploadDia
   // Pre-select from global filter
   const effectiveLocationId = selectedLocationId || globalLocationId || '';
 
-  // Fetch bins for the selected location
+  // Fetch bins physically attached to the selected location (no ancestor inheritance).
+  // SAP EWM / Oracle WMS discipline — stock must post to the exact storage bin node.
   const { data: locationBins = [] } = useQuery({
-    queryKey: ['warehouse-bins-for-location-inherited', effectiveLocationId],
+    queryKey: ['warehouse-bins-at-location-exact', effectiveLocationId],
     queryFn: async (): Promise<{ id: string; bin_code: string; description: string | null; inherited_from_location_name: string | null }[]> => {
       if (!effectiveLocationId) return [];
       const { data, error } = await supabase.rpc(
-        'list_bins_for_location_inherited',
+        'list_bins_at_location' as any,
         { p_location_id: effectiveLocationId },
       );
       if (error) throw error;
-      return ((data || []) as any[])
-        .filter(b => (b.status ?? 'active') === 'active')
-        .map(b => ({
-          id: b.id,
-          bin_code: b.bin_code,
-          description: b.name ?? null,
-          inherited_from_location_name: b.inherited_from_location_name ?? null,
-        }));
+      return ((data || []) as any[]).map(b => ({
+        id: b.id,
+        bin_code: b.bin_code,
+        description: b.name ?? null,
+        inherited_from_location_name: null,
+      }));
     },
     enabled: !!effectiveLocationId,
   });
@@ -302,13 +301,13 @@ export function BulkStockUploadDialog({ open, onOpenChange }: BulkStockUploadDia
       const binMap = new Map<string, string>();
       if (binMode === 'per-row') {
         const binCodesOriginal = [...new Set(dataRows.map(r => (r[binIdx] || '').trim()).filter(Boolean))];
-        // Pull inherited bin set for this location once, then resolve codes locally.
-        const { data: inheritedBins } = await supabase.rpc(
-          'list_bins_for_location_inherited',
+        // Exact-node bins only — never resolve a bin code against an ancestor location.
+        const { data: exactBins } = await supabase.rpc(
+          'list_bins_at_location' as any,
           { p_location_id: effectiveLocationId },
         );
         const lookup = new Map<string, string>();
-        ((inheritedBins || []) as any[]).forEach(b => {
+        ((exactBins || []) as any[]).forEach(b => {
           lookup.set((b.bin_code || '').toLowerCase().trim(), b.id);
         });
         binCodesOriginal.forEach(code => {

@@ -56,7 +56,7 @@ export function MoveToolBetweenBinsDialog({
     enabled: open && !!tool?.location_id,
     queryFn: async () => {
       const { data, error } = await supabase.rpc(
-        "list_bins_for_location_inherited",
+        "list_bins_at_location" as any,
         { p_location_id: tool!.location_id! },
       );
       if (error) throw error;

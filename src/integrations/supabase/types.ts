@@ -19331,6 +19331,7 @@ export type Database = {
           location_id: string | null
           name: string
           notes: string | null
+          parent_bin_id: string | null
           root_location_id: string | null
           status: string
           updated_at: string
@@ -19349,6 +19350,7 @@ export type Database = {
           location_id?: string | null
           name: string
           notes?: string | null
+          parent_bin_id?: string | null
           root_location_id?: string | null
           status?: string
           updated_at?: string
@@ -19367,6 +19369,7 @@ export type Database = {
           location_id?: string | null
           name?: string
           notes?: string | null
+          parent_bin_id?: string | null
           root_location_id?: string | null
           status?: string
           updated_at?: string
@@ -19384,6 +19387,13 @@ export type Database = {
             columns: ["location_id"]
             isOneToOne: false
             referencedRelation: "warehouse_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "warehouse_bins_parent_bin_id_fkey"
+            columns: ["parent_bin_id"]
+            isOneToOne: false
+            referencedRelation: "warehouse_bins"
             referencedColumns: ["id"]
           },
           {
@@ -21586,6 +21596,21 @@ export type Database = {
       journal_entry_has_sensitive_accounts: {
         Args: { je_id: string }
         Returns: boolean
+      }
+      list_bins_at_location: {
+        Args: { p_location_id: string }
+        Returns: {
+          bin_code: string
+          bin_type_id: string
+          capacity: number
+          company_id: string
+          current_quantity: number
+          id: string
+          location_id: string
+          name: string
+          parent_bin_id: string
+          status: string
+        }[]
       }
       list_bins_for_location_inherited: {
         Args: { p_location_id: string }
