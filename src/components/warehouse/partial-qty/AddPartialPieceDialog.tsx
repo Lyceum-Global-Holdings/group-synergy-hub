@@ -425,8 +425,8 @@ export function AddPartialPieceDialog({ open, onOpenChange, defaultParentItemId 
 
           <TabsContent value="bulk" className="mt-4">
             <div className="flex items-center justify-between mb-2">
-              <div className="text-sm text-muted-foreground">
-                {filledRows.length} row{filledRows.length === 1 ? "" : "s"} · total {totalSize.toFixed(4).replace(/\.?0+$/, "")} {sizeUom}
+              <div className="text-sm text-muted-foreground tabular-nums">
+                {filledRows.length} row{filledRows.length === 1 ? "" : "s"} · {totalPieces} pcs · total {totalSize.toLocaleString(undefined, { maximumFractionDigits: 4 })} {sizeUom}
               </div>
               <div className="flex gap-2">
                 <Button type="button" size="sm" variant="outline" onClick={pasteFromClipboard}>
