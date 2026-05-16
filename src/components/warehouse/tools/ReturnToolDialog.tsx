@@ -68,7 +68,7 @@ export function ReturnToolDialog({ open, onOpenChange, activeIssues }: ReturnToo
         .maybeSingle();
       if (!tool?.location_id) return [];
       const { data, error } = await supabase.rpc(
-        "list_bins_for_location_inherited",
+        "list_bins_at_location" as any,
         { p_location_id: tool.location_id },
       );
       if (error) throw error;

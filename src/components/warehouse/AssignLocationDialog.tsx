@@ -84,7 +84,7 @@ export function AssignLocationDialog({ items, open, onOpenChange, onComplete, co
     if (binsByLocation.has(locationId)) return;
     
     const { data } = await supabase.rpc(
-      "list_bins_for_location_inherited",
+      "list_bins_at_location" as any,
       { p_location_id: locationId },
     );
     const filtered = (data || [])
