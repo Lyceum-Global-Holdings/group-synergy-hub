@@ -88,9 +88,9 @@ export function useBulkCatalogImport(defaults: BulkCatalogDefaults = { company_i
       const hit = byKey.get(code.toLowerCase());
       if (!hit) {
         missing.push(code);
-        return newRow({ item_code: code, status: 'invalid', message: 'Not in catalog' });
+        return makeRow({ item_code: code, status: 'invalid', message: 'Not in catalog' });
       }
-      return newRow({
+      return makeRow({
         catalog_item_id: hit.id,
         item_code: hit.item_code,
         name: hit.name,
