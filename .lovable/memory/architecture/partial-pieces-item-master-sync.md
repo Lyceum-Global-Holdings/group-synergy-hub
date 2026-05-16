@@ -16,7 +16,9 @@ Trigger `trg_warehouse_item_catalog_propagate_defaults` (`AFTER UPDATE OF base_u
 - Reserved / consumed / scrapped pieces are NEVER touched (historical cost integrity).
 
 ## Picker scope
-- `list_partial_piece_items` returns every active item in the master (LEFT JOIN); `piece_count` may be 0 so newly-added items are immediately selectable in the Partial Quantities filter.
+- `list_partial_piece_items(p_company_id, p_location_id, p_search, p_limit, p_offset)` is server-paged and searches `warehouse_item_catalog` (~15k rows) by `item_code` / `name`. Returns `total_count` for "showing X of Y" UX. Default limit 100.
+- `PartialPieceItemPicker` uses debounced server search via `usePartialPieceItems({ search, limit })`. Never client-fetch the full catalog into cmdk.
+- Parent filter on `/warehouse/partial-quantities` derives options from currently-loaded `warehouse_partial_pieces` rows (not from the picker source).
 
 ## React Query invalidation
 - `useWarehouseItems` create / update / bulk-import mutations invalidate `['partial-pieces']` and `['partial-piece-items']`.
