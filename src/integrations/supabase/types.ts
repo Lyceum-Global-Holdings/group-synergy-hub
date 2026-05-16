@@ -19657,7 +19657,7 @@ export type Database = {
           barcode: string | null
           base_uom: string | null
           brand: string | null
-          catalog_item_id: string | null
+          catalog_item_id: string
           category_id: string | null
           company_id: string | null
           created_at: string
@@ -19692,7 +19692,7 @@ export type Database = {
           barcode?: string | null
           base_uom?: string | null
           brand?: string | null
-          catalog_item_id?: string | null
+          catalog_item_id: string
           category_id?: string | null
           company_id?: string | null
           created_at?: string
@@ -19727,7 +19727,7 @@ export type Database = {
           barcode?: string | null
           base_uom?: string | null
           brand?: string | null
-          catalog_item_id?: string | null
+          catalog_item_id?: string
           category_id?: string | null
           company_id?: string | null
           created_at?: string
@@ -21196,7 +21196,7 @@ export type Database = {
           barcode: string | null
           base_uom: string | null
           brand: string | null
-          catalog_item_id: string | null
+          catalog_item_id: string
           category_id: string | null
           company_id: string | null
           created_at: string
