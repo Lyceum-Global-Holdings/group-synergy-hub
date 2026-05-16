@@ -67,8 +67,10 @@ export function BulkCatalogToInventoryDialog({ open, onOpenChange }: Props) {
 
   const locationsByCompany = useMemo(() => {
     return (companyId: string | null) => {
-      if (!companyId) return locations;
-      return locations.filter((l) => !l.company_id || l.company_id === companyId);
+      const scoped = !companyId
+        ? locations
+        : locations.filter((l) => !l.company_id || l.company_id === companyId);
+      return buildLocationOptions(scoped, { activeOnly: true });
     };
   }, [locations]);
 
