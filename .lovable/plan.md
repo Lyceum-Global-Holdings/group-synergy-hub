@@ -1,68 +1,41 @@
-## Goal
-Make Inventory show stock correctly by selected Location and Sub-location permanently, without relying on the warehouse-level bin row as the physical stock location.
+## Plan: make sub-location inventory visibility permanent
 
-## Root cause
-The current model now scopes `warehouse_bins` to the root warehouse, which is correct for shared bin codes. But several inventory reads and stock write paths still assume `warehouse_bins.location_id` is the physical stock location. That makes sub-location stock disappear or roll up incorrectly because the bin row points to the warehouse root, not the sub-location where stock actually sits.
+### What is actually going wrong
+The current inventory RPC is returning stock for VEB/sub-locations, but it also returns zero/inactive item-master rows and several legacy tools still overwrite or infer location from the bin master (`warehouse_bins.location_id`) instead of the physical stock node (`warehouse_bin_allocations.location_id`). This is why the issue keeps coming back: reads were partially fixed, but legacy triggers/admin repair tools and some stock paths still collapse stock back to root/bin locations.
 
-## Permanent solution
+### Fix
+1. **Lock the canonical WMS model in the database**
+   - Keep bin codes scoped to the root warehouse so sub-locations can share those bins.
+   - Make `warehouse_bin_allocations.location_id` the only physical stock-location source of truth.
+   - Stop item-master `location_id` from being resynced from bin master location.
+   - Replace the old allocation-to-item-location sync trigger with a safe no-op/compatibility function so future allocation changes cannot move item master rows away from sub-locations.
 
-1. **Canonicalize stock location at allocation level**
-   - Treat `warehouse_bin_allocations.location_id` as the source of truth for physical stock location.
-   - Keep `warehouse_bins.root_location_id/location_id` as the shared warehouse/bin master scope only.
-   - Ensure all new/updated allocation rows are written with the exact selected location/sub-location.
+2. **Repair the inventory RPC permanently**
+   - Rewrite `list_warehouse_inventory` so location-filtered inventory returns only rows that have stock in the selected location/subtree, unless the user explicitly chooses zero stock.
+   - Aggregate bins from allocation rows at that exact physical location/subtree.
+   - Add `location_id` and `location_name` into each returned bin JSON so the UI can show exactly where the bin quantity belongs.
+   - Ensure parent locations include child stock, while child/sub-location views show only that subtree.
 
-2. **Replace Inventory’s split query logic with one canonical server RPC**
-   - Update/create `list_warehouse_inventory` so it returns:
-     - one item row per item,
-     - location-filtered `current_stock` derived from allocation sums,
-     - `bins` derived from allocations at the selected location/subtree,
-     - parent location totals including child sub-locations,
-     - sub-location totals showing only that sub-location subtree.
-   - Use `warehouse_bin_allocations.location_id` for stock filtering, with fallback to bin location only for legacy rows.
+3. **Backfill and normalize existing data**
+   - Backfill missing allocation `location_id` from stock transaction history first, then item location, then bin root.
+   - Recompute `warehouse_items.current_stock`, `available_quantity`, and `reserved_quantity` from allocations so totals match the allocation ledger.
+   - Preserve existing stock quantities; this is not a delete/reset.
 
-3. **Update frontend Inventory to use the canonical RPC**
-   - Refactor `useWarehouseItemsLazyInventory` to stop doing client-side bin/allocation enrichment.
-   - Pass selected company, selected location, search/filter params, and pagination to the RPC.
-   - Display `item.current_stock` as the selected location/sub-location stock total, not global item stock, when a location filter is active.
-   - Remove the separate `all-items-location-stock` client-side query from `ItemMasterTab`, because it is duplicating logic and causing inconsistent totals.
+4. **Remove unsafe admin repair behavior**
+   - Update “Fix Allocations” and “Fix from History” flows so they never move allocation `bin_id` just because the item master has a location.
+   - Any repair must update `warehouse_bin_allocations.location_id` instead of changing the shared bin code.
 
-4. **Fix all stock write paths that create/update allocations**
-   - Update these paths to include allocation `location_id` and lookup existing allocations by `(item, bin, company, location)`:
-     - Create item opening stock
-     - Add from catalog
-     - Bulk item import
-     - Bulk stock upload
-     - GRN bin allocation approval
-     - Manual bin allocation dialog
-     - Stock transfer destination allocation
-     - Returns/adjustments where applicable
-   - This prevents a sub-location receipt from merging into the same bin at the root warehouse.
+5. **Patch remaining high-risk stock write paths**
+   - Ensure GRN approval allocation lookup/upsert uses `(item, bin, company, location)` and writes `location_id`.
+   - Ensure stock transactions created from GRN include the same physical `location_id` and `bin_id`.
+   - Keep previously patched import/upload/transfer paths aligned with the same rule.
 
-5. **Add database guardrails**
-   - Keep/complete the allocation trigger that validates allocation location belongs under the bin’s root warehouse.
-   - Add/verify a uniqueness rule on `(warehouse_item_id, bin_id, company_id, location_id)` for active allocation rows.
-   - Update stock transaction guard logic so ledger rows preserve the caller’s exact `location_id` when it is valid, rather than overwriting it with the bin root.
-
-6. **Backfill existing data safely**
-   - For existing allocation rows, populate `warehouse_bin_allocations.location_id` from the best available source:
-     - exact stock transaction location for the item/bin,
-     - then item location,
-     - then bin root as last resort.
-   - Recompute item master totals from allocations after the location backfill.
+6. **Frontend display correction**
+   - Keep `/warehouse/inventory` using `list_warehouse_inventory` only.
+   - Show bin badges from the RPC allocation result, not from bin master location.
+   - Default filtered location views to in-stock/allocated rows only so zero inactive catalog rows do not hide the real sub-location stock.
 
 7. **Verification**
-   - Query the DB to confirm positive allocations exist by sub-location.
-   - Verify the Inventory RPC returns those rows for:
-     - exact sub-location,
-     - parent warehouse including child stock,
-     - all locations.
-   - Verify the preview no longer throws the current `Maximum call stack size exceeded` runtime error.
-   - Confirm Inventory shows correct stock/bins after selecting a location and a sub-location.
-
-## Technical notes
-- Database structural changes will use migrations only.
-- Data backfill/corrections will be handled separately as data operations, not schema migrations.
-- The design follows SAP EWM/Oracle WMS style separation:
-  - Bin master = warehouse/root scoped storage identity.
-  - Allocation = exact physical stock location and quantity.
-  - Ledger = immutable movement history at exact location/bin granularity.
+   - Verify with database queries for known sub-locations like VEB: allocation counts, item counts, bin JSON, and parent rollup totals.
+   - Verify network response for `/rpc/list_warehouse_inventory` shows positive rows and bins for the selected sub-location.
+   - Check the runtime `Maximum call stack size exceeded` signal and remove any repeat render/update loop if it persists after the inventory correction.
