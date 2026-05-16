@@ -13,8 +13,6 @@ import { useSuperAdmin } from "@/hooks/useSuperAdmin";
 export function CompanySelector() {
   const { selectedCompany, setSelectedCompany, companies, isViewingAllCompanies } = useCompany();
   const { data: isSuperAdmin } = useSuperAdmin();
-  const navigate = useNavigate();
-  const location = useLocation();
 
   // If user has only one company, don't show selector at all
   if (companies.length === 1 && !isSuperAdmin) {
