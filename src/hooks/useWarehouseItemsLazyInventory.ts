@@ -238,8 +238,6 @@ export function useWarehouseItemsLazyInventory({
               binsQuery = binsQuery.in('location_id', permittedLocationIds);
             }
           }
-        }
-
           const { data } = await binsQuery;
           bins = data || [];
         }
