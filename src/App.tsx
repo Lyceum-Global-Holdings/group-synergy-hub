@@ -309,6 +309,7 @@ function App() {
                 <Route path="/warehouse/asset-management" element={<AssetManagement />} />
                 <Route path="/warehouse/tool-management" element={<ToolManagement />} />
                 <Route path="/warehouse/item-bin-master" element={<ItemBinMaster />} />
+                <Route path="/warehouse/network" element={<WarehouseNetwork />} />
                 <Route path="/warehouse/bin-allocations" element={<BinAllocations />} />
                 <Route path="/warehouse/inventory" element={<Inventory />} />
                 <Route path="/warehouse/stock-audit" element={<StockAudit />} />
