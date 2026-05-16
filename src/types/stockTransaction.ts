@@ -30,6 +30,8 @@ export interface StockTransaction {
   total_value: number | null;
   notes: string | null;
   company_id: string | null;
+  location_id?: string | null;
+  bin_id?: string | null;
   created_by: string | null;
   created_at: string;
   updated_at: string;
@@ -52,6 +54,8 @@ export interface CreateStockTransactionData {
   total_value?: number;
   notes?: string;
   company_id?: string;
+  location_id?: string;
+  bin_id?: string;
   issued_to_location_id?: string;
   secondary_quantity_change?: number;
   secondary_uom?: string;
