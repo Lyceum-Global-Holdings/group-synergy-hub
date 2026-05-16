@@ -236,6 +236,8 @@ export function useConsumePartialPiecePieces() {
     onSuccess: invalidate,
   });
 }
+
+export function useSplitPartialPiece() {
   const invalidate = useInvalidate();
   return useMutation({
     mutationFn: async (input: { id: string; first_size: number; second_size: number }) => {
