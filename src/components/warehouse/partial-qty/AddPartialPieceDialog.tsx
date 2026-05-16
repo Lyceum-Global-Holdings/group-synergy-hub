@@ -133,7 +133,7 @@ export function AddPartialPieceDialog({ open, onOpenChange, defaultParentItemId 
 
   function reset() {
     setMode("single");
-    setCatalogItemId(""); setLocationId(""); setBinId("");
+    setSelectedItem(null); setLocationId(""); setBinId("");
     setSizeValue(""); setPieceQty("1"); setSizeUom(""); setPieceCode("");
     setSourceRef(""); setBatchNumber(""); setUnitCost(""); setLabel(""); setNotes("");
     setRows([emptyRow(), emptyRow(), emptyRow()]);
@@ -326,7 +326,7 @@ export function AddPartialPieceDialog({ open, onOpenChange, defaultParentItemId 
               <Label>Parent Item *</Label>
               <PartialPieceItemPicker
                 value={catalogItemId}
-                onSelect={(it) => setCatalogItemId(it?.catalog_item_id ?? "")}
+                onSelect={(it) => setSelectedItem(it)}
                 placeholder="Search by item code or name…"
                 className="w-full"
               />
