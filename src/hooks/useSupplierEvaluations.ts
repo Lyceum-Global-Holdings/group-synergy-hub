@@ -29,6 +29,11 @@ export const useSupplierEvaluations = () => {
 
       if (error) throw error;
       return ((data || []) as any[]).map(flattenWarehouseItem) as SupplierEvaluation[];
+    },
+  });
+};
+
+// Fetch single supplier evaluation with entries
 export const useSupplierEvaluation = (id: string) => {
   return useQuery({
     queryKey: ["supplier-evaluation", id],
