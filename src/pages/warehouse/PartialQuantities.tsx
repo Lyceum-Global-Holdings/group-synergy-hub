@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,6 +18,9 @@ import { SplitPartialPieceDialog } from "@/components/warehouse/partial-qty/Spli
 import { ImportPartialPiecesDialog } from "@/components/warehouse/partial-qty/ImportPartialPiecesDialog";
 import { useLocationFilter } from "@/contexts/LocationFilterContext";
 import { useWarehouseLocations } from "@/hooks/useWarehouseLocations";
+import { useRealtimeChannel } from "@/hooks/useRealtimeBus";
+import { useQueryClient } from "@tanstack/react-query";
+import { scheduleInvalidate } from "@/lib/queryInvalidation";
 import { cn } from "@/lib/utils";
 
 const STATUS_VARIANT: Record<PartialPieceStatus, "default" | "secondary" | "outline" | "destructive"> = {
@@ -155,6 +158,14 @@ export default function PartialQuantities() {
     parentItemId: parentItemId === "all" ? null : parentItemId,
   });
   const { data: itemOptions = [] } = usePartialPieceItems();
+
+  // Cross-tab sync: when Item Master changes anywhere, refresh partial pieces.
+  const qc = useQueryClient();
+  const onItemsChange = useCallback(() => {
+    scheduleInvalidate(qc, ["partial-pieces"]);
+    scheduleInvalidate(qc, ["partial-piece-items"]);
+  }, [qc]);
+  useRealtimeChannel("warehouse_items", onItemsChange);
 
   const [view, setView] = useState<ViewMode>(() => {
     if (typeof window === "undefined") return "grouped";
