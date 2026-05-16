@@ -270,6 +270,8 @@ export const useCompleteStockTransfer = () => {
 
         const fromBinId = item.from_bin_id;
         const toBinId = item.to_bin_id;
+        const sourceLocationId = transfer.from_department_id || transfer.from_sublocation_id || transfer.from_location_id || null;
+        const destinationLocationId = transfer.to_department_id || transfer.to_sublocation_id || transfer.to_location_id || null;
 
         if (!fromBinId || !toBinId) {
           console.error('[CompleteTransfer] Missing bin IDs for item:', item.id);
@@ -309,6 +311,8 @@ export const useCompleteStockTransfer = () => {
             quantity_before: currentStock,
             quantity_after: currentStock - item.quantity_requested,
             notes: `Transfer ${transfer.transfer_number} - Out from bin ${fromBinId}`,
+            bin_id: fromBinId,
+            location_id: sourceLocationId,
             created_by: user.id,
           });
           if (transOutError) {
@@ -327,6 +331,8 @@ export const useCompleteStockTransfer = () => {
             quantity_before: currentStock - item.quantity_requested,
             quantity_after: currentStock,
             notes: `Transfer ${transfer.transfer_number} - In to bin ${toBinId}`,
+            bin_id: toBinId,
+            location_id: destinationLocationId,
             created_by: user.id,
           });
           if (transInError) {
@@ -340,12 +346,13 @@ export const useCompleteStockTransfer = () => {
         // ===== UPDATE SOURCE BIN ALLOCATION (decrease stock) =====
         console.log('[CompleteTransfer] Updating source bin allocation for bin:', fromBinId);
         
-        const { data: sourceAllocation, error: sourceAllocError } = await supabase
+        let sourceAllocationQuery = supabase
           .from('warehouse_bin_allocations')
           .select('*')
           .eq('warehouse_item_id', item.warehouse_item_id)
-          .eq('bin_id', fromBinId)
-          .maybeSingle();
+          .eq('bin_id', fromBinId);
+        if (sourceLocationId) sourceAllocationQuery = sourceAllocationQuery.eq('location_id', sourceLocationId);
+        const { data: sourceAllocation, error: sourceAllocError } = await sourceAllocationQuery.maybeSingle();
 
         if (sourceAllocError) {
           console.error('Failed to get source allocation:', sourceAllocError);
@@ -403,12 +410,13 @@ export const useCompleteStockTransfer = () => {
         // ===== CREATE OR UPDATE DESTINATION BIN ALLOCATION (increase stock) =====
         console.log('[CompleteTransfer] Updating destination bin allocation for bin:', toBinId);
 
-        const { data: destAllocation, error: destAllocError } = await supabase
+        let destAllocationQuery = supabase
           .from('warehouse_bin_allocations')
           .select('*')
           .eq('warehouse_item_id', item.warehouse_item_id)
-          .eq('bin_id', toBinId)
-          .maybeSingle();
+          .eq('bin_id', toBinId);
+        if (destinationLocationId) destAllocationQuery = destAllocationQuery.eq('location_id', destinationLocationId);
+        const { data: destAllocation, error: destAllocError } = await destAllocationQuery.maybeSingle();
 
         if (destAllocError) {
           console.error('Failed to check destination allocation:', destAllocError);
@@ -453,6 +461,7 @@ export const useCompleteStockTransfer = () => {
               allocated_quantity: item.quantity_requested,
               reserved_quantity: 0,
               company_id: companyId,
+              location_id: destinationLocationId,
               created_by: user.id,
             });
 
