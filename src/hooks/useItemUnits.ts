@@ -21,7 +21,9 @@ export const useItemUnits = () => {
 
       if (error) throw error;
       return data as ItemUnit[];
-    }
+    },
+    staleTime: 5 * 60_000,
+    gcTime: 30 * 60_000,
   });
 
   const createUnitMutation = useMutation({
