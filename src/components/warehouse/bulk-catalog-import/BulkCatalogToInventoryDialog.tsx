@@ -13,6 +13,7 @@ import {
 import { Plus, Trash2, ClipboardPaste, Loader2, X, CheckCircle2, AlertCircle } from 'lucide-react';
 import { useCompanies } from '@/hooks/useCompanies';
 import { useCompany } from '@/contexts/CompanyContext';
+import { useLocationFilter } from '@/contexts/LocationFilterContext';
 import { useWarehouseLocations } from '@/hooks/useWarehouseLocations';
 import { useWarehouseBins } from '@/hooks/useWarehouseBins';
 import { useToast } from '@/hooks/use-toast';
@@ -33,8 +34,19 @@ export function BulkCatalogToInventoryDialog({ open, onOpenChange }: Props) {
   const qc = useQueryClient();
   const { companies } = useCompanies();
   const { selectedCompany } = useCompany();
+  const { globalLocationId } = useLocationFilter();
   const { locations } = useWarehouseLocations();
   const { bins } = useWarehouseBins({ skipLocationFilter: true });
+
+  const defaultCompanyId = selectedCompany?.id ?? null;
+  // Only use global location if it belongs to the active company (or is unscoped)
+  const defaultLocationId = useMemo(() => {
+    if (!globalLocationId) return null;
+    const loc = locations.find((l) => l.id === globalLocationId);
+    if (!loc) return null;
+    if (!loc.company_id || !defaultCompanyId || loc.company_id === defaultCompanyId) return globalLocationId;
+    return null;
+  }, [globalLocationId, locations, defaultCompanyId]);
 
   const {
     rows,
@@ -48,12 +60,9 @@ export function BulkCatalogToInventoryDialog({ open, onOpenChange }: Props) {
     isSubmitting,
     validCount,
     invalidCount,
-  } = useBulkCatalogImport();
+  } = useBulkCatalogImport({ company_id: defaultCompanyId, location_id: defaultLocationId });
 
   const [pasteOpen, setPasteOpen] = useState(false);
-
-  // Default new rows to active company
-  const defaultCompanyId = selectedCompany?.id ?? null;
 
   const locationsByCompany = useMemo(() => {
     return (companyId: string | null) => {
@@ -65,6 +74,9 @@ export function BulkCatalogToInventoryDialog({ open, onOpenChange }: Props) {
   const binsByLocation = useMemo(() => {
     return (locationId: string | null) => bins.filter((b) => b.location_id === locationId);
   }, [bins]);
+
+  const defaultCompanyName = companies.find((c) => c.id === defaultCompanyId)?.name ?? '—';
+  const defaultLocationName = locations.find((l) => l.id === defaultLocationId)?.name ?? 'All locations';
 
   const handleImport = async () => {
     try {
@@ -135,6 +147,9 @@ export function BulkCatalogToInventoryDialog({ open, onOpenChange }: Props) {
               Clear invalid ({invalidCount})
             </Button>
             <Button size="sm" variant="ghost" onClick={resetAll}>Reset</Button>
+            <Badge variant="secondary" className="font-normal">
+              Defaults: {defaultCompanyName} · {defaultLocationName}
+            </Badge>
             <div className="ml-auto flex items-center gap-3 text-sm text-muted-foreground">
               <span className="flex items-center gap-1">
                 <CheckCircle2 className="h-4 w-4 text-success" /> {validCount} valid
@@ -170,9 +185,9 @@ export function BulkCatalogToInventoryDialog({ open, onOpenChange }: Props) {
                     index={idx}
                     row={r}
                     companies={companies}
-                    locations={locationsByCompany(r.company_id ?? defaultCompanyId)}
+                    locations={locationsByCompany(r.company_id)}
                     bins={binsByLocation(r.location_id)}
-                    defaultCompanyId={defaultCompanyId}
+                    defaultLocationId={defaultLocationId}
                     onChange={(patch) => setRow(r.rowId, patch)}
                     onRemove={() => removeRow(r.rowId)}
                   />
@@ -203,14 +218,13 @@ interface RowProps {
   companies: any[];
   locations: any[];
   bins: any[];
-  defaultCompanyId: string | null;
+  defaultLocationId: string | null;
   onChange: (patch: Partial<BulkCatalogRow>) => void;
   onRemove: () => void;
 }
 
-function Row({ index, row, companies, locations, bins, defaultCompanyId, onChange, onRemove }: RowProps) {
-  // Lazy default to active company
-  const companyId = row.company_id ?? defaultCompanyId;
+function Row({ index, row, companies, locations, bins, defaultLocationId, onChange, onRemove }: RowProps) {
+  const companyId = row.company_id;
 
   const statusBadge = () => {
     switch (row.status) {
@@ -242,14 +256,20 @@ function Row({ index, row, companies, locations, bins, defaultCompanyId, onChang
               item_code: it.item_code,
               name: it.name,
               uom: it.unit_name,
-              company_id: row.company_id ?? defaultCompanyId,
             })
           }
         />
       </td>
       <td className="px-2 py-1.5 text-xs text-muted-foreground">{row.uom ?? '—'}</td>
       <td className="px-2 py-1.5">
-        <Select value={companyId ?? undefined} onValueChange={(v) => onChange({ company_id: v, location_id: null, bin_id: null })}>
+        <Select
+          value={companyId ?? undefined}
+          onValueChange={(v) => {
+            // When company changes, keep default location if it belongs to new company; else clear
+            const keepLoc = defaultLocationId && locations.some((l) => l.id === defaultLocationId);
+            onChange({ company_id: v, location_id: keepLoc ? defaultLocationId : null, bin_id: null });
+          }}
+        >
           <SelectTrigger className="h-8 text-xs">
             <SelectValue placeholder="Select…" />
           </SelectTrigger>
