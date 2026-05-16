@@ -92,7 +92,7 @@ export function AddPartialPieceDialog({ open, onOpenChange, defaultParentItemId 
       if (!unitCost && item.unit_cost != null) setUnitCost(String(item.unit_cost));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [parentItemId, units]);
+  }, [catalogItemId, units]);
 
   // Inherit the active global location filter (SAP EWM / Oracle WMS pattern).
   useEffect(() => {
@@ -104,9 +104,12 @@ export function AddPartialPieceDialog({ open, onOpenChange, defaultParentItemId 
   }, [open, globalLocationId]);
 
   // Pre-select parent item when invoked from a grouped parent row.
+  // The caller passes a warehouse_items.id; reverse-lookup the catalog id.
   useEffect(() => {
-    if (open && defaultParentItemId) setParentItemId(defaultParentItemId);
-  }, [open, defaultParentItemId]);
+    if (!open || !defaultParentItemId || items.length === 0) return;
+    const match = items.find(i => i.parent_item_id === defaultParentItemId);
+    if (match) setCatalogItemId(match.catalog_item_id);
+  }, [open, defaultParentItemId, items]);
 
   const lockedLocation = !!globalLocationId;
   const lockedLocationName = useMemo(() => {
@@ -120,7 +123,7 @@ export function AddPartialPieceDialog({ open, onOpenChange, defaultParentItemId 
 
   function reset() {
     setMode("single");
-    setParentItemId(""); setLocationId(""); setBinId("");
+    setCatalogItemId(""); setLocationId(""); setBinId("");
     setSizeValue(""); setPieceQty("1"); setSizeUom(""); setPieceCode("");
     setSourceRef(""); setBatchNumber(""); setUnitCost(""); setLabel(""); setNotes("");
     setRows([emptyRow(), emptyRow(), emptyRow()]);
