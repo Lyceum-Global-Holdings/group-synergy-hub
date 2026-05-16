@@ -241,21 +241,58 @@ export const useWarehouseItems = (options?: { skipCompanyFilter?: boolean; disab
 
   const updateItemMutation = useMutation({
     mutationFn: async ({ id, ...itemData }: Partial<WarehouseItem> & { id: string }) => {
-      console.log('Updating item with ID:', id);
-      console.log('Update payload:', itemData);
-      
-      const { data, error } = await supabase
-        .from('warehouse_items')
-        .update(itemData)
-        .eq('id', id)
-        .select()
-        .single();
+      // Stage 3: split master (catalog-owned) fields from per-company fields.
+      // Master fields go through update_warehouse_catalog_item RPC; the AFTER
+      // trigger fans them out to every company. Per-company fields are written
+      // directly via PostgREST (column-level UPDATE grants enforce the split).
+      const MASTER_FIELDS = [
+        'name', 'description', 'category_id', 'unit_id', 'brand', 'manufacturer',
+        'supplier_id', 'barcode', 'sku', 'image_url', 'is_serialized', 'is_batch_tracked'
+      ] as const;
 
-      if (error) {
-        console.error('Supabase update error:', error);
-        throw error;
+      const master: Record<string, any> = {};
+      const perCompany: Record<string, any> = {};
+      for (const [k, v] of Object.entries(itemData)) {
+        if (k === 'item_code') continue; // immutable; catalog owns it
+        if ((MASTER_FIELDS as readonly string[]).includes(k)) master[k] = v;
+        else perCompany[k] = v;
       }
-      console.log('Update successful, returned data:', data);
+
+      // Master edits: resolve catalog_item_id from the inventory row, then RPC.
+      if (Object.keys(master).length > 0) {
+        const { data: row, error: rowErr } = await supabase
+          .from('warehouse_items')
+          .select('catalog_item_id')
+          .eq('id', id)
+          .single();
+        if (rowErr) throw rowErr;
+        const rpcArgs: Record<string, any> = { p_catalog_item_id: row.catalog_item_id };
+        for (const f of MASTER_FIELDS) {
+          if (f in master) rpcArgs[`p_${f}`] = master[f];
+        }
+        const { error: rpcErr } = await supabase.rpc('update_warehouse_catalog_item', rpcArgs as any);
+        if (rpcErr) throw rpcErr;
+      }
+
+      // Per-company edits: direct update on warehouse_items
+      let data: any = null;
+      if (Object.keys(perCompany).length > 0) {
+        const { data: updated, error } = await supabase
+          .from('warehouse_items')
+          .update(perCompany)
+          .eq('id', id)
+          .select()
+          .single();
+        if (error) throw error;
+        data = updated;
+      } else {
+        const { data: refreshed } = await supabase
+          .from('warehouse_items')
+          .select()
+          .eq('id', id)
+          .single();
+        data = refreshed;
+      }
       return data;
     },
     onSuccess: () => {
