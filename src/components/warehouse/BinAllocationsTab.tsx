@@ -76,10 +76,9 @@ export function BinAllocationsTab() {
     };
   }, [globalLocationId, locations]);
 
-  // Normalize parent (PostgREST self-FK can return array or object) into a flat
-  // hierarchical "Parent › Child" path. Follows WMS standard of showing the
-  // full storage hierarchy (Site/Warehouse › Zone/Sub-location › Bin).
-  const getLocationPath = (allocation: BinAllocationWithDetails) => {
+  // Stable per-render path resolver. Memoized so heavy filter/sort passes
+  // don't re-walk the parent-FK shape for every row on every keystroke.
+  const getLocationPath = useCallback((allocation: BinAllocationWithDetails) => {
     const loc = allocation.warehouse_bin?.warehouse_location;
     if (!loc) return { parent: null, child: null, path: '' };
     const parentRaw = loc.parent;
@@ -95,37 +94,48 @@ export function BinAllocationsTab() {
       };
     }
     return { parent: null, child, path: child };
-  };
+  }, []);
+
+  // Decorate each allocation with searchable lowercase fields + cached path
+  // ONCE per data change, so per-keystroke filter is a cheap string scan.
+  const decorated = useMemo(() => {
+    return (binAllocations || []).map((a) => {
+      const path = getLocationPath(a);
+      return {
+        a,
+        path,
+        locId: a.warehouse_bin?.warehouse_location?.id ?? null,
+        haystack: [
+          a.warehouse_item?.item_code,
+          a.warehouse_item?.name,
+          a.warehouse_bin?.bin_code,
+          a.warehouse_bin?.name,
+          path.path,
+        ].join('\u0001').toLowerCase(),
+      };
+    });
+  }, [binAllocations, getLocationPath]);
+
+  // Defer search input so typing never blocks INP — list re-filters in a
+  // low-priority React transition.
+  const deferredSearch = useDeferredValue(searchTerm);
 
   const filteredAllocations = useMemo(() => {
-    const term = searchTerm.trim().toLowerCase();
-    const base = (binAllocations || []).filter((allocation) => {
-      // Warehouse / sub-location scope
-      if (scope) {
-        const locId = allocation.warehouse_bin?.warehouse_location?.id;
-        if (!locId || !scope.ids.has(locId)) return false;
-      }
-      // Free-text search
+    const term = deferredSearch.trim().toLowerCase();
+    const base = decorated.filter((d) => {
+      if (scope && (!d.locId || !scope.ids.has(d.locId))) return false;
       if (!term) return true;
-      return (
-        allocation.warehouse_item?.item_code?.toLowerCase().includes(term) ||
-        allocation.warehouse_item?.name?.toLowerCase().includes(term) ||
-        allocation.warehouse_bin?.bin_code?.toLowerCase().includes(term) ||
-        allocation.warehouse_bin?.name?.toLowerCase().includes(term) ||
-        getLocationPath(allocation).path.toLowerCase().includes(term)
-      );
+      return d.haystack.includes(term);
     });
-    // Group by location path → bin code → item code for predictable WMS layout
-    return [...base].sort((a, b) => {
-      const pa = getLocationPath(a).path;
-      const pb = getLocationPath(b).path;
-      if (pa !== pb) return pa.localeCompare(pb);
-      const ba = a.warehouse_bin?.bin_code ?? '';
-      const bb = b.warehouse_bin?.bin_code ?? '';
-      if (ba !== bb) return ba.localeCompare(bb);
-      return (a.warehouse_item?.item_code ?? '').localeCompare(b.warehouse_item?.item_code ?? '');
+    base.sort((x, y) => {
+      if (x.path.path !== y.path.path) return x.path.path.localeCompare(y.path.path);
+      const bx = x.a.warehouse_bin?.bin_code ?? '';
+      const by = y.a.warehouse_bin?.bin_code ?? '';
+      if (bx !== by) return bx.localeCompare(by);
+      return (x.a.warehouse_item?.item_code ?? '').localeCompare(y.a.warehouse_item?.item_code ?? '');
     });
-  }, [binAllocations, searchTerm, scope]);
+    return base.map((d) => d.a);
+  }, [decorated, deferredSearch, scope]);
   const { canDelete } = useIsAdminOrHigher();
 
   const handleDelete = () => {
