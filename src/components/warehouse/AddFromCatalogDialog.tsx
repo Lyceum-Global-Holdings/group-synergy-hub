@@ -11,7 +11,10 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useCompany } from '@/contexts/CompanyContext';
 import { useWarehouseBins } from '@/hooks/useWarehouseBins';
+import { useWarehouseLocations } from '@/hooks/useWarehouseLocations';
 import { useItemCategories } from '@/hooks/useItemCategories';
+import { useLocationFilter } from '@/contexts/LocationFilterContext';
+import { buildLocationOptions, getRootLocationId } from '@/lib/warehouse/locationHierarchy';
 import { toast } from 'sonner';
 import { CatalogItem } from '@/types/itemBin';
 import { QTY_STEP, QTY_MIN, parseQty } from '@/lib/quantityInput';
@@ -24,6 +27,8 @@ interface AddFromCatalogDialogProps {
 export function AddFromCatalogDialog({ open, onOpenChange }: AddFromCatalogDialogProps) {
   const { selectedCompany } = useCompany();
   const { bins } = useWarehouseBins();
+  const { locations } = useWarehouseLocations();
+  const { globalLocationId } = useLocationFilter();
   const { categories } = useItemCategories(selectedCompany?.id);
   const queryClient = useQueryClient();
 
@@ -32,6 +37,17 @@ export function AddFromCatalogDialog({ open, onOpenChange }: AddFromCatalogDialo
   const [selectedItem, setSelectedItem] = useState<CatalogItem | null>(null);
   const [quantity, setQuantity] = useState<string>('1');
   const [selectedBinId, setSelectedBinId] = useState<string>('');
+  const [selectedLocationId, setSelectedLocationId] = useState<string>('');
+
+  const locationOptions = useMemo(() => buildLocationOptions(locations, { activeOnly: true }), [locations]);
+  const effectiveLocationId = selectedLocationId || globalLocationId || '';
+  const selectedRootLocationId = useMemo(
+    () => getRootLocationId(locations, effectiveLocationId),
+    [locations, effectiveLocationId]
+  );
+  const filteredBins = effectiveLocationId
+    ? bins.filter((bin) => (bin.root_location_id ?? bin.location_id) === selectedRootLocationId)
+    : bins;
 
   // Fetch all catalog items using cursor-based batching to bypass 1,000-row limit
   const { data: catalogItems = [], isLoading: isLoadingCatalog } = useQuery({
@@ -128,7 +144,7 @@ export function AddFromCatalogDialog({ open, onOpenChange }: AddFromCatalogDialo
   const importMutation = useMutation({
     mutationFn: async () => {
       const qty = parseQty(quantity);
-      if (!selectedItem || !selectedCompany?.id || !selectedBinId || !qty || qty <= 0) {
+      if (!selectedItem || !selectedCompany?.id || !effectiveLocationId || !selectedBinId || !qty || qty <= 0) {
         throw new Error('Please fill in all required fields with a valid quantity');
       }
 
@@ -137,7 +153,7 @@ export function AddFromCatalogDialog({ open, onOpenChange }: AddFromCatalogDialo
       // Look for existing inventory row in this company for this catalog item.
       const { data: existingRow } = await supabase
         .from('warehouse_items')
-        .select('id, current_stock')
+        .select('id, current_stock, location_id')
         .eq('company_id', selectedCompany.id)
         .or(`catalog_item_id.eq.${selectedItem.id},item_code.eq.${selectedItem.item_code}`)
         .maybeSingle();
@@ -153,6 +169,7 @@ export function AddFromCatalogDialog({ open, onOpenChange }: AddFromCatalogDialo
           .update({
             current_stock: newStock,
             status: 'active',
+            ...(existingRow.location_id ? {} : { location_id: effectiveLocationId }),
           })
           .eq('id', existingRow.id)
           .select('id')
@@ -185,6 +202,7 @@ export function AddFromCatalogDialog({ open, onOpenChange }: AddFromCatalogDialo
             is_serialized: selectedItem.is_serialized,
             status: 'active',
             company_id: selectedCompany.id,
+            location_id: effectiveLocationId,
             current_stock: qty,
             reserved_quantity: 0,
             created_by: userId,
@@ -196,7 +214,7 @@ export function AddFromCatalogDialog({ open, onOpenChange }: AddFromCatalogDialo
         itemId = newItem.id;
       }
 
-      // Upsert bin allocation on (warehouse_item_id, bin_id, company_id).
+      // Upsert bin allocation on (warehouse_item_id, bin_id, company_id, location_id).
       // If allocation already exists, increment allocated_quantity.
       const { data: existingAlloc } = await supabase
         .from('warehouse_bin_allocations')
@@ -204,6 +222,7 @@ export function AddFromCatalogDialog({ open, onOpenChange }: AddFromCatalogDialo
         .eq('warehouse_item_id', itemId)
         .eq('bin_id', selectedBinId)
         .eq('company_id', selectedCompany.id)
+        .eq('location_id', effectiveLocationId)
         .maybeSingle();
 
       if (existingAlloc) {
@@ -222,6 +241,7 @@ export function AddFromCatalogDialog({ open, onOpenChange }: AddFromCatalogDialo
             allocated_quantity: qty,
             reserved_quantity: 0,
             company_id: selectedCompany.id,
+            location_id: effectiveLocationId,
             created_by: userId,
           });
         if (allocInsertError) throw allocInsertError;
@@ -247,6 +267,7 @@ export function AddFromCatalogDialog({ open, onOpenChange }: AddFromCatalogDialo
     setSearchTerm('');
     setSelectedItem(null);
     setQuantity('1');
+    setSelectedLocationId('');
     setSelectedBinId('');
     onOpenChange(false);
   };
