@@ -171,10 +171,22 @@ export const useWarehouseItems = (options?: { skipCompanyFilter?: boolean; disab
 
       const { initialStock, initialUnitCost, ...itemDataWithoutStock } = itemData;
 
+      // Stage 1: every inventory row must link to a catalog entry. Resolve by item_code.
+      const { data: catalogRow, error: catalogErr } = await supabase
+        .from('warehouse_item_catalog')
+        .select('id')
+        .eq('item_code', itemDataWithoutStock.item_code)
+        .maybeSingle();
+      if (catalogErr) throw catalogErr;
+      if (!catalogRow) {
+        throw new Error(`Catalog entry missing for item_code ${itemDataWithoutStock.item_code}. Create the catalog row first.`);
+      }
+
       const { data, error } = await supabase
         .from('warehouse_items')
         .insert({
           ...itemDataWithoutStock,
+          catalog_item_id: catalogRow.id,
           company_id: selectedCompany.id,
           created_by: user.id
         })
