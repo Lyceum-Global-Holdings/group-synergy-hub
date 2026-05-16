@@ -217,6 +217,12 @@ export function BinMasterTab() {
         onOpenChange={setIsBulkScopeOpen}
         bins={selectedBins}
       />
+
+      <RelocateBinDialog
+        open={relocatingBin !== null}
+        onOpenChange={(o) => { if (!o) setRelocatingBin(null); }}
+        bin={relocatingBin}
+      />
     </div>
   );
 }
