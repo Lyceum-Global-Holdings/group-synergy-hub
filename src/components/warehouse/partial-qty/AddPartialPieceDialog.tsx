@@ -11,7 +11,7 @@ import { useLocationFilter } from "@/contexts/LocationFilterContext";
 import { useWarehouseLocations } from "@/hooks/useWarehouseLocations";
 import { useItemUnits } from "@/hooks/useItemUnits";
 import { PartialPieceItemPicker, type PartialPieceItemOption } from "@/components/warehouse/partial-qty/PartialPieceItemPicker";
-import { usePartialPieceItems, ensurePartialPieceParentItem } from "@/hooks/warehouse/usePartialPieces";
+import { ensurePartialPieceParentItem } from "@/hooks/warehouse/usePartialPieces";
 import {
   useCreatePartialPiece,
   useCreatePartialPiecesBulk,
@@ -49,17 +49,17 @@ export function AddPartialPieceDialog({ open, onOpenChange, defaultParentItemId 
   const { globalLocationId } = useLocationFilter();
   const { toast } = useToast();
   const { locations } = useWarehouseLocations();
-  const { data: items = [] } = usePartialPieceItems();
   const { units } = useItemUnits();
   const create = useCreatePartialPiece();
   const createBulk = useCreatePartialPiecesBulk();
 
   const [mode, setMode] = useState<"single" | "bulk">("single");
 
-  // Shared header state (used by both modes). We key on catalog_item_id since
-  // the picker now sources from the full Item Master; the per-company
-  // warehouse_items row is resolved (and created if needed) at submit time.
-  const [catalogItemId, setCatalogItemId] = useState("");
+  // Shared header state (used by both modes). The picker is server-paged, so
+  // we hold the full selected option locally — never look it up against an
+  // unfiltered list.
+  const [selectedItem, setSelectedItem] = useState<PartialPieceItemOption | null>(null);
+  const catalogItemId = selectedItem?.catalog_item_id ?? "";
   const [locationId, setLocationId] = useState("");
   const [binId, setBinId] = useState<string>("");
   const [sizeUom, setSizeUom] = useState("");
@@ -77,10 +77,7 @@ export function AddPartialPieceDialog({ open, onOpenChange, defaultParentItemId 
   // Bulk-mode rows
   const [rows, setRows] = useState<BulkRowState[]>([emptyRow(), emptyRow(), emptyRow()]);
 
-  const item = useMemo<PartialPieceItemOption | undefined>(
-    () => items.find(i => i.catalog_item_id === catalogItemId),
-    [items, catalogItemId],
-  );
+  const item = selectedItem;
 
   useEffect(() => {
     if (item) {
@@ -103,13 +100,26 @@ export function AddPartialPieceDialog({ open, onOpenChange, defaultParentItemId 
     }
   }, [open, globalLocationId]);
 
-  // Pre-select parent item when invoked from a grouped parent row.
-  // The caller passes a warehouse_items.id; reverse-lookup the catalog id.
+  // Pre-select parent item when invoked from a grouped parent row. The caller
+  // passes a warehouse_items.id; resolve to a catalog option on demand.
   useEffect(() => {
-    if (!open || !defaultParentItemId || items.length === 0) return;
-    const match = items.find(i => i.parent_item_id === defaultParentItemId);
-    if (match) setCatalogItemId(match.catalog_item_id);
-  }, [open, defaultParentItemId, items]);
+    if (!open || !defaultParentItemId || selectedItem || !selectedCompany?.id) return;
+    let cancelled = false;
+    (async () => {
+      const { data, error } = await supabase.rpc("list_partial_piece_items", {
+        p_company_id: selectedCompany.id,
+        p_location_id: globalLocationId,
+        p_search: null,
+        p_limit: 1000,
+        p_offset: 0,
+      });
+      if (cancelled || error || !data) return;
+      const match = (data as unknown as PartialPieceItemOption[])
+        .find(i => i.parent_item_id === defaultParentItemId);
+      if (match) setSelectedItem(match);
+    })();
+    return () => { cancelled = true; };
+  }, [open, defaultParentItemId, selectedItem, selectedCompany?.id, globalLocationId]);
 
   const lockedLocation = !!globalLocationId;
   const lockedLocationName = useMemo(() => {
@@ -123,7 +133,7 @@ export function AddPartialPieceDialog({ open, onOpenChange, defaultParentItemId 
 
   function reset() {
     setMode("single");
-    setCatalogItemId(""); setLocationId(""); setBinId("");
+    setSelectedItem(null); setLocationId(""); setBinId("");
     setSizeValue(""); setPieceQty("1"); setSizeUom(""); setPieceCode("");
     setSourceRef(""); setBatchNumber(""); setUnitCost(""); setLabel(""); setNotes("");
     setRows([emptyRow(), emptyRow(), emptyRow()]);
@@ -316,7 +326,7 @@ export function AddPartialPieceDialog({ open, onOpenChange, defaultParentItemId 
               <Label>Parent Item *</Label>
               <PartialPieceItemPicker
                 value={catalogItemId}
-                onSelect={(it) => setCatalogItemId(it?.catalog_item_id ?? "")}
+                onSelect={(it) => setSelectedItem(it)}
                 placeholder="Search by item code or name…"
                 className="w-full"
               />

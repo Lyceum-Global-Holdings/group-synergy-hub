@@ -15,20 +15,33 @@ export interface PartialPieceItemRow {
   track_secondary_quantity: boolean | null;
   has_inventory_row: boolean;
   piece_count: number;
+  total_count?: number;
 }
 
-export function usePartialPieceItems() {
+/**
+ * Server-paged partial-piece parent item picker source.
+ * - `search` is debounced upstream; passing it narrows ~15k catalog items
+ *   to a manageable result set.
+ * - When unsearched, returns the first `limit` rows ordered by item_code.
+ * Total active catalog size is returned in `total_count` on each row.
+ */
+export function usePartialPieceItems(opts?: { search?: string; limit?: number }) {
   const { selectedCompany } = useCompany();
   const { globalLocationId } = useLocationFilter();
   const companyId = selectedCompany?.id ?? null;
+  const search = opts?.search?.trim() || "";
+  const limit = opts?.limit ?? 100;
   return useQuery({
-    queryKey: ["partial-piece-items", companyId, globalLocationId],
+    queryKey: ["partial-piece-items", companyId, globalLocationId, search, limit],
     enabled: !!companyId,
     staleTime: 30_000,
     queryFn: async () => {
       const { data, error } = await supabase.rpc("list_partial_piece_items", {
         p_company_id: companyId!,
         p_location_id: globalLocationId,
+        p_search: search || null,
+        p_limit: limit,
+        p_offset: 0,
       });
       if (error) throw error;
       return (data ?? []) as unknown as PartialPieceItemRow[];

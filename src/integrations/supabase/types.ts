@@ -21803,7 +21803,13 @@ export type Database = {
         }[]
       }
       list_partial_piece_items: {
-        Args: { p_company_id: string; p_location_id?: string }
+        Args: {
+          p_company_id: string
+          p_limit?: number
+          p_location_id?: string
+          p_offset?: number
+          p_search?: string
+        }
         Returns: {
           base_uom: string
           catalog_item_id: string
@@ -21813,6 +21819,7 @@ export type Database = {
           parent_item_id: string
           piece_count: number
           secondary_uom: string
+          total_count: number
           track_secondary_quantity: boolean
           unit_cost: number
         }[]
