@@ -20967,6 +20967,10 @@ export type Database = {
         }
         Returns: Json
       }
+      bulk_import_inventory_with_stock: {
+        Args: { p_rows: Json }
+        Returns: Json
+      }
       calculate_aging_buckets: {
         Args: {
           p_as_of_date: string
