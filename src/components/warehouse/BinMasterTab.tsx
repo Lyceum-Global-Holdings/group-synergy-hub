@@ -18,6 +18,7 @@ import { useWarehouseBins } from '@/hooks/useWarehouseBins';
 import { useWarehouseLocations } from '@/hooks/useWarehouseLocations';
 import { CreateBinDialog } from '@/components/warehouse/CreateBinDialog';
 import { BulkBinScopeDialog } from '@/components/warehouse/BulkBinScopeDialog';
+import { RelocateBinDialog } from '@/components/warehouse/RelocateBinDialog';
 import { WarehouseBin } from '@/types/itemBin';
 import { useIsAdminOrHigher } from '@/hooks/useIsAdminOrHigher';
 
