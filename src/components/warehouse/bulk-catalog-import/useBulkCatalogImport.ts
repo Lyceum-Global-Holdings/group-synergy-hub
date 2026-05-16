@@ -105,7 +105,7 @@ export function useBulkCatalogImport(defaults: BulkCatalogDefaults = { company_i
       return [...trimmed, ...newRows];
     });
     return { resolved: cleaned.length - missing.length, missing };
-  }, []);
+  }, [makeRow]);
 
   const validateRow = useCallback((r: BulkCatalogRow): string | null => {
     if (!r.catalog_item_id) return 'Pick a catalog item';
