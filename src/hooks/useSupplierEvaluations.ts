@@ -19,7 +19,10 @@ export const useSupplierEvaluations = () => {
         .select(`
           *,
           supplier:suppliers(id, name, supplier_code),
-          warehouse_item:warehouse_items(id, item_code, name)
+          warehouse_item:warehouse_items(
+            id,
+            catalog:warehouse_item_catalog!warehouse_items_catalog_item_id_fkey(item_code, name)
+          )
         `)
         .order("created_at", { ascending: false });
 
@@ -39,10 +42,16 @@ export const useSupplierEvaluation = (id: string) => {
         .select(`
           *,
           supplier:suppliers(id, name, supplier_code),
-          warehouse_item:warehouse_items(id, item_code, name),
+          warehouse_item:warehouse_items(
+            id,
+            catalog:warehouse_item_catalog!warehouse_items_catalog_item_id_fkey(item_code, name)
+          ),
           entries:supplier_evaluation_entries(
             *,
-            warehouse_item:warehouse_items(id, item_code, name)
+            warehouse_item:warehouse_items(
+            id,
+            catalog:warehouse_item_catalog!warehouse_items_catalog_item_id_fkey(item_code, name)
+          )
           )
         `)
         .eq("id", id)
@@ -79,7 +88,10 @@ export const useCreateSupplierEvaluation = () => {
         .select(`
           *,
           supplier:suppliers(id, name, supplier_code),
-          warehouse_item:warehouse_items(id, item_code, name)
+          warehouse_item:warehouse_items(
+            id,
+            catalog:warehouse_item_catalog!warehouse_items_catalog_item_id_fkey(item_code, name)
+          )
         `)
         .single();
 
@@ -125,7 +137,10 @@ export const useUpdateSupplierEvaluation = () => {
         .select(`
           *,
           supplier:suppliers(id, name, supplier_code),
-          warehouse_item:warehouse_items(id, item_code, name)
+          warehouse_item:warehouse_items(
+            id,
+            catalog:warehouse_item_catalog!warehouse_items_catalog_item_id_fkey(item_code, name)
+          )
         `)
         .single();
 
@@ -195,7 +210,10 @@ export const useSupplierEvaluationEntries = (evaluationId: string) => {
         .from("supplier_evaluation_entries")
         .select(`
           *,
-          warehouse_item:warehouse_items(id, item_code, name)
+          warehouse_item:warehouse_items(
+            id,
+            catalog:warehouse_item_catalog!warehouse_items_catalog_item_id_fkey(item_code, name)
+          )
         `)
         .eq("evaluation_id", evaluationId)
         .order("receipt_date", { ascending: false });

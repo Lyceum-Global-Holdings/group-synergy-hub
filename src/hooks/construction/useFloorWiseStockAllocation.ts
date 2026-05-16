@@ -139,9 +139,7 @@ export function useFloorWiseStockAllocation(projectId: string | null) {
           total_cost,
           warehouse_item:warehouse_items(
             id,
-            item_code,
-            name,
-            unit_id
+            catalog:warehouse_item_catalog!warehouse_items_catalog_item_id_fkey(item_code, name, unit_id)
           )
         `)
         .in("room_id", roomIds.length > 0 ? roomIds : ["no-rooms"]);

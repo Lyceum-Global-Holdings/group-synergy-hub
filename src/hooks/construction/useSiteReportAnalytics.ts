@@ -97,10 +97,9 @@ export const useSiteReportAnalytics = (filters: AnalyticsFilters) => {
               project_id
             )
           ),
-          warehouse_items (
+          warehouse_items(
             id,
-            name,
-            item_code
+            catalog:warehouse_item_catalog!warehouse_items_catalog_item_id_fkey(name, item_code)
           )
         `)
         .gte('created_at', `${startDateStr}T00:00:00`)

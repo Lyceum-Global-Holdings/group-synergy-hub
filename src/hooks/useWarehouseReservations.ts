@@ -20,10 +20,10 @@ export function useWarehouseReservations() {
         .select(`
           *,
           warehouse_item:warehouse_items!warehouse_item_reservations_warehouse_item_id_fkey(
-            item_code,
-            name,
+            id,
             current_stock,
-            reserved_quantity
+            reserved_quantity,
+            catalog:warehouse_item_catalog!warehouse_items_catalog_item_id_fkey(item_code, name)
           ),
           bin_allocation:warehouse_bin_allocations!warehouse_item_reservations_bin_allocation_id_fkey(
             allocated_quantity,
@@ -234,10 +234,10 @@ export function useWarehouseReservations() {
       .select(`
         *,
         warehouse_item:warehouse_items!warehouse_item_reservations_warehouse_item_id_fkey(
-          item_code,
-          name,
-          current_stock
-        )
+            id,
+            current_stock,
+            catalog:warehouse_item_catalog!warehouse_items_catalog_item_id_fkey(item_code, name)
+          )
       `)
       .eq('reference_type', referenceType)
       .eq('reference_id', referenceId);

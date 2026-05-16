@@ -156,13 +156,12 @@ export function CreateMaterialIssueDialog({ open, onOpenChange }: MaterialIssueD
         quantity_remaining,
         status,
         warehouse_item:warehouse_items(
-          id,
-          item_code,
-          name,
-          unit_of_measure,
-          current_stock,
-          reserved_quantity
-        ),
+            id,
+            unit_of_measure,
+            current_stock,
+            reserved_quantity,
+            catalog:warehouse_item_catalog!warehouse_items_catalog_item_id_fkey(item_code, name)
+          ),
         bin_allocation:warehouse_bin_allocations(
           bin:warehouse_bins(bin_code, name)
         )

@@ -35,7 +35,11 @@ export function useCpoView(cpoId: string) {
         .from('warehouse_item_reservations')
         .select(`
           *,
-          warehouse_item:warehouse_items(item_code, name, current_stock),
+          warehouse_item:warehouse_items(
+            id,
+            current_stock,
+            catalog:warehouse_item_catalog!warehouse_items_catalog_item_id_fkey(item_code, name)
+          ),
           bin_allocation:warehouse_bin_allocations(
             *,
             warehouse_bin:warehouse_bins(bin_code, name)
@@ -61,7 +65,10 @@ export function useCpoView(cpoId: string) {
           *,
           items:material_issue_items(
             *,
-            warehouse_item:warehouse_items(item_code, name)
+            warehouse_item:warehouse_items(
+            id,
+            catalog:warehouse_item_catalog!warehouse_items_catalog_item_id_fkey(item_code, name)
+          )
           ),
           issued_by_profile:profiles(full_name, email)
         `)
@@ -82,7 +89,10 @@ export function useCpoView(cpoId: string) {
         .from('warehouse_stock_movements')
         .select(`
           *,
-          warehouse_item:warehouse_items(item_code, name),
+          warehouse_item:warehouse_items(
+            id,
+            catalog:warehouse_item_catalog!warehouse_items_catalog_item_id_fkey(item_code, name)
+          ),
           performed_by_profile:profiles(full_name, email)
         `)
         .eq('reference_id', cpoId)

@@ -21,10 +21,9 @@ export const useSupplierAnalytics = () => {
             address_line1,
             status
           ),
-          warehouse_item:warehouse_items (
+          warehouse_item:warehouse_items(
             id,
-            item_code,
-            name
+            catalog:warehouse_item_catalog!warehouse_items_catalog_item_id_fkey(item_code, name)
           ),
           entries:supplier_evaluation_entries (
             id,
@@ -47,11 +46,10 @@ export const useSupplierAnalytics = () => {
             notes,
             created_at,
             updated_at,
-            warehouse_item:warehouse_items (
-              id,
-              item_code,
-              name
-            )
+            warehouse_item:warehouse_items(
+            id,
+            catalog:warehouse_item_catalog!warehouse_items_catalog_item_id_fkey(item_code, name)
+          )
           )
         `)
         .order("evaluation_period_start", { ascending: false });
@@ -123,11 +121,10 @@ export const useSupplierEvaluationsBySupplier = (supplierId: string | null) => {
             notes,
             created_at,
             updated_at,
-            warehouse_item:warehouse_items (
-              id,
-              item_code,
-              name
-            )
+            warehouse_item:warehouse_items(
+            id,
+            catalog:warehouse_item_catalog!warehouse_items_catalog_item_id_fkey(item_code, name)
+          )
           )
         `)
         .eq("supplier_id", supplierId)

@@ -63,13 +63,13 @@ export const useCycleCountItems = (countId: string | undefined) => {
         .from("cycle_count_items")
         .select(`
           *,
-          warehouse_items (
+          warehouse_items(
             id,
-            item_code,
             item_name,
             unit_of_measure,
             current_stock,
-            unit_cost
+            unit_cost,
+            catalog:warehouse_item_catalog!warehouse_items_catalog_item_id_fkey(item_code)
           ),
           warehouse_bins (
             id,

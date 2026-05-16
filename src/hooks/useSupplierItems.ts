@@ -13,11 +13,8 @@ export const useSupplierItems = (supplierId?: string) => {
           *,
           warehouse_item:warehouse_items(
             id,
-            item_code,
-            name,
-            category_id,
-            unit_id,
-            current_stock
+            current_stock,
+            catalog:warehouse_item_catalog!warehouse_items_catalog_item_id_fkey(item_code, name, category_id, unit_id)
           )
         `)
         .order('created_at', { ascending: false });

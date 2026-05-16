@@ -15,10 +15,9 @@ export const useRoomMaterials = (roomId: string | null) => {
           *,
           warehouse_item:warehouse_items(
             id,
-            item_code,
-            name,
             current_stock,
-            unit_cost
+            unit_cost,
+            catalog:warehouse_item_catalog!warehouse_items_catalog_item_id_fkey(item_code, name)
           )
         `)
         .eq('room_id', roomId)

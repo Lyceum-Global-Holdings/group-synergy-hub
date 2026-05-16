@@ -103,7 +103,12 @@ export function CreateMaterialRequestDialog({ open, onOpenChange }: CreateMateri
       .from('warehouse_item_reservations')
       .select(`
         *,
-        warehouse_item:warehouse_items(id, item_code, name, current_stock, reserved_quantity),
+        warehouse_item:warehouse_items(
+            id,
+            current_stock,
+            reserved_quantity,
+            catalog:warehouse_item_catalog!warehouse_items_catalog_item_id_fkey(item_code, name)
+          ),
         bin_allocation:warehouse_bin_allocations(
           id,
           allocated_quantity,
