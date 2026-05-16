@@ -78,6 +78,26 @@ export function buildLocationOptions(
   return result;
 }
 
+export function getRootLocationId(
+  locations: Pick<WarehouseLocation, 'id' | 'parent_id'>[],
+  locationId: string | null | undefined,
+): string | null {
+  if (!locationId) return null;
+
+  const byId = new Map(locations.map((location) => [location.id, location]));
+  let current = byId.get(locationId);
+  const seen = new Set<string>();
+
+  while (current?.parent_id && !seen.has(current.id)) {
+    seen.add(current.id);
+    const parent = byId.get(current.parent_id);
+    if (!parent) break;
+    current = parent;
+  }
+
+  return current?.id ?? locationId;
+}
+
 export function locationTypeLabel(type: string | null | undefined): string {
   switch (type) {
     case 'sublocation':
