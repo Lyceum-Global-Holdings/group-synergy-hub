@@ -13,6 +13,7 @@ import {
 import { Plus, Trash2, ClipboardPaste, Loader2, X, CheckCircle2, AlertCircle } from 'lucide-react';
 import { useCompanies } from '@/hooks/useCompanies';
 import { useCompany } from '@/contexts/CompanyContext';
+import { useLocationFilter } from '@/contexts/LocationFilterContext';
 import { useWarehouseLocations } from '@/hooks/useWarehouseLocations';
 import { useWarehouseBins } from '@/hooks/useWarehouseBins';
 import { useToast } from '@/hooks/use-toast';
