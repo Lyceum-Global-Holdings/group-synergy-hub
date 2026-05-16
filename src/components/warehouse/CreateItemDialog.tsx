@@ -308,7 +308,6 @@ export function CreateItemDialog({ open, onOpenChange, editingItem }: CreateItem
             total_value: unitCostValue > 0 ? unitCostValue * stockQuantity : undefined,
             notes: 'Opening stock balance',
             location_id: formData.location_id || undefined,
-            bin_id: initialBinId || undefined,
             ...(secondaryQty !== undefined ? { secondary_quantity_change: secondaryQty } : {}),
           });
 
