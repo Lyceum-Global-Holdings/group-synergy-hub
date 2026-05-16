@@ -34,8 +34,19 @@ export function BulkCatalogToInventoryDialog({ open, onOpenChange }: Props) {
   const qc = useQueryClient();
   const { companies } = useCompanies();
   const { selectedCompany } = useCompany();
+  const { globalLocationId } = useLocationFilter();
   const { locations } = useWarehouseLocations();
   const { bins } = useWarehouseBins({ skipLocationFilter: true });
+
+  const defaultCompanyId = selectedCompany?.id ?? null;
+  // Only use global location if it belongs to the active company (or is unscoped)
+  const defaultLocationId = useMemo(() => {
+    if (!globalLocationId) return null;
+    const loc = locations.find((l) => l.id === globalLocationId);
+    if (!loc) return null;
+    if (!loc.company_id || !defaultCompanyId || loc.company_id === defaultCompanyId) return globalLocationId;
+    return null;
+  }, [globalLocationId, locations, defaultCompanyId]);
 
   const {
     rows,
@@ -49,12 +60,9 @@ export function BulkCatalogToInventoryDialog({ open, onOpenChange }: Props) {
     isSubmitting,
     validCount,
     invalidCount,
-  } = useBulkCatalogImport();
+  } = useBulkCatalogImport({ company_id: defaultCompanyId, location_id: defaultLocationId });
 
   const [pasteOpen, setPasteOpen] = useState(false);
-
-  // Default new rows to active company
-  const defaultCompanyId = selectedCompany?.id ?? null;
 
   const locationsByCompany = useMemo(() => {
     return (companyId: string | null) => {
@@ -66,6 +74,9 @@ export function BulkCatalogToInventoryDialog({ open, onOpenChange }: Props) {
   const binsByLocation = useMemo(() => {
     return (locationId: string | null) => bins.filter((b) => b.location_id === locationId);
   }, [bins]);
+
+  const defaultCompanyName = companies.find((c) => c.id === defaultCompanyId)?.name ?? '—';
+  const defaultLocationName = locations.find((l) => l.id === defaultLocationId)?.name ?? 'All locations';
 
   const handleImport = async () => {
     try {
