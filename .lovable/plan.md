@@ -1,126 +1,60 @@
 ## Goal
 
-Refactor the inventory module so the physical model follows a clean, internationally-standard WMS hierarchy and stock is unambiguously traceable end-to-end:
+Let an operator move an existing bin from one warehouse/sub-location to another while keeping inventory totals, allocations, and the stock ledger consistent.
 
-```text
-All Companies (Org / Holding)
-  └── Company (legal entity, e.g. Lyceum Global Holdings, VeBuild)
-        └── Warehouse / Location (Tier‑1 physical site, e.g. LNNB, LSS, Lyceum Fulfilment Centre)
-              └── Sub-location / Zone / Floor (Tier‑2, e.g. 7th Floor, VEB, LNQ‑5F)
-                    └── Bin / Storage Position (atomic storage unit)
-```
+## Two relocation modes (operator picks one)
 
-Bins can be attached **directly to a Warehouse OR to a Sub-location**. Stock allocations always carry the physical `location_id` of the node the bin currently sits at — already the rule we standardised on. This plan tightens the model, fixes orphan rows, and adds a visualization + management surface under Warehouse Management.
+1. **Move bin with its stock** — the physical bin (and everything in it) is wheeled to a new node. All `warehouse_bin_allocations` for the bin update `location_id` to the new node. No quantity changes. A single `bin_relocation` ledger entry per affected item records source/destination location for traceability.
+2. **Move empty bin only** — refuses to run if any allocation on the bin has `allocated_quantity > 0`. Operator must transfer/issue stock out first. Bin's `location_id` updates, no allocation rows touched.
 
-This follows the GS1/WMS standard "Site → Zone → Location → Bin" pattern (SAP EWM, Oracle WMS, Manhattan, Blue Yonder all use the same shape).
+This matches SAP EWM "Storage Bin Move" + Oracle WMS "Bin Transfer" patterns.
 
----
+## Constraints enforced server-side
 
-## Problems found during exploration
+- Destination must be a `warehouse` or `sublocation/department` in the same `company_id` as the bin.
+- Destination must be different from current `location_id`.
+- For "with stock" mode: the destination's root warehouse must be reachable (no cross-company moves). If user wants cross-company, that's a transfer order — out of scope here.
+- Caller must have edit access on both source and destination locations (existing `can_access_company` + location permissions).
 
-1. **Cross-company hierarchy leaks.** Several sub-locations sit under a parent warehouse from a *different* company (e.g. VeBuild sub-locations under an NCG-owned parent; LGH 7th–10th floors with `company_id = NULL`).
-2. **Orphan locations.** ~10 `warehouse_locations` rows have `company_id IS NULL`, so RLS/visibility is inconsistent.
-3. **No enforced hierarchy depth.** Nothing prevents a sub-location being parented under another sub-location, so a 3rd level could sneak in.
-4. **No first-class concept of "Organisation"** above company. Today the UI groups by company only; the user wants an "All Companies" root view.
-5. **Bin → location relationship is ambiguous.** Bins reference one `location_id` that may be a warehouse or a sub-location; there is no validated rule and no UI affordance to pick the right level.
-6. **No visual hierarchy explorer.** Admins cannot see the full Org → Company → Warehouse → Sub-location → Bin graph in one place.
+## Implementation
 
----
+### 1. Migration
 
-## Solution
+**RPC `relocate_warehouse_bin(_bin_id uuid, _new_location_id uuid, _mode text, _reason text)`** — SECURITY DEFINER, returns jsonb summary.
+- Validates company match, depth (≤ 2), permission, and mode preconditions.
+- Mode `with_stock`:
+  - Updates `warehouse_bins.location_id` (and `root_location_id`).
+  - Updates every `warehouse_bin_allocations.location_id` for the bin to the new node.
+  - Inserts a `stock_transactions` row per item with `transaction_type='bin_relocation'`, `quantity=0`, source/destination location_ids in metadata, reason text. The existing ledger trigger leaves qty_before/after equal because allocation totals don't change.
+- Mode `empty_only`:
+  - Hard-fails if `SUM(allocated_quantity) > 0`.
+  - Updates `warehouse_bins.location_id` only.
+- Writes a `warehouse_bin_relocations` audit row (new table) with: bin_id, from_location_id, to_location_id, mode, reason, performed_by, performed_at, item_count, total_qty.
 
-### 1. Data model tightening (no destructive changes)
+Add `bin_relocation` to the allowed `stock_transactions.transaction_type` check constraint.
 
-`warehouse_locations`
-- Constrain `type ∈ ('warehouse','sublocation')` (rename `'location' → 'warehouse'` in a backfill).
-- Enforce: `type='warehouse' ⇒ parent_id IS NULL`; `type='sublocation' ⇒ parent_id IS NOT NULL AND parent.type='warehouse'` (trigger).
-- Enforce `company_id` matches parent's `company_id` when parent exists (trigger).
-- Backfill all `company_id IS NULL` rows by inferring from parent or from the dominant company of bins/allocations attached to them; flag the rest for the admin to resolve in the new UI.
+### 2. UI
 
-`warehouse_bins`
-- Keep single `location_id` (can point to a warehouse or a sublocation).
-- Add generated/maintained `root_warehouse_id` (resolve to top-level warehouse) — already partially present as `root_location_id`; standardise the name and the trigger that maintains it.
-- Validate: `bins.company_id = warehouse_locations.company_id` of its `location_id`.
+- **`BinMasterTab` row action**: new "Relocate…" item in the row menu.
+- **`RelocateBinDialog`** (new):
+  - Header: bin code, current location breadcrumb (Company › Warehouse › Sub).
+  - Mode toggle (radio): "Move with current stock" / "Move empty bin only".
+  - Destination picker: cascading `Warehouse → Sub-location` from the new `get_location_hierarchy` RPC, restricted to bin's company. Selecting a warehouse means "attach to warehouse root".
+  - Stock summary: items + total qty in the bin (shows even in empty_only mode so the user sees what's blocking).
+  - Reason (textarea, required).
+  - Submit calls the new RPC, invalidates `warehouse-bins`, `warehouse-network-hierarchy`, `bin-allocations-*`, `list_warehouse_inventory` caches.
+- **Warehouse Network page**: add a small "Move bin" action surfaced under each warehouse card's bin count tooltip in a follow-up (out of scope this round to keep blast radius small).
 
-`warehouse_bin_allocations`
-- Already carries `location_id` (physical node). Keep as source of truth (matches existing memory rule).
-- Add FK check trigger: `allocation.location_id` must be `bin.location_id` OR a descendant of `bin.location_id` (so a warehouse-level bin can hold sub-located stock if needed, but never the other way around).
+### 3. History
 
-### 2. Helper functions (Postgres)
+New tab on `BinMasterTab` row (or a side drawer) showing the bin's `warehouse_bin_relocations` history. Minimal: list view with from/to, mode, qty moved, reason, user, timestamp.
 
-- `get_location_hierarchy(_company_id uuid DEFAULT NULL)` — returns the full tree as JSON for the visualization.
-- `get_location_ancestors(_location_id uuid)` and existing `get_location_subtree_ids` — already exist, reuse.
-- `validate_location_hierarchy()` trigger — enforces depth + company match.
+## Out of scope
 
-### 3. UI: "Warehouse Network" page under Warehouse Management
-
-New route: `/warehouse/network` (registered in `moduleConfig.ts`).
-
-Two views, toggleable:
-
-**a. Tree explorer (default)**
-
-```text
-▾ All Companies
-   ▾ Lyceum Global Holdings
-      ▾ LNNB (Warehouse · 12 bins · 1,240 SKUs)
-         ├─ 4th Floor (Sub · 3 bins)
-         ├─ 5th Floor (Sub · 4 bins)
-         └─ 7th Floor (Sub · 5 bins)
-      ▸ Lyceum Fulfilment Centre
-   ▸ VeBuild
-   ▸ NCG Warehouse Solutions
-```
-
-- Each node shows: bin count, SKU count, total qty, status pill.
-- Inline actions per node: **Add sub-location**, **Add bin (here)**, **Edit**, **View stock**.
-- "Add bin (here)" lets the admin attach a bin to either the warehouse level or the sub-location level — same dialog, level inferred from the selected node.
-
-**b. Graph view (interconnectivity diagram)**
-
-- React Flow (already in lockfile) diagram rendering the same tree as nodes + edges, colour-coded by company, with edge labels showing bin counts. Pan/zoom, export PNG.
-- Single source of truth = `get_location_hierarchy` RPC.
-
-### 4. Bin creation/allocation UX
-
-- `CreateBinDialog`: location picker becomes a 3-step cascading selector — **Company → Warehouse → (optional) Sub-location**. If sub-location is left blank, the bin attaches to the warehouse. Validation prevents mismatched company.
-- `CreateBinAllocationDialog` & GRN allocation: location selector defaults to the bin's `location_id` and only allows descendants of it.
-- `BulkBinScopeDialog`: same cascading selector, applies to a multi-select of bins.
-
-### 5. Inventory views
-
-- `ItemMasterTab` location filter becomes the same cascading **Company → Warehouse → Sub-location** picker, wired to the existing `globalLocationId` context.
-- `list_warehouse_inventory` RPC already filters by physical location subtree — no behavioural change needed, just ensure the new sub-locations created via the network page flow through.
-
-### 6. Backfill / data repair (one-off migration)
-
-- Set `company_id` on orphan locations from parent or from majority bin owner.
-- Renormalize `type='location' → 'warehouse'`.
-- Re-parent any cross-company sub-locations to a same-company warehouse (interactive — surfaced as warnings in the new Network page, not silently moved).
-- Recompute `warehouse_bins.root_warehouse_id`.
-
-### 7. Out of scope (explicit)
-
-- No change to stock math, ledger triggers, GRN approvals, or RLS rules already locked down by recent migrations.
-- No change to bin barcode / QR formats.
-
----
-
-## Deliverables
-
-1. Migration: hierarchy constraints, triggers, backfill, `get_location_hierarchy` RPC.
-2. New route `/warehouse/network` with tree + React Flow graph views.
-3. Refactored bin/allocation dialogs with cascading Company → Warehouse → Sub-location picker (shared component `LocationHierarchyPicker`).
-4. Updated `moduleConfig.ts` registration + sidebar entry under Warehouse Management.
-5. Admin "Unassigned locations" panel inside Network page to resolve orphans.
-
-## Technical notes
-
-- Use existing `useRealtimeChannel` bus to live-refresh the Network page on location/bin changes.
-- React Flow already installed; no new deps.
-- Keep the picker as a single reusable component so GRN, transfers, audits, and item master all use one control.
-- All new RPCs `SECURITY INVOKER`, company-scoped via existing RLS.
+- Cross-company relocations (those go through Stock Transfer).
+- Bulk multi-bin relocation (defer; one bin at a time first).
+- Auto-merge if the destination already has the same bin code (we don't merge bins; bin codes are unique per company).
 
 ## Open question
 
-Do you want the "Organisation / All Companies" root to be a real DB entity (a `organisations` table with companies as children) or stay as a virtual grouping in the UI only? The latter is faster and matches current scope; the former is needed only if you plan multiple holdings later.
+Should the "with stock" mode require approval (queue an item in Approval Console) for bins above a value/qty threshold, or execute immediately? Defaulting to immediate matches standard WMS pick-list behaviour, but I can wire it through the existing approval RPC if you want a paper trail with sign-off.
