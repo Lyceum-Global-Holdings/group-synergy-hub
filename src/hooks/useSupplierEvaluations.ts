@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { flattenCatalog } from '@/lib/flattenWarehouseItem';
+import { flattenWarehouseItem } from '@/lib/flattenWarehouseItem';
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import {
@@ -28,7 +28,7 @@ export const useSupplierEvaluations = () => {
         .order("created_at", { ascending: false });
 
       if (error) throw error;
-      return data || [];
+      return ((data || []) as any[]).map(flattenWarehouseItem) as SupplierEvaluation[];
     },
   });
 };
@@ -59,7 +59,10 @@ export const useSupplierEvaluation = (id: string) => {
         .maybeSingle();
 
       if (error) throw error;
-      return data;
+      if (!data) return null;
+      const d = flattenWarehouseItem(data as any) as any;
+      if (Array.isArray(d.entries)) d.entries = d.entries.map(flattenWarehouseItem);
+      return d as SupplierEvaluation;
     },
     enabled: !!id,
   });
@@ -97,7 +100,7 @@ export const useCreateSupplierEvaluation = () => {
         .single();
 
       if (error) throw error;
-      return evaluation;
+      return flattenWarehouseItem(evaluation as any) as SupplierEvaluation;
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["supplier-evaluations"] });
@@ -146,11 +149,7 @@ export const useUpdateSupplierEvaluation = () => {
         .single();
 
       if (error) throw error;
-      return data;
-    },
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["supplier-evaluations"] });
-      queryClient.invalidateQueries({ queryKey: ["supplier-evaluation", data.id] });
+      return flattenWarehouseItem(data as any) as SupplierEvaluation;
       // Update supplier rating based on updated evaluation
       updateRating.mutate(data.supplier_id);
       toast({
@@ -220,7 +219,7 @@ export const useSupplierEvaluationEntries = (evaluationId: string) => {
         .order("receipt_date", { ascending: false });
 
       if (error) throw error;
-      return data || [];
+      return ((data || []) as any[]).map(flattenWarehouseItem) as SupplierEvaluationEntry[];
     },
     enabled: !!evaluationId,
   });

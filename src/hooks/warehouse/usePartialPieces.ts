@@ -4,6 +4,19 @@ import { useCompany } from "@/contexts/CompanyContext";
 import { useLocationFilter } from "@/contexts/LocationFilterContext";
 import type { PartialPieceRow } from "@/types/partialPiece";
 
+export interface PartialPieceItemRow {
+  catalog_item_id: string;
+  parent_item_id: string | null;
+  item_code: string;
+  item_name: string;
+  base_uom: string | null;
+  secondary_uom: string | null;
+  unit_cost: number | null;
+  track_secondary_quantity: boolean | null;
+  has_inventory_row: boolean;
+  piece_count: number;
+}
+
 export function usePartialPieceItems() {
   const { selectedCompany } = useCompany();
   const { globalLocationId } = useLocationFilter();
@@ -18,18 +31,18 @@ export function usePartialPieceItems() {
         p_location_id: globalLocationId,
       });
       if (error) throw error;
-      return (data ?? []) as Array<{
-        parent_item_id: string;
-        item_code: string;
-        item_name: string;
-        base_uom: string | null;
-        secondary_uom: string | null;
-        unit_cost: number | null;
-        track_secondary_quantity: boolean | null;
-        piece_count: number;
-      }>;
+      return (data ?? []) as unknown as PartialPieceItemRow[];
     },
   });
+}
+
+export async function ensurePartialPieceParentItem(companyId: string, catalogItemId: string): Promise<string> {
+  const { data, error } = await supabase.rpc("ensure_partial_piece_parent_item", {
+    p_company_id: companyId,
+    p_catalog_item_id: catalogItemId,
+  });
+  if (error) throw error;
+  return data as string;
 }
 
 const KEY = "partial-pieces";

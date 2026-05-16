@@ -10,13 +10,15 @@ import { Badge } from "@/components/ui/badge";
 import { usePartialPieceItems } from "@/hooks/warehouse/usePartialPieces";
 
 export interface PartialPieceItemOption {
-  parent_item_id: string;
+  catalog_item_id: string;
+  parent_item_id: string | null;
   item_code: string;
   item_name: string;
   base_uom: string | null;
   secondary_uom: string | null;
   unit_cost: number | null;
   track_secondary_quantity: boolean | null;
+  has_inventory_row: boolean;
   piece_count: number;
 }
 
@@ -42,7 +44,7 @@ export function PartialPieceItemPicker({
   const { data: items = [], isLoading } = usePartialPieceItems();
 
   const selected = useMemo(
-    () => items.find(i => i.parent_item_id === value) || null,
+    () => items.find(i => i.catalog_item_id === value) || null,
     [items, value],
   );
 
@@ -87,11 +89,11 @@ export function PartialPieceItemPicker({
               )}
               {items.map(it => (
                 <CommandItem
-                  key={it.parent_item_id}
+                  key={it.catalog_item_id}
                   value={`${it.item_code} ${it.item_name}`}
                   onSelect={() => { onSelect(it); setOpen(false); }}
                 >
-                  <Check className={cn("mr-2 h-4 w-4", value === it.parent_item_id ? "opacity-100" : "opacity-0")} />
+                  <Check className={cn("mr-2 h-4 w-4", value === it.catalog_item_id ? "opacity-100" : "opacity-0")} />
                   <div className="flex items-center gap-2 flex-1 min-w-0">
                     <Badge variant="outline" className="text-xs shrink-0">{it.item_code}</Badge>
                     <span className="font-medium truncate flex-1">{it.item_name}</span>

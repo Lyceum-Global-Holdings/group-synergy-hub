@@ -11,7 +11,7 @@ import { useLocationFilter } from "@/contexts/LocationFilterContext";
 import { useWarehouseLocations } from "@/hooks/useWarehouseLocations";
 import { useItemUnits } from "@/hooks/useItemUnits";
 import { PartialPieceItemPicker, type PartialPieceItemOption } from "@/components/warehouse/partial-qty/PartialPieceItemPicker";
-import { usePartialPieceItems } from "@/hooks/warehouse/usePartialPieces";
+import { usePartialPieceItems, ensurePartialPieceParentItem } from "@/hooks/warehouse/usePartialPieces";
 import {
   useCreatePartialPiece,
   useCreatePartialPiecesBulk,
@@ -56,8 +56,10 @@ export function AddPartialPieceDialog({ open, onOpenChange, defaultParentItemId 
 
   const [mode, setMode] = useState<"single" | "bulk">("single");
 
-  // Shared header state (used by both modes)
-  const [parentItemId, setParentItemId] = useState("");
+  // Shared header state (used by both modes). We key on catalog_item_id since
+  // the picker now sources from the full Item Master; the per-company
+  // warehouse_items row is resolved (and created if needed) at submit time.
+  const [catalogItemId, setCatalogItemId] = useState("");
   const [locationId, setLocationId] = useState("");
   const [binId, setBinId] = useState<string>("");
   const [sizeUom, setSizeUom] = useState("");
@@ -76,8 +78,8 @@ export function AddPartialPieceDialog({ open, onOpenChange, defaultParentItemId 
   const [rows, setRows] = useState<BulkRowState[]>([emptyRow(), emptyRow(), emptyRow()]);
 
   const item = useMemo<PartialPieceItemOption | undefined>(
-    () => items.find(i => i.parent_item_id === parentItemId),
-    [items, parentItemId],
+    () => items.find(i => i.catalog_item_id === catalogItemId),
+    [items, catalogItemId],
   );
 
   useEffect(() => {
@@ -90,7 +92,7 @@ export function AddPartialPieceDialog({ open, onOpenChange, defaultParentItemId 
       if (!unitCost && item.unit_cost != null) setUnitCost(String(item.unit_cost));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [parentItemId, units]);
+  }, [catalogItemId, units]);
 
   // Inherit the active global location filter (SAP EWM / Oracle WMS pattern).
   useEffect(() => {
@@ -102,9 +104,12 @@ export function AddPartialPieceDialog({ open, onOpenChange, defaultParentItemId 
   }, [open, globalLocationId]);
 
   // Pre-select parent item when invoked from a grouped parent row.
+  // The caller passes a warehouse_items.id; reverse-lookup the catalog id.
   useEffect(() => {
-    if (open && defaultParentItemId) setParentItemId(defaultParentItemId);
-  }, [open, defaultParentItemId]);
+    if (!open || !defaultParentItemId || items.length === 0) return;
+    const match = items.find(i => i.parent_item_id === defaultParentItemId);
+    if (match) setCatalogItemId(match.catalog_item_id);
+  }, [open, defaultParentItemId, items]);
 
   const lockedLocation = !!globalLocationId;
   const lockedLocationName = useMemo(() => {
@@ -118,7 +123,7 @@ export function AddPartialPieceDialog({ open, onOpenChange, defaultParentItemId 
 
   function reset() {
     setMode("single");
-    setParentItemId(""); setLocationId(""); setBinId("");
+    setCatalogItemId(""); setLocationId(""); setBinId("");
     setSizeValue(""); setPieceQty("1"); setSizeUom(""); setPieceCode("");
     setSourceRef(""); setBatchNumber(""); setUnitCost(""); setLabel(""); setNotes("");
     setRows([emptyRow(), emptyRow(), emptyRow()]);
@@ -190,11 +195,13 @@ export function AddPartialPieceDialog({ open, onOpenChange, defaultParentItemId 
   async function submitSingle() {
     if (!selectedCompany?.id) return;
     const qtyNum = Math.trunc(Number(pieceQty) || 0);
-    if (!parentItemId || !locationId || !sizeValue || !sizeUom || qtyNum < 1) {
+    if (!catalogItemId || !locationId || !sizeValue || !sizeUom || qtyNum < 1) {
       toast({ title: "Missing required fields", description: "Size, Qty (≥1), UOM, item and location are required.", variant: "destructive" });
       return;
     }
     try {
+      const parentItemId = item?.parent_item_id
+        ?? await ensurePartialPieceParentItem(selectedCompany.id, catalogItemId);
       await create.mutateAsync({
         company_id: selectedCompany.id,
         parent_item_id: parentItemId,
@@ -221,7 +228,7 @@ export function AddPartialPieceDialog({ open, onOpenChange, defaultParentItemId 
   // ---- Submit (bulk) ----
   async function submitBulk() {
     if (!selectedCompany?.id) return;
-    if (!parentItemId || !locationId || !sizeUom) {
+    if (!catalogItemId || !locationId || !sizeUom) {
       toast({ title: "Missing required header fields", description: "Item, location and UOM are required.", variant: "destructive" });
       return;
     }
@@ -259,6 +266,8 @@ export function AddPartialPieceDialog({ open, onOpenChange, defaultParentItemId 
     });
 
     try {
+      const parentItemId = item?.parent_item_id
+        ?? await ensurePartialPieceParentItem(selectedCompany.id, catalogItemId);
       const ids = await createBulk.mutateAsync({
         company_id: selectedCompany.id,
         parent_item_id: parentItemId,
@@ -306,8 +315,8 @@ export function AddPartialPieceDialog({ open, onOpenChange, defaultParentItemId 
             <div className="col-span-2">
               <Label>Parent Item *</Label>
               <PartialPieceItemPicker
-                value={parentItemId}
-                onSelect={(it) => setParentItemId(it?.parent_item_id ?? "")}
+                value={catalogItemId}
+                onSelect={(it) => setCatalogItemId(it?.catalog_item_id ?? "")}
                 placeholder="Search by item code or name…"
                 className="w-full"
               />
