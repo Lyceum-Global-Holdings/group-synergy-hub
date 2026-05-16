@@ -218,14 +218,13 @@ interface RowProps {
   companies: any[];
   locations: any[];
   bins: any[];
-  defaultCompanyId: string | null;
+  defaultLocationId: string | null;
   onChange: (patch: Partial<BulkCatalogRow>) => void;
   onRemove: () => void;
 }
 
-function Row({ index, row, companies, locations, bins, defaultCompanyId, onChange, onRemove }: RowProps) {
-  // Lazy default to active company
-  const companyId = row.company_id ?? defaultCompanyId;
+function Row({ index, row, companies, locations, bins, defaultLocationId, onChange, onRemove }: RowProps) {
+  const companyId = row.company_id;
 
   const statusBadge = () => {
     switch (row.status) {
@@ -257,14 +256,20 @@ function Row({ index, row, companies, locations, bins, defaultCompanyId, onChang
               item_code: it.item_code,
               name: it.name,
               uom: it.unit_name,
-              company_id: row.company_id ?? defaultCompanyId,
             })
           }
         />
       </td>
       <td className="px-2 py-1.5 text-xs text-muted-foreground">{row.uom ?? '—'}</td>
       <td className="px-2 py-1.5">
-        <Select value={companyId ?? undefined} onValueChange={(v) => onChange({ company_id: v, location_id: null, bin_id: null })}>
+        <Select
+          value={companyId ?? undefined}
+          onValueChange={(v) => {
+            // When company changes, keep default location if it belongs to new company; else clear
+            const keepLoc = defaultLocationId && locations.some((l) => l.id === defaultLocationId);
+            onChange({ company_id: v, location_id: keepLoc ? defaultLocationId : null, bin_id: null });
+          }}
+        >
           <SelectTrigger className="h-8 text-xs">
             <SelectValue placeholder="Select…" />
           </SelectTrigger>
