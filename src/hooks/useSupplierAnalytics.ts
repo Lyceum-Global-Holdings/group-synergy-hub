@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { SupplierEvaluation } from "@/types/supplierEvaluation";
 import { calculateSupplierAnalytics, SupplierAnalytics } from "@/lib/supplierAnalytics";
+import { flattenCatalog } from '@/lib/flattenWarehouseItem';
 
 export const useSupplierAnalytics = () => {
   return useQuery({

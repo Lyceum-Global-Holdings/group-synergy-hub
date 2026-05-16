@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { flattenCatalog } from '@/lib/flattenWarehouseItem';
 
 export function useCpoView(cpoId: string) {
   // Main CPO data with all relationships

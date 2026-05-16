@@ -21,6 +21,7 @@ import { WarehouseItem } from "@/types/itemBin";
 import { ReservationWithDetails } from "@/types/warehouseReservation";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
+import { flattenCatalog } from '@/lib/flattenWarehouseItem';
 
 interface CreateMaterialRequestDialogProps {
   open: boolean;

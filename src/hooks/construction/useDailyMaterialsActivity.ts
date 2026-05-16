@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useCompany } from "@/contexts/CompanyContext";
+import { flattenCatalog } from '@/lib/flattenWarehouseItem';
 
 export interface DailyMaterialIssue {
   min_number: string;

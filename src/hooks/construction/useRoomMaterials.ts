@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { FloorRoomMaterial, RoomMaterialStatus } from '@/types/construction';
 import { toast } from 'sonner';
+import { flattenCatalog } from '@/lib/flattenWarehouseItem';
 
 export const useRoomMaterials = (roomId: string | null) => {
   return useQuery({

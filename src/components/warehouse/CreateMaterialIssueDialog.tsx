@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import {
+import { flattenCatalog } from '@/lib/flattenWarehouseItem';
   Dialog,
   DialogContent,
   DialogDescription,
