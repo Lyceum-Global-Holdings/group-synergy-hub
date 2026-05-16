@@ -11,7 +11,7 @@ import { useLocationFilter } from "@/contexts/LocationFilterContext";
 import { useWarehouseLocations } from "@/hooks/useWarehouseLocations";
 import { useItemUnits } from "@/hooks/useItemUnits";
 import { PartialPieceItemPicker, type PartialPieceItemOption } from "@/components/warehouse/partial-qty/PartialPieceItemPicker";
-import { usePartialPieceItems, ensurePartialPieceParentItem } from "@/hooks/warehouse/usePartialPieces";
+import { ensurePartialPieceParentItem } from "@/hooks/warehouse/usePartialPieces";
 import {
   useCreatePartialPiece,
   useCreatePartialPiecesBulk,
