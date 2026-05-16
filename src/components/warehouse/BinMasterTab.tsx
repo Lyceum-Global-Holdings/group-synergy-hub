@@ -112,6 +112,7 @@ export function BinMasterTab() {
               )}
               <TableHead>Bin Code</TableHead>
               <TableHead>Name</TableHead>
+              <TableHead>Warehouse</TableHead>
               <TableHead>Capacity</TableHead>
               <TableHead>Current Qty</TableHead>
               <TableHead>Status</TableHead>
