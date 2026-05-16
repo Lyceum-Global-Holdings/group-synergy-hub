@@ -19177,6 +19177,7 @@ export type Database = {
           created_at: string
           created_by: string | null
           id: string
+          location_id: string | null
           notes: string | null
           reserved_quantity: number
           secondary_quantity: number | null
@@ -19191,6 +19192,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           id?: string
+          location_id?: string | null
           notes?: string | null
           reserved_quantity?: number
           secondary_quantity?: number | null
@@ -19205,6 +19207,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           id?: string
+          location_id?: string | null
           notes?: string | null
           reserved_quantity?: number
           secondary_quantity?: number | null
@@ -19239,6 +19242,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "profiles_directory"
             referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "warehouse_bin_allocations_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "warehouse_locations"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "warehouse_bin_allocations_warehouse_item_id_fkey"
@@ -21208,6 +21218,10 @@ export type Database = {
           inheritance_source_name: string
         }[]
       }
+      get_location_subtree_ids: {
+        Args: { p_location_id: string }
+        Returns: string[]
+      }
       get_location_with_ancestors: {
         Args: { p_location_id: string }
         Returns: {
@@ -21261,6 +21275,12 @@ export type Database = {
           name: string
           parent_id: string
           type: string
+        }[]
+      }
+      get_subtree_bin_ids: {
+        Args: { p_location_id: string }
+        Returns: {
+          id: string
         }[]
       }
       get_tool_candidate_items: {

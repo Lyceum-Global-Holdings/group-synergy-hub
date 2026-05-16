@@ -199,13 +199,20 @@ export function useWarehouseItemsLazyInventory({
       }));
 
       if (itemIds.length > 0) {
+        let scopedLocationIds: Set<string> | null = null;
+        if (locationId) {
+          const { data: scopeRows } = await supabase.rpc('get_location_subtree_ids' as any, {
+            p_location_id: locationId,
+          } as any);
+          scopedLocationIds = new Set(((scopeRows || []) as any[]).map((row) => String(row)));
+          if (scopedLocationIds.size === 0) scopedLocationIds.add(locationId);
+        }
+
         let binsQuery = supabase
           .from('warehouse_bins')
           .select('id, bin_code, name, location_id');
 
-        if (locationId) {
-          binsQuery = binsQuery.eq('location_id', locationId);
-        } else if (permissions && !permissions.viewAllLocations) {
+        if (!locationId && permissions && !permissions.viewAllLocations) {
           const permittedLocationIds = [
             ...new Set([
               ...permissions.viewLocationIds,
@@ -222,7 +229,7 @@ export function useWarehouseItemsLazyInventory({
 
         const { data: allocations } = await supabase
           .from('warehouse_bin_allocations')
-          .select('warehouse_item_id, bin_id, available_quantity')
+          .select('warehouse_item_id, bin_id, location_id, available_quantity')
           .in('warehouse_item_id', itemIds)
           .gt('available_quantity', 0);
 
@@ -235,6 +242,7 @@ export function useWarehouseItemsLazyInventory({
 
           allocations.forEach((alloc: any) => {
             const itemId = alloc.warehouse_item_id;
+            if (scopedLocationIds && !scopedLocationIds.has(alloc.location_id || '')) return;
             if (!permittedBinIds.has(alloc.bin_id)) return;
 
             const bin = binLookup.get(alloc.bin_id);
