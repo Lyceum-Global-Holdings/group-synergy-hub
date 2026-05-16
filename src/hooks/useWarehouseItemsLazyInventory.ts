@@ -212,10 +212,11 @@ export function useWarehouseItemsLazyInventory({
           if (ids.length > 0) {
             const rows: Array<{ id: string; bin_code: string; name: string; location_id: string | null }> = [];
             for (let i = 0; i < ids.length; i += 500) {
-              const { data } = await supabase
+              const { data, error } = await supabase
                 .from('warehouse_bins')
                 .select('id, bin_code, name, location_id')
                 .in('id', ids.slice(i, i + 500));
+              if (error) throw error;
               if (data) rows.push(...data);
             }
             bins = rows;
