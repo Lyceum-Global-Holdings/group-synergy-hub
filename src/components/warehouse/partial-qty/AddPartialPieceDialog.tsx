@@ -443,6 +443,7 @@ export function AddPartialPieceDialog({ open, onOpenChange, defaultParentItemId 
                   <tr>
                     <th className="text-left p-2 w-10">#</th>
                     <th className="text-left p-2">Size *</th>
+                    <th className="text-left p-2 w-24">Qty *</th>
                     <th className="text-left p-2">Piece code</th>
                     <th className="text-left p-2">Label suffix</th>
                     <th className="p-2 w-20"></th>
@@ -456,8 +457,19 @@ export function AddPartialPieceDialog({ open, onOpenChange, defaultParentItemId 
                         <Input
                           type="number"
                           step="0.0001"
+                          min={0}
                           value={r.size_value}
                           onChange={(e) => updateRow(r.key, { size_value: e.target.value })}
+                          className="h-8"
+                        />
+                      </td>
+                      <td className="p-2">
+                        <Input
+                          type="number"
+                          step="1"
+                          min={1}
+                          value={r.piece_count}
+                          onChange={(e) => updateRow(r.key, { piece_count: e.target.value.replace(/[^\d]/g, "") })}
                           className="h-8"
                         />
                       </td>
