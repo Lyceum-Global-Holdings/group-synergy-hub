@@ -75,15 +75,19 @@ export function CreateBinDialog({ open, onOpenChange, editingBin }: CreateBinDia
     setCodeError(null);
   }, [editingBin, open]);
 
-  // Bins live at the warehouse (root) level. Sub-locations and departments
-  // automatically inherit access — matches SAP EWM / Oracle WMS storage-bin model.
-  const sortedLocations = useMemo(
-    () =>
-      [...locations]
-        .filter((l) => !l.parent_id)
-        .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })),
-    [locations]
-  );
+  // Bins can attach to either a top-level warehouse OR a sub-location/department.
+  // Matches SAP EWM / Oracle WMS bin model: storage bin → physical node (warehouse OR zone).
+  const sortedLocations = useMemo(() => {
+    const byId = new Map(locations.map((l) => [l.id, l] as const));
+    const labelFor = (l: typeof locations[number]) => {
+      if (!l.parent_id) return l.name;
+      const parent = byId.get(l.parent_id);
+      return parent ? `${parent.name} › ${l.name}` : l.name;
+    };
+    return [...locations]
+      .map((l) => ({ ...l, _label: labelFor(l), _isSub: !!l.parent_id }))
+      .sort((a, b) => a._label.localeCompare(b._label, undefined, { sensitivity: 'base' }));
+  }, [locations]);
 
   const validateCode = (code: string) => {
     const v = code.trim().toUpperCase();
