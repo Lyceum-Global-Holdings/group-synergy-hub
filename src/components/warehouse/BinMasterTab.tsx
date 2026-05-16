@@ -171,8 +171,17 @@ export function BinMasterTab() {
                         variant="ghost"
                         size="sm"
                         onClick={() => setEditingBin(bin)}
+                        title="Edit bin"
                       >
                         <Edit className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setRelocatingBin(bin)}
+                        title="Relocate bin"
+                      >
+                        <MoveRight className="h-4 w-4" />
                       </Button>
                       {canDelete && (
                         <Button
@@ -180,6 +189,7 @@ export function BinMasterTab() {
                           size="sm"
                           onClick={() => deleteBin(bin.id)}
                           disabled={isDeleting}
+                          title="Delete bin"
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
