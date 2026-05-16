@@ -35,12 +35,13 @@ const MAX_BULK_ROWS = 200;
 interface BulkRowState {
   key: string;
   size_value: string;
+  piece_count: string;
   piece_code: string;
   label_suffix: string;
 }
 
 function emptyRow(): BulkRowState {
-  return { key: crypto.randomUUID(), size_value: "", piece_code: "", label_suffix: "" };
+  return { key: crypto.randomUUID(), size_value: "", piece_count: "1", piece_code: "", label_suffix: "" };
 }
 
 export function AddPartialPieceDialog({ open, onOpenChange, defaultParentItemId }: Props) {
