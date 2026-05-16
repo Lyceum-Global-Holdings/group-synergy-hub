@@ -225,13 +225,13 @@ export function CreateBinDialog({ open, onOpenChange, editingBin }: CreateBinDia
 
             {(editingBin || scope === 'location') ? (
               <div className="space-y-2">
-                <Label htmlFor="location_id">Location *</Label>
+                <Label htmlFor="location_id">Warehouse *</Label>
                 <Select
                   value={formData.location_id}
                   onValueChange={(value) => setFormData((p) => ({ ...p, location_id: value }))}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Select location" />
+                    <SelectValue placeholder="Select warehouse" />
                   </SelectTrigger>
                   <SelectContent>
                     {sortedLocations.map((location) => (
@@ -241,6 +241,9 @@ export function CreateBinDialog({ open, onOpenChange, editingBin }: CreateBinDia
                     ))}
                   </SelectContent>
                 </Select>
+                <p className="text-xs text-muted-foreground">
+                  Bin is shared across every sub-location and department under this warehouse.
+                </p>
               </div>
             ) : (
               <div className="space-y-2">
