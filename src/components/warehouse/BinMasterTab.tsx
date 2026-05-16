@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Plus, Search, Edit, Trash2, Layers } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, Layers, MoveRight } from 'lucide-react';
 import {
   Table,
   TableBody,
