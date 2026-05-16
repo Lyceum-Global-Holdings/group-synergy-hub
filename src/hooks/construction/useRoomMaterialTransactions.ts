@@ -59,7 +59,7 @@ export const useIssueMaterial = () => {
     mutationFn: async (data: IssueMaterialData) => {
       // Get current warehouse stock
       const { data: warehouseItem, error: warehouseError } = await supabase
-        .from('warehouse_items')
+        .from('warehouse_items_full')
         .select('current_stock, unit_cost')
         .eq('id', data.warehouse_item_id)
         .single();
@@ -163,7 +163,7 @@ export const useReturnMaterial = () => {
     mutationFn: async (data: ReturnMaterialData) => {
       // Get current warehouse stock
       const { data: warehouseItem, error: warehouseError } = await supabase
-        .from('warehouse_items')
+        .from('warehouse_items_full')
         .select('current_stock, unit_cost')
         .eq('id', data.warehouse_item_id)
         .single();

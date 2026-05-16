@@ -48,7 +48,7 @@ export const rlsTests: TestCase[] = [
     id: "RLS-005", name: "Warehouse Items RLS", category: "RLS & Security", priority: "high",
     description: "Verify warehouse items have company-scoped access", status: "idle",
     run: async () => {
-      const { data, error } = await supabase.from("warehouse_items").select("id").limit(5);
+      const { data, error } = await supabase.from("warehouse_items_full").select("id").limit(5);
       if (error) return { passed: false, error: error.message };
       return { passed: true, details: `Items visible: ${data?.length ?? 0}` };
     },

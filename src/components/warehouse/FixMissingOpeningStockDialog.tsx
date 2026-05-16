@@ -46,7 +46,7 @@ export function FixMissingOpeningStockDialog({
     queryFn: async () => {
       // First get items for this company
       const { data: items, error: itemsError } = await supabase
-        .from('warehouse_items')
+        .from('warehouse_items_full')
         .select('id, item_code, name, current_stock, company_id')
         .eq('company_id', selectedCompany?.id || '');
 

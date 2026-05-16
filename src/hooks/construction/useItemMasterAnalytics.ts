@@ -44,7 +44,7 @@ export function useItemMasterAnalytics() {
     queryFn: async (): Promise<ItemMasterAnalytics> => {
       // Build query with company filter
       let query = supabase
-        .from('warehouse_items')
+        .from('warehouse_items_full')
         .select(`
           id,
           item_code,

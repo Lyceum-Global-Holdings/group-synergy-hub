@@ -40,7 +40,7 @@ export async function reconcileItem(
   try {
     // 1. Load item details
     const { data: itemData, error: itemError } = await supabase
-      .from('warehouse_items')
+      .from('warehouse_items_full')
       .select('location_id, company_id')
       .eq('id', item.id)
       .single();

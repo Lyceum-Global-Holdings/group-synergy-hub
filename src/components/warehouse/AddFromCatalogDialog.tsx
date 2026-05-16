@@ -91,7 +91,7 @@ export function AddFromCatalogDialog({ open, onOpenChange }: AddFromCatalogDialo
 
       while (true) {
         let q = supabase
-          .from('warehouse_items')
+          .from('warehouse_items_full')
           .select('id, catalog_item_id')
           .eq('company_id', selectedCompany!.id)
           .not('catalog_item_id', 'is', null)
@@ -146,7 +146,7 @@ export function AddFromCatalogDialog({ open, onOpenChange }: AddFromCatalogDialo
 
       // Look for existing inventory row in this company for this catalog item.
       const { data: existingRow } = await supabase
-        .from('warehouse_items')
+        .from('warehouse_items_full')
         .select('id, current_stock, location_id')
         .eq('company_id', selectedCompany.id)
         .or(`catalog_item_id.eq.${selectedItem.id},item_code.eq.${selectedItem.item_code}`)

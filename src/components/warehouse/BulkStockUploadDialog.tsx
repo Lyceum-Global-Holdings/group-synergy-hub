@@ -288,7 +288,7 @@ export function BulkStockUploadDialog({ open, onOpenChange }: BulkStockUploadDia
       for (let i = 0; i < uniqueCatalogIds.length; i += 500) {
         const chunk = uniqueCatalogIds.slice(i, i + 500);
         const { data } = await supabase
-          .from('warehouse_items')
+          .from('warehouse_items_full')
           .select('id, catalog_item_id')
           .eq('company_id', selectedCompany.id)
           .in('catalog_item_id', chunk);
@@ -462,7 +462,7 @@ export function BulkStockUploadDialog({ open, onOpenChange }: BulkStockUploadDia
               const cat = row.catalog_item;
 
               const { data: existingRow } = await supabase
-                .from('warehouse_items')
+                .from('warehouse_items_full')
                 .select('id')
                 .eq('company_id', selectedCompany!.id)
                 .or(`catalog_item_id.eq.${cat.id},item_code.eq.${cat.item_code}`)

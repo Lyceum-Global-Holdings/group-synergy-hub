@@ -282,7 +282,7 @@ export const useCompleteStockTransfer = () => {
 
         // Get current stock and company_id for transaction records
         const { data: warehouseItem } = await supabase
-          .from("warehouse_items")
+          .from("warehouse_items_full")
           .select("current_stock, company_id")
           .eq("id", item.warehouse_item_id)
           .single();

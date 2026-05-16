@@ -380,7 +380,7 @@ export const useDemandCalculation = (companyId?: string) => {
       let warehouseItems: any[] = [];
       if (warehouseItemIds.length > 0 || itemCodes.length > 0 || itemNames.length > 0) {
         let query = supabase
-          .from('warehouse_items')
+          .from('warehouse_items_full')
           .select('id, item_code, name, current_stock, reserved_quantity, reorder_level, min_stock_level, unit_cost, supplier_id, company_id');
         
         // Add company filter if available
@@ -627,7 +627,7 @@ export const useDemandCalculation = (companyId?: string) => {
 
       // Fetch warehouse items for stock information
       const { data: warehouseItems, error: wiError } = await supabase
-        .from('warehouse_items')
+        .from('warehouse_items_full')
         .select('*');
 
       if (wiError) {
@@ -932,7 +932,7 @@ export const useDemandCalculation = (companyId?: string) => {
 
       // Fetch warehouse items for stock information including reserved quantities
       const { data: warehouseItems, error: wiError } = await supabase
-        .from('warehouse_items')
+        .from('warehouse_items_full')
         .select('id, item_code, name, current_stock, reserved_quantity, reorder_level, min_stock_level, unit_cost, supplier_id, company_id');
 
       if (wiError) {

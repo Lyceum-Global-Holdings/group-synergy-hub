@@ -168,7 +168,7 @@ export const useCreateGoodsReceiptNote = () => {
           // If no warehouse_item_id but has item_code, look it up
           if (!warehouseItemId && item.item_code) {
             const { data: warehouseItem } = await supabase
-              .from('warehouse_items')
+              .from('warehouse_items_full')
               .select('id')
               .eq('item_code', item.item_code)
               .or(`company_id.eq.${data.company_id},company_id.is.null`)
@@ -346,7 +346,7 @@ export const useApproveGoodsReceiptNote = () => {
       for (const item of grnItems) {
         if (!item.warehouse_item_id) continue;
         const { data: whItem } = await supabase
-          .from('warehouse_items')
+          .from('warehouse_items_full')
           .select('current_stock')
           .eq('id', item.warehouse_item_id)
           .single();

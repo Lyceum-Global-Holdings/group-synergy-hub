@@ -184,7 +184,7 @@ export const useIsItemBatchTracked = (warehouseItemId: string) => {
     queryKey: ['is-batch-tracked', warehouseItemId],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('warehouse_items')
+        .from('warehouse_items_full')
         .select('is_batch_tracked')
         .eq('id', warehouseItemId)
         .single();
@@ -363,7 +363,7 @@ export const useBatchTrackedItems = () => {
     queryKey: ['batch-tracked-items'],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('warehouse_items')
+        .from('warehouse_items_full')
         .select('id, name, item_code')
         .eq('is_batch_tracked', true)
         .order('name');
