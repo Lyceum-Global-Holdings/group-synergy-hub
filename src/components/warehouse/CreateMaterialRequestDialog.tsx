@@ -21,6 +21,7 @@ import { WarehouseItem } from "@/types/itemBin";
 import { ReservationWithDetails } from "@/types/warehouseReservation";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
+import { flattenCatalog } from '@/lib/flattenWarehouseItem';
 
 interface CreateMaterialRequestDialogProps {
   open: boolean;
@@ -52,7 +53,7 @@ export function CreateMaterialRequestDialog({ open, onOpenChange }: CreateMateri
     srn_number: "",
     items_required_date: "",
     purpose: "",
-    priority: "medium" as MaterialRequestPriority,
+    priority: "medium" as unknown as MaterialRequestPriority,
     notes: "",
   });
   const [items, setItems] = useState<RequestItem[]>([]);
@@ -103,7 +104,12 @@ export function CreateMaterialRequestDialog({ open, onOpenChange }: CreateMateri
       .from('warehouse_item_reservations')
       .select(`
         *,
-        warehouse_item:warehouse_items(id, item_code, name, current_stock, reserved_quantity),
+        warehouse_item:warehouse_items(
+            id,
+            current_stock,
+            reserved_quantity,
+            catalog:warehouse_item_catalog!warehouse_items_catalog_item_id_fkey(item_code, name)
+          ),
         bin_allocation:warehouse_bin_allocations(
           id,
           allocated_quantity,
@@ -115,7 +121,7 @@ export function CreateMaterialRequestDialog({ open, onOpenChange }: CreateMateri
       .in('status', ['active', 'partially_issued']);
 
     if (!error && data) {
-      setCpoReservations(data as ReservationWithDetails[]);
+      setCpoReservations(data as unknown as ReservationWithDetails[]);
     }
   };
 
@@ -600,7 +606,7 @@ export function CreateMaterialRequestDialog({ open, onOpenChange }: CreateMateri
               </Button>
               <div className="flex gap-2">
                 <Button variant="outline" onClick={() => handleSubmit(false)} disabled={isCreating}>
-                  Save as Draft
+                  Save as unknown as Draft
                 </Button>
                 <Button onClick={() => handleSubmit(true)} disabled={isCreating}>
                   <CheckCircle className="mr-2 h-4 w-4" />

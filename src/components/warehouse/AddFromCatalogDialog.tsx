@@ -172,40 +172,29 @@ export function AddFromCatalogDialog({ open, onOpenChange }: AddFromCatalogDialo
         if (updateError) throw updateError;
         itemId = updated.id;
       } else {
-        // Fresh insert (first time this catalog item lands in this company)
-        const { data: newItem, error: insertError } = await supabase
-          .from('warehouse_items')
-          .insert({
-            catalog_item_id: selectedItem.id,
-            item_code: selectedItem.item_code,
-            name: selectedItem.name,
-            description: selectedItem.description,
-            category_id: selectedItem.category_id,
-            unit_id: selectedItem.unit_id,
-            brand: selectedItem.brand,
-            manufacturer: selectedItem.manufacturer,
-            barcode: selectedItem.barcode,
-            sku: selectedItem.sku,
-            unit_cost: selectedItem.unit_cost,
-            selling_price: selectedItem.selling_price,
-            reorder_level: selectedItem.reorder_level,
-            min_stock_level: selectedItem.min_stock_level,
-            max_stock_level: selectedItem.max_stock_level,
-            image_url: selectedItem.image_url,
-            is_batch_tracked: selectedItem.is_batch_tracked,
-            is_serialized: selectedItem.is_serialized,
-            status: 'active',
-            company_id: selectedCompany.id,
-            location_id: effectiveLocationId,
-            current_stock: qty,
-            reserved_quantity: 0,
-            created_by: userId,
-          } as any)
-          .select()
-          .single();
+        // Fresh per-company inventory row. Master fields are owned by the catalog,
+        // so route via upsert_warehouse_inventory and patch stock/location separately.
+        const { data: newId, error: rpcErr } = await supabase.rpc('upsert_warehouse_inventory', {
+          p_company_id: selectedCompany.id,
+          p_catalog_item_id: selectedItem.id,
+          p_location_id: effectiveLocationId,
+          p_unit_cost: selectedItem.unit_cost ?? null,
+          p_selling_price: selectedItem.selling_price ?? null,
+          p_reorder_level: selectedItem.reorder_level ?? null,
+          p_min_stock_level: selectedItem.min_stock_level ?? null,
+          p_max_stock_level: selectedItem.max_stock_level ?? null,
+          p_status: 'active',
+        });
+        if (rpcErr) throw rpcErr;
+        itemId = newId as unknown as string;
 
-        if (insertError) throw insertError;
-        itemId = newItem.id;
+        if (qty > 0) {
+          const { error: stockErr } = await supabase
+            .from('warehouse_items')
+            .update({ current_stock: qty })
+            .eq('id', itemId);
+          if (stockErr) throw stockErr;
+        }
       }
 
       // Upsert bin allocation on (warehouse_item_id, bin_id, company_id, location_id).

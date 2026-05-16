@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useCompany } from "@/contexts/CompanyContext";
+import { flattenCatalog } from '@/lib/flattenWarehouseItem';
 
 export interface DailyMaterialIssue {
   min_number: string;
@@ -68,15 +69,14 @@ export function useDailyMaterialsActivity(startDate: string | null, endDate?: st
             quantity_issued,
             notes,
             item_id,
-            warehouse_items!material_issue_items_item_id_fkey (
-              item_code,
-              name,
-              notes,
-              supplier_id,
-              suppliers!warehouse_items_supplier_id_fkey (
+            warehouse_items!material_issue_items_item_id_fkey(
+            id,
+            notes,
+            suppliers!warehouse_items_supplier_id_fkey (
                 name,
-                supplier_type
-              )
+            supplier_type,
+            catalog:warehouse_item_catalog!warehouse_items_catalog_item_id_fkey(item_code, name, supplier_id)
+          )
             )
           )
         `)
@@ -126,11 +126,11 @@ export function useDailyMaterialsActivity(startDate: string | null, endDate?: st
             quantity_returned,
             condition,
             notes,
-            warehouse_items (
-              item_code,
-              name,
-              notes
-            )
+            warehouse_items(
+            id,
+            notes,
+            catalog:warehouse_item_catalog!warehouse_items_catalog_item_id_fkey(item_code, name)
+          )
           )
         `)
         .eq("company_id", selectedCompany.id)
@@ -183,16 +183,15 @@ export function useDailyMaterialsActivity(startDate: string | null, endDate?: st
           issued_to_location:issued_to_location_id (
             name
           ),
-          warehouse_items!inner (
-            item_code,
-            name,
+          warehouse_items!inner(
+            id,
             notes,
             company_id,
-            supplier_id,
             suppliers!warehouse_items_supplier_id_fkey (
               name,
-              supplier_type
-            )
+            supplier_type,
+            catalog:warehouse_item_catalog!warehouse_items_catalog_item_id_fkey(item_code, name, supplier_id)
+          )
           )
         `)
         .eq("warehouse_items.company_id", selectedCompany.id)
@@ -217,7 +216,7 @@ export function useDailyMaterialsActivity(startDate: string | null, endDate?: st
           profilesMap = profilesData.reduce((acc, profile) => {
             acc[profile.user_id] = profile.full_name || profile.email || 'Unknown';
             return acc;
-          }, {} as Record<string, string>);
+          }, {} as unknown as Record<string, string>);
         }
       }
 

@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import type {
+import { flattenCatalog } from '@/lib/flattenWarehouseItem';
   CycleCount,
   CycleCountItem,
   CycleCountSchedule,
@@ -27,7 +28,7 @@ export const useCycleCounts = (status?: CycleCountStatus) => {
 
       const { data, error } = await query;
       if (error) throw error;
-      return data as CycleCount[];
+      return data as unknown as CycleCount[];
     },
   });
 };
@@ -46,7 +47,7 @@ export const useCycleCount = (countId: string | undefined) => {
         .single();
 
       if (error) throw error;
-      return data as CycleCount;
+      return data as unknown as CycleCount;
     },
     enabled: !!countId,
   });
@@ -63,13 +64,13 @@ export const useCycleCountItems = (countId: string | undefined) => {
         .from("cycle_count_items")
         .select(`
           *,
-          warehouse_items (
+          warehouse_items(
             id,
-            item_code,
             item_name,
             unit_of_measure,
             current_stock,
-            unit_cost
+            unit_cost,
+            catalog:warehouse_item_catalog!warehouse_items_catalog_item_id_fkey(item_code)
           ),
           warehouse_bins (
             id,
@@ -98,7 +99,7 @@ export const useCycleCountSchedules = () => {
         .order("created_at", { ascending: false });
 
       if (error) throw error;
-      return data as CycleCountSchedule[];
+      return data as unknown as CycleCountSchedule[];
     },
   });
 };
@@ -124,7 +125,7 @@ export const useCreateCycleCount = () => {
         .single();
 
       if (error) throw error;
-      return cycleCount as CycleCount;
+      return cycleCount as unknown as CycleCount;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["cycle-counts"] });
@@ -158,7 +159,7 @@ export const useAddCycleCountItem = () => {
         .single();
 
       if (error) throw error;
-      return item as CycleCountItem;
+      return item as unknown as CycleCountItem;
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ["cycle-count-items", variables.cycle_count_id] });

@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import type { 
+import { flattenCatalog } from '@/lib/flattenWarehouseItem';
   WarehouseItemReservation, 
   CreateReservationData,
   BulkReservationRequest,
@@ -20,10 +21,10 @@ export function useWarehouseReservations() {
         .select(`
           *,
           warehouse_item:warehouse_items!warehouse_item_reservations_warehouse_item_id_fkey(
-            item_code,
-            name,
+            id,
             current_stock,
-            reserved_quantity
+            reserved_quantity,
+            catalog:warehouse_item_catalog!warehouse_items_catalog_item_id_fkey(item_code, name)
           ),
           bin_allocation:warehouse_bin_allocations!warehouse_item_reservations_bin_allocation_id_fkey(
             allocated_quantity,
@@ -37,7 +38,7 @@ export function useWarehouseReservations() {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      return data as ReservationWithDetails[];
+      return data as unknown as ReservationWithDetails[];
     },
   });
 
@@ -234,16 +235,16 @@ export function useWarehouseReservations() {
       .select(`
         *,
         warehouse_item:warehouse_items!warehouse_item_reservations_warehouse_item_id_fkey(
-          item_code,
-          name,
-          current_stock
-        )
+            id,
+            current_stock,
+            catalog:warehouse_item_catalog!warehouse_items_catalog_item_id_fkey(item_code, name)
+          )
       `)
       .eq('reference_type', referenceType)
       .eq('reference_id', referenceId);
 
     if (error) throw error;
-    return data as ReservationWithDetails[];
+    return data as unknown as ReservationWithDetails[];
   };
 
   return {

@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useCompany } from '@/contexts/CompanyContext';
 import type { 
+import { flattenCatalog } from '@/lib/flattenWarehouseItem';
   WarehouseBinAllocation, 
   CreateBinAllocationData,
   BinAllocationWithDetails 
@@ -21,9 +22,9 @@ export function useWarehouseBinAllocations(options?: { disableFetch?: boolean })
         .select(`
           *,
           warehouse_item:warehouse_items!warehouse_bin_allocations_warehouse_item_id_fkey(
-            item_code,
-            name,
-            company_id
+            id,
+            company_id,
+            catalog:warehouse_item_catalog!warehouse_items_catalog_item_id_fkey(item_code, name)
           ),
           warehouse_bin:warehouse_bins!warehouse_bin_allocations_bin_id_fkey(
             bin_code,
@@ -49,12 +50,12 @@ export function useWarehouseBinAllocations(options?: { disableFetch?: boolean })
       // Filter by warehouse item's company_id (not allocation's company_id)
       // This ensures allocations show if the item belongs to the selected company
       if (!isViewingAllCompanies && selectedCompany?.id) {
-        return (allAllocations as unknown as BinAllocationWithDetails[]).filter(
+        return (allAllocations as unknown as unknown as BinAllocationWithDetails[]).filter(
           (allocation) => (allocation.warehouse_item as { item_code: string; name: string; company_id: string | null })?.company_id === selectedCompany.id
         );
       }
 
-      return allAllocations as unknown as BinAllocationWithDetails[];
+      return allAllocations as unknown as unknown as BinAllocationWithDetails[];
     },
     enabled: !options?.disableFetch && !!(isViewingAllCompanies || selectedCompany?.id),
     // Live-critical: bin allocations drive available stock numbers.
@@ -78,7 +79,7 @@ export function useWarehouseBinAllocations(options?: { disableFetch?: boolean })
       .order('available_quantity', { ascending: false });
 
     if (error) throw error;
-    return data as BinAllocationWithDetails[];
+    return data as unknown as BinAllocationWithDetails[];
   };
 
   // Get allocations for a specific bin
@@ -88,15 +89,15 @@ export function useWarehouseBinAllocations(options?: { disableFetch?: boolean })
       .select(`
         *,
         warehouse_item:warehouse_items!warehouse_bin_allocations_warehouse_item_id_fkey(
-          item_code,
-          name
-        )
+            id,
+            catalog:warehouse_item_catalog!warehouse_items_catalog_item_id_fkey(item_code, name)
+          )
       `)
       .eq('bin_id', binId)
       .order('allocated_quantity', { ascending: false });
 
     if (error) throw error;
-    return data as BinAllocationWithDetails[];
+    return data as unknown as BinAllocationWithDetails[];
   };
 
   // Create bin allocation

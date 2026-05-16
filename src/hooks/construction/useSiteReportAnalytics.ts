@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, eachDayOfInterval, format } from 'date-fns';
+import { flattenCatalog } from '@/lib/flattenWarehouseItem';
 
 export type PeriodType = 'daily' | 'weekly' | 'monthly' | 'custom';
 
@@ -97,10 +98,9 @@ export const useSiteReportAnalytics = (filters: AnalyticsFilters) => {
               project_id
             )
           ),
-          warehouse_items (
+          warehouse_items(
             id,
-            name,
-            item_code
+            catalog:warehouse_item_catalog!warehouse_items_catalog_item_id_fkey(name, item_code)
           )
         `)
         .gte('created_at', `${startDateStr}T00:00:00`)

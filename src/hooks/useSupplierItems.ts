@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { CreateSupplierItemData, UpdateSupplierItemData, SupplierItemWithDetails } from "@/types/supplierItems";
+import { flattenCatalog } from '@/lib/flattenWarehouseItem';
 
 export const useSupplierItems = (supplierId?: string) => {
   return useQuery({
@@ -13,11 +14,8 @@ export const useSupplierItems = (supplierId?: string) => {
           *,
           warehouse_item:warehouse_items(
             id,
-            item_code,
-            name,
-            category_id,
-            unit_id,
-            current_stock
+            current_stock,
+            catalog:warehouse_item_catalog!warehouse_items_catalog_item_id_fkey(item_code, name, category_id, unit_id)
           )
         `)
         .order('created_at', { ascending: false });
@@ -29,7 +27,7 @@ export const useSupplierItems = (supplierId?: string) => {
       const { data, error } = await query;
 
       if (error) throw error;
-      return data as SupplierItemWithDetails[];
+      return data as unknown as SupplierItemWithDetails[];
     },
     enabled: !!supplierId,
   });

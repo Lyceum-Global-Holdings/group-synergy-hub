@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { FloorRoomMaterial, RoomMaterialStatus } from '@/types/construction';
 import { toast } from 'sonner';
+import { flattenCatalog } from '@/lib/flattenWarehouseItem';
 
 export const useRoomMaterials = (roomId: string | null) => {
   return useQuery({
@@ -15,17 +16,16 @@ export const useRoomMaterials = (roomId: string | null) => {
           *,
           warehouse_item:warehouse_items(
             id,
-            item_code,
-            name,
             current_stock,
-            unit_cost
+            unit_cost,
+            catalog:warehouse_item_catalog!warehouse_items_catalog_item_id_fkey(item_code, name)
           )
         `)
         .eq('room_id', roomId)
         .order('created_at', { ascending: true });
       
       if (error) throw error;
-      return data as unknown as FloorRoomMaterial[];
+      return data as unknown as unknown as FloorRoomMaterial[];
     },
     enabled: !!roomId,
   });
@@ -52,7 +52,7 @@ export const useCreateRoomMaterial = () => {
         .insert({
           ...data,
           total_cost,
-          status: 'planned' as RoomMaterialStatus,
+          status: 'planned' as unknown as RoomMaterialStatus,
         })
         .select()
         .single();

@@ -19808,107 +19808,68 @@ export type Database = {
       warehouse_items: {
         Row: {
           available_quantity: number | null
-          barcode: string | null
           base_uom: string | null
-          brand: string | null
           catalog_item_id: string
-          category_id: string | null
           company_id: string | null
           created_at: string
           created_by: string | null
           current_stock: number | null
-          description: string | null
           id: string
-          image_url: string | null
-          is_batch_tracked: boolean | null
-          is_serialized: boolean | null
-          item_code: string
           location_id: string | null
-          manufacturer: string | null
           max_stock_level: number | null
           min_stock_level: number | null
-          name: string
           notes: string | null
           reorder_level: number | null
           reserved_quantity: number | null
           secondary_uom: string | null
           selling_price: number | null
-          sku: string | null
           status: string
-          supplier_id: string | null
           track_secondary_quantity: boolean
           unit_cost: number | null
-          unit_id: string | null
           updated_at: string
         }
         Insert: {
           available_quantity?: number | null
-          barcode?: string | null
           base_uom?: string | null
-          brand?: string | null
           catalog_item_id: string
-          category_id?: string | null
           company_id?: string | null
           created_at?: string
           created_by?: string | null
           current_stock?: number | null
-          description?: string | null
           id?: string
-          image_url?: string | null
-          is_batch_tracked?: boolean | null
-          is_serialized?: boolean | null
-          item_code: string
           location_id?: string | null
-          manufacturer?: string | null
           max_stock_level?: number | null
           min_stock_level?: number | null
-          name: string
           notes?: string | null
           reorder_level?: number | null
           reserved_quantity?: number | null
           secondary_uom?: string | null
           selling_price?: number | null
-          sku?: string | null
           status?: string
-          supplier_id?: string | null
           track_secondary_quantity?: boolean
           unit_cost?: number | null
-          unit_id?: string | null
           updated_at?: string
         }
         Update: {
           available_quantity?: number | null
-          barcode?: string | null
           base_uom?: string | null
-          brand?: string | null
           catalog_item_id?: string
-          category_id?: string | null
           company_id?: string | null
           created_at?: string
           created_by?: string | null
           current_stock?: number | null
-          description?: string | null
           id?: string
-          image_url?: string | null
-          is_batch_tracked?: boolean | null
-          is_serialized?: boolean | null
-          item_code?: string
           location_id?: string | null
-          manufacturer?: string | null
           max_stock_level?: number | null
           min_stock_level?: number | null
-          name?: string
           notes?: string | null
           reorder_level?: number | null
           reserved_quantity?: number | null
           secondary_uom?: string | null
           selling_price?: number | null
-          sku?: string | null
           status?: string
-          supplier_id?: string | null
           track_secondary_quantity?: boolean
           unit_cost?: number | null
-          unit_id?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -19920,31 +19881,10 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "warehouse_items_category_id_fkey"
-            columns: ["category_id"]
-            isOneToOne: false
-            referencedRelation: "item_categories"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "warehouse_items_location_id_fkey"
             columns: ["location_id"]
             isOneToOne: false
             referencedRelation: "warehouse_locations"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "warehouse_items_supplier_id_fkey"
-            columns: ["supplier_id"]
-            isOneToOne: false
-            referencedRelation: "suppliers"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "warehouse_items_unit_id_fkey"
-            columns: ["unit_id"]
-            isOneToOne: false
-            referencedRelation: "item_units"
             referencedColumns: ["id"]
           },
         ]
@@ -20817,11 +20757,10 @@ export type Database = {
           company_id: string | null
           id: string | null
           item_code: string | null
-          last_adjustment_date: string | null
           name: string | null
+          qty_decreases: number | null
+          qty_increases: number | null
           total_adjustments: number | null
-          total_decreases: number | null
-          total_increases: number | null
           value_decreases: number | null
           value_increases: number | null
         }
@@ -20929,51 +20868,6 @@ export type Database = {
           },
         ]
       }
-      v_stock_transactions_location_mismatch: {
-        Row: {
-          created_at: string | null
-          item_code: string | null
-          item_company_id: string | null
-          item_id: string | null
-          item_location_id: string | null
-          transaction_id: string | null
-          transaction_type:
-            | Database["public"]["Enums"]["stock_transaction_type"]
-            | null
-          tx_company_id: string | null
-          tx_location_id: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "fk_stock_transactions_warehouse_items"
-            columns: ["item_id"]
-            isOneToOne: false
-            referencedRelation: "v_adjustment_summary_by_item"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "fk_stock_transactions_warehouse_items"
-            columns: ["item_id"]
-            isOneToOne: false
-            referencedRelation: "warehouse_items"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "fk_stock_transactions_warehouse_items"
-            columns: ["item_id"]
-            isOneToOne: false
-            referencedRelation: "warehouse_items_full"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "warehouse_items_location_id_fkey"
-            columns: ["item_location_id"]
-            isOneToOne: false
-            referencedRelation: "warehouse_locations"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       warehouse_items_full: {
         Row: {
           available_quantity: number | null
@@ -20984,6 +20878,7 @@ export type Database = {
           category_id: string | null
           company_id: string | null
           created_at: string | null
+          created_by: string | null
           current_stock: number | null
           description: string | null
           id: string | null
@@ -21010,6 +20905,27 @@ export type Database = {
           updated_at: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "warehouse_item_catalog_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "item_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "warehouse_item_catalog_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "warehouse_item_catalog_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "item_units"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "warehouse_items_catalog_item_id_fkey"
             columns: ["catalog_item_id"]
@@ -21140,13 +21056,6 @@ export type Database = {
       can_manage_site_report_attendance: {
         Args: { _site_report_id: string }
         Returns: boolean
-      }
-      check_catalog_mirror_parity: {
-        Args: never
-        Returns: {
-          drift_count: number
-          sample_inventory_id: string
-        }[]
       }
       check_duplicate_supplier: {
         Args: {
@@ -21448,37 +21357,24 @@ export type Database = {
         Args: { p_company_id: string; p_location_id: string }
         Returns: {
           available_quantity: number | null
-          barcode: string | null
           base_uom: string | null
-          brand: string | null
           catalog_item_id: string
-          category_id: string | null
           company_id: string | null
           created_at: string
           created_by: string | null
           current_stock: number | null
-          description: string | null
           id: string
-          image_url: string | null
-          is_batch_tracked: boolean | null
-          is_serialized: boolean | null
-          item_code: string
           location_id: string | null
-          manufacturer: string | null
           max_stock_level: number | null
           min_stock_level: number | null
-          name: string
           notes: string | null
           reorder_level: number | null
           reserved_quantity: number | null
           secondary_uom: string | null
           selling_price: number | null
-          sku: string | null
           status: string
-          supplier_id: string | null
           track_secondary_quantity: boolean
           unit_cost: number | null
-          unit_id: string | null
           updated_at: string
         }[]
         SetofOptions: {
@@ -22156,7 +22052,6 @@ export type Database = {
         Args: { p_item_id: string }
         Returns: undefined
       }
-      reconcile_catalog_mirror: { Args: never; Returns: number }
       reconcile_stock_batch:
         | {
             Args: {

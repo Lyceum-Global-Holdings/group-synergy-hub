@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { SupplierEvaluation } from "@/types/supplierEvaluation";
 import { calculateSupplierAnalytics, SupplierAnalytics } from "@/lib/supplierAnalytics";
+import { flattenCatalog } from '@/lib/flattenWarehouseItem';
 
 export const useSupplierAnalytics = () => {
   return useQuery({
@@ -21,10 +22,9 @@ export const useSupplierAnalytics = () => {
             address_line1,
             status
           ),
-          warehouse_item:warehouse_items (
+          warehouse_item:warehouse_items(
             id,
-            item_code,
-            name
+            catalog:warehouse_item_catalog!warehouse_items_catalog_item_id_fkey(item_code, name)
           ),
           entries:supplier_evaluation_entries (
             id,
@@ -47,11 +47,10 @@ export const useSupplierAnalytics = () => {
             notes,
             created_at,
             updated_at,
-            warehouse_item:warehouse_items (
-              id,
-              item_code,
-              name
-            )
+            warehouse_item:warehouse_items(
+            id,
+            catalog:warehouse_item_catalog!warehouse_items_catalog_item_id_fkey(item_code, name)
+          )
           )
         `)
         .order("evaluation_period_start", { ascending: false });
@@ -66,7 +65,7 @@ export const useSupplierAnalytics = () => {
         if (!supplierEvaluationsMap.has(supplierId)) {
           supplierEvaluationsMap.set(supplierId, []);
         }
-        supplierEvaluationsMap.get(supplierId)!.push(evaluation as SupplierEvaluation);
+        supplierEvaluationsMap.get(supplierId)!.push(evaluation as unknown as SupplierEvaluation);
       });
 
       // Calculate analytics for each supplier
@@ -123,18 +122,17 @@ export const useSupplierEvaluationsBySupplier = (supplierId: string | null) => {
             notes,
             created_at,
             updated_at,
-            warehouse_item:warehouse_items (
-              id,
-              item_code,
-              name
-            )
+            warehouse_item:warehouse_items(
+            id,
+            catalog:warehouse_item_catalog!warehouse_items_catalog_item_id_fkey(item_code, name)
+          )
           )
         `)
         .eq("supplier_id", supplierId)
         .order("evaluation_period_start", { ascending: false });
 
       if (error) throw error;
-      return data as SupplierEvaluation[];
+      return data as unknown as SupplierEvaluation[];
     },
     enabled: !!supplierId,
   });

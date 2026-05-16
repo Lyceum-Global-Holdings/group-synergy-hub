@@ -51,11 +51,7 @@ export function useItemMasterAnalytics() {
           name,
           current_stock,
           status,
-          category_id,
-          item_categories (
-            id,
-            name
-          )
+          category_id
         `)
         .order('current_stock', { ascending: false });
 
@@ -64,11 +60,26 @@ export function useItemMasterAnalytics() {
         query = query.eq('company_id', selectedCompany.id);
       }
 
-      const { data: items, error } = await query;
+      const { data: itemsRaw, error } = await query;
 
       if (error) throw error;
 
-      const itemList = items || [];
+      // Views don't expose PostgREST FK relations — join category names manually
+      const categoryIds = Array.from(new Set((itemsRaw || []).map((i: any) => i.category_id).filter(Boolean) as string[]));
+      const categoryNameById = new Map<string, string>();
+      if (categoryIds.length > 0) {
+        const { data: cats } = await supabase
+          .from('item_categories')
+          .select('id, name')
+          .in('id', categoryIds);
+        (cats || []).forEach((c: any) => categoryNameById.set(c.id, c.name));
+      }
+      const itemList = (itemsRaw || []).map((i: any) => ({
+        ...i,
+        item_categories: i.category_id
+          ? { id: i.category_id, name: categoryNameById.get(i.category_id) || 'Uncategorized' }
+          : null,
+      }));
 
       // Calculate summary
       const totalItems = itemList.length;
