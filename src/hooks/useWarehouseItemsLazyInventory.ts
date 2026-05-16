@@ -198,7 +198,7 @@ export function useWarehouseItemsLazyInventory({
         bins: null,
       }));
 
-        if (itemIds.length > 0) {
+      if (itemIds.length > 0) {
         let scopedLocationIds: Set<string> | null = null;
         if (locationId) {
           const { data: scopeRows } = await supabase.rpc('get_location_subtree_ids' as any, {
@@ -242,7 +242,7 @@ export function useWarehouseItemsLazyInventory({
 
           allocations.forEach((alloc: any) => {
             const itemId = alloc.warehouse_item_id;
-            if (scopedLocationIds && !scopedLocationIds.has(alloc.location_id)) return;
+            if (scopedLocationIds && !scopedLocationIds.has(alloc.location_id || '')) return;
             if (!permittedBinIds.has(alloc.bin_id)) return;
 
             const bin = binLookup.get(alloc.bin_id);
