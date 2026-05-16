@@ -93,6 +93,7 @@ const PartialQuantities = lazy(() => import("./pages/warehouse/PartialQuantities
 const PublicAssetView = lazy(() => import("./pages/PublicAssetView"));
 const PublicBinAllocation = lazy(() => import("./pages/PublicBinAllocation"));
 const ToolManagement = lazy(() => import("./pages/warehouse/ToolManagement"));
+const WarehouseNetwork = lazy(() => import("./pages/warehouse/WarehouseNetwork"));
 const PoEmailApproval = lazy(() => import("./pages/procurement/PoEmailApproval"));
 const Accounting = lazy(() => import("./pages/Accounting"));
 const Auth = lazy(() => import("./pages/Auth"));
