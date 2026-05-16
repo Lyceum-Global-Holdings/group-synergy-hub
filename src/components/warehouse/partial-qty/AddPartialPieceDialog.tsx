@@ -9,9 +9,9 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useLocationFilter } from "@/contexts/LocationFilterContext";
 import { useWarehouseLocations } from "@/hooks/useWarehouseLocations";
-import { useWarehouseItems } from "@/hooks/useWarehouseItems";
 import { useItemUnits } from "@/hooks/useItemUnits";
-import { ItemSelector } from "@/components/common/ItemSelector";
+import { PartialPieceItemPicker, type PartialPieceItemOption } from "@/components/warehouse/partial-qty/PartialPieceItemPicker";
+import { usePartialPieceItems } from "@/hooks/warehouse/usePartialPieces";
 import {
   useCreatePartialPiece,
   useCreatePartialPiecesBulk,
