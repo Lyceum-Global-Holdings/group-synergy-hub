@@ -179,15 +179,22 @@ export function RelocateBinDialog({ open, onOpenChange, bin }: Props) {
               <SelectTrigger id="target">
                 <SelectValue placeholder="Select warehouse or sub-location" />
               </SelectTrigger>
-              <SelectContent>
-                {destinations.map((d) => (
-                  <SelectItem key={d.id} value={d.id}>
-                    {d.isSub ? `↳ ${d.label}` : d.label}
+              <SelectContent className="max-h-[320px]">
+                {loadingLocations && destinations.length === 0 && (
+                  <div className="px-3 py-2 text-sm text-muted-foreground">Loading locations…</div>
+                )}
+                {destinations.map((opt) => (
+                  <SelectItem
+                    key={opt.location.id}
+                    value={opt.location.id}
+                    style={{ paddingLeft: `${12 + opt.depth * 16}px` }}
+                  >
+                    {opt.breadcrumb}
                   </SelectItem>
                 ))}
-                {destinations.length === 0 && (
+                {!loadingLocations && destinations.length === 0 && (
                   <div className="px-3 py-2 text-sm text-muted-foreground">
-                    No other locations in this company.
+                    No other locations available.
                   </div>
                 )}
               </SelectContent>
