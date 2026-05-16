@@ -72,8 +72,9 @@ export function BulkBinScopeDialog({ open, onOpenChange, bins }: Props) {
         <DialogHeader>
           <DialogTitle>Change bin scope ({bins.length} bin{bins.length === 1 ? '' : 's'})</DialogTitle>
           <DialogDescription>
-            Replicate the selected bins across multiple companies and warehouse locations / sub-locations.
-            Each (bin code · company · location) tuple becomes one storage bin row, following SAP EWM / GS1
+            Replicate the selected bins across multiple companies and warehouses. Each (bin code · company · warehouse)
+            tuple becomes one storage bin row; sub-locations and departments under each warehouse inherit it
+            automatically — SAP EWM / Oracle WMS / GS1 storage-bin model.
             storage-bin semantics.
           </DialogDescription>
         </DialogHeader>
