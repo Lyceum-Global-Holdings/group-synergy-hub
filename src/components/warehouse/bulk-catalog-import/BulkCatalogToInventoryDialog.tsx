@@ -147,6 +147,9 @@ export function BulkCatalogToInventoryDialog({ open, onOpenChange }: Props) {
               Clear invalid ({invalidCount})
             </Button>
             <Button size="sm" variant="ghost" onClick={resetAll}>Reset</Button>
+            <Badge variant="secondary" className="font-normal">
+              Defaults: {defaultCompanyName} · {defaultLocationName}
+            </Badge>
             <div className="ml-auto flex items-center gap-3 text-sm text-muted-foreground">
               <span className="flex items-center gap-1">
                 <CheckCircle2 className="h-4 w-4 text-success" /> {validCount} valid
