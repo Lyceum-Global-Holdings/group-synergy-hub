@@ -74,3 +74,19 @@ Bins are already snapped to root by the existing trigger. Allocations reference 
 - `src/components/warehouse/ItemMasterTab.tsx` — replace direct `warehouse_bins.eq('location_id', …)` with the helper RPC.
 - `src/components/warehouse/BinAllocationsTab.tsx` — use the helper instead of in-memory descendant walk.
 - `.lovable/plan.md` — log the fix.
+
+---
+
+## Implementation log — warehouse subtree inventory visibility ✓ shipped
+
+- Added `get_location_subtree_ids(p_location_id)` as the permanent warehouse-scope helper: any selected node resolves to the root warehouse plus all descendants.
+- Added `get_subtree_bin_ids(p_location_id)` for client-side bin-scoped queries.
+- Updated `get_company_inventory_at_location` to use subtree membership for both item primary location and bin allocation location.
+- Updated `list_warehouse_inventory` to expand `_location_ids` through the same helper before filtering bin JSON.
+- Updated `ItemMasterTab` stock-by-location query to fetch subtree bin IDs instead of exact `warehouse_bins.location_id = selectedLocation`.
+- Updated `useWarehouseItemsLazyInventory` bin enrichment to use subtree bin IDs when a location filter is active.
+- Updated `BinAllocationsTab` to use the database helper instead of a local descendants-only traversal, so root and sub-location selection are consistent.
+
+Verification performed:
+- Confirmed `get_location_subtree_ids()` returns multiple scoped locations for a sample sub-location.
+- Confirmed `get_subtree_bin_ids()` returns warehouse bins when called with a sub-location.
