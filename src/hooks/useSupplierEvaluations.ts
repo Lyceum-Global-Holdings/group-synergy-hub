@@ -59,7 +59,10 @@ export const useSupplierEvaluation = (id: string) => {
         .maybeSingle();
 
       if (error) throw error;
-      return data;
+      if (!data) return null;
+      const d = flattenWarehouseItem(data as any) as any;
+      if (Array.isArray(d.entries)) d.entries = d.entries.map(flattenWarehouseItem);
+      return d as SupplierEvaluation;
     },
     enabled: !!id,
   });
