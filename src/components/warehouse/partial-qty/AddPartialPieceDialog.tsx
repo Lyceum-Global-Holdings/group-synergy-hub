@@ -228,7 +228,7 @@ export function AddPartialPieceDialog({ open, onOpenChange, defaultParentItemId 
   // ---- Submit (bulk) ----
   async function submitBulk() {
     if (!selectedCompany?.id) return;
-    if (!parentItemId || !locationId || !sizeUom) {
+    if (!catalogItemId || !locationId || !sizeUom) {
       toast({ title: "Missing required header fields", description: "Item, location and UOM are required.", variant: "destructive" });
       return;
     }
@@ -266,6 +266,8 @@ export function AddPartialPieceDialog({ open, onOpenChange, defaultParentItemId 
     });
 
     try {
+      const parentItemId = item?.parent_item_id
+        ?? await ensurePartialPieceParentItem(selectedCompany.id, catalogItemId);
       const ids = await createBulk.mutateAsync({
         company_id: selectedCompany.id,
         parent_item_id: parentItemId,
