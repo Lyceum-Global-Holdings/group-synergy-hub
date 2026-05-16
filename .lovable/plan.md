@@ -1,70 +1,85 @@
-# Excel-View Inventory Import
 
-Add a spreadsheet-style editor on the Inventory page where users type/paste rows like Excel, validate inline, and commit catalog items **plus opening stock** (company / location / bin) in a single transaction. International-standards aligned (GS1 GTIN barcode, UNSPSC-friendly category, ISO UoM, IFRS opening-stock journal via existing stock_transactions trigger).
+# Bulk Catalog → Inventory Import (Table Grid)
 
-## UX
-
-New button on `/warehouse/inventory` → **"Add via Excel"** opens a full-screen sheet with a Handsontable-style editable grid.
-
-Columns (in two color-banded groups):
-
-**Catalog (global)**
-- `item_code` (blank = auto-generate INV-{CAT}-{NNN})
-- `name *`, `description`, `category *`, `unit *` (ISO UoM abbrev), `barcode` (GTIN-8/12/13/14 checksum validated), `sku`, `brand`, `manufacturer`, `is_serialized`, `is_batch_tracked`, `unit_cost`, `selling_price`, `reorder_level`, `min_stock_level`, `max_stock_level`, `status`
-
-**Opening stock (per-company, optional per row)**
-- `company *` (defaults to active company), `location *` (warehouse/sublocation), `bin` (optional), `opening_qty`, `batch_no` (if batch-tracked), `expiry_date`, `serial_numbers` (semicolon-separated if serialized)
-
-Features:
-- Paste from Excel/Google Sheets (TSV)
-- Add/remove rows, drag-fill, undo/redo
-- Per-cell validation badges with hover tooltip
-- Dropdown cells for category / unit / location / bin / company (typeahead)
-- Bottom status bar: `X new · Y duplicates · Z errors`
-- "Download .xlsx template" and "Import .xlsx" buttons populate the grid (uses existing `xlsx` lib pattern)
-- "Validate" runs full validation; "Import" greyed until 0 errors
+Replace the current "Add via Excel" flow on `/warehouse/inventory` with a focused **Catalog → Inventory** bulk-provisioning grid. Users do NOT create new catalog items here; they pick existing ones and assign opening stock per location/bin.
 
 ## Standards alignment
 
-- **GS1 GTIN** check-digit validation on barcode
-- **ISO 80000 / UN-CEFACT** unit abbreviations enforced from `item_units`
-- **UNSPSC-friendly** 3-letter category code reused for auto item_code
-- **IFRS opening balance**: opening stock booked via existing `stock_transactions` with `transaction_type='opening_balance'`, leveraging the qty_before/after trigger
-- **Multi-tenant**: `company_id` mandatory on every stock row, RLS-enforced
+- **GS1 GDSN / SAP MM**: separation of *item master* (catalog) from *plant/storage-location stock*.
+- **IFRS / WMS opening-balance**: opening stock posted as `stock_transactions` with `transaction_type = 'opening_balance'`, scoped per (company, item, location, bin) — matches existing memory rule.
+- **Idempotent batch import** with per-row status (success / skipped / error) — partial commits via savepoints.
+- **One row per (item, location, bin)** — supports splitting a single catalog item across multiple storage locations in one import.
 
-## Technical
+## UX — `BulkCatalogToInventoryDialog`
 
-**Library:** `@silevis/reactgrid` (MIT, lightweight, paste-from-Excel support) — chosen over Handsontable (GPL/commercial). Add `xlsx` (already common) for file import/export of the template.
+Full-screen Sheet opened from Inventory header button "Bulk add from catalog".
 
-**Files**
-- `src/components/warehouse/excel-import/` (new)
-  - `InventoryExcelGrid.tsx` — grid wrapper + column defs + validation
-  - `useInventoryExcelImport.ts` — parse, validate, autocode, commit
-  - `excelColumns.ts` — column metadata, dropdown sources, validators (GTIN, ISO UoM)
-  - `templateXlsx.ts` — download/import .xlsx using `xlsx`
-- `src/components/warehouse/ExcelInventoryImportDialog.tsx` — full-screen dialog wrapper
-- Button added to `Inventory.tsx` header
+Grid columns (left → right):
 
-**DB migration** — new RPC `bulk_import_inventory_with_stock(p_rows jsonb)` (SECURITY DEFINER, company-scoped via `can_access_company`) that, per row:
-1. Insert/upsert into `warehouse_item_catalog` (reuses `create_catalog_item` logic) — get `catalog_item_id`
-2. If opening_qty > 0: call existing `upsert_warehouse_inventory` to get `warehouse_items` row
-3. Insert `stock_transactions` row (`opening_balance`) — trigger updates `bin_allocations` + qty_before/after
-4. Returns `{row_index, status, catalog_item_id, error}[]` so the grid can mark each row
+| # | Column | Type | Notes |
+|---|---|---|---|
+| 1 | Item (code / name / GTIN) | Combobox picker | Async search via `list_warehouse_catalog` RPC. Shows code, name, UoM. |
+| 2 | Catalog code | readonly | Auto-filled from picker. |
+| 3 | UoM | readonly | From catalog. |
+| 4 | Company | Combobox | Defaults to active company; admins can override. |
+| 5 | Location | Combobox | Filtered by selected company; uses `warehouse_locations`. |
+| 6 | Bin | Combobox | Filtered by location; uses `warehouse_bins`. Required when location is bin-managed. |
+| 7 | Opening qty | number ≥ 0 | Defaults to 0; if 0, only provisions the `warehouse_items` row. |
+| 8 | Unit cost | number ≥ 0 | Optional; defaults to catalog `standard_cost`. |
+| 9 | Reorder level | number | Optional, sets per-company reorder. |
+| 10 | Status | badge | pending / valid / error / imported (set after submit). |
 
-Single RPC call wraps everything in one transaction; failures per row are reported back without aborting the batch (savepoints).
+Three input modes (all feed the same grid):
 
-**Reuse**
-- `allocateAutoCodes` from `src/lib/bulkImport` for item-code generation
-- `parseCSV`/`downloadCSV` not needed (xlsx instead)
-- All existing validation rules from `BulkItemImportContent` ported to `excelColumns.ts`
+1. **Picker per row** — click a row's Item cell → searchable Combobox listing the global catalog (uses existing `useWarehouseCatalogPage`).
+2. **Paste from Excel** — paste TSV: first column = item code OR GTIN; remaining columns map left-to-right to Location, Bin, Opening Qty, Unit Cost, Reorder. Unknown codes flagged red with "Not in catalog".
+3. **Bulk add by codes** — textarea modal: paste a list of `item_code` / GTIN values → resolves into rows (one per code) ready for location/bin/qty.
 
-## Out of scope (this iteration)
-- Editing existing items via the grid (insert-only); use existing Edit dialog
-- Multi-bin per row (one bin per row; users add multiple rows for split allocation)
-- Serial-number generation; users paste them explicitly
+Grid features:
+- Inline validation (red border + tooltip), live valid/error counters in footer.
+- Duplicate detection for `(item, company, location, bin)` within the grid.
+- "+ Add row", row delete, "Clear invalid", "Download template (.xlsx)".
+- "Validate" button runs server-side dry-run; "Import" commits.
 
-## Verification
-- Paste 50 rows from Excel → all dropdowns resolve, validation flags bad GTINs / unknown categories
-- Import .xlsx template → grid populates
-- Commit → catalog rows created, `warehouse_items` rows created for the active company, `stock_transactions` opening_balance posted, bin allocations match opening_qty
-- `/warehouse/inventory` list reflects new on-hand stock immediately (realtime + invalidation)
+## Backend — single RPC
+
+`bulk_provision_inventory_from_catalog(p_rows jsonb)` (SECURITY DEFINER, search_path=public):
+
+Each input row: `{ row_index, catalog_item_id | item_code | gtin, company_id, location_id, bin_id?, opening_qty, unit_cost?, reorder_level? }`.
+
+Per-row, inside a savepoint:
+1. Resolve catalog item by `catalog_item_id`, else `item_code`, else `gtin`. Error if not found / inactive.
+2. Authorize: caller must have `can_access_company(company_id)`.
+3. Validate location belongs to company; bin belongs to location.
+4. Call existing `upsert_warehouse_inventory(...)` to create/find `warehouse_items` row for `(catalog_item_id, company_id, location_id)`. Apply `unit_cost`, `reorder_level` if provided.
+5. If `opening_qty > 0` → insert `stock_transactions` row: `transaction_type='opening_balance'`, `item_id`, `location_id`, `bin_id`, `quantity = opening_qty`, `unit_cost`. Existing triggers update bin allocation and `qty_before/after` (per memory rule).
+6. Return `{row_index, status: 'imported'|'skipped'|'error', warehouse_item_id, error}`.
+
+Rollback per-row only; the batch always returns a full report (no full-transaction abort).
+
+## Files
+
+**New**
+- `src/components/warehouse/bulk-catalog-import/BulkCatalogToInventoryDialog.tsx` — Sheet + grid orchestration.
+- `src/components/warehouse/bulk-catalog-import/CatalogInventoryGrid.tsx` — table UI with paste handler.
+- `src/components/warehouse/bulk-catalog-import/CatalogItemCell.tsx` — async combobox cell.
+- `src/components/warehouse/bulk-catalog-import/LocationBinCells.tsx` — dependent dropdowns.
+- `src/components/warehouse/bulk-catalog-import/PasteCodesDialog.tsx` — bulk paste of codes/GTINs.
+- `src/components/warehouse/bulk-catalog-import/useCatalogInventoryImport.ts` — validation, resolve, submit hook.
+- `src/components/warehouse/bulk-catalog-import/types.ts` + `validators.ts`.
+- `supabase/migrations/<ts>_bulk_provision_inventory_from_catalog.sql` — new RPC + grants.
+
+**Edited**
+- `src/pages/warehouse/Inventory.tsx` — replace "Add via Excel" button with **"Bulk add from catalog"**, wire to new dialog. Remove `ExcelInventoryImportDialog` mount.
+
+**Removed**
+- `src/components/warehouse/ExcelInventoryImportDialog.tsx`
+- `src/components/warehouse/excel-import/` (no longer needed; this flow doesn't create catalog items).
+
+## Memory update
+- Replace `mem://features/warehouse/excel-inventory-import` with `mem://features/warehouse/bulk-catalog-to-inventory` documenting: catalog-only source, opening_balance posting, multi-row per item, RPC name.
+
+## Out of scope
+- Creating new catalog items (use existing Add Item / Bulk Item Import flows).
+- Editing existing on-hand stock (use Stock Audit / GRN).
+- Serial-number generation.
