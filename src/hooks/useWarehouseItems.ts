@@ -186,6 +186,8 @@ export const useWarehouseItems = (options?: { skipCompanyFilter?: boolean; disab
     },
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ['warehouse-items'] });
+      queryClient.invalidateQueries({ queryKey: ['partial-pieces'] });
+      queryClient.invalidateQueries({ queryKey: ['partial-piece-items'] });
       toast({
         title: "Success", 
         description: "Item created successfully",
