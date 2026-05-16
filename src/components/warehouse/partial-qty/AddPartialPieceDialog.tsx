@@ -156,8 +156,9 @@ export function AddPartialPieceDialog({ open, onOpenChange, defaultParentItemId 
         return {
           key: crypto.randomUUID(),
           size_value: cols[0] ?? "",
-          piece_code: cols[1] ?? "",
-          label_suffix: cols[2] ?? "",
+          piece_count: cols[1] && /^\d+$/.test(cols[1]) ? cols[1] : "1",
+          piece_code: cols[2] ?? "",
+          label_suffix: cols[3] ?? "",
         };
       });
       if (!parsed.length) return;
