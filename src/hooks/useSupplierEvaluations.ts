@@ -28,12 +28,7 @@ export const useSupplierEvaluations = () => {
         .order("created_at", { ascending: false });
 
       if (error) throw error;
-      return data || [];
-    },
-  });
-};
-
-// Fetch single supplier evaluation with entries
+      return ((data || []) as any[]).map(flattenWarehouseItem) as SupplierEvaluation[];
 export const useSupplierEvaluation = (id: string) => {
   return useQuery({
     queryKey: ["supplier-evaluation", id],
