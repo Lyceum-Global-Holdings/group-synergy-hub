@@ -31,19 +31,12 @@ export function StockMovementChart() {
           </CardTitle>
           <p className="text-xs text-muted-foreground mt-1">{activeWarehouseName}</p>
         </div>
-        <Select value={selectedItemId} onValueChange={setSelectedItemId}>
-          <SelectTrigger className="w-[220px]">
-            <SelectValue placeholder="All Items" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Items</SelectItem>
-            {items.filter(i => i.status === 'active').map(item => (
-              <SelectItem key={item.id} value={item.id}>
-                {item.item_code} - {item.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <ItemSearchCombobox
+          value={selectedItemId}
+          onChange={(v) => setSelectedItemId(v)}
+          allLabel="All Items"
+          triggerClassName="w-[260px]"
+        />
       </CardHeader>
       <CardContent>
         {isLoading ? (
