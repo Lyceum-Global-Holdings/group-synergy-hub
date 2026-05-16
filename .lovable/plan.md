@@ -1,41 +1,33 @@
-## Goal
-Make **Add Piece → Parent Item** load the full Item Master, not only the subset that already has a `warehouse_items` inventory row for the selected company.
-
-## Findings
-- Current picker RPC returns `14041` active company inventory rows.
-- Item Master has `15016` active catalog rows.
-- `972` active catalog items do not yet have a company-scoped `warehouse_items` row, so they are invisible in Add Piece.
-- This is a Stage 6b source-of-truth issue: master attributes live in `warehouse_item_catalog`, while `warehouse_items` is now only per-company inventory state.
-
 ## Plan
-1. **Replace the picker source**
-   - Update `list_partial_piece_items` to start from `warehouse_item_catalog`.
-   - LEFT JOIN the current company’s `warehouse_items` row when it exists.
-   - Return all active catalog items, with `parent_item_id` set to the existing inventory row id when present.
-   - Include `catalog_item_id` and a `has_inventory_row` flag so the UI can distinguish provisioned vs not-yet-provisioned items.
 
-2. **Create international-standard parent linkage**
-   - Add an RPC like `ensure_partial_piece_parent_item(p_company_id, p_catalog_item_id)`.
-   - It will call/use the existing `upsert_warehouse_inventory` pattern to create the per-company `warehouse_items` row only when the user actually selects a catalog item for partial-piece creation.
-   - This preserves ERP/WMS separation: Global Item Master stays global; company inventory rows are created on demand for transactions.
+Fix the Add Partial Piece parent-item dropdown so it can access the full `warehouse_item_catalog` Item Master instead of only the first REST page of results.
 
-3. **Update Add Piece UI flow**
-   - Extend `PartialPieceItemPicker` / `usePartialPieceItems` types to support `catalog_item_id` and nullable `parent_item_id`.
-   - When a selected catalog item has no `parent_item_id`, call the new ensure RPC, then use the returned `warehouse_items.id` as the actual `parent_item_id` for create/bulk create.
-   - Keep existing behavior unchanged for items that already have inventory rows.
+### 1. Add server-side paged search for the picker
+- Update `list_partial_piece_items` to support safe pagination/search parameters:
+  - `p_search`
+  - `p_limit`
+  - `p_offset`
+- Keep it sourced from `warehouse_item_catalog` with a `LEFT JOIN` to company-scoped `warehouse_items`.
+- Preserve on-demand inventory provisioning via `ensure_partial_piece_parent_item`.
+- Use stable ordering by cleaned item code/name so whitespace-prefixed codes do not distort results.
+- Keep access constrained through the existing company/RLS model.
 
-4. **Keep list/filter behavior stable**
-   - The page-level parent filter can use the same enriched picker list.
-   - Existing partial piece listing remains tied to real `warehouse_partial_pieces.parent_item_id`, so only created pieces appear in the table.
+### 2. Update the picker hook to bypass the 1,000-row cap
+- Replace the single RPC call in `usePartialPieceItems` with a paged fetch loop for full-list use cases, or expose query-driven pagination for the dialog.
+- Ensure the parent item picker can reach all ~15,000 active catalog items, not just the first Supabase REST page.
+- Keep React Query keys scoped by company and global location filter.
 
-5. **Verification**
-   - Confirm picker count matches active Item Master count.
-   - Select one of the previously missing 972 catalog items and create a partial piece.
-   - Confirm a company inventory row is created on demand and the new partial piece appears with catalog code/name.
+### 3. Make the dialog picker scalable
+- Update `PartialPieceItemPicker` to search against server-backed catalog results rather than rendering all 15k rows into `cmdk` at once.
+- Keep selected values by `catalog_item_id`.
+- Show item code/name and piece count exactly as today.
+- Ensure selecting a catalog-only item still creates the missing company `warehouse_items` row at submit time.
 
-## Files/areas to change
-- Supabase migration for the picker RPC + ensure-parent RPC.
-- `src/hooks/warehouse/usePartialPieces.ts`
-- `src/components/warehouse/partial-qty/PartialPieceItemPicker.tsx`
-- `src/components/warehouse/partial-qty/AddPartialPieceDialog.tsx`
-- `src/pages/warehouse/PartialQuantities.tsx` if needed for the filter type.
+### 4. Preserve page filter behavior
+- Keep the Partial Quantities page parent-item filter compatible with existing partial pieces.
+- Avoid changing create/update/delete behavior outside this picker flow.
+
+### 5. Verify
+- Confirm the database active catalog count matches the picker’s searchable item universe.
+- Confirm known missing catalog-only items can be searched and selected in Add Partial Piece.
+- Confirm submission still resolves/creates the real `parent_item_id` before saving the partial piece.
