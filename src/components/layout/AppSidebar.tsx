@@ -221,7 +221,12 @@ export function AppSidebar() {
               {visibleAdminItems.map((item) => (
                 <SidebarMenuItem key={item.url}>
                   <SidebarMenuButton asChild isActive={isActive(item.url)}>
-                    <NavLink to={item.url} className="flex items-center gap-2">
+                    <NavLink
+                      to={item.url}
+                      className="flex items-center gap-2"
+                      onMouseEnter={() => preloadRoute(item.url)}
+                      onFocus={() => preloadRoute(item.url)}
+                    >
                       <item.icon className="h-4 w-4" />
                       <span>{item.title}</span>
                     </NavLink>
