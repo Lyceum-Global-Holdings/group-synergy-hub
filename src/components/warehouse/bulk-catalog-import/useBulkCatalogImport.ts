@@ -113,6 +113,7 @@ export function useBulkCatalogImport(defaults: BulkCatalogDefaults = { company_i
     const qty = r.opening_qty ? Number(r.opening_qty) : 0;
     if (Number.isNaN(qty) || qty < 0) return 'Opening qty must be ≥ 0';
     if (qty > 0 && !r.location_id) return 'Location required when qty > 0';
+    if (qty > 0 && !r.bin_id) return 'Bin required when qty > 0';
     if (r.bin_id && !r.location_id) return 'Location required for bin';
     if (r.unit_cost && Number(r.unit_cost) < 0) return 'Unit cost must be ≥ 0';
     return null;
