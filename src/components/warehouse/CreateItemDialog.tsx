@@ -28,7 +28,7 @@ import { useWarehouseLocations } from '@/hooks/useWarehouseLocations';
 import { useWarehouseBins } from '@/hooks/useWarehouseBins';
 import { useWarehouseBinAllocations } from '@/hooks/useWarehouseBinAllocations';
 import { useCompany } from '@/contexts/CompanyContext';
-import { buildLocationOptions, locationTypeLabel } from '@/lib/warehouse/locationHierarchy';
+import { buildLocationOptions, getRootLocationId, locationTypeLabel } from '@/lib/warehouse/locationHierarchy';
 import { WarehouseItem } from '@/types/itemBin';
 import { supabase } from '@/integrations/supabase/client';
 import { Upload, X, Plus } from 'lucide-react';
@@ -109,8 +109,13 @@ export function CreateItemDialog({ open, onOpenChange, editingItem }: CreateItem
   }, [nextItemCode, editingItem]);
 
   // Filter bins by selected warehouse location
-  const filteredBins = formData.location_id 
-    ? bins.filter(bin => bin.location_id === formData.location_id)
+  const selectedRootLocationId = useMemo(
+    () => getRootLocationId(locations, formData.location_id),
+    [locations, formData.location_id]
+  );
+
+  const filteredBins = formData.location_id
+    ? bins.filter(bin => (bin.root_location_id ?? bin.location_id) === selectedRootLocationId)
     : bins;
 
   const handleSupplierCreated = async (supplierId: string) => {
@@ -302,6 +307,8 @@ export function CreateItemDialog({ open, onOpenChange, editingItem }: CreateItem
             unit_cost: unitCostValue > 0 ? unitCostValue : undefined,
             total_value: unitCostValue > 0 ? unitCostValue * stockQuantity : undefined,
             notes: 'Opening stock balance',
+            location_id: formData.location_id || undefined,
+            bin_id: initialBinId || undefined,
             ...(secondaryQty !== undefined ? { secondary_quantity_change: secondaryQty } : {}),
           });
 
@@ -311,6 +318,7 @@ export function CreateItemDialog({ open, onOpenChange, editingItem }: CreateItem
               warehouse_item_id: result.item.id,
               bin_id: initialBinId,
               allocated_quantity: stockQuantity,
+              location_id: formData.location_id || undefined,
               notes: 'Opening stock allocation',
               ...(secondaryQty !== undefined ? { secondary_quantity: secondaryQty } : {}),
             });
