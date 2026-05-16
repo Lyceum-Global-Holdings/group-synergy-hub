@@ -24,6 +24,9 @@ import {
 } from '@/components/ui/table';
 import { useWarehouseBins } from '@/hooks/useWarehouseBins';
 import { Package } from 'lucide-react';
+import { useLocationFilter } from '@/contexts/LocationFilterContext';
+import { useWarehouseLocations } from '@/hooks/useWarehouseLocations';
+import { getRootLocationId } from '@/lib/warehouse/locationHierarchy';
 
 interface GrnItem {
   id: string;
@@ -38,6 +41,7 @@ export interface BinAllocation {
   grn_item_id: string;
   warehouse_item_id: string;
   bin_id: string;
+  location_id: string | null;
   quantity: number;
 }
 
@@ -57,7 +61,14 @@ export function GrnBinAllocationDialog({
   isLoading,
 }: GrnBinAllocationDialogProps) {
   const { bins } = useWarehouseBins();
-  const activeBins = bins.filter((b) => b.status === 'active');
+  const { globalLocationId } = useLocationFilter();
+  const { locations } = useWarehouseLocations();
+  const selectedRootLocationId = getRootLocationId(locations, globalLocationId);
+  const activeBins = bins.filter((b) => {
+    if (b.status !== 'active') return false;
+    if (!selectedRootLocationId) return true;
+    return (b.root_location_id ?? b.location_id) === selectedRootLocationId;
+  });
 
   const [binSelections, setBinSelections] = useState<Record<string, string>>({});
 
@@ -78,6 +89,7 @@ export function GrnBinAllocationDialog({
         grn_item_id: item.id,
         warehouse_item_id: item.warehouse_item_id!,
         bin_id: binSelections[item.id],
+        location_id: globalLocationId ?? activeBins.find((bin) => bin.id === binSelections[item.id])?.location_id ?? null,
         quantity: item.quantity_received,
       }));
 

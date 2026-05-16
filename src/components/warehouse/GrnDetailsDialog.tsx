@@ -73,6 +73,7 @@ export function GrnDetailsDialog({ grnId, open, onOpenChange }: GrnDetailsDialog
       binAllocations: allocations.map((a) => ({
         warehouse_item_id: a.warehouse_item_id,
         bin_id: a.bin_id,
+        location_id: a.location_id,
         quantity: a.quantity,
       })),
     });

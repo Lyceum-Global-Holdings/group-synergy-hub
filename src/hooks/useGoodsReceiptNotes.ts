@@ -308,6 +308,7 @@ export const useSubmitGoodsReceiptNote = () => {
 export interface GrnBinAllocationInput {
   warehouse_item_id: string;
   bin_id: string;
+  location_id?: string | null;
   quantity: number;
 }
 
@@ -377,22 +378,27 @@ export const useApproveGoodsReceiptNote = () => {
 
       // Insert stock transaction records for movement history
       if (itemsWithStock.length > 0) {
-        const stockTransactions = itemsWithStock.map((item) => ({
-          item_id: item.warehouse_item_id,
-          transaction_type: 'goods_receipt' as const,
-          reference_type: 'grn' as const,
-          reference_id: id,
-          quantity_change: item.quantity_received,
-          quantity_before: item.quantity_before,
-          quantity_after: item.quantity_before + item.quantity_received,
-          unit_cost: item.unit_price,
-          total_value: item.total_cost,
-          notes: `GRN ${(grn as any).grn_number} - ${item.item_name}`,
-          company_id: grn.company_id,
-          created_by: user.id,
-          secondary_quantity_change: item.secondary_quantity_received,
-          secondary_uom: item.secondary_uom,
-        }));
+        const stockTransactions = itemsWithStock.map((item) => {
+          const allocation = binAllocations.find((a) => a.warehouse_item_id === item.warehouse_item_id);
+          return {
+            item_id: item.warehouse_item_id,
+            transaction_type: 'goods_receipt' as const,
+            reference_type: 'grn' as const,
+            reference_id: id,
+            quantity_change: item.quantity_received,
+            quantity_before: item.quantity_before,
+            quantity_after: item.quantity_before + item.quantity_received,
+            unit_cost: item.unit_price,
+            total_value: item.total_cost,
+            notes: `GRN ${(grn as any).grn_number} - ${item.item_name}`,
+            company_id: grn.company_id,
+            created_by: user.id,
+            bin_id: allocation?.bin_id ?? null,
+            location_id: allocation?.location_id ?? null,
+            secondary_quantity_change: item.secondary_quantity_received,
+            secondary_uom: item.secondary_uom,
+          };
+        });
 
         const { error: txError } = await supabase
           .from('stock_transactions')
@@ -420,14 +426,26 @@ export const useApproveGoodsReceiptNote = () => {
         const secondaryDelta = totalSec != null && totalForItem > 0
           ? (totalSec * (alloc.quantity || 0)) / totalForItem
           : null;
+        let allocationLocationId = alloc.location_id ?? null;
+        if (!allocationLocationId) {
+          const { data: binScope } = await supabase
+            .from('warehouse_bins')
+            .select('root_location_id, location_id')
+            .eq('id', alloc.bin_id)
+            .maybeSingle();
+          allocationLocationId = (binScope as any)?.root_location_id ?? (binScope as any)?.location_id ?? null;
+        }
 
-        const { data: existing } = await supabase
+        let existingQuery = supabase
           .from('warehouse_bin_allocations')
           .select('id, allocated_quantity, secondary_quantity')
           .eq('warehouse_item_id', alloc.warehouse_item_id)
           .eq('bin_id', alloc.bin_id)
-          .eq('company_id', grn.company_id)
-          .maybeSingle();
+          .eq('company_id', grn.company_id);
+        existingQuery = allocationLocationId
+          ? existingQuery.eq('location_id', allocationLocationId)
+          : existingQuery.is('location_id', null);
+        const { data: existing } = await existingQuery.maybeSingle();
 
         if (existing) {
           const updates: any = {
@@ -446,6 +464,7 @@ export const useApproveGoodsReceiptNote = () => {
           const insertPayload: any = {
             warehouse_item_id: alloc.warehouse_item_id,
             bin_id: alloc.bin_id,
+            location_id: allocationLocationId,
             allocated_quantity: alloc.quantity,
             company_id: grn.company_id,
             created_by: user.id,
