@@ -434,20 +434,31 @@ export const useWarehouseItems = (options?: { skipCompanyFilter?: boolean; disab
         throw new Error(`Catalog entries missing for ${missing.length} item codes (first: ${missing.slice(0, 5).join(', ')}). Create catalog rows first.`);
       }
 
-      const itemsWithUser = itemsData.map(item => ({
-        ...item,
-        catalog_item_id: catalogByCode.get(item.item_code)!,
-        company_id: selectedCompany.id,
-        created_by: user.id
-      }));
+      // Stage 6: warehouse_items no longer accepts mirrored master fields.
+      // Route every row through upsert_warehouse_inventory.
+      const created: Array<{ id: string; item_code: string }> = [];
+      for (const item of itemsData) {
+        const catalogId = catalogByCode.get(item.item_code)!;
+        const { data: newId, error: rpcErr } = await supabase.rpc('upsert_warehouse_inventory', {
+          p_company_id: selectedCompany.id,
+          p_catalog_item_id: catalogId,
+          p_location_id: item.location_id ?? null,
+          p_base_uom: item.base_uom ?? null,
+          p_secondary_uom: item.secondary_uom ?? null,
+          p_track_secondary: item.track_secondary_quantity ?? false,
+          p_reorder_level: item.reorder_level ?? null,
+          p_min_stock_level: item.min_stock_level ?? null,
+          p_max_stock_level: item.max_stock_level ?? null,
+          p_unit_cost: item.unit_cost ?? null,
+          p_selling_price: item.selling_price ?? null,
+          p_status: item.status ?? 'active',
+          p_notes: item.notes ?? null,
+        });
+        if (rpcErr) throw rpcErr;
+        created.push({ id: newId as unknown as string, item_code: item.item_code });
+      }
 
-      const { data, error } = await supabase
-        .from('warehouse_items')
-        .insert(itemsWithUser)
-        .select();
-
-      if (error) throw error;
-      return data;
+      return created;
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['warehouse-items'] });
