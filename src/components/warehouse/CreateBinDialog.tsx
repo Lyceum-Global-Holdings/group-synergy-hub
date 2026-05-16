@@ -299,7 +299,7 @@ export function CreateBinDialog({ open, onOpenChange, editingBin }: CreateBinDia
                         className="flex items-center gap-2 rounded px-2 py-1.5 hover:bg-muted cursor-pointer"
                       >
                         <Checkbox checked={checked} onCheckedChange={() => toggleLocation(loc.id)} />
-                        <span className="text-sm">{loc.name}</span>
+                        <span className="text-sm">{loc._isSub ? `↳ ${loc._label}` : loc._label}</span>
                       </label>
                     );
                   })}
