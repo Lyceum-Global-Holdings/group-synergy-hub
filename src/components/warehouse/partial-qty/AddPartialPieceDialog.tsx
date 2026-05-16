@@ -35,12 +35,13 @@ const MAX_BULK_ROWS = 200;
 interface BulkRowState {
   key: string;
   size_value: string;
+  piece_count: string;
   piece_code: string;
   label_suffix: string;
 }
 
 function emptyRow(): BulkRowState {
-  return { key: crypto.randomUUID(), size_value: "", piece_code: "", label_suffix: "" };
+  return { key: crypto.randomUUID(), size_value: "", piece_count: "1", piece_code: "", label_suffix: "" };
 }
 
 export function AddPartialPieceDialog({ open, onOpenChange, defaultParentItemId }: Props) {
@@ -68,6 +69,7 @@ export function AddPartialPieceDialog({ open, onOpenChange, defaultParentItemId 
 
   // Single-mode only
   const [sizeValue, setSizeValue] = useState("");
+  const [pieceQty, setPieceQty] = useState("1");
   const [pieceCode, setPieceCode] = useState("");
 
   // Bulk-mode rows
@@ -117,7 +119,7 @@ export function AddPartialPieceDialog({ open, onOpenChange, defaultParentItemId 
   function reset() {
     setMode("single");
     setParentItemId(""); setLocationId(""); setBinId("");
-    setSizeValue(""); setSizeUom(""); setPieceCode("");
+    setSizeValue(""); setPieceQty("1"); setSizeUom(""); setPieceCode("");
     setSourceRef(""); setBatchNumber(""); setUnitCost(""); setLabel(""); setNotes("");
     setRows([emptyRow(), emptyRow(), emptyRow()]);
   }
@@ -154,8 +156,9 @@ export function AddPartialPieceDialog({ open, onOpenChange, defaultParentItemId 
         return {
           key: crypto.randomUUID(),
           size_value: cols[0] ?? "",
-          piece_code: cols[1] ?? "",
-          label_suffix: cols[2] ?? "",
+          piece_count: cols[1] && /^\d+$/.test(cols[1]) ? cols[1] : "1",
+          piece_code: cols[2] ?? "",
+          label_suffix: cols[3] ?? "",
         };
       });
       if (!parsed.length) return;
@@ -170,16 +173,25 @@ export function AddPartialPieceDialog({ open, onOpenChange, defaultParentItemId 
     () => rows.filter(r => r.size_value.trim() !== "" && Number(r.size_value) > 0),
     [rows],
   );
+  const totalPieces = useMemo(
+    () => filledRows.reduce((s, r) => s + Math.max(1, Math.trunc(Number(r.piece_count) || 1)), 0),
+    [filledRows],
+  );
   const totalSize = useMemo(
-    () => filledRows.reduce((s, r) => s + Number(r.size_value || 0), 0),
+    () =>
+      filledRows.reduce(
+        (s, r) => s + Number(r.size_value || 0) * Math.max(1, Math.trunc(Number(r.piece_count) || 1)),
+        0,
+      ),
     [filledRows],
   );
 
   // ---- Submit (single) ----
   async function submitSingle() {
     if (!selectedCompany?.id) return;
-    if (!parentItemId || !locationId || !sizeValue || !sizeUom) {
-      toast({ title: "Missing required fields", variant: "destructive" });
+    const qtyNum = Math.trunc(Number(pieceQty) || 0);
+    if (!parentItemId || !locationId || !sizeValue || !sizeUom || qtyNum < 1) {
+      toast({ title: "Missing required fields", description: "Size, Qty (≥1), UOM, item and location are required.", variant: "destructive" });
       return;
     }
     try {
@@ -188,6 +200,7 @@ export function AddPartialPieceDialog({ open, onOpenChange, defaultParentItemId 
         parent_item_id: parentItemId,
         size_value: Number(sizeValue),
         size_uom: sizeUom || null,
+        piece_count: qtyNum,
         location_id: locationId,
         bin_id: binId || null,
         piece_code: pieceCode.trim() || null,
@@ -239,6 +252,7 @@ export function AddPartialPieceDialog({ open, onOpenChange, defaultParentItemId 
       const finalLabel = [labelPrefix, suffix].filter(Boolean).join(" ");
       return {
         size_value: Number(r.size_value),
+        piece_count: Math.max(1, Math.trunc(Number(r.piece_count) || 1)),
         piece_code: r.piece_code.trim() || null,
         label: finalLabel || null,
       };
@@ -381,22 +395,38 @@ export function AddPartialPieceDialog({ open, onOpenChange, defaultParentItemId 
           </div>
 
           <TabsContent value="single" className="mt-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-3 gap-4">
               <div>
                 <Label>Size *</Label>
-                <Input type="number" step="0.0001" value={sizeValue} onChange={(e) => setSizeValue(e.target.value)} />
+                <Input type="number" step="0.0001" min={0} value={sizeValue} onChange={(e) => setSizeValue(e.target.value)} />
+              </div>
+              <div>
+                <Label>Qty (pieces) *</Label>
+                <Input
+                  type="number"
+                  step="1"
+                  min={1}
+                  value={pieceQty}
+                  onChange={(e) => setPieceQty(e.target.value.replace(/[^\d]/g, ""))}
+                />
               </div>
               <div>
                 <Label>Piece Code</Label>
                 <Input value={pieceCode} onChange={(e) => setPieceCode(e.target.value)} placeholder="auto-generated if blank" />
               </div>
             </div>
+            {sizeValue && Number(sizeValue) > 0 && Number(pieceQty) > 0 && (
+              <p className="text-xs text-muted-foreground mt-2 tabular-nums">
+                Total: {(Number(sizeValue) * Math.trunc(Number(pieceQty) || 0)).toLocaleString(undefined, { maximumFractionDigits: 4 })} {sizeUom}
+                {" "}({pieceQty} × {sizeValue} {sizeUom})
+              </p>
+            )}
           </TabsContent>
 
           <TabsContent value="bulk" className="mt-4">
             <div className="flex items-center justify-between mb-2">
-              <div className="text-sm text-muted-foreground">
-                {filledRows.length} row{filledRows.length === 1 ? "" : "s"} · total {totalSize.toFixed(4).replace(/\.?0+$/, "")} {sizeUom}
+              <div className="text-sm text-muted-foreground tabular-nums">
+                {filledRows.length} row{filledRows.length === 1 ? "" : "s"} · {totalPieces} pcs · total {totalSize.toLocaleString(undefined, { maximumFractionDigits: 4 })} {sizeUom}
               </div>
               <div className="flex gap-2">
                 <Button type="button" size="sm" variant="outline" onClick={pasteFromClipboard}>
@@ -413,6 +443,7 @@ export function AddPartialPieceDialog({ open, onOpenChange, defaultParentItemId 
                   <tr>
                     <th className="text-left p-2 w-10">#</th>
                     <th className="text-left p-2">Size *</th>
+                    <th className="text-left p-2 w-24">Qty *</th>
                     <th className="text-left p-2">Piece code</th>
                     <th className="text-left p-2">Label suffix</th>
                     <th className="p-2 w-20"></th>
@@ -426,8 +457,19 @@ export function AddPartialPieceDialog({ open, onOpenChange, defaultParentItemId 
                         <Input
                           type="number"
                           step="0.0001"
+                          min={0}
                           value={r.size_value}
                           onChange={(e) => updateRow(r.key, { size_value: e.target.value })}
+                          className="h-8"
+                        />
+                      </td>
+                      <td className="p-2">
+                        <Input
+                          type="number"
+                          step="1"
+                          min={1}
+                          value={r.piece_count}
+                          onChange={(e) => updateRow(r.key, { piece_count: e.target.value.replace(/[^\d]/g, "") })}
                           className="h-8"
                         />
                       </td>
@@ -463,7 +505,7 @@ export function AddPartialPieceDialog({ open, onOpenChange, defaultParentItemId 
               </table>
             </div>
             <p className="text-xs text-muted-foreground mt-2">
-              Tip: paste from Excel — columns <span className="font-mono">size, piece_code, label</span>. Max {MAX_BULK_ROWS} rows per batch. All rows commit together or none.
+              Tip: paste from Excel — columns <span className="font-mono">size, qty, piece_code, label</span>. Max {MAX_BULK_ROWS} rows per batch. All rows commit together or none.
             </p>
           </TabsContent>
         </Tabs>

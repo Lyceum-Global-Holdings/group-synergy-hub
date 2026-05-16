@@ -19920,9 +19920,11 @@ export type Database = {
           label: string | null
           location_id: string
           notes: string | null
+          original_piece_count: number
           parent_item_id: string
           parent_piece_id: string | null
           piece_code: string
+          piece_count: number
           size_uom: string
           size_value: number
           source_ref: string | null
@@ -19944,9 +19946,11 @@ export type Database = {
           label?: string | null
           location_id: string
           notes?: string | null
+          original_piece_count?: number
           parent_item_id: string
           parent_piece_id?: string | null
           piece_code: string
+          piece_count?: number
           size_uom: string
           size_value: number
           source_ref?: string | null
@@ -19968,9 +19972,11 @@ export type Database = {
           label?: string | null
           location_id?: string
           notes?: string | null
+          original_piece_count?: number
           parent_item_id?: string
           parent_piece_id?: string | null
           piece_code?: string
+          piece_count?: number
           size_uom?: string
           size_value?: number
           source_ref?: string | null
@@ -20925,6 +20931,18 @@ export type Database = {
         }
         Returns: Json
       }
+      consume_partial_piece_pieces: {
+        Args: {
+          p_id: string
+          p_notes?: string
+          p_pieces: number
+          p_post_to_stock?: boolean
+          p_reason: string
+          p_reference?: string
+          p_residual_size: number
+        }
+        Returns: Json
+      }
       create_assets_from_request: {
         Args: { p_request_id: string }
         Returns: {
@@ -21664,16 +21682,19 @@ export type Database = {
           location_id: string
           location_name: string
           notes: string
+          original_piece_count: number
           parent_item_code: string
           parent_item_id: string
           parent_item_name: string
           parent_item_status: string
           piece_code: string
+          piece_count: number
           secondary_uom: string
           size_uom: string
           size_value: number
           source_ref: string
           status: string
+          total_size_value: number
           track_secondary_quantity: boolean
           unit_cost: number
           updated_at: string

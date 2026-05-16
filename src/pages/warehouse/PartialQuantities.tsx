@@ -81,9 +81,10 @@ function buildGroups(rows: PartialPieceRow[]): GroupRow[] {
       map.set(r.parent_item_id, g);
     }
     g.pieces.push(r);
-    g.piece_count += 1;
+    const qty = Math.max(1, Math.trunc(Number(r.piece_count) || 1));
+    g.piece_count += qty;
     const uom = (r.size_uom || "").trim() || "—";
-    g.totals_by_uom[uom] = (g.totals_by_uom[uom] || 0) + Number(r.size_value || 0);
+    g.totals_by_uom[uom] = (g.totals_by_uom[uom] || 0) + Number(r.size_value || 0) * qty;
     g.status_counts[r.status] = (g.status_counts[r.status] || 0) + 1;
     if (r.age_days > g.oldest_age_days) g.oldest_age_days = r.age_days;
   }
@@ -109,13 +110,17 @@ function flattenGroups(groups: GroupRow[], expanded: Set<string>): AnyRow[] {
 }
 
 function toCsv(rows: PartialPieceRow[]): string {
-  const head = ["piece_code","parent_item_code","parent_item_name","size_value","size_uom","location","bin","status","source_ref","batch_number","unit_cost","label","age_days","created_at"];
-  const body = rows.map(r => [
-    r.piece_code, r.parent_item_code, r.parent_item_name,
-    r.size_value, r.size_uom, r.location_name, r.bin_code ?? "",
-    r.status, r.source_ref ?? "", r.batch_number ?? "",
-    r.unit_cost ?? "", r.label ?? "", r.age_days, r.created_at,
-  ].map(v => `"${String(v ?? "").replace(/"/g, '""')}"`).join(","));
+  const head = ["piece_code","parent_item_code","parent_item_name","size_value","quantity","total_size","size_uom","location","bin","status","source_ref","batch_number","unit_cost","label","age_days","created_at"];
+  const body = rows.map(r => {
+    const qty = Math.max(1, Math.trunc(Number(r.piece_count) || 1));
+    return [
+      r.piece_code, r.parent_item_code, r.parent_item_name,
+      r.size_value, qty, Number(r.size_value) * qty,
+      r.size_uom, r.location_name, r.bin_code ?? "",
+      r.status, r.source_ref ?? "", r.batch_number ?? "",
+      r.unit_cost ?? "", r.label ?? "", r.age_days, r.created_at,
+    ].map(v => `"${String(v ?? "").replace(/"/g, '""')}"`).join(",");
+  });
   return [head.join(","), ...body].join("\n");
 }
 
@@ -276,9 +281,12 @@ export default function PartialQuantities() {
             </div>
           );
         }
+        const qty = Math.max(1, Math.trunc(Number(r.piece_count) || 1));
         return (
           <span className="tabular-nums">
-            {fmtNum(Number(r.size_value))} {r.size_uom}
+            {qty > 1
+              ? `${qty} × ${fmtNum(Number(r.size_value))} ${r.size_uom} = ${fmtNum(qty * Number(r.size_value))} ${r.size_uom}`
+              : `${fmtNum(Number(r.size_value))} ${r.size_uom}`}
           </span>
         );
       },

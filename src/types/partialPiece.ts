@@ -12,6 +12,9 @@ export interface PartialPieceRow extends Record<string, unknown> {
   parent_item_status?: string | null;
   size_value: number;
   size_uom: string;
+  piece_count: number;
+  original_piece_count: number;
+  total_size_value: number;
   location_id: string;
   location_name: string;
   bin_id: string | null;
