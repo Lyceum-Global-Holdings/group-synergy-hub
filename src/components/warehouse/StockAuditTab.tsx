@@ -214,7 +214,7 @@ export function StockAuditTab() {
     }
 
     const { data: itemsWithLocation } = await supabase
-      .from('warehouse_items')
+      .from('warehouse_items_full')
       .select('id, location_id')
       .in('id', itemIds);
 

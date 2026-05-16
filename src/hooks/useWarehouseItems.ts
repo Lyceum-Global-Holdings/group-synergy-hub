@@ -27,7 +27,7 @@ export const useWarehouseItems = (options?: { skipCompanyFilter?: boolean; disab
 
       while (true) {
         let query = supabase
-          .from('warehouse_items')
+          .from('warehouse_items_full')
           .select(`
             *,
             supplier:suppliers(id, name)
@@ -261,7 +261,7 @@ export const useWarehouseItems = (options?: { skipCompanyFilter?: boolean; disab
       // Master edits: resolve catalog_item_id from the inventory row, then RPC.
       if (Object.keys(master).length > 0) {
         const { data: row, error: rowErr } = await supabase
-          .from('warehouse_items')
+          .from('warehouse_items_full')
           .select('catalog_item_id')
           .eq('id', id)
           .single();
@@ -287,7 +287,7 @@ export const useWarehouseItems = (options?: { skipCompanyFilter?: boolean; disab
         data = updated;
       } else {
         const { data: refreshed } = await supabase
-          .from('warehouse_items')
+          .from('warehouse_items_full')
           .select()
           .eq('id', id)
           .single();

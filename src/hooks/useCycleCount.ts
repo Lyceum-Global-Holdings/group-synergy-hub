@@ -290,7 +290,7 @@ export const usePostCycleCountAdjustments = () => {
         if (item.variance_quantity && item.variance_quantity !== 0) {
           // Get current stock
           const { data: warehouseItem } = await supabase
-            .from("warehouse_items")
+            .from("warehouse_items_full")
             .select("current_stock")
             .eq("id", item.warehouse_item_id)
             .single();

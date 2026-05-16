@@ -83,7 +83,7 @@ export const useStockMovementReport = () => {
       for (let i = 0; i < itemIds.length; i += 500) {
         const chunk = itemIds.slice(i, i + 500);
         const { data, error: itemsError } = await supabase
-          .from('warehouse_items')
+          .from('warehouse_items_full')
           .select(`
             id,
             item_code,

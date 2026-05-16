@@ -315,7 +315,7 @@ export function useWarehouseBinAllocations(options?: { disableFetch?: boolean })
 
       // ============ STEP 1: Batch reconcile via RPC ============
       const { data: items, error: itemsError } = await supabase
-        .from('warehouse_items')
+        .from('warehouse_items_full')
         .select('id, location_id')
         .eq('company_id', selectedCompany.id)
         .eq('status', 'active');
@@ -627,7 +627,7 @@ export function useWarehouseBinAllocations(options?: { disableFetch?: boolean })
       
       // Step 1: Get all items with their location_id
       const { data: items, error: itemsError } = await supabase
-        .from('warehouse_items')
+        .from('warehouse_items_full')
         .select('id, location_id, name, item_code')
         .not('location_id', 'is', null);
       

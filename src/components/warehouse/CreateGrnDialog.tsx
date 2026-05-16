@@ -146,7 +146,7 @@ export function CreateGrnDialog({ open, onOpenChange, poId }: CreateGrnDialogPro
       let trackingFlags: Record<string, { is_batch_tracked: boolean; is_serialized: boolean; track_secondary_quantity: boolean; secondary_uom: string | null }> = {};
       if (warehouseItemIds.length > 0) {
         const { data: warehouseItems } = await supabase
-          .from('warehouse_items')
+          .from('warehouse_items_full')
           .select('id, is_batch_tracked, is_serialized, track_secondary_quantity, secondary_uom')
           .in('id', warehouseItemIds);
 
