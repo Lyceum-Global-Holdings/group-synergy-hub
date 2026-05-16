@@ -873,7 +873,7 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
         // Prefer the globally-selected location so history is scoped to bins at that physical site.
         const scopeLocationId = globalLocationId ?? stockMovementItem.location_id ?? null;
         const scopeLocationName =
-          allLocations.find((l) => l.id === scopeLocationId)?.name ?? null;
+          scopeLocationId ? locationNameById.get(scopeLocationId) ?? null : null;
         return (
           <Suspense fallback={null}>
             <StockMovementDialog
