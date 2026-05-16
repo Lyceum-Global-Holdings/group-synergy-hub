@@ -38,7 +38,11 @@ export function BulkBinScopeDialog({ open, onOpenChange, bins }: Props) {
   const [mode, setMode] = useState<'clone' | 'replace'>('clone');
   const [global, setGlobal] = useState(false);
 
-  const locationOptions = useMemo(() => buildLocationOptions(locations, { activeOnly: true }), [locations]);
+  // Bins live at the warehouse (root) level; only top-level locations are valid targets.
+  const locationOptions = useMemo(
+    () => buildLocationOptions(locations, { activeOnly: true }).filter((o) => o.depth === 0),
+    [locations]
+  );
 
   const reset = () => {
     setCompanyIds([]);
