@@ -127,6 +127,11 @@ export function useWarehouseItemCatalog(options?: { disableFetch?: boolean }) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: CATALOG_QUERY_KEY });
+      // Stage 2 AFTER trigger propagates mirrored fields to every company's
+      // warehouse_items row — refresh those caches too.
+      queryClient.invalidateQueries({ queryKey: ['warehouse-items'] });
+      queryClient.invalidateQueries({ queryKey: ['warehouse-inventory-page'] });
+      queryClient.invalidateQueries({ queryKey: ['warehouse-catalog-page'] });
       toast({ title: 'Success', description: 'Catalog item updated successfully' });
     },
     onError: (error: any) => {
