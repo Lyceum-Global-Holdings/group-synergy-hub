@@ -1,98 +1,98 @@
-## Goal
 
-Keep Partial Pieces tightly synced with Item Master so:
+## Problem
 
-1. **Edits to Item Master appear live** in the Partial Pieces list, group headers, exports and filters.
-2. **UOM / unit-cost defaults propagate** to existing *available* partial pieces when the item's defaults change.
-3. **All active items in Item Master are pickable** in the Partial Pieces parent-item filter (not only items that already have pieces).
+Today each `warehouse_partial_pieces` row represents **exactly one** physical piece of a given `size_value` + `size_uom`. If a user has 5 identical 2.30 m offcuts, they must create 5 rows (or use bulk mode and type 5 lines). The Add dialog only captures `size`, never quantity.
 
-## Behavior
+## International standard we follow
 
-### 1. Live reflection of Item Master edits
+Aligning with **SAP EWM Handling Units**, **Oracle WMS Catch-Weight / Dual-UOM**, and **GS1 Logistic Unit (SSCC) variable-measure** semantics:
 
-- `list_partial_pieces` and `list_partial_piece_items` already join `warehouse_items` for display fields. Confirm columns selected: `item_code`, `item_name`, `base_uom`, `secondary_uom`, `track_secondary_quantity`, `unit_cost`. Add the ones missing so the UI never reads stale denormalized data.
-- React Query wiring: when item master mutations succeed (`useUpsertWarehouseItem`, bulk import, category/UOM edits), invalidate `["partial-pieces"]` and `["partial-piece-items"]` in addition to existing keys.
-- Realtime: extend the shared realtime bus subscription on `warehouse_items` to also invalidate the two partial-piece query keys (debounced, company-scoped) so other open tabs refresh.
+- A partial-piece record is a **handling group** of `N` identical pieces.
+- Each piece has a measured size in the size UOM (the "variable measure" / catch quantity).
+- The base-UOM stock value = `piece_count × size_value` (converted to base UOM where applicable). This stays consistent with the existing dual-quantity-tracking memo (base UOM is canonical for valuation/FIFO; the secondary count is informational).
+- Consumption, reservation, scrap and split operate on **whole pieces first**, then on the residual size of the last piece (matches EWM "partial consumption of an HU").
 
-### 2. Picker shows every active item (not just items with pieces)
+## Scope of change
 
-- Replace `usePartialPieceItems` source with the existing item-master list used by `AddPartialPieceDialog` (`useWarehouseItems` / `ItemSelector`), respecting the global location filter for stock visibility but **not** filtering out items with zero pieces.
-- Group rows for items without any pieces are not rendered in the table (the table is about existing pieces), but the **parent-item filter dropdown** at the top of `PartialQuantities` will list every active item. Show a small "0 pieces" hint next to items that have none.
-- Keep `list_partial_piece_items` for the legacy "items that have pieces" use cases (badge counts), but switch the filter dropdown to the full master.
+### 1. Data model (single migration)
 
-### 3. Default propagation on Item Master update
+Add to `warehouse_partial_pieces`:
 
-New DB trigger `trg_warehouse_items_propagate_defaults` on `warehouse_items` AFTER UPDATE:
+| Column | Type | Notes |
+|---|---|---|
+| `piece_count` | `integer NOT NULL DEFAULT 1 CHECK (piece_count >= 1)` | identical pieces in this record |
+| `original_piece_count` | `integer NOT NULL DEFAULT 1` | captured at creation, never mutated |
 
-- When `base_uom` or `secondary_uom` change: update `warehouse_partial_pieces.size_uom` for rows where `status = 'available'`, `parent_item_id = NEW.id`, and `size_uom = OLD.secondary_uom OR OLD.base_uom` (i.e. rows still on the old default). Rows with a custom UOM are left alone.
-- When `unit_cost` changes: update `warehouse_partial_pieces.unit_cost` for rows where `status = 'available'`, `parent_item_id = NEW.id`, and `unit_cost = OLD.unit_cost` (still at old default; custom overrides preserved). Consumed/scrapped/reserved pieces are never touched (historical cost integrity).
-- Trigger is `SECURITY DEFINER`, sets `search_path = public`, and is wrapped in a single statement per column group to keep it cheap. Adds a row to `audit_logs` summarising affected piece count.
+Backfill: `piece_count = 1`, `original_piece_count = 1` for all existing rows (current behaviour preserved exactly).
 
-### 4. Frontend invalidations
+Generated helper view column (optional) `total_size_value = piece_count * size_value` exposed by `list_partial_pieces` for UI display only.
 
-- `useUpsertWarehouseItem` and bulk-item-import success handlers: add `qc.invalidateQueries({ queryKey: ["partial-pieces"] })` and `["partial-piece-items"]`.
-- `usePartialPieces` keeps `staleTime: 0`; `usePartialPieceItems` already at 30 s — fine.
+### 2. RPCs (same migration)
 
-## Technical Details
+- `create_partial_piece` payload accepts `piece_count` (default 1). When > 1, generated `piece_code` becomes `…/PQ-NNNN` for the group and individual labels get a `#k` suffix only if the user opts in.
+- `bulk_create_partial_pieces`: each row accepts `piece_count`.
+- `issue_partial_quantity(p_piece_id, p_pieces, p_residual_size, …)` — new signature:
+  - Decrement `piece_count` by `p_pieces` (whole pieces consumed).
+  - If `p_residual_size > 0`, also reduce the **last** remaining piece's `size_value` by that residual (creates a smaller successor row, original group moved to `consumed` when `piece_count` hits 0).
+  - Keeps existing single-piece behaviour when caller passes `piece_count = 1` (back-compat shim retained for one release).
+- `split_partial_piece`: unchanged for size split; new `split_group_off(p_piece_id, p_pieces_to_split_off)` to peel `k` pieces into a new record (common EWM "HU split").
+- `list_partial_pieces` returns `piece_count`, `original_piece_count`, `total_size_value`.
 
-**Migration**
+Stock-ledger writes use `quantity_change = -(p_pieces × size_value + p_residual_size)` in base UOM and `secondary_quantity_change = -p_pieces` so the ledger continues to satisfy the `stock-ledger-immutable-balances` rule.
 
-```sql
-CREATE OR REPLACE FUNCTION public.warehouse_items_propagate_defaults()
-RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
-DECLARE
-  v_uom_updates int := 0;
-  v_cost_updates int := 0;
-BEGIN
-  IF NEW.base_uom IS DISTINCT FROM OLD.base_uom
-     OR NEW.secondary_uom IS DISTINCT FROM OLD.secondary_uom THEN
-    UPDATE warehouse_partial_pieces
-       SET size_uom = COALESCE(NEW.secondary_uom, NEW.base_uom),
-           updated_at = now()
-     WHERE parent_item_id = NEW.id
-       AND status = 'available'
-       AND size_uom IS NOT DISTINCT FROM COALESCE(OLD.secondary_uom, OLD.base_uom);
-    GET DIAGNOSTICS v_uom_updates = ROW_COUNT;
-  END IF;
+### 3. UI — `AddPartialPieceDialog`
 
-  IF NEW.unit_cost IS DISTINCT FROM OLD.unit_cost THEN
-    UPDATE warehouse_partial_pieces
-       SET unit_cost = NEW.unit_cost,
-           updated_at = now()
-     WHERE parent_item_id = NEW.id
-       AND status = 'available'
-       AND unit_cost IS NOT DISTINCT FROM OLD.unit_cost;
-    GET DIAGNOSTICS v_cost_updates = ROW_COUNT;
-  END IF;
+Single tab gains a **Qty (pieces)** input next to **Size**:
 
-  IF v_uom_updates + v_cost_updates > 0 THEN
-    INSERT INTO audit_logs (company_id, entity_type, entity_id, action, payload)
-    VALUES (NEW.company_id, 'warehouse_item', NEW.id,
-            'partial_pieces_defaults_propagated',
-            jsonb_build_object('uom_updates', v_uom_updates, 'cost_updates', v_cost_updates));
-  END IF;
-
-  RETURN NEW;
-END $$;
-
-CREATE TRIGGER trg_warehouse_items_propagate_defaults
-AFTER UPDATE OF base_uom, secondary_uom, unit_cost ON warehouse_items
-FOR EACH ROW EXECUTE FUNCTION public.warehouse_items_propagate_defaults();
+```text
+Size *           Qty *           UOM *
+[  2.30  ]       [   5  ]        [  m  ▾]
+                 → Total: 11.50 m (5 × 2.30 m)
 ```
 
-**RPC update**: ensure `list_partial_pieces` returns `secondary_uom` and `track_secondary_quantity` (so UI hints stay correct after master edits).
+- `Qty` default `1`, min `1`, integer.
+- Live total preview under the inputs.
+- Piece-code hint becomes `…/PQ-NNNN` (group code) plus a checkbox **"Generate individual piece codes (#1…#N)"** for users who need per-piece traceability.
 
-**Files**
+Bulk tab gets a new **Qty** column between Size and Piece code; running total at the top becomes `Σ qty pieces · Σ (qty×size) {uom}`.
 
-- New migration: `supabase/migrations/<ts>_partial_pieces_master_sync.sql` (function + trigger + RPC refresh).
-- `src/hooks/warehouse/usePartialPieces.ts` — invalidation helper covers item master keys; (no further client logic needed).
-- `src/hooks/useWarehouseItems.ts` — on upsert/import success, also invalidate `["partial-pieces"]` and `["partial-piece-items"]`.
-- `src/pages/warehouse/PartialQuantities.tsx` — parent-item filter dropdown sources from `useWarehouseItems` (filtered to `status='active'`) instead of `usePartialPieceItems`; show "0 pieces" hint where applicable.
-- Realtime bus: add `warehouse_items` channel handler that debounce-invalidates the two partial-piece keys.
-- Memory note: `mem://architecture/partial-pieces-item-master-sync.md` documenting the propagation rules (only `available` rows updated; historical cost on consumed pieces preserved).
+### 4. Consume / Issue dialog
+
+`ConsumePartialPieceDialog` switches from "enter quantity ≤ size" to a two-field UX:
+
+```text
+Pieces to consume: [  2  ] of 5      Residual size on last piece: [ 0.00 ] m
+Total consumed: 4.60 m
+```
+
+Validation: `0 ≤ pieces ≤ piece_count`; residual only allowed when `pieces < piece_count`; `0 ≤ residual < size_value`.
+
+### 5. Lists & exports
+
+- `PartialQuantities` table shows new **Qty** column and **Total size** (computed).
+- Bulk-import CSV template (`importTemplate.ts`) gains optional `quantity` column (default 1).
+- `partial-pieces-item-master-sync` memory unchanged (still about UOM/cost propagation).
 
 ## Out of scope
 
-- Auto-creating placeholder pieces for new items (explicitly not requested).
-- Backfilling/rewriting historical UOM or cost on consumed/scrapped/reserved pieces.
-- Cross-company propagation (multi-tenant isolation untouched).
+- Mixed-size groups (each record still = identical pieces). Different sizes still mean different rows.
+- Per-piece serial numbers / GS1 SSCC printing — separate request.
+- Retro-grouping of existing single-piece records.
+
+## Files touched
+
+- `supabase/migrations/<ts>_partial_pieces_qty.sql` (schema + RPCs)
+- `src/types/partialPiece.ts` (add `piece_count`, `original_piece_count`, `total_size_value`)
+- `src/components/warehouse/partial-qty/AddPartialPieceDialog.tsx` (Qty input + bulk column + totals)
+- `src/components/warehouse/partial-qty/ConsumePartialPieceDialog.tsx` (pieces + residual)
+- `src/components/warehouse/partial-qty/importTemplate.ts` (CSV column)
+- `src/hooks/warehouse/usePartialPieces.ts` (payload + types)
+- `src/pages/warehouse/PartialQuantities.tsx` (Qty + Total columns)
+- `.lovable/memory/architecture/partial-pieces-handling-unit.md` (new memo) + index update
+
+## Acceptance
+
+- Creating "Size 2.30 m, Qty 5" produces one row with `piece_count=5`, `total_size_value=11.50 m`.
+- Issuing 2 pieces leaves `piece_count=3`, ledger entry `-4.60 m / -2 pcs`.
+- Issuing 5 pieces moves the row to `consumed`.
+- Existing rows continue to behave identically (qty=1).
