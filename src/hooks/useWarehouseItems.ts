@@ -182,24 +182,32 @@ export const useWarehouseItems = (options?: { skipCompanyFilter?: boolean; disab
         throw new Error(`Catalog entry missing for item_code ${itemDataWithoutStock.item_code}. Create the catalog row first.`);
       }
 
-      // Stage 2: mirrored master fields (name, category_id, brand, sku, etc.) are
-      // overwritten from warehouse_item_catalog by the wh_items_sync_from_catalog
-      // BEFORE trigger. Any values supplied here for those columns are ignored —
-      // catalog always wins. Per-company fields (location_id, base_uom, unit_cost,
-      // selling_price, reorder/min/max, status, notes, stock) remain writable.
-      const { data, error } = await supabase
-        .from('warehouse_items')
-        .insert({
-          ...itemDataWithoutStock,
-          catalog_item_id: catalogRow.id,
-          company_id: selectedCompany.id,
-          created_by: user.id
-        })
-        .select()
-        .single();
-
+      // Stage 6: mirrored master fields no longer live on warehouse_items.
+      // Use upsert_warehouse_inventory RPC for per-company fields only.
+      const { data: newId, error } = await supabase.rpc('upsert_warehouse_inventory', {
+        p_company_id: selectedCompany.id,
+        p_catalog_item_id: catalogRow.id,
+        p_location_id: itemDataWithoutStock.location_id ?? null,
+        p_base_uom: itemDataWithoutStock.base_uom ?? null,
+        p_secondary_uom: itemDataWithoutStock.secondary_uom ?? null,
+        p_track_secondary: itemDataWithoutStock.track_secondary_quantity ?? false,
+        p_reorder_level: itemDataWithoutStock.reorder_level ?? null,
+        p_min_stock_level: itemDataWithoutStock.min_stock_level ?? null,
+        p_max_stock_level: itemDataWithoutStock.max_stock_level ?? null,
+        p_unit_cost: itemDataWithoutStock.unit_cost ?? null,
+        p_selling_price: itemDataWithoutStock.selling_price ?? null,
+        p_status: itemDataWithoutStock.status ?? 'active',
+        p_notes: itemDataWithoutStock.notes ?? null,
+      });
       if (error) throw error;
-      return { item: data, initialStock, initialUnitCost };
+
+      const { data: row, error: rowErr } = await supabase
+        .from('warehouse_items_full')
+        .select('*')
+        .eq('id', newId as unknown as string)
+        .single();
+      if (rowErr) throw rowErr;
+      return { item: row, initialStock, initialUnitCost };
     },
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ['warehouse-items'] });
