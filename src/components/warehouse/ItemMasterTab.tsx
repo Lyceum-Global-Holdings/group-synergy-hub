@@ -258,26 +258,33 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
         if (locationBinIds.length === 0) return {};
       }
 
-      // Fetch allocations with cursor-based batching
+      // Fetch allocations with cursor-based batching. If a warehouse has >500
+      // bins, chunk the scoped bin IDs; PostgREST `.in()` URLs become too large
+      // and the old code silently ignored every bin after the first chunk.
       const allocations: { warehouse_item_id: string; bin_id: string; available_quantity: number }[] = [];
-      let lastAllocId: string | null = null;
-      while (true) {
-        let q = supabase
-          .from('warehouse_bin_allocations')
-          .select('id, warehouse_item_id, bin_id, available_quantity')
-          .gt('available_quantity', 0)
-          .order('id')
-          .limit(1000);
-        if (lastAllocId) q = q.gt('id', lastAllocId);
-        if (locationBinIds) {
-          q = q.in('bin_id', locationBinIds.slice(0, 500));
+      const binChunks = locationBinIds
+        ? Array.from({ length: Math.ceil(locationBinIds.length / 500) }, (_, i) => locationBinIds!.slice(i * 500, i * 500 + 500))
+        : [null];
+
+      for (const binChunk of binChunks) {
+        let lastAllocId: string | null = null;
+        while (true) {
+          let q = supabase
+            .from('warehouse_bin_allocations')
+            .select('id, warehouse_item_id, bin_id, available_quantity')
+            .gt('available_quantity', 0)
+            .order('id')
+            .limit(1000);
+          if (lastAllocId) q = q.gt('id', lastAllocId);
+          if (binChunk) q = q.in('bin_id', binChunk);
+
+          const { data, error: allocError } = await q;
+          if (allocError) throw allocError;
+          if (!data || data.length === 0) break;
+          allocations.push(...data);
+          if (data.length < 1000) break;
+          lastAllocId = data[data.length - 1].id;
         }
-        const { data, error: allocError } = await q;
-        if (allocError) throw allocError;
-        if (!data || data.length === 0) break;
-        allocations.push(...data);
-        if (data.length < 1000) break;
-        lastAllocId = data[data.length - 1].id;
       }
 
       if (allocations.length === 0) return {};
