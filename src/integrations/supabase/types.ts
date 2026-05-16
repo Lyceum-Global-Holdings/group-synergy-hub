@@ -21700,6 +21700,46 @@ export type Database = {
           updated_at: string
         }[]
       }
+      list_warehouse_catalog: {
+        Args: {
+          _category_id?: string
+          _cursor_created_at?: string
+          _cursor_id?: string
+          _limit?: number
+          _search?: string
+          _status?: string
+          _supplier_id?: string
+        }
+        Returns: {
+          barcode: string
+          brand: string
+          category_id: string
+          category_name: string
+          created_at: string
+          description: string
+          id: string
+          image_url: string
+          is_batch_tracked: boolean
+          is_serialized: boolean
+          item_code: string
+          manufacturer: string
+          max_stock_level: number
+          min_stock_level: number
+          name: string
+          notes: string
+          reorder_level: number
+          selling_price: number
+          sku: string
+          status: string
+          supplier_id: string
+          supplier_name: string
+          total_count: number
+          unit_cost: number
+          unit_id: string
+          unit_name: string
+          updated_at: string
+        }[]
+      }
       list_warehouse_inventory: {
         Args: {
           _category_id?: string
