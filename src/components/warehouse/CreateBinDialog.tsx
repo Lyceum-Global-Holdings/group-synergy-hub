@@ -75,8 +75,13 @@ export function CreateBinDialog({ open, onOpenChange, editingBin }: CreateBinDia
     setCodeError(null);
   }, [editingBin, open]);
 
+  // Bins live at the warehouse (root) level. Sub-locations and departments
+  // automatically inherit access — matches SAP EWM / Oracle WMS storage-bin model.
   const sortedLocations = useMemo(
-    () => [...locations].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })),
+    () =>
+      [...locations]
+        .filter((l) => !l.parent_id)
+        .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })),
     [locations]
   );
 
