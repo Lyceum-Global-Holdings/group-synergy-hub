@@ -173,16 +173,25 @@ export function AddPartialPieceDialog({ open, onOpenChange, defaultParentItemId 
     () => rows.filter(r => r.size_value.trim() !== "" && Number(r.size_value) > 0),
     [rows],
   );
+  const totalPieces = useMemo(
+    () => filledRows.reduce((s, r) => s + Math.max(1, Math.trunc(Number(r.piece_count) || 1)), 0),
+    [filledRows],
+  );
   const totalSize = useMemo(
-    () => filledRows.reduce((s, r) => s + Number(r.size_value || 0), 0),
+    () =>
+      filledRows.reduce(
+        (s, r) => s + Number(r.size_value || 0) * Math.max(1, Math.trunc(Number(r.piece_count) || 1)),
+        0,
+      ),
     [filledRows],
   );
 
   // ---- Submit (single) ----
   async function submitSingle() {
     if (!selectedCompany?.id) return;
-    if (!parentItemId || !locationId || !sizeValue || !sizeUom) {
-      toast({ title: "Missing required fields", variant: "destructive" });
+    const qtyNum = Math.trunc(Number(pieceQty) || 0);
+    if (!parentItemId || !locationId || !sizeValue || !sizeUom || qtyNum < 1) {
+      toast({ title: "Missing required fields", description: "Size, Qty (≥1), UOM, item and location are required.", variant: "destructive" });
       return;
     }
     try {
@@ -191,6 +200,7 @@ export function AddPartialPieceDialog({ open, onOpenChange, defaultParentItemId 
         parent_item_id: parentItemId,
         size_value: Number(sizeValue),
         size_uom: sizeUom || null,
+        piece_count: qtyNum,
         location_id: locationId,
         bin_id: binId || null,
         piece_code: pieceCode.trim() || null,
