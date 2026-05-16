@@ -28,6 +28,7 @@ export function BinMasterTab() {
   const [editingBin, setEditingBin] = useState<WarehouseBin | null>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [isBulkScopeOpen, setIsBulkScopeOpen] = useState(false);
+  const [relocatingBin, setRelocatingBin] = useState<WarehouseBin | null>(null);
 
   const { bins, isLoading, deleteBin, isDeleting } = useWarehouseBins();
   const { locations } = useWarehouseLocations();
