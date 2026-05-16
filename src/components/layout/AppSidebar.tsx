@@ -1,4 +1,5 @@
 import { NavLink, useLocation } from "react-router-dom";
+import { preloadRoute } from "@/lib/routePreloader";
 import { useSuperAdmin } from "@/hooks/useSuperAdmin";
 import {
   Building2,
