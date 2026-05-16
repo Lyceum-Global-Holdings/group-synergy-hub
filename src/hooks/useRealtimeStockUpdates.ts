@@ -19,7 +19,11 @@ export function useRealtimeStockUpdates() {
       const cid = (payload?.new ?? payload?.old)?.company_id;
       scheduleInvalidate(queryClient, ["warehouse-bin-allocations", cid]);
       scheduleInvalidate(queryClient, ["all-items-location-stock", cid]);
-      scheduleInvalidate(queryClient, ["warehouse-items"]);
+      // Inventory list RPC key — refreshes the on-screen inventory table.
+      scheduleInvalidate(queryClient, ["warehouse-items-inventory"]);
+      // NOTE: intentionally do NOT invalidate the bulk ["warehouse-items"] key
+      // here — that hook full-fetches the entire catalog and is only used by
+      // bulk/import dialogs, not by the live inventory view.
     },
     [queryClient],
   );
@@ -28,6 +32,7 @@ export function useRealtimeStockUpdates() {
     (_payload: any) => {
       scheduleInvalidate(queryClient, ["warehouse-bins"]);
       scheduleInvalidate(queryClient, ["all-items-location-stock"]);
+      scheduleInvalidate(queryClient, ["warehouse-items-inventory"]);
     },
     [queryClient],
   );

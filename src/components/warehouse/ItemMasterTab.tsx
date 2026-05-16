@@ -233,6 +233,20 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
     [allLocations]
   );
 
+  // O(1) lookup maps — replaces O(n*m) .find() calls in the render loop
+  const categoryById = useMemo(
+    () => new Map(categories.map((c) => [c.id, c])),
+    [categories]
+  );
+  const unitById = useMemo(
+    () => new Map(units.map((u) => [u.id, u])),
+    [units]
+  );
+  const companyById = useMemo(
+    () => new Map(companies.map((c) => [c.id, c])),
+    [companies]
+  );
+
   // The inventory RPC already returns location-scoped stock for the selected
   // location/subtree. Keep the UI summary derived from those canonical rows.
   const itemLocationStock = useMemo<ItemLocationStockMap>(() => {
@@ -575,7 +589,7 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
                 <TableCell colSpan={visibleCount + 1} className="text-center py-8 text-muted-foreground">
                   {globalLocationId && selectedCompany?.name
                     ? `No inventory for ${selectedCompany.name} at ${
-                        allLocations.find((l: any) => l.id === globalLocationId)?.name ?? 'this location'
+                        locationNameById.get(globalLocationId) ?? 'this location'
                       }.`
                     : 'No items found. Create your first item to get started.'}
                 </TableCell>
@@ -627,16 +641,16 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
                   </TableCell>
                   {col('category') && (
                     <TableCell>
-                      {item.category_id 
-                        ? categories.find(c => c.id === item.category_id)?.name || '-'
+                      {item.category_id
+                        ? categoryById.get(item.category_id)?.name || '-'
                         : '-'
                       }
                     </TableCell>
                   )}
                   {col('unit') && (
                     <TableCell>
-                      {item.unit_id 
-                        ? units.find(u => u.id === item.unit_id)?.abbreviation || '-'
+                      {item.unit_id
+                        ? unitById.get(item.unit_id)?.abbreviation || '-'
                         : '-'
                       }
                     </TableCell>
@@ -676,8 +690,8 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
                   )}
                   {col('company') && (
                     <TableCell>
-                      {item.company_id 
-                        ? companies.find(c => c.id === item.company_id)?.name || '-'
+                      {item.company_id
+                        ? companyById.get(item.company_id)?.name || '-'
                         : 'All Companies'
                       }
                     </TableCell>
@@ -859,7 +873,7 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
         // Prefer the globally-selected location so history is scoped to bins at that physical site.
         const scopeLocationId = globalLocationId ?? stockMovementItem.location_id ?? null;
         const scopeLocationName =
-          allLocations.find((l) => l.id === scopeLocationId)?.name ?? null;
+          scopeLocationId ? locationNameById.get(scopeLocationId) ?? null : null;
         return (
           <Suspense fallback={null}>
             <StockMovementDialog
