@@ -246,14 +246,15 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
   const { data: itemLocationStock = {} } = useQuery<ItemLocationStockMap>({
     queryKey: ['all-items-location-stock', globalLocationId],
     queryFn: async () => {
-      // When a specific location is selected, pre-fetch its bin IDs for scoping
+      // When a specific location is selected, resolve to the full warehouse
+      // subtree (root + all sub-locations). Bins are warehouse-root scoped, so
+      // exact location equality hides stock when a sub-location is selected.
       let locationBinIds: string[] | null = null;
       if (globalLocationId) {
-        const { data: locBins } = await supabase
-          .from('warehouse_bins')
-          .select('id')
-          .eq('location_id', globalLocationId);
-        locationBinIds = locBins?.map(b => b.id) || [];
+        const { data: locBins, error: locBinsError } = await (supabase as any)
+          .rpc('get_subtree_bin_ids', { p_location_id: globalLocationId });
+        if (locBinsError) throw locBinsError;
+        locationBinIds = locBins?.map((b: { id: string }) => b.id) || [];
         if (locationBinIds.length === 0) return {};
       }
 
