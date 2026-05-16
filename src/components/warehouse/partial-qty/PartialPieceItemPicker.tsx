@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Check, ChevronsUpDown, Package } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -30,23 +30,45 @@ interface Props {
   disabled?: boolean;
 }
 
+const PAGE_SIZE = 100;
+
 /**
- * Lightweight parent-item picker for partial pieces.
- * Sourced from `list_partial_piece_items` RPC (single query, all active items),
- * which is realtime-invalidated on Item Master changes — so newly added or
- * edited items appear immediately without re-fetching the heavy warehouse_items
- * list with allocations.
+ * Parent-item picker for partial pieces.
+ *
+ * Sourced from `list_partial_piece_items` RPC with server-side search and
+ * pagination — supports the full Item Master (~15k items) without hitting
+ * the 1,000-row REST cap or rendering everything into cmdk.
  */
 export function PartialPieceItemPicker({
   value, onSelect, placeholder = "Search by item code or name…", className, disabled,
 }: Props) {
   const [open, setOpen] = useState(false);
-  const { data: items = [], isLoading } = usePartialPieceItems();
+  const [query, setQuery] = useState("");
+  const [debounced, setDebounced] = useState("");
+  const [lastSelected, setLastSelected] = useState<PartialPieceItemOption | null>(null);
 
-  const selected = useMemo(
-    () => items.find(i => i.catalog_item_id === value) || null,
-    [items, value],
-  );
+  // Debounce search input to limit RPC calls.
+  useEffect(() => {
+    const t = setTimeout(() => setDebounced(query.trim()), 200);
+    return () => clearTimeout(t);
+  }, [query]);
+
+  const { data: items = [], isFetching } = usePartialPieceItems({
+    search: debounced,
+    limit: PAGE_SIZE,
+  });
+
+  // The current results may not contain the previously selected item; keep
+  // it cached so the trigger label remains correct after search narrows.
+  const selected = useMemo(() => {
+    if (!value) return null;
+    const inResults = items.find(i => i.catalog_item_id === value);
+    if (inResults) return inResults;
+    if (lastSelected && lastSelected.catalog_item_id === value) return lastSelected;
+    return null;
+  }, [items, value, lastSelected]);
+
+  const totalCount = items[0]?.total_count;
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -74,10 +96,16 @@ export function PartialPieceItemPicker({
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-[420px] p-0" align="start">
-        <Command>
-          <CommandInput placeholder="Search items by code or name..." />
+        <Command shouldFilter={false}>
+          <CommandInput
+            placeholder="Search items by code or name..."
+            value={query}
+            onValueChange={setQuery}
+          />
           <CommandList>
-            <CommandEmpty>{isLoading ? "Loading items…" : "No active items found."}</CommandEmpty>
+            <CommandEmpty>
+              {isFetching ? "Searching…" : "No active items found."}
+            </CommandEmpty>
             <CommandGroup>
               {selected && (
                 <CommandItem
@@ -90,12 +118,16 @@ export function PartialPieceItemPicker({
               {items.map(it => (
                 <CommandItem
                   key={it.catalog_item_id}
-                  value={`${it.item_code} ${it.item_name}`}
-                  onSelect={() => { onSelect(it); setOpen(false); }}
+                  value={it.catalog_item_id}
+                  onSelect={() => {
+                    setLastSelected(it);
+                    onSelect(it);
+                    setOpen(false);
+                  }}
                 >
                   <Check className={cn("mr-2 h-4 w-4", value === it.catalog_item_id ? "opacity-100" : "opacity-0")} />
                   <div className="flex items-center gap-2 flex-1 min-w-0">
-                    <Badge variant="outline" className="text-xs shrink-0">{it.item_code}</Badge>
+                    <Badge variant="outline" className="text-xs shrink-0">{it.item_code || "—"}</Badge>
                     <span className="font-medium truncate flex-1">{it.item_name}</span>
                     <span className="text-xs text-muted-foreground shrink-0">
                       {it.piece_count} pcs
@@ -104,6 +136,11 @@ export function PartialPieceItemPicker({
                 </CommandItem>
               ))}
             </CommandGroup>
+            {typeof totalCount === "number" && totalCount > items.length && (
+              <div className="px-3 py-2 text-xs text-muted-foreground border-t">
+                Showing {items.length} of {totalCount.toLocaleString()} items — refine your search to see more.
+              </div>
+            )}
           </CommandList>
         </Command>
       </PopoverContent>
