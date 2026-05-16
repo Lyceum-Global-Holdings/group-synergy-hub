@@ -44,7 +44,7 @@ export function PartialPieceItemPicker({
   const { data: items = [], isLoading } = usePartialPieceItems();
 
   const selected = useMemo(
-    () => items.find(i => i.parent_item_id === value) || null,
+    () => items.find(i => i.catalog_item_id === value) || null,
     [items, value],
   );
 
