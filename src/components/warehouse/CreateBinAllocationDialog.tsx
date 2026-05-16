@@ -94,17 +94,38 @@ export function CreateBinAllocationDialog({ open, onOpenChange }: CreateBinAlloc
           </div>
 
           <div className="space-y-2">
+            <Label htmlFor="location_id">Physical Location *</Label>
+            <Select
+              value={formData.location_id}
+              onValueChange={(value) => setFormData({ ...formData, location_id: value, bin_id: '' })}
+              required
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select stock location" />
+              </SelectTrigger>
+              <SelectContent>
+                {locationOptions.map(({ location, depth, breadcrumb }) => (
+                  <SelectItem key={location.id} value={location.id}>
+                    <span style={{ paddingInlineStart: `${depth * 12}px` }}>{breadcrumb}</span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
             <Label htmlFor="bin_id">Bin Location *</Label>
             <Select
               value={formData.bin_id}
               onValueChange={(value) => setFormData({ ...formData, bin_id: value })}
+              disabled={!formData.location_id}
               required
             >
               <SelectTrigger>
-                <SelectValue placeholder="Select bin" />
+                <SelectValue placeholder={formData.location_id ? 'Select bin' : 'Select location first'} />
               </SelectTrigger>
               <SelectContent>
-                {bins?.map((bin) => {
+                {filteredBins?.map((bin) => {
                   const locName = bin.location_id ? locationNameById.get(bin.location_id) : null;
                   return (
                     <SelectItem key={bin.id} value={bin.id}>
