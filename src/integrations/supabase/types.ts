@@ -19271,6 +19271,7 @@ export type Database = {
           location_id: string | null
           name: string
           notes: string | null
+          root_location_id: string | null
           status: string
           updated_at: string
         }
@@ -19288,6 +19289,7 @@ export type Database = {
           location_id?: string | null
           name: string
           notes?: string | null
+          root_location_id?: string | null
           status?: string
           updated_at?: string
         }
@@ -19305,6 +19307,7 @@ export type Database = {
           location_id?: string | null
           name?: string
           notes?: string | null
+          root_location_id?: string | null
           status?: string
           updated_at?: string
         }
@@ -19319,6 +19322,13 @@ export type Database = {
           {
             foreignKeyName: "warehouse_bins_location_id_fkey"
             columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "warehouse_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "warehouse_bins_root_location_id_fkey"
+            columns: ["root_location_id"]
             isOneToOne: false
             referencedRelation: "warehouse_locations"
             referencedColumns: ["id"]
@@ -21241,6 +21251,7 @@ export type Database = {
           version: number
         }[]
       }
+      get_root_location_id: { Args: { _location_id: string }; Returns: string }
       get_stock_bearing_locations_for_company: {
         Args: { p_company_id: string }
         Returns: {
