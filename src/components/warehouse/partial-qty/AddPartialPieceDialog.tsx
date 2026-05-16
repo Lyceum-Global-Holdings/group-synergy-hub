@@ -56,8 +56,10 @@ export function AddPartialPieceDialog({ open, onOpenChange, defaultParentItemId 
 
   const [mode, setMode] = useState<"single" | "bulk">("single");
 
-  // Shared header state (used by both modes)
-  const [parentItemId, setParentItemId] = useState("");
+  // Shared header state (used by both modes). We key on catalog_item_id since
+  // the picker now sources from the full Item Master; the per-company
+  // warehouse_items row is resolved (and created if needed) at submit time.
+  const [catalogItemId, setCatalogItemId] = useState("");
   const [locationId, setLocationId] = useState("");
   const [binId, setBinId] = useState<string>("");
   const [sizeUom, setSizeUom] = useState("");
@@ -76,8 +78,8 @@ export function AddPartialPieceDialog({ open, onOpenChange, defaultParentItemId 
   const [rows, setRows] = useState<BulkRowState[]>([emptyRow(), emptyRow(), emptyRow()]);
 
   const item = useMemo<PartialPieceItemOption | undefined>(
-    () => items.find(i => i.parent_item_id === parentItemId),
-    [items, parentItemId],
+    () => items.find(i => i.catalog_item_id === catalogItemId),
+    [items, catalogItemId],
   );
 
   useEffect(() => {
