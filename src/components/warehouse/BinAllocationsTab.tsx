@@ -26,6 +26,8 @@ import { ReturnStockFromSublocationDialog } from './ReturnStockFromSublocationDi
 import { BinAllocationQRDialog } from './BinAllocationQRDialog';
 import { generateBulkBinQRCodePdf, downloadBulkBinQRCodePdf } from '@/utils/bulkBinQRCodePdf';
 import { toast } from 'sonner';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 import type { ColumnDef } from '@tanstack/react-table';
 import type { BinAllocationWithDetails } from '@/types/warehouseReservation';
 
@@ -41,30 +43,25 @@ export function BinAllocationsTab() {
   const { globalLocationId } = useLocationFilter();
   const { locations } = useWarehouseLocations();
 
-  // Build descendant set for the selected location (root + every sub-location).
-  // Selecting a parent warehouse includes its full subtree, matching standard
-  // WMS hierarchy filter semantics.
+  const { data: scopedLocationIds = [] } = useQuery({
+    queryKey: ['location-subtree-ids', globalLocationId],
+    enabled: !!globalLocationId,
+    queryFn: async () => {
+      const { data, error } = await (supabase as any).rpc('get_location_subtree_ids', {
+        p_location_id: globalLocationId,
+      });
+      if (error) throw error;
+      return (data || []).map((r: { location_id: string }) => r.location_id);
+    },
+    staleTime: 5 * 60_000,
+  });
+
+  // Canonical WMS warehouse scope comes from the database helper: selecting any
+  // node resolves to the root warehouse + every descendant, so sub-location
+  // stock is visible under the main location and vice versa.
   const scope = useMemo(() => {
     if (!globalLocationId) return null;
-    const childrenByParent = new Map<string, string[]>();
-    for (const l of locations || []) {
-      if (l.parent_id) {
-        const arr = childrenByParent.get(l.parent_id) ?? [];
-        arr.push(l.id);
-        childrenByParent.set(l.parent_id, arr);
-      }
-    }
-    const ids = new Set<string>([globalLocationId]);
-    const stack = [globalLocationId];
-    while (stack.length) {
-      const id = stack.pop()!;
-      for (const child of childrenByParent.get(id) ?? []) {
-        if (!ids.has(child)) {
-          ids.add(child);
-          stack.push(child);
-        }
-      }
-    }
+    const ids = new Set<string>(scopedLocationIds.length ? scopedLocationIds : [globalLocationId]);
     const root = (locations || []).find((l) => l.id === globalLocationId);
     return {
       ids,
@@ -74,7 +71,7 @@ export function BinAllocationsTab() {
           : root.name
         : 'Selected location',
     };
-  }, [globalLocationId, locations]);
+  }, [globalLocationId, locations, scopedLocationIds]);
 
   // Stable per-render path resolver. Memoized so heavy filter/sort passes
   // don't re-walk the parent-FK shape for every row on every keystroke.
