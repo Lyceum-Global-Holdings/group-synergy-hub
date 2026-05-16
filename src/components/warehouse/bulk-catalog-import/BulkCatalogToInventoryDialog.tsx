@@ -94,6 +94,9 @@ export function BulkCatalogToInventoryDialog({ open, onOpenChange }: Props) {
       if (ok > 0) {
         qc.invalidateQueries({ queryKey: ['warehouse-inventory'] });
         qc.invalidateQueries({ queryKey: ['warehouse-items'] });
+        qc.invalidateQueries({ queryKey: ['warehouse-items-inventory'] });
+        qc.invalidateQueries({ queryKey: ['warehouse-bin-allocations'] });
+        qc.invalidateQueries({ queryKey: ['warehouse-bins'] });
       }
     } catch (e: any) {
       toast({ title: 'Import failed', description: e.message, variant: 'destructive' });
