@@ -91,3 +91,28 @@ Stage 5 done when: TTFB < 600 ms p75 on all warehouse routes
 ```
 
 All measurements taken from `performance_metrics` over the same 7-day window as the screenshot.
+
+---
+
+## Implementation log
+
+### Stage 3 — Heavy list rendering ✓ shipped
+- `BinAllocationsTab`: introduced `useDeferredValue` for the search input so typing no longer blocks INP. Pre-computed each row's lowercase search haystack + cached location-path once per data change in `decorated`, so per-keystroke filtering is a single `String.includes` scan instead of 4 lookups + path walk per row.
+- `getLocationPath` is now a `useCallback`-stable function; sort comparator reads the cached path.
+
+### Stage 4 — Layout stability & assets ✓ partial
+- Inter webfont now loads non-blocking via `media="print" onload="this.media='all'"` + `display=swap` to eliminate FOIT/CLS from font swap.
+- `prefers-reduced-motion` global guard added to `src/index.css` — collapses all animation/transition durations to 0.001ms for users who opt in, cutting INP budget spent on motion.
+
+### Stage 5 — Data layer ✓ partial
+- `scheduleInvalidate` default debounce raised from 250 ms → **500 ms** to coalesce realtime stampedes (bulk imports, GRN posting, stock transfers) into a single refetch per key.
+- Lookup hooks moved off `staleTime: 0` to a proper SWR window:
+  - `useWarehouseLocations`: `staleTime: 5 min, gcTime: 30 min`
+  - `useItemUnits`: `staleTime: 5 min, gcTime: 30 min`
+  - `useItemCategories`: `staleTime: 5 min, gcTime: 30 min`
+  - `useCompanies`: removed `staleTime: 0` + `refetchOnMount: 'always'`, replaced with `staleTime: 2 min, gcTime: 30 min`. Realtime + explicit invalidation still keep these fresh; navigations no longer trigger refetches.
+
+### Still open
+- Stage 3: migrate `BinAllocationsTab` / `BatchManagementTab` / `PartialQuantitiesTab` from `DataTable` → `VirtualTable` (column-API rewrite — separate PR).
+- Stage 4: AVIF/WebP `vite-imagetools` pass over PNG hero/marketing assets.
+- Stage 5: convert `useWarehouseBinAllocations` to a `SECURITY INVOKER` list RPC with keyset pagination (still full-fetches today).
