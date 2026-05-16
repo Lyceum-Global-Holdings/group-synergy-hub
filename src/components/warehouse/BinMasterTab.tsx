@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Plus, Search, Edit, Trash2, Layers } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, Layers, MoveRight } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -18,6 +18,7 @@ import { useWarehouseBins } from '@/hooks/useWarehouseBins';
 import { useWarehouseLocations } from '@/hooks/useWarehouseLocations';
 import { CreateBinDialog } from '@/components/warehouse/CreateBinDialog';
 import { BulkBinScopeDialog } from '@/components/warehouse/BulkBinScopeDialog';
+import { RelocateBinDialog } from '@/components/warehouse/RelocateBinDialog';
 import { WarehouseBin } from '@/types/itemBin';
 import { useIsAdminOrHigher } from '@/hooks/useIsAdminOrHigher';
 
@@ -27,6 +28,7 @@ export function BinMasterTab() {
   const [editingBin, setEditingBin] = useState<WarehouseBin | null>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [isBulkScopeOpen, setIsBulkScopeOpen] = useState(false);
+  const [relocatingBin, setRelocatingBin] = useState<WarehouseBin | null>(null);
 
   const { bins, isLoading, deleteBin, isDeleting } = useWarehouseBins();
   const { locations } = useWarehouseLocations();
@@ -169,8 +171,17 @@ export function BinMasterTab() {
                         variant="ghost"
                         size="sm"
                         onClick={() => setEditingBin(bin)}
+                        title="Edit bin"
                       >
                         <Edit className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setRelocatingBin(bin)}
+                        title="Relocate bin"
+                      >
+                        <MoveRight className="h-4 w-4" />
                       </Button>
                       {canDelete && (
                         <Button
@@ -178,6 +189,7 @@ export function BinMasterTab() {
                           size="sm"
                           onClick={() => deleteBin(bin.id)}
                           disabled={isDeleting}
+                          title="Delete bin"
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -204,6 +216,12 @@ export function BinMasterTab() {
         open={isBulkScopeOpen}
         onOpenChange={setIsBulkScopeOpen}
         bins={selectedBins}
+      />
+
+      <RelocateBinDialog
+        open={relocatingBin !== null}
+        onOpenChange={(o) => { if (!o) setRelocatingBin(null); }}
+        bin={relocatingBin}
       />
     </div>
   );
