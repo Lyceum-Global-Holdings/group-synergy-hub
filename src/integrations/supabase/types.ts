@@ -20893,6 +20893,13 @@ export type Database = {
         Args: { _site_report_id: string }
         Returns: boolean
       }
+      check_catalog_mirror_parity: {
+        Args: never
+        Returns: {
+          drift_count: number
+          sample_inventory_id: string
+        }[]
+      }
       check_duplicate_supplier: {
         Args: {
           p_email?: string
@@ -21901,6 +21908,7 @@ export type Database = {
         Args: { p_item_id: string }
         Returns: undefined
       }
+      reconcile_catalog_mirror: { Args: never; Returns: number }
       reconcile_stock_batch:
         | {
             Args: {
