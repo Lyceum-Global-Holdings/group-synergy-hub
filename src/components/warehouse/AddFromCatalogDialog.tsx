@@ -384,13 +384,34 @@ export function AddFromCatalogDialog({ open, onOpenChange }: AddFromCatalogDialo
                 </p>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="bin">Assign to Bin *</Label>
-                <Select value={selectedBinId} onValueChange={setSelectedBinId}>
+                <Label htmlFor="location">Stock Location *</Label>
+                <Select
+                  value={effectiveLocationId}
+                  onValueChange={(value) => {
+                    setSelectedLocationId(value);
+                    setSelectedBinId('');
+                  }}
+                >
                   <SelectTrigger>
-                    <SelectValue placeholder="Select a bin" />
+                    <SelectValue placeholder="Select location" />
                   </SelectTrigger>
                   <SelectContent>
-                    {bins.map(bin => (
+                    {locationOptions.map(({ location, depth, breadcrumb }) => (
+                      <SelectItem key={location.id} value={location.id}>
+                        <span style={{ paddingInlineStart: `${depth * 12}px` }}>{breadcrumb}</span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="bin">Assign to Bin *</Label>
+                <Select value={selectedBinId} onValueChange={setSelectedBinId} disabled={!effectiveLocationId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder={effectiveLocationId ? 'Select a bin' : 'Select location first'} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {filteredBins.map(bin => (
                       <SelectItem key={bin.id} value={bin.id}>
                         {bin.bin_code} {bin.name ? `- ${bin.name}` : ''}
                       </SelectItem>
@@ -407,7 +428,7 @@ export function AddFromCatalogDialog({ open, onOpenChange }: AddFromCatalogDialo
             <Button variant="outline" onClick={handleClose}>Cancel</Button>
             <Button
               onClick={() => importMutation.mutate()}
-              disabled={importMutation.isPending || !selectedBinId || !parseQty(quantity) || (parseQty(quantity) ?? 0) <= 0}
+              disabled={importMutation.isPending || !effectiveLocationId || !selectedBinId || !parseQty(quantity) || (parseQty(quantity) ?? 0) <= 0}
             >
               {importMutation.isPending ? 'Importing...' : 'Import to Inventory'}
             </Button>
