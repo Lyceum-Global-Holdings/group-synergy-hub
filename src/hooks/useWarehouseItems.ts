@@ -171,10 +171,22 @@ export const useWarehouseItems = (options?: { skipCompanyFilter?: boolean; disab
 
       const { initialStock, initialUnitCost, ...itemDataWithoutStock } = itemData;
 
+      // Stage 1: every inventory row must link to a catalog entry. Resolve by item_code.
+      const { data: catalogRow, error: catalogErr } = await supabase
+        .from('warehouse_item_catalog')
+        .select('id')
+        .eq('item_code', itemDataWithoutStock.item_code)
+        .maybeSingle();
+      if (catalogErr) throw catalogErr;
+      if (!catalogRow) {
+        throw new Error(`Catalog entry missing for item_code ${itemDataWithoutStock.item_code}. Create the catalog row first.`);
+      }
+
       const { data, error } = await supabase
         .from('warehouse_items')
         .insert({
           ...itemDataWithoutStock,
+          catalog_item_id: catalogRow.id,
           company_id: selectedCompany.id,
           created_by: user.id
         })
@@ -359,8 +371,22 @@ export const useWarehouseItems = (options?: { skipCompanyFilter?: boolean; disab
         throw new Error('No company selected');
       }
 
+      // Stage 1: resolve catalog_item_id for every row from warehouse_item_catalog.
+      const codes = Array.from(new Set(itemsData.map(i => i.item_code).filter(Boolean)));
+      const { data: catalogRows, error: catalogErr } = await supabase
+        .from('warehouse_item_catalog')
+        .select('id, item_code')
+        .in('item_code', codes);
+      if (catalogErr) throw catalogErr;
+      const catalogByCode = new Map((catalogRows ?? []).map(r => [r.item_code, r.id]));
+      const missing = codes.filter(c => !catalogByCode.has(c));
+      if (missing.length) {
+        throw new Error(`Catalog entries missing for ${missing.length} item codes (first: ${missing.slice(0, 5).join(', ')}). Create catalog rows first.`);
+      }
+
       const itemsWithUser = itemsData.map(item => ({
         ...item,
+        catalog_item_id: catalogByCode.get(item.item_code)!,
         company_id: selectedCompany.id,
         created_by: user.id
       }));
