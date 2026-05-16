@@ -19266,6 +19266,56 @@ export type Database = {
           },
         ]
       }
+      warehouse_bin_relocations: {
+        Row: {
+          bin_id: string
+          company_id: string
+          created_at: string
+          from_location_id: string | null
+          id: string
+          item_count: number
+          mode: string
+          performed_by: string | null
+          reason: string | null
+          to_location_id: string
+          total_quantity: number
+        }
+        Insert: {
+          bin_id: string
+          company_id: string
+          created_at?: string
+          from_location_id?: string | null
+          id?: string
+          item_count?: number
+          mode: string
+          performed_by?: string | null
+          reason?: string | null
+          to_location_id: string
+          total_quantity?: number
+        }
+        Update: {
+          bin_id?: string
+          company_id?: string
+          created_at?: string
+          from_location_id?: string | null
+          id?: string
+          item_count?: number
+          mode?: string
+          performed_by?: string | null
+          reason?: string | null
+          to_location_id?: string
+          total_quantity?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "warehouse_bin_relocations_bin_id_fkey"
+            columns: ["bin_id"]
+            isOneToOne: false
+            referencedRelation: "warehouse_bins"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       warehouse_bins: {
         Row: {
           bin_code: string
@@ -21796,6 +21846,15 @@ export type Database = {
           p_stage: string
         }
         Returns: undefined
+      }
+      relocate_warehouse_bin: {
+        Args: {
+          _bin_id: string
+          _mode: string
+          _new_location_id: string
+          _reason?: string
+        }
+        Returns: Json
       }
       remove_item_from_inventory: {
         Args: { p_item_id: string }
