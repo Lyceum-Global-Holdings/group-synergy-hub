@@ -15,6 +15,7 @@ import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle } from 'lucide-react';
 import { useWarehouseBins } from '@/hooks/useWarehouseBins';
+import { useWarehouseLocations } from '@/hooks/useWarehouseLocations';
 import { CreateBinDialog } from '@/components/warehouse/CreateBinDialog';
 import { BulkBinScopeDialog } from '@/components/warehouse/BulkBinScopeDialog';
 import { WarehouseBin } from '@/types/itemBin';
