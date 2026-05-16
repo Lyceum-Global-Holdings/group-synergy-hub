@@ -10,13 +10,15 @@ import { Badge } from "@/components/ui/badge";
 import { usePartialPieceItems } from "@/hooks/warehouse/usePartialPieces";
 
 export interface PartialPieceItemOption {
-  parent_item_id: string;
+  catalog_item_id: string;
+  parent_item_id: string | null;
   item_code: string;
   item_name: string;
   base_uom: string | null;
   secondary_uom: string | null;
   unit_cost: number | null;
   track_secondary_quantity: boolean | null;
+  has_inventory_row: boolean;
   piece_count: number;
 }
 
