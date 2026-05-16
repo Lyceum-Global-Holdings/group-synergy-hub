@@ -21208,10 +21208,6 @@ export type Database = {
           inheritance_source_name: string
         }[]
       }
-      get_location_subtree_ids: {
-        Args: { p_location_id: string }
-        Returns: string[]
-      }
       get_location_with_ancestors: {
         Args: { p_location_id: string }
         Returns: {
@@ -21265,12 +21261,6 @@ export type Database = {
           name: string
           parent_id: string
           type: string
-        }[]
-      }
-      get_subtree_bin_ids: {
-        Args: { p_location_id: string }
-        Returns: {
-          id: string
         }[]
       }
       get_tool_candidate_items: {

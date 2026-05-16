@@ -19,7 +19,7 @@ const keyToString = (key: QueryKey) => JSON.stringify(key);
 export function scheduleInvalidate(
   qc: QueryClient,
   queryKey: QueryKey,
-  debounceMs = 500,
+  debounceMs = 250,
 ) {
   const k = keyToString(queryKey);
   const existing = timers.get(k);

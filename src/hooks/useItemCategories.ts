@@ -28,9 +28,7 @@ export const useItemCategories = (companyId?: string) => {
 
       if (error) throw error;
       return data as ItemCategory[];
-    },
-    staleTime: 5 * 60_000,
-    gcTime: 30 * 60_000,
+    }
   });
 
   // Fetch excluded category IDs for this company

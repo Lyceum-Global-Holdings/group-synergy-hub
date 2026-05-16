@@ -231,16 +231,3 @@
     box-shadow: var(--shadow-lg);
   }
 }
-
-/* Stage 4: Accessibility + INP guard.
-   Honour the OS-level "reduce motion" preference — disables Tailwind
-   animations, framer-motion-driven CSS transitions, and our own
-   keyframes so low-power devices stop spending INP budget on animation. */
-@media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
-    animation-duration: 0.001ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.001ms !important;
-    scroll-behavior: auto !important;
-  }
-}

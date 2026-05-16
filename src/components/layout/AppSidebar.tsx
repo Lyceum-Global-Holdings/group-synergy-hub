@@ -1,5 +1,4 @@
 import { NavLink, useLocation } from "react-router-dom";
-import { preloadRoute } from "@/lib/routePreloader";
 import { useSuperAdmin } from "@/hooks/useSuperAdmin";
 import {
   Building2,
@@ -194,13 +193,7 @@ export function AppSidebar() {
                               asChild
                               isActive={isActive(item.url)}
                             >
-                              <NavLink
-                                to={item.url}
-                                onMouseEnter={() => preloadRoute(item.url)}
-                                onFocus={() => preloadRoute(item.url)}
-                              >
-                                {item.title}
-                              </NavLink>
+                              <NavLink to={item.url}>{item.title}</NavLink>
                             </SidebarMenuSubButton>
                           </SidebarMenuSubItem>
                         ))}
@@ -221,12 +214,7 @@ export function AppSidebar() {
               {visibleAdminItems.map((item) => (
                 <SidebarMenuItem key={item.url}>
                   <SidebarMenuButton asChild isActive={isActive(item.url)}>
-                    <NavLink
-                      to={item.url}
-                      className="flex items-center gap-2"
-                      onMouseEnter={() => preloadRoute(item.url)}
-                      onFocus={() => preloadRoute(item.url)}
-                    >
+                    <NavLink to={item.url} className="flex items-center gap-2">
                       <item.icon className="h-4 w-4" />
                       <span>{item.title}</span>
                     </NavLink>

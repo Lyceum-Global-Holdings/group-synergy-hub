@@ -199,49 +199,25 @@ export function useWarehouseItemsLazyInventory({
       }));
 
       if (itemIds.length > 0) {
-        let bins: Array<{ id: string; bin_code: string; name: string; location_id: string | null }> | null = null;
+        let binsQuery = supabase
+          .from('warehouse_bins')
+          .select('id, bin_code, name, location_id');
 
         if (locationId) {
-          // Canonical WMS scope: selecting any node uses the root warehouse +
-          // all descendants, not exact equality on the selected sub-location.
-          const { data: scopedBinIds, error: scopedBinsError } = await (supabase as any)
-            .rpc('get_subtree_bin_ids', { p_location_id: locationId });
-          if (scopedBinsError) throw scopedBinsError;
-
-          const ids = (scopedBinIds || []).map((b: { id: string }) => b.id);
-          if (ids.length > 0) {
-            const rows: Array<{ id: string; bin_code: string; name: string; location_id: string | null }> = [];
-            for (let i = 0; i < ids.length; i += 500) {
-              const { data, error } = await supabase
-                .from('warehouse_bins')
-                .select('id, bin_code, name, location_id')
-                .in('id', ids.slice(i, i + 500));
-              if (error) throw error;
-              if (data) rows.push(...data);
-            }
-            bins = rows;
-          } else {
-            bins = [];
+          binsQuery = binsQuery.eq('location_id', locationId);
+        } else if (permissions && !permissions.viewAllLocations) {
+          const permittedLocationIds = [
+            ...new Set([
+              ...permissions.viewLocationIds,
+              ...permissions.editLocationIds,
+            ]),
+          ];
+          if (permittedLocationIds.length > 0) {
+            binsQuery = binsQuery.in('location_id', permittedLocationIds);
           }
-        } else {
-          let binsQuery = supabase
-            .from('warehouse_bins')
-            .select('id, bin_code, name, location_id');
-
-          if (permissions && !permissions.viewAllLocations) {
-            const permittedLocationIds = [
-              ...new Set([
-                ...permissions.viewLocationIds,
-                ...permissions.editLocationIds,
-              ]),
-            ];
-            if (permittedLocationIds.length > 0) {
-              binsQuery = binsQuery.in('location_id', permittedLocationIds);
-            }
-          }
-          const { data } = await binsQuery;
-          bins = data || [];
         }
+
+        const { data: bins } = await binsQuery;
         const permittedBinIds = new Set(bins?.map((b) => b.id) || []);
 
         const { data: allocations } = await supabase

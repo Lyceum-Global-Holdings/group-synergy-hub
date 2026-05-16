@@ -23,10 +23,8 @@ export function useCompanies() {
   } = useQuery({
     queryKey: ['companies', isSuperAdmin, isAdmin, userProfile?.company_id, userProfile?.user_id],
     enabled: dependenciesReady,
-    // Quasi-static lookup: companies change rarely; refresh every 2 min instead
-    // of on every mount. Realtime invalidation still bumps this when needed.
-    staleTime: 2 * 60_000,
-    gcTime: 30 * 60_000,
+    staleTime: 0, // Always consider data stale to ensure fresh fetch
+    refetchOnMount: 'always', // Force refetch when component mounts
     queryFn: async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return [];

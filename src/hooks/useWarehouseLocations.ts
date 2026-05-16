@@ -14,6 +14,8 @@ export const useWarehouseLocations = () => {
   } = useQuery({
     queryKey: ['warehouse-locations'],
     queryFn: async () => {
+      console.log('Fetching warehouse locations...');
+      
       const { data, error } = await supabase
         .from('warehouse_locations')
         .select('*')
@@ -23,13 +25,10 @@ export const useWarehouseLocations = () => {
         console.error('Error fetching locations:', error);
         throw error;
       }
-
+      
+      console.log('Fetched locations:', data);
       return data as WarehouseLocation[];
-    },
-    // Locations are quasi-static lookup data — keep fresh for 5 min to avoid
-    // refetching on every navigation (Stage 5: data layer).
-    staleTime: 5 * 60_000,
-    gcTime: 30 * 60_000,
+    }
   });
 
   const invalidateLocationQueries = async () => {

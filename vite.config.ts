@@ -11,21 +11,6 @@ export default defineConfig(async ({ mode }) => ({
   plugins: [
     react(),
     mode === "development" && (await import("lovable-tagger")).componentTagger(),
-    // Stage 2 — JS budget. Emit pre-compressed .br and .gz next to every static
-    // asset so the CDN can serve them without runtime compression cost.
-    // Modern browsers prefer brotli, older ones fall back to gzip.
-    mode === "production" && (await import("vite-plugin-compression")).default({
-      algorithm: "brotliCompress",
-      ext: ".br",
-      threshold: 1024,
-      deleteOriginFile: false,
-    }),
-    mode === "production" && (await import("vite-plugin-compression")).default({
-      algorithm: "gzip",
-      ext: ".gz",
-      threshold: 1024,
-      deleteOriginFile: false,
-    }),
   ].filter(Boolean),
   resolve: {
     alias: {

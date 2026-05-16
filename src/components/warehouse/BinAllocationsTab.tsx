@@ -1,4 +1,4 @@
-import { useState, useMemo, useDeferredValue, useCallback } from 'react';
+import { useState, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -26,8 +26,6 @@ import { ReturnStockFromSublocationDialog } from './ReturnStockFromSublocationDi
 import { BinAllocationQRDialog } from './BinAllocationQRDialog';
 import { generateBulkBinQRCodePdf, downloadBulkBinQRCodePdf } from '@/utils/bulkBinQRCodePdf';
 import { toast } from 'sonner';
-import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
 import type { ColumnDef } from '@tanstack/react-table';
 import type { BinAllocationWithDetails } from '@/types/warehouseReservation';
 
@@ -43,25 +41,30 @@ export function BinAllocationsTab() {
   const { globalLocationId } = useLocationFilter();
   const { locations } = useWarehouseLocations();
 
-  const { data: scopedLocationIds = [] } = useQuery({
-    queryKey: ['location-subtree-ids', globalLocationId],
-    enabled: !!globalLocationId,
-    queryFn: async () => {
-      const { data, error } = await (supabase as any).rpc('get_location_subtree_ids', {
-        p_location_id: globalLocationId,
-      });
-      if (error) throw error;
-      return (data || []).map((r: { location_id: string }) => r.location_id);
-    },
-    staleTime: 5 * 60_000,
-  });
-
-  // Canonical WMS warehouse scope comes from the database helper: selecting any
-  // node resolves to the root warehouse + every descendant, so sub-location
-  // stock is visible under the main location and vice versa.
+  // Build descendant set for the selected location (root + every sub-location).
+  // Selecting a parent warehouse includes its full subtree, matching standard
+  // WMS hierarchy filter semantics.
   const scope = useMemo(() => {
     if (!globalLocationId) return null;
-    const ids = new Set<string>(scopedLocationIds.length ? scopedLocationIds : [globalLocationId]);
+    const childrenByParent = new Map<string, string[]>();
+    for (const l of locations || []) {
+      if (l.parent_id) {
+        const arr = childrenByParent.get(l.parent_id) ?? [];
+        arr.push(l.id);
+        childrenByParent.set(l.parent_id, arr);
+      }
+    }
+    const ids = new Set<string>([globalLocationId]);
+    const stack = [globalLocationId];
+    while (stack.length) {
+      const id = stack.pop()!;
+      for (const child of childrenByParent.get(id) ?? []) {
+        if (!ids.has(child)) {
+          ids.add(child);
+          stack.push(child);
+        }
+      }
+    }
     const root = (locations || []).find((l) => l.id === globalLocationId);
     return {
       ids,
@@ -71,11 +74,12 @@ export function BinAllocationsTab() {
           : root.name
         : 'Selected location',
     };
-  }, [globalLocationId, locations, scopedLocationIds]);
+  }, [globalLocationId, locations]);
 
-  // Stable per-render path resolver. Memoized so heavy filter/sort passes
-  // don't re-walk the parent-FK shape for every row on every keystroke.
-  const getLocationPath = useCallback((allocation: BinAllocationWithDetails) => {
+  // Normalize parent (PostgREST self-FK can return array or object) into a flat
+  // hierarchical "Parent › Child" path. Follows WMS standard of showing the
+  // full storage hierarchy (Site/Warehouse › Zone/Sub-location › Bin).
+  const getLocationPath = (allocation: BinAllocationWithDetails) => {
     const loc = allocation.warehouse_bin?.warehouse_location;
     if (!loc) return { parent: null, child: null, path: '' };
     const parentRaw = loc.parent;
@@ -91,48 +95,37 @@ export function BinAllocationsTab() {
       };
     }
     return { parent: null, child, path: child };
-  }, []);
-
-  // Decorate each allocation with searchable lowercase fields + cached path
-  // ONCE per data change, so per-keystroke filter is a cheap string scan.
-  const decorated = useMemo(() => {
-    return (binAllocations || []).map((a) => {
-      const path = getLocationPath(a);
-      return {
-        a,
-        path,
-        locId: a.warehouse_bin?.warehouse_location?.id ?? null,
-        haystack: [
-          a.warehouse_item?.item_code,
-          a.warehouse_item?.name,
-          a.warehouse_bin?.bin_code,
-          a.warehouse_bin?.name,
-          path.path,
-        ].join('\u0001').toLowerCase(),
-      };
-    });
-  }, [binAllocations, getLocationPath]);
-
-  // Defer search input so typing never blocks INP — list re-filters in a
-  // low-priority React transition.
-  const deferredSearch = useDeferredValue(searchTerm);
+  };
 
   const filteredAllocations = useMemo(() => {
-    const term = deferredSearch.trim().toLowerCase();
-    const base = decorated.filter((d) => {
-      if (scope && (!d.locId || !scope.ids.has(d.locId))) return false;
+    const term = searchTerm.trim().toLowerCase();
+    const base = (binAllocations || []).filter((allocation) => {
+      // Warehouse / sub-location scope
+      if (scope) {
+        const locId = allocation.warehouse_bin?.warehouse_location?.id;
+        if (!locId || !scope.ids.has(locId)) return false;
+      }
+      // Free-text search
       if (!term) return true;
-      return d.haystack.includes(term);
+      return (
+        allocation.warehouse_item?.item_code?.toLowerCase().includes(term) ||
+        allocation.warehouse_item?.name?.toLowerCase().includes(term) ||
+        allocation.warehouse_bin?.bin_code?.toLowerCase().includes(term) ||
+        allocation.warehouse_bin?.name?.toLowerCase().includes(term) ||
+        getLocationPath(allocation).path.toLowerCase().includes(term)
+      );
     });
-    base.sort((x, y) => {
-      if (x.path.path !== y.path.path) return x.path.path.localeCompare(y.path.path);
-      const bx = x.a.warehouse_bin?.bin_code ?? '';
-      const by = y.a.warehouse_bin?.bin_code ?? '';
-      if (bx !== by) return bx.localeCompare(by);
-      return (x.a.warehouse_item?.item_code ?? '').localeCompare(y.a.warehouse_item?.item_code ?? '');
+    // Group by location path → bin code → item code for predictable WMS layout
+    return [...base].sort((a, b) => {
+      const pa = getLocationPath(a).path;
+      const pb = getLocationPath(b).path;
+      if (pa !== pb) return pa.localeCompare(pb);
+      const ba = a.warehouse_bin?.bin_code ?? '';
+      const bb = b.warehouse_bin?.bin_code ?? '';
+      if (ba !== bb) return ba.localeCompare(bb);
+      return (a.warehouse_item?.item_code ?? '').localeCompare(b.warehouse_item?.item_code ?? '');
     });
-    return base.map((d) => d.a);
-  }, [decorated, deferredSearch, scope]);
+  }, [binAllocations, searchTerm, scope]);
   const { canDelete } = useIsAdminOrHigher();
 
   const handleDelete = () => {

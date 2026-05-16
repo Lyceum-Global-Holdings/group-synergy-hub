@@ -246,45 +246,37 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
   const { data: itemLocationStock = {} } = useQuery<ItemLocationStockMap>({
     queryKey: ['all-items-location-stock', globalLocationId],
     queryFn: async () => {
-      // When a specific location is selected, resolve to the full warehouse
-      // subtree (root + all sub-locations). Bins are warehouse-root scoped, so
-      // exact location equality hides stock when a sub-location is selected.
+      // When a specific location is selected, pre-fetch its bin IDs for scoping
       let locationBinIds: string[] | null = null;
       if (globalLocationId) {
-        const { data: locBins, error: locBinsError } = await (supabase as any)
-          .rpc('get_subtree_bin_ids', { p_location_id: globalLocationId });
-        if (locBinsError) throw locBinsError;
-        locationBinIds = locBins?.map((b: { id: string }) => b.id) || [];
+        const { data: locBins } = await supabase
+          .from('warehouse_bins')
+          .select('id')
+          .eq('location_id', globalLocationId);
+        locationBinIds = locBins?.map(b => b.id) || [];
         if (locationBinIds.length === 0) return {};
       }
 
-      // Fetch allocations with cursor-based batching. If a warehouse has >500
-      // bins, chunk the scoped bin IDs; PostgREST `.in()` URLs become too large
-      // and the old code silently ignored every bin after the first chunk.
+      // Fetch allocations with cursor-based batching
       const allocations: { warehouse_item_id: string; bin_id: string; available_quantity: number }[] = [];
-      const binChunks = locationBinIds
-        ? Array.from({ length: Math.ceil(locationBinIds.length / 500) }, (_, i) => locationBinIds!.slice(i * 500, i * 500 + 500))
-        : [null];
-
-      for (const binChunk of binChunks) {
-        let lastAllocId: string | null = null;
-        while (true) {
-          let q = supabase
-            .from('warehouse_bin_allocations')
-            .select('id, warehouse_item_id, bin_id, available_quantity')
-            .gt('available_quantity', 0)
-            .order('id')
-            .limit(1000);
-          if (lastAllocId) q = q.gt('id', lastAllocId);
-          if (binChunk) q = q.in('bin_id', binChunk);
-
-          const { data, error: allocError } = await q;
-          if (allocError) throw allocError;
-          if (!data || data.length === 0) break;
-          allocations.push(...data);
-          if (data.length < 1000) break;
-          lastAllocId = data[data.length - 1].id;
+      let lastAllocId: string | null = null;
+      while (true) {
+        let q = supabase
+          .from('warehouse_bin_allocations')
+          .select('id, warehouse_item_id, bin_id, available_quantity')
+          .gt('available_quantity', 0)
+          .order('id')
+          .limit(1000);
+        if (lastAllocId) q = q.gt('id', lastAllocId);
+        if (locationBinIds) {
+          q = q.in('bin_id', locationBinIds.slice(0, 500));
         }
+        const { data, error: allocError } = await q;
+        if (allocError) throw allocError;
+        if (!data || data.length === 0) break;
+        allocations.push(...data);
+        if (data.length < 1000) break;
+        lastAllocId = data[data.length - 1].id;
       }
 
       if (allocations.length === 0) return {};
