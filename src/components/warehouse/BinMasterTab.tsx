@@ -91,7 +91,9 @@ export function BinMasterTab() {
       <Alert>
         <AlertCircle className="h-4 w-4" />
         <AlertDescription>
-          Bins are shared across all companies and scoped by warehouse location.
+          Bin codes are unique per warehouse and per company. Every sub-location and department under a
+          warehouse can use that warehouse's bins automatically — no need to duplicate the bin per floor or
+          department.
         </AlertDescription>
       </Alert>
 
