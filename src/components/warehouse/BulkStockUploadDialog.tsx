@@ -469,65 +469,34 @@ export function BulkStockUploadDialog({ open, onOpenChange }: BulkStockUploadDia
                 .maybeSingle();
 
               if (existingRow) {
+                // Per-company fields only — master attrs are catalog-owned.
                 await supabase
                   .from('warehouse_items')
                   .update({
-                    current_stock: 0,
-                    reserved_quantity: 0,
                     status: 'active',
                     location_id: effectiveLocationId || null,
-                    name: cat.name,
-                    description: cat.description,
-                    category_id: cat.category_id,
-                    unit_id: cat.unit_id,
-                    brand: cat.brand,
-                    manufacturer: cat.manufacturer,
-                    barcode: cat.barcode,
-                    sku: cat.sku,
-                    unit_cost: cat.unit_cost,
-                    selling_price: cat.selling_price,
-                    reorder_level: cat.reorder_level,
-                    min_stock_level: cat.min_stock_level,
-                    max_stock_level: cat.max_stock_level,
-                    image_url: cat.image_url,
-                    is_batch_tracked: cat.is_batch_tracked,
-                    is_serialized: cat.is_serialized,
+                    unit_cost: cat.unit_cost ?? null,
+                    selling_price: cat.selling_price ?? null,
+                    reorder_level: cat.reorder_level ?? null,
+                    min_stock_level: cat.min_stock_level ?? null,
+                    max_stock_level: cat.max_stock_level ?? null,
                   })
                   .eq('id', existingRow.id);
                 itemId = existingRow.id;
               } else {
-                const { data: newItem, error: insertError } = await supabase
-                  .from('warehouse_items')
-                  .insert({
-                    catalog_item_id: cat.id,
-                    item_code: cat.item_code,
-                    name: cat.name,
-                    description: cat.description,
-                    category_id: cat.category_id,
-                    unit_id: cat.unit_id,
-                    brand: cat.brand,
-                    manufacturer: cat.manufacturer,
-                    barcode: cat.barcode,
-                    sku: cat.sku,
-                    unit_cost: cat.unit_cost,
-                    selling_price: cat.selling_price,
-                    reorder_level: cat.reorder_level,
-                    min_stock_level: cat.min_stock_level,
-                    max_stock_level: cat.max_stock_level,
-                    image_url: cat.image_url,
-                    is_batch_tracked: cat.is_batch_tracked,
-                    is_serialized: cat.is_serialized,
-                    status: 'active',
-                    company_id: selectedCompany!.id,
-                    location_id: effectiveLocationId || null,
-                    current_stock: 0,
-                    reserved_quantity: 0,
-                    created_by: user?.id,
-                  })
-                  .select('id')
-                  .single();
+                const { data: newId, error: insertError } = await supabase.rpc('upsert_warehouse_inventory', {
+                  p_company_id: selectedCompany!.id,
+                  p_catalog_item_id: cat.id,
+                  p_location_id: effectiveLocationId || null,
+                  p_unit_cost: cat.unit_cost ?? null,
+                  p_selling_price: cat.selling_price ?? null,
+                  p_reorder_level: cat.reorder_level ?? null,
+                  p_min_stock_level: cat.min_stock_level ?? null,
+                  p_max_stock_level: cat.max_stock_level ?? null,
+                  p_status: 'active',
+                });
                 if (insertError) throw insertError;
-                itemId = newItem.id;
+                itemId = newId as unknown as string;
               }
             }
 
