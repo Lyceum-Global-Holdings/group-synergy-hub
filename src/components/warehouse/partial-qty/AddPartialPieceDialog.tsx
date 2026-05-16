@@ -505,7 +505,7 @@ export function AddPartialPieceDialog({ open, onOpenChange, defaultParentItemId 
               </table>
             </div>
             <p className="text-xs text-muted-foreground mt-2">
-              Tip: paste from Excel — columns <span className="font-mono">size, piece_code, label</span>. Max {MAX_BULK_ROWS} rows per batch. All rows commit together or none.
+              Tip: paste from Excel — columns <span className="font-mono">size, qty, piece_code, label</span>. Max {MAX_BULK_ROWS} rows per batch. All rows commit together or none.
             </p>
           </TabsContent>
         </Tabs>
