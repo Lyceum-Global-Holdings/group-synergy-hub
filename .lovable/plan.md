@@ -1,34 +1,50 @@
-## Stage 2 — Catalog-First Write Contract
+## Stage 6 — Finish the Catalog Source-of-Truth Cleanup
 
-Goal: make `warehouse_item_catalog` the single source of truth for item master attributes. `warehouse_items` keeps only per-company stock + economics; mirrored master columns become trigger-maintained read caches.
+Goal: eliminate the last direct PostgREST writes against `warehouse_items` mirrored fields, then drop the mirrored columns entirely. Stages 1–5 made the catalog the source of truth via triggers + RPCs; this stage removes the now-redundant cache columns and the legacy code paths that wrote to them.
 
-### Mirrored columns (cache from catalog → warehouse_items)
-`name`, `description`, `category_id`, `unit_id`, `brand`, `manufacturer`, `supplier_id`, `barcode`, `sku`, `image_url`, `is_serialized`, `is_batch_tracked`
+### Scope: 8 writer files migrating to RPCs
 
-### Per-company columns (stay writable on warehouse_items)
-`current_stock`, `reserved_quantity`, `available_quantity` (generated), `location_id`, `base_uom`, `secondary_uom`, `track_secondary_quantity`, `reorder_level`, `min_stock_level`, `max_stock_level`, `unit_cost`, `selling_price`, `status`, `notes`, `item_code` (mirrored but stable)
+These are the only files still issuing `INSERT` / `UPDATE` against `warehouse_items` (readers are unaffected because mirrored columns are dropped — readers switch to joined views):
+
+| File | Current behavior | New behavior |
+|---|---|---|
+| `AddFromCatalogDialog.tsx` | Direct insert with all mirrored fields + update path | `upsert_warehouse_inventory` RPC |
+| `BulkStockUploadDialog.tsx` | Direct upsert with mirrored fields (~2 sites) | `upsert_warehouse_inventory` RPC |
+| `BulkItemImportDialog.tsx` | Direct insert during import | `upsert_warehouse_inventory` RPC (catalog already dual-written) |
+| `BulkInventoryUpdateDialog.tsx` | Bulk `.update()` on per-company fields | `upsert_warehouse_inventory` RPC per row |
+| `BulkInventoryDeleteDialog.tsx` | `.update({status:'inactive'})` | `upsert_warehouse_inventory` RPC (status only) |
+| `AssignLocationDialog.tsx` | `.update({location_id})` | `upsert_warehouse_inventory` RPC (location only) |
+| `FixMissingOpeningStockDialog.tsx` | Reads + writes opening stock | Reader switches to RPC; writes via `upsert_warehouse_inventory` |
+| `useWarehouseItems.ts` insert path (single + bulk) | Already partially migrated in Stage 3 | Verify both paths use RPC; remove dead code |
+
+### Reader migration (21 files)
+
+After mirrored columns are dropped, the 21 reader files that `select` mirrored columns from `warehouse_items` will break. Two-step migration:
+
+1. **Create DB view `warehouse_items_full`** — `SELECT wi.*, c.name, c.description, c.category_id, c.unit_id, c.brand, c.manufacturer, c.supplier_id, c.barcode, c.sku, c.image_url, c.is_serialized, c.is_batch_tracked FROM warehouse_items wi LEFT JOIN warehouse_item_catalog c ON c.id = wi.catalog_item_id`. SECURITY INVOKER (default for views), inherits RLS from base tables.
+2. **Mechanical rename**: every reader switches `from('warehouse_items')` → `from('warehouse_items_full')`. Readers that already only select per-company columns stay on `warehouse_items`.
 
 ### Database migration
 
-1. **`wh_items_sync_from_catalog`** — BEFORE INSERT OR UPDATE trigger on `warehouse_items`. Looks up the linked catalog row by `NEW.catalog_item_id` and overwrites every mirrored column on `NEW` so any client-supplied values are ignored. Also forces `NEW.item_code = catalog.item_code`.
+1. `CREATE OR REPLACE VIEW public.warehouse_items_full AS SELECT ...` exposing mirrored columns from catalog join.
+2. `GRANT SELECT ON public.warehouse_items_full TO authenticated`.
+3. After all frontend changes ship and bake for 1 day: a follow-up migration drops mirrored columns from `warehouse_items` and the `wh_items_sync_from_catalog` BEFORE trigger (no longer needed once columns are gone). The `wh_catalog_propagate` AFTER trigger is also removed. `reconcile_catalog_mirror` and `check_catalog_mirror_parity` get dropped along with the nightly cron job.
 
-2. **`wh_catalog_propagate`** — AFTER UPDATE trigger on `warehouse_item_catalog`. When any mirrored column changes, one `UPDATE warehouse_items SET ... WHERE catalog_item_id = NEW.id` propagates to every company in a single statement. Skipped when only `updated_at` changes.
+### Phased rollout
 
-3. **`upsert_warehouse_inventory(p_company_id, p_catalog_item_id, p_location_id, p_base_uom, p_secondary_uom, p_track_secondary, p_reorder_level, p_min_stock, p_max_stock, p_unit_cost, p_selling_price, p_status, p_notes)`** — SECURITY INVOKER RPC. Inserts a `warehouse_items` row (mirrored fields filled by the BEFORE trigger) or updates the existing `(company_id, catalog_item_id)` row's per-company columns only. Returns the row id. Does not accept any mirrored field.
-
-4. **`update_warehouse_catalog_item(p_catalog_item_id, ...)`** — SECURITY INVOKER RPC for editing master attributes. Updates the catalog row; the AFTER trigger fans out to all companies.
-
-5. Backfill `item_code` parity once more inside the migration to guarantee zero drift before triggers activate.
-
-### Frontend changes
-
-- **`src/hooks/useWarehouseItems.ts`** — both insert paths (single + bulk) switch to `supabase.rpc('upsert_warehouse_inventory', ...)`. Stop sending mirrored fields. Update path: split into two calls — `update_warehouse_catalog_item` for master edits, `upsert_warehouse_inventory` for per-company edits. The two-call orchestration lives in the hook so callers stay unchanged.
-- **`src/hooks/warehouse/useWarehouseCatalog.ts`** (if present) — catalog updates route through `update_warehouse_catalog_item`.
-- Bulk import path keeps the existing catalog-first dual flow but inventory inserts go through the RPC.
+- **Phase 6a (this PR)**: Create `warehouse_items_full` view + migrate the 8 writer files + mechanical-rename the 21 reader files. Mirrored columns stay in place as a safety net.
+- **Phase 6b (next PR, after 24h soak)**: Drop mirrored columns, sync trigger, propagate trigger, reconcile RPCs, and cron job. Update Stage 2 / Stage 5 memory entries to "deprecated".
 
 ### Verification
-- Add a one-shot SQL check in the migration: after triggers are created, run `SELECT count(*) FROM warehouse_items wi JOIN warehouse_item_catalog c ON c.id = wi.catalog_item_id WHERE wi.name IS DISTINCT FROM c.name OR wi.is_serialized IS DISTINCT FROM c.is_serialized` and `RAISE` if non-zero.
-- Manual smoke after deploy: edit a catalog row's `name` → confirm all company rows update; insert a `warehouse_items` row with a bogus `name` via RPC → confirm catalog value wins.
 
-### Out of scope (Stage 3+)
-Dropping mirrored columns, unified reader RPCs (`list_warehouse_inventory`), migrating the 21 raw `from('warehouse_items')` reader files, and deprecating direct PostgREST writes.
+- Pre-drop SQL audit: `SELECT count(*) FROM warehouse_items wi JOIN warehouse_item_catalog c ON c.id = wi.catalog_item_id WHERE wi.name IS DISTINCT FROM c.name` must be 0 right before phase 6b.
+- Manual smoke: add from catalog, bulk upload stock, assign location, bulk update, bulk delete — confirm each succeeds and the inventory page still shows correct names/brands.
+- Build: TypeScript compile passes (the regenerated `types.ts` will surface any missed reader).
+
+### Risk
+
+- The view layer means readers don't need column-level rewrites — just table name swaps. Low risk.
+- Writer migration is mostly mechanical: replace insert/update blocks with one RPC call. Behavior preserved.
+- Phase 6b is deferred so we can roll back column drop independently if production surfaces an edge case.
+
+Want me to start with Phase 6a?
