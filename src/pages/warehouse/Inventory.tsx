@@ -1,7 +1,9 @@
-import { lazy, Suspense } from 'react';
-import { Loader2 } from 'lucide-react';
+import { lazy, Suspense, useState } from 'react';
+import { Loader2, FileSpreadsheet } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useRealtimeStockUpdates } from '@/hooks/useRealtimeStockUpdates';
+import { Button } from '@/components/ui/button';
+import { ExcelInventoryImportDialog } from '@/components/warehouse/ExcelInventoryImportDialog';
 
 const ItemMasterTab = lazy(() =>
   import('@/components/warehouse/ItemMasterTab').then(m => ({ default: m.ItemMasterTab }))
@@ -10,15 +12,23 @@ const ItemMasterTab = lazy(() =>
 export default function Inventory() {
   useRealtimeStockUpdates();
   const navigate = useNavigate();
+  const [excelOpen, setExcelOpen] = useState(false);
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold">Inventory</h1>
-        <p className="text-muted-foreground">
-          On-hand stock by item, location and bin
-        </p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold">Inventory</h1>
+          <p className="text-muted-foreground">
+            On-hand stock by item, location and bin
+          </p>
+        </div>
+        <Button onClick={() => setExcelOpen(true)} className="shrink-0">
+          <FileSpreadsheet className="h-4 w-4 mr-2" />
+          Add via Excel
+        </Button>
       </div>
+      <ExcelInventoryImportDialog open={excelOpen} onOpenChange={setExcelOpen} />
 
       <Suspense
         fallback={
