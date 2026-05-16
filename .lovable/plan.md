@@ -1,95 +1,62 @@
 ## Problem
 
-After we merged storage bins to the root warehouse (SAP EWM model), the inventory queries still filter physical stock with `bin.location_id = <selected location>` **exactly**. Result:
+The previous fix made `get_location_subtree_ids` resolve any node up to its **root warehouse first**, then return the whole tree. Result: selecting a sub-location returns every sibling sub-location's stock too. This violates standard WMS scoping (SAP EWM, Manhattan, Oracle WMS), where a storage node owns only itself and its descendants — never its parents or siblings.
 
-- **Pick a sub-location** in the global location filter → no bins match (they all live at the root) → "no inventory" empty state, even when stock exists.
-- **Pick the root warehouse** → only bins literally tagged with that root match. Anything that historically still references a sub-location ID (legacy `warehouse_items.location_id`, `stock_transactions.location_id`) is invisible.
+## Correct Scoping Rule (International WMS Standard)
 
-The user wants the standard WMS behaviour: any node in a warehouse tree should display the same on-hand picture — the **entire warehouse subtree** rolls up.
-
-## Fix — single source of truth, applied server-side
-
-Introduce one SQL helper and route every inventory/stock query through it. No more ad-hoc location filters scattered across hooks.
-
-### 1. New SQL helper `get_location_subtree_ids(p_location_id uuid)`
-
-Recursive CTE returning the **root ancestor + every descendant of that root**. So passing in any node — root, sub-location, sub-sub-location — returns the full warehouse tree's location IDs.
+For any selected location node N, the visible stock scope is:
 
 ```text
-warehouse A (root)
-├── Zone 1
-│   └── Aisle 1A
-└── Zone 2
+scope(N) = { N } ∪ descendants(N)
 ```
 
-`get_location_subtree_ids(<Aisle 1A>)` → `{A, Zone 1, Aisle 1A, Zone 2}`
-`get_location_subtree_ids(<A>)` → `{A, Zone 1, Aisle 1A, Zone 2}`
+- Leaf sub-location → only its own bins/allocations
+- Mid-level zone → that zone + all child aisles/bins
+- Root warehouse → entire warehouse (rollup of every descendant)
 
-This is the canonical "warehouse scope" set.
+Parents and siblings are never included. This matches SAP EWM's Storage Section / Storage Bin hierarchy and ISA-95 location modeling.
 
-### 2. Patch `get_company_inventory_at_location`
+## Changes
 
-Replace the equality filters with subtree membership:
+### 1. Database — fix subtree helper (single migration)
 
-- `wi.location_id = ANY (subtree)`
-- `wb.location_id = ANY (subtree)`
+Rewrite `public.get_location_subtree_ids(p_location_id uuid)` to start the recursive CTE **at the selected node**, not at the root:
 
-Keep the existing `can_access_company` + `get_effective_location_company_ids` security guards.
+```sql
+WITH RECURSIVE tree AS (
+  SELECT id FROM warehouse_locations WHERE id = p_location_id
+  UNION ALL
+  SELECT child.id
+  FROM warehouse_locations child
+  JOIN tree t ON child.parent_id = t.id
+)
+SELECT id FROM tree;
+```
 
-### 3. Patch `list_warehouse_inventory` RPC
+Drop the `get_root_location_id(...)` call inside it. `get_subtree_bin_ids`, `get_company_inventory_at_location`, and `list_warehouse_inventory` all consume this helper and need no further change — their semantics automatically become "self + descendants".
 
-Before the bins aggregation runs, expand each ID in `_location_ids` through `get_location_subtree_ids` and use the union as the bin filter. Permissions input semantics stay identical to the caller.
+### 2. Frontend — no logic changes needed
 
-### 4. Patch `ItemMasterTab.tsx` `all-items-location-stock` query
+`ItemMasterTab.tsx`, `BinAllocationsTab.tsx`, and `useWarehouseItemsLazyInventory.ts` already call the helper/RPC. They inherit the corrected behavior.
 
-Today it fetches `warehouse_bins` with `location_id = globalLocationId`. Replace with a single call to a new tiny RPC `get_subtree_bin_ids(p_location_id)` (thin wrapper over the helper) — or expand client-side by calling the helper via `supabase.rpc`. Either way, the bin set becomes the warehouse subtree.
+### 3. Legacy fallback rows
 
-### 5. Align `BinAllocationsTab`
-
-It already does subtree expansion *client-side* (descendants only). Switch to the same helper for parity — eliminates the drift between "Bin allocations" and "Inventory" tabs when the same location is selected.
-
-### 6. No data migration required
-
-Bins are already snapped to root by the existing trigger. Allocations reference bins. The fix is purely query-side.
+`warehouse_items.location_id` and `stock_transactions.location_id` rows pinned to a parent location will continue to surface at that parent (correct: they belong to that node). They won't leak into siblings.
 
 ## Verification
 
-- Select a known sub-location with historical stock → Inventory tab shows the same rows as selecting its root warehouse.
-- Select the root warehouse → totals equal the sum of every sub-location's bin allocations (no double-counting; DISTINCT on `(wi.created_at, wi.id)` already handles that).
-- Bin Allocations tab and Inventory tab show consistent counts for the same selected location.
+| Selection | Expected |
+|---|---|
+| Leaf bin location | Only its own allocations |
+| Mid zone | Zone + child aisles/bins, nothing from sibling zones |
+| Root warehouse | Full rollup of all descendants |
+| "All locations" (null) | Unchanged, no filter |
 
-## Out of scope
+Manual check: pick a sub-location with known stock → Inventory tab and Bin Allocations tab show identical row counts limited to that subtree.
 
-- Splitting bins back per sub-location (the previous architectural decision stands).
-- New UI; only data-layer fixes.
-- Reworking permissions — location ACL evaluation is unchanged.
+## Files
 
-## Files touched
+- `supabase/migrations/<new>.sql` — replace `get_location_subtree_ids` body
+- `.lovable/plan.md` — log the correction
 
-- `supabase/migrations/<new>.sql`
-  - `CREATE OR REPLACE FUNCTION get_location_subtree_ids(uuid)`
-  - `CREATE OR REPLACE FUNCTION get_subtree_bin_ids(uuid)` (helper, optional)
-  - Rewrite `get_company_inventory_at_location`
-  - Rewrite `list_warehouse_inventory` (only the bins-jsonb sub-select + filter expansion)
-- `src/components/warehouse/ItemMasterTab.tsx` — replace direct `warehouse_bins.eq('location_id', …)` with the helper RPC.
-- `src/components/warehouse/BinAllocationsTab.tsx` — use the helper instead of in-memory descendant walk.
-- `.lovable/plan.md` — log the fix.
-
----
-
-## Implementation log — warehouse subtree inventory visibility ✓ shipped
-
-- Added `get_location_subtree_ids(p_location_id)` as the permanent warehouse-scope helper: any selected node resolves to the root warehouse plus all descendants.
-- Added `get_subtree_bin_ids(p_location_id)` for client-side bin-scoped queries.
-- Updated `get_company_inventory_at_location` to use subtree membership for both item primary location and bin allocation location.
-- Updated `list_warehouse_inventory` to expand `_location_ids` through the same helper before filtering bin JSON.
-- Updated `ItemMasterTab` stock-by-location query to fetch subtree bin IDs instead of exact `warehouse_bins.location_id = selectedLocation`.
-- Updated `useWarehouseItemsLazyInventory` bin enrichment to use subtree bin IDs when a location filter is active.
-- Updated `BinAllocationsTab` to use the database helper instead of a local descendants-only traversal, so root and sub-location selection are consistent.
-
-Verification performed:
-- Confirmed `get_location_subtree_ids()` returns multiple scoped locations for a sample sub-location.
-- Confirmed `get_subtree_bin_ids()` returns warehouse bins when called with a sub-location.
-- Hardened `get_company_inventory_at_location` so positive bin allocation stock is visible even when item-master `current_stock` is stale.
-- Revoked default PUBLIC/anonymous execution from the new inventory helper RPCs; authenticated users retain access through the app.
-- Fixed large-warehouse bin scoping by chunking scoped bin IDs instead of only querying the first 500 bins.
+No frontend, type, or RLS changes.
