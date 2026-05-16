@@ -81,9 +81,10 @@ function buildGroups(rows: PartialPieceRow[]): GroupRow[] {
       map.set(r.parent_item_id, g);
     }
     g.pieces.push(r);
-    g.piece_count += 1;
+    const qty = Math.max(1, Math.trunc(Number(r.piece_count) || 1));
+    g.piece_count += qty;
     const uom = (r.size_uom || "").trim() || "—";
-    g.totals_by_uom[uom] = (g.totals_by_uom[uom] || 0) + Number(r.size_value || 0);
+    g.totals_by_uom[uom] = (g.totals_by_uom[uom] || 0) + Number(r.size_value || 0) * qty;
     g.status_counts[r.status] = (g.status_counts[r.status] || 0) + 1;
     if (r.age_days > g.oldest_age_days) g.oldest_age_days = r.age_days;
   }
