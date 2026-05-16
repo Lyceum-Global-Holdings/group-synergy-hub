@@ -7,6 +7,9 @@ export interface PartialPieceRow extends Record<string, unknown> {
   parent_item_code: string;
   parent_item_name: string;
   base_uom: string | null;
+  secondary_uom?: string | null;
+  track_secondary_quantity?: boolean | null;
+  parent_item_status?: string | null;
   size_value: number;
   size_uom: string;
   location_id: string;
