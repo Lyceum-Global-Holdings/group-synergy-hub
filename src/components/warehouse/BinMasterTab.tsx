@@ -29,6 +29,9 @@ export function BinMasterTab() {
   const [isBulkScopeOpen, setIsBulkScopeOpen] = useState(false);
 
   const { bins, isLoading, deleteBin, isDeleting } = useWarehouseBins();
+  const { locations } = useWarehouseLocations();
+  const locationName = (id: string | null | undefined) =>
+    (id && locations.find((l) => l.id === id)?.name) || '—';
   const { canDelete } = useIsAdminOrHigher();
   const isAdminOrHigher = canDelete;
 
