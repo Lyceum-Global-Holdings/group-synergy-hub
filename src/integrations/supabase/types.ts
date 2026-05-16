@@ -22727,6 +22727,44 @@ export type Database = {
         }
         Returns: undefined
       }
+      update_warehouse_catalog_item: {
+        Args: {
+          p_barcode?: string
+          p_brand?: string
+          p_catalog_item_id: string
+          p_category_id?: string
+          p_description?: string
+          p_image_url?: string
+          p_is_batch_tracked?: boolean
+          p_is_serialized?: boolean
+          p_manufacturer?: string
+          p_name?: string
+          p_notes?: string
+          p_sku?: string
+          p_status?: string
+          p_supplier_id?: string
+          p_unit_id?: string
+        }
+        Returns: string
+      }
+      upsert_warehouse_inventory: {
+        Args: {
+          p_base_uom?: string
+          p_catalog_item_id: string
+          p_company_id: string
+          p_location_id?: string
+          p_max_stock_level?: number
+          p_min_stock_level?: number
+          p_notes?: string
+          p_reorder_level?: number
+          p_secondary_uom?: string
+          p_selling_price?: number
+          p_status?: string
+          p_track_secondary?: boolean
+          p_unit_cost?: number
+        }
+        Returns: string
+      }
       user_has_company_access: {
         Args: { _company_id: string; _user_id: string }
         Returns: boolean
