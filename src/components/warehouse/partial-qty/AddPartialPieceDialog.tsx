@@ -69,6 +69,7 @@ export function AddPartialPieceDialog({ open, onOpenChange, defaultParentItemId 
 
   // Single-mode only
   const [sizeValue, setSizeValue] = useState("");
+  const [pieceQty, setPieceQty] = useState("1");
   const [pieceCode, setPieceCode] = useState("");
 
   // Bulk-mode rows
