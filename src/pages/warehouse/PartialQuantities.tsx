@@ -9,7 +9,7 @@ import {
   Download, Pencil, PackageMinus, Scissors, Search, Upload, Plus, X,
   ChevronRight, ChevronDown, Layers, List as ListIcon,
 } from "lucide-react";
-import { usePartialPieces, usePartialPieceItems } from "@/hooks/warehouse/usePartialPieces";
+import { usePartialPieces } from "@/hooks/warehouse/usePartialPieces";
 import { PIECE_STATUS_OPTIONS, type PartialPieceRow, type PartialPieceStatus } from "@/types/partialPiece";
 import { AddPartialPieceDialog } from "@/components/warehouse/partial-qty/AddPartialPieceDialog";
 import { EditPartialPieceDialog } from "@/components/warehouse/partial-qty/EditPartialPieceDialog";
@@ -162,7 +162,24 @@ export default function PartialQuantities() {
     status,
     parentItemId: parentItemId === "all" ? null : parentItemId,
   });
-  const { data: itemOptions = [] } = usePartialPieceItems();
+  // Parent filter options are derived from currently-loaded partial pieces —
+  // the picker source is server-paged and cannot enumerate all items.
+  const itemOptions = useMemo(() => {
+    const seen = new Map<string, { parent_item_id: string; item_code: string; item_name: string; piece_count: number }>();
+    for (const r of rows) {
+      const key = r.parent_item_id;
+      if (!key) continue;
+      const cur = seen.get(key);
+      if (cur) cur.piece_count += 1;
+      else seen.set(key, {
+        parent_item_id: key,
+        item_code: r.parent_item_code ?? "",
+        item_name: r.parent_item_name ?? "",
+        piece_count: 1,
+      });
+    }
+    return Array.from(seen.values()).sort((a, b) => a.item_code.localeCompare(b.item_code));
+  }, [rows]);
 
   // Cross-tab sync: when Item Master changes anywhere, refresh partial pieces.
   const qc = useQueryClient();
