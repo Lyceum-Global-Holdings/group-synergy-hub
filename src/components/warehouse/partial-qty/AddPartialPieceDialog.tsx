@@ -315,8 +315,8 @@ export function AddPartialPieceDialog({ open, onOpenChange, defaultParentItemId 
             <div className="col-span-2">
               <Label>Parent Item *</Label>
               <PartialPieceItemPicker
-                value={parentItemId}
-                onSelect={(it) => setParentItemId(it?.parent_item_id ?? "")}
+                value={catalogItemId}
+                onSelect={(it) => setCatalogItemId(it?.catalog_item_id ?? "")}
                 placeholder="Search by item code or name…"
                 className="w-full"
               />
