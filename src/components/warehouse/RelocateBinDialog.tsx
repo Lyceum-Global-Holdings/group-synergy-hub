@@ -28,7 +28,7 @@ interface Props {
 export function RelocateBinDialog({ open, onOpenChange, bin }: Props) {
   const { toast } = useToast();
   const qc = useQueryClient();
-  const { locations } = useWarehouseLocations();
+  const { locations, isLoading: loadingLocations } = useWarehouseLocations();
   const [mode, setMode] = useState<Mode>('with_stock');
   const [targetId, setTargetId] = useState<string>('');
   const [reason, setReason] = useState('');
