@@ -154,19 +154,19 @@ export function CreateBinDialog({ open, onOpenChange, editingBin }: CreateBinDia
                 <div className="flex items-center gap-2">
                   <RadioGroupItem value="location" id="scope-location" />
                   <Label htmlFor="scope-location" className="font-normal cursor-pointer">
-                    Location-specific
+                    Single warehouse
                   </Label>
                 </div>
                 <div className="flex items-center gap-2">
                   <RadioGroupItem value="global" id="scope-global" />
                   <Label htmlFor="scope-global" className="font-normal cursor-pointer">
-                    Global (apply same code to multiple locations)
+                    Multiple warehouses (replicate same code)
                   </Label>
                 </div>
               </RadioGroup>
               <p className="text-xs text-muted-foreground">
-                The same bin code can exist in multiple locations. Each location gets its own physical bin and
-                independent stock.
+                Bin codes are unique per warehouse. Every sub-location and department under the selected
+                warehouse can use this bin automatically.
               </p>
             </div>
           )}
