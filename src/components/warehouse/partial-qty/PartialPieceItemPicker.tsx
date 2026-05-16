@@ -89,11 +89,11 @@ export function PartialPieceItemPicker({
               )}
               {items.map(it => (
                 <CommandItem
-                  key={it.parent_item_id}
+                  key={it.catalog_item_id}
                   value={`${it.item_code} ${it.item_name}`}
                   onSelect={() => { onSelect(it); setOpen(false); }}
                 >
-                  <Check className={cn("mr-2 h-4 w-4", value === it.parent_item_id ? "opacity-100" : "opacity-0")} />
+                  <Check className={cn("mr-2 h-4 w-4", value === it.catalog_item_id ? "opacity-100" : "opacity-0")} />
                   <div className="flex items-center gap-2 flex-1 min-w-0">
                     <Badge variant="outline" className="text-xs shrink-0">{it.item_code}</Badge>
                     <span className="font-medium truncate flex-1">{it.item_name}</span>
