@@ -246,35 +246,30 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
   const { data: itemLocationStock = {} } = useQuery<ItemLocationStockMap>({
     queryKey: ['all-items-location-stock', globalLocationId],
     queryFn: async () => {
-      // When a specific location is selected, pre-fetch its bin IDs for scoping
-      let locationBinIds: string[] | null = null;
+      let scopedLocationIds: Set<string> | null = null;
       if (globalLocationId) {
-        const { data: locBins } = await supabase
-          .from('warehouse_bins')
-          .select('id')
-          .eq('location_id', globalLocationId);
-        locationBinIds = locBins?.map(b => b.id) || [];
-        if (locationBinIds.length === 0) return {};
+        const { data: scopeRows } = await supabase.rpc('get_location_subtree_ids' as any, {
+          p_location_id: globalLocationId,
+        } as any);
+        scopedLocationIds = new Set(((scopeRows || []) as any[]).map((row) => String(row)));
+        if (scopedLocationIds.size === 0) scopedLocationIds.add(globalLocationId);
       }
 
       // Fetch allocations with cursor-based batching
-      const allocations: { warehouse_item_id: string; bin_id: string; available_quantity: number }[] = [];
+      const allocations: { warehouse_item_id: string; bin_id: string; location_id: string | null; available_quantity: number }[] = [];
       let lastAllocId: string | null = null;
       while (true) {
         let q = supabase
           .from('warehouse_bin_allocations')
-          .select('id, warehouse_item_id, bin_id, available_quantity')
+          .select('id, warehouse_item_id, bin_id, location_id, available_quantity')
           .gt('available_quantity', 0)
           .order('id')
           .limit(1000);
         if (lastAllocId) q = q.gt('id', lastAllocId);
-        if (locationBinIds) {
-          q = q.in('bin_id', locationBinIds.slice(0, 500));
-        }
         const { data, error: allocError } = await q;
         if (allocError) throw allocError;
         if (!data || data.length === 0) break;
-        allocations.push(...data);
+        allocations.push(...data.filter((a) => !scopedLocationIds || scopedLocationIds.has(a.location_id || '')));
         if (data.length < 1000) break;
         lastAllocId = data[data.length - 1].id;
       }
