@@ -149,11 +149,7 @@ export const useUpdateSupplierEvaluation = () => {
         .single();
 
       if (error) throw error;
-      return data;
-    },
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["supplier-evaluations"] });
-      queryClient.invalidateQueries({ queryKey: ["supplier-evaluation", data.id] });
+      return flattenWarehouseItem(data as any) as SupplierEvaluation;
       // Update supplier rating based on updated evaluation
       updateRating.mutate(data.supplier_id);
       toast({
