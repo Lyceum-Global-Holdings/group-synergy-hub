@@ -182,6 +182,11 @@ export const useWarehouseItems = (options?: { skipCompanyFilter?: boolean; disab
         throw new Error(`Catalog entry missing for item_code ${itemDataWithoutStock.item_code}. Create the catalog row first.`);
       }
 
+      // Stage 2: mirrored master fields (name, category_id, brand, sku, etc.) are
+      // overwritten from warehouse_item_catalog by the wh_items_sync_from_catalog
+      // BEFORE trigger. Any values supplied here for those columns are ignored —
+      // catalog always wins. Per-company fields (location_id, base_uom, unit_cost,
+      // selling_price, reorder/min/max, status, notes, stock) remain writable.
       const { data, error } = await supabase
         .from('warehouse_items')
         .insert({
