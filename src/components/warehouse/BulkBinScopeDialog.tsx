@@ -120,7 +120,7 @@ export function BulkBinScopeDialog({ open, onOpenChange, bins }: Props) {
             </div>
 
             <div>
-              <Label className="text-sm font-medium">Target locations</Label>
+              <Label className="text-sm font-medium">Target warehouses</Label>
               <ScrollArea className="h-48 mt-2 border rounded-md p-2">
                 <div className="space-y-1">
                   {locationOptions.map((opt) => (
