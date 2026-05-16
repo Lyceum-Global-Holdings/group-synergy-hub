@@ -1,0 +1,10 @@
+REVOKE ALL ON FUNCTION public.validate_bin_allocation_location() FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.stock_transactions_location_guard() FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.set_stock_transaction_balances() FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.recompute_item_primary_location(uuid) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.tg_sync_item_location_from_allocation() FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.tg_sync_items_when_bin_relocated() FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.get_company_inventory_at_location(uuid, uuid) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.get_company_inventory_at_location(uuid, uuid) TO authenticated;
+REVOKE ALL ON FUNCTION public.list_warehouse_inventory(uuid, text, uuid, text, uuid[], timestamptz, uuid, int, text, uuid) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.list_warehouse_inventory(uuid, text, uuid, text, uuid[], timestamptz, uuid, int, text, uuid) TO authenticated;
