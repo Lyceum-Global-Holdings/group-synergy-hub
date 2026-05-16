@@ -292,7 +292,10 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
       
       if (bins.length === 0) return {};
       
-      const locationIds = [...new Set(bins.map(b => b.location_id).filter(Boolean))] as string[];
+      const locationIds = [...new Set([
+        ...allocations.map(a => a.location_id).filter(Boolean),
+        ...bins.map(b => b.location_id).filter(Boolean),
+      ])] as string[];
       if (locationIds.length === 0) return {};
       
       const locations: { id: string; name: string }[] = [];
@@ -316,7 +319,7 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
         const binId = alloc.bin_id;
         if (!binId) return;
         
-        const locationId = binLocationMap.get(binId);
+        const locationId = alloc.location_id ?? binLocationMap.get(binId);
         if (!locationId) return;
         
         const locationName = locationNameMap.get(locationId);
