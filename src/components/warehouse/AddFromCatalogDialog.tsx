@@ -400,9 +400,15 @@ export function AddFromCatalogDialog({ open, onOpenChange }: AddFromCatalogDialo
               </div>
               <div className="space-y-2">
                 <Label htmlFor="bin">Assign to Bin *</Label>
-                <Select value={selectedBinId} onValueChange={setSelectedBinId} disabled={!effectiveLocationId}>
+                <Select value={selectedBinId} onValueChange={setSelectedBinId} disabled={!effectiveLocationId || filteredBins.length === 0}>
                   <SelectTrigger>
-                    <SelectValue placeholder={effectiveLocationId ? 'Select a bin' : 'Select location first'} />
+                    <SelectValue placeholder={
+                      !effectiveLocationId
+                        ? 'Select location first'
+                        : filteredBins.length === 0
+                          ? 'No bins at this location — create one in Bin Master'
+                          : 'Select a bin'
+                    } />
                   </SelectTrigger>
                   <SelectContent>
                     {filteredBins.map(bin => {
@@ -416,6 +422,9 @@ export function AddFromCatalogDialog({ open, onOpenChange }: AddFromCatalogDialo
                     })}
                   </SelectContent>
                 </Select>
+                <p className="text-xs text-muted-foreground">
+                  Showing bins that physically belong to the selected location only.
+                </p>
               </div>
             </div>
           </div>
