@@ -14,6 +14,14 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link rel="dns-prefetch" href="https://fonts.googleapis.com" />
+    <!-- Stage 4: explicitly request font-display:swap so text paints with the
+         system fallback and never blocks FCP/LCP on the webfont network. -->
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      media="print"
+      onload="this.media='all'"
+    />
     <!-- Supabase API + Realtime: the first auth + telemetry round-trips happen
          before any user interaction, so paying DNS/TLS up front saves ~200–400 ms TTFB. -->
     <link rel="preconnect" href="https://ajsyvuozkgcnnvvefeed.supabase.co" crossorigin />
