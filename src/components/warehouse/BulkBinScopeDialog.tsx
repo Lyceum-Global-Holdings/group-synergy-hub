@@ -38,7 +38,11 @@ export function BulkBinScopeDialog({ open, onOpenChange, bins }: Props) {
   const [mode, setMode] = useState<'clone' | 'replace'>('clone');
   const [global, setGlobal] = useState(false);
 
-  const locationOptions = useMemo(() => buildLocationOptions(locations, { activeOnly: true }), [locations]);
+  // Bins live at the warehouse (root) level; only top-level locations are valid targets.
+  const locationOptions = useMemo(
+    () => buildLocationOptions(locations, { activeOnly: true }).filter((o) => o.depth === 0),
+    [locations]
+  );
 
   const reset = () => {
     setCompanyIds([]);
@@ -68,8 +72,9 @@ export function BulkBinScopeDialog({ open, onOpenChange, bins }: Props) {
         <DialogHeader>
           <DialogTitle>Change bin scope ({bins.length} bin{bins.length === 1 ? '' : 's'})</DialogTitle>
           <DialogDescription>
-            Replicate the selected bins across multiple companies and warehouse locations / sub-locations.
-            Each (bin code · company · location) tuple becomes one storage bin row, following SAP EWM / GS1
+            Replicate the selected bins across multiple companies and warehouses. Each (bin code · company · warehouse)
+            tuple becomes one storage bin row; sub-locations and departments under each warehouse inherit it
+            automatically — SAP EWM / Oracle WMS / GS1 storage-bin model.
             storage-bin semantics.
           </DialogDescription>
         </DialogHeader>
@@ -115,7 +120,7 @@ export function BulkBinScopeDialog({ open, onOpenChange, bins }: Props) {
             </div>
 
             <div>
-              <Label className="text-sm font-medium">Target locations</Label>
+              <Label className="text-sm font-medium">Target warehouses</Label>
               <ScrollArea className="h-48 mt-2 border rounded-md p-2">
                 <div className="space-y-1">
                   {locationOptions.map((opt) => (

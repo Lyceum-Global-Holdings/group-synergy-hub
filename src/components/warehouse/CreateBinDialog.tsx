@@ -75,8 +75,13 @@ export function CreateBinDialog({ open, onOpenChange, editingBin }: CreateBinDia
     setCodeError(null);
   }, [editingBin, open]);
 
+  // Bins live at the warehouse (root) level. Sub-locations and departments
+  // automatically inherit access — matches SAP EWM / Oracle WMS storage-bin model.
   const sortedLocations = useMemo(
-    () => [...locations].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })),
+    () =>
+      [...locations]
+        .filter((l) => !l.parent_id)
+        .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })),
     [locations]
   );
 
@@ -137,7 +142,7 @@ export function CreateBinDialog({ open, onOpenChange, editingBin }: CreateBinDia
           <DialogDescription>
             {editingBin
               ? 'Update bin information'
-              : 'Add a storage bin. Choose a single location, or apply the same code across multiple locations.'}
+              : 'Add a storage bin at the warehouse level. All sub-locations and departments under that warehouse will be able to use this bin automatically.'}
           </DialogDescription>
         </DialogHeader>
 
@@ -149,19 +154,19 @@ export function CreateBinDialog({ open, onOpenChange, editingBin }: CreateBinDia
                 <div className="flex items-center gap-2">
                   <RadioGroupItem value="location" id="scope-location" />
                   <Label htmlFor="scope-location" className="font-normal cursor-pointer">
-                    Location-specific
+                    Single warehouse
                   </Label>
                 </div>
                 <div className="flex items-center gap-2">
                   <RadioGroupItem value="global" id="scope-global" />
                   <Label htmlFor="scope-global" className="font-normal cursor-pointer">
-                    Global (apply same code to multiple locations)
+                    Multiple warehouses (replicate same code)
                   </Label>
                 </div>
               </RadioGroup>
               <p className="text-xs text-muted-foreground">
-                The same bin code can exist in multiple locations. Each location gets its own physical bin and
-                independent stock.
+                Bin codes are unique per warehouse. Every sub-location and department under the selected
+                warehouse can use this bin automatically.
               </p>
             </div>
           )}
@@ -220,13 +225,13 @@ export function CreateBinDialog({ open, onOpenChange, editingBin }: CreateBinDia
 
             {(editingBin || scope === 'location') ? (
               <div className="space-y-2">
-                <Label htmlFor="location_id">Location *</Label>
+                <Label htmlFor="location_id">Warehouse *</Label>
                 <Select
                   value={formData.location_id}
                   onValueChange={(value) => setFormData((p) => ({ ...p, location_id: value }))}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Select location" />
+                    <SelectValue placeholder="Select warehouse" />
                   </SelectTrigger>
                   <SelectContent>
                     {sortedLocations.map((location) => (
@@ -236,6 +241,9 @@ export function CreateBinDialog({ open, onOpenChange, editingBin }: CreateBinDia
                     ))}
                   </SelectContent>
                 </Select>
+                <p className="text-xs text-muted-foreground">
+                  Bin is shared across every sub-location and department under this warehouse.
+                </p>
               </div>
             ) : (
               <div className="space-y-2">

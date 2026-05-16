@@ -15,6 +15,7 @@ import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle } from 'lucide-react';
 import { useWarehouseBins } from '@/hooks/useWarehouseBins';
+import { useWarehouseLocations } from '@/hooks/useWarehouseLocations';
 import { CreateBinDialog } from '@/components/warehouse/CreateBinDialog';
 import { BulkBinScopeDialog } from '@/components/warehouse/BulkBinScopeDialog';
 import { WarehouseBin } from '@/types/itemBin';
@@ -28,6 +29,9 @@ export function BinMasterTab() {
   const [isBulkScopeOpen, setIsBulkScopeOpen] = useState(false);
 
   const { bins, isLoading, deleteBin, isDeleting } = useWarehouseBins();
+  const { locations } = useWarehouseLocations();
+  const locationName = (id: string | null | undefined) =>
+    (id && locations.find((l) => l.id === id)?.name) || '—';
   const { canDelete } = useIsAdminOrHigher();
   const isAdminOrHigher = canDelete;
 
@@ -87,7 +91,9 @@ export function BinMasterTab() {
       <Alert>
         <AlertCircle className="h-4 w-4" />
         <AlertDescription>
-          Bins are shared across all companies and scoped by warehouse location.
+          Bin codes are unique per warehouse and per company. Every sub-location and department under a
+          warehouse can use that warehouse's bins automatically — no need to duplicate the bin per floor or
+          department.
         </AlertDescription>
       </Alert>
 
@@ -106,6 +112,7 @@ export function BinMasterTab() {
               )}
               <TableHead>Bin Code</TableHead>
               <TableHead>Name</TableHead>
+              <TableHead>Warehouse</TableHead>
               <TableHead>Capacity</TableHead>
               <TableHead>Current Qty</TableHead>
               <TableHead>Status</TableHead>
@@ -115,13 +122,13 @@ export function BinMasterTab() {
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={isAdminOrHigher ? 7 : 6} className="text-center py-8">
+                <TableCell colSpan={isAdminOrHigher ? 8 : 7} className="text-center py-8">
                   Loading bins...
                 </TableCell>
               </TableRow>
             ) : filteredBins.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={isAdminOrHigher ? 7 : 6} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={isAdminOrHigher ? 8 : 7} className="text-center py-8 text-muted-foreground">
                   No bins found. Create your first bin to get started.
                 </TableCell>
               </TableRow>
@@ -146,6 +153,9 @@ export function BinMasterTab() {
                     </div>
                   </TableCell>
                   <TableCell>{bin.name}</TableCell>
+                  <TableCell className="text-muted-foreground">
+                    {locationName((bin as any).root_location_id ?? bin.location_id)}
+                  </TableCell>
                   <TableCell>{bin.capacity || '-'}</TableCell>
                   <TableCell>{bin.current_quantity || 0}</TableCell>
                   <TableCell>
