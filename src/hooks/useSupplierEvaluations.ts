@@ -219,7 +219,7 @@ export const useSupplierEvaluationEntries = (evaluationId: string) => {
         .order("receipt_date", { ascending: false });
 
       if (error) throw error;
-      return data || [];
+      return ((data || []) as any[]).map(flattenWarehouseItem) as SupplierEvaluationEntry[];
     },
     enabled: !!evaluationId,
   });
