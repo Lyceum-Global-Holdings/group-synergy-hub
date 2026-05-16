@@ -142,7 +142,7 @@ export function CreateBinDialog({ open, onOpenChange, editingBin }: CreateBinDia
           <DialogDescription>
             {editingBin
               ? 'Update bin information'
-              : 'Add a storage bin. Choose a single location, or apply the same code across multiple locations.'}
+              : 'Add a storage bin at the warehouse level. All sub-locations and departments under that warehouse will be able to use this bin automatically.'}
           </DialogDescription>
         </DialogHeader>
 
