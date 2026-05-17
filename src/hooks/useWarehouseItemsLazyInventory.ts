@@ -60,6 +60,7 @@ export function useWarehouseItemsLazyInventory({
       status,
       supplierId,
       stockMode,
+      ownerCompanyId,
     ],
     queryFn: async ({ pageParam }: { pageParam: Cursor | null }) => {
       const permittedLocationIds = permissions && !permissions.viewAllLocations
