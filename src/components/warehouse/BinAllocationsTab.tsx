@@ -23,6 +23,7 @@ import { useCompany } from '@/contexts/CompanyContext';
 import { useIsAdminOrHigher } from '@/hooks/useIsAdminOrHigher';
 import { CreateBinAllocationDialog } from './CreateBinAllocationDialog';
 import { ReturnStockFromSublocationDialog } from './ReturnStockFromSublocationDialog';
+import { MoveBinAllocationDialog } from './MoveBinAllocationDialog';
 import { BinAllocationQRDialog } from './BinAllocationQRDialog';
 import { generateBulkBinQRCodePdf, downloadBulkBinQRCodePdf } from '@/utils/bulkBinQRCodePdf';
 import { toast } from 'sonner';
