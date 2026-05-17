@@ -34,6 +34,7 @@ export function BinMasterTab() {
 
   const { bins, isLoading, deleteBin, isDeleting } = useWarehouseBins();
   const { locations } = useWarehouseLocations();
+  const { mutate: setBinSharing, isPending: isSettingSharing } = useSetBinSharing();
   const locationName = (id: string | null | undefined) =>
     (id && locations.find((l) => l.id === id)?.name) || '—';
   const { canDelete } = useIsAdminOrHigher();
