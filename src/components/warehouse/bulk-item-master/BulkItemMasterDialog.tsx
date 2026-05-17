@@ -26,11 +26,46 @@ import {
   AlertCircle,
   Sparkles,
   RotateCcw,
+  Copy,
+  Download,
 } from 'lucide-react';
 import { useBulkItemMaster } from './useBulkItemMaster';
 import { PasteNamesDialog } from './PasteNamesDialog';
 import type { BulkItemMasterRow } from './types';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
+
+function resolveCode(row: BulkItemMasterRow): string {
+  return (row.item_code?.trim() || row.auto_item_code || '').trim();
+}
+
+function csvEscape(v: string): string {
+  if (/[",\r\n]/.test(v)) return `"${v.replace(/"/g, '""')}"`;
+  return v;
+}
+
+function buildExportRows(
+  rows: BulkItemMasterRow[],
+  categories: any[],
+  units: any[],
+) {
+  const catMap = new Map(categories.map((c) => [c.id, c.name as string]));
+  const uomMap = new Map(units.map((u) => [u.id, (u.abbreviation as string) || (u.name as string)]));
+  return rows
+    .map((r) => ({
+      code: resolveCode(r),
+      name: r.name?.trim() ?? '',
+      category: r.category_id ? catMap.get(r.category_id) ?? '' : '',
+      uom: r.unit_id ? uomMap.get(r.unit_id) ?? '' : '',
+    }))
+    .filter((r) => r.code);
+}
+
+function timestamp() {
+  const d = new Date();
+  const p = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}`;
+}
 
 interface Props {
   open: boolean;
