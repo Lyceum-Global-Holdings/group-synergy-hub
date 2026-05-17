@@ -1,50 +1,47 @@
 ## Goal
-When a row's item code already exists in the catalog, let the user choose how to handle the conflict in the **Bulk create items** dialog. Today every duplicate is hard-flagged as `invalid` ("Item code already exists in the catalog"), forcing the user to delete/rename rows manually.
+Let users paste both item codes and opening quantities (and optionally unit cost / notes) in one step from the "Bulk add from catalog" dialog on `/warehouse/inventory`, instead of only pasting codes and then editing qty per row.
 
-## New toolbar control
-Add a small **"On duplicate code"** Select to the dialog toolbar (next to *Reset*) with three options:
+## Solution
+Extend the existing paste flow in `src/components/warehouse/bulk-catalog-import/` to accept tabular paste (Excel/Sheets-friendly TSV or CSV), so each line becomes one fully-populated row.
 
-- **Fail** (default — current behavior). Row → `invalid`. Nothing inserted.
-- **Skip**. Row → new `skipped` status. Row is not submitted but stays visible with a "Skipped — code already exists" tag. Excluded from the create count.
-- **Update**. Row → `valid` (with a warning "Will update existing item"). On submit, the row PATCHes the existing catalog item by id instead of inserting.
+### Accepted paste formats
+Auto-detect delimiter (`\t`, `,`, or `;`). Each line:
 
-Policy applies to **catalog-collision** errors only. In-batch duplicates (same code typed twice in the grid) remain a hard `invalid` regardless of policy.
+```
+<code>      <opening_qty>   [unit_cost]   [notes]
+ITM-001     50              12.50        Opening from FY26 audit
+5012345678900  10
+ITM-XYZ     0
+```
 
-## Changes (frontend only, 3 files)
+- Column 1 (required): item code / GTIN / SKU
+- Column 2 (optional): opening qty (number; blank or missing → 0)
+- Column 3 (optional): unit cost
+- Column 4 (optional): notes
+- Single-column paste keeps working (qty defaults to 0) — fully backward compatible.
+- Header row auto-skipped if first cell matches `/code|item|sku|gtin/i`.
 
-### 1. `src/components/warehouse/bulk-item-master/types.ts`
-- Extend `BulkItemRowStatus` with `'skipped' | 'updated'`.
-- Add `existing_catalog_id?: string | null` to `BulkItemMasterRow` (set during `recompute` when the code matches an existing catalog row; used by submit for the update path).
+Location and bin come from the dialog defaults (already in `useBulkCatalogImport`). If a row has qty > 0 but no default location/bin, it stays in the grid flagged invalid with the existing message ("Location required when qty > 0" / "Bin required when qty > 0") — user fixes inline before submit. This reuses the validator without backend changes.
 
-### 2. `src/components/warehouse/bulk-item-master/useBulkItemMaster.ts`
-- Add `duplicatePolicy: 'fail' | 'skip' | 'update'` state (default `'fail'`) and a `setDuplicatePolicy` setter; expose both on the return.
-- Replace `existingCodes: Set<string>` with `existingCodeToId: Map<string, string>` so we can resolve the target id for updates.
-- In `recompute`, when `existingCodeToId.has(lower)`:
-  - set `next.existing_catalog_id = existingCodeToId.get(lower)`;
-  - branch by `duplicatePolicy`:
-    - `fail` → push current error (unchanged).
-    - `skip` → warning + force `status = 'skipped'` (skip the valid/invalid assignment).
-    - `update` → warning "Will update existing item" + allow `status = 'valid'` to be computed from remaining errors.
-- In `submit`:
-  - Partition `valid` rows into `creates` (no `existing_catalog_id`) and `updates` (have it).
-  - Creates: existing `bulkCreateItemsAsync` path (unchanged).
-  - Updates: `Promise.all` on `updateItemAsync({ id, name, description, brand, category_id, unit_id })` — do **not** change `item_code` (it's the match key).
-  - On success mark create rows `imported` and update rows `updated`.
-  - Toast summary: `"Imported X, updated Y"` (omit zero counts).
-- `validCount` continues to count rows that will act (creates + updates). Add `skippedCount` for the toolbar chip.
-- Expose `duplicatePolicy`, `setDuplicatePolicy`, `skippedCount`.
+### File changes (frontend only)
+1. **`PasteCodesDialog.tsx`**
+   - Update title/description to mention multi-column paste with example.
+   - Change `onResolve` signature to pass parsed rows: `{ code: string; opening_qty?: number; unit_cost?: number; notes?: string }[]`.
+   - Add a tiny parser: split lines, detect delimiter per line, trim cells, skip header, coerce numbers (ignore non-numeric qty → 0 with row warning).
+   - Toast summary: "X matched · Y not found · Z with qty".
 
-### 3. `src/hooks/useWarehouseItemCatalog.ts`
-- Add `updateItemAsync: updateMutation.mutateAsync` to the return (mirrors existing `updateItem`). Tiny additive change — no behavior shift.
+2. **`useBulkCatalogImport.ts`**
+   - Rename/extend `seedFromCodes` → `seedFromPaste(entries)`. Same catalog lookup batched in one `.or(...)` query.
+   - When building each `newRow`, pass `opening_qty`, `unit_cost`, `notes` from the entry; default `location_id` / `bin_id` from `defaultsRef`.
+   - Keep `seedFromCodes` as a thin wrapper for any other caller (none today, but safe).
 
-### 4. `src/components/warehouse/bulk-item-master/BulkItemMasterDialog.tsx`
-- Add a labeled `<Select>` ("On duplicate code: Fail / Skip / Update") in the toolbar bound to `duplicatePolicy`.
-- Status badges: add **Skipped** (secondary) and **Updated** (outline + success colour, mirroring "Imported"). Treat them as terminal/disabled rows like `imported`.
-- Submit button label: `Process N item(s)` when policy is `update` or `skip` (since "Create" is no longer accurate); keep `Create N item(s)` when policy is `fail`.
-- Toolbar chip: show `{skippedCount} skipped` when > 0.
+3. **`BulkCatalogToInventoryDialog.tsx`**
+   - Wire the new resolver signature; no UI rework — same paste button.
 
-## Out of scope
-- No DB migration, no RPC change, no schema change.
-- Bulk PATCH endpoint is not introduced — updates run as parallel single-row PATCHes (typical N for bulk import is small, and the existing `updateMutation` already handles auth/invalidations).
-- In-batch dedupe rules are unchanged.
-- Excel-paste/classifier behavior untouched.
+### Out of scope
+- No DB / RPC changes (`bulk_provision_inventory_from_catalog` already accepts `opening_qty`, `unit_cost`, `notes`).
+- No new catalog creation flow (that's the separate Bulk Item Master).
+- No bin auto-selection logic — bin still comes from the row default; qty>0 without a bin stays flagged.
+
+### Validation
+Manual: paste a 3-row TSV with mixed columns, confirm rows appear pre-filled, invalid rows surface inline, submit runs through the existing RPC.
