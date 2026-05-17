@@ -75,6 +75,7 @@ export function ItemMasterDefinitionTab({ onNavigateToInventory, onNavigateToBin
   const [statusFilter, setStatusFilter] = useState('all');
   const [supplierFilter, setSupplierFilter] = useState('all');
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [isBulkOpen, setIsBulkOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<CatalogItem | null>(null);
   const [viewingItem, setViewingItem] = useState<CatalogItem | null>(null);
   const [stockMovementItem, setStockMovementItem] = useState<CatalogItem | null>(null);
@@ -332,6 +333,9 @@ export function ItemMasterDefinitionTab({ onNavigateToInventory, onNavigateToBin
             <Button variant="outline" onClick={handleDownloadExcel} disabled={isExporting}>
               {isExporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
               {isExporting ? 'Exporting...' : 'Download Excel'}
+            </Button>
+            <Button variant="outline" onClick={() => setIsBulkOpen(true)}>
+              <Plus className="mr-2 h-4 w-4" /> Bulk create items
             </Button>
             <Button onClick={() => setIsCreateDialogOpen(true)}>
               <Plus className="mr-2 h-4 w-4" /> Add Item
