@@ -10,7 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Plus, Trash2, ClipboardPaste, Loader2, X, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Plus, Trash2, ClipboardPaste, Loader2, X, CheckCircle2, AlertCircle, CopyCheck } from 'lucide-react';
 import { useCompanies } from '@/hooks/useCompanies';
 import { useCompany } from '@/contexts/CompanyContext';
 import { useLocationFilter } from '@/contexts/LocationFilterContext';
@@ -125,6 +125,29 @@ export function BulkCatalogToInventoryDialog({ open, onOpenChange }: Props) {
     void seedFromPaste(entries);
   };
 
+  const applyFirstRowBinToAll = () => {
+    const first = rows[0];
+    if (!first || !first.bin_id) {
+      toast({
+        title: 'No bin on first row',
+        description: 'Select a company, location and bin on row 1 first.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    let applied = 0;
+    rows.forEach((r, i) => {
+      if (i === 0) return;
+      setRow(r.rowId, {
+        company_id: first.company_id,
+        location_id: first.location_id,
+        bin_id: first.bin_id,
+      });
+      applied += 1;
+    });
+    toast({ title: 'Bin applied', description: `Applied row 1 bin to ${applied} row${applied === 1 ? '' : 's'}.` });
+  };
+
   return (
     <>
       <Sheet open={open} onOpenChange={onOpenChange}>
@@ -151,6 +174,9 @@ export function BulkCatalogToInventoryDialog({ open, onOpenChange }: Props) {
             </Button>
             <Button size="sm" variant="outline" onClick={() => setPasteOpen(true)}>
               <ClipboardPaste className="h-4 w-4 mr-1" /> Paste codes &amp; qty
+            </Button>
+            <Button size="sm" variant="outline" onClick={applyFirstRowBinToAll} disabled={rows.length < 2 || !rows[0]?.bin_id}>
+              <CopyCheck className="h-4 w-4 mr-1" /> Apply row 1 bin to all
             </Button>
             <Button size="sm" variant="ghost" onClick={clearInvalid} disabled={invalidCount === 0}>
               Clear invalid ({invalidCount})
