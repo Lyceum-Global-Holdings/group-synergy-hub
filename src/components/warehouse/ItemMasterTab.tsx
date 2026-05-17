@@ -72,6 +72,9 @@ const BulkInventoryUpdateDialog = lazy(() =>
 const BulkInventoryDeleteDialog = lazy(() =>
   import('@/components/warehouse/BulkInventoryDeleteDialog').then(m => ({ default: m.BulkInventoryDeleteDialog }))
 );
+const BulkChangeStockOwnerDialog = lazy(() =>
+  import('@/components/warehouse/BulkChangeStockOwnerDialog').then(m => ({ default: m.BulkChangeStockOwnerDialog }))
+);
 import { WarehouseItem } from '@/types/itemBin';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -141,6 +144,7 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
   const [visibleColumns, setVisibleColumns] = useState<Record<InvColumnKey, boolean>>(INV_DEFAULT_VISIBLE);
   const [selectedItemIds, setSelectedItemIds] = useState<Set<string>>(new Set());
   const [isBulkUpdateOpen, setIsBulkUpdateOpen] = useState(false);
+  const [isBulkChangeOwnerOpen, setIsBulkChangeOwnerOpen] = useState(false);
   const [isBulkDeleteOpen, setIsBulkDeleteOpen] = useState(false);
   
   // Filter states
@@ -1060,6 +1064,7 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
           <CheckSquare className="h-4 w-4 text-primary" />
           <span className="text-sm font-medium">{selectedItemIds.size} item(s) selected</span>
           <Button size="sm" variant="outline" onClick={() => setIsBulkUpdateOpen(true)}>Bulk Update</Button>
+          <Button size="sm" variant="outline" onClick={() => setIsBulkChangeOwnerOpen(true)}>Change Stock Owner</Button>
           {canDelete && (
             <Button size="sm" variant="destructive" onClick={() => setIsBulkDeleteOpen(true)}>Bulk Delete</Button>
           )}
@@ -1088,6 +1093,17 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
             onOpenChange={setIsBulkDeleteOpen}
             selectedItems={selectedItems}
             onComplete={clearSelection}
+          />
+        </Suspense>
+      )}
+      {isBulkChangeOwnerOpen && (
+        <Suspense fallback={null}>
+          <BulkChangeStockOwnerDialog
+            open={isBulkChangeOwnerOpen}
+            onOpenChange={setIsBulkChangeOwnerOpen}
+            selectedIds={selectedItemIds}
+            onComplete={clearSelection}
+            defaultFromCompanyId={ownerCompanyFilter === 'all' ? null : ownerCompanyFilter}
           />
         </Suspense>
       )}
