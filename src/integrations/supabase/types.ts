@@ -19475,6 +19475,7 @@ export type Database = {
           description: string | null
           id: string
           is_global_template: boolean
+          is_shared: boolean
           location_id: string | null
           name: string
           notes: string | null
@@ -19494,6 +19495,7 @@ export type Database = {
           description?: string | null
           id?: string
           is_global_template?: boolean
+          is_shared?: boolean
           location_id?: string | null
           name: string
           notes?: string | null
@@ -19513,6 +19515,7 @@ export type Database = {
           description?: string | null
           id?: string
           is_global_template?: boolean
+          is_shared?: boolean
           location_id?: string | null
           name?: string
           notes?: string | null
@@ -20944,6 +20947,36 @@ export type Database = {
       }
     }
     Functions: {
+      add_shared_bin_allocation: {
+        Args: {
+          _bin_id: string
+          _notes?: string
+          _owner_company_id: string
+          _quantity: number
+          _warehouse_item_id: string
+        }
+        Returns: {
+          allocated_quantity: number
+          available_quantity: number | null
+          bin_id: string
+          company_id: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          location_id: string | null
+          notes: string | null
+          reserved_quantity: number
+          secondary_quantity: number | null
+          updated_at: string
+          warehouse_item_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "warehouse_bin_allocations"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       adjust_bin_allocation_from_scan: {
         Args: {
           p_allocation_id: string
@@ -22855,6 +22888,35 @@ export type Database = {
           revalued_balance: number
           unrealized_gain_loss: number
         }[]
+      }
+      set_bin_sharing: {
+        Args: { _bin_id: string; _is_shared: boolean }
+        Returns: {
+          bin_code: string
+          bin_type_id: string | null
+          capacity: number | null
+          company_id: string | null
+          created_at: string
+          created_by: string | null
+          current_quantity: number | null
+          description: string | null
+          id: string
+          is_global_template: boolean
+          is_shared: boolean
+          location_id: string | null
+          name: string
+          notes: string | null
+          parent_bin_id: string | null
+          root_location_id: string | null
+          status: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "warehouse_bins"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       set_location_company_assignments_admin: {
         Args: {
