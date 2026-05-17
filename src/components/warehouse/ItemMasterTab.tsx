@@ -702,14 +702,6 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
                       )}
                     </TableCell>
                   )}
-                  {col('company') && (
-                    <TableCell>
-                      {item.company_id
-                        ? companyById.get(item.company_id)?.name || '-'
-                        : 'All Companies'
-                      }
-                    </TableCell>
-                  )}
                   {col('stock_owner') && (
                     <TableCell>
                       {item.stock_owners && item.stock_owners.length > 0 ? (
