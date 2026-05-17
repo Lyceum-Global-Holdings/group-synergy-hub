@@ -398,19 +398,20 @@ export function useBulkItemMaster(): UseBulkItemMasterReturn {
       const autoTargets = creates.filter((r) => !r.code_manual);
       const byCatCode = new Map<string, BulkItemMasterRow[]>();
       autoTargets.forEach((r) => {
-        const cat = categoryById.get(r.category_id!);
-        const code = cat?.code?.trim().toUpperCase();
-        if (!code) return;
-        if (!byCatCode.has(code)) byCatCode.set(code, []);
-        byCatCode.get(code)!.push(r);
+        const codes = resolveCategoryCodes(r.category_id);
+        if (!codes) return;
+        const key = `${codes.parent}-${codes.leaf}`;
+        if (!byCatCode.has(key)) byCatCode.set(key, []);
+        byCatCode.get(key)!.push(r);
       });
 
       const finalCodes = new Map<string, string>();
-      for (const [catCode, group] of byCatCode.entries()) {
+      for (const [compoundKey, group] of byCatCode.entries()) {
         const codes = await allocateItemCodes({
-          categoryCode: catCode,
+          categoryCode: compoundKey, // "PARENT-LEAF"
           count: group.length,
           scope: 'catalog',
+          padWidth: 4,
         });
         group.forEach((r, i) => finalCodes.set(r.rowId, codes[i]));
       }
