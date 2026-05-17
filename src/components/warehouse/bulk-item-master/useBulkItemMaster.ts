@@ -75,25 +75,55 @@ export function useBulkItemMaster(): UseBulkItemMasterReturn {
     return map;
   }, [existingItems]);
 
+  // Codes follow the standard XXX-XXX-XXX-NNNN format:
+  //   INV-{PARENT_CAT}-{LEAF_CAT}-{NNNN}
+  // (If the leaf category has no parent, the leaf code is used for both
+  //  the second and third segments so the shape is preserved.)
   const maxByCategoryCode = useMemo(() => {
     const map = new Map<string, number>();
     existingItems.forEach((it) => {
       const code = it.item_code || '';
-      const m = code.match(/^INV-([A-Z0-9]+)-(\d+)/i);
-      if (!m) return;
-      const cat = m[1].toUpperCase();
-      const seq = Number(m[2]);
-      if (!Number.isFinite(seq)) return;
-      if ((map.get(cat) ?? 0) < seq) map.set(cat, seq);
+      // New 4-segment format
+      let m = code.match(/^INV-([A-Z0-9]+)-([A-Z0-9]+)-(\d+)$/i);
+      let key = '';
+      let seq = NaN;
+      if (m) {
+        key = `${m[1].toUpperCase()}-${m[2].toUpperCase()}`;
+        seq = Number(m[3]);
+      } else {
+        // Legacy 3-segment format INV-CAT-NNN — treat as parent=leaf=CAT
+        m = code.match(/^INV-([A-Z0-9]+)-(\d+)$/i);
+        if (m) {
+          const cat = m[1].toUpperCase();
+          key = `${cat}-${cat}`;
+          seq = Number(m[2]);
+        }
+      }
+      if (!key || !Number.isFinite(seq)) return;
+      if ((map.get(key) ?? 0) < seq) map.set(key, seq);
     });
     return map;
   }, [existingItems]);
 
   const categoryById = useMemo(() => {
-    const m = new Map<string, { id: string; name: string; code?: string | null }>();
-    categories.forEach((c) => m.set(c.id, c));
+    const m = new Map<string, { id: string; name: string; code?: string | null; parent_id?: string | null }>();
+    categories.forEach((c: any) => m.set(c.id, c));
     return m;
   }, [categories]);
+
+  /** Resolve a category to its (parent3, leaf3) code pair, uppercased. */
+  const resolveCategoryCodes = useCallback(
+    (categoryId: string | null): { parent: string; leaf: string } | null => {
+      if (!categoryId) return null;
+      const leaf = categoryById.get(categoryId);
+      const leafCode = leaf?.code?.trim().toUpperCase();
+      if (!leafCode) return null;
+      const parent = leaf?.parent_id ? categoryById.get(leaf.parent_id) : null;
+      const parentCode = parent?.code?.trim().toUpperCase() || leafCode;
+      return { parent: parentCode, leaf: leafCode };
+    },
+    [categoryById],
+  );
 
   const recompute = useCallback(
     (input: BulkItemMasterRow[]): BulkItemMasterRow[] => {
