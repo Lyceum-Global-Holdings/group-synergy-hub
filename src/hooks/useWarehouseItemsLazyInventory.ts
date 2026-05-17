@@ -40,6 +40,7 @@ export function useWarehouseItemsLazyInventory({
   supplierId,
   locationId,
   stockMode = 'all',
+  ownerCompanyId = null,
 }: UseWarehouseItemsLazyInventoryOptions) {
   const { selectedCompany, isViewingAllCompanies } = useCompany();
   const { data: permissions } = useCurrentUserLocationPermissions();
