@@ -195,6 +195,8 @@ export function StockAdjustmentDialog({
       transactionNotes = `Manual stock ${adjustmentType} - Bin: ${bins.find(b => b.id === binId)?.bin_code}`;
     }
 
+    const selectedBin = bins.find(b => b.id === binId);
+
     createTransaction({
       item_id: itemId,
       transaction_type: transactionType,
@@ -206,6 +208,8 @@ export function StockAdjustmentDialog({
       total_value: unitCost ? parseFloat(unitCost) * Math.abs(quantityChange) : undefined,
       notes: transactionNotes,
       issued_to_location_id: issuedLocationId,
+      bin_id: binId,
+      location_id: selectedBin?.location_id ?? undefined,
     });
 
     onOpenChange(false);
