@@ -549,6 +549,11 @@ export function ItemMasterDefinitionTab({ onNavigateToInventory, onNavigateToBin
           />
         </Suspense>
       )}
+      {isBulkOpen && (
+        <Suspense fallback={null}>
+          <BulkItemMasterDialog open={isBulkOpen} onOpenChange={setIsBulkOpen} />
+        </Suspense>
+      )}
     </div>
   );
 }
