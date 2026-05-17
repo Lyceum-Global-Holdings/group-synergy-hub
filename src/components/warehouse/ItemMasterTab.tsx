@@ -93,6 +93,7 @@ const INV_COLUMN_DEFS = [
   { key: 'supplier', label: 'Supplier', fixed: false },
   { key: 'bin', label: 'Bin', fixed: false },
   { key: 'company', label: 'Company', fixed: false },
+  { key: 'stock_owner', label: 'Stock Owner', fixed: false },
   { key: 'current_stock', label: 'Current Stock', fixed: false },
   { key: 'unit_cost', label: 'Unit Cost', fixed: false },
   { key: 'status', label: 'Status', fixed: false },
