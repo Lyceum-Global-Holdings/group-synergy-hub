@@ -1,64 +1,34 @@
-# Show LNPE stock under NCG's LNPE bin, owned by Lyceum Nugegoda Quarters
+# Revert LNPE to standalone main warehouse
 
-## Goal (confirmed)
+The earlier migration re-parented `LNPE` (`a7d67f4c…`) under "Lyceum Nugegoda Quarters" and switched its operator to NCG. You've decided LNPE must stay a top-level main warehouse, not a sub-location of LNQ.
 
-In the **NCG Warehouse Solutions** inventory view, the LNPE location's bin should display the in-scope stock with **owner = Lyceum Nugegoda Quarters** (LNQ company). This is the SAP EWM "Party Entitled to Dispose" pattern: NCG **operates** the bin, LNQ **owns** the stock inside it.
+## Change
 
-## Scope (only the LNPE bin)
+One data migration on `warehouse_locations` row `a7d67f4c…` (LNPE):
 
-Only the single `LNPE` bin (`dfce7a5b…`) at the `LNPE` location (`a7d67f4c…`) is touched. Specifically the 143 allocations currently owned by the LNQ company (the 6 377.5 units highlighted in your screenshot). The 286 NCG-owned rows in the same bin stay as they are. No other LNQ items, bins, or warehouses are affected.
+- `parent_id` → `NULL` (top-level)
+- `company_id` → `11a46626-34c8-4ea8-8cc1-df0ec439fd48` (Lyceum Nugegoda — original owner)
+- `type` → `'warehouse'`
+- `is_standalone_warehouse` → `true`
 
-## Approach — reparent the LNPE location node, re-tag owner only
+## What stays as-is
 
-One data migration, no schema change, no synthetic stock movements.
+- LNPE bin (`dfce7a5b…`) keeps `is_shared = true`.
+- The 143 LNQ-owned allocations and 286 NCG-owned allocations in that bin are untouched — the multi-owner shared-bin pattern continues to handle cross-company visibility.
+- No stock movements, no FIFO/batch relinking, no code changes.
 
-1. **Reparent LNPE under LNQ, change operator to NCG**
-   - `warehouse_locations` row `a7d67f4c…` (LNPE):
-     - `parent_id = 6508ac11…` (Lyceum Nugegoda Quarters)
-     - `company_id = 1c918a89…` (NCG Warehouse Solutions) — NCG is the operator
-     - `type = 'sublocation'`
-     - `is_standalone_warehouse = false`
-
-2. **Keep stock ownership = Lyceum Nugegoda Quarters**
-   - LNPE bin (`dfce7a5b…`) stays `is_shared = true`.
-   - The 143 in-scope `warehouse_bin_allocations` keep `company_id = 11a46626…` (LNQ).
-   - The 127 `warehouse_items` rows tagged to the LNQ company at LNPE keep that owner. Shared-bin triggers already allow this layout (multi-owner stock at an NCG-operated bin).
-
-3. **No transfer transactions, no new bin codes, no FIFO/batch re-link.**
-
-## What the user will see after the migration
-
-- Header **Company = NCG Warehouse Solutions**, **Location = LNPE** (or **LNQ** rolled up):
-  - LNPE bin rows appear with **Owner / Company column = "Lyceum Nugegoda Quarters"** for the 143 in-scope rows, exactly like your screenshot but with the company label flipped to LNQ.
-  - The 286 NCG-owned rows in the same bin still show "NCG Warehouse Solutions".
-  - A "Shared bin" badge stays on the bin chip (existing UI from the multi-owner work).
-- Header **Company = Lyceum Nugegoda Quarters**: the same 143 rows are still visible to LNQ, because they own that stock.
-
-## Verification (read-only)
-
-- `warehouse_locations`: LNPE is a child of LNQ, `company_id = NCG`.
-- `list_warehouse_inventory` with NCG + LNPE filter returns both owners' rows, with `company_id` reflecting the true stock owner per row.
-- `enforce_bin_allocation_location_parity` trigger passes (shared bin exemption).
-- Sum of `quantity` per (item, owner) unchanged for both companies.
-
-## Why this is the international-standard answer
-
-This is the textbook SAP EWM / WMS pattern:
-- **Storage Bin → Party Entitled to Dispose** decouples *operator of the bin* from *owner of the stock*.
-- No phantom goods movements are posted to record a paperwork change of custody.
-- Audit trail and FIFO/batch lineage stay intact.
-- Equivalent to GS1 LIM / IFRS 15 "control vs custody" separation for third-party warehousing.
-
-## Technical detail
+## SQL
 
 ```sql
 UPDATE public.warehouse_locations
-   SET parent_id               = '6508ac11-b2d1-47ea-aa9f-c4fadde44c28',
-       company_id              = '1c918a89-2370-4c10-aa07-3da6e8305d7d',
-       type                    = 'sublocation',
-       is_standalone_warehouse = false,
+   SET parent_id               = NULL,
+       company_id              = '11a46626-34c8-4ea8-8cc1-df0ec439fd48',
+       type                    = 'warehouse',
+       is_standalone_warehouse = true,
        updated_at              = now()
  WHERE id = 'a7d67f4c-7b06-4ce1-904c-a6097c0641a1';
 ```
 
-No code changes required — the multi-owner shared-bin RPCs, list endpoints, and badges already render owner ≠ operator correctly.
+## Result
+
+LNPE shows again as its own main warehouse under Lyceum Nugegoda company in the location tree; NCG continues to see its 286 owned allocations through the shared-bin mechanism.
