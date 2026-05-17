@@ -585,10 +585,7 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
               <TableHead>Name</TableHead>
               {col('category') && <TableHead>Category</TableHead>}
               {col('unit') && <TableHead>Unit</TableHead>}
-              {col('brand') && <TableHead>Brand</TableHead>}
-              {col('supplier') && <TableHead>Supplier</TableHead>}
               {col('bin') && <TableHead>Bin</TableHead>}
-              {col('company') && <TableHead>Company</TableHead>}
               {col('stock_owner') && <TableHead>Stock Owner</TableHead>}
               {col('current_stock') && <TableHead className="text-right">Current Stock</TableHead>}
               {col('unit_cost') && <TableHead>Unit Cost</TableHead>}
