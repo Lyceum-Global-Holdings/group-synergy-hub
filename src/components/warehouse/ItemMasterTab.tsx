@@ -170,6 +170,11 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
     return () => clearTimeout(timer);
   }, [searchTerm]);
 
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedOwnerLabel(ownerLabelFilter.trim()), 300);
+    return () => clearTimeout(timer);
+  }, [ownerLabelFilter]);
+
   // Lazy loading hook for inventory items
   const {
     data: lazyData,
