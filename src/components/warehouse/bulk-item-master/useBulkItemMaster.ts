@@ -334,11 +334,16 @@ export function useBulkItemMaster(): UseBulkItemMasterReturn {
 
   const submit = useCallback(async () => {
     const valid = rows.filter((r) => r.status === 'valid');
-    if (valid.length === 0) return { ok: 0, failed: 0 };
+    if (valid.length === 0) return { created: 0, updated: 0, skipped: 0, failed: 0 };
+
+    const skippedNow = rows.filter((r) => r.status === 'skipped').length;
+    const creates = valid.filter((r) => !r.existing_catalog_id);
+    const updates = valid.filter((r) => !!r.existing_catalog_id);
 
     setIsSubmitting(true);
     try {
-      const autoTargets = valid.filter((r) => !r.code_manual);
+      // ---- allocate auto codes for creates only ----
+      const autoTargets = creates.filter((r) => !r.code_manual);
       const byCatCode = new Map<string, BulkItemMasterRow[]>();
       autoTargets.forEach((r) => {
         const cat = categoryById.get(r.category_id!);
@@ -358,7 +363,7 @@ export function useBulkItemMaster(): UseBulkItemMasterReturn {
         group.forEach((r, i) => finalCodes.set(r.rowId, codes[i]));
       }
 
-      const payloads: Array<CreateCatalogItemData & { _rowId: string }> = valid.map((r) => {
+      const createPayloads: Array<CreateCatalogItemData & { _rowId: string }> = creates.map((r) => {
         const code = r.code_manual ? r.item_code : (finalCodes.get(r.rowId) ?? r.item_code);
         return {
           _rowId: r.rowId,
@@ -372,44 +377,92 @@ export function useBulkItemMaster(): UseBulkItemMasterReturn {
         };
       });
 
-      const insertData = payloads.map(({ _rowId, ...p }) => p);
+      // ---- run create + update in parallel ----
+      const createPromise =
+        createPayloads.length > 0
+          ? bulkCreateItemsAsync(createPayloads.map(({ _rowId, ...p }) => p))
+          : Promise.resolve(null);
+
+      const updateResults = await Promise.allSettled(
+        updates.map((r) =>
+          updateItemAsync({
+            id: r.existing_catalog_id!,
+            name: r.name.trim(),
+            description: r.description.trim() || undefined,
+            brand: r.brand.trim() || undefined,
+            category_id: r.category_id!,
+            unit_id: r.unit_id!,
+          } as any).then(() => r.rowId),
+        ),
+      );
+
+      let createOk = false;
+      let createErr: any = null;
       try {
-        await bulkCreateItemsAsync(insertData);
-        setRows((prev) =>
-          prev.map((r) => {
-            if (r.status !== 'valid') return r;
-            const finalCode = payloads.find((p) => p._rowId === r.rowId)?.item_code;
-            return {
-              ...r,
-              item_code: finalCode ?? r.item_code,
-              status: 'imported' as const,
-              errors: [],
-            };
-          }),
-        );
-        invalidateStock();
-        toast({
-          title: 'Items created',
-          description: `${valid.length} item${valid.length === 1 ? '' : 's'} added to the master.`,
-        });
-        return { ok: valid.length, failed: 0 };
-      } catch (e: any) {
-        setRows((prev) =>
-          prev.map((r) =>
-            r.status === 'valid'
-              ? { ...r, status: 'error' as const, errors: [e?.message ?? 'Insert failed'] }
-              : r,
-          ),
-        );
-        return { ok: 0, failed: valid.length };
+        await createPromise;
+        createOk = true;
+      } catch (e) {
+        createErr = e;
       }
+
+      const updatedRowIds = new Set(
+        updateResults.filter((res) => res.status === 'fulfilled').map((res: any) => res.value),
+      );
+      const failedUpdateIds = new Set(
+        updates
+          .map((r, i) => (updateResults[i].status === 'rejected' ? r.rowId : null))
+          .filter((v): v is string => !!v),
+      );
+
+      setRows((prev) =>
+        prev.map((r) => {
+          if (r.status !== 'valid') return r;
+          if (r.existing_catalog_id) {
+            if (updatedRowIds.has(r.rowId)) {
+              return { ...r, status: 'updated' as const, errors: [] };
+            }
+            if (failedUpdateIds.has(r.rowId)) {
+              const res = updateResults[updates.findIndex((u) => u.rowId === r.rowId)];
+              const msg = res && res.status === 'rejected' ? (res.reason?.message ?? 'Update failed') : 'Update failed';
+              return { ...r, status: 'error' as const, errors: [msg] };
+            }
+            return r;
+          }
+          // create row
+          if (createOk) {
+            const finalCode = createPayloads.find((p) => p._rowId === r.rowId)?.item_code;
+            return { ...r, item_code: finalCode ?? r.item_code, status: 'imported' as const, errors: [] };
+          }
+          return { ...r, status: 'error' as const, errors: [createErr?.message ?? 'Insert failed'] };
+        }),
+      );
+
+      invalidateStock();
+
+      const createdN = createOk ? createPayloads.length : 0;
+      const updatedN = updatedRowIds.size;
+      const failedN = (createOk ? 0 : createPayloads.length) + failedUpdateIds.size;
+
+      const parts: string[] = [];
+      if (createdN) parts.push(`Imported ${createdN}`);
+      if (updatedN) parts.push(`updated ${updatedN}`);
+      if (skippedNow) parts.push(`skipped ${skippedNow}`);
+      if (failedN) parts.push(`failed ${failedN}`);
+      toast({
+        title: failedN > 0 ? 'Completed with errors' : 'Items processed',
+        description: parts.join(', ') || 'Nothing to do',
+        variant: failedN > 0 ? 'destructive' : undefined,
+      });
+
+      return { created: createdN, updated: updatedN, skipped: skippedNow, failed: failedN };
     } finally {
       setIsSubmitting(false);
     }
-  }, [rows, categoryById, bulkCreateItemsAsync, invalidateStock, toast]);
+  }, [rows, categoryById, bulkCreateItemsAsync, updateItemAsync, invalidateStock, toast]);
 
   const validCount = rows.filter((r) => r.status === 'valid').length;
   const invalidCount = rows.filter((r) => r.status === 'invalid').length;
+  const skippedCount = rows.filter((r) => r.status === 'skipped').length;
 
   return {
     rows,
@@ -425,6 +478,9 @@ export function useBulkItemMaster(): UseBulkItemMasterReturn {
     isSubmitting: isSubmitting || isBulkCreating,
     validCount,
     invalidCount,
+    skippedCount,
+    duplicatePolicy,
+    setDuplicatePolicy,
     categories,
     units,
   };
