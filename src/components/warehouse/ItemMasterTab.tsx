@@ -176,6 +176,9 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
   const {
     data: lazyData,
     isLoading,
+    isError,
+    error: lazyError,
+    refetch: refetchInventory,
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
