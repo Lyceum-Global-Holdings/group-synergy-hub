@@ -1096,6 +1096,17 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
           />
         </Suspense>
       )}
+      {isBulkChangeOwnerOpen && (
+        <Suspense fallback={null}>
+          <BulkChangeStockOwnerDialog
+            open={isBulkChangeOwnerOpen}
+            onOpenChange={setIsBulkChangeOwnerOpen}
+            selectedIds={selectedItemIds}
+            onComplete={clearSelection}
+            defaultFromCompanyId={ownerCompanyFilter === 'all' ? null : ownerCompanyFilter}
+          />
+        </Suspense>
+      )}
     </div>
   );
 }
