@@ -2,7 +2,9 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Plus, Search, Edit, Trash2, Layers, MoveRight } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, Layers, MoveRight, Users } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
+import { useSetBinSharing } from '@/hooks/warehouse/useBinSharing';
 import {
   Table,
   TableBody,
@@ -32,6 +34,7 @@ export function BinMasterTab() {
 
   const { bins, isLoading, deleteBin, isDeleting } = useWarehouseBins();
   const { locations } = useWarehouseLocations();
+  const { mutate: setBinSharing, isPending: isSettingSharing } = useSetBinSharing();
   const locationName = (id: string | null | undefined) =>
     (id && locations.find((l) => l.id === id)?.name) || '—';
   const { canDelete } = useIsAdminOrHigher();
@@ -118,19 +121,20 @@ export function BinMasterTab() {
               <TableHead>Capacity</TableHead>
               <TableHead>Current Qty</TableHead>
               <TableHead>Status</TableHead>
+              <TableHead>Shared</TableHead>
               <TableHead className="w-[100px]">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={isAdminOrHigher ? 8 : 7} className="text-center py-8">
+                <TableCell colSpan={isAdminOrHigher ? 9 : 8} className="text-center py-8">
                   Loading bins...
                 </TableCell>
               </TableRow>
             ) : filteredBins.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={isAdminOrHigher ? 8 : 7} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={isAdminOrHigher ? 9 : 8} className="text-center py-8 text-muted-foreground">
                   No bins found. Create your first bin to get started.
                 </TableCell>
               </TableRow>
@@ -152,6 +156,11 @@ export function BinMasterTab() {
                       {bin.is_global_template && (
                         <Badge variant="outline" className="text-xs">Global</Badge>
                       )}
+                      {bin.is_shared && (
+                        <Badge variant="secondary" className="text-xs gap-1">
+                          <Users className="h-3 w-3" /> Shared
+                        </Badge>
+                      )}
                     </div>
                   </TableCell>
                   <TableCell>{bin.name}</TableCell>
@@ -164,6 +173,22 @@ export function BinMasterTab() {
                     <Badge className={getStatusColor(bin.status)}>
                       {bin.status}
                     </Badge>
+                  </TableCell>
+                  <TableCell>
+                    {isAdminOrHigher ? (
+                      <Switch
+                        checked={!!bin.is_shared}
+                        disabled={isSettingSharing}
+                        onCheckedChange={(v) =>
+                          setBinSharing({ binId: bin.id, isShared: !!v })
+                        }
+                        aria-label="Toggle multi-owner sharing"
+                      />
+                    ) : (
+                      <span className="text-xs text-muted-foreground">
+                        {bin.is_shared ? 'Yes' : 'No'}
+                      </span>
+                    )}
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center space-x-2">

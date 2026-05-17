@@ -45,6 +45,7 @@ export interface WarehouseBin {
   notes: string | null;
   company_id: string | null;
   is_global_template?: boolean;
+  is_shared?: boolean;
   created_at: string;
   updated_at: string;
   created_by: string | null;
