@@ -175,7 +175,7 @@ export function StockAdjustmentDialog({
 
     // Determine transaction type and notes based on issue destination
     const selectedSubLocation = (locations || []).find(l => l.id === selectedSubLocationId);
-    const selectedParentLocation = (locations || []).find(l => l.id === selectedLocationId);
+    const selectedParentLocation = derivedParentLocation;
     const isSubLocationIssue = issueToSubLocation && selectedSubLocation && adjustmentType === 'decrease';
     
     let transactionType: StockTransactionType = 'adjustment';
