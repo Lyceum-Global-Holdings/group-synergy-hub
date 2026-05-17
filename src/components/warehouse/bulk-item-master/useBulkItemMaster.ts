@@ -57,20 +57,22 @@ export function useBulkItemMaster(): UseBulkItemMasterReturn {
   const { toast } = useToast();
   const { categories } = useItemCategories();
   const { units } = useItemUnits();
-  const { items: existingItems, bulkCreateItemsAsync, isBulkCreating } =
+  const { items: existingItems, bulkCreateItemsAsync, updateItemAsync, isBulkCreating } =
     useWarehouseItemCatalog();
   const invalidateStock = useInvalidateWarehouseStock();
+
+  const [duplicatePolicy, setDuplicatePolicy] = useState<DuplicatePolicy>('fail');
 
   const [rows, setRows] = useState<BulkItemMasterRow[]>(() =>
     Array.from({ length: 5 }, emptyRow),
   );
 
-  const existingCodes = useMemo(() => {
-    const set = new Set<string>();
+  const existingCodeToId = useMemo(() => {
+    const map = new Map<string, string>();
     existingItems.forEach((it) => {
-      if (it.item_code) set.add(it.item_code.toLowerCase());
+      if (it.item_code) map.set(it.item_code.toLowerCase(), it.id);
     });
-    return set;
+    return map;
   }, [existingItems]);
 
   const maxByCategoryCode = useMemo(() => {
