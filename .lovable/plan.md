@@ -1,82 +1,87 @@
-## Root cause recap
+## Goal
 
-Three independent gaps combined into one user-visible bug ("transferred stock not appearing in LNQ"):
+Add an Excel-like bulk **Item Master** creation grid inside the **Item Master** tab (`ItemMasterDefinitionTab` on `/warehouse/item-bin-master`), with paste-from-Excel support and an **auto-classifier** that suggests **Category** and **UoM** from item names using international standards (UNSPSC for category families, UN/CEFACT Recommendation 20 for UoM codes). **Item code is auto-generated but editable** per row.
 
-1. **No realtime on bin tables** — `warehouse_bin_allocations` / `warehouse_bins` were not in the `supabase_realtime` publication, so the inventory grid never refetched after a transfer.
-2. **No explicit cache invalidation** in transfer dialogs (`MoveBinAllocationDialog`, `ItemTransferDialog`, stock-transfer completion) for the inventory list keys (`warehouse-items-inventory`, `all-items-location-stock`).
-3. **Filter-after-paginate bug** in `list_warehouse_inventory` RPC — search/category/location filters ran after `LIMIT`, hiding rows that existed.
+## Where it plugs in
 
-All three are now patched, but the same class of bug will recur unless we add structural guardrails.
+`src/components/warehouse/ItemMasterDefinitionTab.tsx` toolbar — new button **"Bulk create items"** placed next to the existing **"Add Item"** button (around line 333).
 
-## Prevention plan
+Writes to `warehouse_item_catalog` only (true master). Stock / location / bin allocation stays in the Inventory "Bulk add from catalog" flow.
 
-### 1. Realtime publication contract (DB)
+## UX
 
-- Add a migration that creates a **`verify_realtime_coverage()`** SQL function listing every table the app considers "live" (whitelist) and asserting each is in `supabase_realtime` with `REPLICA IDENTITY FULL`.
-- Whitelist seed: all `warehouse_*` movement tables (`warehouse_items`, `warehouse_bin_allocations`, `warehouse_bins`, `warehouse_item_catalog`, `stock_transactions`, `stock_transfer_requests`, `warehouse_locations`).
-- Add a pg_cron daily job that calls it and writes failures to `system_errors` so we get alerted before a user does.
+Bottom sheet, same shell pattern as `BulkCatalogToInventoryDialog`:
 
-### 2. Centralised invalidation helper (frontend)
-
-Create `src/hooks/useInvalidateWarehouseStock.ts` exporting one function that invalidates the full canonical set in one call:
-
-```
-['warehouse-items'], ['warehouse-items-inventory'],
-['warehouse-bin-allocations'], ['all-items-location-stock'],
-['stock-transactions'], ['stock-transfer-requests'],
-['warehouse-catalog'], ['warehouse-locations-stock']
+```text
+┌─ Toolbar ──────────────────────────────────────────────────────────────┐
+│ [+ Add 10 rows] [📋 Paste names] [✨ Auto-classify all]   ✓ N valid    │
+├─ Grid ─────────────────────────────────────────────────────────────────┤
+│ # │ Name* │ Description │ Category* │ UoM* │ Brand │ Item code │ Status│
+└────────────────────────────────────────────────────────────────────────┘
 ```
 
-Then refactor every stock-mutating surface to call **only** this hook:
-- `MoveBinAllocationDialog`
-- `ItemTransferDialog`
-- `CreateStockTransferDialog` + transfer approval/completion flows
-- `BulkStockUpload`, GRN allocation, adjustment dialogs, scanned-bin adjustment
+- **Paste names** dialog: textarea, one item per line; or paste TSV (name⇥description⇥brand…) directly into the grid (first column = name).
+- On paste / on blur of Name → row auto-fills Category + UoM via the classifier with a ✨ "suggested" hint. User can override from a searchable select.
+- **Item code** column:
+  - Auto-generated as soon as Category is set, using existing `allocateAutoCodes` logic — format `INV-{CAT}-{NNN}` per `mem://architecture/item-code-generation-standards`.
+  - **Editable text input** — the user can overwrite the suggested code at any time.
+  - A small **"Auto"** badge is shown when the value matches the auto-generated suggestion; the badge disappears once the user edits it (becomes "Custom"). A 🔄 reset icon restores the auto value.
+  - When Category changes after a manual edit, the user's custom code is preserved (no surprise overwrite); the reset icon stays available.
+  - Live validation: format check, in-tenant duplicate check against `warehouse_item_catalog`, plus dedupe against other rows in the grid. Errors shown inline on the row.
+  - On submit, blank or still-auto cells are finalised through `allocateAutoCodes` so concurrent rows get unique sequence numbers.
+- Inline validation: name required, category required, UoM required, item code unique. Row status badges (Pending / Valid / Invalid / Imported).
+- Submit calls existing `bulkCreateItemsAsync` from `useWarehouseItemCatalog`. No new RPC, no schema change.
+- On success, invalidate via `useInvalidateWarehouseStock`.
 
-Removes the "I forgot to invalidate key X" failure mode forever.
+## Auto-classifier (international standards)
 
-### 3. RPC contract test for `list_warehouse_inventory`
+Pure client-side, deterministic, zero-network — `src/lib/itemMaster/autoClassify.ts`.
 
-Add a Deno test under `supabase/functions/_tests/` (or a SQL test migration) that seeds:
-- 1 company, 2 locations, 50 items, 1 item only at location B with a search-unique name
+1. **UoM detection — UN/CEFACT Recommendation 20**
+   - Regex pass: `8W`, `230V`, `1.5mm`, `10kg`, `500ml`, `2m`, `pack of 10`, `box`, `roll`, `pair`, `set`, `pcs/nos/each`.
+   - Map to UN/CEFACT codes: `EA`/`H87` (each/piece), `MTR` (metre), `KGM` (kilogram), `LTR` (litre), `MMT` (millimetre), `PR` (pair), `SET` (set), `BX` (box), `RO` (roll), `PK` (pack), `GRM` (gram).
+   - Resolve to closest tenant UoM via `useItemUnits` (case-insensitive `abbreviation` match); fallback `PCS`/`EA`.
 
-…and asserts:
-- `list_warehouse_inventory(search=>'unique')` returns the row even with default `LIMIT 25` and `OFFSET 0`.
-- Same with `location_id` filter.
-- Same with `category_id` filter.
+2. **Category detection — UNSPSC-aligned keyword dictionary**
+   - Keyword → UNSPSC family seed table for construction / MEP / IT / consumables / safety / hardware (e.g. `led|ceiling|recessed|bulb|switch|socket|breaker|cable|conduit` → *Electrical & Lighting* / UNSPSC 39).
+   - Tokenise the name, score against keyword sets, pick highest-scoring family.
+   - Resolve to a real tenant `item_categories` row by case-insensitive name match. If none exists, surface the suggested UNSPSC family name as a row warning and leave Category empty — **no silent category creation** (respects `mem://architecture/item-category-depth-cap`).
 
-This locks in the "filter-before-paginate" contract so a future RPC refactor cannot regress it.
+3. **Confidence display**
+   - High (UoM token hit + ≥2 category keywords): solid ✨.
+   - Low (single weak token): muted ✨ with tooltip "suggested — please confirm".
+   - None: blank, user picks.
 
-### 4. Realtime listener audit
+4. **Unit tests** (`src/lib/itemMaster/__tests__/autoClassify.test.ts`)
+   - "LED ceiling recessed 8W" → *Electrical & Lighting*, *EA*, high.
+   - "PVC conduit 25mm 3m" → *MTR*, *Electrical*.
+   - "Portland cement 50kg" → *KGM*, *Construction materials*.
+   - "Thinner 1L" → *LTR*.
+   - Gibberish → empty, no crash.
 
-One-time sweep of `useRealtimeChannel` subscribers to confirm every warehouse list page subscribes to **both** `warehouse_items` and `warehouse_bin_allocations` (today most subscribe only to the former). Codify via a lint-style check: a `// @realtime: warehouse-stock` tag near each subscription, plus a CI grep that fails if a hook named `useWarehouse*Stock*` does not contain the tag.
+## File plan
 
-### 5. Post-mutation read-after-write probe (defence in depth)
+New
+- `src/components/warehouse/bulk-item-master/BulkItemMasterDialog.tsx` — sheet + grid.
+- `src/components/warehouse/bulk-item-master/PasteNamesDialog.tsx` — textarea paste.
+- `src/components/warehouse/bulk-item-master/useBulkItemMaster.ts` — row state, validation, auto-code preview + manual override + reset, submit via `bulkCreateItemsAsync`.
+- `src/components/warehouse/bulk-item-master/types.ts`.
+- `src/lib/itemMaster/autoClassify.ts` — classifier (UNSPSC keyword dict + UN/CEFACT UoM map).
+- `src/lib/itemMaster/__tests__/autoClassify.test.ts`.
 
-In the transfer success handlers, after invalidation, fire a lightweight RPC `verify_bin_allocation(item_id, location_id, bin_id, expected_qty)` and surface a toast warning if the read-back disagrees. Catches DB-side regressions (triggers, ledger drift) at the moment they happen instead of days later.
+Edited
+- `src/components/warehouse/ItemMasterDefinitionTab.tsx` — add **Bulk create items** button next to **Add Item** and mount the dialog (lazy-loaded).
 
-### 6. Documentation / memory
-
-Add two project-memory entries:
-- `mem://architecture/warehouse-realtime-coverage` — canonical list of "live" tables + the invalidation hook to use.
-- `mem://architecture/list-rpc-filter-before-paginate` — rule: every list RPC must apply search/scoping filters inside the same CTE that produces the page, never on a pre-paginated subquery.
+Memory
+- `mem://features/warehouse/bulk-item-master` — grid lives in Item Master, classifier rules (UNSPSC + UN/CEFACT), item code auto-generated via `allocateAutoCodes` but **manually editable** per row with Auto/Custom badge and reset, never auto-create categories.
 
 ## Out of scope
 
-- No business-logic changes to transfers, ledger, or FIFO.
-- No UI redesign.
-- No new tables.
+- No DB migration, no new RPC, no schema change.
+- No automatic category creation; suggestions only.
+- No backend AI call — classifier is offline / deterministic.
+- Stock / location / bin allocation stays in the Inventory "Bulk add from catalog" flow.
 
-## Deliverables
+## Deliverable
 
-```
-supabase/migrations/<ts>_realtime_coverage_guard.sql
-supabase/migrations/<ts>_list_warehouse_inventory_contract_test.sql
-src/hooks/useInvalidateWarehouseStock.ts
-src/components/warehouse/MoveBinAllocationDialog.tsx        (refactor)
-src/components/warehouse/ItemTransferDialog.tsx             (refactor)
-src/components/warehouse/CreateStockTransferDialog.tsx      (refactor)
-src/components/warehouse/StockTransferDetailsDialog.tsx     (refactor)
-mem://architecture/warehouse-realtime-coverage
-mem://architecture/list-rpc-filter-before-paginate
-```
+5 new files, 1 edited component, 1 memory entry, 1 test file. Zero schema changes.

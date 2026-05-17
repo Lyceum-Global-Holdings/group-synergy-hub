@@ -38,6 +38,9 @@ const DeleteItemConfirmationDialog = lazy(() =>
 const ItemDetailsDialog = lazy(() =>
   import('@/components/warehouse/ItemDetailsDialog').then(m => ({ default: m.ItemDetailsDialog }))
 );
+const BulkItemMasterDialog = lazy(() =>
+  import('@/components/warehouse/bulk-item-master/BulkItemMasterDialog').then(m => ({ default: m.BulkItemMasterDialog }))
+);
 import { useIsAdminOrHigher } from '@/hooks/useIsAdminOrHigher';
 import { CatalogItem } from '@/types/itemBin';
 
@@ -72,6 +75,7 @@ export function ItemMasterDefinitionTab({ onNavigateToInventory, onNavigateToBin
   const [statusFilter, setStatusFilter] = useState('all');
   const [supplierFilter, setSupplierFilter] = useState('all');
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [isBulkOpen, setIsBulkOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<CatalogItem | null>(null);
   const [viewingItem, setViewingItem] = useState<CatalogItem | null>(null);
   const [stockMovementItem, setStockMovementItem] = useState<CatalogItem | null>(null);
@@ -330,6 +334,9 @@ export function ItemMasterDefinitionTab({ onNavigateToInventory, onNavigateToBin
               {isExporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
               {isExporting ? 'Exporting...' : 'Download Excel'}
             </Button>
+            <Button variant="outline" onClick={() => setIsBulkOpen(true)}>
+              <Plus className="mr-2 h-4 w-4" /> Bulk create items
+            </Button>
             <Button onClick={() => setIsCreateDialogOpen(true)}>
               <Plus className="mr-2 h-4 w-4" /> Add Item
             </Button>
@@ -540,6 +547,11 @@ export function ItemMasterDefinitionTab({ onNavigateToInventory, onNavigateToBin
             open={!!viewingItem}
             onOpenChange={(open) => { if (!open) setViewingItem(null); }}
           />
+        </Suspense>
+      )}
+      {isBulkOpen && (
+        <Suspense fallback={null}>
+          <BulkItemMasterDialog open={isBulkOpen} onOpenChange={setIsBulkOpen} />
         </Suspense>
       )}
     </div>
