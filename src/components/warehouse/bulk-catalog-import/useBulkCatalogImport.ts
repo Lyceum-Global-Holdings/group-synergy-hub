@@ -239,6 +239,7 @@ export function useBulkCatalogImport(defaults: BulkCatalogDefaults = { company_i
     clearInvalid,
     resetAll,
     seedFromCodes,
+    seedFromPaste,
     submit,
     isSubmitting,
     validCount,
