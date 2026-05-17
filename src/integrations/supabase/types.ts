@@ -23084,6 +23084,13 @@ export type Database = {
           is_valid: boolean
         }[]
       }
+      verify_realtime_coverage: {
+        Args: never
+        Returns: {
+          issue: string
+          table_name: string
+        }[]
+      }
     }
     Enums: {
       account_category:

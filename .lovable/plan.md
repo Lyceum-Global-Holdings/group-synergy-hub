@@ -1,79 +1,82 @@
-## Diagnosis
+## Root cause recap
 
-I traced the transfer end-to-end in the database. The stock **was** moved correctly. The UI is showing stale data.
+Three independent gaps combined into one user-visible bug ("transferred stock not appearing in LNQ"):
 
-### What the DB shows for `LED ceiling recessed - 8W` (item id `6ceac60f…`)
+1. **No realtime on bin tables** — `warehouse_bin_allocations` / `warehouse_bins` were not in the `supabase_realtime` publication, so the inventory grid never refetched after a transfer.
+2. **No explicit cache invalidation** in transfer dialogs (`MoveBinAllocationDialog`, `ItemTransferDialog`, stock-transfer completion) for the inventory list keys (`warehouse-items-inventory`, `all-items-location-stock`).
+3. **Filter-after-paginate bug** in `list_warehouse_inventory` RPC — search/category/location filters ran after `LIMIT`, hiding rows that existed.
 
-```text
-Transfer:  STR-20260517-001   status=completed   completed at 11:05:44 UTC
-           LNPE (dfce7a5b…)  →  LNQ (013c1ade…)   qty 153
+All three are now patched, but the same class of bug will recur unless we add structural guardrails.
 
-warehouse_bin_allocations (per-bin balances):
-  LNQ   153.00   ← NEW row, location_id = Lyceum Nugegoda Quarters ✓
-  LNPE  245.00   ← decreased from 398 by 153 ✓
+## Prevention plan
 
-stock_transactions (ledger):
-  11:05:43  transfer_out  bin=LNPE  qty -153   398 → 245 ✓
-  11:05:43  transfer_in   bin=LNQ   qty +153     0 → 153 ✓
+### 1. Realtime publication contract (DB)
 
-warehouse_items.current_stock = 398 (unchanged, transfer is intra-company)
+- Add a migration that creates a **`verify_realtime_coverage()`** SQL function listing every table the app considers "live" (whitelist) and asserting each is in `supabase_realtime` with `REPLICA IDENTITY FULL`.
+- Whitelist seed: all `warehouse_*` movement tables (`warehouse_items`, `warehouse_bin_allocations`, `warehouse_bins`, `warehouse_item_catalog`, `stock_transactions`, `stock_transfer_requests`, `warehouse_locations`).
+- Add a pg_cron daily job that calls it and writes failures to `system_errors` so we get alerted before a user does.
+
+### 2. Centralised invalidation helper (frontend)
+
+Create `src/hooks/useInvalidateWarehouseStock.ts` exporting one function that invalidates the full canonical set in one call:
+
+```
+['warehouse-items'], ['warehouse-items-inventory'],
+['warehouse-bin-allocations'], ['all-items-location-stock'],
+['stock-transactions'], ['stock-transfer-requests'],
+['warehouse-catalog'], ['warehouse-locations-stock']
 ```
 
-Allocation row, ledger, and stock totals are all consistent. The 153 units are physically in LNQ as a brand-new bin allocation. **There is no DB bug.**
+Then refactor every stock-mutating surface to call **only** this hook:
+- `MoveBinAllocationDialog`
+- `ItemTransferDialog`
+- `CreateStockTransferDialog` + transfer approval/completion flows
+- `BulkStockUpload`, GRN allocation, adjustment dialogs, scanned-bin adjustment
 
-### Why the Inventory UI doesn't show LNQ
+Removes the "I forgot to invalidate key X" failure mode forever.
 
-The Inventory tab reads from `list_warehouse_inventory` and is refreshed by `useRealtimeStockUpdates`, which subscribes to `warehouse_bin_allocations` and `warehouse_bins` Postgres CDC events.
+### 3. RPC contract test for `list_warehouse_inventory`
 
-The Supabase realtime publication on this project currently includes only `warehouse_items`:
+Add a Deno test under `supabase/functions/_tests/` (or a SQL test migration) that seeds:
+- 1 company, 2 locations, 50 items, 1 item only at location B with a search-unique name
 
-```sql
--- pg_publication_tables WHERE pubname='supabase_realtime'
-public.warehouse_items   ← only this one
--- warehouse_bin_allocations  MISSING
--- warehouse_bins             MISSING
-```
+…and asserts:
+- `list_warehouse_inventory(search=>'unique')` returns the row even with default `LIMIT 25` and `OFFSET 0`.
+- Same with `location_id` filter.
+- Same with `category_id` filter.
 
-Consequences:
+This locks in the "filter-before-paginate" contract so a future RPC refactor cannot regress it.
 
-1. A bin-to-bin transfer doesn't change `warehouse_items.current_stock` (total is unchanged), so no `warehouse_items` realtime event fires.
-2. The bin-level changes happen on `warehouse_bin_allocations` / `warehouse_bins`, which are not published → the realtime subscriptions in `useRealtimeStockUpdates` never fire.
-3. React Query has `staleTime: 30s` and `refetchOnWindowFocus: false`, so the cached per-bin breakdown sits there until the user manually triggers a refetch (search change, filter change, page reload).
+### 4. Realtime listener audit
 
-Secondary issue: the explicit `invalidateQueries` calls in the transfer write paths target `['warehouse-bin-allocations']`, `['warehouse-items']`, `['stock-transactions']`, `['stock-transfer-requests']` — but **not** `['warehouse-items-inventory']`, which is the Inventory tab's actual key. So even users who avoid the realtime path don't get instant feedback.
+One-time sweep of `useRealtimeChannel` subscribers to confirm every warehouse list page subscribes to **both** `warehouse_items` and `warehouse_bin_allocations` (today most subscribe only to the former). Codify via a lint-style check: a `// @realtime: warehouse-stock` tag near each subscription, plus a CI grep that fails if a hook named `useWarehouse*Stock*` does not contain the tag.
 
-## Fix (international-standard: DB is the single source of truth; UI listens to CDC)
+### 5. Post-mutation read-after-write probe (defence in depth)
 
-### 1. DB migration — publish the bin tables to realtime
+In the transfer success handlers, after invalidation, fire a lightweight RPC `verify_bin_allocation(item_id, location_id, bin_id, expected_qty)` and surface a toast warning if the read-back disagrees. Catches DB-side regressions (triggers, ledger drift) at the moment they happen instead of days later.
 
-```sql
-ALTER TABLE public.warehouse_bin_allocations REPLICA IDENTITY FULL;
-ALTER TABLE public.warehouse_bins            REPLICA IDENTITY FULL;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.warehouse_bin_allocations;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.warehouse_bins;
-```
+### 6. Documentation / memory
 
-`REPLICA IDENTITY FULL` is required so the realtime payload carries `company_id`, matching the scoped invalidation in `useRealtimeStockUpdates.onBinAllocation`.
-
-### 2. Frontend — also invalidate the Inventory list key explicitly
-
-Three transfer write paths today bypass the inventory key:
-
-- `src/components/warehouse/MoveBinAllocationDialog.tsx` (new, added today) — add `['warehouse-items-inventory']` and `['all-items-location-stock']` to the post-success invalidation list.
-- `src/components/warehouse/ItemTransferDialog.tsx` — after the `transfer_stock_fifo` RPC succeeds, invalidate `['warehouse-items-inventory']`, `['warehouse-bin-allocations']`, `['warehouse-items']`, `['all-items-location-stock']`, `['stock-transactions']`. Currently it invalidates nothing.
-- Stock Transfer page completion handler (if/when a transfer flips to `completed`): mirror the same invalidations.
-
-This gives belt-and-braces freshness: realtime CDC for passive listeners, explicit invalidation for the user who just clicked.
+Add two project-memory entries:
+- `mem://architecture/warehouse-realtime-coverage` — canonical list of "live" tables + the invalidation hook to use.
+- `mem://architecture/list-rpc-filter-before-paginate` — rule: every list RPC must apply search/scoping filters inside the same CTE that produces the page, never on a pre-paginated subquery.
 
 ## Out of scope
 
-- No change to `transfer_stock_fifo` RPC, triggers, or RLS — they are working correctly.
-- No change to staleTime or `refetchOnWindowFocus` — keeping the project-wide caching contract intact (per memory `react-query-global-cache-freshness-permanent`).
-- Historical inconsistency on the Mar 6 transfer (older ledger rows had source bin_id stamped on the transfer_in row) is an artifact of an earlier RPC version — already fixed in the current RPC; no backfill needed for current balances.
+- No business-logic changes to transfers, ledger, or FIFO.
+- No UI redesign.
+- No new tables.
 
-## Files
+## Deliverables
 
-- New migration: `supabase/migrations/<ts>_publish_bin_tables_realtime.sql`
-- Edited: `src/components/warehouse/MoveBinAllocationDialog.tsx`
-- Edited: `src/components/warehouse/ItemTransferDialog.tsx`
-- Optionally edited: `src/components/warehouse/StockTransferDetailsDialog.tsx` (if it owns the "Complete" action)
+```
+supabase/migrations/<ts>_realtime_coverage_guard.sql
+supabase/migrations/<ts>_list_warehouse_inventory_contract_test.sql
+src/hooks/useInvalidateWarehouseStock.ts
+src/components/warehouse/MoveBinAllocationDialog.tsx        (refactor)
+src/components/warehouse/ItemTransferDialog.tsx             (refactor)
+src/components/warehouse/CreateStockTransferDialog.tsx      (refactor)
+src/components/warehouse/StockTransferDetailsDialog.tsx     (refactor)
+mem://architecture/warehouse-realtime-coverage
+mem://architecture/list-rpc-filter-before-paginate
+```
