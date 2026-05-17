@@ -156,6 +156,11 @@ export function BinMasterTab() {
                       {bin.is_global_template && (
                         <Badge variant="outline" className="text-xs">Global</Badge>
                       )}
+                      {bin.is_shared && (
+                        <Badge variant="secondary" className="text-xs gap-1">
+                          <Users className="h-3 w-3" /> Shared
+                        </Badge>
+                      )}
                     </div>
                   </TableCell>
                   <TableCell>{bin.name}</TableCell>
