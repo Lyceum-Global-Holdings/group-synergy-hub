@@ -15,7 +15,7 @@ import { useCompanies } from '@/hooks/useCompanies';
 import { useCompany } from '@/contexts/CompanyContext';
 import { useLocationFilter } from '@/contexts/LocationFilterContext';
 import { useWarehouseLocations } from '@/hooks/useWarehouseLocations';
-import { useWarehouseBins } from '@/hooks/useWarehouseBins';
+import { useBinsAtLocation } from '@/hooks/warehouse/useBinsAtLocation';
 import { useToast } from '@/hooks/use-toast';
 import { useQueryClient } from '@tanstack/react-query';
 import { CatalogItemCell } from './CatalogItemCell';
