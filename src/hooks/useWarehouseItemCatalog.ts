@@ -217,6 +217,7 @@ export function useWarehouseItemCatalog(options?: { disableFetch?: boolean }) {
     createItem: createMutation.mutate,
     createItemAsync: createMutation.mutateAsync,
     updateItem: updateMutation.mutate,
+    updateItemAsync: updateMutation.mutateAsync,
     deleteItem: ({ id, forceDelete = false }: { id: string; forceDelete?: boolean }) =>
       deleteMutation.mutate({ id, forceDelete }),
     markItemInactive: markInactiveMutation.mutate,
