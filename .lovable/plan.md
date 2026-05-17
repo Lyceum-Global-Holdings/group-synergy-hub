@@ -1,96 +1,80 @@
-## Problem
+# Stock Owner column & filter — Inventory + Bulk Update
 
-On `/warehouse/inventory`, filtering by **Lyceum Fulfilment Centre → VEB** shows only **29 items**, even though there are **221 items with stock allocated to VEB** in the database.
+## Why this is the right model
 
-## Root cause
+International WMS standards (SAP EWM, Oracle WMS, ISO 19440 "Party of ownership") separate two concepts:
 
-The `list_warehouse_inventory` RPC pre-paginates the `warehouse_items` master table **before** applying the location filter:
+- **Item Master Company** — who maintains the catalog row (already shown as "Company").
+- **Stock Owner** — the legal entity that owns the *physical units* sitting in a bin at a location. In our schema this is `warehouse_bin_allocations.company_id`, and our shared-bin model (`mem://architecture/multi-owner-shared-bins`) already allows one bin/location to hold stock for multiple owners.
 
-```sql
-base AS (
-  SELECT wi.* FROM warehouse_items wi
-  WHERE (_company_id IS NULL OR wi.company_id = _company_id)
-    AND (_status IS NULL OR wi.status = _status)
-    AND public.can_access_company(wi.company_id)
-    AND (cursor predicate)
-  ORDER BY wi.created_at DESC, wi.id DESC
-  LIMIT GREATEST(_limit, 1) * 8           -- ← grabs only the 400 newest items
-)
-```
+We will surface Stock Owner as a **dedicated, never-merged column** plus a **filter**, on both the Inventory list and the Bulk Update dialog. No writes change — it is read/filter only.
 
-The location-scoped allocation join (`with_stock` / `filtered`) runs **after** this limit. Of the 400 newest items in Lyceum Fulfilment, only 29 happen to have allocations under VEB — so the page returns 29 rows. Because the page is shorter than `pageSize` (50), the frontend keyset stops and never asks for the next page, hiding the remaining ~192 items.
+## UX
 
-This is the same shape of bug whenever a location filter is narrower than the rolling 400-item window: items appear missing.
+Inventory toolbar gets a new "Stock Owner" Select next to Category/Status/Supplier:
 
 ```text
-warehouse_items (newest 400)        warehouse_bin_allocations @ VEB
-       └────────────┬──────────────────────────┘
-                    │ intersection only
-                    ▼
-               29 rows returned   ← UI stops here
+[ Search… ] [ Category v ] [ Stock Owner v ] [ Status v ] [ Supplier v ] [ Stock v ]
 ```
 
-## Fix
+New column "Stock Owner" (toggleable, default on) renders one badge per distinct owner found in the row's allocations at the current location scope. Example cell content for a shared bin:
 
-Rewrite `list_warehouse_inventory` so that **when a location scope is requested**, the candidate set is driven by the location's allocations rather than by the global newest-items window. The cursor/pagination is then applied to this narrowed candidate set.
-
-### RPC changes (single migration, replaces the function body only)
-
-1. After computing `scope_arr.has_scope` and `scope_arr.ids`:
-   - When `has_scope = true`, build a `candidates` CTE:
-     ```sql
-     SELECT DISTINCT a.warehouse_item_id AS id
-     FROM warehouse_bin_allocations a
-     WHERE a.location_id = ANY (scope_arr.ids)
-       AND (_company_id IS NULL OR a.company_id = _company_id)
-       AND a.allocated_quantity > 0
-     UNION
-     -- include zero-stock items physically homed at the scope when _stock_mode = 'zero'
-     SELECT wi.id
-     FROM warehouse_items wi
-     WHERE _stock_mode = 'zero'
-       AND wi.location_id = ANY (scope_arr.ids)
-       AND (_company_id IS NULL OR wi.company_id = _company_id)
-     ```
-   - When `has_scope = false`, `candidates = SELECT id FROM warehouse_items` (unfiltered).
-
-2. Rewrite `base` to start from `candidates`:
-   ```sql
-   base AS (
-     SELECT wi.<cols>
-     FROM warehouse_items wi
-     JOIN candidates c ON c.id = wi.id
-     WHERE (_company_id IS NULL OR wi.company_id = _company_id)
-       AND (_status IS NULL OR wi.status = _status)
-       AND public.can_access_company(wi.company_id)
-       AND (cursor predicate)
-     ORDER BY wi.created_at DESC, wi.id DESC
-     LIMIT GREATEST(_limit, 1)        -- exact page size, no *8 fudge
-   )
-   ```
-
-3. Keep the rest of the pipeline (`joined` → `with_stock` → `filtered`) intact. The `filtered` "drop items with zero allocated when has_scope" guard still holds because `candidates` already enforced it.
-
-4. Keep signature, return columns, `SECURITY DEFINER`, `search_path`, and grants identical so no client / type changes are needed.
-
-### Index support
-
-Add (idempotent) if not present:
-```sql
-CREATE INDEX IF NOT EXISTS idx_bin_alloc_location_company_qty
-  ON warehouse_bin_allocations (location_id, company_id)
-  WHERE allocated_quantity > 0;
+```text
+Stock Owner: [Lyceum FC]  [NCG Trading]
 ```
-Backs the new `candidates` lookup so VEB-scoped queries stay sub-100 ms.
 
-## Expected result
+When the Stock Owner filter is set, only allocations of that owner contribute to `current_stock`, the bins list and the badge column — so the row's totals and bin pills reflect a single owner's holdings at the selected location.
 
-- VEB under Lyceum Fulfilment Centre shows all **221** items (paged 50 at a time, infinite scroll continues correctly).
-- No change for users without a location filter — `candidates` collapses to all items.
-- All other location/sub-location filters (Lyceum Nugegoda, Wattala, etc.) similarly stop truncating to the newest-400 window.
+Bulk Update dialog gets the same Stock Owner Select at the top, plus a short note: "Filter limits which selected rows are updated to those holding stock for this owner at the current location."
 
-## Files touched
+## Technical changes
 
-- New migration: `supabase/migrations/<ts>_fix_list_warehouse_inventory_location_pagination.sql` — replaces `public.list_warehouse_inventory(...)` body and adds the partial index.
+### 1. Database — `list_warehouse_inventory` RPC (new migration)
 
-No frontend changes required.
+- Add parameter `_owner_company_id uuid DEFAULT NULL`.
+- In `candidates` CTE (scope path): add `AND (_owner_company_id IS NULL OR a.company_id = _owner_company_id)`.
+- In `page_bins` CTE: add the same predicate so bins/quantities reflect the owner filter.
+- Add two output columns:
+  - `owner_company_ids uuid[]`
+  - `owner_company_names text[]`
+  Computed via a small extra CTE that groups distinct `(a.company_id, companies.name)` per item over the same location/owner scope, ordered by name.
+- Keep partial index `(location_id, company_id) WHERE allocated_quantity > 0` (already added).
+- Drop & recreate function (Postgres signature change).
+
+### 2. Frontend hook — `src/hooks/useWarehouseItemsLazyInventory.ts`
+
+- Add `ownerCompanyId?: string | null` option.
+- Include in `queryKey`.
+- Pass `_owner_company_id: ownerCompanyId ?? null` into the RPC call.
+
+### 3. Inventory page — `src/components/warehouse/ItemMasterTab.tsx`
+
+- Extend `INV_COLUMN_DEFS` with `{ key: 'stock_owner', label: 'Stock Owner', fixed: false }`.
+- Add `const [ownerCompanyFilter, setOwnerCompanyFilter] = useState('all')`.
+- Render a new "Stock Owner" `Select` in the filter row, options = `companies` plus "All owners".
+- Forward `ownerCompanyId: ownerCompanyFilter === 'all' ? null : ownerCompanyFilter` to `useWarehouseItemsLazyInventory`.
+- New `<TableHead>` + `<TableCell>` rendering badges from `item.owner_company_names`; show "—" when empty.
+- Export (Excel) writer: include a "Stock Owner" column joining names with `, `.
+
+### 4. Bulk update — `src/components/warehouse/BulkInventoryUpdateDialog.tsx`
+
+- New prop `defaultOwnerCompanyId?: string | null` passed from `ItemMasterTab` (the currently applied filter).
+- Add `ownerCompanyId` state + Select (same options as the list).
+- Before processing, re-query `warehouse_bin_allocations` for `selectedIds` filtered by `company_id = ownerCompanyId` (when set) to derive the effective `warehouse_item_id` list to update; rows with no allocation for that owner are skipped with a toast count ("Skipped N items with no stock for selected owner").
+- Update message: "Updated X items for owner Y, skipped Z."
+
+### 5. Types
+
+- `src/integrations/supabase/types.ts` is auto-regenerated by the migration tool — no manual edit.
+- Update `InventoryPageRow` in `src/hooks/useWarehouseInventoryPage.ts` to include `owner_company_ids: string[] | null` and `owner_company_names: string[] | null`.
+- Mirror the same fields where `useWarehouseItemsLazyInventory` maps rows to `WarehouseItem` (extend `WarehouseItem` in `src/types/itemBin.ts` with the two optional arrays).
+
+### 6. Memory
+
+After build, add a short memory: `mem://architecture/stock-owner-vs-item-company` — "Stock Owner = warehouse_bin_allocations.company_id (SAP EWM party of ownership); Item Master Company = warehouse_items.company_id. Surface both as distinct columns, never merge."
+
+## Out of scope
+
+- No write path / transfer of ownership in this change.
+- No changes to RLS — `can_access_company` already gates allocation visibility.
+- Reports/Valuation screens are unchanged in this pass (can adopt the same filter later).
