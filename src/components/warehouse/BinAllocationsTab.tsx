@@ -218,15 +218,26 @@ export function BinAllocationsTab() {
       id: 'actions',
       header: 'Actions',
       cell: ({ row }: { row: { original: BinAllocationWithDetails } }) => (
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => setAllocationToDelete(row.original.id)}
-          className="text-destructive hover:text-destructive hover:bg-destructive/10"
-          title="Delete allocation"
-        >
-          <Trash2 className="h-4 w-4" />
-        </Button>
+        <div className="flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setMoveAllocation(row.original)}
+            title="Move stock to another bin/warehouse"
+            disabled={(row.original.available_quantity || 0) <= 0}
+          >
+            <ArrowRightLeft className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setAllocationToDelete(row.original.id)}
+            className="text-destructive hover:text-destructive hover:bg-destructive/10"
+            title="Delete allocation"
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </div>
       ),
     }] as ColumnDef<BinAllocationWithDetails>[] : []),
   ];
