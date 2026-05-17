@@ -93,7 +93,7 @@ export async function allocateItemCodes(
 
   const codes: string[] = [];
   for (let i = 1; i <= count; i++) {
-    const nextSeq = (maxSeq + i).toString().padStart(3, '0');
+    const nextSeq = (maxSeq + i).toString().padStart(padWidth, '0');
     codes.push(`${prefix}${nextSeq}`);
   }
 
