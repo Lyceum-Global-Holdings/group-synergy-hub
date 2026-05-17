@@ -532,6 +532,16 @@ export function ItemMasterDefinitionTab({ onNavigateToInventory, onNavigateToBin
           </DialogContent>
         </Dialog>
       )}
+
+      {viewingItem && (
+        <Suspense fallback={null}>
+          <ItemDetailsDialog
+            item={viewingItem as any}
+            open={!!viewingItem}
+            onOpenChange={(open) => { if (!open) setViewingItem(null); }}
+          />
+        </Suspense>
+      )}
     </div>
   );
 }
