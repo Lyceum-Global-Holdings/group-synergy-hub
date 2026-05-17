@@ -38,6 +38,9 @@ const DeleteItemConfirmationDialog = lazy(() =>
 const ItemDetailsDialog = lazy(() =>
   import('@/components/warehouse/ItemDetailsDialog').then(m => ({ default: m.ItemDetailsDialog }))
 );
+const BulkItemMasterDialog = lazy(() =>
+  import('@/components/warehouse/bulk-item-master/BulkItemMasterDialog').then(m => ({ default: m.BulkItemMasterDialog }))
+);
 import { useIsAdminOrHigher } from '@/hooks/useIsAdminOrHigher';
 import { CatalogItem } from '@/types/itemBin';
 
