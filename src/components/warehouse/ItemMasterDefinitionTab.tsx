@@ -389,18 +389,6 @@ export function ItemMasterDefinitionTab({ onNavigateToInventory, onNavigateToBin
                   </TableCell>
                   {col('category') && <TableCell>{category?.name || '-'}</TableCell>}
                   {col('unit') && <TableCell>{unit?.abbreviation || '-'}</TableCell>}
-                  {col('brand') && <TableCell>{item.brand || '-'}</TableCell>}
-                  {col('supplier') && <TableCell>{item.supplier?.name || '-'}</TableCell>}
-                  {col('barcode_sku') && (
-                    <TableCell className="text-xs">
-                      {item.barcode || item.sku ? (
-                        <div className="space-y-0.5">
-                          {item.barcode && <div>{item.barcode}</div>}
-                          {item.sku && <div className="text-muted-foreground">{item.sku}</div>}
-                        </div>
-                      ) : '-'}
-                    </TableCell>
-                  )}
                   {col('unit_cost') && <TableCell className="text-right">{item.unit_cost?.toFixed(2) || '-'}</TableCell>}
                   {col('selling_price') && <TableCell className="text-right">{item.selling_price?.toFixed(2) || '-'}</TableCell>}
                   {col('reorder_level') && <TableCell className="text-right">{item.reorder_level ?? '-'}</TableCell>}
