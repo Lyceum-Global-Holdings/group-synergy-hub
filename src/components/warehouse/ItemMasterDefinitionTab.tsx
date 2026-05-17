@@ -73,6 +73,7 @@ export function ItemMasterDefinitionTab({ onNavigateToInventory, onNavigateToBin
   const [supplierFilter, setSupplierFilter] = useState('all');
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<CatalogItem | null>(null);
+  const [viewingItem, setViewingItem] = useState<CatalogItem | null>(null);
   const [stockMovementItem, setStockMovementItem] = useState<CatalogItem | null>(null);
   const [previewImage, setPreviewImage] = useState<{ url: string; name: string } | null>(null);
   const [deletingItem, setDeletingItem] = useState<CatalogItem | null>(null);
