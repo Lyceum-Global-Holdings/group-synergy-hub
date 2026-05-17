@@ -47,7 +47,7 @@ export async function allocateItemCodes(
         }
       : optionsOrCategoryCode;
 
-  const { categoryCode, count, scope, companyId = null } = opts;
+  const { categoryCode, count, scope, companyId = null, padWidth = 3 } = opts;
 
   if (!categoryCode) {
     throw new Error('Category code is required to auto-generate item codes');
