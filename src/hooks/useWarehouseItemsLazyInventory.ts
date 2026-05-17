@@ -83,6 +83,7 @@ export function useWarehouseItemsLazyInventory({
         _limit: pageSize,
         _stock_mode: stockMode,
         _supplier_id: supplierId && supplierId !== 'all' ? supplierId : null,
+        _owner_company_id: ownerCompanyId ?? null,
       } as any);
       if (error) throw error;
 
