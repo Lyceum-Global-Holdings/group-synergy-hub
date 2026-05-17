@@ -342,9 +342,6 @@ export function ItemMasterDefinitionTab({ onNavigateToInventory, onNavigateToBin
               <TableHead>Name</TableHead>
               {col('category') && <TableHead>Category</TableHead>}
               {col('unit') && <TableHead>Unit</TableHead>}
-              {col('brand') && <TableHead>Brand</TableHead>}
-              {col('supplier') && <TableHead>Supplier</TableHead>}
-              {col('barcode_sku') && <TableHead>Barcode / SKU</TableHead>}
               {col('unit_cost') && <TableHead className="text-right">Unit Cost</TableHead>}
               {col('selling_price') && <TableHead className="text-right">Selling Price</TableHead>}
               {col('reorder_level') && <TableHead className="text-right">Reorder Lvl</TableHead>}
