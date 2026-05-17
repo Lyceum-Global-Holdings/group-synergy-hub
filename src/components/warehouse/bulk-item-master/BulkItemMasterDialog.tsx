@@ -150,6 +150,19 @@ export function BulkItemMasterDialog({ open, onOpenChange }: Props) {
               Clear invalid ({invalidCount})
             </Button>
             <Button size="sm" variant="ghost" onClick={resetAll}>Reset</Button>
+            <div className="flex items-center gap-2 pl-2 border-l">
+              <span className="text-xs text-muted-foreground">On duplicate code:</span>
+              <Select value={duplicatePolicy} onValueChange={(v) => setDuplicatePolicy(v as any)}>
+                <SelectTrigger className="h-8 w-[110px] text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="fail">Fail</SelectItem>
+                  <SelectItem value="skip">Skip</SelectItem>
+                  <SelectItem value="update">Update</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
             {(() => {
               const exportRows = buildExportRows(rows, categories, units);
               const n = exportRows.length;
