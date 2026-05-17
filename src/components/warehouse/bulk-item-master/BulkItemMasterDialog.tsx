@@ -16,6 +16,15 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '@/components/ui/command';
 import {
   Plus,
   Trash2,
@@ -28,6 +37,8 @@ import {
   RotateCcw,
   Copy,
   Download,
+  ChevronsUpDown,
+  Check,
 } from 'lucide-react';
 import { useBulkItemMaster } from './useBulkItemMaster';
 import { PasteNamesDialog } from './PasteNamesDialog';
