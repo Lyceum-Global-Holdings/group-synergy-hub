@@ -180,11 +180,10 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
     hasNextPage,
     isFetchingNextPage,
   } = useWarehouseItemsLazyInventory({
-    pageSize: 100,
+    pageSize: 50,
     search: debouncedSearch,
     categoryId: categoryFilter,
     status: statusFilter,
-    supplierId: supplierFilter,
     locationId: globalLocationId,
     stockMode,
     ownerLabel: debouncedOwnerLabel || null,
