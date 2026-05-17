@@ -25,6 +25,14 @@ export interface ImportResultRow {
   error?: string;
 }
 
+export interface PasteEntry {
+  code: string;
+  opening_qty?: number | null;
+  unit_cost?: number | null;
+  reorder_level?: number | null;
+  notes?: string | null;
+}
+
 export function newRow(partial: Partial<BulkCatalogRow> = {}): BulkCatalogRow {
   return {
     rowId: crypto.randomUUID(),

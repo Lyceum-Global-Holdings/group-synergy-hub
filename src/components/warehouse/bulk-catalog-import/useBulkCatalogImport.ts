@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { BulkCatalogRow, ImportResultRow, newRow } from './types';
+import { BulkCatalogRow, ImportResultRow, PasteEntry, newRow } from './types';
 
 export interface BulkCatalogDefaults {
   company_id: string | null;
@@ -61,51 +61,95 @@ export function useBulkCatalogImport(defaults: BulkCatalogDefaults = { company_i
   }, [makeRow]);
 
 
-  /** Append rows by item codes (paste-to-resolve). Resolves catalog in one query. */
-  const seedFromCodes = useCallback(async (codes: string[]) => {
-    const cleaned = Array.from(new Set(codes.map((c) => c.trim()).filter(Boolean)));
-    if (cleaned.length === 0) return { resolved: 0, missing: [] as string[] };
+  /**
+   * Append rows by pasted entries. Each entry may include `code` only or also
+   * `opening_qty`, `unit_cost`, `reorder_level`, `notes`. Catalog is resolved
+   * in a single query against item_code / barcode / sku.
+   */
+  const seedFromPaste = useCallback(
+    async (entries: PasteEntry[]) => {
+      // Deduplicate by code+qty signature so identical lines collapse, but keep
+      // distinct qty values as separate rows.
+      const cleaned = entries
+        .map((e) => ({ ...e, code: (e.code ?? '').trim() }))
+        .filter((e) => e.code.length > 0);
+      if (cleaned.length === 0) return { resolved: 0, missing: [] as string[], withQty: 0 };
 
-    const { data, error } = await supabase
-      .from('warehouse_item_catalog')
-      .select('id, item_code, name, barcode, sku, unit:item_units(abbreviation)')
-      .or(
-        `item_code.in.(${cleaned.map((c) => `"${c}"`).join(',')}),barcode.in.(${cleaned
-          .map((c) => `"${c}"`)
-          .join(',')}),sku.in.(${cleaned.map((c) => `"${c}"`).join(',')})`,
-      );
-    if (error) throw error;
+      const uniqueCodes = Array.from(new Set(cleaned.map((e) => e.code)));
+      const { data, error } = await supabase
+        .from('warehouse_item_catalog')
+        .select('id, item_code, name, barcode, sku, unit:item_units(abbreviation)')
+        .or(
+          `item_code.in.(${uniqueCodes.map((c) => `"${c}"`).join(',')}),barcode.in.(${uniqueCodes
+            .map((c) => `"${c}"`)
+            .join(',')}),sku.in.(${uniqueCodes.map((c) => `"${c}"`).join(',')})`,
+        );
+      if (error) throw error;
 
-    const byKey = new Map<string, any>();
-    for (const it of data ?? []) {
-      if (it.item_code) byKey.set(it.item_code.toLowerCase(), it);
-      if ((it as any).barcode) byKey.set(((it as any).barcode as string).toLowerCase(), it);
-      if ((it as any).sku) byKey.set(((it as any).sku as string).toLowerCase(), it);
-    }
-
-    const missing: string[] = [];
-    const newRows: BulkCatalogRow[] = cleaned.map((code) => {
-      const hit = byKey.get(code.toLowerCase());
-      if (!hit) {
-        missing.push(code);
-        return makeRow({ item_code: code, status: 'invalid', message: 'Not in catalog' });
+      const byKey = new Map<string, any>();
+      for (const it of data ?? []) {
+        if (it.item_code) byKey.set(it.item_code.toLowerCase(), it);
+        if ((it as any).barcode) byKey.set(((it as any).barcode as string).toLowerCase(), it);
+        if ((it as any).sku) byKey.set(((it as any).sku as string).toLowerCase(), it);
       }
-      return makeRow({
-        catalog_item_id: hit.id,
-        item_code: hit.item_code,
-        name: hit.name,
-        uom: hit.unit?.abbreviation ?? null,
-        status: 'pending',
-      });
-    });
 
-    setRows((rs) => {
-      // Replace fully-empty initial blank rows
-      const trimmed = rs.filter((r) => r.catalog_item_id || r.item_code || r.name);
-      return [...trimmed, ...newRows];
-    });
-    return { resolved: cleaned.length - missing.length, missing };
-  }, [makeRow]);
+      const missing: string[] = [];
+      let withQty = 0;
+      const newRows: BulkCatalogRow[] = cleaned.map((entry) => {
+        const hit = byKey.get(entry.code.toLowerCase());
+        const qtyStr =
+          entry.opening_qty != null && Number.isFinite(entry.opening_qty) && entry.opening_qty > 0
+            ? String(entry.opening_qty)
+            : '';
+        if (qtyStr) withQty += 1;
+        const costStr =
+          entry.unit_cost != null && Number.isFinite(entry.unit_cost) ? String(entry.unit_cost) : '';
+        const reorderStr =
+          entry.reorder_level != null && Number.isFinite(entry.reorder_level)
+            ? String(entry.reorder_level)
+            : '';
+        if (!hit) {
+          missing.push(entry.code);
+          return makeRow({
+            item_code: entry.code,
+            opening_qty: qtyStr,
+            unit_cost: costStr,
+            reorder_level: reorderStr,
+            notes: entry.notes ?? '',
+            status: 'invalid',
+            message: 'Not in catalog',
+          });
+        }
+        return makeRow({
+          catalog_item_id: hit.id,
+          item_code: hit.item_code,
+          name: hit.name,
+          uom: hit.unit?.abbreviation ?? null,
+          opening_qty: qtyStr,
+          unit_cost: costStr,
+          reorder_level: reorderStr,
+          notes: entry.notes ?? '',
+          status: 'pending',
+        });
+      });
+
+      setRows((rs) => {
+        const trimmed = rs.filter((r) => r.catalog_item_id || r.item_code || r.name);
+        return [...trimmed, ...newRows];
+      });
+      return { resolved: cleaned.length - missing.length, missing, withQty };
+    },
+    [makeRow],
+  );
+
+  /** Back-compat: seed from a flat list of codes (no qty). */
+  const seedFromCodes = useCallback(
+    async (codes: string[]) => {
+      const { resolved, missing } = await seedFromPaste(codes.map((code) => ({ code })));
+      return { resolved, missing };
+    },
+    [seedFromPaste],
+  );
 
   const validateRow = useCallback((r: BulkCatalogRow): string | null => {
     if (!r.catalog_item_id) return 'Pick a catalog item';
@@ -195,6 +239,7 @@ export function useBulkCatalogImport(defaults: BulkCatalogDefaults = { company_i
     clearInvalid,
     resetAll,
     seedFromCodes,
+    seedFromPaste,
     submit,
     isSubmitting,
     validCount,
