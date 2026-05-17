@@ -104,9 +104,11 @@ export function BulkInventoryUpdateDialog({ open, onOpenChange, selectedIds, onC
     queryClient.invalidateQueries({ queryKey: ['warehouse-item-catalog'] });
 
     if (errorCount === 0) {
-      toast.success(`Updated ${successCount} items successfully`);
+      toast.success(
+        `Updated ${successCount} items${skippedCount ? `, skipped ${skippedCount} (no stock for owner)` : ''}`
+      );
     } else {
-      toast.warning(`Updated ${successCount} items, ${errorCount} error(s)`);
+      toast.warning(`Updated ${successCount} items, ${errorCount} error(s)${skippedCount ? `, skipped ${skippedCount}` : ''}`);
     }
 
     setIsProcessing(false);
@@ -120,6 +122,7 @@ export function BulkInventoryUpdateDialog({ open, onOpenChange, selectedIds, onC
     setUnitId('');
     setStatus('');
     setBrand('');
+    setOwnerCompanyId(defaultOwnerCompanyId ?? '');
   };
 
   return (
