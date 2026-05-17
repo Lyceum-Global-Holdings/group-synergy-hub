@@ -144,6 +144,7 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
   const [visibleColumns, setVisibleColumns] = useState<Record<InvColumnKey, boolean>>(INV_DEFAULT_VISIBLE);
   const [selectedItemIds, setSelectedItemIds] = useState<Set<string>>(new Set());
   const [isBulkUpdateOpen, setIsBulkUpdateOpen] = useState(false);
+  const [isBulkChangeOwnerOpen, setIsBulkChangeOwnerOpen] = useState(false);
   const [isBulkDeleteOpen, setIsBulkDeleteOpen] = useState(false);
   
   // Filter states
