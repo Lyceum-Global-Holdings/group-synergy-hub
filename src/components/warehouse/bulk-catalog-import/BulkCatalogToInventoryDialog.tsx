@@ -15,7 +15,7 @@ import { useCompanies } from '@/hooks/useCompanies';
 import { useCompany } from '@/contexts/CompanyContext';
 import { useLocationFilter } from '@/contexts/LocationFilterContext';
 import { useWarehouseLocations } from '@/hooks/useWarehouseLocations';
-import { useWarehouseBins } from '@/hooks/useWarehouseBins';
+import { useBinsAtLocation } from '@/hooks/warehouse/useBinsAtLocation';
 import { useToast } from '@/hooks/use-toast';
 import { useQueryClient } from '@tanstack/react-query';
 import { CatalogItemCell } from './CatalogItemCell';
@@ -37,7 +37,7 @@ export function BulkCatalogToInventoryDialog({ open, onOpenChange }: Props) {
   const { selectedCompany } = useCompany();
   const { globalLocationId } = useLocationFilter();
   const { locations } = useWarehouseLocations();
-  const { bins } = useWarehouseBins({ skipLocationFilter: true });
+  
 
   const defaultCompanyId = selectedCompany?.id ?? null;
   // Only use global location if it belongs to the active company (or is unscoped)
@@ -75,9 +75,6 @@ export function BulkCatalogToInventoryDialog({ open, onOpenChange }: Props) {
     };
   }, [locations]);
 
-  const binsByLocation = useMemo(() => {
-    return (locationId: string | null) => bins.filter((b) => b.location_id === locationId);
-  }, [bins]);
 
   const defaultCompanyName = companies.find((c) => c.id === defaultCompanyId)?.name ?? '—';
   const defaultLocationName = locations.find((l) => l.id === defaultLocationId)?.name ?? 'All locations';
@@ -221,7 +218,6 @@ export function BulkCatalogToInventoryDialog({ open, onOpenChange }: Props) {
                     row={r}
                     companies={companies}
                     locations={locationsByCompany(r.company_id)}
-                    bins={binsByLocation(r.location_id)}
                     defaultLocationId={defaultLocationId}
                     onChange={(patch) => setRow(r.rowId, patch)}
                     onRemove={() => removeRow(r.rowId)}
@@ -252,14 +248,14 @@ interface RowProps {
   row: BulkCatalogRow;
   companies: any[];
   locations: any[];
-  bins: any[];
   defaultLocationId: string | null;
   onChange: (patch: Partial<BulkCatalogRow>) => void;
   onRemove: () => void;
 }
 
-function Row({ index, row, companies, locations, bins, defaultLocationId, onChange, onRemove }: RowProps) {
+function Row({ index, row, companies, locations, defaultLocationId, onChange, onRemove }: RowProps) {
   const companyId = row.company_id;
+  const { data: bins = [], isLoading: binsLoading } = useBinsAtLocation(row.location_id);
 
   const statusBadge = () => {
     switch (row.status) {
@@ -337,10 +333,10 @@ function Row({ index, row, companies, locations, bins, defaultLocationId, onChan
         <Select
           value={row.bin_id ?? undefined}
           onValueChange={(v) => onChange({ bin_id: v })}
-          disabled={!row.location_id || bins.length === 0}
+          disabled={!row.location_id || binsLoading || bins.length === 0}
         >
           <SelectTrigger className="h-8 text-xs">
-            <SelectValue placeholder={bins.length === 0 ? 'No bins' : 'Optional'} />
+            <SelectValue placeholder={binsLoading ? 'Loading…' : bins.length === 0 ? 'No bins' : 'Optional'} />
           </SelectTrigger>
           <SelectContent>
             {bins.map((b) => (
