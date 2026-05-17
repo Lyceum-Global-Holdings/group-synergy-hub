@@ -17,11 +17,12 @@ interface BulkInventoryUpdateDialogProps {
   onOpenChange: (open: boolean) => void;
   selectedIds: Set<string>;
   onComplete: () => void;
+  defaultOwnerCompanyId?: string | null;
 }
 
-export function BulkInventoryUpdateDialog({ open, onOpenChange, selectedIds, onComplete }: BulkInventoryUpdateDialogProps) {
+export function BulkInventoryUpdateDialog({ open, onOpenChange, selectedIds, onComplete, defaultOwnerCompanyId = null }: BulkInventoryUpdateDialogProps) {
   const queryClient = useQueryClient();
-  const { selectedCompany } = useCompany();
+  const { selectedCompany, companies } = useCompany();
   const { categories } = useItemCategories(selectedCompany?.id);
   const { units } = useItemUnits();
 
@@ -29,6 +30,7 @@ export function BulkInventoryUpdateDialog({ open, onOpenChange, selectedIds, onC
   const [unitId, setUnitId] = useState<string>('');
   const [status, setStatus] = useState<string>('');
   const [brand, setBrand] = useState<string>('');
+  const [ownerCompanyId, setOwnerCompanyId] = useState<string>(defaultOwnerCompanyId ?? '');
   const [isProcessing, setIsProcessing] = useState(false);
 
   const handleSubmit = async () => {
@@ -50,18 +52,38 @@ export function BulkInventoryUpdateDialog({ open, onOpenChange, selectedIds, onC
     setIsProcessing(true);
     let successCount = 0;
     let errorCount = 0;
+    let skippedCount = 0;
+
+    // Narrow target item IDs to those holding stock for the selected Stock Owner
+    let targetIds = Array.from(selectedIds);
+    if (ownerCompanyId) {
+      const { data: allocRows, error: allocErr } = await supabase
+        .from('warehouse_bin_allocations')
+        .select('warehouse_item_id')
+        .eq('company_id', ownerCompanyId)
+        .gt('allocated_quantity', 0)
+        .in('warehouse_item_id', targetIds);
+      if (allocErr) {
+        toast.error('Failed to resolve stock owner filter');
+        setIsProcessing(false);
+        return;
+      }
+      const ownerSet = new Set((allocRows || []).map((r: any) => r.warehouse_item_id));
+      skippedCount = targetIds.length - ownerSet.size;
+      targetIds = targetIds.filter((id) => ownerSet.has(id));
+    }
 
     // Resolve catalog_item_id per selected inventory row when master fields change
     let catalogIds: string[] = [];
-    if (Object.keys(master).length > 0) {
+    if (Object.keys(master).length > 0 && targetIds.length > 0) {
       const { data: rows } = await supabase
         .from('warehouse_items_full')
         .select('catalog_item_id')
-        .in('id', Array.from(selectedIds));
+        .in('id', targetIds);
       catalogIds = Array.from(new Set((rows || []).map((r: any) => r.catalog_item_id).filter(Boolean)));
     }
 
-    for (const id of selectedIds) {
+    for (const id of targetIds) {
       if (Object.keys(perCompany).length > 0) {
         const { error } = await supabase.from('warehouse_items').update(perCompany).eq('id', id);
         if (error) { console.error('Bulk update error for', id, error); errorCount++; continue; }
@@ -82,9 +104,11 @@ export function BulkInventoryUpdateDialog({ open, onOpenChange, selectedIds, onC
     queryClient.invalidateQueries({ queryKey: ['warehouse-item-catalog'] });
 
     if (errorCount === 0) {
-      toast.success(`Updated ${successCount} items successfully`);
+      toast.success(
+        `Updated ${successCount} items${skippedCount ? `, skipped ${skippedCount} (no stock for owner)` : ''}`
+      );
     } else {
-      toast.warning(`Updated ${successCount} items, ${errorCount} error(s)`);
+      toast.warning(`Updated ${successCount} items, ${errorCount} error(s)${skippedCount ? `, skipped ${skippedCount}` : ''}`);
     }
 
     setIsProcessing(false);
@@ -98,6 +122,7 @@ export function BulkInventoryUpdateDialog({ open, onOpenChange, selectedIds, onC
     setUnitId('');
     setStatus('');
     setBrand('');
+    setOwnerCompanyId(defaultOwnerCompanyId ?? '');
   };
 
   return (
@@ -107,6 +132,20 @@ export function BulkInventoryUpdateDialog({ open, onOpenChange, selectedIds, onC
           <DialogTitle>Bulk Update {selectedIds.size} Items</DialogTitle>
         </DialogHeader>
         <p className="text-sm text-muted-foreground">Only non-empty fields will be applied.</p>
+
+        <div className="space-y-1.5">
+          <Label>Stock Owner filter</Label>
+          <Select value={ownerCompanyId || 'all'} onValueChange={(v) => setOwnerCompanyId(v === 'all' ? '' : v)}>
+            <SelectTrigger><SelectValue placeholder="All stock owners" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All stock owners</SelectItem>
+              {companies.map(c => (
+                <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-muted-foreground">Only items holding stock for this owner will be updated.</p>
+        </div>
 
         <div className="space-y-4 py-2">
           <div className="space-y-1.5">

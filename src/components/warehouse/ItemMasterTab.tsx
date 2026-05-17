@@ -93,6 +93,7 @@ const INV_COLUMN_DEFS = [
   { key: 'supplier', label: 'Supplier', fixed: false },
   { key: 'bin', label: 'Bin', fixed: false },
   { key: 'company', label: 'Company', fixed: false },
+  { key: 'stock_owner', label: 'Stock Owner', fixed: false },
   { key: 'current_stock', label: 'Current Stock', fixed: false },
   { key: 'unit_cost', label: 'Unit Cost', fixed: false },
   { key: 'status', label: 'Status', fixed: false },
@@ -147,6 +148,7 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
   const [binFilter, setBinFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [supplierFilter, setSupplierFilter] = useState<string>("all");
+  const [ownerCompanyFilter, setOwnerCompanyFilter] = useState<string>("all");
   const [stockMode, setStockMode] = useState<'all' | 'in_stock' | 'zero' | 'low'>("all");
   const [previewImage, setPreviewImage] = useState<{ url: string; name: string } | null>(null);
 
@@ -178,6 +180,7 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
     supplierId: supplierFilter,
     locationId: globalLocationId,
     stockMode,
+    ownerCompanyId: ownerCompanyFilter === 'all' ? null : ownerCompanyFilter,
   });
 
   // Keep mutations via the old hook with fetching disabled
@@ -282,7 +285,7 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
     return Array.from(suppliers).sort();
   }, [allItems]);
 
-  const hasActiveFilters = categoryFilter !== "all" || binFilter !== "all" || statusFilter !== "all" || supplierFilter !== "all" || stockMode !== "all";
+  const hasActiveFilters = categoryFilter !== "all" || binFilter !== "all" || statusFilter !== "all" || supplierFilter !== "all" || stockMode !== "all" || ownerCompanyFilter !== "all";
 
   const clearFilters = () => {
     setCategoryFilter("all");
@@ -290,6 +293,7 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
     setStatusFilter("all");
     setSupplierFilter("all");
     setStockMode("all");
+    setOwnerCompanyFilter("all");
   };
 
   // Selection helpers
@@ -455,6 +459,18 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
               </SelectContent>
             </Select>
 
+            <Select value={ownerCompanyFilter} onValueChange={setOwnerCompanyFilter}>
+              <SelectTrigger className="w-[160px]">
+                <SelectValue placeholder="Stock Owner" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Stock Owners</SelectItem>
+                {companies.map(c => (
+                  <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
             {hasActiveFilters && (
               <Button variant="ghost" size="sm" onClick={clearFilters}>
                 <X className="h-4 w-4 mr-1" />
@@ -571,6 +587,7 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
               {col('supplier') && <TableHead>Supplier</TableHead>}
               {col('bin') && <TableHead>Bin</TableHead>}
               {col('company') && <TableHead>Company</TableHead>}
+              {col('stock_owner') && <TableHead>Stock Owner</TableHead>}
               {col('current_stock') && <TableHead className="text-right">Current Stock</TableHead>}
               {col('unit_cost') && <TableHead>Unit Cost</TableHead>}
               {col('status') && <TableHead>Status</TableHead>}
@@ -694,6 +711,19 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
                         ? companyById.get(item.company_id)?.name || '-'
                         : 'All Companies'
                       }
+                    </TableCell>
+                  )}
+                  {col('stock_owner') && (
+                    <TableCell>
+                      {item.owner_company_names && item.owner_company_names.length > 0 ? (
+                        <div className="flex flex-wrap gap-1">
+                          {item.owner_company_names.map((n, i) => (
+                            <Badge key={`${n}-${i}`} variant="secondary" className="text-xs">{n}</Badge>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
                     </TableCell>
                   )}
                   {col('current_stock') && (
@@ -1046,6 +1076,7 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
             onOpenChange={setIsBulkUpdateOpen}
             selectedIds={selectedItemIds}
             onComplete={clearSelection}
+            defaultOwnerCompanyId={ownerCompanyFilter === 'all' ? null : ownerCompanyFilter}
           />
         </Suspense>
       )}

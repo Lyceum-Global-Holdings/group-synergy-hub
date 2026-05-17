@@ -31,6 +31,8 @@ export interface InventoryPageRow {
   created_at: string;
   updated_at: string;
   bins: Array<{ id: string; bin_code: string; name: string; quantity: number }>;
+  owner_company_ids: string[] | null;
+  owner_company_names: string[] | null;
 }
 
 interface Params {
@@ -95,7 +97,7 @@ export function useWarehouseInventoryPage({
         _limit: pageSize,
       });
       if (error) throw error;
-      return (data ?? []) as InventoryPageRow[];
+      return (data ?? []) as unknown as InventoryPageRow[];
     },
     staleTime: 30_000,
     placeholderData: keepPreviousData,

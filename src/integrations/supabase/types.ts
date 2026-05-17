@@ -21953,6 +21953,7 @@ export type Database = {
           _cursor_id?: string
           _limit?: number
           _location_ids?: string[]
+          _owner_company_id?: string
           _search?: string
           _status?: string
           _stock_mode?: string
@@ -21975,6 +21976,8 @@ export type Database = {
           max_stock_level: number
           min_stock_level: number
           name: string
+          owner_company_ids: string[]
+          owner_company_names: string[]
           reorder_level: number
           reserved_quantity: number
           selling_price: number

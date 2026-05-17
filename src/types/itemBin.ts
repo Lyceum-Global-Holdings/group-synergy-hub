@@ -79,6 +79,8 @@ export interface WarehouseItem {
     name: string;
     quantity: number;
   }> | null;
+  owner_company_ids?: string[] | null;
+  owner_company_names?: string[] | null;
   status: 'active' | 'inactive' | 'discontinued';
   is_serialized: boolean;
   is_batch_tracked: boolean;

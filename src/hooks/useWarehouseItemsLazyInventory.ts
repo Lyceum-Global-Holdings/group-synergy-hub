@@ -19,6 +19,7 @@ interface UseWarehouseItemsLazyInventoryOptions {
   supplierId?: string;
   locationId?: string | null;
   stockMode?: StockMode;
+  ownerCompanyId?: string | null;
 }
 
 const MAX_ITEMS = 20000;
@@ -39,6 +40,7 @@ export function useWarehouseItemsLazyInventory({
   supplierId,
   locationId,
   stockMode = 'all',
+  ownerCompanyId = null,
 }: UseWarehouseItemsLazyInventoryOptions) {
   const { selectedCompany, isViewingAllCompanies } = useCompany();
   const { data: permissions } = useCurrentUserLocationPermissions();
@@ -58,6 +60,7 @@ export function useWarehouseItemsLazyInventory({
       status,
       supplierId,
       stockMode,
+      ownerCompanyId,
     ],
     queryFn: async ({ pageParam }: { pageParam: Cursor | null }) => {
       const permittedLocationIds = permissions && !permissions.viewAllLocations
@@ -80,6 +83,7 @@ export function useWarehouseItemsLazyInventory({
         _limit: pageSize,
         _stock_mode: stockMode,
         _supplier_id: supplierId && supplierId !== 'all' ? supplierId : null,
+        _owner_company_id: ownerCompanyId ?? null,
       } as any);
       if (error) throw error;
 
@@ -90,6 +94,8 @@ export function useWarehouseItemsLazyInventory({
           ? { id: row.supplier_id, name: row.supplier_name }
           : null,
         bins: Array.isArray(row.bins) && row.bins.length > 0 ? row.bins : null,
+        owner_company_ids: Array.isArray(row.owner_company_ids) ? row.owner_company_ids : null,
+        owner_company_names: Array.isArray(row.owner_company_names) ? row.owner_company_names : null,
       }));
 
       let nextCursor: Cursor | null = null;
