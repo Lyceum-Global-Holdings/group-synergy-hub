@@ -57,6 +57,7 @@ export function BulkCatalogToInventoryDialog({ open, onOpenChange }: Props) {
     clearInvalid,
     resetAll,
     seedFromCodes,
+    seedFromPaste,
     submit,
     isSubmitting,
     validCount,
@@ -213,7 +214,7 @@ export function BulkCatalogToInventoryDialog({ open, onOpenChange }: Props) {
         </SheetContent>
       </Sheet>
 
-      <PasteCodesDialog open={pasteOpen} onOpenChange={setPasteOpen} onResolve={seedFromCodes} />
+      <PasteCodesDialog open={pasteOpen} onOpenChange={setPasteOpen} onResolve={seedFromPaste} />
     </>
   );
 }
