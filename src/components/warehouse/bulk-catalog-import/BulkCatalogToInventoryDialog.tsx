@@ -150,7 +150,7 @@ export function BulkCatalogToInventoryDialog({ open, onOpenChange }: Props) {
               <Plus className="h-4 w-4 mr-1" /> Add 5 rows
             </Button>
             <Button size="sm" variant="outline" onClick={() => setPasteOpen(true)}>
-              <ClipboardPaste className="h-4 w-4 mr-1" /> Paste codes
+              <ClipboardPaste className="h-4 w-4 mr-1" /> Paste codes &amp; qty
             </Button>
             <Button size="sm" variant="ghost" onClick={clearInvalid} disabled={invalidCount === 0}>
               Clear invalid ({invalidCount})
