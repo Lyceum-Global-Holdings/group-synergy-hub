@@ -1,27 +1,37 @@
-# Fix: Sub-locations not showing in Adjust Stock dialog
+# Fix: Stock movement history not appearing after adjustments
 
-## Problem
-In `StockAdjustmentDialog` (Decrease Stock → "Issue to Sub-Location"), the screenshot shows a single "Location *" dropdown that says "No locations available". The current flow asks the user to first pick a parent Location, then a Sub-Location. `parentLocations` is filtered to `type === 'location'` only, and when no such records exist (or none are visible in the user's scope) the picker is empty and the sub-location step never appears.
+## Root cause
+`StockAdjustmentDialog.handleSubmit` inserts a `stock_transactions` row without `bin_id` or `location_id`:
 
-The user already picked a Bin (LNQ - LNQ at the LNQ location), so requiring them to re-pick the parent location is redundant.
+```ts
+createTransaction({
+  item_id, transaction_type, reference_type,
+  quantity_change, quantity_before, quantity_after,
+  unit_cost, total_value, notes,
+  issued_to_location_id,
+});
+```
+
+DB confirms the two most recent adjustments today have `bin_id IS NULL` and `location_id IS NULL`.
+
+The history dialog reads via `get_bin_scoped_stock_movements`, which is bin/location-scoped. With a `locationId` in scope (Inventory tab always passes one), rows with NULL bin_id AND NULL location_id are filtered out — so the new adjustment never appears in the user's history view.
 
 ## Fix (frontend only, `src/components/warehouse/StockAdjustmentDialog.tsx`)
 
-1. Derive the parent location from the **selected bin** (`bins.find(b => b.id === binId).location_id`). If the bin's location is itself a sub-location, walk up to its `parent_id` to find the true parent.
-2. Remove the "Location *" parent picker UI entirely. Show only the **Sub-Location** picker, populated with all active sub-locations whose `parent_id` matches the bin's parent location.
-3. Show the resolved parent location name as static text above the sub-location picker, e.g. "Issuing from: LNQ".
-4. If no bin is selected yet, hide the sub-location picker and show a hint: "Select a bin first".
-5. If the bin's location has no sub-locations, show "No sub-locations under {location name}" (existing disabled item, but using the derived parent).
-6. Update the submit handler:
-   - `selectedParentLocation` becomes the derived parent (not from a dropdown).
-   - Validation: when `issueToSubLocation` is on, require `binId` and `selectedSubLocationId`.
-7. Reset `selectedSubLocationId` when `binId` changes (parent context shifted).
-8. Remove now-unused `selectedLocationId` state and `parentLocations` memo.
+Populate `bin_id` (and derived `location_id`) on the transaction insert:
+
+1. Resolve the selected bin: `const selectedBin = bins.find(b => b.id === binId);`
+2. Pass to `createTransaction`:
+   - `bin_id: binId`
+   - `location_id: selectedBin?.location_id ?? undefined`
+3. No other call sites changed; the field is already in `CreateStockTransactionData` and on the `stock_transactions` table.
+
+This makes the row visible to the bin-scoped reader for both bin-only and location-only scope filters.
 
 ## Out of scope
-- No backend / RPC / RLS changes.
-- No changes to how bins or locations are fetched.
-- Increase Stock flow unchanged.
+- No DB migration. The RPC and table already support the fields.
+- No backfill of the two NULL-bin rows already inserted (they were created by the same bug; user can re-issue if needed, or we can write a one-off backfill if asked).
+- No changes to GRN / transfer / picking writers (they already set bin_id/location_id).
 
 ## Files
-- `src/components/warehouse/StockAdjustmentDialog.tsx` (only file edited)
+- `src/components/warehouse/StockAdjustmentDialog.tsx`
