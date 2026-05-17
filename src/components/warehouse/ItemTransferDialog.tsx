@@ -99,6 +99,7 @@ export function ItemTransferDialog({
     values: z.infer<typeof formSchema>;
   } | null>(null);
   const [isCompleting, setIsCompleting] = useState(false);
+  const queryClient = useQueryClient();
 
   const unitName = item?.unit_id 
     ? units.find(u => u.id === item.unit_id)?.abbreviation || "units"
