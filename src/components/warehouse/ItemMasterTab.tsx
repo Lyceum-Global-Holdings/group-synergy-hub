@@ -459,6 +459,18 @@ export function ItemMasterTab({ onGoToAudit }: ItemMasterTabProps) {
               </SelectContent>
             </Select>
 
+            <Select value={ownerCompanyFilter} onValueChange={setOwnerCompanyFilter}>
+              <SelectTrigger className="w-[160px]">
+                <SelectValue placeholder="Stock Owner" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Stock Owners</SelectItem>
+                {companies.map(c => (
+                  <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
             {hasActiveFilters && (
               <Button variant="ghost" size="sm" onClick={clearFilters}>
                 <X className="h-4 w-4 mr-1" />
