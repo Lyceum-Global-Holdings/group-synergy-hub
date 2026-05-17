@@ -87,6 +87,9 @@ export function BulkItemMasterDialog({ open, onOpenChange }: Props) {
     isSubmitting,
     validCount,
     invalidCount,
+    skippedCount,
+    duplicatePolicy,
+    setDuplicatePolicy,
     categories,
     units,
   } = useBulkItemMaster();
@@ -147,6 +150,19 @@ export function BulkItemMasterDialog({ open, onOpenChange }: Props) {
               Clear invalid ({invalidCount})
             </Button>
             <Button size="sm" variant="ghost" onClick={resetAll}>Reset</Button>
+            <div className="flex items-center gap-2 pl-2 border-l">
+              <span className="text-xs text-muted-foreground">On duplicate code:</span>
+              <Select value={duplicatePolicy} onValueChange={(v) => setDuplicatePolicy(v as any)}>
+                <SelectTrigger className="h-8 w-[110px] text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="fail">Fail</SelectItem>
+                  <SelectItem value="skip">Skip</SelectItem>
+                  <SelectItem value="update">Update</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
             {(() => {
               const exportRows = buildExportRows(rows, categories, units);
               const n = exportRows.length;
@@ -204,6 +220,11 @@ export function BulkItemMasterDialog({ open, onOpenChange }: Props) {
               <span className="flex items-center gap-1">
                 <AlertCircle className="h-4 w-4 text-destructive" /> {invalidCount} invalid
               </span>
+              {skippedCount > 0 && (
+                <span className="flex items-center gap-1">
+                  {skippedCount} skipped
+                </span>
+              )}
             </div>
           </div>
 
@@ -245,7 +266,9 @@ export function BulkItemMasterDialog({ open, onOpenChange }: Props) {
             </Button>
             <Button onClick={handleSubmit} disabled={isSubmitting || validCount === 0}>
               {isSubmitting && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-              Create {validCount} item{validCount === 1 ? '' : 's'}
+              {duplicatePolicy === 'fail'
+                ? `Create ${validCount} item${validCount === 1 ? '' : 's'}`
+                : `Process ${validCount} item${validCount === 1 ? '' : 's'}`}
             </Button>
           </div>
         </SheetContent>
@@ -277,6 +300,10 @@ function Row({ index, row, categories, units, onChange, onRemove, onResetCode }:
         return <Badge variant="destructive">Error</Badge>;
       case 'imported':
         return <Badge variant="outline" className="border-success text-success">Imported</Badge>;
+      case 'updated':
+        return <Badge variant="outline" className="border-success text-success">Updated</Badge>;
+      case 'skipped':
+        return <Badge variant="secondary">Skipped</Badge>;
       default:
         return <Badge variant="secondary">Pending</Badge>;
     }
@@ -290,7 +317,7 @@ function Row({ index, row, categories, units, onChange, onRemove, onResetCode }:
       className={cn(
         'border-b hover:bg-muted/30',
         row.status === 'invalid' && 'bg-destructive/5',
-        row.status === 'imported' && 'bg-success/5 opacity-70',
+        ['imported','updated'].includes(row.status) && 'bg-success/5 opacity-70',
       )}
     >
       <td className="px-2 py-1.5 text-xs text-muted-foreground tabular-nums align-top pt-3">
@@ -303,7 +330,7 @@ function Row({ index, row, categories, units, onChange, onRemove, onResetCode }:
             onChange={(e) => onChange({ name: e.target.value })}
             placeholder="Item name"
             className="h-8 text-xs"
-            disabled={row.status === 'imported'}
+            disabled={['imported','updated'].includes(row.status)}
           />
           {row.classify_confidence !== 'none' && (
             <TooltipProvider>
@@ -331,14 +358,14 @@ function Row({ index, row, categories, units, onChange, onRemove, onResetCode }:
           value={row.description}
           onChange={(e) => onChange({ description: e.target.value })}
           className="h-8 text-xs"
-          disabled={row.status === 'imported'}
+          disabled={['imported','updated'].includes(row.status)}
         />
       </td>
       <td className="px-2 py-1.5">
         <Select
           value={row.category_id ?? undefined}
           onValueChange={(v) => onChange({ category_id: v })}
-          disabled={row.status === 'imported'}
+          disabled={['imported','updated'].includes(row.status)}
         >
           <SelectTrigger className="h-8 text-xs">
             <SelectValue placeholder="Select…" />
@@ -356,7 +383,7 @@ function Row({ index, row, categories, units, onChange, onRemove, onResetCode }:
         <Select
           value={row.unit_id ?? undefined}
           onValueChange={(v) => onChange({ unit_id: v })}
-          disabled={row.status === 'imported'}
+          disabled={['imported','updated'].includes(row.status)}
         >
           <SelectTrigger className="h-8 text-xs">
             <SelectValue placeholder="UoM" />
@@ -373,7 +400,7 @@ function Row({ index, row, categories, units, onChange, onRemove, onResetCode }:
           value={row.brand}
           onChange={(e) => onChange({ brand: e.target.value })}
           className="h-8 text-xs"
-          disabled={row.status === 'imported'}
+          disabled={['imported','updated'].includes(row.status)}
         />
       </td>
       <td className="px-2 py-1.5">
@@ -383,7 +410,7 @@ function Row({ index, row, categories, units, onChange, onRemove, onResetCode }:
             onChange={(e) => onChange({ item_code: e.target.value.toUpperCase() })}
             placeholder={row.auto_item_code || 'auto'}
             className="h-8 text-xs font-mono"
-            disabled={row.status === 'imported'}
+            disabled={['imported','updated'].includes(row.status)}
           />
           {codeIsAuto ? (
             <Badge variant="secondary" className="text-[10px] h-5 px-1.5 shrink-0">Auto</Badge>
@@ -396,7 +423,7 @@ function Row({ index, row, categories, units, onChange, onRemove, onResetCode }:
                     size="icon"
                     className="h-7 w-7 shrink-0"
                     onClick={onResetCode}
-                    disabled={!row.auto_item_code || row.status === 'imported'}
+                    disabled={!row.auto_item_code || ['imported','updated'].includes(row.status)}
                   >
                     <RotateCcw className="h-3.5 w-3.5" />
                   </Button>
@@ -423,7 +450,7 @@ function Row({ index, row, categories, units, onChange, onRemove, onResetCode }:
           size="icon"
           className="h-7 w-7"
           onClick={onRemove}
-          disabled={row.status === 'imported'}
+          disabled={['imported','updated'].includes(row.status)}
         >
           <Trash2 className="h-3.5 w-3.5" />
         </Button>

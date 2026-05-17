@@ -1,22 +1,50 @@
 ## Goal
-Let users export the item codes generated in the Bulk Create Items grid so they can paste them back into Excel or save a CSV.
+When a row's item code already exists in the catalog, let the user choose how to handle the conflict in the **Bulk create items** dialog. Today every duplicate is hard-flagged as `invalid` ("Item code already exists in the catalog"), forcing the user to delete/rename rows manually.
 
-## Change (single file)
-Edit `src/components/warehouse/bulk-item-master/BulkItemMasterDialog.tsx`:
+## New toolbar control
+Add a small **"On duplicate code"** Select to the dialog toolbar (next to *Reset*) with three options:
 
-1. Add two new toolbar buttons next to "Reset":
-   - **Copy codes** (`Copy` icon) — copies a TSV to clipboard with columns: `Item Code`, `Name`, `Category`, `UoM`. Includes every row that has a resolved code (auto or manual). Toast on success.
-   - **Download CSV** (`Download` icon) — triggers a CSV download (`item-codes-YYYYMMDD-HHmm.csv`) with the same columns, properly quoted.
+- **Fail** (default — current behavior). Row → `invalid`. Nothing inserted.
+- **Skip**. Row → new `skipped` status. Row is not submitted but stays visible with a "Skipped — code already exists" tag. Excluded from the create count.
+- **Update**. Row → `valid` (with a warning "Will update existing item"). On submit, the row PATCHes the existing catalog item by id instead of inserting.
 
-2. Helpers (inline in the file):
-   - `resolveCodeForRow(row)` → `row.item_code?.trim() || row.auto_item_code || ''`
-   - `buildExportRows()` → maps rows with a non-empty resolved code to `{ code, name, category, uom }` using `categories` / `units` lookup maps.
-   - `toCsv(rows)` with RFC 4180 quoting, UTF-8 BOM prefix for Excel compatibility.
-   - `toTsv(rows)` for clipboard.
+Policy applies to **catalog-collision** errors only. In-batch duplicates (same code typed twice in the grid) remain a hard `invalid` regardless of policy.
 
-3. Buttons disabled when no exportable codes exist. Counter shown in tooltip ("Export N codes").
+## Changes (frontend only, 3 files)
+
+### 1. `src/components/warehouse/bulk-item-master/types.ts`
+- Extend `BulkItemRowStatus` with `'skipped' | 'updated'`.
+- Add `existing_catalog_id?: string | null` to `BulkItemMasterRow` (set during `recompute` when the code matches an existing catalog row; used by submit for the update path).
+
+### 2. `src/components/warehouse/bulk-item-master/useBulkItemMaster.ts`
+- Add `duplicatePolicy: 'fail' | 'skip' | 'update'` state (default `'fail'`) and a `setDuplicatePolicy` setter; expose both on the return.
+- Replace `existingCodes: Set<string>` with `existingCodeToId: Map<string, string>` so we can resolve the target id for updates.
+- In `recompute`, when `existingCodeToId.has(lower)`:
+  - set `next.existing_catalog_id = existingCodeToId.get(lower)`;
+  - branch by `duplicatePolicy`:
+    - `fail` → push current error (unchanged).
+    - `skip` → warning + force `status = 'skipped'` (skip the valid/invalid assignment).
+    - `update` → warning "Will update existing item" + allow `status = 'valid'` to be computed from remaining errors.
+- In `submit`:
+  - Partition `valid` rows into `creates` (no `existing_catalog_id`) and `updates` (have it).
+  - Creates: existing `bulkCreateItemsAsync` path (unchanged).
+  - Updates: `Promise.all` on `updateItemAsync({ id, name, description, brand, category_id, unit_id })` — do **not** change `item_code` (it's the match key).
+  - On success mark create rows `imported` and update rows `updated`.
+  - Toast summary: `"Imported X, updated Y"` (omit zero counts).
+- `validCount` continues to count rows that will act (creates + updates). Add `skippedCount` for the toolbar chip.
+- Expose `duplicatePolicy`, `setDuplicatePolicy`, `skippedCount`.
+
+### 3. `src/hooks/useWarehouseItemCatalog.ts`
+- Add `updateItemAsync: updateMutation.mutateAsync` to the return (mirrors existing `updateItem`). Tiny additive change — no behavior shift.
+
+### 4. `src/components/warehouse/bulk-item-master/BulkItemMasterDialog.tsx`
+- Add a labeled `<Select>` ("On duplicate code: Fail / Skip / Update") in the toolbar bound to `duplicatePolicy`.
+- Status badges: add **Skipped** (secondary) and **Updated** (outline + success colour, mirroring "Imported"). Treat them as terminal/disabled rows like `imported`.
+- Submit button label: `Process N item(s)` when policy is `update` or `skip` (since "Create" is no longer accurate); keep `Create N item(s)` when policy is `fail`.
+- Toolbar chip: show `{skippedCount} skipped` when > 0.
 
 ## Out of scope
-- No changes to `useBulkItemMaster`, classifier, or DB layer.
-- No new dependency — uses `navigator.clipboard` and a Blob + anchor download.
-- Codes for rows where the user hasn't picked a category yet (no `auto_item_code`) are simply skipped.
+- No DB migration, no RPC change, no schema change.
+- Bulk PATCH endpoint is not introduced — updates run as parallel single-row PATCHes (typical N for bulk import is small, and the existing `updateMutation` already handles auth/invalidations).
+- In-batch dedupe rules are unchanged.
+- Excel-paste/classifier behavior untouched.

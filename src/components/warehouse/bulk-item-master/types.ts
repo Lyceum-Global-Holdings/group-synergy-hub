@@ -1,4 +1,13 @@
-export type BulkItemRowStatus = 'pending' | 'valid' | 'invalid' | 'imported' | 'error';
+export type BulkItemRowStatus =
+  | 'pending'
+  | 'valid'
+  | 'invalid'
+  | 'imported'
+  | 'updated'
+  | 'skipped'
+  | 'error';
+
+export type DuplicatePolicy = 'fail' | 'skip' | 'update';
 
 export interface BulkItemMasterRow {
   rowId: string;
@@ -17,6 +26,8 @@ export interface BulkItemMasterRow {
   classify_confidence: 'high' | 'low' | 'none';
   /** Suggested UNSPSC family name when no tenant category matched. */
   suggested_family: string | null;
+  /** Existing catalog row id when the current code matches a catalog item. */
+  existing_catalog_id: string | null;
   status: BulkItemRowStatus;
   errors: string[];
   warnings: string[];
