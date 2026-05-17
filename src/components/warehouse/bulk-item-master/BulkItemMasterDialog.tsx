@@ -373,22 +373,12 @@ function Row({ index, row, categories, units, onChange, onRemove, onResetCode }:
         />
       </td>
       <td className="px-2 py-1.5">
-        <Select
-          value={row.category_id ?? undefined}
-          onValueChange={(v) => onChange({ category_id: v })}
+        <CategoryCombobox
+          categories={categories}
+          value={row.category_id}
+          onChange={(v) => onChange({ category_id: v })}
           disabled={['imported','updated'].includes(row.status)}
-        >
-          <SelectTrigger className="h-8 text-xs">
-            <SelectValue placeholder="Select…" />
-          </SelectTrigger>
-          <SelectContent className="max-h-[300px]">
-            {categories.map((c) => (
-              <SelectItem key={c.id} value={c.id}>
-                {c.name}{c.code ? ` (${c.code})` : ''}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        />
       </td>
       <td className="px-2 py-1.5">
         <Select
