@@ -243,10 +243,20 @@ export function useBulkItemMaster(): UseBulkItemMasterReturn {
           if (r.rowId !== rowId) return r;
           const merged: BulkItemMasterRow = { ...r, ...patch };
           if ('item_code' in patch && patch.code_manual === undefined) {
+            // Normalize manual codes to the canonical XXX-XXX-XXX-NNNN
+            // shape: if the user typed something that matches the trailing
+            // three segments (cat-sub-seq) without the leading prefix,
+            // prepend "INV-" automatically.
+            const raw = merged.item_code.trim().toUpperCase();
+            if (/^[A-Z0-9]{2,4}-[A-Z0-9]{2,4}-\d{3,5}$/.test(raw)) {
+              merged.item_code = `INV-${raw}`;
+            } else {
+              merged.item_code = raw;
+            }
             const isAutoMatch =
               !!merged.auto_item_code &&
               merged.item_code.toUpperCase() === merged.auto_item_code.toUpperCase();
-            merged.code_manual = !isAutoMatch && merged.item_code.trim().length > 0;
+            merged.code_manual = !isAutoMatch && merged.item_code.length > 0;
           }
           return merged;
         });
