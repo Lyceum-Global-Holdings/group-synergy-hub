@@ -317,7 +317,7 @@ function Row({ index, row, categories, units, onChange, onRemove, onResetCode }:
       className={cn(
         'border-b hover:bg-muted/30',
         row.status === 'invalid' && 'bg-destructive/5',
-        row.status === 'imported' && 'bg-success/5 opacity-70',
+        ['imported','updated'].includes(row.status) && 'bg-success/5 opacity-70',
       )}
     >
       <td className="px-2 py-1.5 text-xs text-muted-foreground tabular-nums align-top pt-3">
@@ -330,7 +330,7 @@ function Row({ index, row, categories, units, onChange, onRemove, onResetCode }:
             onChange={(e) => onChange({ name: e.target.value })}
             placeholder="Item name"
             className="h-8 text-xs"
-            disabled={row.status === 'imported'}
+            disabled={['imported','updated'].includes(row.status)}
           />
           {row.classify_confidence !== 'none' && (
             <TooltipProvider>
@@ -358,14 +358,14 @@ function Row({ index, row, categories, units, onChange, onRemove, onResetCode }:
           value={row.description}
           onChange={(e) => onChange({ description: e.target.value })}
           className="h-8 text-xs"
-          disabled={row.status === 'imported'}
+          disabled={['imported','updated'].includes(row.status)}
         />
       </td>
       <td className="px-2 py-1.5">
         <Select
           value={row.category_id ?? undefined}
           onValueChange={(v) => onChange({ category_id: v })}
-          disabled={row.status === 'imported'}
+          disabled={['imported','updated'].includes(row.status)}
         >
           <SelectTrigger className="h-8 text-xs">
             <SelectValue placeholder="Select…" />
@@ -383,7 +383,7 @@ function Row({ index, row, categories, units, onChange, onRemove, onResetCode }:
         <Select
           value={row.unit_id ?? undefined}
           onValueChange={(v) => onChange({ unit_id: v })}
-          disabled={row.status === 'imported'}
+          disabled={['imported','updated'].includes(row.status)}
         >
           <SelectTrigger className="h-8 text-xs">
             <SelectValue placeholder="UoM" />
@@ -400,7 +400,7 @@ function Row({ index, row, categories, units, onChange, onRemove, onResetCode }:
           value={row.brand}
           onChange={(e) => onChange({ brand: e.target.value })}
           className="h-8 text-xs"
-          disabled={row.status === 'imported'}
+          disabled={['imported','updated'].includes(row.status)}
         />
       </td>
       <td className="px-2 py-1.5">
@@ -410,7 +410,7 @@ function Row({ index, row, categories, units, onChange, onRemove, onResetCode }:
             onChange={(e) => onChange({ item_code: e.target.value.toUpperCase() })}
             placeholder={row.auto_item_code || 'auto'}
             className="h-8 text-xs font-mono"
-            disabled={row.status === 'imported'}
+            disabled={['imported','updated'].includes(row.status)}
           />
           {codeIsAuto ? (
             <Badge variant="secondary" className="text-[10px] h-5 px-1.5 shrink-0">Auto</Badge>
@@ -423,7 +423,7 @@ function Row({ index, row, categories, units, onChange, onRemove, onResetCode }:
                     size="icon"
                     className="h-7 w-7 shrink-0"
                     onClick={onResetCode}
-                    disabled={!row.auto_item_code || row.status === 'imported'}
+                    disabled={!row.auto_item_code || ['imported','updated'].includes(row.status)}
                   >
                     <RotateCcw className="h-3.5 w-3.5" />
                   </Button>
@@ -450,7 +450,7 @@ function Row({ index, row, categories, units, onChange, onRemove, onResetCode }:
           size="icon"
           className="h-7 w-7"
           onClick={onRemove}
-          disabled={row.status === 'imported'}
+          disabled={['imported','updated'].includes(row.status)}
         >
           <Trash2 className="h-3.5 w-3.5" />
         </Button>
