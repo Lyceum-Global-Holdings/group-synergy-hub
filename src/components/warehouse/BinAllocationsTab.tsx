@@ -363,6 +363,12 @@ export function BinAllocationsTab() {
         onOpenChange={(o) => !o && setQrAllocation(null)}
       />
 
+      <MoveBinAllocationDialog
+        allocation={moveAllocation}
+        open={!!moveAllocation}
+        onOpenChange={(o) => !o && setMoveAllocation(null)}
+      />
+
       <AlertDialog open={!!allocationToDelete} onOpenChange={() => setAllocationToDelete(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
