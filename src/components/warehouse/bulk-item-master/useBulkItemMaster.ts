@@ -181,7 +181,7 @@ export function useBulkItemMaster(): UseBulkItemMasterReturn {
         if (!next.unit_id) next.errors.push('UoM is required');
 
         if (!next.item_code) {
-          if (next.category_id && !catCode) {
+          if (next.category_id && !codes) {
             next.errors.push(
               `Category "${cat?.name ?? ''}" has no 3-letter code — cannot generate item code`,
             );
