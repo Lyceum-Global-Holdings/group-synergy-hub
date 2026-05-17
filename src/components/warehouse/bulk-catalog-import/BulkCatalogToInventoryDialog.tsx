@@ -248,14 +248,14 @@ interface RowProps {
   row: BulkCatalogRow;
   companies: any[];
   locations: any[];
-  bins: any[];
   defaultLocationId: string | null;
   onChange: (patch: Partial<BulkCatalogRow>) => void;
   onRemove: () => void;
 }
 
-function Row({ index, row, companies, locations, bins, defaultLocationId, onChange, onRemove }: RowProps) {
+function Row({ index, row, companies, locations, defaultLocationId, onChange, onRemove }: RowProps) {
   const companyId = row.company_id;
+  const { data: bins = [], isLoading: binsLoading } = useBinsAtLocation(row.location_id);
 
   const statusBadge = () => {
     switch (row.status) {
