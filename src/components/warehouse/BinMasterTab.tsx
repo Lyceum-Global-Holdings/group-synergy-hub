@@ -128,13 +128,13 @@ export function BinMasterTab() {
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={isAdminOrHigher ? 8 : 7} className="text-center py-8">
+                <TableCell colSpan={isAdminOrHigher ? 9 : 8} className="text-center py-8">
                   Loading bins...
                 </TableCell>
               </TableRow>
             ) : filteredBins.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={isAdminOrHigher ? 8 : 7} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={isAdminOrHigher ? 9 : 8} className="text-center py-8 text-muted-foreground">
                   No bins found. Create your first bin to get started.
                 </TableCell>
               </TableRow>
