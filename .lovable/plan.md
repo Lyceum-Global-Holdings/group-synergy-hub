@@ -1,34 +1,32 @@
-# Revert LNPE to standalone main warehouse
+## Plan: Fix Bulk add from Catalog location/bin posting
 
-The earlier migration re-parented `LNPE` (`a7d67f4c…`) under "Lyceum Nugegoda Quarters" and switched its operator to NCG. You've decided LNPE must stay a top-level main warehouse, not a sub-location of LNQ.
+### Problem to fix
+Bulk add from Catalog currently sends `location_id` and `bin_id`, but the backend only creates/updates the inventory item and inserts a stock transaction. It does not explicitly create/increment the matching `warehouse_bin_allocations` row for the selected exact physical node, so stock can appear under the item/default location or fail to show in the selected bin.
 
-## Change
+### Changes
+1. **Backend RPC: `bulk_provision_inventory_from_catalog`**
+   - Update the RPC to treat the selected bin as the source of truth for physical placement.
+   - Validate that:
+     - company is accessible,
+     - location exists,
+     - bin exists,
+     - if a bin is selected, its exact `warehouse_bins.location_id` matches the selected location/sub-location.
+   - Provision/find the per-company inventory row via `upsert_warehouse_inventory`.
+   - For opening stock rows, explicitly upsert `warehouse_bin_allocations` on:
+     - `warehouse_item_id`,
+     - `bin_id`,
+     - `company_id`,
+     - `location_id`.
+   - Increment `allocated_quantity` when the same item/bin/location already exists instead of creating duplicates.
+   - Then insert the stock transaction for audit/ledger with the same `location_id` and `bin_id`.
 
-One data migration on `warehouse_locations` row `a7d67f4c…` (LNPE):
+2. **Frontend row picker: exact location/sub-location and bin safety**
+   - Use the existing hierarchy label helper so the Location dropdown clearly shows parent → sub-location paths.
+   - Keep the Bin dropdown filtered to bins attached to the selected exact location/sub-location only.
+   - Add client-side validation that rejects any stale row where `bin_id` no longer belongs to the selected `location_id` before calling the RPC.
 
-- `parent_id` → `NULL` (top-level)
-- `company_id` → `11a46626-34c8-4ea8-8cc1-df0ec439fd48` (Lyceum Nugegoda — original owner)
-- `type` → `'warehouse'`
-- `is_standalone_warehouse` → `true`
+3. **Cache refresh after import**
+   - After successful import, invalidate inventory and bin allocation queries so the selected location/sub-location and bin reflect the new stock immediately.
 
-## What stays as-is
-
-- LNPE bin (`dfce7a5b…`) keeps `is_shared = true`.
-- The 143 LNQ-owned allocations and 286 NCG-owned allocations in that bin are untouched — the multi-owner shared-bin pattern continues to handle cross-company visibility.
-- No stock movements, no FIFO/batch relinking, no code changes.
-
-## SQL
-
-```sql
-UPDATE public.warehouse_locations
-   SET parent_id               = NULL,
-       company_id              = '11a46626-34c8-4ea8-8cc1-df0ec439fd48',
-       type                    = 'warehouse',
-       is_standalone_warehouse = true,
-       updated_at              = now()
- WHERE id = 'a7d67f4c-7b06-4ce1-904c-a6097c0641a1';
-```
-
-## Result
-
-LNPE shows again as its own main warehouse under Lyceum Nugegoda company in the location tree; NCG continues to see its 286 owned allocations through the shared-bin mechanism.
+### Expected result
+When a row is imported with `Location/Sub-location = X` and `Bin = Y`, stock is added to `warehouse_bin_allocations` for exactly `(item, company, X, Y)`, inventory filtering by that location/sub-location shows the item, and the selected bin shows the added quantity.

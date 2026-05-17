@@ -163,16 +163,8 @@ export function BinAllocationsTab() {
       },
     },
     {
-      id: 'bin_code',
+      accessorKey: 'warehouse_bin.bin_code',
       header: 'Bin Code',
-      cell: ({ row }) => (
-        <div className="flex items-center gap-2">
-          <span>{row.original.warehouse_bin?.bin_code}</span>
-          {row.original.warehouse_bin?.is_shared && (
-            <Badge variant="secondary" className="text-xs">Shared</Badge>
-          )}
-        </div>
-      ),
     },
     {
       accessorKey: 'warehouse_bin.name',
