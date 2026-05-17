@@ -75,9 +75,6 @@ export function BulkCatalogToInventoryDialog({ open, onOpenChange }: Props) {
     };
   }, [locations]);
 
-  const binsByLocation = useMemo(() => {
-    return (locationId: string | null) => bins.filter((b) => b.location_id === locationId);
-  }, [bins]);
 
   const defaultCompanyName = companies.find((c) => c.id === defaultCompanyId)?.name ?? '—';
   const defaultLocationName = locations.find((l) => l.id === defaultLocationId)?.name ?? 'All locations';
