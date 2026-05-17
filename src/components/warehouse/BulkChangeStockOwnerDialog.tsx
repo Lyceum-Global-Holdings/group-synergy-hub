@@ -3,11 +3,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
-import { Loader2, AlertTriangle } from 'lucide-react';
+import { Loader2, AlertTriangle, MapPin } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useCompany } from '@/contexts/CompanyContext';
 import { useQueryClient } from '@tanstack/react-query';
 import { useLocationFilter } from '@/contexts/LocationFilterContext';
+import { useWarehouseLocations } from '@/hooks/useWarehouseLocations';
 import { toast } from 'sonner';
 
 interface Props {
@@ -28,12 +29,10 @@ export function BulkChangeStockOwnerDialog({
   const qc = useQueryClient();
   const { companies } = useCompany();
   const { globalLocationId } = useLocationFilter();
+  const { locations } = useWarehouseLocations();
 
   const [fromCompany, setFromCompany] = useState<string>(defaultFromCompanyId ?? '');
   const [toCompany, setToCompany] = useState<string>('');
-  const [scope, setScope] = useState<'current_location' | 'all_locations'>(
-    globalLocationId ? 'current_location' : 'all_locations'
-  );
   const [busy, setBusy] = useState(false);
 
   const toOptions = useMemo(
@@ -41,7 +40,36 @@ export function BulkChangeStockOwnerDialog({
     [companies, fromCompany]
   );
 
+  // Compute selected location + all descendants (sub-locations / departments).
+  const { scopeIds, scopeLabel, descendantCount } = useMemo(() => {
+    if (!globalLocationId) return { scopeIds: [] as string[], scopeLabel: '', descendantCount: 0 };
+    const childrenOf = new Map<string, string[]>();
+    for (const l of locations) {
+      const p = l.parent_id ?? null;
+      if (!p) continue;
+      if (!childrenOf.has(p)) childrenOf.set(p, []);
+      childrenOf.get(p)!.push(l.id);
+    }
+    const ids = new Set<string>([globalLocationId]);
+    const queue = [globalLocationId];
+    while (queue.length) {
+      const cur = queue.shift()!;
+      for (const child of childrenOf.get(cur) ?? []) {
+        if (!ids.has(child)) { ids.add(child); queue.push(child); }
+      }
+    }
+    const root = locations.find((l) => l.id === globalLocationId);
+    const label = root ? (root.location_code ? `${root.name} (${root.location_code})` : root.name) : '';
+    return { scopeIds: Array.from(ids), scopeLabel: label, descendantCount: ids.size - 1 };
+  }, [globalLocationId, locations]);
+
+  const canSubmit = !!globalLocationId && !!fromCompany && !!toCompany && fromCompany !== toCompany && selectedIds.size > 0;
+
   const handleSubmit = async () => {
+    if (!globalLocationId) {
+      toast.error('Select a location in the header first');
+      return;
+    }
     if (!fromCompany || !toCompany) {
       toast.error('Select both source and target Stock Owner');
       return;
@@ -60,8 +88,7 @@ export function BulkChangeStockOwnerDialog({
       _item_ids: Array.from(selectedIds),
       _from_company: fromCompany,
       _to_company: toCompany,
-      _location_ids:
-        scope === 'current_location' && globalLocationId ? [globalLocationId] : null,
+      _location_ids: scopeIds,
     } as any);
     setBusy(false);
 
@@ -77,7 +104,7 @@ export function BulkChangeStockOwnerDialog({
     const total = Number(row?.total_quantity ?? 0);
 
     if (moved + merged === 0) {
-      toast.warning('No allocations matched the source Stock Owner / scope');
+      toast.warning('No allocations matched the source Stock Owner in this location');
     } else {
       toast.success(
         `Transferred ${total} units across ${moved + merged} allocation row(s)` +
@@ -99,13 +126,31 @@ export function BulkChangeStockOwnerDialog({
         <DialogHeader>
           <DialogTitle>Change Stock Owner — {selectedIds.size} item(s)</DialogTitle>
           <DialogDescription>
-            Reassigns ownership of physical stock (SAP EWM "Stock Owner") between companies. Bin
-            and location stay the same; quantities are merged if the target owner already holds
-            stock for the same item in the same bin.
+            Reassigns ownership of physical stock (SAP EWM "Stock Owner") between companies within
+            the currently selected location. Bin and location stay the same; quantities are merged
+            if the target owner already holds stock for the same item in the same bin.
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 py-2">
+          {!globalLocationId ? (
+            <div className="flex gap-2 text-sm text-destructive bg-destructive/10 border border-destructive/30 rounded p-3">
+              <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+              <span>
+                Select a location in the header to change Stock Owner. System-wide changes are not
+                allowed here.
+              </span>
+            </div>
+          ) : (
+            <div className="flex gap-2 text-xs text-muted-foreground bg-muted/50 rounded p-2">
+              <MapPin className="h-4 w-4 mt-0.5 shrink-0" />
+              <span>
+                Scope: <strong className="text-foreground">{scopeLabel}</strong>
+                {descendantCount > 0 ? ` (+${descendantCount} sub-location${descendantCount === 1 ? '' : 's'})` : ''}
+              </span>
+            </div>
+          )}
+
           <div className="space-y-1.5">
             <Label>From (current owner)</Label>
             <Select value={fromCompany} onValueChange={setFromCompany}>
@@ -130,31 +175,18 @@ export function BulkChangeStockOwnerDialog({
             </Select>
           </div>
 
-          <div className="space-y-1.5">
-            <Label>Location scope</Label>
-            <Select value={scope} onValueChange={(v) => setScope(v as typeof scope)}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="current_location" disabled={!globalLocationId}>
-                  Current location only{!globalLocationId ? ' (no location selected)' : ''}
-                </SelectItem>
-                <SelectItem value="all_locations">All locations</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
           <div className="flex gap-2 text-xs text-muted-foreground bg-muted/50 rounded p-2">
             <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
             <span>
-              Only allocations belonging to the source owner are moved. This action is restricted
-              to administrators and cannot be undone in bulk.
+              Only allocations belonging to the source owner inside this location scope are moved.
+              This action is restricted to administrators and cannot be undone in bulk.
             </span>
           </div>
         </div>
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>Cancel</Button>
-          <Button onClick={handleSubmit} disabled={busy || !fromCompany || !toCompany}>
+          <Button onClick={handleSubmit} disabled={busy || !canSubmit}>
             {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Transfer ownership
           </Button>

@@ -1,80 +1,29 @@
-# Stock Owner column & filter — Inventory + Bulk Update
+## Goal
 
-## Why this is the right model
+Scope the **Bulk Change Stock Owner** action to the currently selected location (and its sub-locations / departments) only. Never allow a system-wide ownership change from this dialog.
 
-International WMS standards (SAP EWM, Oracle WMS, ISO 19440 "Party of ownership") separate two concepts:
+## Behavior
 
-- **Item Master Company** — who maintains the catalog row (already shown as "Company").
-- **Stock Owner** — the legal entity that owns the *physical units* sitting in a bin at a location. In our schema this is `warehouse_bin_allocations.company_id`, and our shared-bin model (`mem://architecture/multi-owner-shared-bins`) already allows one bin/location to hold stock for multiple owners.
+- The dialog always operates within the location selected in the global header (`globalLocationId`).
+- If the selected location is a parent (warehouse), the change covers the parent + all descendants (sub-locations and departments).
+- If the selected location is a leaf (sub-location / department), only that node is affected.
+- If **no** global location is selected, the "Transfer ownership" button is disabled and an inline warning explains: *"Select a location in the header to change Stock Owner. System-wide changes are not allowed here."*
 
-We will surface Stock Owner as a **dedicated, never-merged column** plus a **filter**, on both the Inventory list and the Bulk Update dialog. No writes change — it is read/filter only.
+## Changes
 
-## UX
+### `src/components/warehouse/BulkChangeStockOwnerDialog.tsx`
+- Remove the `scope` Select and the `all_locations` path entirely.
+- Load warehouse locations via `useWarehouseLocations`. Compute `effectiveLocationIds = [globalLocationId, ...descendants(globalLocationId)]` (BFS over `parent_id`).
+- Always call `bulk_change_stock_owner` with `_location_ids: effectiveLocationIds`.
+- Replace the scope row with a read-only summary chip: *"Scope: {breadcrumb of selected location} (+N sub-locations)"*.
+- Disable submit + show warning banner when `!globalLocationId`.
 
-Inventory toolbar gets a new "Stock Owner" Select next to Category/Status/Supplier:
+### No database changes
+The existing `bulk_change_stock_owner(_location_ids uuid[])` already filters `warehouse_bin_allocations.location_id = ANY(_location_ids)`. Passing the descendant set is sufficient.
 
-```text
-[ Search… ] [ Category v ] [ Stock Owner v ] [ Status v ] [ Supplier v ] [ Stock v ]
-```
-
-New column "Stock Owner" (toggleable, default on) renders one badge per distinct owner found in the row's allocations at the current location scope. Example cell content for a shared bin:
-
-```text
-Stock Owner: [Lyceum FC]  [NCG Trading]
-```
-
-When the Stock Owner filter is set, only allocations of that owner contribute to `current_stock`, the bins list and the badge column — so the row's totals and bin pills reflect a single owner's holdings at the selected location.
-
-Bulk Update dialog gets the same Stock Owner Select at the top, plus a short note: "Filter limits which selected rows are updated to those holding stock for this owner at the current location."
-
-## Technical changes
-
-### 1. Database — `list_warehouse_inventory` RPC (new migration)
-
-- Add parameter `_owner_company_id uuid DEFAULT NULL`.
-- In `candidates` CTE (scope path): add `AND (_owner_company_id IS NULL OR a.company_id = _owner_company_id)`.
-- In `page_bins` CTE: add the same predicate so bins/quantities reflect the owner filter.
-- Add two output columns:
-  - `owner_company_ids uuid[]`
-  - `owner_company_names text[]`
-  Computed via a small extra CTE that groups distinct `(a.company_id, companies.name)` per item over the same location/owner scope, ordered by name.
-- Keep partial index `(location_id, company_id) WHERE allocated_quantity > 0` (already added).
-- Drop & recreate function (Postgres signature change).
-
-### 2. Frontend hook — `src/hooks/useWarehouseItemsLazyInventory.ts`
-
-- Add `ownerCompanyId?: string | null` option.
-- Include in `queryKey`.
-- Pass `_owner_company_id: ownerCompanyId ?? null` into the RPC call.
-
-### 3. Inventory page — `src/components/warehouse/ItemMasterTab.tsx`
-
-- Extend `INV_COLUMN_DEFS` with `{ key: 'stock_owner', label: 'Stock Owner', fixed: false }`.
-- Add `const [ownerCompanyFilter, setOwnerCompanyFilter] = useState('all')`.
-- Render a new "Stock Owner" `Select` in the filter row, options = `companies` plus "All owners".
-- Forward `ownerCompanyId: ownerCompanyFilter === 'all' ? null : ownerCompanyFilter` to `useWarehouseItemsLazyInventory`.
-- New `<TableHead>` + `<TableCell>` rendering badges from `item.owner_company_names`; show "—" when empty.
-- Export (Excel) writer: include a "Stock Owner" column joining names with `, `.
-
-### 4. Bulk update — `src/components/warehouse/BulkInventoryUpdateDialog.tsx`
-
-- New prop `defaultOwnerCompanyId?: string | null` passed from `ItemMasterTab` (the currently applied filter).
-- Add `ownerCompanyId` state + Select (same options as the list).
-- Before processing, re-query `warehouse_bin_allocations` for `selectedIds` filtered by `company_id = ownerCompanyId` (when set) to derive the effective `warehouse_item_id` list to update; rows with no allocation for that owner are skipped with a toast count ("Skipped N items with no stock for selected owner").
-- Update message: "Updated X items for owner Y, skipped Z."
-
-### 5. Types
-
-- `src/integrations/supabase/types.ts` is auto-regenerated by the migration tool — no manual edit.
-- Update `InventoryPageRow` in `src/hooks/useWarehouseInventoryPage.ts` to include `owner_company_ids: string[] | null` and `owner_company_names: string[] | null`.
-- Mirror the same fields where `useWarehouseItemsLazyInventory` maps rows to `WarehouseItem` (extend `WarehouseItem` in `src/types/itemBin.ts` with the two optional arrays).
-
-### 6. Memory
-
-After build, add a short memory: `mem://architecture/stock-owner-vs-item-company` — "Stock Owner = warehouse_bin_allocations.company_id (SAP EWM party of ownership); Item Master Company = warehouse_items.company_id. Surface both as distinct columns, never merge."
+### No other UI changes
+Inventory tab, filters, types, and other dialogs are untouched.
 
 ## Out of scope
-
-- No write path / transfer of ownership in this change.
-- No changes to RLS — `can_access_company` already gates allocation visibility.
-- Reports/Valuation screens are unchanged in this pass (can adopt the same filter later).
+- No change to the Stock Owner *filter* (read-only) or Bulk Update dialog.
+- No RPC / migration changes.
